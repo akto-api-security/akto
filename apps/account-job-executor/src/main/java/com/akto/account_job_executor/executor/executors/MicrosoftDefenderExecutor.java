@@ -737,6 +737,24 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
                     // Assets > Skills tab — that tab reads ApiCollection.skills[]).
                     skillsByCollection.computeIfAbsent(syntheticHost, k -> new HashSet<>()).add(skillName);
                     agentByCollection.put(syntheticHost, agent);
+
+                    // Fire cyborg's LLM-based skill validation. This calls /api/validateAndReportSkill
+                    // which prompts an LLM with the skill content, populates ComponentRiskAnalysis
+                    // (Evidence/IsComponentMalicious) on mcp_audit_info, and reports a threat event
+                    // when malicious. Run in background so it doesn't slow per-device ingestion.
+                    final String fSkillName = skillName;
+                    final String fSkillDescription = meta.description;
+                    final String fSkillContent = meta.content.isEmpty() ? rawContent : meta.content;
+                    final String fAgent = agent;
+                    final String fPath = path;
+                    final String fCollectionName = syntheticHost;
+                    new Thread(() -> {
+                        try {
+                            validateAndReportSkill(fSkillName, fSkillDescription, fSkillContent, fAgent, fPath, fCollectionName);
+                        } catch (Exception ex) {
+                            logger.error("Failed to validate skill {}: {}", fSkillName, ex.getMessage());
+                        }
+                    }, "skill-validator-" + skillName).start();
                 } catch (Exception e) {
                     logger.error("Failed to serialize skill discovery: {}", e.getMessage());
                 }
@@ -760,6 +778,71 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
             Set<String> skills = e.getValue();
             String agent = agentByCollection.get(collectionHost);
             createAgentSkillCollection(collectionHost, agent, skills, normalizedUrl);
+        }
+    }
+
+    /**
+     * Calls cyborg's /api/validateAndReportSkill which runs an LLM-based skill malicious-pattern
+     * check (pipe-to-interpreter, credential exfiltration, prompt injection), updates the
+     * mcp_audit_info collection with ComponentRiskAnalysis, and reports a threat event when
+     * flagged. The endpoint is implemented in akto-cyborg:
+     *   apps/database-abstractor/src/main/java/com/akto/action/SkillValidationAction.java
+     */
+    private void validateAndReportSkill(String skillName, String skillDescription, String skillContent,
+            String agentName, String filePath, String collectionName) {
+        String dbAbstractorEnv = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+        if (dbAbstractorEnv == null || dbAbstractorEnv.isEmpty()) {
+            logger.error("DATABASE_ABSTRACTOR_SERVICE_URL not set — skipping skill validation for {}", skillName);
+            return;
+        }
+        String url = (dbAbstractorEnv.endsWith("/") ? dbAbstractorEnv.substring(0, dbAbstractorEnv.length() - 1) : dbAbstractorEnv)
+                + "/api/validateAndReportSkill";
+
+        Map<String, Object> req = new HashMap<>();
+        req.put("skillName", skillName);
+        req.put("skillDescription", skillDescription == null ? "" : skillDescription);
+        req.put("skillContent", skillContent == null ? "" : skillContent);
+        req.put("agentName", agentName == null ? "" : agentName);
+        req.put("filePath", filePath == null ? "" : filePath);
+        req.put("collectionName", collectionName == null ? "" : collectionName);
+        req.put("contextSource", "AGENTIC");
+        req.put("source", "MICROSOFT_DEFENDER");
+        req.put("reportThreat", true);
+
+        RequestConfig cfg = RequestConfig.custom()
+            .setConnectTimeout(CONNECT_TIMEOUT_MS)
+            .setSocketTimeout(SOCKET_TIMEOUT_MS)
+            .build();
+
+        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+            HttpPost post = new HttpPost(url);
+            post.setHeader("Content-Type", "application/json");
+            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+            if (token != null && !token.isEmpty()) {
+                // Cyborg auth filter expects raw JWT in Authorization header (no "Bearer " prefix)
+                post.setHeader("Authorization", token);
+            }
+            post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(req), ContentType.APPLICATION_JSON));
+
+            try (CloseableHttpResponse resp = client.execute(post)) {
+                int status = resp.getStatusLine().getStatusCode();
+                String body = EntityUtils.toString(resp.getEntity());
+                if (status == 200) {
+                    JsonNode result = OBJECT_MAPPER.readTree(body);
+                    boolean isMalicious = result.path("isMalicious").asBoolean(false);
+                    double maliciousScore = result.path("maliciousMatchScore").asDouble(0.0);
+                    String reason = result.path("reason").asText("");
+                    if (isMalicious) {
+                        logger.warn("Skill {} flagged as malicious (score={}, reason={})", skillName, maliciousScore, reason);
+                    } else {
+                        logger.info("Skill {} validated as safe (score={})", skillName, maliciousScore);
+                    }
+                } else {
+                    logger.error("Skill validation API returned HTTP {} for {}: {}", status, skillName, body);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Failed to call validateAndReportSkill for {}: {}", skillName, e.getMessage());
         }
     }
 
