@@ -64,6 +64,7 @@ const initialState = {
     collectionsRegistryStatusMap: {},// Keep in memory (not persisted)
     tagCollectionsMap: {},// Keep in memory (not persisted)
     hostNameMap: {}, // Keep in memory (not persisted)
+    skillRiskScoreCache: { data: {}, ts: 0 }, // skillName -> maxRiskScore, in-memory only
     lastFetchedInfo: { lastRiskScoreInfo: 0, lastSensitiveInfo: 0 },
     lastFetchedResp: { criticalUrls: 0, riskScoreMap: {} },
     lastFetchedSeverityResp: {},
@@ -157,6 +158,13 @@ let persistStore = (set, get) => ({
             set({ hostNameMap });
         } catch (error) {
             console.error("Error setting hostNameMap:", error);
+        }
+    },
+    setSkillRiskScoreCache: (skillRiskScoreCache) => {
+        try {
+            set({ skillRiskScoreCache });
+        } catch (error) {
+            console.error("Error setting skillRiskScoreCache:", error);
         }
     },
     setLastFetchedInfo: (lastFetchedInfo) => {
