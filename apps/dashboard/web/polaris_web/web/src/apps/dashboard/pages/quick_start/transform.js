@@ -1017,6 +1017,18 @@ const cursorHookObj = {
     component: <CursorHook/>
 }
 
+const ampHookObj = {
+    icon: '/public/ampcode.svg',
+    label: "Amp Code Hooks",
+    text: "Import your Amp proxy traffic, seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents',
+    key: "AMP_HOOK",
+    component: <BannerComponent
+        content="Import your Amp proxy traffic, seamlessly into AKTO."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents'
+    />
+}
+
 const n8nImportObj = {
     icon: '/public/n8n.svg',
     label: "N8N",
@@ -2028,7 +2040,7 @@ const quickStartFunc = {
 
         // Endpoint Agents
         const endpointAgents = [
-            cursorHookObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, neovimHookObj, openCodeHookObj, hermesHookObj,intellijHookObj, antigravityObj,
+            cursorHookObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, neovimHookObj, openCodeHookObj, ampHookObj, hermesHookObj,intellijHookObj, antigravityObj,
         ]
 
         const localHostedModels = [
