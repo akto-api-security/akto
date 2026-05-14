@@ -1,11 +1,14 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.testing.config.TestSuites;
+import com.akto.util.enums.GlobalEnums;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class DefaultTestSuites extends TestSuites {
     public static final String SUITE_TYPE = "suiteType";
@@ -18,7 +21,6 @@ public class DefaultTestSuites extends TestSuites {
         testSuitesPerType.put(DefaultSuitesType.SEVERITY.name(), 4);
         testSuitesPerType.put(DefaultSuitesType.DURATION.name(), 2);
         testSuitesPerType.put(DefaultSuitesType.MCP_SECURITY.name(), 8);
-        testSuitesPerType.put(DefaultSuitesType.AI_AGENT_SECURITY.name(), 16);
     }
 
     public DefaultTestSuites() {}
@@ -35,6 +37,12 @@ public class DefaultTestSuites extends TestSuites {
         DURATION,
         MCP_SECURITY,
         AI_AGENT_SECURITY
+    }
+
+    private static final String OWASP_AGENTIC_SINGLE_SHOT_SUITE_SUFFIX = " (single shot)";
+
+    private static String owaspAgenticSingleShotSuiteName(GlobalEnums.TestCategory tc) {
+        return tc.getDisplayName() + OWASP_AGENTIC_SINGLE_SHOT_SUITE_SUFFIX;
     }
 
     public static final Map<String, List<String>> owaspTop10List = new HashMap<>();
@@ -81,6 +89,31 @@ public class DefaultTestSuites extends TestSuites {
         aiAgentSecurityList.put("Agent Security - Agent Exploitation", Arrays.asList("AGENTIC_SECURITY_AGENT_EXPLOITATION"));
         aiAgentSecurityList.put("Agent Security - Infrastructure", Arrays.asList("AGENTIC_SECURITY_INFRASTRUCTURE"));
         aiAgentSecurityList.put("Agent Security - Data Exposure & Code Execution", Arrays.asList("AGENTIC_SECURITY_DATA_EXPOSURE", "AGENTIC_SECURITY_CODE_EXECUTION"));
+    }
+
+    /**
+     * Extra {@link DefaultSuitesType#AI_AGENT_SECURITY} suites: one per OWASP Agentic Top 10 bucket,
+     * single-shot YAML probes only (see {@link com.akto.dao.testing.DefaultTestSuitesDao}).
+     */
+    public static final Map<String, List<String>> owaspAgenticSingleShotSuiteList = new HashMap<>();
+    static {
+        for (GlobalEnums.TestCategory tc : GlobalEnums.TestCategory.OWASP_AGENTIC_TOP10_PROBE_CATEGORIES) {
+            owaspAgenticSingleShotSuiteList.put(owaspAgenticSingleShotSuiteName(tc), Arrays.asList(tc.getName()));
+        }
+    }
+
+    static {
+        testSuitesPerType.put(
+                DefaultSuitesType.AI_AGENT_SECURITY.name(),
+                aiAgentSecurityList.size() + owaspAgenticSingleShotSuiteList.size());
+    }
+
+    public static Set<String> owaspAgenticSingleShotCategoryNames() {
+        Set<String> names = new HashSet<>();
+        for (GlobalEnums.TestCategory tc : GlobalEnums.TestCategory.OWASP_AGENTIC_TOP10_PROBE_CATEGORIES) {
+            names.add(tc.getName());
+        }
+        return names;
     }
 
     public DefaultSuitesType getSuiteType() {
