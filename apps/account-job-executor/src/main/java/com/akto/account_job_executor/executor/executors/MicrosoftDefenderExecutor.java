@@ -167,7 +167,9 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         String deviceName = getStringOrDefault(row, "DeviceName", "unknown-device");
         String softwareName = getStringOrDefault(row, "SoftwareName", "unknown");
         String slug = toolSlug(softwareName);
-        String host = deviceName + "." + slug + ".defender.microsoft.com";
+        // Host format matches mcp-endpoint-shield's GenerateIngestDataV2 (deviceLabel.ai-agent.agentName)
+        // so Defender-discovered AI agents land in the same collection as gateway-discovered ones.
+        String host = deviceName + ".ai-agent." + slug;
 
         record.put("path", "/defender/software-inventory/" + softwareName + "/" + deviceName);
         record.put("method", "GET");
@@ -243,7 +245,8 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         // ProcessCommandLine can contain incidental matches (e.g. tasklist patterns), so it's the
         // weakest signal and only used as a last resort.
         String tool = detectToolFirst(initiatingFileName, initiatingCmdLine, fileName, folderPath, processCommandLine);
-        String host = deviceName + "." + tool + ".defender.microsoft.com";
+        // Host: deviceLabel.ai-agent.toolName — matches mcp-endpoint-shield convention
+        String host = deviceName + ".ai-agent." + tool;
 
         record.put("path", "/defender/process-events/" + tool + "/" + deviceName);
         record.put("method", "GET");
@@ -541,7 +544,6 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
                 if (configPath.isEmpty()) continue;
 
                 String clientSlug = clientTypeSlug(client);
-                String syntheticHostBase = deviceName + "." + clientSlug + ".defender.microsoft.com";
 
                 if (!servers.isArray() || servers.size() == 0) continue;
 
@@ -553,7 +555,25 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
 
                     if (serverName.isEmpty()) continue;
 
-                    String collectionName = serverName.toLowerCase();
+                    // MCP server host matches mcp-endpoint-shield's generateMcpServerCollectionName:
+                    //   HTTP server: <deviceLabel>.<clientType>.<urlHost>
+                    //   STDIO server: <deviceLabel>.<clientType>.<serverName>
+                    // Each MCP server gets its OWN collection (not grouped by AI agent client).
+                    String mcpServerHost;
+                    if (!url.isEmpty()) {
+                        String urlHost = serverName;
+                        try {
+                            java.net.URI parsedUri = new java.net.URI(url);
+                            if (parsedUri.getHost() != null && !parsedUri.getHost().isEmpty()) {
+                                urlHost = parsedUri.getHost();
+                            }
+                        } catch (Exception ignored) { }
+                        mcpServerHost = (deviceName + "." + clientSlug + "." + urlHost).toLowerCase();
+                    } else {
+                        mcpServerHost = (deviceName + "." + clientSlug + "." + serverName).toLowerCase();
+                    }
+
+                    String collectionName = mcpServerHost;
 
                     if (!serverCollections.containsKey(collectionName)) {
                         ServerCollectionInfo info = new ServerCollectionInfo();
@@ -569,7 +589,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
 
                     Map<String, String> reqHeaders = new HashMap<>();
                     reqHeaders.put("content-type", "application/json");
-                    reqHeaders.put("host", syntheticHostBase);
+                    reqHeaders.put("host", mcpServerHost);
                     reqHeaders.put("x-transport", "DISCOVERY");
                     reqHeaders.put("x-discovery-type", "mcp-config");
 
@@ -589,11 +609,12 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
                     tagMap.put("source", "ENDPOINT");
                     tagMap.put("connector", "MICROSOFT_DEFENDER");
                     tagMap.put("mcp-server", "MCP Server");
-                    tagMap.put("ai-agent", clientSlug);
+                    tagMap.put("mcp-client", clientSlug);
 
                     try {
                         Map<String, Object> batch = new HashMap<>();
-                        batch.put("path", "https://" + syntheticHostBase + "/mcp/" + serverName);
+                        // Path mirrors shield's STDIO format: just /mcp (server identity is in the host)
+                        batch.put("path", "https://" + mcpServerHost + "/mcp");
                         batch.put("requestHeaders", OBJECT_MAPPER.writeValueAsString(reqHeaders));
                         batch.put("responseHeaders", "{}");
                         batch.put("method", "POST");
@@ -681,7 +702,9 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
                     ? normalizeSlug(skillNameFromScript)
                     : deriveSkillName(meta, path);
 
-                String syntheticHost = deviceName + "." + agent + ".defender.microsoft.com";
+                // Host: deviceLabel.ai-agent.agentName — matches mcp-endpoint-shield's skill ingestion
+                // so a skill on the same device+agent lands in the same collection as the gateway's.
+                String syntheticHost = deviceName + ".ai-agent." + agent;
 
                 Map<String, String> reqHeaders = new HashMap<>();
                 reqHeaders.put("content-type", "application/json");
@@ -805,7 +828,9 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         req.put("agentName", agentName == null ? "" : agentName);
         req.put("filePath", filePath == null ? "" : filePath);
         req.put("collectionName", collectionName == null ? "" : collectionName);
-        req.put("contextSource", "AGENTIC");
+        // Use ENDPOINT (matches mcp-endpoint-shield's ContextSourceEndpoint) so the verdict
+        // surfaces under Atlas. "AGENTIC" would route it to Argus instead.
+        req.put("contextSource", "ENDPOINT");
         req.put("source", "MICROSOFT_DEFENDER");
         req.put("reportThreat", true);
 
@@ -866,6 +891,9 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
 
             List<Map<String, Object>> tagsList = new ArrayList<>();
             addTag(tagsList, "source", "ENDPOINT", ts);
+            // `gen-ai: Gen AI` tells the dashboard's groupCollectionsByService to treat this as an
+            // AI-agent / skill collection (NOT MCP Servers). Required to match shield's baseTagsAgent.
+            addTag(tagsList, "gen-ai", "Gen AI", ts);
             addTag(tagsList, "connector", "MICROSOFT_DEFENDER", ts);
             if (agent != null && !"unknown".equals(agent)) {
                 addTag(tagsList, "mcp-client", agent, ts);
@@ -944,6 +972,11 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
                 addTag(tagsList, "connector", "MICROSOFT_DEFENDER", info.timestamp);
                 if (info.clientType != null && !info.clientType.isEmpty()) {
                     addTag(tagsList, "mcp-client", info.clientType, info.timestamp);
+                }
+                // Match shield's CreateCollectionForMCPServer: STDIO servers (no URL) carry the
+                // `local-mcp-server: <serverName>` tag so the dashboard knows the binary identity.
+                if ((info.url == null || info.url.isEmpty()) && info.serverName != null && !info.serverName.isEmpty()) {
+                    addTag(tagsList, "local-mcp-server", info.serverName, info.timestamp);
                 }
 
                 Map<String, Object> request = new HashMap<>();
