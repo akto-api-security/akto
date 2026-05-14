@@ -1,20 +1,18 @@
 package com.akto.action.settings;
 
 import com.akto.action.UserAction;
-import com.akto.dao.EndpointShieldSettingsDao;
+import com.akto.dao.AccountSettingsDao;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.EndpointShieldSettings;
 import com.mongodb.client.model.Updates;
 import lombok.Getter;
 import lombok.Setter;
-import org.bson.conversions.Bson;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
 
 public class EndpointShieldSettingsAction extends UserAction {
 
@@ -22,82 +20,90 @@ public class EndpointShieldSettingsAction extends UserAction {
     private static final String DEFAULT_MANIFEST_URL =
         "https://akto-endpoint-agents.s3.us-east-1.amazonaws.com/atlas-installers/jamf-releases/latest.json";
 
+    // Dot-notation prefix for nested sub-document fields
+    private static final String FIELD_PREFIX = AccountSettings.ENDPOINT_SHIELD_SETTINGS + ".";
+
     @Getter @Setter private EndpointShieldSettings endpointShieldSettings;
     @Getter @Setter private boolean stale;
 
     public String fetchEndpointShieldSettings() {
-        endpointShieldSettings = EndpointShieldSettingsDao.instance.findOne(
-            EndpointShieldSettingsDao.generateFilter());
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+            AccountSettingsDao.generateFilter());
 
-        if (endpointShieldSettings == null) {
+        if (accountSettings == null) {
             endpointShieldSettings = new EndpointShieldSettings();
+            return SUCCESS.toUpperCase();
         }
 
-        // Persist defaults on first use so subsequent manifest upserts attach to a real document
-        if (endpointShieldSettings.getManifestUrl() == null) {
-            endpointShieldSettings.setManifestUrl(DEFAULT_MANIFEST_URL);
-            endpointShieldSettings.setAutoUpdateEnabled(true);
-            EndpointShieldSettingsDao.instance.updateOne(
-                EndpointShieldSettingsDao.generateFilter(),
-                Updates.combine(
-                    Updates.set(EndpointShieldSettings.MANIFEST_URL,        DEFAULT_MANIFEST_URL),
-                    Updates.set(EndpointShieldSettings.AUTO_UPDATE_ENABLED, true)
-                )
+        EndpointShieldSettings existing = accountSettings.getEndpointShieldSettings();
+
+        // Persist defaults on first use
+        if (existing == null || existing.getManifestUrl() == null) {
+            EndpointShieldSettings defaults = new EndpointShieldSettings();
+            defaults.setManifestUrl(DEFAULT_MANIFEST_URL);
+            defaults.setAutoUpdateEnabled(true);
+
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.ENDPOINT_SHIELD_SETTINGS, defaults)
             );
+            accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            existing = accountSettings.getEndpointShieldSettings();
         }
 
-        long age = System.currentTimeMillis() - endpointShieldSettings.getLatestVersionFetchedAt();
+        long age = System.currentTimeMillis() - existing.getLatestVersionFetchedAt();
         stale = age > MANIFEST_CACHE_TTL_MS;
         if (stale) {
-            refreshFromManifest(endpointShieldSettings.getManifestUrl());
-            EndpointShieldSettings refreshed = EndpointShieldSettingsDao.instance.findOne(
-                EndpointShieldSettingsDao.generateFilter());
-            if (refreshed != null) endpointShieldSettings = refreshed;
+            refreshFromManifest(existing.getManifestUrl());
+            accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            existing = accountSettings.getEndpointShieldSettings();
         }
+
+        endpointShieldSettings = existing;
         return SUCCESS.toUpperCase();
     }
 
     public String saveEndpointShieldSettings() {
         if (endpointShieldSettings == null) return ERROR.toUpperCase();
 
-        EndpointShieldSettings existing = EndpointShieldSettingsDao.instance.findOne(
-            EndpointShieldSettingsDao.generateFilter());
+        AccountSettings account = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        EndpointShieldSettings existing = account != null ? account.getEndpointShieldSettings() : null;
+        String existingUrl = existing != null ? existing.getManifestUrl() : null;
+        boolean manifestUrlChanged = !endpointShieldSettings.getManifestUrl().equals(existingUrl);
 
-        boolean manifestUrlChanged = existing == null
-            || !endpointShieldSettings.getManifestUrl().equals(existing.getManifestUrl());
-
-        List<Bson> updates = new ArrayList<>();
-        updates.add(Updates.set(EndpointShieldSettings.AUTO_UPDATE_ENABLED, endpointShieldSettings.isAutoUpdateEnabled()));
-        updates.add(Updates.set(EndpointShieldSettings.MANIFEST_URL,        endpointShieldSettings.getManifestUrl()));
-        updates.add(Updates.set(EndpointShieldSettings.TARGET_VERSION,      endpointShieldSettings.getTargetVersion()));
-
-        // Clear cached version when URL changes so stale version is not shown
+        // When URL changes, reset cached version so stale version is not shown
         if (manifestUrlChanged) {
-            updates.add(Updates.set(EndpointShieldSettings.LATEST_VERSION,            null));
-            updates.add(Updates.set(EndpointShieldSettings.LATEST_VERSION_FETCHED_AT, 0L));
+            endpointShieldSettings.setLatestVersion(null);
+            endpointShieldSettings.setLatestVersionFetchedAt(0L);
+        } else if (existing != null) {
+            // Preserve cached version/timestamp fields not sent from frontend
+            endpointShieldSettings.setLatestVersion(existing.getLatestVersion());
+            endpointShieldSettings.setLatestVersionFetchedAt(existing.getLatestVersionFetchedAt());
         }
 
-        EndpointShieldSettingsDao.instance.updateOne(
-            EndpointShieldSettingsDao.generateFilter(),
-            Updates.combine(updates)
+        AccountSettingsDao.instance.updateOne(
+            AccountSettingsDao.generateFilter(),
+            Updates.set(AccountSettings.ENDPOINT_SHIELD_SETTINGS, endpointShieldSettings)
         );
         return SUCCESS.toUpperCase();
     }
 
     // Called by the [Refresh] button - always force-fetches from manifest
     public String refreshLatestVersion() {
-        EndpointShieldSettings settings = EndpointShieldSettingsDao.instance.findOne(
-            EndpointShieldSettingsDao.generateFilter());
-        String manifestUrl = (settings != null && settings.getManifestUrl() != null)
-            ? settings.getManifestUrl()
+        AccountSettings account = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        EndpointShieldSettings existing = account != null ? account.getEndpointShieldSettings() : null;
+        String manifestUrl = (existing != null && existing.getManifestUrl() != null)
+            ? existing.getManifestUrl()
             : DEFAULT_MANIFEST_URL;
+
         boolean success = refreshFromManifest(manifestUrl);
         if (!success) {
             addActionError("Failed to fetch version from manifest URL. Please check the URL and try again.");
             return ERROR.toUpperCase();
         }
-        endpointShieldSettings = EndpointShieldSettingsDao.instance.findOne(
-            EndpointShieldSettingsDao.generateFilter());
+        endpointShieldSettings = AccountSettingsDao.instance
+            .findOne(AccountSettingsDao.generateFilter())
+            .getEndpointShieldSettings();
         return SUCCESS.toUpperCase();
     }
 
@@ -120,11 +126,11 @@ public class EndpointShieldSettingsAction extends UserAction {
             String latest = new JSONObject(sb.toString()).optString("version", null);
             if (latest == null) return false;
 
-            EndpointShieldSettingsDao.instance.updateOne(
-                EndpointShieldSettingsDao.generateFilter(),
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
                 Updates.combine(
-                    Updates.set(EndpointShieldSettings.LATEST_VERSION,            latest),
-                    Updates.set(EndpointShieldSettings.LATEST_VERSION_FETCHED_AT, System.currentTimeMillis())
+                    Updates.set(FIELD_PREFIX + EndpointShieldSettings.LATEST_VERSION,            latest),
+                    Updates.set(FIELD_PREFIX + EndpointShieldSettings.LATEST_VERSION_FETCHED_AT, System.currentTimeMillis())
                 )
             );
             return true;

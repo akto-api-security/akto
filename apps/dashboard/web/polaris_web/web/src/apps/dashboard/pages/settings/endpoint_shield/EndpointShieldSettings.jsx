@@ -7,6 +7,10 @@ import settingRequests from '../api'
 import func from '@/util/func'
 
 function EndpointShieldSettings() {
+    if (!window.USER_NAME?.toLowerCase()?.endsWith("@akto.io")) {
+        return null
+    }
+
     const [manifestUrl, setManifestUrl]     = useState('')
     const [savedManifestUrl, setSavedManifestUrl] = useState('')
     const [autoUpdate, setAutoUpdate]       = useState(true)

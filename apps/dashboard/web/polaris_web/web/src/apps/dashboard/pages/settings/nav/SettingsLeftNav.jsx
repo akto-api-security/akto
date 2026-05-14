@@ -173,12 +173,12 @@ const SettingsLeftNav = () => {
                         selected: page === "allowed-hosts",
                         onClick: () => navigate("/dashboard/settings/allowed-hosts")
                     },
-                    {
+                    ...(window.USER_NAME?.toLowerCase()?.endsWith("@akto.io") ? [{
                         label: 'Endpoint Shield',
                         icon: LockFilledMajor,
                         selected: page === "endpoint-shield",
                         onClick: () => navigate("/dashboard/settings/endpoint-shield")
-                    }
+                    }] : [])
                 ] : []),
                     {
                         label: 'Test library',
