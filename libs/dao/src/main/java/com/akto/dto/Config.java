@@ -26,7 +26,7 @@ public abstract class Config {
     String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, SLACK_ALERT_CYBORG, CYBORG_TOOLS_AUTH, DATADOG_FORWARDER;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, SLACK_ALERT_CYBORG, CYBORG_TOOLS_AUTH, DATADOG_FORWARDER, AUTOMATED_AI_TESTING_KEY;
     }
 
     ConfigType configType;
@@ -729,5 +729,25 @@ public abstract class Config {
 
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    }
+
+    @BsonDiscriminator
+    public static class AutomatedAiTestingKeyConfig extends Config {
+        private String apiKey;
+
+        public static final String CONFIG_ID = "AUTOMATED_AI_TESTING_KEY";
+
+        public AutomatedAiTestingKeyConfig() {
+            this.configType = ConfigType.AUTOMATED_AI_TESTING_KEY;
+            this.id = CONFIG_ID;
+        }
+
+        public String getApiKey() {
+            return apiKey;
+        }
+
+        public void setApiKey(String apiKey) {
+            this.apiKey = apiKey;
+        }
     }
 }
