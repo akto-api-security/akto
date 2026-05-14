@@ -10,6 +10,18 @@
 #
 # Requirements: POSIX shell (bash/zsh), find, stat, python3 (for JSON parsing)
 
+# Enable debug logging to stderr
+DEBUG_LOG="/tmp/akto-scan-mcp-configs.log"
+log_debug() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" >&2
+}
+
+log_debug "=== MCP Config Discovery Script Started ==="
+log_debug "Hostname: $(hostname)"
+log_debug "OS: $(uname -s)"
+log_debug "Current User: $(whoami)"
+log_debug "Working Directory: $(pwd)"
+
 # Ensure JSON is always closed even if the script exits early
 JSON_STARTED=false
 JSON_CLOSED=false
@@ -19,6 +31,7 @@ cleanup() {
         echo "  ]"
         echo "}"
     fi
+    log_debug "=== MCP Config Discovery Script Ended ==="
 }
 trap cleanup EXIT
 
@@ -95,23 +108,25 @@ except Exception as e:
 add_file() {
     local path="$1"
     local client_type="$2"
-    
+
     if [ -f "$path" ]; then
+        log_debug "Found config file: $path ($client_type)"
         local size=$(stat -f%z "$path" 2>/dev/null || stat -c%s "$path" 2>/dev/null || echo "0")
         local mtime=$(stat -f%m "$path" 2>/dev/null || stat -c%Y "$path" 2>/dev/null || echo "0")
         local perms=$(stat -f%Sp "$path" 2>/dev/null || stat -c%A "$path" 2>/dev/null || echo "unknown")
-        
+
         # Parse mcpServers from the config file
         local servers=$(parse_mcp_servers "$path")
-        
+        log_debug "Parsed servers from $path: $servers"
+
         if [ "$FIRST" = false ]; then
             echo ","
         fi
         FIRST=false
-        
+
         # Escape path for JSON
         local escaped_path=$(echo "$path" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
-        
+
         echo -n "    {\"path\":\"$escaped_path\",\"client\":\"$client_type\",\"size\":$size,\"modified\":$mtime,\"permissions\":\"$perms\",\"servers\":$servers}"
     fi
 }
@@ -143,6 +158,8 @@ if [ "$(uname -s)" = "Darwin" ]; then
 elif [ "$(uname -s)" = "Linux" ]; then
     USER_HOMES=$(ls -d /home/* /root 2>/dev/null)
 fi
+
+log_debug "Found user homes: $USER_HOMES"
 
 # Scan each user's home directory
 for user_home in $USER_HOMES; do

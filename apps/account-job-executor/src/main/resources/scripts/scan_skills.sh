@@ -20,6 +20,16 @@
 # Requirements: POSIX shell (bash/zsh), find
 # Optional: None (uses shell builtins only)
 
+# Enable debug logging to stderr
+log_debug() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" >&2
+}
+
+log_debug "=== Skills Discovery Script Started ==="
+log_debug "Hostname: $(hostname)"
+log_debug "OS: $(uname -s)"
+log_debug "Current User: $(whoami)"
+
 # Ensure JSON output even on error
 cleanup() {
     if [ "$JSON_STARTED" = true ] && [ "$JSON_CLOSED" = false ]; then
@@ -27,6 +37,7 @@ cleanup() {
         echo "  ]"
         echo "}"
     fi
+    log_debug "=== Skills Discovery Script Ended ==="
 }
 trap cleanup EXIT
 
@@ -46,27 +57,31 @@ FIRST=true
 add_skill() {
     local path="$1"
     local agent="$2"
-    
+
     if [ -f "$path" ]; then
+        log_debug "Found skill file: $path (agent: $agent)"
+
         if [ "$FIRST" = true ]; then
             FIRST=false
         else
             echo ","
         fi
-        
+
         local size=$(stat -f%z "$path" 2>/dev/null || stat -c%s "$path" 2>/dev/null || echo "0")
         local mtime=$(stat -f%m "$path" 2>/dev/null || stat -c%Y "$path" 2>/dev/null || echo "0")
-        
+
         # Extract skill_name from parent directory (e.g. ~/.claude/skills/mcp-gateway-dev/SKILL.md -> mcp-gateway-dev)
         local skill_name
         skill_name=$(basename "$(dirname "$path")" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
-        
+        log_debug "Skill name: $skill_name, Size: $size bytes"
+
         # Use python3 -c to safely read file content and encode as JSON (no heredoc to avoid stdin conflict)
         if command -v python3 >/dev/null 2>&1; then
             python3 -c "import json,sys; p,a,s,m,n=sys.argv[1],sys.argv[2],int(sys.argv[3]),int(sys.argv[4]),sys.argv[5]; c=open(p,'r',encoding='utf-8',errors='replace').read(); print('    '+json.dumps({'path':p,'agent':a,'size':s,'modified':m,'skill_name':n,'skill_content':c}),end='')" "$path" "$agent" "$size" "$mtime" "$skill_name" 2>/dev/null || \
             echo -n "    {\"path\":\"$path\",\"agent\":\"$agent\",\"size\":$size,\"modified\":$mtime,\"skill_name\":\"$skill_name\",\"skill_content\":\"\"}"
         else
             # Fallback: no content (python3 not available)
+            log_debug "python3 not available, using fallback without content"
             echo -n "    {\"path\":\"$path\",\"agent\":\"$agent\",\"size\":$size,\"modified\":$mtime,\"skill_name\":\"$skill_name\",\"skill_content\":\"\"}"
         fi
     fi
@@ -85,12 +100,16 @@ scan_agent_dir() {
     local base_path="$1"
     local agent_name="$2"
     local max_depth=5
-    
+
     if [ ! -d "$base_path" ]; then
+        log_debug "Directory not found: $base_path"
         return
     fi
-    
+
+    log_debug "Scanning agent directory: $base_path (agent: $agent_name, depth: $max_depth)"
+
     # Find skill files matching exact patterns (case-insensitive)
+    local found_count=0
     while IFS= read -r file; do
         # Skip if in junk directory
         skip=false
@@ -101,9 +120,10 @@ scan_agent_dir() {
                 break
             fi
         done
-        
+
         if [ "$skip" = false ]; then
             add_skill "$file" "$agent_name"
+            found_count=$((found_count + 1))
         fi
     done < <(find "$base_path" -maxdepth "$max_depth" -type f \( \
         -iname "SKILL.md" -o \
@@ -113,6 +133,8 @@ scan_agent_dir() {
         -iname "PROMPT.md" -o \
         -iname "prompt.md" \
     \) 2>/dev/null)
+
+    log_debug "Scan complete for $base_path: found $found_count skill files"
 }
 
 # Get all user home directories
@@ -123,8 +145,12 @@ elif [ "$(uname -s)" = "Linux" ]; then
     USER_HOMES=$(ls -d /home/* /root 2>/dev/null)
 fi
 
+log_debug "Found user homes: $USER_HOMES"
+
 # Phase 1: Scan hardcoded agent directories (depth 5)
+log_debug "=== Phase 1: Scanning hardcoded agent directories ==="
 for user_home in $USER_HOMES; do
+    log_debug "Processing user home: $user_home"
     scan_agent_dir "$user_home/.cursor" "cursor"
     scan_agent_dir "$user_home/.claude" "claude"
     scan_agent_dir "$user_home/.codeium/windsurf" "windsurf"
