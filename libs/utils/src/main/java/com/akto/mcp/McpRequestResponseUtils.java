@@ -104,7 +104,7 @@ public final class McpRequestResponseUtils {
 
     private static boolean isMcpErrorResponse(HttpResponseParams responseParams) {
         String responsePayload = responseParams.getPayload();
-        if (responsePayload == null || responsePayload.isEmpty()) {
+        if (responsePayload == null || responsePayload.isEmpty() || responsePayload.trim().equals("{}")) {
             return false;
         }
 
