@@ -1079,7 +1079,28 @@ const settingRequests = {
             method: 'post',
             data: {patternValue, connectorType}
         })
-    }
+    },
+    fetchWizIntegration() {
+        return request({
+            url: '/api/fetchWizIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addWizIntegration(tenantDataCenter, clientId, clientSecret) {
+        return request({
+            url: '/api/addWizIntegration',
+            method: 'post',
+            data: {tenantDataCenter, clientId, clientSecret}
+        })
+    },
+    removeWizIntegration() {
+        return request({
+            url: '/api/removeWizIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
 }
 
 export default settingRequests

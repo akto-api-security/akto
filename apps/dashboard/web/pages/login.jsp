@@ -74,6 +74,7 @@
                     window.AZURE_BOARDS_INTEGRATED ='${requestScope.azureBoardsIntegrated}'
                     window.SERVICENOW_INTEGRATED ='${requestScope.servicenowIntegrated}'
                     window.DEVREV_INTEGRATED ='${requestScope.devrevIntegrated}'
+                    window.WIZ_INTEGRATED ='${requestScope.wizIntegrated}'
                     window.USER_ROLE ='${requestScope.userRole}'
                     window.TIME_ZONE = '${requestScope.currentTimeZone}'
                     window.USER_FULL_NAME = '${requestScope.userFullName}'

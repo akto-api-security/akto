@@ -38,6 +38,7 @@ import com.akto.dto.jira_integration.JiraIntegration;
 import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.JobParams;
 import com.akto.dto.jobs.TicketSyncJobParams;
+import com.akto.dto.jobs.WizSyncJobParams;
 import com.akto.dto.loaders.Loader;
 import com.akto.dto.loaders.NormalLoader;
 import com.akto.dto.loaders.PostmanUploadLoader;
@@ -81,6 +82,8 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.dto.usage.UsageSync;
+import com.akto.dto.wiz_integration.WizEndpointAsset;
+import com.akto.dto.wiz_integration.WizIntegration;
 import com.akto.types.CappedList;
 import com.akto.types.CappedSet;
 import com.akto.util.DbMode;
@@ -340,6 +343,9 @@ public class DaoInit {
         ClassModel<UserAnalysisData.UserAnalysisDataKey> userAnalysisDataKeyClassModel = ClassModel.builder(UserAnalysisData.UserAnalysisDataKey.class).enableDiscriminator(true).build();
         ClassModel<AccountSettings.ProxyPatternInfo> proxyPatternInfoClassModel = ClassModel.builder(AccountSettings.ProxyPatternInfo.class).enableDiscriminator(true).build();
         ClassModel<EndpointMcpConfig> endpointMcpConfigClassModel = ClassModel.builder(EndpointMcpConfig.class).enableDiscriminator(true).build();
+        ClassModel<WizIntegration> wizIntegrationClassModel = ClassModel.builder(WizIntegration.class).enableDiscriminator(true).build();
+        ClassModel<WizEndpointAsset> wizEndpointAssetClassModel = ClassModel.builder(WizEndpointAsset.class).enableDiscriminator(true).build();
+        ClassModel<WizSyncJobParams> wizSyncJobParamsClassModel = ClassModel.builder(WizSyncJobParams.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -383,6 +389,7 @@ public class DaoInit {
                 ticketSyncJobParamsClassModel, apiHitCountInfoClassModel, collectionTagsModel, apiSequencesClassModel,
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
                 traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
+                wizIntegrationClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel,
                 mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel)
             .automatic(true).build());
 

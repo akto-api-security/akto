@@ -107,6 +107,7 @@ import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
 import AzureDataExplorer from "../dashboard/pages/settings/integrations/AzureDataExplorer";
 import ServiceNow from "../dashboard/pages/settings/integrations/ServiceNow";
 import DevRev from "../dashboard/pages/settings/integrations/DevRev";
+import Wiz from "@/apps/dashboard/pages/settings/integrations/Wiz.jsx";
 import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
@@ -482,6 +483,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/devrev",
                         element: <DevRev/>,
+                    },
+                    {
+                        path: "integrations/wiz",
+                        element: <Wiz/>,
                     },
                     {
                         path: "integrations/akto_apis",

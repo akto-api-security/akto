@@ -421,6 +421,28 @@ const settingFunctions = {
         allUrls: allUrls
       }
     },
+    fetchWizIntegration: async function(){
+      let wizIntegration = {}
+      await settingRequests.fetchWizIntegration().then((resp)=>{
+        wizIntegration = resp.wizIntegration
+      })
+      return wizIntegration
+    },
+    addWizIntegration: async function(tenantDataCenter, clientId, clientSecret) {
+      let wizIntegration = {}
+      await settingRequests.addWizIntegration(tenantDataCenter, clientId, clientSecret).then((resp)=>{
+        wizIntegration = resp
+      })
+      return wizIntegration
+    },
+    removeWizIntegration: async function() {
+      let trafficData = {}
+      await settingRequests.removeWizIntegration().then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
+
 }
 
 export default settingFunctions
