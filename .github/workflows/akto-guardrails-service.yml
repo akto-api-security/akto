@@ -39,7 +39,9 @@ jobs:
 
       - name: Create .netrc for private GitHub repos
         run: |
-          echo -e "machine github.com\nlogin x-access-token\npassword ${{ secrets.GH_PACKAGES_TOKEN }}" > apps/guardrails-service/container/.netrc
+          cd apps/guardrails-service/container
+          chmod +x setup-netrc.sh
+          GITHUB_TOKEN=${{ secrets.AKTO_GITHUB_TOKEN }} ./setup-netrc.sh
 
       - name: Build and push to DockerHub and ECR
         uses: docker/build-push-action@v4
