@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.WizIntegrationDao;
@@ -37,6 +38,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
@@ -59,8 +61,13 @@ public class WizIntegrationUtils {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
     private static final LoggerMaker loggerMaker = new LoggerMaker(WizIntegrationUtils.class, LogDb.DASHBOARD);
+
+    private static final ConcurrentHashMap<Integer, Object> tokenLocks = new ConcurrentHashMap<>();
     
     public static final String AUTH_ENDPOINT = "https://auth.app.wiz.io/oauth/token";
+    private static final int TESTING_RUN_RESULT_BATCH_SIZE = 500;
+    private static final int LARGE_TEXT_BATCH_SIZE = 50;
+    private static final int WIZ_SYNC_PAGE_SIZE = 100;
 
     public static boolean isWizDevMode() {
         String wizDevMode = System.getenv("WIZ_DEV_MODE");
@@ -181,11 +188,25 @@ public class WizIntegrationUtils {
             return wizIntegration.getAccessToken();
         }
 
-        loggerMaker.infoAndAddToDb("Cached access token expired or missing, generating new Wiz access token");
+        int accountId = Context.accountId.get();
+        Object lock = tokenLocks.computeIfAbsent(accountId, k -> new Object());
 
-        String clientId = wizIntegration.getClientId(); 
-        String clientSecret = wizIntegration.getClientSecret();
-        return generateAccessToken(clientId, clientSecret);
+        synchronized (lock) {
+            wizIntegration = WizIntegrationDao.instance.findOne(new BasicDBObject());
+            if (wizIntegration == null) {
+                throw new Exception("WizIntegration cannot be null");
+            }
+
+            if (wizIntegration.isTokenValid()) {
+                loggerMaker.infoAndAddToDb("Using cached Wiz access token (post-lock re-check)");
+                return wizIntegration.getAccessToken();
+            }
+
+            loggerMaker.infoAndAddToDb("Cached access token expired or missing, generating new Wiz access token");
+            String clientId = wizIntegration.getClientId();
+            String clientSecret = wizIntegration.getClientSecret();
+            return generateAccessToken(clientId, clientSecret);
+        }
     }
 
     public static Map<String, String> requestSecurityScanUpload(String filename) throws Exception {
@@ -376,7 +397,7 @@ public class WizIntegrationUtils {
                         dashboardUrl = aktoUrlConfig.getHostUrl();
                     }
                 }
-                assetAttackSurfaceFinding.put("externalFindingLink", String.format("%s/reports/issues?result=%s", dashboardUrl, testingRunResult.getHexId()));
+                assetAttackSurfaceFinding.put("externalFindingLink", String.format("%s/dashboard/reports/issues?result=%s", dashboardUrl, testingRunResult.getHexId()));
             } catch (Exception e) {
                 throw new Exception("Error building asset attack surface finding: " + e.getMessage());
             }
@@ -388,18 +409,46 @@ public class WizIntegrationUtils {
     public static Map<TestingIssuesId,TestingRunResult> fetchTestingRunResultMap(List<TestingIssuesId> testingIssuesIdList) {
         Map<TestingIssuesId, TestingRunResult> testingRunResultMap = new HashMap<>();
 
-        for (TestingIssuesId testingIssuesId: testingIssuesIdList) {
+        if (testingIssuesIdList == null || testingIssuesIdList.isEmpty()) {
+            return testingRunResultMap;
+        }
+
+        // Build reverse lookup map once upfront
+        Map<String, Map<ApiInfoKey, TestingIssuesId>> lookupMap = new HashMap<>();
+        for (TestingIssuesId id : testingIssuesIdList) {
+            lookupMap
+                .computeIfAbsent(id.getTestSubCategory(), k -> new HashMap<>())
+                .put(id.getApiInfoKey(), id);
+        }
+
+        // id is returned implicitly. It is required to obtain the hexId of the testing run result which is needed to link to the issue in the dashboard from wiz.
+        Bson projection = Projections.include(TestingRunResult.TEST_SUB_TYPE, TestingRunResult.API_INFO_KEY);
+
+        for (int i = 0; i < testingIssuesIdList.size(); i += TESTING_RUN_RESULT_BATCH_SIZE) {
+            int end = Math.min(i + TESTING_RUN_RESULT_BATCH_SIZE, testingIssuesIdList.size());
+            List<TestingIssuesId> batch = testingIssuesIdList.subList(i, end);
+
+            List<Bson> orConditions = new ArrayList<>();
+            for (TestingIssuesId id : batch) {
+                orConditions.add(Filters.and(
+                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, id.getTestSubCategory()),
+                    Filters.eq(TestingRunResult.API_INFO_KEY, id.getApiInfoKey())
+                ));
+            }
+
             try {
-                Bson filter = Filters.and(
-                    Filters.in(TestingRunResult.TEST_SUB_TYPE, testingIssuesId.getTestSubCategory()),
-                    Filters.in(TestingRunResult.API_INFO_KEY, testingIssuesId.getApiInfoKey())
-                );
-                TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(filter);
-                if (testingRunResult != null) {
-                    testingRunResultMap.put(testingIssuesId, testingRunResult);
+                List<TestingRunResult> results = TestingRunResultDao.instance.findAll(Filters.or(orConditions), projection);
+                for (TestingRunResult result : results) {
+                    Map<ApiInfoKey, TestingIssuesId> inner = lookupMap.get(result.getTestSubType());
+                    if (inner != null) {
+                        TestingIssuesId matchedId = inner.get(result.getApiInfoKey());
+                        if (matchedId != null) {
+                            testingRunResultMap.put(matchedId, result);
+                        }
+                    }
                 }
             } catch (Exception e) {
-                loggerMaker.error(String.format("Error fetching TestingRunResult for TestingIssuesId: %s - %s", testingIssuesId.toString(), e.getMessage()));
+                loggerMaker.error(String.format("Error fetching TestingRunResult batch [%d-%d]: %s", i, end, e.getMessage()));
             }
         }
 
@@ -409,11 +458,24 @@ public class WizIntegrationUtils {
     public static Map<String, YamlTemplate> fetchYamlTemplateMap(Set<String> testSubCategorySet) {
         Map<String, YamlTemplate> yamlTemplateMap = new HashMap<>();
 
-        if (testSubCategorySet != null) {
-            Bson filter = Filters.in(Constants.ID, testSubCategorySet);
-            List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(filter, Projections.include(YamlTemplate.INFO));
-            for (YamlTemplate yamlTemplate : yamlTemplates) {
-                yamlTemplateMap.put(yamlTemplate.getId(), yamlTemplate);
+        if (testSubCategorySet == null || testSubCategorySet.isEmpty()) {
+            return yamlTemplateMap;
+        }
+
+        List<String> testSubCategoryList = new ArrayList<>(testSubCategorySet);
+
+        for (int i = 0; i < testSubCategoryList.size(); i += LARGE_TEXT_BATCH_SIZE) {
+            int end = Math.min(i + LARGE_TEXT_BATCH_SIZE, testSubCategoryList.size());
+            List<String> batch = testSubCategoryList.subList(i, end);
+
+            try {
+                Bson filter = Filters.in(Constants.ID, batch);
+                List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(filter, Projections.include(YamlTemplate.INFO));
+                for (YamlTemplate yamlTemplate : yamlTemplates) {
+                    yamlTemplateMap.put(yamlTemplate.getId(), yamlTemplate);
+                }
+            } catch (Exception e) {
+                loggerMaker.error(String.format("Error fetching YamlTemplate batch [%d-%d]: %s", i, end, e.getMessage()));
             }
         }
 
@@ -423,20 +485,37 @@ public class WizIntegrationUtils {
     public static Map<String, Remediation> fetchRemediationMap(Set<String> testSubCategorySet) {
         Map<String, Remediation> remediationMap = new HashMap<>();
 
-        if (testSubCategorySet != null) {
-            Map<String, String> remediationIdMap = new HashMap<>();
-            for(String testSubCategory : testSubCategorySet) {
-                String remediationId = String.format("tests-library-master/remediation/%s.md", testSubCategory);
-                remediationIdMap.put(remediationId, testSubCategory);
-            }
+        if (testSubCategorySet == null || testSubCategorySet.isEmpty()) {
+            return remediationMap;
+        }
 
-            Bson filter = Filters.in(Constants.ID, remediationIdMap.keySet());
-            List<Remediation> remediations = RemediationsDao.instance.findAll(filter);
+        Map<String, String> remediationIdMap = new HashMap<>();
+        for (String testSubCategory : testSubCategorySet) {
+            String remediationId = String.format("tests-library-master/remediation/%s.md", testSubCategory);
+            remediationIdMap.put(remediationId, testSubCategory);
+        }
 
-            for (Remediation remediation : remediations) {
-                String remediationId = remediation.getid();
-                String testSubCategory = remediationIdMap.get(remediationId);
-                remediationMap.put(testSubCategory, remediation);
+        List<String> remediationIdList = new ArrayList<>(remediationIdMap.keySet());
+
+        for (int i = 0; i < remediationIdList.size(); i += LARGE_TEXT_BATCH_SIZE) {
+            int end = Math.min(i + LARGE_TEXT_BATCH_SIZE, remediationIdList.size());
+            List<String> batch = remediationIdList.subList(i, end);
+
+            try {
+                Bson filter = Filters.in(Constants.ID, batch);
+                List<Remediation> remediations = RemediationsDao.instance.findAll(filter);
+
+                for (Remediation remediation : remediations) {
+                    String remediationId = remediation.getid();
+                    String testSubCategory = remediationIdMap.get(remediationId);
+                    if (testSubCategory == null) {
+                        loggerMaker.error("No matching testSubCategory for remediationId: " + remediationId);
+                        continue;
+                    }
+                    remediationMap.put(testSubCategory, remediation);
+                }
+            } catch (Exception e) {
+                loggerMaker.error(String.format("Error fetching remediations batch [%d-%d]: %s", i, end, e.getMessage()));
             }
         }
 
@@ -558,15 +637,26 @@ public class WizIntegrationUtils {
 
         // Find all testing run issues in this account that need to be synced with Wiz
         List<TestingRunIssues> testingRunIssuesList = new ArrayList<>();
+        Bson wizSyncFilter = Filters.and(
+            Filters.ne(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, null),
+            Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN)
+        );
+        Bson wizSyncProjection = Projections.include(Constants.ID, TestingRunIssues.KEY_SEVERITY, TestingRunIssues.WIZ_FINDING_CREATION_STATUS);
+        int skip = 0;
         try {
-            testingRunIssuesList = TestingRunIssuesDao.instance.findAll(
-                Filters.ne(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, null),
-                Projections.include(Constants.ID, TestingRunIssues.KEY_SEVERITY, TestingRunIssues.WIZ_FINDING_CREATION_STATUS)
-            );
+            List<TestingRunIssues> page;
+            do {
+                page = TestingRunIssuesDao.instance.findAll(wizSyncFilter, skip, WIZ_SYNC_PAGE_SIZE, null, wizSyncProjection);
+                if (page != null) {
+                    testingRunIssuesList.addAll(page);
+                    skip += page.size();
+                }
+            } while (page != null && page.size() == WIZ_SYNC_PAGE_SIZE);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching testing run issues for Wiz sync: " + e.getMessage());
             return;
         }
+        loggerMaker.infoAndAddToDb(String.format("Finished fetching testing run issues for wiz sync. Total: %d", testingRunIssuesList.size()));
 
         if (testingRunIssuesList == null || testingRunIssuesList.isEmpty()) {
             loggerMaker.infoAndAddToDb("No testing run issues to sync with Wiz. Skipping sync.");
