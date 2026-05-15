@@ -425,25 +425,27 @@ public class Main {
 
         String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
 
-        buildKafka();
-        buildProtobufKafkaProducer(brokerUrlFinal);
-        buildLocalKafkaProducer(kafkaBrokerUrl);
+        if (!isInMemoryQueueMode()) {
+            buildKafka();
+            buildProtobufKafkaProducer(brokerUrlFinal);
+            buildLocalKafkaProducer(kafkaBrokerUrl);
 
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                if (kafkaProducer == null || !kafkaProducer.producerReady) {
-                    buildKafka();
+            scheduler.scheduleAtFixedRate(new Runnable() {
+                public void run() {
+                    if (kafkaProducer == null || !kafkaProducer.producerReady) {
+                        buildKafka();
+                    }
+                    // Also check protobuf producer
+                    if (protobufKafkaProducer == null) {
+                        buildProtobufKafkaProducer(brokerUrlFinal);
+                    }
+                    // Also check local producer
+                    if (localKafkaProducer == null || !localKafkaProducer.producerReady) {
+                        buildLocalKafkaProducer(brokerUrlFinal);
+                    }
                 }
-                // Also check protobuf producer
-                if (protobufKafkaProducer == null) {
-                    buildProtobufKafkaProducer(brokerUrlFinal);
-                }
-                // Also check local producer
-                if (localKafkaProducer == null || !localKafkaProducer.producerReady) {
-                    buildLocalKafkaProducer(brokerUrlFinal);
-                }
-            }
-        }, 5, 5, TimeUnit.MINUTES);
+            }, 5, 5, TimeUnit.MINUTES);
+        }
 
         final boolean checkPg = aSettings != null && aSettings.isRedactPayload();
 
@@ -458,8 +460,10 @@ public class Main {
         }
 
         final Main main = new Main();
-        Properties properties = Main.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
-        main.consumer = new KafkaConsumer<>(properties);
+        if (!isInMemoryQueueMode()) {
+            Properties properties = Main.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
+            main.consumer = new KafkaConsumer<>(properties);
+        }
 
         final Thread mainThread = Thread.currentThread();
         final AtomicBoolean exceptionOnCommitSync = new AtomicBoolean(false);
@@ -497,7 +501,7 @@ public class Main {
                 }
 
                 // Stop mini-runtime
-                main.consumer.wakeup();
+                if (main.consumer != null) main.consumer.wakeup();
                 try {
                     if (!exceptionOnCommitSync.get()) {
                         mainThread.join();
@@ -519,6 +523,7 @@ public class Main {
 
         scheduler.scheduleAtFixedRate(()-> {
             try {
+                if (main.consumer == null) return;
 
                 Map<MetricName, ? extends Metric> metrics = main.consumer.metrics();
 
@@ -577,74 +582,76 @@ public class Main {
         // executor.scheduleAtFixedRate(task, 2, 60, TimeUnit.SECONDS);
 
         String kafkaUrl = kafkaBrokerUrl;
-        executorService.schedule(new Runnable() {
-            public void run() {
-                try {
-                    loggerMaker.infoAndAddToDb("Starting traffic log consumer");
-                    String logTopicName = getLogTopicName();
-                    
-                    Properties logConsumerProps = Main.configProperties(kafkaUrl, groupIdConfig + LOG_GROUP_ID,maxPollRecordsConfig);
-                    KafkaConsumer<String, String> logConsumer = new KafkaConsumer<>(logConsumerProps);
-                    long lastLogSyncOffset = 0;
+        if (!isInMemoryQueueMode()) {
+            executorService.schedule(new Runnable() {
+                public void run() {
                     try {
-                        logConsumer.subscribe(Collections.singletonList(logTopicName));
-                        loggerMaker.infoAndAddToDb("Second consumer subscribed to " + logTopicName);
-                        while (true) {
-                            ConsumerRecords<String, String> records = logConsumer.poll(Duration.ofMillis(10000));
-                            try {
-                                logConsumer.commitSync();
-                            } catch (Exception e) {
-                                throw e;
-                            }
-                            for (ConsumerRecord<String, String> record : records) {
+                        loggerMaker.infoAndAddToDb("Starting traffic log consumer");
+                        String logTopicName = getLogTopicName();
+
+                        Properties logConsumerProps = Main.configProperties(kafkaUrl, groupIdConfig + LOG_GROUP_ID,maxPollRecordsConfig);
+                        KafkaConsumer<String, String> logConsumer = new KafkaConsumer<>(logConsumerProps);
+                        long lastLogSyncOffset = 0;
+                        try {
+                            logConsumer.subscribe(Collections.singletonList(logTopicName));
+                            loggerMaker.infoAndAddToDb("Second consumer subscribed to " + logTopicName);
+                            while (true) {
+                                ConsumerRecords<String, String> records = logConsumer.poll(Duration.ofMillis(10000));
                                 try {
-                                    lastLogSyncOffset++;
-                                    TrafficProducerLog trafficProducerLog = SampleParser.parseLogMessage(record.value());
-                                    if (trafficProducerLog == null || trafficProducerLog.getMessage() == null) {
-                                        loggerMaker.errorAndAddToDb("Traffic producer log is null");
+                                    logConsumer.commitSync();
+                                } catch (Exception e) {
+                                    throw e;
+                                }
+                                for (ConsumerRecord<String, String> record : records) {
+                                    try {
+                                        lastLogSyncOffset++;
+                                        TrafficProducerLog trafficProducerLog = SampleParser.parseLogMessage(record.value());
+                                        if (trafficProducerLog == null || trafficProducerLog.getMessage() == null) {
+                                            loggerMaker.errorAndAddToDb("Traffic producer log is null");
+                                            continue;
+                                        }
+                                        String message = String.format("[TRAFFIC_PRODUCER] [%s] %s", trafficProducerLog.getSource(), trafficProducerLog.getMessage());
+
+                                        if (trafficProducerLog.getLogType() != null && trafficProducerLog.getLogType().equalsIgnoreCase("ERROR")) {
+                                            loggerMaker.errorAndAddToDb(message);
+                                        } else if (trafficProducerLog.getLogType() != null && trafficProducerLog.getLogType().equalsIgnoreCase("DEBUG")) {
+                                            loggerMaker.debug(message);
+                                        } else {
+                                            loggerMaker.infoAndAddToDb(message);
+                                        }
+
+                                        if (lastLogSyncOffset % 100 == 0) {
+                                            loggerMaker.info("Committing log offset at position: " + lastLogSyncOffset);
+                                        }
+
+                                    } catch (Exception e) {
+                                        loggerMaker.errorAndAddToDb(e, "Error while parsing traffic producer log kafka message " + e);
                                         continue;
                                     }
-                                    String message = String.format("[TRAFFIC_PRODUCER] [%s] %s", trafficProducerLog.getSource(), trafficProducerLog.getMessage());
-
-                                    if (trafficProducerLog.getLogType() != null && trafficProducerLog.getLogType().equalsIgnoreCase("ERROR")) {
-                                        loggerMaker.errorAndAddToDb(message);
-                                    } else if (trafficProducerLog.getLogType() != null && trafficProducerLog.getLogType().equalsIgnoreCase("DEBUG")) {
-                                        loggerMaker.debug(message);
-                                    } else {
-                                        loggerMaker.infoAndAddToDb(message);
-                                    }
-
-                                    if (lastLogSyncOffset % 100 == 0) {
-                                        loggerMaker.info("Committing log offset at position: " + lastLogSyncOffset);
-                                    }
-
-                                } catch (Exception e) {
-                                    loggerMaker.errorAndAddToDb(e, "Error while parsing traffic producer log kafka message " + e);
-                                    continue;
                                 }
                             }
+                        } catch (WakeupException ignored) {
+                            // Shutdown
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, "Error in second topic consumer");
+                        } finally {
+                            logConsumer.close();
                         }
-                    } catch (WakeupException ignored) {
-                        // Shutdown
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Error in second topic consumer");
-                    } finally {
-                        logConsumer.close();
+                        loggerMaker.errorAndAddToDb(e, "Error while starting traffic log consumer");
                     }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error while starting traffic log consumer");
                 }
-            }
-        }, 0, TimeUnit.SECONDS);
+            }, 0, TimeUnit.SECONDS);
 
-        // Pod heartbeat consumer thread
-        String heartbeatTopicName = "akto.daemonset.producer.heartbeats";
-        new AktoTrafficCollectorTelemetry(kafkaUrl, groupIdConfig, maxPollRecordsConfig, heartbeatTopicName, dataActor, customMiniRuntimeServiceName).run();
+            // Pod heartbeat consumer thread
+            String heartbeatTopicName = "akto.daemonset.producer.heartbeats";
+            new AktoTrafficCollectorTelemetry(kafkaUrl, groupIdConfig, maxPollRecordsConfig, heartbeatTopicName, dataActor, customMiniRuntimeServiceName).run();
 
 
-        String configUpdateTopicName = "akto.config.updates";
-        ConfigUpdatePoller configUpdatePoller = new ConfigUpdatePoller(customMiniRuntimeServiceName, localKafkaProducer, configUpdateTopicName);
-        configUpdatePoller.start();
+            String configUpdateTopicName = "akto.config.updates";
+            ConfigUpdatePoller configUpdatePoller = new ConfigUpdatePoller(customMiniRuntimeServiceName, localKafkaProducer, configUpdateTopicName);
+            configUpdatePoller.start();
+        }
 
         String runMcpJobs = System.getenv("AKTO_RUN_MCP_JOBS");
         boolean shouldRunMcpJobs = true;
@@ -732,7 +739,10 @@ public class Main {
 
         if(isDbMergingModeEnabled()){
             runDBMaintenanceJob(apiConfig);
-        }else{
+        } else if (isInMemoryQueueMode()) {
+            // No Kafka needed — block main thread so daemon threads stay alive
+            try { Thread.currentThread().join(); } catch (InterruptedException ignored) {}
+        } else {
             kafkaSubscribeAndProcess(topicName, syncImmediately, fetchAllSTI, accountInfoMap, isDashboardInstance, centralKafkaTopicName,
                     apiConfig, main, exceptionOnCommitSync, httpCallParserMap, sessionAnalyzerMap);
         }
