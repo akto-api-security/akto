@@ -623,6 +623,17 @@ function IssuesPage() {
             })
         }
 
+        async function createWizFindings() {
+            await api.createWizFindings(items).then((res) => {
+                setToast(true, false, `${items.length} Wiz finding${items.length === 1 ? "" : "s"} creation initiated.`)
+
+                resetResourcesSelected()
+            }).catch((err) => {
+                func.setToast(true, true, "Error initiating Wiz finding(s) creation")
+            })
+        }
+
+
         let issues = [
             {
                 content: 'Update severity',
@@ -678,7 +689,12 @@ function IssuesPage() {
                 content: 'Create DevRev ticket',
                 onAction: () => { createDevRevTicketBulk() },
                 disabled: (window.DEVREV_INTEGRATED === 'false')
-            }
+            },
+            {
+                content: 'Create Wiz finding(s)',
+                onAction: () => { createWizFindings() },
+                disabled: (window.WIZ_INTEGRATED === 'false')
+            },
         ];
 
         let reopen = [{

@@ -154,6 +154,15 @@ public class ProfileAction extends UserAction {
         } catch (Exception e) {
         }
 
+        boolean wizIntegrated = false;
+        try {
+            long documentCount = WizIntegrationDao.instance.estimatedDocumentCount();
+            if (documentCount > 0) {
+                wizIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
         InitializerListener.insertStateInAccountSettings(accountSettings);
 
         Organization organization = OrganizationsDao.instance.findOne(
@@ -202,6 +211,7 @@ public class ProfileAction extends UserAction {
                 .append("azureBoardsIntegrated", azureBoardsIntegrated)
                 .append("servicenowIntegrated", servicenowIntegrated)
                 .append("devrevIntegrated", devrevIntegrated)
+                .append("wizIntegrated", wizIntegrated)
                 .append("userRole", userRole!=null ?userRole.toString().toUpperCase(): "")
                 .append("currentTimeZone", timeZone)
                 .append("organizationName", orgName)
