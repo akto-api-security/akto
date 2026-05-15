@@ -24,10 +24,9 @@ import {
     groupCollectionsBySkill,
     extractEndpointId,
     buildAgenticInventoryFilterForRow,
+    fetchAndCacheSkillApiData,
 } from "./constants";
 import { CLIENT_TYPES, ROW_TYPES, hasPersonalAccountTag } from "./mcpClientHelper";
-
-const SKILL_RISK_CACHE_TTL_MS = 2 * 60 * 1000;
 
 const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills'];
 
@@ -145,17 +144,6 @@ function Endpoints() {
     const enrichSkillsWithApiRiskScores = useCallback(async (skillRows, isMountedRef = { current: true }) => {
         if (!skillRows.length) return;
 
-        const now = Date.now();
-        const cached = PersistStore.getState().skillRiskScoreCache;
-        const cacheAge = now - (cached?.ts || 0);
-
-        // cached.ts > 0 means we already fetched (data may be empty if no /skill/ URLs matched)
-        if (cacheAge <= SKILL_RISK_CACHE_TTL_MS && cached?.ts > 0) {
-            applySkillRiskScores(cached.data, new Set(cached.maliciousSkills || []), isMountedRef);
-            return;
-        }
-
-        // Collect unique collection IDs across all skill rows
         const allCollectionIds = [];
         skillRows.forEach((row) => {
             (row.collections || []).forEach((c) => {
@@ -163,36 +151,9 @@ function Endpoints() {
             });
         });
 
-        // Fetch all collection apiInfos in parallel
-        const results = await Promise.all(
-            allCollectionIds.map(async (id) => {
-                try {
-                    const resp = await api.fetchApiInfosForCollection(id);
-                    return resp?.apiInfoList || [];
-                } catch {
-                    return [];
-                }
-            })
-        );
+        const { skillScoreMap, maliciousSkills } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
 
         if (!isMountedRef.current) return;
-
-        // Build skillName -> { maxRiskScore, isMalicious } from apiInfos where _id.url matches /skill/<skillName>
-        const skillScoreMap = {};
-        const maliciousSkills = new Set();
-        results.forEach((infos) => {
-            infos.forEach((info) => {
-                const splits = info.id.url.split("skills/")
-                const skillName = splits[1]
-                if (!skillName) return;
-                const score = info.riskScore || 0
-                skillScoreMap[skillName] = score
-                const isMalicious = (info.tagsList || []).some(t => t.key === "malicious-skill" && t.value === "true");
-                if (isMalicious) maliciousSkills.add(skillName);
-            });
-        });
-
-        PersistStore.getState().setSkillRiskScoreCache({ data: skillScoreMap, maliciousSkills: [...maliciousSkills], ts: Date.now() });
         applySkillRiskScores(skillScoreMap, maliciousSkills, isMountedRef);
     }, [applySkillRiskScores]);
 

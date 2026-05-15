@@ -10,6 +10,7 @@ import HeadingWithTooltip from '../../../components/shared/HeadingWithTooltip';
 import TooltipText from '../../../components/shared/TooltipText';
 import { FILTER_TYPES } from './useAgenticFilter';
 import { getAgenticCategoryLabel, hasPersonalAccountTag, hasLocalMcpServerTag, CLIENT_TYPES } from '../agentic/mcpClientHelper';
+import PersistStore from '../../../../main/PersistStore';
 
 /** IndexTable adds a leading selection column when `selectable` is true (see AgentEndpointTreeTable). */
 const INDEX_TABLE_SELECTION_COLUMN_COUNT = 1;
@@ -294,6 +295,10 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
     const navigate = useNavigate();
     const childHeaders = getChildHeaders(filterType, showCategoryColumn);
     const columnConfig = getChildColumnConfig(filterType);
+    const maliciousSkillsSet = useMemo(() => {
+        const cached = PersistStore.getState().skillRiskScoreCache;
+        return new Set((cached?.maliciousSkills || []).map(s => String(s).toLowerCase()));
+    }, []);
     
     const handleChildClick = useCallback((collection) => {
         if (collection?.nextUrl) {
@@ -322,12 +327,10 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
             ];
 
             const childHasLocalMcp = hasLocalMcpServerTag(child.envTypeOriginal);
-            // For AI Agent / MCP Server children, surface the count of skills bundled inside
-            // their skills[] array as a badge — gives the user visibility into hidden skills
-            // without exploding them into separate rows.
             const childCategory = getAgenticCategoryLabel(child);
             const showsBundledSkills = childCategory === CLIENT_TYPES.AI_AGENT || childCategory === CLIENT_TYPES.MCP_SERVER;
             const bundledSkillsCount = showsBundledSkills && Array.isArray(child.skills) ? child.skills.length : 0;
+            const childHasMaliciousSkill = Array.isArray(child.skills) && child.skills.some(s => maliciousSkillsSet.has(String(s).toLowerCase()));
             childHeaders.forEach(header => {
                 if (header.value === 'displayNameComp') {
                     cells.push(
@@ -343,6 +346,7 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
                                 {bundledSkillsCount > 0 && (
                                     <Badge size="small" status="info">{`${bundledSkillsCount} ${bundledSkillsCount === 1 ? 'skill' : 'skills'}`}</Badge>
                                 )}
+                                {childHasMaliciousSkill && <Badge size="small" status="critical">Malicious Skills</Badge>}
                                 {childHasLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
                             </HorizontalStack>
                         </div>
@@ -372,7 +376,7 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
 
             return cells;
         });
-    }, [children, handleChildClick, childHeaders, columnConfig, showCategoryColumn]);
+    }, [children, handleChildClick, childHeaders, columnConfig, showCategoryColumn, maliciousSkillsSet]);
 
     const columnContentTypes = useMemo(
         () => ["text", ...childHeaders.map(() => "text")],
