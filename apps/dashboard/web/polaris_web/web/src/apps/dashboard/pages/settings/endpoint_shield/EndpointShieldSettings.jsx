@@ -1,8 +1,9 @@
-import { Box, Button, Divider, HorizontalStack, LegacyCard, Spinner, Tabs, Text, TextField, Tooltip, VerticalStack } from '@shopify/polaris'
+import { Box, Button, Divider, HorizontalStack, LegacyCard, Spinner, Text, TextField, Tooltip, VerticalStack } from '@shopify/polaris'
 import { RefreshMajor } from '@shopify/polaris-icons'
 import { useEffect, useState } from 'react'
 import { ToggleComponent } from '../about/About'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
+import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
 import settingRequests from '../api'
 import func from '@/util/func'
 
@@ -175,11 +176,14 @@ function PlatformPanel({ platformKey, config, onChange, isAdmin }) {
                 )}
 
                 {isAdmin && (
-                    <Box width="80px">
-                        <Button primary onClick={handleSave} loading={saving} disabled={!!manifestUrlError}>
-                            Save
-                        </Button>
-                    </Box>
+                    <>
+                        <Divider />
+                        <Box width="80px">
+                            <Button primary onClick={handleSave} loading={saving} disabled={!!manifestUrlError}>
+                                Save
+                            </Button>
+                        </Box>
+                    </>
                 )}
             </VerticalStack>
         </LegacyCard.Section>
@@ -192,7 +196,6 @@ function EndpointShieldSettings() {
     }
 
     const isAdmin = window.USER_ROLE === 'ADMIN'
-    const [selectedTab, setSelectedTab] = useState(0)
     const [platforms, setPlatforms] = useState(
         () => Object.fromEntries(PLATFORMS.map(p => [p.key, { ...EMPTY_CONFIG }]))
     )
@@ -210,25 +213,26 @@ function EndpointShieldSettings() {
         })
     }, [])
 
-    const tabs = PLATFORMS.map((p, i) => ({ id: p.key, content: p.label, panelID: `panel-${p.key}` }))
-
-    const activeKey = PLATFORMS[selectedTab].key
-
-    const card = (
-        <LegacyCard
-            key="endpoint-shield-platforms"
-            title={<Text variant="headingMd">Update Policy</Text>}
-        >
-            <Divider />
-            <Tabs tabs={tabs} selected={selectedTab} onSelect={setSelectedTab} />
-            <Divider />
+    const tabs = PLATFORMS.map(p => ({
+        id: p.key,
+        content: p.label,
+        component: (
             <PlatformPanel
-                key={activeKey}
-                platformKey={activeKey}
-                config={platforms[activeKey]}
+                platformKey={p.key}
+                config={platforms[p.key]}
                 onChange={updatePlatform}
                 isAdmin={isAdmin}
             />
+        )
+    }))
+
+    const card = (
+        <LegacyCard key="endpoint-shield-platforms">
+            <LegacyCard.Section>
+                <Text variant="headingMd">Agent Update Settings</Text>
+            </LegacyCard.Section>
+            <Divider />
+            <LayoutWithTabs tabs={tabs} currTab={() => {}} noLoading />
         </LegacyCard>
     )
 
