@@ -128,7 +128,7 @@ public class WizIntegrationAction extends UserAction {
     public String fetchWizIntegration() {
         wizIntegration = WizIntegrationDao.instance.findOne(
             new BasicDBObject(),
-            Projections.exclude(WizIntegration.CLIENT_SECRET)
+            Projections.exclude(WizIntegration.CLIENT_SECRET, WizIntegration.ACCESS_TOKEN)
         );
         return Action.SUCCESS.toUpperCase();
     }
