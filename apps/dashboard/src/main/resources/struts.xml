@@ -611,7 +611,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">LOGS</param>
+                <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
