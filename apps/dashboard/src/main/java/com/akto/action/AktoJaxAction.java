@@ -120,13 +120,13 @@ public class AktoJaxAction extends UserAction {
                     apiCollection = apiCollections.get(0);
                     collectionId = apiCollection.getId();
                 } else {
-                    apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, finalCollectionName));
+                    apiCollection = findCollectionByNameOrHost(finalCollectionName);
                     if (apiCollection != null) {
                         collectionId = apiCollection.getId();
                     }
                 }
             } else {
-                apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, finalCollectionName));
+                apiCollection = findCollectionByNameOrHost(finalCollectionName);
                 if (apiCollection != null) {
                     collectionId = apiCollection.getId();
                 }
@@ -348,6 +348,15 @@ public class AktoJaxAction extends UserAction {
             addActionError("Error stopping crawler. Please try again later.");
             return Action.ERROR.toUpperCase();
         }
+    }
+
+    private ApiCollection findCollectionByNameOrHost(String name) {
+        ApiCollection collection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, name));
+        if (collection == null) {
+            // Traffic-mirrored collections have hostName set but name=null; match by hostName
+            collection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.HOST_NAME, name));
+        }
+        return collection;
     }
 
     private void initiateInternalCrawl(String crawlId, String hostname, String username,
