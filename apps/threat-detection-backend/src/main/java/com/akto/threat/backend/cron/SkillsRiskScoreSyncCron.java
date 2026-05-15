@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
+import java.util.regex.Pattern;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -142,12 +143,19 @@ public class SkillsRiskScoreSyncCron {
                             loggerMaker.debugAndAddToDb("Skills malicious events count: " + apiInfoKeyToRiskScore.size());
 
                             List<ApiInfo.ApiInfoTag> maliciousTags = Collections.singletonList(
-                                new ApiInfo.ApiInfoTag("malicious", "true")
+                                new ApiInfo.ApiInfoTag("malicious-skill", "true")
                             );
 
                             List<WriteModel<ApiInfo>> updates = new ArrayList<>();
                             for (Map.Entry<ApiInfoKey, Float> entry : apiInfoKeyToRiskScore.entrySet()) {
-                                Bson filter = ApiInfoDao.getFilter(entry.getKey());
+                                ApiInfoKey key = entry.getKey();
+                                // db stores url as hostname+path; malicious event has only path
+                                Pattern urlPattern = Pattern.compile(".*" + Pattern.quote(key.getUrl()) + "$");
+                                Bson filter = Filters.and(
+                                    Filters.regex("_id.url", urlPattern),
+                                    Filters.eq("_id.method", key.getMethod().name()),
+                                    Filters.eq("_id.apiCollectionId", key.getApiCollectionId())
+                                );
                                 updates.add(new UpdateManyModel<>(filter, Updates.combine(
                                     Updates.set(ApiInfo.RISK_SCORE, entry.getValue()),
                                     Updates.set(ApiInfo.TAGS_LIST, maliciousTags)
