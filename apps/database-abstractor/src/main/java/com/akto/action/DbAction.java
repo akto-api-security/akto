@@ -78,6 +78,7 @@ import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
+import com.akto.notifications.slack.TestingFailureSlackCopy;
 import com.akto.testing.TestExecutor;
 import com.akto.trafficFilter.HostFilter;
 import com.akto.trafficFilter.ParamFilter;
@@ -2655,14 +2656,22 @@ public class DbAction extends ActionSupport {
 
     public String markTestRunResultSummaryFailed() {
         try {
+            boolean hadPriorResults = false;
+            try {
+                hadPriorResults = DbLayer.hasAnyTestingRunResultForSummary(testingRunResultSummaryId);
+            } catch (Exception ex) {
+                loggerMaker.errorAndAddToDb(ex, "markTestRunResultSummaryFailed: could not load prior test results");
+            }
+
             trrs = DbLayer.markTestRunResultSummaryFailed(testingRunResultSummaryId);
             trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
-            // send slack alert for failed state
             int accountId = Context.accountId.get();
-            String customMessage = "Testing Run Result Summary Failed for Summary ID in markTestRunResultSummaryFailed: " + testingRunResultSummaryId;
+            String runHex = trrs.getTestingRunId() != null ? trrs.getTestingRunId().toHexString() : null;
+            TestingFailureSlackCopy.TitleAndDetail slack = TestingFailureSlackCopy.forMarkTestRunSummaryFailed(
+                    hadPriorResults, runHex, testingRunResultSummaryId);
             sendTestingFailureSlackAlertIfEnabled(
-                    "Testing run result summary failed",
-                    customMessage,
+                    slack.title(),
+                    slack.detail(),
                     trrs,
                     accountId,
                     "markTestRunResultSummaryFailed"
@@ -2709,10 +2718,13 @@ public class DbAction extends ActionSupport {
             if (trrs != null && trrs.getTestingRunId() != null) {
                 trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
                 if(trrs.getTestResultsCount() == 0){
-                    String customMessage = "CRITICAL ERROR: No test results found for Summary ID: " + summaryId;
+                    String runHex = trrs.getTestingRunId() != null ? trrs.getTestingRunId().toHexString() : null;
+                    String sumHex = trrs.getId() != null ? trrs.getId().toHexString() : summaryId;
+                    TestingFailureSlackCopy.TitleAndDetail slack =
+                            TestingFailureSlackCopy.forIssueCountInSummaryNoResults(runHex, sumHex);
                     sendTestingFailureSlackAlertIfEnabled(
-                            "No test results",
-                            customMessage,
+                            slack.title(),
+                            slack.detail(),
                             trrs,
                             Context.accountId.get(),
                             "updateIssueCountInSummary"
@@ -2793,13 +2805,18 @@ public class DbAction extends ActionSupport {
     public String updateTestRunResultSummary() {
         try {
             DbLayer.updateTestRunResultSummary(summaryId);
-            // send slack alert for failed state
             int accountId = Context.accountId.get();
-            String customMessage = "Testing Run Result Summary Failed for Summary ID: " + summaryId;
             TestingRunResultSummary summaryForSlack = DbLayer.fetchTestingRunResultSummary(summaryId);
+            String runHex = summaryForSlack != null && summaryForSlack.getTestingRunId() != null
+                    ? summaryForSlack.getTestingRunId().toHexString()
+                    : null;
+            String sumHex = summaryId != null ? summaryId : (summaryForSlack != null && summaryForSlack.getId() != null
+                    ? summaryForSlack.getId().toHexString()
+                    : null);
+            TestingFailureSlackCopy.TitleAndDetail slack = TestingFailureSlackCopy.forUsageLimitStoppedTest(runHex, sumHex);
             sendTestingFailureSlackAlertIfEnabled(
-                    "Testing run result summary failed",
-                    customMessage,
+                    slack.title(),
+                    slack.detail(),
                     summaryForSlack,
                     accountId,
                     "updateTestRunResultSummary"
@@ -2814,6 +2831,20 @@ public class DbAction extends ActionSupport {
     public String updateTestRunResultSummaryNoUpsert() {
         try {
             DbLayer.updateTestRunResultSummaryNoUpsert(testingRunResultSummaryId);
+            int accountId = Context.accountId.get();
+            TestingRunResultSummary summaryForSlack = DbLayer.fetchTestingRunResultSummary(testingRunResultSummaryId);
+            String runHexStopped = summaryForSlack != null && summaryForSlack.getTestingRunId() != null
+                    ? summaryForSlack.getTestingRunId().toHexString()
+                    : null;
+            TestingFailureSlackCopy.TitleAndDetail slack = TestingFailureSlackCopy.forStoppedTestRunSummary(
+                    runHexStopped, testingRunResultSummaryId);
+            sendTestingFailureSlackAlertIfEnabled(
+                    slack.title(),
+                    slack.detail(),
+                    summaryForSlack,
+                    accountId,
+                    "updateTestRunResultSummaryNoUpsert"
+            );
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateTestRunResultSummaryNoUpsert " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -3038,10 +3069,13 @@ public class DbAction extends ActionSupport {
                 trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
             }
             if(trrs != null && trrs.getTestResultsCount() == 0){
-                String customMessage = "CRITICAL ERROR: No test results found for Summary ID: " + summaryId;
+                String runHexState = trrs.getTestingRunId() != null ? trrs.getTestingRunId().toHexString() : null;
+                String sumHexState = trrs.getId() != null ? trrs.getId().toHexString() : summaryId;
+                TestingFailureSlackCopy.TitleAndDetail slack =
+                        TestingFailureSlackCopy.forIssueCountAndStateNoResults(state, runHexState, sumHexState);
                 sendTestingFailureSlackAlertIfEnabled(
-                        "No test results",
-                        customMessage,
+                        slack.title(),
+                        slack.detail(),
                         trrs,
                         Context.accountId.get(),
                         "updateIssueCountAndStateInSummary"
@@ -3170,8 +3204,9 @@ public class DbAction extends ActionSupport {
     /**
      * Sends a failure alert to the account's Slack webhooks when the parent {@link TestingRun} has
      * Slack notifications enabled, using the same channel selection as {@link #sendSlack(TestingRunResultSummary, Map, int)}.
+     * Public so {@code TestingFailureSlackLocalHarness} can exercise the same path locally.
      */
-    private static void sendTestingFailureSlackAlertIfEnabled(
+    public static void sendTestingFailureSlackAlertIfEnabled(
             String title,
             String detailMessage,
             TestingRunResultSummary trrs,

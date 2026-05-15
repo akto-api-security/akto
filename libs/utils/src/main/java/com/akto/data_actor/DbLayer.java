@@ -1805,6 +1805,20 @@ public class DbLayer {
         return fetchLatestTestingRunResultFromComparison(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId));
     }
 
+    /**
+     * True if any {@link TestingRunResult} exists for this summary (standard or vulnerable collection).
+     * Uses {@code findOne} + {@code _id} projection only.
+     */
+    public static boolean hasAnyTestingRunResultForSummary(String testingRunResultSummaryId) {
+        ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
+        Bson filter = Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId);
+        Bson projection = Projections.include(Constants.ID);
+        if (TestingRunResultDao.instance.findOne(filter, projection) != null) {
+            return true;
+        }
+        return VulnerableTestingRunResultDao.instance.findOne(filter, projection) != null;
+    }
+
     public static TestingRunResultSummary fetchTestingRunResultSummary(String testingRunResultSummaryId) {
         ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
         return TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, summaryObjectId));
