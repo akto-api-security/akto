@@ -43,6 +43,7 @@ import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.tracing.ServiceGraphBuilder;
 import com.akto.tracing.TraceParseResult;
 import com.akto.tracing.n8n.N8nTraceParser;
+import com.akto.tracing.snowflake.SnowflakeTraceParser;
 import com.akto.usage.OrgUtils;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
@@ -748,6 +749,58 @@ public class HttpCallParser {
         }
     }
 
+    /**
+     * Whether to persist traces for Snowflake agent traffic via {@link #storeSnowflakeAgentTrace}.
+     * N8N uses {@link #parseN8nTrace} only; other AI agent sources do not get HTTP-derived traces here.
+     */
+    private boolean shouldStoreSnowflakeAgentTrace(HttpResponseParams httpResponseParam) {
+        try {
+            String tagsJson = httpResponseParam.getTags();
+            if (tagsJson == null || tagsJson.isEmpty()) {
+                return false;
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) {
+                return false;
+            }
+            String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+            return source != null && Constants.AI_AGENT_SOURCE_SNOWFLAKE.equalsIgnoreCase(source.trim());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error checking Snowflake trace eligibility: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Stores Snowflake Cortex traces (multi-span when observability data is present) from {@link HttpResponseParams}.
+     */
+    private void storeSnowflakeAgentTrace(HttpResponseParams httpResponseParam) {
+        try {
+            String tagsJson = httpResponseParam.getTags();
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) {
+                return;
+            }
+            String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+            if (source == null || !Constants.AI_AGENT_SOURCE_SNOWFLAKE.equalsIgnoreCase(source.trim())) {
+                return;
+            }
+            if (!SnowflakeTraceParser.getInstance().canParse(httpResponseParam)) {
+                return;
+            }
+            TraceParseResult snowflakeResult = SnowflakeTraceParser.getInstance().parse(httpResponseParam);
+            dataActor.storeTrace(snowflakeResult.getTrace());
+            if (snowflakeResult.getSpans() != null && !snowflakeResult.getSpans().isEmpty()) {
+                dataActor.storeSpans(snowflakeResult.getSpans());
+            }
+            loggerMaker.info("Stored Snowflake AI agent trace (SnowflakeTraceParser)", LogDb.RUNTIME);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error storing Snowflake trace: " + e.getMessage());
+        }
+    }
+
     private List<HttpResponseParams> filterDefaultPayloads(List<HttpResponseParams> filteredResponseParams, Map<String, DefaultPayload> defaultPayloadMap) {
         List<HttpResponseParams> ret = new ArrayList<>();
         for(HttpResponseParams httpResponseParams: filteredResponseParams) {
@@ -1442,6 +1495,10 @@ public class HttpCallParser {
             // Build service graph edges for Arcade traffic
             if (isArcadeTraffic(tagsMap)) {
                 parseArcadeServiceGraph(httpResponseParam);
+            }
+
+            if (shouldStoreSnowflakeAgentTrace(httpResponseParam)) {
+                storeSnowflakeAgentTrace(httpResponseParam);
             }
 
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
