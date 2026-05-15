@@ -107,15 +107,24 @@ function Endpoints() {
         });
     }, [getRiskScoreStatus]);
 
-    const applySkillRiskScores = useCallback((scoreMap, isMountedRef) => {
+    const applySkillRiskScores = useCallback((scoreMap, maliciousSkills, isMountedRef) => {
         if (!isMountedRef.current) return;
         setData((prev) => {
             const updatedSkills = prev.skills.map((row) => {
                 const riskScore = scoreMap[row.groupName] || 0;
+                const isMalicious = maliciousSkills.has(row.groupName);
+                const groupNameDisplay = (
+                    <HorizontalStack gap="2" align="start" wrap={false}>
+                        <Text>{row.groupName}</Text>
+                        {isMalicious && <Badge size="small" status="critical">Malicious</Badge>}
+                    </HorizontalStack>
+                );
                 return {
                     ...row,
                     riskScore,
                     maxRiskScore: riskScore,
+                    isMalicious,
+                    groupNameDisplay,
                     riskScoreComp: riskScore
                         ? <Badge status={getRiskScoreStatus(riskScore)} size="small">{riskScore}</Badge>
                         : "-",
@@ -142,7 +151,7 @@ function Endpoints() {
 
         // cached.ts > 0 means we already fetched (data may be empty if no /skill/ URLs matched)
         if (cacheAge <= SKILL_RISK_CACHE_TTL_MS && cached?.ts > 0) {
-            applySkillRiskScores(cached.data, isMountedRef);
+            applySkillRiskScores(cached.data, new Set(cached.maliciousSkills || []), isMountedRef);
             return;
         }
 
@@ -168,19 +177,23 @@ function Endpoints() {
 
         if (!isMountedRef.current) return;
 
-        // Build skillName -> maxRiskScore from apiInfos where _id.url matches /skill/<skillName>
+        // Build skillName -> { maxRiskScore, isMalicious } from apiInfos where _id.url matches /skill/<skillName>
         const skillScoreMap = {};
+        const maliciousSkills = new Set();
         results.forEach((infos) => {
             infos.forEach((info) => {
                 const splits = info.id.url.split("skills/")
                 const skillName = splits[1]
+                if (!skillName) return;
                 const score = info.riskScore || 0
                 skillScoreMap[skillName] = score
+                const isMalicious = (info.tagsList || []).some(t => t.key === "malicious-skill" && t.value === "true");
+                if (isMalicious) maliciousSkills.add(skillName);
             });
         });
 
-        PersistStore.getState().setSkillRiskScoreCache({ data: skillScoreMap, ts: Date.now() });
-        applySkillRiskScores(skillScoreMap, isMountedRef);
+        PersistStore.getState().setSkillRiskScoreCache({ data: skillScoreMap, maliciousSkills: [...maliciousSkills], ts: Date.now() });
+        applySkillRiskScores(skillScoreMap, maliciousSkills, isMountedRef);
     }, [applySkillRiskScores]);
 
     async function fetchData(isMountedRef = { current: true }) {
