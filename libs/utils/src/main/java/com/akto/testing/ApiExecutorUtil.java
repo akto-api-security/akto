@@ -101,7 +101,7 @@ public class ApiExecutorUtil {
 
             if (cachedForScript != null) {
                 applyCachedToRequest(originalHttpRequest, cachedForScript);
-                return cachedForScript.cachedPayload;
+                return originalHttpRequest.getBody();
             }
 
             loggerMaker.infoAndAddToDb("Starting calculateHashAndAddAuth");
