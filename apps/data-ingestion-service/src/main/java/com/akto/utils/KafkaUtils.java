@@ -10,7 +10,7 @@ public class KafkaUtils {
 
     private static final LoggerMaker logger = new LoggerMaker(KafkaUtils.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static Kafka kafkaProducer;
-    private static TopicPublisher topicPublisher;
+    private static TrafficPublisher topicPublisher;
 
     public void initKafkaProducer() {
         String kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "localhost:29092");
@@ -66,7 +66,7 @@ public class KafkaUtils {
         return kafkaProducer;
     }
 
-    public static void setTopicPublisher(TopicPublisher publisher) {
+    public static void setTopicPublisher(TrafficPublisher publisher) {
         topicPublisher = publisher;
     }
 

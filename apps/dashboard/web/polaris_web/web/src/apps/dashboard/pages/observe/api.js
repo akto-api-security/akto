@@ -78,6 +78,17 @@ export default {
         });
     },
 
+    // Paginated AGENT_SKILL audit rows from mcp_audit_info — same response shape as
+    // fetchAuditData ({ auditData: [...], total: N }). One row per (skill, mcpHost)
+    // detection. The Skills tab uses this both for table rows and for the badge count.
+    async fetchSkillsData(skip = 0, limit = 50, sortKey = 'lastDetected', sortOrder = -1, filters = {}, searchString = '') {
+        const resp = await request({
+            url: '/api/fetchSkillsData',
+            method: 'post',
+            data: { skip, limit, sortKey, sortOrder, filters, searchString }
+        });
+        return resp || { auditData: [], total: 0 };
+    },
     async fetchMcpAuditInfoByCollection(apiCollectionId) {
         const id = typeof apiCollectionId === 'string' ? parseInt(apiCollectionId, 10) : apiCollectionId;
         const resp = await request({

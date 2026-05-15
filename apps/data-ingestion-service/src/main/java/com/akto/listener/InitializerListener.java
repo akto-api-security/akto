@@ -10,9 +10,11 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.metrics.ModuleInfoWorker;
+import com.akto.utils.HttpTrafficPublisher;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.McpCollectionResolver;
 import com.akto.utils.TopicPublisher;
+import com.akto.utils.TrafficPublisher;
 import com.mongodb.ConnectionString;
 
 
@@ -24,20 +26,21 @@ public class InitializerListener implements ServletContextListener {
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
         initMongoConnection();
 
-        // Initialize Kafka
-        KafkaUtils kafkaUtils = new KafkaUtils();
-        kafkaUtils.initKafkaProducer();
-
-        // Initialize GuardrailsConfig and TopicPublisher
         GuardrailsConfig guardrailsConfig = GuardrailsConfig.getInstance();
         logger.infoAndAddToDb("Guardrails configuration: " + guardrailsConfig);
 
-        // Store publisher for use in KafkaUtils
-        TopicPublisher topicPublisher = new TopicPublisher(
-            KafkaUtils.getKafkaProducer(),
-            guardrailsConfig
-        );
-        KafkaUtils.setTopicPublisher(topicPublisher);
+        boolean useHttpIngest = "true".equalsIgnoreCase(System.getenv("USE_HTTP_INGEST"));
+        TrafficPublisher publisher;
+        if (useHttpIngest) {
+            logger.infoAndAddToDb("USE_HTTP_INGEST=true — publishing traffic via HTTP ingest API");
+            publisher = new HttpTrafficPublisher();
+        } else {
+            logger.infoAndAddToDb("Publishing traffic via Kafka");
+            KafkaUtils kafkaUtils = new KafkaUtils();
+            kafkaUtils.initKafkaProducer();
+            publisher = new TopicPublisher(KafkaUtils.getKafkaProducer(), guardrailsConfig);
+        }
+        KafkaUtils.setTopicPublisher(publisher);
 
         String tcpEnv = System.getenv("SYSLOG_TCP_ENABLED");
         boolean tcpEnabled = tcpEnv == null || Boolean.parseBoolean(tcpEnv.trim());

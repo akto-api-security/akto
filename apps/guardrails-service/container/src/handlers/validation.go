@@ -5,13 +5,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/akto-api-security/akto-endpoint-shield/mcp"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/guardrails-service/pkg/slack"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
-	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -123,8 +124,13 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 			zap.Int64("latencyMs", time.Since(start).Milliseconds()))
 		alertMsg := "[guardrails] /validate/request - missing requestPayload"
 		slack.SendAlert(h.logger, alertMsg)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "requestPayload is required",
+		c.JSON(http.StatusOK, &mcp.ValidationResult{
+			Allowed:         true,
+			Modified:        false,
+			ModifiedPayload: "",
+			Reason:          "No request body provided",
+			Metadata:        types.ThreatMetadata{},
+			Behaviour:       "",
 		})
 		return
 	}
@@ -265,8 +271,13 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 			zap.Int64("latencyMs", time.Since(start).Milliseconds()))
 		alertMsg := "[guardrails] /validate/response - missing responsePayload or payload"
 		slack.SendAlert(h.logger, alertMsg)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "responsePayload or payload is required",
+		c.JSON(http.StatusOK, &mcp.ValidationResult{
+			Allowed:         true,
+			Modified:        false,
+			ModifiedPayload: "",
+			Reason:          "No response body provided",
+			Metadata:        types.ThreatMetadata{},
+			Behaviour:       "",
 		})
 		return
 	}

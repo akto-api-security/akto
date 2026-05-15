@@ -83,7 +83,10 @@ public class MetricData {
         TOTAL_PHYSICAL_MEMORY_MB("Total Physical Memory", "Total physical memory available (MB)"),
 
         TC_CPU_USAGE("Traffic Collector CPU Usage", "CPU usage percentage of traffic collector modules"),
-        TC_MEMORY_USAGE("Traffic Collector Memory Used", "Memory used in MB by traffic collector modules");
+        TC_MEMORY_USAGE("Traffic Collector Memory Used", "Memory used in MB by traffic collector modules"),
+        TC_HOST_MEMORY_USED_MB("Traffic Collector Host Memory Used", "Host used memory (MB)"),
+        TC_GOROUTINES("Traffic Collector Goroutines", "Number of goroutines"),
+        TC_SYSTEM_CPU_PERCENT("Traffic Collector System CPU Percent", "Host-level CPU usage percentage");
 
         private final String descriptionName;
         private final String description;

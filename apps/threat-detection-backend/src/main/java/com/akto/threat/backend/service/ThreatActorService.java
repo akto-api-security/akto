@@ -943,12 +943,16 @@ public class ThreatActorService {
   public FetchMaliciousEventsResponse fetchAggregateMaliciousRequests(
       String accountId, FetchMaliciousEventsRequest request) {
 
+    long t0 = System.currentTimeMillis();
+    loggerMaker.warnAndAddToDb("fetchAggregateMaliciousRequests START ts=" + t0 + " refId=" + request.getRefId() + " eventType=" + request.getEventType(), LoggerMaker.LogDb.THREAT_DETECTION);
+
     List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> maliciousPayloadsResponse = new ArrayList<>();
     String refId = request.getRefId();
     Bson filters = Filters.eq("refId", refId);
     FindIterable<MaliciousEventDto> respList;
 
     if (request.getEventType().equalsIgnoreCase(MaliciousEventDto.EventType.AGGREGATED.name())) {
+        loggerMaker.warnAndAddToDb("fetchAggregateMaliciousRequests BEFORE_FIND (AGGREGATED) elapsed=" + (System.currentTimeMillis() - t0) + "ms", LoggerMaker.LogDb.THREAT_DETECTION);
         Bson matchConditions = Filters.and(
             Filters.eq("actor", request.getActor()),
             Filters.eq("filterId", request.getFilterId())
@@ -958,13 +962,18 @@ public class ThreatActorService {
             filters
         );
         respList = maliciousEventDao.getCollection(accountId).find(matchConditions).sort(Sorts.descending("detectedAt")).limit(10);
+        loggerMaker.warnAndAddToDb("fetchAggregateMaliciousRequests AFTER_FIND (AGGREGATED) elapsed=" + (System.currentTimeMillis() - t0) + "ms", LoggerMaker.LogDb.THREAT_DETECTION);
         maliciousPayloadsResponse.addAll(this.fetchMaliciousPayloadsResponse(respList));
+        loggerMaker.warnAndAddToDb("fetchAggregateMaliciousRequests AFTER_PAYLOAD_RESPONSE (AGGREGATED) elapsed=" + (System.currentTimeMillis() - t0) + "ms", LoggerMaker.LogDb.THREAT_DETECTION);
         // TODO: Handle case where aggregate was satisfied only once.
     } else {
+        loggerMaker.warnAndAddToDb("fetchAggregateMaliciousRequests BEFORE_FIND (SINGLE) elapsed=" + (System.currentTimeMillis() - t0) + "ms", LoggerMaker.LogDb.THREAT_DETECTION);
         respList = maliciousEventDao.getCollection(accountId).find(filters);
+        loggerMaker.warnAndAddToDb("fetchAggregateMaliciousRequests AFTER_FIND (SINGLE) elapsed=" + (System.currentTimeMillis() - t0) + "ms", LoggerMaker.LogDb.THREAT_DETECTION);
         maliciousPayloadsResponse = this.fetchMaliciousPayloadsResponse(respList);
-
+        loggerMaker.warnAndAddToDb("fetchAggregateMaliciousRequests AFTER_PAYLOAD_RESPONSE (SINGLE) elapsed=" + (System.currentTimeMillis() - t0) + "ms", LoggerMaker.LogDb.THREAT_DETECTION);
     }
+    loggerMaker.warnAndAddToDb("fetchAggregateMaliciousRequests END totalElapsed=" + (System.currentTimeMillis() - t0) + "ms", LoggerMaker.LogDb.THREAT_DETECTION);
     return FetchMaliciousEventsResponse.newBuilder().addAllMaliciousPayloadsResponse(maliciousPayloadsResponse).build();
   }
 

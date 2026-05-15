@@ -252,4 +252,5 @@ public class EndpointShieldAgentAction extends UserAction {
 
         return SUCCESS.toUpperCase();
     }
+
 }

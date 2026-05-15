@@ -678,6 +678,7 @@
             </result>
         </action>
 
+
         <action name="signup-email" class="com.akto.action.SignupAction" method="registerViaEmail">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2992,7 +2993,7 @@
             </result>
         </action>
 
-        <action name="api/fetchBlockedSkillNames" class="com.akto.action.ApiCollectionsAction" method="fetchBlockedSkillNames">
+        <action name="api/fetchSkillsData" class="com.akto.action.AuditDataAction" method="fetchSkillsData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack"/>
             <interceptor-ref name="roleAccessInterceptor">
@@ -3005,7 +3006,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
-                <param name="root">response</param>
+                <param name="includeProperties">auditData.*,total</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -5147,7 +5148,9 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
-            <result name="SUCCESS"  type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">chattyDomains,aiDomains,domainKey,domainsToAdd,domainsToRemove,deletedPatternResult,patternValue,connectorType</param>
+            </result>
         </action>
 
         <action name="api/updatePrivateCidrIps" class="com.akto.action.AdminSettingsAction" method="editPrivateCidrList">
@@ -5235,6 +5238,30 @@
             </result>
             <result name="SUCCESS" type="json">
                 <param name="root">deletedPatternResult</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/updateAccountDomains" class="com.akto.action.AdminSettingsAction" method="updateAccountDomains">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated account domain list</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^chattyDomains.*,^aiDomains.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -7516,6 +7543,104 @@
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/addFileInspectionRule" class="com.akto.action.endpoint_shield.FileInspectionRuleAction" method="addFileInspectionRule">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^rule.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchFileInspectionRules" class="com.akto.action.endpoint_shield.FileInspectionRuleAction" method="fetchFileInspectionRules">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^rules.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/deleteFileInspectionRule" class="com.akto.action.endpoint_shield.FileInspectionRuleAction" method="deleteFileInspectionRule">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchFileInspectionResults" class="com.akto.action.endpoint_shield.FileInspectionRuleAction" method="fetchFileInspectionResults">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^recentResults.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/getFileInspectionContent" class="com.akto.action.endpoint_shield.FileInspectionRuleAction" method="getFileContent">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^blobContent.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
@@ -11163,7 +11288,7 @@
 
         <action name="api/getActorsCountPerCounty"
             class="com.akto.action.threat_detection.ThreatActorAction"
-            method="getActorsCountPerCounty">
+            method="fetchActorsCountPerCounty">
             <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
@@ -14752,6 +14877,96 @@
                         name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
+
+        <action name="api/addNewRelicIntegration" class="com.akto.action.metrics.NewRelicIntegrationAction" method="addNewRelicIntegration" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User added a New Relic integration</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">NEW_RELIC_INTEGRATION</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/removeNewRelicIntegration" class="com.akto.action.metrics.NewRelicIntegrationAction" method="removeNewRelicIntegration" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User removed New Relic integration</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">NEW_RELIC_INTEGRATION</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchNewRelicIntegration" class="com.akto.action.metrics.NewRelicIntegrationAction" method="fetchNewRelicIntegration" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">NEW_RELIC_INTEGRATION</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/updateIssueDescription" class="com.akto.action.testing_issues.IssuesAction" method="updateIssueDescription">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

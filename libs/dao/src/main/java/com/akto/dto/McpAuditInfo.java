@@ -30,6 +30,12 @@ public class McpAuditInfo {
     public static final String CONTEXT_SOURCE = "contextSource";
     public static final String BLOCK_ALL = "blockAll";
 
+    // Value used in the `type` field for AI-agent skill audit records.
+    public static final String TYPE_AGENT_SKILL = "AGENT_SKILL";
+    // Values used in the `remarks` field for skill/MCP-server approval flows.
+    public static final String REMARKS_REJECTED = "Rejected";
+    public static final String REMARKS_APPROVED = "Approved";
+
     private ObjectId id;
 
     @BsonIgnore

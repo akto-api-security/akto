@@ -980,6 +980,9 @@ public class ApiCollectionsAction extends UserAction {
     @Setter
     private String skillName;
 
+    @Setter
+    private List<String> mcpHosts;
+
     public String updateSkillBlockStatus() {
         try {
             if (this.apiCollectionIds == null || this.apiCollectionIds.isEmpty()) {
@@ -991,23 +994,54 @@ public class ApiCollectionsAction extends UserAction {
                 return ERROR.toUpperCase();
             }
 
+            // Dual-write: keep api_info in sync for legacy readers (ApiEndpoints.jsx etc.)
+            // and update mcp_audit_info (the new source of truth for the Skills tab).
             String skillUrl = "/skills/" + this.skillName;
-            UpdateResult result = ApiInfoDao.instance.updateMany(
+            UpdateResult apiInfoResult = ApiInfoDao.instance.updateMany(
                 Filters.and(
                     Filters.in(ApiInfo.ID_API_COLLECTION_ID, this.apiCollectionIds),
                     Filters.eq(ApiInfo.ID_URL, skillUrl)
                 ),
                 Updates.set(ApiInfo.IS_SKILL_BLOCKED, this.isSkillBlocked)
             );
+            long apiInfoMatched = apiInfoResult.getMatchedCount();
 
-            if (result.getMatchedCount() == 0) {
-                addActionError("No valid skill collections found");
+            // mcp_audit_info: reuse the existing remarks convention used for MCP-server
+            // approval flows (REMARKS_REJECTED = blocked, REMARKS_APPROVED = explicitly allowed).
+            int now = Context.now();
+            User user = getSUser();
+            String markedBy = (user != null && user.getLogin() != null) ? user.getLogin() : "system";
+            String remarksVal = this.isSkillBlocked ? McpAuditInfo.REMARKS_REJECTED : McpAuditInfo.REMARKS_APPROVED;
+
+            List<Bson> auditFilters = new ArrayList<>();
+            auditFilters.add(Filters.eq(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL));
+            auditFilters.add(Filters.eq(McpAuditInfo.RESOURCE_NAME, this.skillName));
+            if (this.mcpHosts != null && !this.mcpHosts.isEmpty()) {
+                auditFilters.add(Filters.in(McpAuditInfo.MCP_HOST, this.mcpHosts));
+            }
+
+            List<Bson> auditUpdates = new ArrayList<>();
+            auditUpdates.add(Updates.set(McpAuditInfo.REMARKS, remarksVal));
+            auditUpdates.add(Updates.set(McpAuditInfo.MARKED_BY, markedBy));
+            auditUpdates.add(Updates.set(McpAuditInfo.UPDATED_TIMESTAMP, now));
+            if (!this.isSkillBlocked) {
+                auditUpdates.add(Updates.set(McpAuditInfo.APPROVED_AT, now));
+            }
+
+            UpdateResult auditResult = McpAuditInfoDao.instance.updateMany(
+                Filters.and(auditFilters),
+                Updates.combine(auditUpdates)
+            );
+
+            if (apiInfoMatched == 0 && auditResult.getMatchedCount() == 0) {
+                addActionError("No matching skill records found");
                 return ERROR.toUpperCase();
             }
 
             response = new BasicDBObject();
             response.put("success", true);
-            response.put("updatedCollections", result.getMatchedCount());
+            response.put("updatedCollections", apiInfoMatched);
+            response.put("updatedAuditRecords", auditResult.getMatchedCount());
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             addActionError("Error updating skill block status: " + e.getMessage());
@@ -1027,38 +1061,6 @@ public class ApiCollectionsAction extends UserAction {
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             addActionError("Error fetching blocked skill collections");
-            return ERROR.toUpperCase();
-        }
-    }
-
-    public String fetchBlockedSkillNames() {
-        try {
-            Set<Integer> blockedCollectionIds = ApiInfoDao.instance.findDistinctFields(
-                ApiInfo.ID_API_COLLECTION_ID,
-                Integer.class,
-                Filters.eq(ApiInfo.IS_SKILL_BLOCKED, true)
-            );
-            Set<String> blockedSkillNames = new HashSet<>();
-            if (!blockedCollectionIds.isEmpty()) {
-                List<String> skillUrls = ApiInfoDao.instance.findDistinctFields(
-                    ApiInfo.ID_URL,
-                    String.class,
-                    Filters.and(
-                        Filters.in(ApiInfo.ID_API_COLLECTION_ID, blockedCollectionIds),
-                        Filters.regex(ApiInfo.ID_URL, "^/skills/")
-                    )
-                ).stream().collect(Collectors.toList());
-                for (String url : skillUrls) {
-                    if (url.startsWith("/skills/")) {
-                        blockedSkillNames.add(url.substring("/skills/".length()));
-                    }
-                }
-            }
-            response = new BasicDBObject();
-            response.put("blockedSkillNames", new ArrayList<>(blockedSkillNames));
-            return SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            addActionError("Error fetching blocked skill names");
             return ERROR.toUpperCase();
         }
     }

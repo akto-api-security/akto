@@ -17,6 +17,7 @@ const KNOWN_CLIENTS = {
     claude2: { displayName: 'Claude CLI', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
     chatgpt: { displayName: 'ChatGPT', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     openai: { displayName: 'OpenAI', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
+    codex: { displayName: 'Codex', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     gemini: { displayName: 'Gemini', domain: 'gemini.google.com', agentType: CLIENT_TYPES.LLM },
     copilot: { displayName: 'Copilot', domain: 'copilot.microsoft.com', agentType: CLIENT_TYPES.AI_AGENT },
     cursor: { displayName: 'Cursor', domain: 'cursor.com', agentType: CLIENT_TYPES.AI_AGENT },

@@ -50,11 +50,11 @@ export default {
             data: { apiCollectionIds, currentIsOutOfTestingScopeVal }
         })
     },
-    updateSkillBlockStatus(apiCollectionIds, skillName, isSkillBlocked) {
+    updateSkillBlockStatus(apiCollectionIds, skillName, isSkillBlocked, mcpHosts) {
         return request({
             url: '/api/updateSkillBlockStatus',
             method: 'post',
-            data: { apiCollectionIds, skillName, isSkillBlocked }
+            data: { apiCollectionIds, skillName, isSkillBlocked, mcpHosts: mcpHosts || [] }
         })
     },
     fetchBlockedSkillCollections() {

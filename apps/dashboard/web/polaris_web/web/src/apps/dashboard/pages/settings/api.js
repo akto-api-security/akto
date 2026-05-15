@@ -1100,6 +1100,66 @@ const settingRequests = {
             method: 'post',
             data: {patternValue, connectorType}
         })
+    },
+
+    fetchFileInspectionRules() {
+        return request({ url: '/api/fetchFileInspectionRules', method: 'post', data: {} })
+    },
+    addFileInspectionRule(path, existenceOnly, maxDepth) {
+        return request({
+            url: '/api/addFileInspectionRule',
+            method: 'post',
+            data: { path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0 }
+        })
+    },
+    deleteFileInspectionRule(path) {
+        return request({
+            url: '/api/deleteFileInspectionRule',
+            method: 'post',
+            data: { path }
+        })
+    },
+    fetchFileInspectionResults(ruleId) {
+        return request({
+            url: '/api/fetchFileInspectionResults',
+            method: 'post',
+            data: { ruleId: ruleId || '' }
+        })
+    },
+    getFileInspectionContent(sha256) {
+        return request({
+            url: '/api/getFileInspectionContent',
+            method: 'post',
+            data: { sha256 }
+        })
+    },
+    fetchNewRelicIntegration() {
+        return request({
+            url: '/api/fetchNewRelicIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addNewRelicIntegration(apiKey) {
+        return request({
+            url: '/api/addNewRelicIntegration',
+            method: 'post',
+            data: {apiKey}
+        })
+    },
+    removeNewRelicIntegration() {
+        return request({
+            url: '/api/removeNewRelicIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    updateAccountDomains(domainKey, domainsToAdd, domainsToRemove) {
+        return request({
+            url: '/api/updateAccountDomains',
+            method: 'post',
+            data: { domainKey, domainsToAdd, domainsToRemove }
+        })
     }
 }
 

@@ -789,6 +789,46 @@ public class AdminSettingsAction extends UserAction {
     @Getter
     private Map<String, AccountSettings.ProxyPatternInfo> deletedPatternResult;
 
+    @Setter
+    private String domainKey;
+    @Setter
+    private List<String> domainsToAdd;
+    @Setter
+    private List<String> domainsToRemove;
+    @Getter
+    private List<String> chattyDomains;
+    @Getter
+    private List<String> aiDomains;
+
+    public String updateAccountDomains() {
+        if (StringUtils.isEmpty(domainKey)) {
+            addActionError("Domain key is required.");
+            return ERROR.toUpperCase();
+        }
+        if (!domainKey.equals(AccountSettings.CHATTY_DOMAINS) && !domainKey.equals(AccountSettings.AI_DOMAINS)) {
+            addActionError("Invalid domain key.");
+            return ERROR.toUpperCase();
+        }
+        try {
+            Bson filter = AccountSettingsDao.generateFilter();
+            if (domainsToAdd != null && !domainsToAdd.isEmpty()) {
+                AccountSettingsDao.instance.updateOne(filter,
+                    Updates.addEachToSet(domainKey, domainsToAdd));
+            }
+            if (domainsToRemove != null && !domainsToRemove.isEmpty()) {
+                AccountSettingsDao.instance.updateOne(filter,
+                    Updates.pullAll(domainKey, domainsToRemove));
+            }
+            AccountSettings settings = AccountSettingsDao.instance.findOne(filter);
+            this.chattyDomains = settings != null ? settings.getChattyDomains() : null;
+            this.aiDomains = settings != null ? settings.getAiDomains() : null;
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error updating account domains for key={}", domainKey, e);
+            return ERROR.toUpperCase();
+        }
+    }
+
     public String deleteProxyPattern() {
         User user = getSUser();
         if (user == null) return ERROR.toUpperCase();

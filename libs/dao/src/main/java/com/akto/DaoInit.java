@@ -45,6 +45,7 @@ import com.akto.dto.loaders.PostmanUploadLoader;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.EndpointShieldLog;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.new_relic_integration.NewRelicIntegration;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
@@ -346,6 +347,7 @@ public class DaoInit {
         ClassModel<WizEndpointAsset> wizEndpointAssetClassModel = ClassModel.builder(WizEndpointAsset.class).enableDiscriminator(true).build();
         ClassModel<WizSyncJobParams> wizSyncJobParamsClassModel = ClassModel.builder(WizSyncJobParams.class).enableDiscriminator(true).build();
         ClassModel<EndpointMcpConfig> endpointMcpConfigClassModel = ClassModel.builder(EndpointMcpConfig.class).enableDiscriminator(true).build();
+        ClassModel<NewRelicIntegration> newRelicIntegrationClassModel = ClassModel.builder(NewRelicIntegration.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -390,7 +392,7 @@ public class DaoInit {
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
                 traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
                 wizIntegrationClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel,
-                mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel)
+                mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel, newRelicIntegrationClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(

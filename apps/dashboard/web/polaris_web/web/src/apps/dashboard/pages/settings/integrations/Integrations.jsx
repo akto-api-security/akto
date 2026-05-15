@@ -191,6 +191,12 @@ function Integrations() {
         name:'Wiz',
         source: '/public/wiz_logo.svg'
     }
+    
+    let newRelicObj ={
+      id: 'new_relic',
+      name:'New Relic',
+      source: '/public/new-relic-logo.svg'
+    }
 
     let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, googleWorkSpaceObj]
     const [currItems , setCurrentItems] = useState(getTabItems('all'))
@@ -245,6 +251,11 @@ function Integrations() {
           content: <span>SIEM <Badge status='new'>{getTabItems('splunk').length}</Badge></span>,
           component: <TabsList />
         },
+        {
+          id: 'monitoring',
+          content: <span>Monitoring <Badge status='new'>{getTabItems('monitoring').length}</Badge></span>,
+          component: <TabsList />
+        },
     ]
 
   function getTabItems(tabId) {
@@ -257,6 +268,7 @@ function Integrations() {
     const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj, wizObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];
     const siemItems = [splunkObj, datadogObj];
+    const monitoringItems = [newRelicObj]
     switch (tabId) {
       case 'traffic':
         return trafficItems;
@@ -297,10 +309,15 @@ function Integrations() {
           return emptyItem;
         }
         return siemItems;
+      case 'monitoring':
+        if (func.checkLocal()) {
+          return emptyItem;
+        }
+        return monitoringItems;
       default:
         let allItems = [...trafficItems, ...aiItems]
         if (!func.checkLocal()){
-          allItems = [...allItems, ...alertsItems, ...automationItems, ...ssoItems,  ...cicdItems, ...wafItems, ...siemItems]
+          allItems = [...allItems, ...alertsItems, ...automationItems, ...ssoItems,  ...cicdItems, ...wafItems, ...siemItems, ...monitoringItems]
         }
         if(func.checkOnPrem()){
           allItems = [...allItems, ...reportingItems]

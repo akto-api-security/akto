@@ -172,6 +172,12 @@ const SettingsLeftNav = () => {
                         icon: GlobeMajor,
                         selected: page === "allowed-hosts",
                         onClick: () => navigate("/dashboard/settings/allowed-hosts")
+                    },
+                    {
+                        label: 'File Inspection',
+                        icon: CodeMajor,
+                        selected: page === "file-inspection",
+                        onClick: () => navigate("/dashboard/settings/file-inspection")
                     }
                 ] : []),
                     {

@@ -963,6 +963,10 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 
 	// Apply schema-based content extraction if configured for this endpoint
 	responseBodyForValidation := s.extractPayloadForValidation(responseBody, params.Method, params.Path, false)
+	s.logger.Info("ValidateResponse - payload prepared for validation",
+		zap.String("path", params.Path),
+		zap.String("method", params.Method),
+		zap.String("payloadToValidate", responseBodyForValidation))
 
 	// Use processor's ProcessResponse method with external policies
 	processStart := time.Now()
