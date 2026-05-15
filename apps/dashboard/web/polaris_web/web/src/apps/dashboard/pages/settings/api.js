@@ -1147,18 +1147,18 @@ const settingRequests = {
             data: {}
         })
     },
-    saveEndpointShieldSettings(endpointShieldSettings) {
+    saveEndpointShieldSettings(platformKey, platformConfig) {
         return request({
             url: '/api/saveEndpointShieldSettings',
             method: 'post',
-            data: {endpointShieldSettings}
+            data: {platformKey, platformConfig}
         })
     },
-    refreshEndpointShieldLatestVersion() {
+    refreshEndpointShieldLatestVersion(platformKey) {
         return request({
             url: '/api/refreshEndpointShieldLatestVersion',
             method: 'post',
-            data: {}
+            data: {platformKey}
         })
     }
 }
