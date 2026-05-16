@@ -82,6 +82,7 @@ const initialState = {
     tableSelectedTab: {},
     dashboardCategory: getInitialDashboardCategory(), // Persisted across page reloads
     selectedCollectionScope: null,
+    guardrailTopicsCatalog: {},
 };
 
 let persistStore = (set, get) => ({
@@ -284,6 +285,14 @@ let persistStore = (set, get) => ({
             set({ dashboardCategory });
         } catch (error) {
             console.error("Error setting dashboardCategory:", error);
+        }
+    },
+    setGuardrailTopicsCatalog: (topicsArray) => {
+        try {
+            const guardrailTopicsCatalog = Object.fromEntries(topicsArray.map(t => [t.topic, t]));
+            set({ guardrailTopicsCatalog });
+        } catch (error) {
+            console.error("Error setting guardrailTopicsCatalog:", error);
         }
     },
 });

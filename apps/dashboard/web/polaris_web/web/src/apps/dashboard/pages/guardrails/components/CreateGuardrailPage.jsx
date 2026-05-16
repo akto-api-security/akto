@@ -52,6 +52,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // Step management
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
+    const guardrailTopicsCatalog = PersistStore(state => state.guardrailTopicsCatalog);
+    const setGuardrailTopicsCatalog = PersistStore(state => state.setGuardrailTopicsCatalog);
 
     // Playground state
     const [playgroundInput, setPlaygroundInput] = useState("");
@@ -288,6 +290,18 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     }, []);
 
     useEffect(() => {
+        if (Object.keys(guardrailTopicsCatalog).length > 0) return;
+        guardrailApi.fetchGuardrailTopics().then(resp => {
+            if (resp?.guardrailTopics) setGuardrailTopicsCatalog(resp.guardrailTopics);
+        });
+    }, [guardrailTopicsCatalog, setGuardrailTopicsCatalog]);
+
+    useEffect(() => {
+        if (!Object.keys(guardrailTopicsCatalog).length) return;
+        setDeniedTopics(prev => prev.map(t => guardrailTopicsCatalog[t.topic] ? { ...t, fromCatalog: true } : t));
+    }, [guardrailTopicsCatalog]);
+
+    useEffect(() => {
         if (allCollections && allCollections.length > 0) {
             filterCollections();
         } else {
@@ -462,7 +476,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         // Denied topics
         const hasDeniedTopics = policy.deniedTopics && policy.deniedTopics.length > 0;
         setEnableDeniedTopics(hasDeniedTopics);
-        setDeniedTopics(policy.deniedTopics || []);
+        setDeniedTopics((policy.deniedTopics || []).map(t => guardrailTopicsCatalog[t.topic] ? { ...t, fromCatalog: true } : t));
 
         // Word filters
         setWordFilters({
@@ -710,6 +724,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableBasePromptRule={setEnableBasePromptRule}
                         basePromptConfidenceScore={basePromptConfidenceScore}
                         setBasePromptConfidenceScore={setBasePromptConfidenceScore}
+                        guardrailTopicsCatalog={guardrailTopicsCatalog}
                     />
                 );
             case 3:

@@ -1,8 +1,10 @@
 package com.akto.action;
 
 import com.akto.dao.GuardrailPoliciesDao;
+import com.akto.dao.GuardrailTopicsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.GuardrailPolicies;
+import com.akto.dto.GuardrailTopic;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -61,6 +63,9 @@ public class GuardrailPoliciesAction extends UserAction {
     @Setter
     private List<String> policyIds;
 
+    @Getter
+    private List<GuardrailTopic> guardrailTopics;
+
     // For playground testing
     @Setter
     private String testInput;
@@ -78,6 +83,17 @@ public class GuardrailPoliciesAction extends UserAction {
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching guardrail policies: " + e.getMessage(), LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+    }
+
+
+    public String fetchGuardrailTopics() {
+        try {
+            this.guardrailTopics = GuardrailTopicsDao.instance.findAll();
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching guardrail topics: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
     }
