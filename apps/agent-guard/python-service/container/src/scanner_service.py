@@ -3,6 +3,7 @@ import os
 import time
 from typing import Dict, Any, List
 from fastapi import FastAPI, HTTPException
+import httpx
 from pydantic import BaseModel
 
 # Fix for optimum 2.0+ and transformers 4.57+ compatibility
@@ -28,7 +29,7 @@ except:
 
 from llm_guard import input_scanners, output_scanners
 from intent_analyzer import IntentAnalysisScanner
-from llm_scanner import init_llm_scanner, is_truthy, LLM_SUPPORTED_SCANNERS
+from llm_scanner import init_llm_scanner, is_truthy, LLM_SUPPORTED_SCANNERS, scan_with_model_map
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,6 +43,37 @@ logger.setLevel(logging.INFO)
 
 app = FastAPI(title="Agent Guard Scanner Service", version="1.0.0")
 scanner_cache = {}
+
+_DB_ABSTRACTOR_URL = (os.getenv("DATABASE_ABSTRACTOR_SERVICE_URL") or "").rstrip("/")
+
+
+def store_model_results(
+    all_results: List[Dict[str, Any]],
+    scanner_name: str,
+) -> None:
+    """
+    Sync: POST all model outputs to DB abstractor. Called from a daemon thread
+    spawned inside scan_with_model_map — never blocks the /scan response. Never raises.
+    """
+    if not _DB_ABSTRACTOR_URL:
+        logger.debug("[ModelMap] DATABASE_ABSTRACTOR_SERVICE_URL not set; skipping DB store")
+        return
+    payload = {
+        "scannerName": scanner_name,
+        "modelResults": all_results,
+    }
+    try:
+        resp = httpx.post(
+            f"{_DB_ABSTRACTOR_URL}/api/storeGuardrailModelResults",
+            json=payload,
+            timeout=10.0,
+        )
+        if resp.status_code >= 400:
+            logger.warning(
+                f"[ModelMap] DB store returned status {resp.status_code} for scanner={scanner_name}"
+            )
+    except Exception as exc:
+        logger.warning(f"[ModelMap] DB store failed for scanner={scanner_name}: {exc}")
 
 # LLM scanner — initialized once from env vars. None if no provider configured.
 _llm_scanner = init_llm_scanner()
@@ -62,6 +94,7 @@ class ScanResponse(BaseModel):
     risk_score: float
     sanitized_text: str
     details: Dict[str, Any] = {}
+    all_results: List[Dict[str, Any]] = []
 
 PROMPT_SCANNERS = {
     "Anonymize": input_scanners.Anonymize,
@@ -164,6 +197,43 @@ async def scan_text(request: ScanRequest):
 
     try:
         logger.info(f"Starting scan: scanner={request.scanner_name}, type={request.scanner_type}, text_length={len(request.text)}")
+
+        # ── modelMap dispatch (multi-model parallel) ──────────────────
+        if (
+            request.config.get("modelMap")
+            and request.scanner_name in LLM_SUPPORTED_SCANNERS
+        ):
+            try:
+                store_fn = store_model_results if request.config.get("storeAllResults") else None
+                result = scan_with_model_map(
+                    request.scanner_name,
+                    request.scanner_type,
+                    request.text,
+                    request.config,
+                    store_fn=store_fn,
+                )
+                return ScanResponse(
+                    scanner_name=request.scanner_name,
+                    is_valid=result["is_valid"],
+                    risk_score=result["risk_score"],
+                    sanitized_text=request.text,
+                    details=result.get("details", {}),
+                    all_results=result.get("all_results", []),
+                )
+            except Exception as model_map_err:
+                total_duration = (time.time() - start_time) * 1000
+                logger.error(f"[ModelMap] scan_with_model_map failed: {model_map_err}")
+                return ScanResponse(
+                    scanner_name=request.scanner_name,
+                    is_valid=True,
+                    risk_score=0.0,
+                    sanitized_text=request.text,
+                    details={
+                        "error": f"modelMap execution failed: {model_map_err}",
+                        "execution_time_ms": round(total_duration, 2),
+                    },
+                )
+        # ── End modelMap dispatch ─────────────────────────────────────
 
         # ── LLM dispatch ─────────────────────────────────────────────
         use_llm_requested = is_truthy(str(request.config.get("use_llm", "")))

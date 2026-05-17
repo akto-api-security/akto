@@ -27,6 +27,9 @@ services:
       - GEMMA_VERTEX_LOCATION=${GEMMA_VERTEX_LOCATION:-}
       - GEMMA_VERTEX_ENDPOINT_ID=${GEMMA_VERTEX_ENDPOINT_ID:-}
       - GEMMA_VERTEX_DEDICATED_DNS=${GEMMA_VERTEX_DEDICATED_DNS:-}
+      # OpenAI-compatible base URL — set to http://host.docker.internal:11434/v1
+      # to use a locally running Ollama instance from inside the container.
+      - OPENAI_COMPATIBLE_BASE_URL=${OPENAI_COMPATIBLE_BASE_URL:-}
     volumes:
       - model-cache:/app/.cache/huggingface
     deploy:
