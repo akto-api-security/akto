@@ -1160,6 +1160,27 @@ const settingRequests = {
             method: 'post',
             data: { domainKey, domainsToAdd, domainsToRemove }
         })
+    },
+    fetchEndpointShieldSettings() {
+        return request({
+            url: '/api/fetchEndpointShieldSettings',
+            method: 'post',
+            data: {}
+        })
+    },
+    saveEndpointShieldSettings(platformKey, platformConfig) {
+        return request({
+            url: '/api/saveEndpointShieldSettings',
+            method: 'post',
+            data: {platformKey, platformConfig}
+        })
+    },
+    refreshEndpointShieldLatestVersion(platformKey) {
+        return request({
+            url: '/api/refreshEndpointShieldLatestVersion',
+            method: 'post',
+            data: {platformKey}
+        })
     }
 }
 
