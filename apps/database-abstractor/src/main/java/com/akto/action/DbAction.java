@@ -621,6 +621,23 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    EndpointShieldSettings endpointShieldSettings;
+
+    public String fetchEndpointShieldSettings() {
+        try {
+            int accountId = Context.accountId.get();
+            AccountSettings settings = DbLayer.fetchAccountSettings(accountId);
+            endpointShieldSettings = settings != null ? settings.getEndpointShieldSettings() : null;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchEndpointShieldSettings " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public EndpointShieldSettings getEndpointShieldSettings() { return endpointShieldSettings; }
+    public void setEndpointShieldSettings(EndpointShieldSettings endpointShieldSettings) { this.endpointShieldSettings = endpointShieldSettings; }
+
     public String fetchDatadogForwarderConfig() {
         try {
             int accountId = Context.accountId.get();
