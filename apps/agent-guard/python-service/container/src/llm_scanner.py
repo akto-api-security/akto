@@ -83,45 +83,10 @@ Analyze this text and respond ONLY with valid JSON:
 Text to analyze:
 %s"""
 
-TOXICITY_DETECTION_PROMPT = """You are a security system that detects toxic content.
-
-Toxic content includes:
-- Hate speech, slurs, or attacks targeting a protected group (race, gender, religion, sexual orientation, disability, etc.)
-- Threats, harassment, or intimidation aimed at an individual
-- Demeaning language, personal attacks, or insults directed at a specific person
-- Unwanted sexual content directed at another person, or sexual content involving minors
-
-Normal disagreement, criticism, robust debate, frustration, hyperbolic expressions, or strong language about ideas/products/events is NOT toxic. Discussion of toxicity in an educational or analytical context is also NOT toxic.
-
-Analyze this text and respond ONLY with valid JSON:
-{
-  "isToxic": <true if this text is toxic, false otherwise>,
-  "confidence": <float 0.0 to 1.0>,
-  "reason": "<one sentence explanation>"
-}
-
-Text to analyze:
-%s"""
-
-GIBBERISH_DETECTION_PROMPT = """You are a security system that detects gibberish or nonsensical input.
-
-Gibberish includes:
-- Random keystrokes (asdfghjkl, qwertyuiop, mnbvcxz patterns)
-- Strings of random characters with no morpheme or word structure
-- Mojibake from corrupted character encoding
-- Pure noise meant to confuse downstream parsers
-
-Normal text in any natural language — including slang, dialect, jargon, technical terms, identifiers, code snippets, JSON, base64, URLs, hashes, emoji, or text with typos — is NOT gibberish. Short or one-word inputs are NOT gibberish if they have any extractable meaning.
-
-Analyze this text and respond ONLY with valid JSON:
-{
-  "isGibberish": <true if this text is gibberish, false otherwise>,
-  "confidence": <float 0.0 to 1.0>,
-  "reason": "<one sentence explanation>"
-}
-
-Text to analyze:
-%s"""
+# Toxicity and Gibberish have only Gemma-tuned variants (defined below). The
+# generic JSON-output templates above (PromptInjection, BanTopics) cover the
+# other providers; for Toxicity/Gibberish we use the same prompt regardless of
+# provider because they're only deployed via the Gemma single-LLM path.
 
 # ── Gemma-tuned variants (used only when SCANNER_LLM_PROVIDER=gemma_vertexai) ─
 # Input-side prompt-injection and ban-topics variants are copied verbatim
@@ -369,13 +334,9 @@ def build_scan_prompt(
             return BAN_TOPICS_DETECTION_PROMPT_GEMMA % (topics_str, text)
         return BAN_TOPICS_DETECTION_PROMPT % (topics_str, text)
     elif scanner_name == "Toxicity":
-        if provider_name == "gemma_vertexai":
-            return TOXICITY_DETECTION_PROMPT_GEMMA % text
-        return TOXICITY_DETECTION_PROMPT % text
+        return TOXICITY_DETECTION_PROMPT_GEMMA % text
     elif scanner_name == "Gibberish":
-        if provider_name == "gemma_vertexai":
-            return GIBBERISH_DETECTION_PROMPT_GEMMA % text
-        return GIBBERISH_DETECTION_PROMPT % text
+        return GIBBERISH_DETECTION_PROMPT_GEMMA % text
     return None
 
 
