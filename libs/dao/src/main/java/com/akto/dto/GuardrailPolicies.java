@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -10,6 +11,7 @@ import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.enums.GlobalEnums.GuardrailSource;
 
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -95,6 +97,9 @@ public class GuardrailPolicies {
 
     // Unique hash from the source system; used for idempotent upserts from GITHUB_WORKFLOW
     private String sourceHash;
+
+    // Modal config
+    private ArrayList<ModalConfig> modalConfigs;
 
     public String getHexId() {
         if (this.id != null) {
@@ -344,6 +349,22 @@ public class GuardrailPolicies {
             this.enabled = enabled;
             this.confidenceScore = confidenceScore;
         }
+    }
+
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ModalConfig {
+        private String provider;
+        private String model;
+        private String baseUrl;
+        private double blockThreshold;
+        private double allowThreshold;
+        private int timeoutMs;
+        private boolean strictBlock;
+        private boolean strictAllow;
     }
 
 }
