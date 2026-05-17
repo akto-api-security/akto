@@ -17,6 +17,26 @@ export const getNodeCategoryFromType = (type) => {
     return { category: 'mcp', type: 'MCP Server', description: 'MCP Server' };
   }
 
+  if (typeLower.includes('agent')) {
+    return { category: 'agent', type: 'AI Agent', description: 'AI Agent' };
+  }
+
+  if (typeLower.includes('workflow')) {
+    return { category: 'workflow', type: 'Workflow', description: 'Agent Planner' };
+  }
+
+  if (typeLower.includes('database') || typeLower.includes('vector_db')) {
+    return { category: 'database', type: 'Database', description: 'Database Operation' };
+  }
+
+  if (typeLower.includes('rag')) {
+    return { category: 'rag', type: 'RAG', description: 'Retrieval Augmented Generation' };
+  }
+
+  if (typeLower.includes('api') || typeLower.includes('http')) {
+    return { category: 'api', type: 'API', description: 'API Call' };
+  }
+
   if (typeLower.includes('tool')) {
     return { category: 'ai-tool', type: 'AI Tool', description: 'AI Tool' };
   }
@@ -34,6 +54,14 @@ export const getComponentColors = (category) => {
       return { borderColor: '#3b82f6', backgroundColor: '#eff6ff' }; // Blue
     case 'agent':
       return { borderColor: '#f97316', backgroundColor: '#fff7ed' }; // Orange
+    case 'workflow':
+      return { borderColor: '#10b981', backgroundColor: '#f0fdf4' }; // Green
+    case 'database':
+      return { borderColor: '#f59e0b', backgroundColor: '#fffbeb' }; // Amber
+    case 'rag':
+      return { borderColor: '#06b6d4', backgroundColor: '#ecfeff' }; // Cyan
+    case 'api':
+      return { borderColor: '#8b5cf6', backgroundColor: '#f5f3ff' }; // Purple
     case 'ai-model':
       return { borderColor: '#ec4899', backgroundColor: '#fdf2f8' }; // Pink
     case 'mcp':
@@ -65,7 +93,13 @@ export const getComponentIcon = (category) => {
     case 'external':
       return CustomersMinor;
     case 'agent':
+    case 'workflow':
       return AutomationMajor;
+    case 'database':
+    case 'rag':
+      return CustomersMinor;
+    case 'api':
+      return CustomersMinor;
     case 'ai-model':
       return MagicMajor;
     case "mcp":
@@ -114,7 +148,7 @@ export const getNodeXPosition = (category) => {
     return 400;
   } else if (category === 'mcp') {
     return 550;
-  } else if (['ai-tool', 'webhook', 'internal'].includes(category)) {
+  } else if (['workflow', 'database', 'rag', 'api', 'ai-tool', 'webhook', 'internal'].includes(category)) {
     return 700;
   }
   return 400;
@@ -266,7 +300,7 @@ export const buildVSCodeGraph = ({ onNodeClick, agentLabel = 'VSCode', hasMcpSer
   return { nodes, edges };
 };
 
-export const CATEGORY_ORDER = ['ai-model', 'mcp', 'ai-tool', 'webhook', 'internal'];
+export const CATEGORY_ORDER = ['agent', 'workflow', 'ai-model', 'mcp', 'rag', 'ai-tool', 'database', 'api', 'webhook', 'internal'];
 
 export const sortCategories = (categories) => {
   return categories.sort((a, b) => {
