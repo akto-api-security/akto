@@ -48,10 +48,11 @@ export class AktoAgentGuardExecutorContainer extends Container {
     GEMMA_VERTEX_LOCATION: "",
     GEMMA_VERTEX_ENDPOINT_ID: "",
     GEMMA_VERTEX_DEDICATED_DNS: "", // optional
-    // Cascade tuning (defaults: 0.9 / 0.9 / 5000)
+    // Cascade tuning (defaults: 0.9 / 0.9 / 5000 / 15000)
     CASCADE_QWEN_MIN_CONFIDENCE: "",
     CASCADE_GEMMA_MIN_CONFIDENCE: "",
-    CASCADE_TIMEOUT_MS: "",
+    CASCADE_TIMEOUT_MS: "",          // fast-tier (Qwen+Gemma) wall-clock
+    CASCADE_HAIKU_TIMEOUT_MS: "",    // Haiku wall-clock from cascade start
   };
 
   override onStart() {

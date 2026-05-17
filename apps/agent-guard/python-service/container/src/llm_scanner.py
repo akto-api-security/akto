@@ -1132,7 +1132,8 @@ def init_cascade_scanners() -> Optional[Dict[str, Any]]:
     Cascade-specific knobs:
       CASCADE_QWEN_MIN_CONFIDENCE   (default 0.9)
       CASCADE_GEMMA_MIN_CONFIDENCE  (default 0.9)
-      CASCADE_TIMEOUT_MS            (default 5000)
+      CASCADE_TIMEOUT_MS            (default 5000)   — fast-tier (Qwen+Gemma) wall-clock
+      CASCADE_HAIKU_TIMEOUT_MS      (default 15000)  — Haiku wall-clock from cascade start
 
     Returns None (and logs a warning) if any provider can't be built.
     """
@@ -1176,11 +1177,14 @@ def init_cascade_scanners() -> Optional[Dict[str, Any]]:
         "haiku": LLMScanner(haiku_provider),
         "qwen_min_confidence": _float_env("CASCADE_QWEN_MIN_CONFIDENCE", 0.9),
         "gemma_min_confidence": _float_env("CASCADE_GEMMA_MIN_CONFIDENCE", 0.9),
-        "timeout_s": _int_env("CASCADE_TIMEOUT_MS", 5000) / 1000.0,
+        "fast_tier_timeout_s": _int_env("CASCADE_TIMEOUT_MS", 5000) / 1000.0,
+        "haiku_timeout_s": _int_env("CASCADE_HAIKU_TIMEOUT_MS", 15000) / 1000.0,
     }
     logger.info(
         f"[Cascade] Initialized: qwen_min_conf={cascade['qwen_min_confidence']} "
-        f"gemma_min_conf={cascade['gemma_min_confidence']} timeout_s={cascade['timeout_s']}"
+        f"gemma_min_conf={cascade['gemma_min_confidence']} "
+        f"fast_tier_timeout_s={cascade['fast_tier_timeout_s']} "
+        f"haiku_timeout_s={cascade['haiku_timeout_s']}"
     )
     return cascade
 
@@ -1224,7 +1228,8 @@ def scan_with_cascade(
     haiku_scanner = cascade["haiku"]
     qwen_min = float(cascade["qwen_min_confidence"])
     gemma_min = float(cascade["gemma_min_confidence"])
-    timeout_s = float(cascade["timeout_s"])
+    fast_tier_timeout_s = float(cascade["fast_tier_timeout_s"])
+    haiku_timeout_s = float(cascade["haiku_timeout_s"])
 
     overall_start = time.time()
 
@@ -1238,10 +1243,10 @@ def scan_with_cascade(
 
     fast_futs = {qwen_fut: "qwen", gemma_fut: "gemma"}
     fast_results: Dict[str, Optional[Dict[str, Any]]] = {"qwen": None, "gemma": None}
-    deadline = overall_start + timeout_s
+    haiku_deadline = overall_start + haiku_timeout_s
 
     try:
-        for fut in concurrent.futures.as_completed(fast_futs, timeout=timeout_s):
+        for fut in concurrent.futures.as_completed(fast_futs, timeout=fast_tier_timeout_s):
             label = fast_futs[fut]
             try:
                 fast_results[label] = fut.result()
@@ -1249,7 +1254,7 @@ def scan_with_cascade(
                 logger.warning(f"[Cascade] {label} failed: {exc}")
                 fast_results[label] = None
     except concurrent.futures.TimeoutError:
-        logger.warning("[Cascade] timed out waiting for Qwen+Gemma fast tier")
+        logger.warning(f"[Cascade] timed out waiting for Qwen+Gemma fast tier after {fast_tier_timeout_s:.1f}s")
 
     qwen_r = fast_results["qwen"]
     gemma_r = fast_results["gemma"]
@@ -1306,7 +1311,9 @@ def scan_with_cascade(
         }
 
     # Either fast voter is missing / unsafe / low-confidence → wait for Haiku.
-    remaining_s = max(0.1, deadline - time.time())
+    # Haiku has its own dedicated wall-clock budget from cascade start
+    # (CASCADE_HAIKU_TIMEOUT_MS); whatever is left after the fast tier returned.
+    remaining_s = max(0.1, haiku_deadline - time.time())
     try:
         haiku_r = haiku_fut.result(timeout=remaining_s)
     except concurrent.futures.TimeoutError:
