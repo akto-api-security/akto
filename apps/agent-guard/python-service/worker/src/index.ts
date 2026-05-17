@@ -29,7 +29,29 @@ export class AktoAgentGuardExecutorContainer extends Container {
     // through the LLM without clients needing to send use_llm.
     SCANNER_LLM_PROVIDER: "anthropic",
     ANTHROPIC_API_KEY: "", // TODO: set before deploy
+    ANTHROPIC_MODEL: "", // optional; defaults to claude-haiku-4-5-20251001
     FORCE_LLM_MODE: "true",
+
+    // Cascade scanner (Qwen + Gemma + Haiku) — set CASCADE_MODE_ENABLED=true
+    // and configure all three providers below to route PromptInjection /
+    // BanTopics through the parallel cascade with fast-pass-on-unanimous-safe.
+    CASCADE_MODE_ENABLED: "", // "true" to enable
+    // Qwen3Guard on Vertex AI
+    VERTEX_AI_SA_KEY_JSON: "", // TODO: base64-encoded SA key JSON
+    VERTEX_AI_PROJECT: "",
+    VERTEX_AI_LOCATION: "",
+    VERTEX_AI_ENDPOINT_ID: "",
+    VERTEX_AI_DEDICATED_DNS: "", // optional
+    // Gemma on Vertex AI
+    GEMMA_VERTEX_SA_KEY_JSON: "", // TODO
+    GEMMA_VERTEX_PROJECT: "",
+    GEMMA_VERTEX_LOCATION: "",
+    GEMMA_VERTEX_ENDPOINT_ID: "",
+    GEMMA_VERTEX_DEDICATED_DNS: "", // optional
+    // Cascade tuning (defaults: 0.9 / 0.9 / 5000)
+    CASCADE_QWEN_MIN_CONFIDENCE: "",
+    CASCADE_GEMMA_MIN_CONFIDENCE: "",
+    CASCADE_TIMEOUT_MS: "",
   };
 
   override onStart() {

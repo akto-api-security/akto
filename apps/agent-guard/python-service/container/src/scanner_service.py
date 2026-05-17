@@ -29,7 +29,14 @@ except:
 
 from llm_guard import input_scanners, output_scanners
 from intent_analyzer import IntentAnalysisScanner
-from llm_scanner import init_llm_scanner, is_truthy, LLM_SUPPORTED_SCANNERS, scan_with_model_map
+from llm_scanner import (
+    init_llm_scanner,
+    init_cascade_scanners,
+    is_truthy,
+    LLM_SUPPORTED_SCANNERS,
+    scan_with_cascade,
+    scan_with_model_map,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -80,6 +87,14 @@ _llm_scanner = init_llm_scanner()
 _force_llm = is_truthy(os.getenv("FORCE_LLM_MODE"))
 if _force_llm:
     logger.info("[Service] FORCE_LLM_MODE=true — PromptInjection/BanTopics will use LLM path")
+
+# Cascade scanner (Qwen + Gemma + Haiku) — initialized once when CASCADE_MODE_ENABLED is truthy.
+_cascade_enabled = is_truthy(os.getenv("CASCADE_MODE_ENABLED"))
+_cascade = init_cascade_scanners() if _cascade_enabled else None
+if _cascade_enabled and _cascade is None:
+    logger.warning("[Service] CASCADE_MODE_ENABLED=true but cascade providers failed to initialize; falling back to existing paths")
+elif _cascade is not None:
+    logger.info("[Service] Cascade enabled — PromptInjection/BanTopics will use Qwen+Gemma+Haiku")
 
 
 class ScanRequest(BaseModel):
@@ -234,6 +249,41 @@ async def scan_text(request: ScanRequest):
                     },
                 )
         # ── End modelMap dispatch ─────────────────────────────────────
+
+        # ── Cascade dispatch (Qwen + Gemma + Haiku) ──────────────────
+        if (
+            _cascade is not None
+            and request.scanner_name in LLM_SUPPORTED_SCANNERS
+        ):
+            try:
+                result = scan_with_cascade(
+                    request.scanner_name,
+                    request.scanner_type,
+                    request.text,
+                    request.config,
+                    _cascade,
+                )
+                return ScanResponse(
+                    scanner_name=request.scanner_name,
+                    is_valid=result["is_valid"],
+                    risk_score=result["risk_score"],
+                    sanitized_text=request.text,
+                    details=result.get("details", {}),
+                )
+            except Exception as cascade_err:
+                total_duration = (time.time() - start_time) * 1000
+                logger.error(f"[Cascade] scan_with_cascade failed: {cascade_err}")
+                return ScanResponse(
+                    scanner_name=request.scanner_name,
+                    is_valid=True,
+                    risk_score=0.0,
+                    sanitized_text=request.text,
+                    details={
+                        "error": f"cascade execution failed: {cascade_err}",
+                        "execution_time_ms": round(total_duration, 2),
+                    },
+                )
+        # ── End cascade dispatch ──────────────────────────────────────
 
         # ── LLM dispatch ─────────────────────────────────────────────
         use_llm_requested = is_truthy(str(request.config.get("use_llm", "")))

@@ -8,9 +8,10 @@ from scanner_service.py when FORCE_LLM_MODE is on or config.use_llm is truthy.
 import base64
 import json
 import logging
+import math
 import os
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import google.auth.transport.requests
 import httpx
@@ -253,7 +254,14 @@ def build_scan_prompt(
 
 
 def parse_llm_result(scanner_name: str, raw: str) -> Dict[str, Any]:
-    """Parse LLM JSON response into a result dict with is_valid, risk_score, details."""
+    """Parse LLM JSON response into a uniform result dict.
+
+    Returns: {is_valid, risk_score, decision_confidence, details}
+      - risk_score: p(unsafe) — i.e. the model's `confidence` field, since the
+        prompt's few-shot examples calibrate `confidence` as p(attack/ban)
+      - decision_confidence: how sure the model is of its OWN verdict — equals
+        confidence when verdict is unsafe, (1 - confidence) when verdict is safe
+    """
     cleaned = clean_json(raw)
     parsed = json.loads(cleaned)
 
@@ -265,9 +273,11 @@ def parse_llm_result(scanner_name: str, raw: str) -> Dict[str, Any]:
     if scanner_name == "PromptInjection":
         is_injection = parsed.get("isInjection", False)
         confidence = float(parsed.get("confidence", 0.0))
+        is_valid = not is_injection
         return {
-            "is_valid": not is_injection,
+            "is_valid": is_valid,
             "risk_score": confidence,
+            "decision_confidence": confidence if is_injection else (1.0 - confidence),
             "details": details,
         }
     elif scanner_name == "BanTopics":
@@ -276,13 +286,15 @@ def parse_llm_result(scanner_name: str, raw: str) -> Dict[str, Any]:
         matched = parsed.get("matchedTopic", "")
         if matched:
             details["matchedTopic"] = matched
+        is_valid = not is_banned
         return {
-            "is_valid": not is_banned,
+            "is_valid": is_valid,
             "risk_score": confidence,
+            "decision_confidence": confidence if is_banned else (1.0 - confidence),
             "details": details,
         }
 
-    return {"is_valid": True, "risk_score": 0.0, "details": details}
+    return {"is_valid": True, "risk_score": 0.0, "decision_confidence": 0.0, "details": details}
 
 
 # ── Providers ────────────────────────────────────────────────────────────────
@@ -470,6 +482,194 @@ class GemmaVertexProvider:
         return data["predictions"]["choices"][0]["message"]["content"]
 
 
+class Qwen3GuardProvider:
+    """Vertex AI provider for Qwen3Guard — a specialised guard classifier that
+    emits `Safety: Safe|Unsafe|Controversial` plus `Categories: …` and exposes a
+    real probability distribution via the first-token top_logprobs.
+
+    Unlike chat LLMs, Qwen3Guard ignores prompt-format instructions, so callers
+    must pass raw user text (no JSON wrapper) and use `complete_with_logprobs`
+    to get back the logprob payload needed for confidence scoring.
+    """
+
+    def __init__(
+        self,
+        sa_key_json_b64: str,
+        project: str,
+        location: str,
+        endpoint_id: str,
+        dedicated_dns: str = "",
+    ):
+        self.project = project
+        self.location = location
+        self.endpoint_id = endpoint_id
+        self.dedicated_dns = dedicated_dns.strip()
+        self.name = "qwen3guard"
+        self._client = httpx.Client(timeout=120.0)
+
+        sa_key_dict = json.loads(base64.b64decode(sa_key_json_b64).decode("utf-8"))
+        self.credentials = service_account.Credentials.from_service_account_info(
+            sa_key_dict,
+            scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        )
+        logger.info(
+            f"[LLMScanner/Qwen3Guard] Initialized provider project={self.project} "
+            f"location={self.location} endpoint={self.endpoint_id} "
+            f"dedicated_dns={'set' if self.dedicated_dns else 'unset'}"
+        )
+
+    def complete_with_logprobs(
+        self, text: str, top_logprobs: int = 5, temperature: float = 0.0
+    ) -> Tuple[str, Optional[list]]:
+        if not self.credentials.valid:
+            self.credentials.refresh(google.auth.transport.requests.Request())
+        host = self.dedicated_dns or f"{self.location}-aiplatform.googleapis.com"
+        url = (
+            f"https://{host}/v1/projects/{self.project}/locations/"
+            f"{self.location}/endpoints/{self.endpoint_id}:predict"
+        )
+        instance: Dict[str, Any] = {
+            "@requestFormat": "chatCompletions",
+            "messages": [{"role": "user", "content": text}],
+            "max_tokens": 64,
+            "temperature": temperature,
+        }
+        if top_logprobs > 0:
+            instance["logprobs"] = True
+            instance["top_logprobs"] = top_logprobs
+        resp = self._client.post(
+            url,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.credentials.token}",
+            },
+            json={"instances": [instance]},
+        )
+        resp.raise_for_status()
+        choice = resp.json()["predictions"]["choices"][0]
+        content = choice["message"]["content"]
+        lp = (choice.get("logprobs") or {}).get("content")
+        return content, lp
+
+
+# ── Qwen3Guard parser ────────────────────────────────────────────────────────
+
+
+def _confidence_from_logprobs(
+    content_lp: Optional[list], chosen_label: str
+) -> Tuple[Optional[float], Optional[Dict[str, float]], str]:
+    """Distribution over {safe, unsafe, controversial} from the safety-label
+    token's top_logprobs. Ported from qwen_prompt_injection_bench/qwen_guard.py.
+
+    Returns (confidence_in_chosen_label, distribution, source). `source` is
+    "logprobs" on success, otherwise a fallback reason string.
+    """
+    if not content_lp:
+        return None, None, "unavailable"
+    text = ""
+    label_idx = None
+    for i, tok in enumerate(content_lp):
+        before = text.lower()
+        text += tok.get("token", "")
+        if "safety:" not in text.lower():
+            continue
+        if "safety:" in before:
+            if tok.get("token", "").strip():
+                label_idx = i
+                break
+        elif text.lower().split("safety:", 1)[1].strip():
+            label_idx = i
+            break
+    if label_idx is None:
+        return None, None, "no-safety-token"
+    entry = content_lp[label_idx]
+    pool = list(entry.get("top_logprobs") or [])
+    if entry.get("token") is not None and entry.get("logprob") is not None:
+        pool.append({"token": entry["token"], "logprob": entry["logprob"]})
+    if not pool:
+        return None, None, "no-top-logprobs"
+    labels = ("safe", "unsafe", "controversial")
+    agg = {label: 0.0 for label in labels}
+    mapped = False
+    for cand in pool:
+        ct = cand.get("token", "").strip().lower()
+        if "safety:" in ct:
+            ct = ct.split("safety:")[-1].strip()
+        ct = ct.lstrip(":").strip().strip("\"'")
+        if not ct:
+            continue
+        for label in labels:
+            if label.startswith(ct) or ct.startswith(label):
+                try:
+                    agg[label] += math.exp(cand["logprob"])
+                    mapped = True
+                except (KeyError, TypeError, OverflowError):
+                    pass
+                break
+    total = sum(agg.values())
+    if not mapped or total <= 0:
+        return None, None, "unmapped"
+    dist = {label: round(v / total, 4) for label, v in agg.items()}
+    return dist.get((chosen_label or "").lower()), dist, "logprobs"
+
+
+def parse_qwen3guard_result(
+    scanner_name: str, raw: str, logprobs_content: Optional[list] = None
+) -> Dict[str, Any]:
+    """Parse Qwen3Guard output (Safety:/Categories: format) into the same
+    uniform shape as parse_llm_result. risk_score = p(unsafe ∪ controversial)."""
+    if not raw:
+        raise ValueError("empty Qwen3Guard response")
+    safety = ""
+    categories = ""
+    for line in raw.strip().splitlines():
+        if ":" not in line:
+            continue
+        key, _, val = line.partition(":")
+        key, val = key.strip().lower(), val.strip()
+        if key == "safety":
+            safety = val
+        elif key in ("categories", "category"):
+            categories = val
+    if not safety:
+        raise ValueError(f"no Safety line in Qwen3Guard response: {raw[:200]!r}")
+    s = safety.lower()
+    if s == "unsafe":
+        is_valid, discrete_risk = False, 1.0
+    elif s == "controversial":
+        is_valid, discrete_risk = False, 0.5
+    elif s == "safe":
+        is_valid, discrete_risk = True, 0.0
+    else:
+        raise ValueError(f"unknown Safety value: {safety!r}")
+
+    conf, dist, source = _confidence_from_logprobs(logprobs_content, s)
+    if dist is not None:
+        risk_score = round(dist["unsafe"] + dist["controversial"], 4)
+        decision_confidence = float(conf) if conf is not None else (1.0 - risk_score if is_valid else risk_score)
+    else:
+        risk_score = discrete_risk
+        decision_confidence = 1.0  # discrete label has no calibrated confidence; trust it fully
+
+    details: Dict[str, Any] = {
+        "safety": safety,
+        "confidence_source": source,
+    }
+    if categories and categories.lower() != "none":
+        details["categories"] = categories
+        if scanner_name == "BanTopics":
+            details["matchedTopic"] = categories
+    if dist is not None:
+        details["prob_distribution"] = dist
+
+    return {
+        "is_valid": is_valid,
+        "risk_score": risk_score,
+        "decision_confidence": decision_confidence,
+        "details": details,
+    }
+
+
 # ── LLMScanner ───────────────────────────────────────────────────────────────
 
 
@@ -481,18 +681,24 @@ class LLMScanner:
 
     def scan(self, scanner_name: str, scanner_type: str, text: str, config: Dict[str, Any]) -> Dict[str, Any]:
         """Returns a dict with keys matching ScanResponse fields, or raises on hard failure."""
-        prompt = build_scan_prompt(
-            scanner_name, scanner_type, config, text,
-            provider_name=self.provider.name,
-        )
-        if prompt is None:
-            raise ValueError(f"Scanner {scanner_name} not supported by LLM path")
-
         start = time.time()
-        raw = self.provider.complete(prompt)
-        elapsed_ms = (time.time() - start) * 1000
 
-        result = parse_llm_result(scanner_name, raw)
+        if self.provider.name == "qwen3guard":
+            # Native guard classifier: bypass JSON prompt template, parse the
+            # Safety:/Categories: format using token logprobs.
+            raw, logprobs_content = self.provider.complete_with_logprobs(text)
+            result = parse_qwen3guard_result(scanner_name, raw, logprobs_content)
+        else:
+            prompt = build_scan_prompt(
+                scanner_name, scanner_type, config, text,
+                provider_name=self.provider.name,
+            )
+            if prompt is None:
+                raise ValueError(f"Scanner {scanner_name} not supported by LLM path")
+            raw = self.provider.complete(prompt)
+            result = parse_llm_result(scanner_name, raw)
+
+        elapsed_ms = (time.time() - start) * 1000
         result["details"]["llm_provider"] = self.provider.name
         result["details"]["scanner_type"] = scanner_type
         result["execution_time_ms"] = round(elapsed_ms, 2)
@@ -500,6 +706,7 @@ class LLMScanner:
         logger.info(
             f"[LLMScanner] scan complete scanner={scanner_name} "
             f"isValid={result['is_valid']} risk={result['risk_score']:.2f} "
+            f"decision_conf={result.get('decision_confidence', 0.0):.2f} "
             f"elapsed_ms={elapsed_ms:.0f}"
         )
         return result
@@ -764,6 +971,279 @@ def scan_with_model_map(
         f"elapsed_ms={winner_elapsed_ms:.0f}"
     )
     return winner
+
+
+# ── Cascade scanner (Qwen + Gemma + Haiku) ───────────────────────────────────
+
+
+def _float_env(name: str, default: float) -> float:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        logger.warning(f"[Cascade] Invalid {name}={raw!r}; falling back to {default}")
+        return default
+
+
+def _int_env(name: str, default: int) -> int:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        logger.warning(f"[Cascade] Invalid {name}={raw!r}; falling back to {default}")
+        return default
+
+
+def init_cascade_scanners() -> Optional[Dict[str, Any]]:
+    """Build Qwen3Guard + Gemma + Haiku providers from env vars.
+
+    Reuses the existing single-provider env var names:
+      Qwen  → VERTEX_AI_SA_KEY_JSON / _PROJECT / _LOCATION / _ENDPOINT_ID
+              (optional VERTEX_AI_DEDICATED_DNS)
+      Gemma → GEMMA_VERTEX_SA_KEY_JSON / _PROJECT / _LOCATION / _ENDPOINT_ID
+              (optional GEMMA_VERTEX_DEDICATED_DNS)
+      Haiku → ANTHROPIC_API_KEY / ANTHROPIC_MODEL
+
+    Cascade-specific knobs:
+      CASCADE_QWEN_MIN_CONFIDENCE   (default 0.9)
+      CASCADE_GEMMA_MIN_CONFIDENCE  (default 0.9)
+      CASCADE_TIMEOUT_MS            (default 5000)
+
+    Returns None (and logs a warning) if any provider can't be built.
+    """
+    # Qwen
+    vertex_sa = os.getenv("VERTEX_AI_SA_KEY_JSON", "")
+    vertex_project = os.getenv("VERTEX_AI_PROJECT", "")
+    vertex_location = os.getenv("VERTEX_AI_LOCATION", "")
+    vertex_endpoint = os.getenv("VERTEX_AI_ENDPOINT_ID", "")
+    vertex_dns = os.getenv("VERTEX_AI_DEDICATED_DNS", "")
+    if not all([vertex_sa, vertex_project, vertex_location, vertex_endpoint]):
+        logger.warning("[Cascade] Qwen (VERTEX_AI_*) env vars not fully set; cascade disabled")
+        return None
+    qwen_provider = Qwen3GuardProvider(
+        vertex_sa, vertex_project, vertex_location, vertex_endpoint, vertex_dns
+    )
+
+    # Gemma
+    gemma_sa = os.getenv("GEMMA_VERTEX_SA_KEY_JSON", "")
+    gemma_project = os.getenv("GEMMA_VERTEX_PROJECT", "")
+    gemma_location = os.getenv("GEMMA_VERTEX_LOCATION", "")
+    gemma_endpoint = os.getenv("GEMMA_VERTEX_ENDPOINT_ID", "")
+    gemma_dns = os.getenv("GEMMA_VERTEX_DEDICATED_DNS", "")
+    if not all([gemma_sa, gemma_project, gemma_location, gemma_endpoint]):
+        logger.warning("[Cascade] Gemma (GEMMA_VERTEX_*) env vars not fully set; cascade disabled")
+        return None
+    gemma_provider = GemmaVertexProvider(
+        gemma_sa, gemma_project, gemma_location, gemma_endpoint, gemma_dns
+    )
+
+    # Haiku
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not anthropic_key:
+        logger.warning("[Cascade] ANTHROPIC_API_KEY not set; cascade disabled")
+        return None
+    anthropic_model = os.getenv("ANTHROPIC_MODEL", "") or DEFAULT_ANTHROPIC_MODEL
+    haiku_provider = AnthropicProvider(anthropic_key, anthropic_model)
+
+    cascade = {
+        "qwen": LLMScanner(qwen_provider),
+        "gemma": LLMScanner(gemma_provider),
+        "haiku": LLMScanner(haiku_provider),
+        "qwen_min_confidence": _float_env("CASCADE_QWEN_MIN_CONFIDENCE", 0.9),
+        "gemma_min_confidence": _float_env("CASCADE_GEMMA_MIN_CONFIDENCE", 0.9),
+        "timeout_s": _int_env("CASCADE_TIMEOUT_MS", 5000) / 1000.0,
+    }
+    logger.info(
+        f"[Cascade] Initialized: qwen_min_conf={cascade['qwen_min_confidence']} "
+        f"gemma_min_conf={cascade['gemma_min_confidence']} timeout_s={cascade['timeout_s']}"
+    )
+    return cascade
+
+
+def _voter_summary(result: Optional[Dict[str, Any]], safe_vote: Optional[bool] = None) -> Dict[str, Any]:
+    """Compact summary of a fast-tier voter for inclusion in the cascade response details."""
+    if result is None:
+        return {"completed": False}
+    out = {
+        "completed": True,
+        "is_valid": result.get("is_valid"),
+        "risk_score": result.get("risk_score"),
+        "decision_confidence": result.get("decision_confidence"),
+    }
+    if safe_vote is not None:
+        out["safe_vote"] = safe_vote
+    return out
+
+
+def scan_with_cascade(
+    scanner_name: str,
+    scanner_type: str,
+    text: str,
+    config: Dict[str, Any],
+    cascade: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Run Qwen + Gemma + Haiku in parallel for a single scanner.
+
+    Decision rule:
+      - Both Qwen and Gemma return `is_valid=True` AND decision_confidence > their
+        min_confidence threshold → return allow immediately (Haiku not awaited;
+        its result is drained in a daemon thread so the HTTP call doesn't dangle).
+      - Otherwise → wait for Haiku; Haiku is authoritative.
+      - Haiku timeout / error → fail open (is_valid=True, risk_score=0.0).
+    """
+    import concurrent.futures
+    import threading
+
+    qwen_scanner = cascade["qwen"]
+    gemma_scanner = cascade["gemma"]
+    haiku_scanner = cascade["haiku"]
+    qwen_min = float(cascade["qwen_min_confidence"])
+    gemma_min = float(cascade["gemma_min_confidence"])
+    timeout_s = float(cascade["timeout_s"])
+
+    overall_start = time.time()
+
+    executor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=3, thread_name_prefix="cascade",
+    )
+    qwen_fut = executor.submit(qwen_scanner.scan, scanner_name, scanner_type, text, config)
+    gemma_fut = executor.submit(gemma_scanner.scan, scanner_name, scanner_type, text, config)
+    haiku_fut = executor.submit(haiku_scanner.scan, scanner_name, scanner_type, text, config)
+    executor.shutdown(wait=False)
+
+    fast_futs = {qwen_fut: "qwen", gemma_fut: "gemma"}
+    fast_results: Dict[str, Optional[Dict[str, Any]]] = {"qwen": None, "gemma": None}
+    deadline = overall_start + timeout_s
+
+    try:
+        for fut in concurrent.futures.as_completed(fast_futs, timeout=timeout_s):
+            label = fast_futs[fut]
+            try:
+                fast_results[label] = fut.result()
+            except Exception as exc:
+                logger.warning(f"[Cascade] {label} failed: {exc}")
+                fast_results[label] = None
+    except concurrent.futures.TimeoutError:
+        logger.warning("[Cascade] timed out waiting for Qwen+Gemma fast tier")
+
+    qwen_r = fast_results["qwen"]
+    gemma_r = fast_results["gemma"]
+
+    def safe_vote(r: Optional[Dict[str, Any]], min_conf: float) -> bool:
+        return (
+            r is not None
+            and r.get("is_valid") is True
+            and float(r.get("decision_confidence", 0.0)) > min_conf
+        )
+
+    qwen_safe = safe_vote(qwen_r, qwen_min)
+    gemma_safe = safe_vote(gemma_r, gemma_min)
+
+    elapsed_ms = lambda: round((time.time() - overall_start) * 1000, 2)
+
+    def _drain_haiku_in_background() -> None:
+        try:
+            late = haiku_fut.result(timeout=120)
+            logger.info(
+                f"[Cascade] late Haiku result (fast-pass already returned): "
+                f"is_valid={late.get('is_valid')} risk={late.get('risk_score', 0.0):.2f}"
+            )
+        except Exception as exc:
+            logger.warning(f"[Cascade] late Haiku drain failed: {exc}")
+
+    if qwen_safe and gemma_safe:
+        ms = elapsed_ms()
+        threading.Thread(
+            target=_drain_haiku_in_background, daemon=True, name="cascade-haiku-drain",
+        ).start()
+        logger.info(
+            f"[Cascade] FAST PASS: qwen.conf={qwen_r['decision_confidence']:.2f} "
+            f"gemma.conf={gemma_r['decision_confidence']:.2f} elapsed_ms={ms:.0f}"
+        )
+        return {
+            "is_valid": True,
+            "risk_score": max(
+                float(qwen_r.get("risk_score", 0.0)),
+                float(gemma_r.get("risk_score", 0.0)),
+            ),
+            "decision_confidence": min(
+                float(qwen_r["decision_confidence"]),
+                float(gemma_r["decision_confidence"]),
+            ),
+            "details": {
+                "cascade_decision": "fast_pass_allow",
+                "qwen": _voter_summary(qwen_r, qwen_safe),
+                "gemma": _voter_summary(gemma_r, gemma_safe),
+                "haiku_consulted": False,
+                "scanner_type": scanner_type,
+            },
+            "execution_time_ms": ms,
+        }
+
+    # Either fast voter is missing / unsafe / low-confidence → wait for Haiku.
+    remaining_s = max(0.1, deadline - time.time())
+    try:
+        haiku_r = haiku_fut.result(timeout=remaining_s)
+    except concurrent.futures.TimeoutError:
+        ms = elapsed_ms()
+        logger.warning(f"[Cascade] Haiku timed out after {remaining_s:.1f}s — failing open")
+        return {
+            "is_valid": True,
+            "risk_score": 0.0,
+            "decision_confidence": 0.0,
+            "details": {
+                "cascade_decision": "haiku_timeout_fail_open",
+                "qwen": _voter_summary(qwen_r, qwen_safe),
+                "gemma": _voter_summary(gemma_r, gemma_safe),
+                "haiku_consulted": True,
+                "error": "haiku timeout",
+                "scanner_type": scanner_type,
+            },
+            "execution_time_ms": ms,
+        }
+    except Exception as exc:
+        ms = elapsed_ms()
+        logger.error(f"[Cascade] Haiku failed: {exc} — failing open")
+        return {
+            "is_valid": True,
+            "risk_score": 0.0,
+            "decision_confidence": 0.0,
+            "details": {
+                "cascade_decision": "haiku_error_fail_open",
+                "qwen": _voter_summary(qwen_r, qwen_safe),
+                "gemma": _voter_summary(gemma_r, gemma_safe),
+                "haiku_consulted": True,
+                "error": f"haiku failed: {exc}",
+                "scanner_type": scanner_type,
+            },
+            "execution_time_ms": ms,
+        }
+
+    ms = elapsed_ms()
+    enriched_details: Dict[str, Any] = dict(haiku_r.get("details", {}))
+    enriched_details.update({
+        "cascade_decision": "haiku_authority",
+        "qwen": _voter_summary(qwen_r, qwen_safe),
+        "gemma": _voter_summary(gemma_r, gemma_safe),
+        "haiku_consulted": True,
+        "scanner_type": scanner_type,
+    })
+    logger.info(
+        f"[Cascade] HAIKU AUTHORITY: qwen_safe={qwen_safe} gemma_safe={gemma_safe} "
+        f"haiku.is_valid={haiku_r['is_valid']} haiku.risk={haiku_r['risk_score']:.2f} "
+        f"elapsed_ms={ms:.0f}"
+    )
+    return {
+        "is_valid": haiku_r["is_valid"],
+        "risk_score": haiku_r["risk_score"],
+        "decision_confidence": haiku_r.get("decision_confidence", 0.0),
+        "details": enriched_details,
+        "execution_time_ms": ms,
+    }
 
 
 # ── Module-level initializer ─────────────────────────────────────────────────
