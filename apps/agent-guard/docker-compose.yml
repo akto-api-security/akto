@@ -57,46 +57,46 @@ services:
     networks:
       - agent-guard-network
 
-  go-service:
-    build:
-      context: ./go-service/container
-      dockerfile: Dockerfile
-    container_name: agent-guard-go
-    ports:
-      - "127.0.0.1:8091:8091"
-    depends_on:
-      python-service:
-        condition: service_healthy
-    environment:
-      - GIN_MODE=release
-      - PORT=8091
-      - PYTHON_SERVICE_URL=http://python-service:8092
-      # Optional LLM scanner config (PromptInjection / BanTopics).
-      # When SCANNER_LLM_PROVIDER is unset, all requests use the Python ML path.
-      # When set, requests with config.use_llm=true are routed to the provider.
-      - SCANNER_LLM_PROVIDER=${SCANNER_LLM_PROVIDER:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - OPENAI_MODEL=${OPENAI_MODEL:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}
-      - VERTEX_AI_PROJECT=${VERTEX_AI_PROJECT:-}
-      - VERTEX_AI_LOCATION=${VERTEX_AI_LOCATION:-}
-      - VERTEX_AI_ENDPOINT_ID=${VERTEX_AI_ENDPOINT_ID:-}
-      - VERTEX_AI_SA_KEY_JSON=${VERTEX_AI_SA_KEY_JSON:-}
-      - VERTEX_AI_DEDICATED_DNS=${VERTEX_AI_DEDICATED_DNS:-}
-      - GEMMA_VERTEX_SA_KEY_JSON=${GEMMA_VERTEX_SA_KEY_JSON:-}
-      - GEMMA_VERTEX_PROJECT=${GEMMA_VERTEX_PROJECT:-}
-      - GEMMA_VERTEX_LOCATION=${GEMMA_VERTEX_LOCATION:-}
-      - GEMMA_VERTEX_ENDPOINT_ID=${GEMMA_VERTEX_ENDPOINT_ID:-}
-      - GEMMA_VERTEX_DEDICATED_DNS=${GEMMA_VERTEX_DEDICATED_DNS:-}
-      # Cascade vars are consumed only by the Python service; duplicated here
-      # so a single .env file covers both stanzas symmetrically.
-      - CASCADE_MODE_ENABLED=${CASCADE_MODE_ENABLED:-}
-      - CASCADE_QWEN_MIN_CONFIDENCE=${CASCADE_QWEN_MIN_CONFIDENCE:-}
-      - CASCADE_GEMMA_MIN_CONFIDENCE=${CASCADE_GEMMA_MIN_CONFIDENCE:-}
-      - CASCADE_TIMEOUT_MS=${CASCADE_TIMEOUT_MS:-}
-    networks:
-      - agent-guard-network
+  # go-service:
+  #   build:
+  #     context: ./go-service/container
+  #     dockerfile: Dockerfile
+  #   container_name: agent-guard-go
+  #   ports:
+  #     - "127.0.0.1:8091:8091"
+  #   depends_on:
+  #     python-service:
+  #       condition: service_healthy
+  #   environment:
+  #     - GIN_MODE=release
+  #     - PORT=8091
+  #     - PYTHON_SERVICE_URL=http://python-service:8092
+  #     # Optional LLM scanner config (PromptInjection / BanTopics).
+  #     # When SCANNER_LLM_PROVIDER is unset, all requests use the Python ML path.
+  #     # When set, requests with config.use_llm=true are routed to the provider.
+  #     - SCANNER_LLM_PROVIDER=${SCANNER_LLM_PROVIDER:-}
+  #     - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+  #     - OPENAI_MODEL=${OPENAI_MODEL:-}
+  #     - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+  #     - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}
+  #     - VERTEX_AI_PROJECT=${VERTEX_AI_PROJECT:-}
+  #     - VERTEX_AI_LOCATION=${VERTEX_AI_LOCATION:-}
+  #     - VERTEX_AI_ENDPOINT_ID=${VERTEX_AI_ENDPOINT_ID:-}
+  #     - VERTEX_AI_SA_KEY_JSON=${VERTEX_AI_SA_KEY_JSON:-}
+  #     - VERTEX_AI_DEDICATED_DNS=${VERTEX_AI_DEDICATED_DNS:-}
+  #     - GEMMA_VERTEX_SA_KEY_JSON=${GEMMA_VERTEX_SA_KEY_JSON:-}
+  #     - GEMMA_VERTEX_PROJECT=${GEMMA_VERTEX_PROJECT:-}
+  #     - GEMMA_VERTEX_LOCATION=${GEMMA_VERTEX_LOCATION:-}
+  #     - GEMMA_VERTEX_ENDPOINT_ID=${GEMMA_VERTEX_ENDPOINT_ID:-}
+  #     - GEMMA_VERTEX_DEDICATED_DNS=${GEMMA_VERTEX_DEDICATED_DNS:-}
+  #     # Cascade vars are consumed only by the Python service; duplicated here
+  #     # so a single .env file covers both stanzas symmetrically.
+  #     - CASCADE_MODE_ENABLED=${CASCADE_MODE_ENABLED:-}
+  #     - CASCADE_QWEN_MIN_CONFIDENCE=${CASCADE_QWEN_MIN_CONFIDENCE:-}
+  #     - CASCADE_GEMMA_MIN_CONFIDENCE=${CASCADE_GEMMA_MIN_CONFIDENCE:-}
+  #     - CASCADE_TIMEOUT_MS=${CASCADE_TIMEOUT_MS:-}
+  #   networks:
+  #     - agent-guard-network
 
 networks:
   agent-guard-network:

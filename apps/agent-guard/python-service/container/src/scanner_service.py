@@ -33,6 +33,7 @@ from llm_scanner import (
     init_llm_scanner,
     init_cascade_scanners,
     is_truthy,
+    CASCADE_SUPPORTED_SCANNERS,
     LLM_SUPPORTED_SCANNERS,
     scan_with_cascade,
     scan_with_model_map,
@@ -253,7 +254,7 @@ async def scan_text(request: ScanRequest):
         # ── Cascade dispatch (Qwen + Gemma + Haiku) ──────────────────
         if (
             _cascade is not None
-            and request.scanner_name in LLM_SUPPORTED_SCANNERS
+            and request.scanner_name in CASCADE_SUPPORTED_SCANNERS
         ):
             try:
                 result = scan_with_cascade(

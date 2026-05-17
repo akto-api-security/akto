@@ -83,6 +83,46 @@ Analyze this text and respond ONLY with valid JSON:
 Text to analyze:
 %s"""
 
+TOXICITY_DETECTION_PROMPT = """You are a security system that detects toxic content.
+
+Toxic content includes:
+- Hate speech, slurs, or attacks targeting a protected group (race, gender, religion, sexual orientation, disability, etc.)
+- Threats, harassment, or intimidation aimed at an individual
+- Demeaning language, personal attacks, or insults directed at a specific person
+- Unwanted sexual content directed at another person, or sexual content involving minors
+
+Normal disagreement, criticism, robust debate, frustration, hyperbolic expressions, or strong language about ideas/products/events is NOT toxic. Discussion of toxicity in an educational or analytical context is also NOT toxic.
+
+Analyze this text and respond ONLY with valid JSON:
+{
+  "isToxic": <true if this text is toxic, false otherwise>,
+  "confidence": <float 0.0 to 1.0>,
+  "reason": "<one sentence explanation>"
+}
+
+Text to analyze:
+%s"""
+
+GIBBERISH_DETECTION_PROMPT = """You are a security system that detects gibberish or nonsensical input.
+
+Gibberish includes:
+- Random keystrokes (asdfghjkl, qwertyuiop, mnbvcxz patterns)
+- Strings of random characters with no morpheme or word structure
+- Mojibake from corrupted character encoding
+- Pure noise meant to confuse downstream parsers
+
+Normal text in any natural language — including slang, dialect, jargon, technical terms, identifiers, code snippets, JSON, base64, URLs, hashes, emoji, or text with typos — is NOT gibberish. Short or one-word inputs are NOT gibberish if they have any extractable meaning.
+
+Analyze this text and respond ONLY with valid JSON:
+{
+  "isGibberish": <true if this text is gibberish, false otherwise>,
+  "confidence": <float 0.0 to 1.0>,
+  "reason": "<one sentence explanation>"
+}
+
+Text to analyze:
+%s"""
+
 # ── Gemma-tuned variants (used only when SCANNER_LLM_PROVIDER=gemma_vertexai) ─
 # Input-side prompt-injection and ban-topics variants are copied verbatim
 # from qwen_prompt_injection_bench/{benchmark,ban_topics_benchmark}.py
@@ -191,9 +231,87 @@ Analyze this text and respond ONLY with valid JSON:
 Text to analyze:
 %s"""
 
+TOXICITY_DETECTION_PROMPT_GEMMA = """You are a security system that detects toxic content.
+
+Toxic content includes:
+- Hate speech, slurs, or attacks targeting a protected group (race, gender, religion, sexual orientation, disability, nationality, etc.)
+- Threats, harassment, or intimidation aimed at a specific individual (incl. doxxing, stalking)
+- Demeaning language, personal attacks, or insults aimed at a specific person
+- Unwanted sexual content directed at another person, or sexual content involving minors
+
+The signal is INTENT and TARGET, not vocabulary. Profanity and strong language are NOT automatically toxic — they are toxic only when they carry a hostile intent at a person or group. Hyperbolic frustration ("I hate Mondays", "this code is garbage"), criticism of work/ideas/products, robust debate, and references to toxicity in educational, analytical, journalistic, or red-team contexts are NOT toxic. Quoting a slur to explain why it's harmful is NOT toxic; using one to attack someone IS.
+
+Examples (these inputs are NOT from the test set):
+
+Input: "You're an idiot and nobody likes you. Just quit already."
+Output: {"isToxic": true, "confidence": 0.88, "reason": "Direct personal insult and harassment aimed at the reader."}
+
+Input: "This API documentation is absolute garbage — whoever wrote it should be fired."
+Output: {"isToxic": false, "confidence": 0.08, "reason": "Hyperbolic frustration about documentation quality; not a personal attack on an identifiable individual."}
+
+Input: "Explain how slurs are weaponised against ethnic minorities in propaganda campaigns."
+Output: {"isToxic": false, "confidence": 0.05, "reason": "Educational/analytical question about hate speech mechanics, not toxic itself."}
+
+Analyze this text and respond ONLY with valid JSON:
+{
+  "isToxic": <true if this text is toxic, false otherwise>,
+  "confidence": <float 0.0 to 1.0>,
+  "reason": "<one sentence explanation>"
+}
+
+Text to analyze:
+%s"""
+
+GIBBERISH_DETECTION_PROMPT_GEMMA = """You are a security system that detects gibberish or nonsensical input.
+
+Gibberish is text from which a competent reader cannot extract any intent or content. Examples:
+- Random keystrokes from keyboard rows (asdfghjkl, qwertyuiop, mnbvcxz, 1234567890)
+- Random character sequences with no morpheme, word, or phrase structure
+- Mojibake from broken character encoding (e.g. "â€™" runs)
+- Pure noise meant to confuse downstream parsers or fill form fields
+
+NOT gibberish — even when it looks "weird" to a non-specialist:
+- Natural language in ANY language and script (English, Chinese, Arabic, Hindi, slang, dialect, baby-talk, broken/non-native English)
+- Technical content: source code, JSON, YAML, regex, base64, hex, hashes, UUIDs, URLs, file paths, shell commands, SQL, log lines
+- Identifiers and slugs: usernames, license plates, SKUs, abbreviations, acronyms, error codes
+- Short or single-word inputs ("yes", "ok", "?", "lol"), repeated emoji/punctuation
+- Text with typos, autocorrect mistakes, or formatting glitches that still contains recognisable words
+- Placeholder text (lorem ipsum) — intentional, not noise
+
+The signal is "can a competent reader extract meaning, intent, or structure from this," NOT "does this look unusual."
+
+Examples (these inputs are NOT from the test set):
+
+Input: "asdfghjkl qwerty zxcvbnm uiop"
+Output: {"isGibberish": true, "confidence": 0.95, "reason": "Three keyboard-row keystroke runs in sequence with no morpheme structure."}
+
+Input: "curl -X POST https://api.example.com/v1/scan -H 'x-api-key: sk-abc' -d '{\\"text\\":\\"hi\\"}'"
+Output: {"isGibberish": false, "confidence": 0.02, "reason": "Standard cURL invocation; entirely parseable shell syntax."}
+
+Input: "ok"
+Output: {"isGibberish": false, "confidence": 0.05, "reason": "Single-word affirmative reply; short but meaningful."}
+
+Analyze this text and respond ONLY with valid JSON:
+{
+  "isGibberish": <true if this text is gibberish, false otherwise>,
+  "confidence": <float 0.0 to 1.0>,
+  "reason": "<one sentence explanation>"
+}
+
+Text to analyze:
+%s"""
+
 # ── Supported scanners ───────────────────────────────────────────────────────
 
-LLM_SUPPORTED_SCANNERS = {"PromptInjection", "BanTopics"}
+# Scanners the single-LLM path supports (PromptInjection / BanTopics / Toxicity
+# / Gibberish). Set FORCE_LLM_MODE=true or send config.use_llm=true to route
+# these to the configured LLM provider instead of the local ML model.
+LLM_SUPPORTED_SCANNERS = {"PromptInjection", "BanTopics", "Toxicity", "Gibberish"}
+
+# Narrower set the parallel cascade (scan_with_cascade) is tuned for. Qwen3Guard
+# only emits a binary safety verdict, so toxicity/gibberish go through the
+# single-LLM path rather than the cascade.
+CASCADE_SUPPORTED_SCANNERS = {"PromptInjection", "BanTopics"}
 
 # ── Provider defaults ────────────────────────────────────────────────────────
 
@@ -250,6 +368,14 @@ def build_scan_prompt(
         if provider_name == "gemma_vertexai":
             return BAN_TOPICS_DETECTION_PROMPT_GEMMA % (topics_str, text)
         return BAN_TOPICS_DETECTION_PROMPT % (topics_str, text)
+    elif scanner_name == "Toxicity":
+        if provider_name == "gemma_vertexai":
+            return TOXICITY_DETECTION_PROMPT_GEMMA % text
+        return TOXICITY_DETECTION_PROMPT % text
+    elif scanner_name == "Gibberish":
+        if provider_name == "gemma_vertexai":
+            return GIBBERISH_DETECTION_PROMPT_GEMMA % text
+        return GIBBERISH_DETECTION_PROMPT % text
     return None
 
 
@@ -291,6 +417,26 @@ def parse_llm_result(scanner_name: str, raw: str) -> Dict[str, Any]:
             "is_valid": is_valid,
             "risk_score": confidence,
             "decision_confidence": confidence if is_banned else (1.0 - confidence),
+            "details": details,
+        }
+    elif scanner_name == "Toxicity":
+        is_toxic = parsed.get("isToxic", False)
+        confidence = float(parsed.get("confidence", 0.0))
+        is_valid = not is_toxic
+        return {
+            "is_valid": is_valid,
+            "risk_score": confidence,
+            "decision_confidence": confidence if is_toxic else (1.0 - confidence),
+            "details": details,
+        }
+    elif scanner_name == "Gibberish":
+        is_gibberish = parsed.get("isGibberish", False)
+        confidence = float(parsed.get("confidence", 0.0))
+        is_valid = not is_gibberish
+        return {
+            "is_valid": is_valid,
+            "risk_score": confidence,
+            "decision_confidence": confidence if is_gibberish else (1.0 - confidence),
             "details": details,
         }
 

@@ -41,22 +41,21 @@ docker-compose restart
 # First scan: ~500ms (uses volume!) ⚡
 ```
 
-### Pre-Warm Cache (Optional)
+### Pre-Warm Cache (Optional, ML scanners only)
 
-**Manual warmup (recommended):**
+With `CASCADE_MODE_ENABLED=true` or `FORCE_LLM_MODE=true` plus an LLM provider
+configured, the slow ML-backed scanners (PromptInjection / BanTopics / Toxicity
+/ Gibberish) all route to the LLM and **no warmup is needed**.
+
+If you call ML-only scanners directly via `/scan` (e.g. `Anonymize`, `Bias`,
+`MaliciousURLs`, `Sensitive`, `BanCode`, `Code`), warm them once after the
+container starts to avoid the ~30s download on the first request per scanner:
+
 ```bash
 docker-compose up -d
 docker exec agent-guard-python python warmup.py
-# Downloads all 7 ONNX models (~2-3 minutes)
-# Then instant for all subsequent scans
+# Downloads ONNX models (~2-3 minutes) for the scanners listed in warmup.py
 ```
-
-**Auto-warmup on build:**
-```dockerfile
-# Uncomment in python-service/Dockerfile:
-RUN python warmup.py
-```
-Build time increases by ~3-5 minutes, but container starts with all models ready.
 
 ---
 

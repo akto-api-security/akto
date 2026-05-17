@@ -34,8 +34,13 @@ ENV HF_HOME=/app/.cache/huggingface
 ENV TRANSFORMERS_VERBOSITY=error
 ENV HF_HUB_VERBOSITY=error
 
-# Pre-download all models during build (makes container work offline and first request fast)
-RUN python warmup.py
+# Note: ML models are no longer pre-downloaded during build. With
+# CASCADE_MODE_ENABLED=true or FORCE_LLM_MODE=true (plus an LLM provider
+# configured), PromptInjection/BanTopics/Toxicity/Gibberish all route to an
+# LLM and the local ONNX models are not loaded. If you need to use ML-backed
+# scanners directly (e.g. Anonymize, Bias, MaliciousURLs, Sensitive), pre-warm
+# them manually after container start:
+#     docker exec agent-guard-python python warmup.py
 
 # Expose the service port
 EXPOSE 8092
