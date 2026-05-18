@@ -214,11 +214,13 @@ TOXICITY_DETECTION_PROMPT_GEMMA = """You are a security system that detects toxi
 
 Toxic content includes:
 - Hate speech, slurs, or attacks targeting a protected group (race, gender, religion, sexual orientation, disability, nationality, etc.)
-- Threats, harassment, or intimidation aimed at a specific individual (incl. doxxing or stalking — exposing personal info to enable harassment, NOT routine handling of PII inside legitimate business workflows like HR, payroll, healthcare enrollment, customer service, or compliance reporting)
+- Threats, harassment, or intimidation aimed at a specific individual
 - Demeaning language, personal attacks, or insults aimed at a specific person
 - Unwanted sexual content directed at another person, or sexual content involving minors
 
-The signal is INTENT and TARGET, not vocabulary. Profanity and strong language are NOT automatically toxic — they are toxic only when they carry a hostile intent at a person or group. Hyperbolic frustration ("I hate Mondays", "this code is garbage"), criticism of work/ideas/products, robust debate, and references to toxicity in educational, analytical, journalistic, or red-team contexts are NOT toxic. Quoting a slur to explain why it's harmful is NOT toxic; using one to attack someone IS. Sharing someone's PII inside a legitimate business workflow (HR onboarding, benefits enrollment, payroll, KYC, customer-support lookups, regulatory reporting) is NOT toxic — toxicity requires hostile intent toward the subject; data-handling concerns belong to PII/privacy scanners, not toxicity.
+The signal is INTENT and TARGET, not vocabulary. Profanity and strong language are NOT automatically toxic — they are toxic only when they carry a hostile intent at a person or group. Hyperbolic frustration ("I hate Mondays", "this code is garbage"), criticism of work/ideas/products, robust debate, and references to toxicity in educational, analytical, journalistic, or red-team contexts are NOT toxic. Quoting a slur to explain why it's harmful is NOT toxic; using one to attack someone IS.
+
+This scanner ONLY detects interpersonal toxicity. Data-handling, privacy, and PII concerns are NOT in scope — those belong to dedicated PII/privacy scanners. Do NOT flag a message as toxic merely because it references, requests, or shares personal information; ignore PII/authorization considerations entirely when scoring toxicity.
 
 Examples (these inputs are NOT from the test set):
 
@@ -230,9 +232,6 @@ Output: {"isToxic": false, "confidence": 0.08, "reason": "Hyperbolic frustration
 
 Input: "Explain how slurs are weaponised against ethnic minorities in propaganda campaigns."
 Output: {"isToxic": false, "confidence": 0.05, "reason": "Educational/analytical question about hate speech mechanics, not toxic itself."}
-
-Input: "Please generate her benefits enrollment summary with her SSN and date of birth so I can send it to our insurance broker by end of day."
-Output: {"isToxic": false, "confidence": 0.04, "reason": "Routine HR/benefits workflow involving an employee's PII for legitimate insurance enrollment; not harassment, doxxing, or attack on a person — data-handling concerns are for a PII scanner, not toxicity."}
 
 Analyze this text and respond ONLY with valid JSON:
 {
@@ -290,10 +289,12 @@ Text to analyze:
 # these to the configured LLM provider instead of the local ML model.
 LLM_SUPPORTED_SCANNERS = {"PromptInjection", "BanTopics", "Toxicity", "Gibberish"}
 
-# Narrower set the parallel cascade (scan_with_cascade) is tuned for. Qwen3Guard
-# only emits a binary safety verdict, so toxicity/gibberish go through the
-# single-LLM path rather than the cascade.
-CASCADE_SUPPORTED_SCANNERS = {"PromptInjection", "BanTopics"}
+# Scanners the parallel cascade (scan_with_cascade) is tuned for. Qwen3Guard's
+# "unsafe" verdict covers prompt-injection, banned-topic, AND toxicity classes
+# (its training includes hate speech, harassment, threats), so it can vote
+# alongside Gemma+Haiku for Toxicity. Gibberish stays single-LLM — Qwen3Guard
+# doesn't classify well-formed-but-nonsense text as unsafe.
+CASCADE_SUPPORTED_SCANNERS = {"PromptInjection", "BanTopics", "Toxicity"}
 
 # ── Provider defaults ────────────────────────────────────────────────────────
 

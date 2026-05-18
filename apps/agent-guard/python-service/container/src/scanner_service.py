@@ -96,7 +96,9 @@ _cascade = init_cascade_scanners() if _cascade_enabled else None
 if _cascade_enabled and _cascade is None:
     logger.warning("[Service] CASCADE_MODE_ENABLED=true but cascade providers failed to initialize; falling back to existing paths")
 elif _cascade is not None:
-    logger.info("[Service] Cascade enabled — PromptInjection/BanTopics will use Qwen+Gemma+Haiku")
+    logger.info(
+        "[Service] Cascade enabled — PromptInjection/BanTopics/Toxicity will use Qwen+Gemma+Haiku"
+    )
 
 # ── Slack per-scan alerts (fire-and-forget) ──────────────────────────────────
 # When SLACK_WEBHOOK_URL is set, every /scan result is posted to Slack from a
