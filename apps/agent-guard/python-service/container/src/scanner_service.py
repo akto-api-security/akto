@@ -1,7 +1,8 @@
 import logging
 import os
+import threading
 import time
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException
 import httpx
 from pydantic import BaseModel
@@ -29,7 +30,15 @@ except:
 
 from llm_guard import input_scanners, output_scanners
 from intent_analyzer import IntentAnalysisScanner
-from llm_scanner import init_llm_scanner, is_truthy, LLM_SUPPORTED_SCANNERS, scan_with_model_map
+from llm_scanner import (
+    init_llm_scanner,
+    init_cascade_scanners,
+    is_truthy,
+    CASCADE_SUPPORTED_SCANNERS,
+    LLM_SUPPORTED_SCANNERS,
+    scan_with_cascade,
+    scan_with_model_map,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -80,6 +89,125 @@ _llm_scanner = init_llm_scanner()
 _force_llm = is_truthy(os.getenv("FORCE_LLM_MODE"))
 if _force_llm:
     logger.info("[Service] FORCE_LLM_MODE=true — PromptInjection/BanTopics will use LLM path")
+
+# Cascade scanner (Qwen + Gemma + Haiku) — initialized once when CASCADE_MODE_ENABLED is truthy.
+_cascade_enabled = is_truthy(os.getenv("CASCADE_MODE_ENABLED"))
+_cascade = init_cascade_scanners() if _cascade_enabled else None
+if _cascade_enabled and _cascade is None:
+    logger.warning("[Service] CASCADE_MODE_ENABLED=true but cascade providers failed to initialize; falling back to existing paths")
+elif _cascade is not None:
+    logger.info(
+        "[Service] Cascade enabled — PromptInjection/BanTopics/Toxicity will use Qwen+Gemma+Haiku"
+    )
+
+# ── Slack per-scan alerts (fire-and-forget) ──────────────────────────────────
+# When SLACK_WEBHOOK_URL is set, every /scan result is posted to Slack from a
+# daemon thread. Never blocks the request path; never raises.
+# Slack truncates a message's `text` at ~40,000 chars and rejects oversized
+# payloads. Default the prompt cap just under that and keep a small reserve for
+# the header / model lines; the whole message is also hard-clamped below so a
+# huge prompt can never push the payload past Slack's limit.
+_SLACK_MSG_HARD_LIMIT = 39000
+_SLACK_WEBHOOK_URL = (os.getenv("SLACK_WEBHOOK_URL") or "").strip()
+_SLACK_PROMPT_MAX = int(os.getenv("SLACK_ALERT_PROMPT_MAXLEN", "38000"))
+if _SLACK_WEBHOOK_URL:
+    logger.info("[SlackAlert] enabled — every scan will be posted to Slack (fire-and-forget)")
+else:
+    logger.info("[SlackAlert] SLACK_WEBHOOK_URL not set — Slack alerts disabled")
+
+
+def _model_lines(details: Dict[str, Any], is_valid: bool, risk_score: float) -> str:
+    """Render the per-model breakdown for whichever path handled the scan."""
+    def voter(name: str, v: Optional[Dict[str, Any]]) -> str:
+        if not v or not v.get("completed"):
+            return f"  • {name}: _no result_"
+        verdict = "safe" if v.get("is_valid") else "unsafe"
+        rs = v.get("risk_score")
+        dc = v.get("decision_confidence")
+        sv = v.get("safe_vote")
+        extra = f" safe_vote={sv}" if sv is not None else ""
+        return f"  • {name}: {verdict} (risk={rs}, conf={dc}){extra}"
+
+    # Cascade path — qwen/gemma/haiku.
+    if "qwen" in details or "gemma" in details:
+        lines = [voter("Qwen", details.get("qwen")), voter("Gemma", details.get("gemma"))]
+        if details.get("haiku_consulted"):
+            lines.append(f"  • Haiku: consulted → {'safe' if is_valid else 'unsafe'} (risk={risk_score})")
+        else:
+            lines.append("  • Haiku: not consulted (fast-pass)")
+        return "\n".join(lines)
+
+    # Single-LLM path (Toxicity / Gibberish / forced LLM).
+    provider = details.get("llm_provider")
+    if provider:
+        return f"  • {provider}: {'safe' if is_valid else 'unsafe'} (risk={risk_score})"
+
+    # Deterministic / local-ML path (BanSubstrings, Secrets, TokenLimit, …).
+    return "  • no LLM — deterministic/ML scanner"
+
+
+def _build_slack_payload(
+    scanner_name: str, text: str, is_valid: bool, risk_score: float,
+    details: Dict[str, Any], e2e_ms: float,
+) -> Dict[str, Any]:
+    decision = details.get("cascade_decision")
+    fast_pass = decision == "fast_pass_allow"
+    result_icon = ":white_check_mark:" if is_valid else ":no_entry:"
+    result_word = "ALLOWED" if is_valid else "BLOCKED"
+    prompt = text if len(text) <= _SLACK_PROMPT_MAX else text[:_SLACK_PROMPT_MAX] + " …[truncated]"
+
+    decision_str = decision or "n/a"
+    err = details.get("error")
+
+    msg = (
+        f":shield: *Agent-Guard* `{scanner_name}` — {result_icon} *{result_word}*\n"
+        f"*Fast-pass:* {'yes' if fast_pass else 'no'}   "
+        f"*Decision:* `{decision_str}`   "
+        f"*E2E latency:* {e2e_ms:.0f} ms\n"
+        f"*Models:*\n{_model_lines(details, is_valid, risk_score)}\n"
+    )
+    if err:
+        msg += f"*Error:* `{err}`\n"
+    msg += f"*Prompt:*\n```{prompt}```"
+
+    # Final safety clamp: Slack rejects/truncates messages over ~40k chars.
+    # Keep the closing fence so the code block still renders if we clipped here.
+    if len(msg) > _SLACK_MSG_HARD_LIMIT:
+        msg = msg[: _SLACK_MSG_HARD_LIMIT - 16] + " …[clipped]```"
+    return {"text": msg}
+
+
+def _post_slack(payload: Dict[str, Any]) -> None:
+    """Runs in a daemon thread. Posts to Slack; swallows every error."""
+    try:
+        resp = httpx.post(_SLACK_WEBHOOK_URL, json=payload, timeout=5.0)
+        if resp.status_code >= 400:
+            logger.warning(f"[SlackAlert] webhook returned {resp.status_code}: {resp.text[:200]}")
+    except Exception as exc:
+        logger.warning(f"[SlackAlert] post failed: {exc}")
+
+
+def fire_slack_alert(
+    scanner_name: str, text: str, response: "ScanResponse", e2e_ms: float,
+) -> None:
+    """Fire-and-forget Slack alert for one completed scan. Builds the payload
+    on the calling thread (cheap, dict access) but does the network POST in a
+    daemon thread so the request path is never blocked. Never raises."""
+    if not _SLACK_WEBHOOK_URL:
+        return
+    try:
+        payload = _build_slack_payload(
+            scanner_name, text, response.is_valid, response.risk_score,
+            response.details or {}, e2e_ms,
+        )
+        threading.Thread(
+            target=_post_slack, args=(payload,),
+            daemon=True, name="slack-alert",
+        ).start()
+    except Exception as exc:
+        # Building the payload should never fail, but alerting must never
+        # affect the scan response.
+        logger.warning(f"[SlackAlert] failed to enqueue alert: {exc}")
 
 
 class ScanRequest(BaseModel):
@@ -193,6 +321,19 @@ async def list_scanners():
 
 @app.post("/scan", response_model=ScanResponse)
 async def scan_text(request: ScanRequest):
+    """Thin wrapper around the scan implementation. Adds a fire-and-forget
+    Slack alert (when configured) for every completed scan, regardless of which
+    path (cascade / single-LLM / modelMap / local-ML / deterministic) produced
+    the result. HTTPException paths (validation/crash) are not alerted — those
+    are logged as errors and represent prompts that were not evaluated."""
+    started = time.time()
+    response = await _scan_text_impl(request)
+    e2e_ms = round((time.time() - started) * 1000, 1)
+    fire_slack_alert(request.scanner_name, request.text, response, e2e_ms)
+    return response
+
+
+async def _scan_text_impl(request: ScanRequest):
     start_time = time.time()
 
     try:
@@ -234,6 +375,41 @@ async def scan_text(request: ScanRequest):
                     },
                 )
         # ── End modelMap dispatch ─────────────────────────────────────
+
+        # ── Cascade dispatch (Qwen + Gemma + Haiku) ──────────────────
+        if (
+            _cascade is not None
+            and request.scanner_name in CASCADE_SUPPORTED_SCANNERS
+        ):
+            try:
+                result = scan_with_cascade(
+                    request.scanner_name,
+                    request.scanner_type,
+                    request.text,
+                    request.config,
+                    _cascade,
+                )
+                return ScanResponse(
+                    scanner_name=request.scanner_name,
+                    is_valid=result["is_valid"],
+                    risk_score=result["risk_score"],
+                    sanitized_text=request.text,
+                    details=result.get("details", {}),
+                )
+            except Exception as cascade_err:
+                total_duration = (time.time() - start_time) * 1000
+                logger.error(f"[Cascade] scan_with_cascade failed: {cascade_err}")
+                return ScanResponse(
+                    scanner_name=request.scanner_name,
+                    is_valid=True,
+                    risk_score=0.0,
+                    sanitized_text=request.text,
+                    details={
+                        "error": f"cascade execution failed: {cascade_err}",
+                        "execution_time_ms": round(total_duration, 2),
+                    },
+                )
+        # ── End cascade dispatch ──────────────────────────────────────
 
         # ── LLM dispatch ─────────────────────────────────────────────
         use_llm_requested = is_truthy(str(request.config.get("use_llm", "")))
