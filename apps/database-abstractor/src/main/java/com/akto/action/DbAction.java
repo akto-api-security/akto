@@ -3096,11 +3096,15 @@ public class DbAction extends ActionSupport {
             if (trrs != null && trrs.getTestingRunId() != null) {
                 trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
             }
-            if(trrs != null && trrs.getTestResultsCount() == 0){
+            if (trrs != null && trrs.getTestResultsCount() == 0) {
                 String runHexState = trrs.getTestingRunId() != null ? trrs.getTestingRunId().toHexString() : null;
                 String sumHexState = trrs.getId() != null ? trrs.getId().toHexString() : summaryId;
+                Map<String, String> metadataForSlack = metadata != null && !metadata.isEmpty()
+                        ? metadata
+                        : trrs.getMetadata();
                 TestingFailureSlackCopy.TitleAndDetail slack =
-                        TestingFailureSlackCopy.forIssueCountAndStateNoResults(state, runHexState, sumHexState);
+                        TestingFailureSlackCopy.forIssueCountAndStateNoResults(
+                                state, runHexState, sumHexState, metadataForSlack);
                 sendTestingFailureSlackAlertIfEnabled(
                         slack.title(),
                         slack.detail(),
@@ -3114,13 +3118,14 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
 
-        // send slack alert
-        try {
-            int timeNow = Context.now();
-            sendSlack(trrs, totalCountIssues, Context.accountId.get());
-            loggerMaker.infoAndAddToDb("Slack alert sent successfully for trrs " + trrs.getId() + " accountId " + Context.accountId.get() + " time taken " + (Context.now() - timeNow));
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "error in sending slack alert for testing" + e);
+        if (trrs == null || trrs.getTestResultsCount() != 0) {
+            try {
+                int timeNow = Context.now();
+                sendSlack(trrs, totalCountIssues, Context.accountId.get());
+                loggerMaker.infoAndAddToDb("Slack alert sent successfully for trrs " + trrs.getId() + " accountId " + Context.accountId.get() + " time taken " + (Context.now() - timeNow));
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "error in sending slack alert for testing" + e);
+            }
         }
 
         return Action.SUCCESS.toUpperCase();

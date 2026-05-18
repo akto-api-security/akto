@@ -2,10 +2,18 @@ package com.akto.notifications.slack;
 
 import com.akto.dto.testing.TestingRun;
 
+import java.util.Map;
+
 /**
  * User-facing title + body for testing-related Slack alerts (database-abstractor / mini-testing paths).
  */
 public final class TestingFailureSlackCopy {
+
+    /** Stored in summary {@code metadata.error} when mini-testing auth prefetch fails. */
+    public static final String AUTH_PREFETCH_FAILURE_MESSAGE =
+            "Failed to fetch auth token after three retries";
+
+    private static final String DASHBOARD_BASE_URL = "https://app.akto.io";
 
     private TestingFailureSlackCopy() {}
 
@@ -31,10 +39,32 @@ public final class TestingFailureSlackCopy {
         return s == null || s.trim().isEmpty();
     }
 
+    private static String slackLink(String path, String label) {
+        return "<" + DASHBOARD_BASE_URL + path + "|" + label + ">";
+    }
+
+    private static String formatTestRunLine(String testingRunHexId) {
+        if (isBlank(testingRunHexId)) {
+            return "Test run: Not available";
+        }
+        String id = testingRunHexId.trim();
+        return "Test run: " + slackLink("/dashboard/testing/" + id, id);
+    }
+
+    private static String formatTestRunSummaryLine(String testingRunHexId, String testRunSummaryHexId) {
+        if (isBlank(testRunSummaryHexId)) {
+            return "Test run summary: Not available";
+        }
+        String summaryId = testRunSummaryHexId.trim();
+        if (isBlank(testingRunHexId)) {
+            return "Test run summary: " + summaryId;
+        }
+        String runId = testingRunHexId.trim();
+        return "Test run summary: " + slackLink("/dashboard/testing/" + runId + "/result/" + summaryId, summaryId);
+    }
+
     private static String withTestRunReferences(String detailBody, String testingRunHexId, String testRunSummaryHexId) {
-        String run = isBlank(testingRunHexId) ? "Not available" : testingRunHexId.trim();
-        String sum = isBlank(testRunSummaryHexId) ? "Not available" : testRunSummaryHexId.trim();
-        return detailBody + "\n\nTest run ID: " + run + "\nTest run summary ID: " + sum;
+        return detailBody + "\n\n" + formatTestRunLine(testingRunHexId) + "\n" + formatTestRunSummaryLine(testingRunHexId, testRunSummaryHexId);
     }
 
     /**
@@ -88,17 +118,43 @@ public final class TestingFailureSlackCopy {
                         testRunSummaryHexId));
     }
 
+    public static boolean isAuthPrefetchFailure(Map<String, String> metadata) {
+        if (metadata == null || metadata.isEmpty()) {
+            return false;
+        }
+        String err = metadata.get("error");
+        return AUTH_PREFETCH_FAILURE_MESSAGE.equals(err);
+    }
+
+    /** Auth token prefetch failed in mini-testing before any API test ran. */
+    public static TitleAndDetail forAuthPrefetchFailure(String testingRunHexId, String testRunSummaryHexId) {
+        return new TitleAndDetail(
+                "API security tests could not start — login failed",
+                withTestRunReferences(
+                        "Akto could not obtain a login token for your test role after three attempts. Check the test role, login workflow, and credentials in Akto, then run the scan again.",
+                        testingRunHexId,
+                        testRunSummaryHexId));
+    }
+
     /**
-     * {@code updateIssueCountAndStateInSummary} with zero test results: {@code FAILED} (e.g. auth prefetch)
-     * vs other terminal states (e.g. {@code COMPLETED}).
+     * {@code updateIssueCountAndStateInSummary} with zero test results: auth prefetch (metadata),
+     * {@code FAILED} (other pre-test failures), or other terminal states (e.g. {@code COMPLETED}).
      */
     public static TitleAndDetail forIssueCountAndStateNoResults(
             String stateString, String testingRunHexId, String testRunSummaryHexId) {
+        return forIssueCountAndStateNoResults(stateString, testingRunHexId, testRunSummaryHexId, null);
+    }
+
+    public static TitleAndDetail forIssueCountAndStateNoResults(
+            String stateString, String testingRunHexId, String testRunSummaryHexId, Map<String, String> metadata) {
+        if (isAuthPrefetchFailure(metadata)) {
+            return forAuthPrefetchFailure(testingRunHexId, testRunSummaryHexId);
+        }
         if (stateString != null && TestingRun.State.FAILED.name().equalsIgnoreCase(stateString.trim())) {
             return new TitleAndDetail(
                     "API security tests could not start",
                     withTestRunReferences(
-                            "Akto could not run this scan because something failed before any API tests were recorded—for example the login token for your test role could not be retrieved after several attempts. Check the test role and credentials in Akto, then run the scan again.",
+                            "Akto could not run this scan because something failed before any API tests were recorded. Check the test role, runner connectivity, and selected APIs in Akto, then run the scan again.",
                             testingRunHexId,
                             testRunSummaryHexId));
         }

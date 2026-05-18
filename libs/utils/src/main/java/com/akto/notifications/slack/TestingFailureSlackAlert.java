@@ -31,7 +31,7 @@ public class TestingFailureSlackAlert extends SlackAlerts {
 
         BasicDBList blocksList = new BasicDBList();
         blocksList.add(createHeader("⚠️ " + title));
-        blocksList.add(createPlainTextSection(detailMessage));
+        blocksList.add(createTextSection(detailMessage));
         blocksList.add(createTextContext(dateText));
 
         BasicDBObject blockObj = new BasicDBObject("blocks", blocksList).append("color", color);
