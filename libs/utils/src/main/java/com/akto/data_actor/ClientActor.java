@@ -4357,7 +4357,8 @@ public class ClientActor extends DataActor {
             .append(McpAuditInfo.REMARKS, auditInfo.getRemarks())
             .append(McpAuditInfo.API_ACCESS_TYPES, auditInfo.getApiAccessTypes())
             .append(McpAuditInfo.HOST_COLLECTION_ID, auditInfo.getHostCollectionId())
-            .append(McpAuditInfo.MCP_HOST, auditInfo.getMcpHost());
+            .append(McpAuditInfo.MCP_HOST, auditInfo.getMcpHost())
+            .append(McpAuditInfo.CONTEXT_SOURCE, auditInfo.getContextSource());
 
         Document wrapper = new Document("auditInfo", d);
         String jsonBody = wrapper.toJson();
