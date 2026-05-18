@@ -62,7 +62,22 @@ const EDGE_TYPES = { agentEdge: AgentEdge };
 export default function IdentityGraph({ row }) {
     const { nodes, edges, height } = useMemo(() => {
         const isArgus = isAgenticSecurityCategory();
-        const resources = IDENTITY_RESOURCES[row.identityName] || getDefaultResources(row.identityName);
+
+        // Use targetResource from API if available, otherwise fall back to hardcoded mapping
+        let resources = [];
+        if (row.targetResource && Array.isArray(row.targetResource) && row.targetResource.length > 0) {
+            // Transform API targetResource format to component format
+            resources = row.targetResource.map((tr) => ({
+                label: tr.resourceName,
+                type: tr.resourceType,
+                accessLevel: tr.accessLevel,
+                category: tr.resourceType === "Agentic" ? "ai-model" : "ai-tool",
+            }));
+        } else {
+            // Fallback to hardcoded resources
+            resources = IDENTITY_RESOURCES[row.identityName] || getDefaultResources(row.identityName);
+        }
+
         const n = resources.length;
         const SPACING = 82;
         const totalH = (n - 1) * SPACING;
@@ -126,12 +141,13 @@ export default function IdentityGraph({ row }) {
                 { id: "e-o-a", source: "owner", target: "agent", type: "agentEdge", data: {} },
             ]),
             { id: "e-a-i", source: "agent",    target: "identity", type: "agentEdge", data: {} },
-            ...resources.map((_, i) => ({
+            ...resources.map((resource, i) => ({
                 id: `e-i-r${i}`,
                 source: "identity",
                 target: `res-${i}`,
                 type: "agentEdge",
-                data: { edgeParam: i === 0 ? row.access : undefined },
+                // Use accessLevel from resource if available (from API), otherwise use row.access (fallback)
+                data: { edgeParam: resource.accessLevel || row.access },
             })),
         ];
 

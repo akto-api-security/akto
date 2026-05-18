@@ -3069,6 +3069,36 @@ public class InitializerListener implements ServletContextListener {
                 }
             }
 
+            featureWiseAllowed.put("AI_AGENTS", new FeatureAccess(true));
+            featureWiseAllowed.put("CODE_ANALYSIS", new FeatureAccess(true));
+            featureWiseAllowed.put("AKTO_GPT_AI", new FeatureAccess(true));
+            featureWiseAllowed.put("ACTIVE_ENDPOINTS", new FeatureAccess(true, -1, 20000, -1));
+            featureWiseAllowed.put("TEST_RUNS", new FeatureAccess(true));
+            featureWiseAllowed.put("CUSTOM_TESTS", new FeatureAccess(true));
+            featureWiseAllowed.put("MCP_SECURITY", new FeatureAccess(true));
+            featureWiseAllowed.put("JIRA_INTEGRATION", new FeatureAccess(true));
+            featureWiseAllowed.put("MCP_ASSET_COUNT", new FeatureAccess(true, -1, -1, -12));
+            featureWiseAllowed.put("AI_ASSET_COUNT", new FeatureAccess(true, -1, -1, -473));
+            featureWiseAllowed.put("THREAT_DETECTION", new FeatureAccess(true));
+            featureWiseAllowed.put("DEVREV_INTEGRATION", new FeatureAccess(true));
+            featureWiseAllowed.put("SERVICENOW_INTEGRATION", new FeatureAccess(true));
+            featureWiseAllowed.put("ACTIVE_ACCOUNTS", new FeatureAccess(true, -1, 200000, -1));
+            featureWiseAllowed.put("ADX_INTEGRATION", new FeatureAccess(true, -1, 200000, -1));
+            featureWiseAllowed.put("AKTO_API_GROUP_CRONS", new FeatureAccess(true));
+            featureWiseAllowed.put("AKTO_API_INFO_CRONS", new FeatureAccess(true));
+            featureWiseAllowed.put("SECURITY_TYPE_AGENTIC", new FeatureAccess(true));
+            featureWiseAllowed.put("ENDPOINT_SECURITY", new FeatureAccess(true));
+            featureWiseAllowed.put("AKTO_EXTERNAL_API", new FeatureAccess(true));
+            featureWiseAllowed.put("API_TOKENS", new FeatureAccess(true));
+            featureWiseAllowed.put("CI_CD_INTEGRATION", new FeatureAccess(true));
+
+            if (!organization.getAccounts().contains(1000000)) {
+                featureWiseAllowed.put("SSO_ONLY_LOGIN", new FeatureAccess(true));
+            }
+            // featureWiseAllowed.put("SSO_ONLY_LOGIN", new FeatureAccess(true));
+            featureWiseAllowed.put("AKTO_SSO", new FeatureAccess(true));
+
+
             for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
                 String label = entry.getKey();
                 FeatureAccess value = entry.getValue();

@@ -4,10 +4,91 @@ import FlyLayout from "../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
 import { IdentityIcon, AgentIcon, getViolationDetail, resolvePolicyName } from "./nhiViolationsData";
 import func from "@/util/func";
+import observeRequests from "../observe/api";
+import Store from "../../store";
+import JiraTicketCreationModal from "../../components/shared/JiraTicketCreationModal.jsx";
+import issuesFunctions from "@/apps/dashboard/pages/issues/module";
+import settingFunctions from "@/apps/dashboard/pages/settings/module";
 
 export default function ViolationDetailsPanel({ row, show, setShow }) {
     const [actionActive, setActionActive] = useState(false);
+    const [marking, setMarking] = useState(false);
+    const [jiraModalActive, setJiraModalActive] = useState(false);
+    const [projId, setProjId] = useState("");
+    const [issueType, setIssueType] = useState("");
+    const [labelsText, setLabelsText] = useState("");
+    const [jiraProjectMap, setJiraProjectMap] = useState({});
+    const userEmail = Store((state) => state.username);
     const detail = getViolationDetail(row.violation);
+
+    const handleMarkAsFixed = async () => {
+        try {
+            if (!userEmail) {
+                console.error("User email not found");
+                return;
+            }
+
+            setMarking(true);
+
+            const result = await observeRequests.markViolationAsFixed(row.id, userEmail);
+            console.log("Mark as fixed result:", result);
+
+            setMarking(false);
+            setActionActive(false);
+            setShow(false);
+
+            // Refresh the violations list
+            window.location.reload();
+        } catch (err) {
+            console.error("Error marking violation as fixed:", err);
+            setMarking(false);
+            setActionActive(false);
+        }
+    };
+
+    const handleOpenJiraModal = () => {
+        setActionActive(false);
+        settingFunctions.fetchJiraIntegration().then((jiraIntegration) => {
+            if (jiraIntegration.projectIdsMap !== null && Object.keys(jiraIntegration.projectIdsMap).length > 0) {
+                setJiraProjectMap(jiraIntegration.projectIdsMap);
+                if (Object.keys(jiraIntegration.projectIdsMap).length > 0) {
+                    setProjId(Object.keys(jiraIntegration.projectIdsMap)[0]);
+                }
+            } else {
+                setProjId(jiraIntegration.projId);
+                setIssueType(jiraIntegration.issueType);
+            }
+            setJiraModalActive(true);
+        });
+    };
+
+    const handleSaveJiraAction = (issueId, labels) => {
+        let jiraMetaData;
+        try {
+            jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData(projId, issueType);
+            // Use labels parameter if provided
+            if (labels !== undefined && labels && labels.trim()) {
+                jiraMetaData.labels = labels.trim();
+            }
+        } catch (error) {
+            console.error("Please fill all required fields before creating a Jira ticket.");
+            return;
+        }
+
+        setJiraModalActive(false);
+        // Create Jira ticket from violation
+        observeRequests.createJiraTicketFromViolation(row.id, window.location.origin, projId, issueType, jiraMetaData).then((res) => {
+            if (res?.errorMessage) {
+                console.error("Error creating Jira ticket:", res.errorMessage);
+            } else {
+                console.log("Jira ticket created successfully");
+                setShow(false);
+                window.location.reload();
+            }
+        }).catch((err) => {
+            console.error("Error creating Jira ticket:", err);
+        });
+    };
 
     // ── TitleComponent ────────────────────────────────────────────────────────
     const TitleComponent = () => (
@@ -46,10 +127,9 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                     onClose={() => setActionActive(false)}
                 >
                     <ActionList items={[
-                        { content: "Open Jira Ticket",  onAction: () => setActionActive(false) },
-                        { content: "Mark as Fixed",     onAction: () => setActionActive(false) },
+                        { content: "Open Jira Ticket",  onAction: handleOpenJiraModal },
+                        { content: "Mark as Fixed",     onAction: handleMarkAsFixed },
                         { content: "Update Policy",     onAction: () => setActionActive(false) },
-                        { content: "Disable Identity",  destructive: true, onAction: () => setActionActive(false) },
                     ]} />
                 </Popover>
             </HorizontalStack>
@@ -188,21 +268,37 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
     };
 
     return (
-        <FlyLayout
-            title="Violation details"
-            show={show}
-            setShow={setShow}
-            components={[
-                <TitleComponent key="title" />,
-                <LayoutWithTabs
-                    key={row.id}
-                    tabs={[overviewTab, remediationTab, timelineTab]}
-                    currTab={() => {}}
-                    noLoading
-                />,
-            ]}
-            showDivider
-            newComp
-        />
+        <>
+            <FlyLayout
+                title="Violation details"
+                show={show}
+                setShow={setShow}
+                components={[
+                    <TitleComponent key="title" />,
+                    <LayoutWithTabs
+                        key={row.id}
+                        tabs={[overviewTab, remediationTab, timelineTab]}
+                        currTab={() => {}}
+                        noLoading
+                    />,
+                ]}
+                showDivider
+                newComp
+            />
+            <JiraTicketCreationModal
+                activator={<div />}
+                modalActive={jiraModalActive}
+                setModalActive={setJiraModalActive}
+                handleSaveAction={handleSaveJiraAction}
+                jiraProjectMaps={jiraProjectMap}
+                setProjId={setProjId}
+                setIssueType={setIssueType}
+                projId={projId}
+                issueType={issueType}
+                issueId={row.id}
+                labelsText={labelsText}
+                setLabelsText={setLabelsText}
+            />
+        </>
     );
 }

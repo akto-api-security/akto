@@ -5,6 +5,8 @@ import { Avatar } from "@shopify/polaris";
 import { CellType } from "../../components/tables/rows/GithubRow";
 import func from "@/util/func";
 import { isAgenticSecurityCategory } from "../../../main/labelHelper";
+import IconCacheService from "@/services/IconCacheService";
+import { getDomainForFavicon } from "../observe/agentic/mcpClientHelper";
 
 // ── Identity icon ──────────────────────────────────────────────────────────────
 const IDENTITY_DOMAIN_MAP = {
@@ -38,13 +40,16 @@ const IDENTITY_DOMAIN_MAP = {
     k9s: "k9s.trade", replicate: "replicate.com",
 };
 const INTERNAL_KEYWORDS = new Set(["internal", "connector", "filesystem"]);
+const iconCacheService = new IconCacheService();
+
 export function IdentityIcon({ name }) {
     const parts = (name || "").toLowerCase().split(/[-_\d]+/).filter(p => p.length > 2);
     if (parts.some(p => INTERNAL_KEYWORDS.has(p)))
         return <Box style={{width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon source={SettingsMajor} color="subdued" /></Box>;
     const domain = parts.reduce((found, p) => found || IDENTITY_DOMAIN_MAP[p] || null, null);
     if (!domain) return null;
-    return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={20} height={20} style={{borderRadius:3,flexShrink:0}} alt="" />;
+    const faviconUrl = iconCacheService.getFaviconUrl(domain);
+    return <img src={faviconUrl} width={20} height={20} style={{borderRadius:3,flexShrink:0}} alt="" />;
 }
 
 // ── Agent icon ─────────────────────────────────────────────────────────────────
@@ -88,21 +93,37 @@ const AGENT_SPECIFIC_DOMAIN = {
 };
 const AGENT_MCP  = new Set(["aws","azure","stripe","playwright","postgres","atlassian","docker","filesystem","universal","k9s trade","vulnerable mcp","ak platform"]);
 const AGENT_LLM  = new Set(["gemini","grok","claude","openai","anthropic","cohere","perplexity","langchain"]);
+
 export function getAgentType(name) {
     const key = (name || "").toLowerCase().trim();
     if (AGENT_MCP.has(key)) return "MCP Server";
     if (AGENT_LLM.has(key)) return "LLM";
     return "AI Agent";
 }
-const AI_ICON_POOL = ["claude.ai","openai.com","deepseek.com","x.ai","gemini.google.com","mistral.ai","perplexity.ai","cohere.com"];
+
 export function AgentIcon({ name }) {
     const key = (name || "").toLowerCase().trim();
+
+    // Try to get domain from KNOWN_CLIENTS via getDomainForFavicon
+    const domain = getDomainForFavicon(key);
+
+    // If domain found, use favicon (matches Agentic Assets pattern)
+    if (domain) {
+        const faviconUrl = iconCacheService.getFaviconUrl(domain);
+        return <img src={faviconUrl} width={20} height={20} style={{borderRadius:3,flexShrink:0}} alt="" />;
+    }
+
+    // Fallback: Use category-based icons (matches CollectionIcon pattern from Agentic Assets)
+    // MCP Servers
     if (AGENT_MCP.has(key))
         return <Avatar source={MCPIcon} shape="square" size="extraSmall" />;
+
+    // LLMs
     if (AGENT_LLM.has(key))
         return <Box style={{width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon source={MagicMajor} color="base" /></Box>;
-    const domain = AGENT_SPECIFIC_DOMAIN[key] || AI_ICON_POOL[key.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % AI_ICON_POOL.length];
-    return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={20} height={20} style={{borderRadius:3,flexShrink:0}} alt="" />;
+
+    // Default fallback for unknown agents (no icon)
+    return null;
 }
 
 // ── Violation severity badges ──────────────────────────────────────────────────

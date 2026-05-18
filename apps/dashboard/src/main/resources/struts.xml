@@ -1677,6 +1677,94 @@
             </result>
         </action>
 
+        <action name="api/fetchNhiIdentities" class="com.akto.action.NhiGovernanceIdentitiesAction" method="fetchNhiIdentities">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchNhiIdentityById" class="com.akto.action.NhiGovernanceIdentitiesAction" method="fetchNhiIdentityById">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/disableNhiIdentity" class="com.akto.action.NhiGovernanceIdentitiesAction" method="disableNhiIdentity">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAllNhiViolations" class="com.akto.action.NhiGovernanceViolationsAction" method="fetchAllViolations">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchNhiViolationsByIds" class="com.akto.action.NhiGovernanceViolationsAction" method="fetchViolationsByIds">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchNhiViolationById" class="com.akto.action.NhiGovernanceViolationsAction" method="fetchViolationById">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/markViolationAsFixed" class="com.akto.action.NhiGovernanceViolationsAction" method="markViolationAsFixed">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/createJiraTicketFromViolation" class="com.akto.action.NhiGovernanceViolationsAction" method="createJiraTicketFromViolation">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchGuardrailPolicies" class="com.akto.action.GuardrailPoliciesAction" method="fetchGuardrailPolicies">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -15263,6 +15351,84 @@
             </result>
             <result name="UNAUTHORIZED" type="json">
                 <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <!-- NHI Governance Actions -->
+        <action name="api/fetchNhiIdentities" class="com.akto.action.NhiGovernanceIdentitiesAction" method="fetchNhiIdentities">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAllNhiViolations" class="com.akto.action.NhiGovernanceViolationsAction" method="fetchAllViolations">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchNhiViolations" class="com.akto.action.NhiGovernanceViolationsAction" method="fetchViolations">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchNhiViolationsByIds" class="com.akto.action.NhiGovernanceViolationsAction" method="fetchViolations">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/disableNhiIdentity" class="com.akto.action.NhiGovernanceIdentitiesAction" method="disableNhiIdentity">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/markViolationAsFixed" class="com.akto.action.NhiGovernanceViolationsAction" method="markViolationAsFixed">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/createJiraTicketFromViolation" class="com.akto.action.NhiGovernanceViolationsAction" method="createJiraTicketFromViolation">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>

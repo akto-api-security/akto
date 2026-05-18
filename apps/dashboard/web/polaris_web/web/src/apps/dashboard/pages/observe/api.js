@@ -1102,6 +1102,78 @@ export default {
             method: 'post',
             data: { hostnames }
         })
+    },
+
+    async fetchNhiIdentities(contextSource) {
+        const resp = await request({
+            url: '/api/fetchNhiIdentities',
+            method: 'post',
+            data: { contextSource }
+        })
+        return resp?.identities || []
+    },
+
+    async fetchNhiIdentityById(identityId) {
+        const resp = await request({
+            url: '/api/fetchNhiIdentityById',
+            method: 'post',
+            data: { identity: { id: identityId } }
+        })
+        return resp?.identity || null
+    },
+
+    async fetchAllNhiViolations(contextSource) {
+        const resp = await request({
+            url: '/api/fetchAllNhiViolations',
+            method: 'post',
+            data: { contextSource }
+        })
+        return resp?.violations || []
+    },
+
+    async fetchNhiViolationsByIds(violationIds) {
+        const resp = await request({
+            url: '/api/fetchNhiViolationsByIds',
+            method: 'post',
+            data: { violationIds }
+        })
+        return resp?.violations || []
+    },
+
+    async fetchNhiViolationById(violationId) {
+        const resp = await request({
+            url: '/api/fetchNhiViolationById',
+            method: 'post',
+            data: { violation: { id: violationId } }
+        })
+        return resp?.violation || null
+    },
+
+    async disableNhiIdentity(identityId, userEmail) {
+        const resp = await request({
+            url: '/api/disableNhiIdentity',
+            method: 'post',
+            data: { identityId, userEmail }
+        })
+        return resp?.success || false
+    },
+
+    async markViolationAsFixed(violationId, userEmail) {
+        const resp = await request({
+            url: '/api/markViolationAsFixed',
+            method: 'post',
+            data: { violationId, userEmail }
+        })
+        return resp?.success || false
+    },
+
+    async createJiraTicketFromViolation(violationId, aktoDashboardHost, projId, issueType, jiraMetaData) {
+        const resp = await request({
+            url: '/api/createJiraTicketFromViolation',
+            method: 'post',
+            data: { violationId, aktoDashboardHost, projId, issueType, jiraMetaData }
+        })
+        return resp
     }
 
 }
