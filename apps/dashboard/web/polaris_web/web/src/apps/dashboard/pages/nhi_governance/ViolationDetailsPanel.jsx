@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ActionList, Badge, Box, Button, Divider, HorizontalStack, Link, Popover, Text, VerticalStack } from "@shopify/polaris";
 import FlyLayout from "../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
-import { IdentityIcon, AgentIcon, getViolationDetail, resolvePolicyName } from "./nhiViolationsData";
+import { IdentityIcon, AgentIcon, resolvePolicyName } from "./nhiViolationsData";
 import func from "@/util/func";
 import observeRequests from "../observe/api";
 import Store from "../../store";
@@ -19,8 +19,6 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
     const [labelsText, setLabelsText] = useState("");
     const [jiraProjectMap, setJiraProjectMap] = useState({});
     const userEmail = Store((state) => state.username);
-    const detail = getViolationDetail(row.violation);
-
     const handleMarkAsFixed = async () => {
         try {
             if (!userEmail) return;
@@ -146,7 +144,7 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                 <VerticalStack gap="5">
                     <VerticalStack gap="2">
                         <Text variant="headingSm" color="subdued">Description</Text>
-                        <Text variant="bodyMd">{detail.description}</Text>
+                        <Text variant="bodyMd">{row.description}</Text>
                     </VerticalStack>
                     <Divider />
                     <HorizontalStack gap="8">
@@ -180,7 +178,7 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                         <Box style={{ alignSelf: "flex-start" }}>
                             <VerticalStack gap="1">
                                 <Text variant="headingSm" color="subdued">Affected Resources</Text>
-                                <Text variant="bodyMd" fontWeight="semibold">{detail.affectedResources}</Text>
+                                <Text variant="bodyMd" fontWeight="semibold">{(row.affectedResources || []).join(", ")}</Text>
                             </VerticalStack>
                         </Box>
                         <Box style={{ alignSelf: "flex-start" }}>
@@ -191,15 +189,19 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                         </Box>
                     </HorizontalStack>
                     <Divider />
-                    <VerticalStack gap="2">
-                        <Text variant="headingSm" color="subdued">Why This Triggered</Text>
-                        <Text variant="bodyMd">{detail.whyTriggered}</Text>
-                    </VerticalStack>
-                    <Divider />
+                    {row.whyTriggered && (
+                        <>
+                            <VerticalStack gap="2">
+                                <Text variant="headingSm" color="subdued">Why This Triggered</Text>
+                                <Text variant="bodyMd">{row.whyTriggered}</Text>
+                            </VerticalStack>
+                            <Divider />
+                        </>
+                    )}
                     <VerticalStack gap="2">
                         <Text variant="headingSm" color="subdued">Blast Radius</Text>
                         <VerticalStack gap="2">
-                            {detail.blastRadius.map((item, i) => (
+                            {(row.blastRadius || []).map((item, i) => (
                                 <HorizontalStack key={i} gap="2" blockAlign="start" wrap={false}>
                                     <Text variant="bodyMd">•</Text>
                                     <Text variant="bodyMd">{item}</Text>
@@ -221,7 +223,7 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                 <VerticalStack gap="4">
                     <Text variant="headingSm" color="subdued">Steps to resolve</Text>
                     <VerticalStack gap="4">
-                        {detail.remediationSteps.map((step, i) => (
+                        {(row.remediationSteps || []).map((step, i) => (
                             <HorizontalStack key={i} gap="3" blockAlign="start" wrap={false}>
                                 <Box style={{
                                     background: "#F6F6F7", borderRadius: "50%",
@@ -245,12 +247,12 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
         component: (
             <Box padding="5">
                 <VerticalStack>
-                    {detail.timeline.map((item, i) => (
+                    {(row.timeline || []).map((item, i) => (
                         <HorizontalStack key={i} align="space-between" blockAlign="start" wrap={false}>
                             <HorizontalStack gap="3" blockAlign="start" wrap={false}>
                                 <Box style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                                     <img src="/public/issues-event-icon.svg" width={20} height={20} alt="" style={{ flexShrink: 0 }} />
-                                    {i < detail.timeline.length - 1 && (
+                                    {i < (row.timeline || []).length - 1 && (
                                         <Box style={{ width: 2, flex: 1, minHeight: 24, background: "var(--p-color-border-subdued, #E4E5E7)", margin: "4px 0" }} />
                                     )}
                                 </Box>
@@ -259,7 +261,9 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                                 </Box>
                             </HorizontalStack>
                             <Box paddingInlineStart="4" paddingBlockStart="05" style={{ whiteSpace: "nowrap" }}>
-                                <Text variant="bodySm" color="subdued">{item.time}</Text>
+                                <Text variant="bodySm" color="subdued">
+                                    {item.timestamp ? new Date(item.timestamp * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
+                                </Text>
                             </Box>
                         </HorizontalStack>
                     ))}

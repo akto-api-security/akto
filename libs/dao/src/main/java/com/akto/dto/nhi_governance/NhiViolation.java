@@ -30,6 +30,7 @@ public class NhiViolation {
     public static final String UPDATED_AT = "updatedAt";
     public static final String UPDATED_BY = "updatedBy";
     public static final String DESCRIPTION = "description";
+    public static final String WHY_TRIGGERED = "whyTriggered";
     public static final String AFFECTED_RESOURCES = "affectedResources";
     public static final String BLAST_RADIUS = "blastRadius";
     public static final String REMEDIATION_STEPS = "remediationSteps";
@@ -57,6 +58,7 @@ public class NhiViolation {
     private Integer updatedAt;
     private String updatedBy;
     private String description;
+    private String whyTriggered;
     private List<String> affectedResources;
     private List<String> blastRadius;
     private List<String> remediationSteps;

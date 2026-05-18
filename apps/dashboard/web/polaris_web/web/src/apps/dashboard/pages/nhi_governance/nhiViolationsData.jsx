@@ -203,5 +203,3 @@ export const violationsSortOptions = [
     { label: "Severity", value: "severity asc",  directionLabel: "Critical first", sortKey: "severityOrder", columnIndex: 3 },
     { label: "Severity", value: "severity desc", directionLabel: "Low first",      sortKey: "severityOrder", columnIndex: 3 },
 ];
-
-export const getViolationDetail = (violationStr) => VIOLATION_DETAIL_MAP[violationStr] || DEFAULT_DETAIL;
