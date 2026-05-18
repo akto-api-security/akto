@@ -202,6 +202,10 @@ public class MaliciousTrafficDetectorTask implements Task {
   private int MAX_KAFKA_DEBUG_MSGS = 100;
   private static boolean kafkaPollingEnabled = System.getenv().getOrDefault("KAFKA_POLL_ENABLED", "true").equals("true");
 
+  public Consumer<String, byte[]> getKafkaConsumer() {
+    return kafkaConsumer;
+  }
+
   public void run() {
     String topicName = "akto.api.logs2";
     logger.warnAndAddToDb(this.instanceId + ": Subscribing to Kafka topic: " + topicName);
