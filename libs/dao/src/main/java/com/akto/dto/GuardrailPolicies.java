@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -9,6 +10,7 @@ import org.bson.types.ObjectId;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -84,6 +86,9 @@ public class GuardrailPolicies {
 
     private SecretsDetection secretsDetection;
     private boolean applyToAllServers;
+
+    // Modal config
+    private ArrayList<ModalConfig> modalConfigs;
 
     public String getHexId() {
         if (this.id != null) {
@@ -293,4 +298,47 @@ public class GuardrailPolicies {
             this.confidenceScore = confidenceScore;
         }
     }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class SentimentDetection {
+        private boolean enabled;
+        private double confidenceScore;
+
+        public SentimentDetection(boolean enabled, double confidenceScore) {
+            this.enabled = enabled;
+            this.confidenceScore = confidenceScore;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class TokenLimitDetection {
+        private boolean enabled;
+        private double confidenceScore;
+
+        public TokenLimitDetection(boolean enabled, double confidenceScore) {
+            this.enabled = enabled;
+            this.confidenceScore = confidenceScore;
+        }
+    }
+
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ModalConfig {
+        private String provider;
+        private String model;
+        private String baseUrl;
+        private double blockThreshold;
+        private double allowThreshold;
+        private int timeoutMs;
+        private boolean strictBlock;
+        private boolean strictAllow;
+    }
+
 }
