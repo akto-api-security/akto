@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/akto-api-security/akto-endpoint-shield/utils"
 	"github.com/akto-api-security/guardrails-service/handlers"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
@@ -21,6 +22,8 @@ func main() {
 	cfg := config.LoadConfig()
 	logger := initLogger(cfg.LogLevel)
 	defer logger.Sync()
+
+	utils.SetLogger(logger)
 
 	logger.Info("Starting guardrails-service",
 		zap.Int("port", cfg.ServerPort),

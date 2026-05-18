@@ -827,9 +827,9 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 
 	// Use the default processor - skipThreat is passed via ValidationContext
 	processStart := time.Now()
-	processResult, err := s.processor.ProcessRequest(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
+	processResult, err := s.processor.ProcessRequestParallel(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
 	if err != nil {
-		s.logger.Error("ValidateRequest - ProcessRequest failed",
+		s.logger.Error("ValidateRequest - ProcessRequestParallel failed",
 			zap.String("path", params.Path),
 			zap.String("method", params.Method),
 			zap.String("account", params.AktoAccountID),
@@ -839,7 +839,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		return nil, fmt.Errorf("failed to process request: %w", err)
 	}
 
-	s.logger.Info("ValidateRequest - ProcessRequest result",
+	s.logger.Info("ValidateRequest - ProcessRequestParallel result",
 		zap.String("path", params.Path),
 		zap.String("method", params.Method),
 		zap.String("sessionID", sessionID),
@@ -970,9 +970,9 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 
 	// Use processor's ProcessResponse method with external policies
 	processStart := time.Now()
-	processResult, err := s.processor.ProcessResponse(ctx, responseBodyForValidation, valCtx, policies)
+	processResult, err := s.processor.ProcessResponseParallel(ctx, responseBodyForValidation, valCtx, policies)
 	if err != nil {
-		s.logger.Error("ValidateResponse - ProcessResponse failed",
+		s.logger.Error("ValidateResponse - ProcessResponseParallel failed",
 			zap.String("path", params.Path),
 			zap.String("method", params.Method),
 			zap.String("account", params.AktoAccountID),
