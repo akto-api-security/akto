@@ -547,6 +547,13 @@ public class HttpCallParser {
         return Constants.AI_AGENT_SOURCE_N8N.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
     }
 
+    private boolean isSnowflakeTraffic(Map<String, String> tagsMap) {
+        if (tagsMap == null) {
+            return false;
+        }
+        return Constants.AI_AGENT_SOURCE_SNOWFLAKE.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+    }
+
     private boolean isAgenticTraffic(Map<String, String> tagsMap) {
         if (tagsMap == null) {
             return false;
@@ -747,29 +754,6 @@ public class HttpCallParser {
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error parsing Arcade service graph: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Whether to persist traces for Snowflake agent traffic via {@link #storeSnowflakeAgentTrace}.
-     * N8N uses {@link #parseN8nTrace} only; other AI agent sources do not get HTTP-derived traces here.
-     */
-    private boolean shouldStoreSnowflakeAgentTrace(HttpResponseParams httpResponseParam) {
-        try {
-            String tagsJson = httpResponseParam.getTags();
-            if (tagsJson == null || tagsJson.isEmpty()) {
-                return false;
-            }
-            @SuppressWarnings("unchecked")
-            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
-            if (tagsMap == null) {
-                return false;
-            }
-            String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
-            return source != null && Constants.AI_AGENT_SOURCE_SNOWFLAKE.equalsIgnoreCase(source.trim());
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error checking Snowflake trace eligibility: " + e.getMessage());
-            return false;
         }
     }
 
@@ -1466,7 +1450,7 @@ public class HttpCallParser {
                         + httpResponseParam.getRequestParams().getURL());
             }
 
-            if (isAtlasTraffic(httpResponseParam) || isArgusTraffic(httpResponseParam) || shouldStoreSnowflakeAgentTrace(httpResponseParam)) {
+            if (isAtlasTraffic(httpResponseParam) || isArgusTraffic(httpResponseParam)) {
                 if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
                     loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams skipping advanced filters for agentic traffic "
                             + httpResponseParam.getRequestParams().getURL());
@@ -1530,7 +1514,7 @@ public class HttpCallParser {
                 parseArcadeServiceGraph(httpResponseParam);
             }
 
-            if (shouldStoreSnowflakeAgentTrace(httpResponseParam)) {
+            if (isSnowflakeTraffic(tagsMap)) {
                 storeSnowflakeAgentTrace(httpResponseParam);
             }
 
