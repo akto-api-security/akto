@@ -867,7 +867,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
-                <param name="excludeProperties">apiCollections\[\d+\]\.envType</param>
+                <param name="excludeProperties">apiCollections\[\d+\]\.(envType|displayName|sampleCollectionsDropped|genAICollection|startTs|sseCallbackUrl|userSetEnvType|deactivated|automated|skills|urlsCount|name|vxlanId|type|serviceGraphEdges)</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
