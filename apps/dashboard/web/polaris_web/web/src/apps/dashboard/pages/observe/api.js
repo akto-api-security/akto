@@ -1113,15 +1113,6 @@ export default {
         return resp?.identities || []
     },
 
-    async fetchNhiIdentityById(identityId) {
-        const resp = await request({
-            url: '/api/fetchNhiIdentityById',
-            method: 'post',
-            data: { identity: { id: identityId } }
-        })
-        return resp?.identity || null
-    },
-
     async fetchAllNhiViolations(contextSource) {
         const resp = await request({
             url: '/api/fetchAllNhiViolations',
@@ -1129,24 +1120,6 @@ export default {
             data: { contextSource }
         })
         return resp?.violations || []
-    },
-
-    async fetchNhiViolationsByIds(violationIds) {
-        const resp = await request({
-            url: '/api/fetchNhiViolationsByIds',
-            method: 'post',
-            data: { violationIds }
-        })
-        return resp?.violations || []
-    },
-
-    async fetchNhiViolationById(violationId) {
-        const resp = await request({
-            url: '/api/fetchNhiViolationById',
-            method: 'post',
-            data: { violation: { id: violationId } }
-        })
-        return resp?.violation || null
     },
 
     async disableNhiIdentity(identityId, userEmail) {
