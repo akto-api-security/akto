@@ -289,20 +289,32 @@ def parse_llm_result(scanner_name: str, raw: str) -> Dict[str, Any]:
 
 
 class OpenAIProvider:
-    def __init__(self, api_key: str, model: str):
+    """
+    OpenAI-compatible provider. Works with OpenAI, Ollama, LM Studio, vLLM,
+    or any other service that speaks the /v1/chat/completions API.
+
+    base_url: override to point at a local server, e.g. "http://localhost:11434/v1"
+              for Ollama. Defaults to the OpenAI production endpoint.
+    api_key:  pass an empty string for servers that don't require auth (Ollama).
+    """
+
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
         self.api_key = api_key
         self.model = model or DEFAULT_OPENAI_MODEL
-        self.name = "openai"
+        self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
+        self.name = "openai" if "openai.com" in self.base_url else "openai_compatible"
         self._client = httpx.Client(timeout=120.0)
-        logger.info(f"[LLMScanner/OpenAI] Initialized provider model={self.model}")
+        logger.info(
+            f"[LLMScanner/OpenAI] Initialized provider model={self.model} base_url={self.base_url}"
+        )
 
     def complete(self, prompt: str) -> str:
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         resp = self._client.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-            },
+            f"{self.base_url}/chat/completions",
+            headers=headers,
             json={
                 "model": self.model,
                 "temperature": 0.1,
@@ -491,6 +503,267 @@ class LLMScanner:
             f"elapsed_ms={elapsed_ms:.0f}"
         )
         return result
+
+
+# ── Multi-model parallel scanner ─────────────────────────────────────────────
+
+
+def build_provider_from_config(entry: Dict[str, Any]) -> Optional[Any]:
+    """Build a provider instance from a modelMap entry using env-var credentials."""
+    provider_name = (entry.get("provider") or "").strip().lower()
+    model = (entry.get("model") or "").strip()
+
+    if provider_name in ("openai", "ollama", "openai_compatible"):
+        # Ollama and other OpenAI-compatible servers need a base_url but no key.
+        # Priority: entry-level base_url > env var OPENAI_COMPATIBLE_BASE_URL > default.
+        base_url = (entry.get("baseUrl") or "").strip()
+        if not base_url:
+            base_url = os.getenv("OPENAI_COMPATIBLE_BASE_URL", "")
+        api_key = os.getenv("OPENAI_API_KEY", "")
+        # Ollama doesn't require a key; only enforce for real OpenAI calls.
+        if not api_key and not base_url:
+            logger.warning("[ModelMap] OPENAI_API_KEY not set and no baseUrl; skipping openai entry")
+            return None
+        return OpenAIProvider(api_key, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+
+    if provider_name == "anthropic":
+        api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            logger.warning("[ModelMap] ANTHROPIC_API_KEY not set; skipping anthropic entry")
+            return None
+        return AnthropicProvider(api_key, model or DEFAULT_ANTHROPIC_MODEL)
+
+    if provider_name == "vertexai":
+        sa_key = os.getenv("VERTEX_AI_SA_KEY_JSON", "")
+        project = os.getenv("VERTEX_AI_PROJECT", "")
+        location = os.getenv("VERTEX_AI_LOCATION", "")
+        endpoint_id = os.getenv("VERTEX_AI_ENDPOINT_ID", "")
+        if not all([sa_key, project, location, endpoint_id]):
+            logger.warning("[ModelMap] Missing Vertex AI env vars; skipping vertexai entry")
+            return None
+        return VertexAIProvider(sa_key, project, location, endpoint_id)
+
+    if provider_name == "gemma_vertexai":
+        sa_key = os.getenv("GEMMA_VERTEX_SA_KEY_JSON", "")
+        project = os.getenv("GEMMA_VERTEX_PROJECT", "")
+        location = os.getenv("GEMMA_VERTEX_LOCATION", "")
+        endpoint_id = os.getenv("GEMMA_VERTEX_ENDPOINT_ID", "")
+        dedicated_dns = os.getenv("GEMMA_VERTEX_DEDICATED_DNS", "")
+        if not all([sa_key, project, location, endpoint_id]):
+            logger.warning("[ModelMap] Missing Gemma Vertex env vars; skipping gemma_vertexai entry")
+            return None
+        return GemmaVertexProvider(sa_key, project, location, endpoint_id, dedicated_dns)
+
+    logger.warning(f"[ModelMap] Unknown provider '{provider_name}'; skipping entry")
+    return None
+
+
+def _is_confident_decision(result: Dict[str, Any], entry: Dict[str, Any]) -> Optional[bool]:
+    """
+    Return True (definitive block), False (definitive allow), or None (inconclusive)
+    based on the model result and the entry's blockThreshold / allowThreshold.
+
+    blockThreshold: risk_score >= this → definitive block
+    allowThreshold: risk_score <= this → definitive allow
+    If neither threshold is crossed the result is inconclusive.
+    """
+    risk = result["risk_score"]
+    block_threshold = entry.get("blockThreshold")
+    allow_threshold = entry.get("allowThreshold")
+
+    if block_threshold is not None and risk >= float(block_threshold):
+        return True   # definitive block
+    if allow_threshold is not None and risk <= float(allow_threshold):
+        return False  # definitive allow
+    return None       # inconclusive
+
+
+def scan_with_model_map(
+    scanner_name: str,
+    scanner_type: str,
+    text: str,
+    config: Dict[str, Any],
+    store_fn: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """
+    Run multiple LLM models in parallel for a single scanner.
+
+    Each model entry carries blockThreshold and allowThreshold:
+      - risk_score >= blockThreshold  → definitive block, return immediately
+      - risk_score <= allowThreshold  → definitive allow, return immediately
+      - otherwise                     → inconclusive, keep waiting
+
+    As soon as a confident decision arrives the response is built and returned.
+    All remaining in-flight futures continue running in a daemon thread; when
+    they finish their results are passed to store_fn (fire-and-forget DB store).
+    If every model is inconclusive the result with the highest risk_score wins.
+    On total failure the function fails open (is_valid=True, risk_score=0.0).
+
+    store_fn(all_results, scanner_name) is called in a background thread for any
+    results that arrive after the winner — never on the calling thread.
+    """
+    import concurrent.futures
+    import threading
+
+    model_map: list = config.get("modelMap", [])
+    if not model_map:
+        raise ValueError("scan_with_model_map called with empty modelMap")
+
+    overall_start = time.time()
+
+    # Build (LLMScanner, entry) pairs; skip entries whose credentials are missing.
+    scanners: list = []
+    for entry in model_map:
+        provider = build_provider_from_config(entry)
+        if provider is None:
+            continue
+        scanners.append((LLMScanner(provider), entry))
+
+    if not scanners:
+        raise ValueError("scan_with_model_map: no usable providers found in modelMap")
+
+    # Use a persistent executor (not a context-manager) so we can return early
+    # without killing in-flight threads. Daemon threads are cleaned up on process exit.
+    executor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=len(scanners),
+        thread_name_prefix="modelmap",
+    )
+
+    future_to_entry: Dict[concurrent.futures.Future, Dict[str, Any]] = {
+        executor.submit(scanner.scan, scanner_name, scanner_type, text, config): entry
+        for scanner, entry in scanners
+    }
+    # Don't accept new work; existing futures keep running after we return.
+    executor.shutdown(wait=False)
+
+    completed_results: list = []
+    inconclusive_results: list = []
+    winner: Optional[Dict[str, Any]] = None
+    winner_elapsed_ms: float = 0.0
+
+    def _annotate(result: Dict[str, Any], entry: Dict[str, Any]) -> Dict[str, Any]:
+        result["provider"] = entry.get("provider", "")
+        result["model"] = entry.get("model", "")
+        return result
+
+    # Drain futures as they complete; stop as soon as we have a confident answer.
+    for future in concurrent.futures.as_completed(future_to_entry):
+        entry = future_to_entry[future]
+        timeout_s = (entry.get("timeoutMs") or 5000) / 1000.0
+
+        try:
+            result = future.result(timeout=timeout_s)
+        except concurrent.futures.TimeoutError:
+            logger.warning(
+                f"[ModelMap] Provider '{entry.get('provider')}' timed out "
+                f"after {timeout_s}s for scanner={scanner_name}"
+            )
+            continue
+        except Exception as exc:
+            logger.error(f"[ModelMap] Provider '{entry.get('provider')}' raised: {exc}")
+            continue
+
+        _annotate(result, entry)
+        completed_results.append(result)
+
+        decision = _is_confident_decision(result, entry)
+
+        if decision is True:
+            # Definitive block — return immediately.
+            winner = result
+            winner["is_valid"] = False
+            winner_elapsed_ms = round((time.time() - overall_start) * 1000, 2)
+            logger.info(
+                f"[ModelMap] Definitive BLOCK: provider='{entry.get('provider')}' "
+                f"risk={result['risk_score']:.2f} blockThreshold={entry.get('blockThreshold')} "
+                f"scanner={scanner_name} elapsed_ms={winner_elapsed_ms:.0f}"
+            )
+            break
+
+        if decision is False:
+            # Definitive allow — return immediately.
+            winner = result
+            winner["is_valid"] = True
+            winner_elapsed_ms = round((time.time() - overall_start) * 1000, 2)
+            logger.info(
+                f"[ModelMap] Definitive ALLOW: provider='{entry.get('provider')}' "
+                f"risk={result['risk_score']:.2f} allowThreshold={entry.get('allowThreshold')} "
+                f"scanner={scanner_name} elapsed_ms={winner_elapsed_ms:.0f}"
+            )
+            break
+
+        # Inconclusive — keep waiting for other models.
+        inconclusive_results.append(result)
+        logger.debug(
+            f"[ModelMap] Inconclusive: provider='{entry.get('provider')}' "
+            f"risk={result['risk_score']:.2f} scanner={scanner_name}"
+        )
+
+    # Tiebreaker: all models inconclusive — use highest risk_score.
+    if winner is None:
+        if inconclusive_results:
+            winner = max(inconclusive_results, key=lambda r: r["risk_score"])
+            winner_elapsed_ms = round((time.time() - overall_start) * 1000, 2)
+            logger.info(
+                f"[ModelMap] All inconclusive; tiebreaker provider='{winner.get('provider')}' "
+                f"risk={winner['risk_score']:.2f} scanner={scanner_name}"
+            )
+        else:
+            # Every model failed or timed out — fail open.
+            logger.error(f"[ModelMap] All providers failed for scanner={scanner_name}; failing open")
+            winner = {"is_valid": True, "risk_score": 0.0, "details": {"error": "all providers failed"}}
+            winner_elapsed_ms = round((time.time() - overall_start) * 1000, 2)
+
+    winner["execution_time_ms"] = winner_elapsed_ms
+
+    # Remaining futures are still running. Collect them in a background thread
+    # and pass results to store_fn so they are persisted without blocking the caller.
+    remaining = [f for f in future_to_entry if not f.done()]
+    if remaining and store_fn is not None:
+        def _collect_and_store(
+            futures: list,
+            entry_map: Dict,
+            already_done: list,
+            fn: Any,
+            sname: str,
+        ) -> None:
+            late_results = list(already_done)
+            for fut in concurrent.futures.as_completed(futures):
+                ent = entry_map[fut]
+                try:
+                    r = fut.result(timeout=(ent.get("timeoutMs") or 5000) / 1000.0)
+                    _annotate(r, ent)
+                    late_results.append(r)
+                except Exception as exc:
+                    logger.warning(f"[ModelMap] Late result failed provider='{ent.get('provider')}': {exc}")
+            if late_results:
+                try:
+                    fn(late_results, sname)
+                except Exception as exc:
+                    logger.warning(f"[ModelMap] store_fn raised: {exc}")
+
+        threading.Thread(
+            target=_collect_and_store,
+            args=(remaining, future_to_entry, list(completed_results), store_fn, scanner_name),
+            daemon=True,
+            name="modelmap-store",
+        ).start()
+    elif store_fn is not None and completed_results:
+        # All futures already done — store synchronously in a daemon thread.
+        threading.Thread(
+            target=store_fn,
+            args=(completed_results, scanner_name),
+            daemon=True,
+            name="modelmap-store",
+        ).start()
+
+    logger.info(
+        f"[ModelMap] scan_with_model_map returning scanner={scanner_name} "
+        f"isValid={winner['is_valid']} risk={winner['risk_score']:.2f} "
+        f"completed_so_far={len(completed_results)} remaining={len(remaining)} "
+        f"elapsed_ms={winner_elapsed_ms:.0f}"
+    )
+    return winner
 
 
 # ── Module-level initializer ─────────────────────────────────────────────────
