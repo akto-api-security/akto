@@ -179,6 +179,8 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
       }
 
       for (ConsumerRecord<String, byte[]> record : records) {
+        AllMetrics.instance.setTdKafkaRecordCount(1);
+        AllMetrics.instance.setTdKafkaRecordSize(record.serializedValueSize());
         HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
         if (MAX_KAFKA_DEBUG_MSGS > 0) {
           MAX_KAFKA_DEBUG_MSGS--;
@@ -187,7 +189,9 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
         if (ignoreTrafficFilter(httpResponseParam)) {
           continue;
         }
+        long startTime = System.currentTimeMillis();
         processRecord(httpResponseParam);
+        AllMetrics.instance.setTdKafkaProcessLatency(System.currentTimeMillis() - startTime);
       }
     } catch (Exception e) {
       logger.errorAndAddToDb("Error observed in processing record " + e.getMessage());
