@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Box } from "@shopify/polaris";
 import ReactFlow, { Background } from "react-flow-renderer";
 import { AgentNode, AgentEdge } from "../observe/api_collections/AgentDiscoverGraph";
+import { getAgentType } from "./nhiViolationsData";
 
 const NODE_TYPES = { agentNode: AgentNode };
 const EDGE_TYPES = { agentEdge: AgentEdge };
@@ -41,7 +42,7 @@ export default function IdentityOverviewGraph({ tableData, onIdentityClick }) {
                     component: {
                         id: `a-${agentName}`,
                         label: agentName,
-                        type: "AI Agent",
+                        type: getAgentType(agentName),
                         category: "agent",
                         description: `${n} identities`,
                         status: "active",
