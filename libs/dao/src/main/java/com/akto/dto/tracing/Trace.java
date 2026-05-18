@@ -27,6 +27,7 @@ public class Trace {
     private int totalTokens;
     private int totalInputTokens;
     private int totalOutputTokens;
+    private int apiCollectionId;
     private Map<String, Object> rootInput;
     private Map<String, Object> rootOutput;
     private Map<String, Object> metadata;

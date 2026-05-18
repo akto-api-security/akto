@@ -10,7 +10,6 @@ import com.akto.tracing.TraceParser;
 import com.akto.util.Constants;
 import com.fasterxml.jackson.databind.JsonNode;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -67,6 +66,16 @@ public class SnowflakeTraceParser implements TraceParser {
             "input_timestamp", "is_client_side", "code", "description", "semantic_model",
             // argument containers (argument.name / argument.value) are always metadata
             "argument"
+    ));
+
+    /** Last-segment keys routed to span.input for non-root spans. */
+    private static final Set<String> INPUT_LEAF_KEYS = new HashSet<>(Arrays.asList(
+            "messages", "instruction", "query", "argument", "code"
+    ));
+
+    /** Last-segment keys routed to span.output for non-root spans. */
+    private static final Set<String> OUTPUT_LEAF_KEYS = new HashSet<>(Arrays.asList(
+            "response", "thinking_response", "think", "text", "result"
     ));
 
     // ── Backwards-compatible static API ──────────────────────────────────
@@ -232,9 +241,9 @@ public class SnowflakeTraceParser implements TraceParser {
 
         // 1. Collect, filter, and sort rows oldest-first
         List<Map<String, Object>> rows = collectRows(tags, params);
-        String traceId = SnowflakeTraceParserUtils.resolvePrimaryRecordId(rows);
-        if (traceId == null) traceId = UUID.randomUUID().toString();
-        rows = filterToTrace(rows, traceId);
+        String rawTraceId = SnowflakeTraceParserUtils.resolvePrimaryRecordId(rows);
+        String traceId = rawTraceId != null ? toUuidFormat(rawTraceId) : UUID.randomUUID().toString();
+        rows = filterToTrace(rows, rawTraceId != null ? rawTraceId : traceId);
         rows = sortOldestFirst(rows);
 
         Map<String, Object> merged = SnowflakeTraceParserUtils.mergeMapsInOrder(rows);
@@ -242,9 +251,7 @@ public class SnowflakeTraceParser implements TraceParser {
         long   rootStart   = resolveStartMillis(params, merged);
         String rootStatus  = resolveStatus(params, merged);
 
-        String rootSpanId = SnowflakeTraceParserUtils.firstNonBlank(
-                SnowflakeTraceParserUtils.stringValue(merged.get(KEY_INPUT_ID)),
-                UUID.randomUUID().toString());
+        String rootSpanId = deterministicSpanId(traceId, "root");
 
         Map<String, Object> rootInput = new HashMap<>();
         String userText = resolveUserText(params, merged);
@@ -264,7 +271,7 @@ public class SnowflakeTraceParser implements TraceParser {
                 .id(rootSpanId).traceId(traceId)
                 .parentSpanId(null)
                 .spanKind(TracingConstants.SpanKind.AGENT)
-                .name("REQUEST_RECEIVED")
+                .name(agentName)
                 .startTimeMillis(rootStart).endTimeMillis(rootEnd)
                 .status(rootStatus)
                 .input(rootInput).output(rootOutput)
@@ -342,6 +349,7 @@ public class SnowflakeTraceParser implements TraceParser {
                 .totalTokens(totalTokens)
                 .totalInputTokens(totalInputTokens)
                 .totalOutputTokens(totalOutputTokens)
+                .apiCollectionId(params.getRequestParams() != null ? params.getRequestParams().getApiCollectionId() : 0)
                 .rootInput(rootInput).rootOutput(rootOutput)
                 .metadata(traceMeta)
                 .spanIds(spanIds)
@@ -396,8 +404,7 @@ public class SnowflakeTraceParser implements TraceParser {
                 long ts = SnowflakeTraceParserUtils.rowObsTimestamp(row);
                 if (ts <= 0) ts = rootStart;
                 KindAndName kn     = resolveKindAndName(entity, row);
-                String      spanId = UUID.nameUUIDFromBytes(
-                        (traceId + "|" + mapKey).getBytes(StandardCharsets.UTF_8)).toString();
+                String      spanId = deterministicSpanId(traceId, mapKey);
                 entitySpan = Span.builder()
                         .id(spanId).traceId(traceId)
                         .parentSpanId(parent.getId())
@@ -416,13 +423,16 @@ public class SnowflakeTraceParser implements TraceParser {
 
             // Dedicated tool spans are siblings; don't push them onto the planning stack
             if (!isDedicated) stack.push(entitySpan);
-            attachMeta(entitySpan, key, row.get(key));
+            attachMeta(entitySpan, key, truncateValue(row.get(key)));
         }
 
-        // Pass 2: metadata keys → attach to the closest ancestor span
+        // Pass 2: metadata keys → attach to the closest ancestor span, filtered by depth
         for (String key : metaKeys) {
-            attachMeta(findOwner(key, lastStep, planningSpans, stack.peek(), rootSpan),
-                    key, row.get(key));
+            Span owner = findOwner(key, lastStep, planningSpans, stack.peek(), rootSpan);
+            int keyParts = key.split("\\.", -1).length;
+            int maxParts = (owner == rootSpan) ? DEPTH_OFFSET : DEPTH_OFFSET + owner.getDepth() + 1;
+            if (keyParts > maxParts) continue;
+            attachMeta(owner, key, truncateValue(row.get(key)));
         }
     }
 
@@ -439,8 +449,7 @@ public class SnowflakeTraceParser implements TraceParser {
         }
         long ts = SnowflakeTraceParserUtils.rowObsTimestamp(row);
         if (ts <= 0) ts = rootStart;
-        String spanId = UUID.nameUUIDFromBytes(
-                (traceId + "|planning|" + step).getBytes(StandardCharsets.UTF_8)).toString();
+        String spanId = deterministicSpanId(traceId, "planning-" + step);
         Map<String, Object> meta = baseMetadata(params, tags, merged);
         meta.put("planningStepNumber", step);
         Span ps = Span.builder()
@@ -662,11 +671,43 @@ public class SnowflakeTraceParser implements TraceParser {
         return false;
     }
 
+    private static Object truncateValue(Object val) {
+        if (val == null) return null;
+        String s = val instanceof String ? (String) val : val.toString();
+        return s.length() > 1000 ? s.substring(0, 1000) : s;
+    }
+
     private static void attachMeta(Span span, String key, Object value) {
-        if (span == null || key == null) return;
+        if (span == null || key == null || value == null) return;
+        boolean isRoot = span.getParentSpanId() == null;
+        if (!isRoot) {
+            String lastSeg = key.substring(key.lastIndexOf('.') + 1);
+            if (INPUT_LEAF_KEYS.contains(lastSeg)) {
+                Map<String, Object> m = span.getInput();
+                if (m == null) { m = new LinkedHashMap<>(); span.setInput(m); }
+                m.put(lastSeg, value);
+                return;
+            }
+            if (OUTPUT_LEAF_KEYS.contains(lastSeg)) {
+                Map<String, Object> m = span.getOutput();
+                if (m == null) { m = new LinkedHashMap<>(); span.setOutput(m); }
+                m.put(lastSeg, value);
+                return;
+            }
+        }
         Map<String, Object> m = span.getMetadata();
         if (m == null) { m = new LinkedHashMap<>(); span.setMetadata(m); }
-        m.put(key, value);
+        // MongoDB forbids '.' and '$' in field names; replace with '_'
+        m.put(sanitizeMongoKey(key), value);
+    }
+
+    private static String deterministicSpanId(String traceId, String role) {
+        return UUID.nameUUIDFromBytes((traceId + ":" + role).getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
+    }
+
+    private static String sanitizeMongoKey(String key) {
+        if (key == null) return null;
+        return key.replace('.', '_').replace('$', '_');
     }
 
     private static void updateSpanTimes(Span span, Map<String, Object> row, long fallback) {
@@ -791,11 +832,13 @@ public class SnowflakeTraceParser implements TraceParser {
                                               Map<String, Object> merged) {
         Map<String, Object> m = new HashMap<>();
         m.put("sourceType", SOURCE_TYPE);
-        m.put("statusCode", params.getStatusCode());
+        m.put("statusCode", String.valueOf(params.getStatusCode()));
         if (params.getRequestParams() != null) {
-            m.put("path", params.getRequestParams().getURL());
-            m.put("method", params.getRequestParams().getMethod());
-            m.put("apiCollectionId", params.getRequestParams().getApiCollectionId());
+            String path = params.getRequestParams().getURL();
+            if (path != null) m.put("path", path);
+            String method = params.getRequestParams().getMethod();
+            if (method != null) m.put("method", method);
+            m.put("apiCollectionId", String.valueOf(params.getRequestParams().getApiCollectionId()));
         }
         String bot = tagText(tags, Constants.AI_AGENT_TAG_BOT_NAME);
         if (bot != null) m.put("botName", bot);
@@ -807,5 +850,14 @@ public class SnowflakeTraceParser implements TraceParser {
         if (tags == null || !tags.has(field)) return null;
         String v = tags.get(field).asText("");
         return v.isEmpty() ? null : v;
+    }
+
+    /** Converts a raw 32-char hex string to UUID format (8-4-4-4-12). Returns as-is if already valid UUID or wrong length. */
+    static String toUuidFormat(String s) {
+        if (s == null) return null;
+        String hex = s.replaceAll("-", "");
+        if (hex.length() != 32) return s;
+        return hex.substring(0, 8) + "-" + hex.substring(8, 12) + "-"
+                + hex.substring(12, 16) + "-" + hex.substring(16, 20) + "-" + hex.substring(20);
     }
 }
