@@ -288,6 +288,8 @@ public class DaoInit {
         ClassModel<EndpointMcpConfig> endpointMcpConfigClassModel = ClassModel.builder(EndpointMcpConfig.class).enableDiscriminator(true).build();
         ClassModel<DeviceDomainConfig> deviceDomainConfigClassModel = ClassModel.builder(DeviceDomainConfig.class).enableDiscriminator(true).build();
         ClassModel<NewRelicIntegration> newRelicIntegrationClassModel = ClassModel.builder(NewRelicIntegration.class).enableDiscriminator(true).build();
+        ClassModel<EndpointShieldSettings> endpointShieldSettingsClassModel = ClassModel.builder(EndpointShieldSettings.class).enableDiscriminator(true).build();
+        ClassModel<PlatformShieldConfig> platformShieldConfigClassModel = ClassModel.builder(PlatformShieldConfig.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -318,7 +320,7 @@ public class DaoInit {
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
                 RuntimeMetricsClassModel, jobsParam, ModuleInfoClassModel,fileClassModel, tlsAuthClassModel, apiHitCountInfoClassModel, collectionTagsModel, hostRegexTestingEndpointsClassModel, tagsTestingEndpointsClassModel
-                , authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, logsEndpointShieldClassModel, proxyPatternInfoClassModel, apiSequencesClassModel, endpointMcpConfigClassModel, deviceDomainConfigClassModel, newRelicIntegrationClassModel).automatic(true).build());
+                , authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, logsEndpointShieldClassModel, proxyPatternInfoClassModel, apiSequencesClassModel, endpointMcpConfigClassModel, deviceDomainConfigClassModel, newRelicIntegrationClassModel, endpointShieldSettingsClassModel, platformShieldConfigClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
