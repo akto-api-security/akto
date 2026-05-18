@@ -73,4 +73,8 @@ public abstract class AbstractKafkaConsumerTask<V> implements Task {
   }
 
   abstract void processRecords(ConsumerRecords<String, V> records);
+
+  public Consumer<String, V> getKafkaConsumer() {
+    return kafkaConsumer;
+  }
 }

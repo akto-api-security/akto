@@ -278,6 +278,8 @@ public class MaliciousTrafficDetectorTask implements Task {
                 if (record.value().length > MAX_PAYLOAD_SIZE_BYTES) {
                   continue;
                 }
+                AllMetrics.instance.setTdKafkaRecordCount(1);
+                AllMetrics.instance.setTdKafkaRecordSize(record.serializedValueSize());
                 HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
                 if(MAX_KAFKA_DEBUG_MSGS > 0){
                   MAX_KAFKA_DEBUG_MSGS--;
@@ -286,7 +288,10 @@ public class MaliciousTrafficDetectorTask implements Task {
                 if(ignoreTrafficFilter(httpResponseParam)){
                   continue;
                 }
+                long startTime = System.currentTimeMillis();
                 processRecord(httpResponseParam);
+                AllMetrics.instance.setTdKafkaProcessLatency(System.currentTimeMillis() - startTime);
+
               }
 
               if (!records.isEmpty()) {
