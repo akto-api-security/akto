@@ -202,6 +202,10 @@ public class MaliciousTrafficDetectorTask implements Task {
   private int MAX_KAFKA_DEBUG_MSGS = 100;
   private static boolean kafkaPollingEnabled = System.getenv().getOrDefault("KAFKA_POLL_ENABLED", "true").equals("true");
 
+  public Consumer<String, byte[]> getKafkaConsumer() {
+    return kafkaConsumer;
+  }
+
   public void run() {
     String topicName = "akto.api.logs2";
     logger.warnAndAddToDb(this.instanceId + ": Subscribing to Kafka topic: " + topicName);
@@ -278,6 +282,8 @@ public class MaliciousTrafficDetectorTask implements Task {
                 if (record.value().length > MAX_PAYLOAD_SIZE_BYTES) {
                   continue;
                 }
+                AllMetrics.instance.setTdKafkaRecordCount(1);
+                AllMetrics.instance.setTdKafkaRecordSize(record.serializedValueSize());
                 HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
                 if(MAX_KAFKA_DEBUG_MSGS > 0){
                   MAX_KAFKA_DEBUG_MSGS--;
@@ -286,7 +292,10 @@ public class MaliciousTrafficDetectorTask implements Task {
                 if(ignoreTrafficFilter(httpResponseParam)){
                   continue;
                 }
+                long startTime = System.currentTimeMillis();
                 processRecord(httpResponseParam);
+                AllMetrics.instance.setTdKafkaProcessLatency(System.currentTimeMillis() - startTime);
+
               }
 
               if (!records.isEmpty()) {
