@@ -4,7 +4,7 @@ import { IndexFiltersMode } from "@shopify/polaris";
 import FlyLayout from "../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
-import { IdentityIcon, violationsTableData as fallbackViolationsData, violationsHeaders, violationsSortOptions, SEV_ORD, sevBadge, AgentIcon, PolicyCell } from "./nhiViolationsData";
+import { IdentityIcon, violationsHeaders, violationsSortOptions, SEV_ORD, sevBadge, AgentIcon, PolicyCell } from "./nhiViolationsData";
 import IdentityGraph from "./IdentityGraph";
 import observeRequests from "../observe/api";
 import { isAgenticSecurityCategory } from "../../../main/labelHelper";
@@ -91,11 +91,11 @@ export default function IdentityDetailsPanel({ row, show, setShow }) {
                 if (Array.isArray(response)) {
                     setAllViolations(response);
                 } else {
-                    setAllViolations(fallbackViolationsData);
+                    setAllViolations([]);
                 }
             } catch (err) {
                 console.error("Error fetching violations:", err);
-                setAllViolations(fallbackViolationsData);
+                setAllViolations([]);
             } finally {
                 setLoading(false);
             }
@@ -124,16 +124,11 @@ export default function IdentityDetailsPanel({ row, show, setShow }) {
 
     const handleDisableIdentity = async () => {
         try {
-            if (!userEmail) {
-                console.error("User email not found");
-                return;
-            }
+            if (!userEmail) return;
 
             setDisabling(true);
-            console.log("Disabling identity:", row.hexId, "by user:", userEmail);
 
-            const result = await observeRequests.disableNhiIdentity(row.hexId, userEmail);
-            console.log("Disable result:", result);
+            await observeRequests.disableNhiIdentity(row.hexId, userEmail);
 
             setDisabling(false);
             setActionActive(false);

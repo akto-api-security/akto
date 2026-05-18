@@ -2,8 +2,10 @@ package com.akto.action;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.nhi_governance.NhiViolationDao;
+import com.akto.dao.nhi_governance.NhiPolicyDao;
 import com.akto.dao.JiraIntegrationDao;
 import com.akto.dto.nhi_governance.NhiViolation;
+import com.akto.dto.nhi_governance.NhiPolicy;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.jira_integration.JiraIntegration;
@@ -23,6 +25,7 @@ import org.bson.types.ObjectId;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.HashMap;
 import java.util.Map;
@@ -71,18 +74,44 @@ public class NhiGovernanceViolationsAction extends UserAction {
 
     public String fetchAllViolations() {
         try {
-            // Build filter based on contextSource if provided
-            Bson filter;
-            if (contextSource != null && !contextSource.isEmpty()) {
-                filter = Filters.eq(NhiViolation.CONTEXT_SOURCE, contextSource);
-                loggerMaker.infoAndAddToDb("Applied filter for contextSource: " + contextSource);
-            } else {
-                filter = Filters.empty();
+            Bson filter = (contextSource != null && !contextSource.isEmpty())
+                    ? Filters.eq(NhiViolation.CONTEXT_SOURCE, contextSource)
+                    : Filters.empty();
+
+            violations = NhiViolationDao.instance.findAll(filter);
+
+            // Collect all unique policyIds across violations
+            Set<String> allPolicyIds = violations.stream()
+                    .filter(v -> v.getPolicyIds() != null)
+                    .flatMap(v -> v.getPolicyIds().stream())
+                    .collect(Collectors.toSet());
+
+            // Build hexId → policyName map from a single DB query
+            Map<String, String> policyIdToName = new HashMap<>();
+            if (!allPolicyIds.isEmpty()) {
+                List<ObjectId> objectIds = allPolicyIds.stream()
+                        .map(ObjectId::new)
+                        .collect(Collectors.toList());
+                List<NhiPolicy> policies = NhiPolicyDao.instance.findAll(
+                        Filters.in(NhiPolicy.ID, objectIds)
+                );
+                for (NhiPolicy p : policies) {
+                    if (p.getId() != null) {
+                        policyIdToName.put(p.getId().toHexString(), p.getPolicyName());
+                    }
+                }
             }
 
-            // Fetch all violations
-            violations = NhiViolationDao.instance.findAll(filter);
-            loggerMaker.infoAndAddToDb("Found " + violations.size() + " violations");
+            // Populate policy names in each violation from policyIds
+            for (NhiViolation v : violations) {
+                if (v.getPolicyIds() != null && !v.getPolicyIds().isEmpty()) {
+                    List<String> names = v.getPolicyIds().stream()
+                            .map(id -> policyIdToName.getOrDefault(id, id))
+                            .collect(Collectors.toList());
+                    v.setPolicy(names);
+                }
+            }
+
             return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
@@ -97,7 +126,6 @@ public class NhiGovernanceViolationsAction extends UserAction {
 
             // Handle single violation fetch
             if (violationId != null && !violationId.isEmpty()) {
-                loggerMaker.infoAndAddToDb("Fetching violation by ID: " + violationId + " for account: " + accountId);
                 violation = NhiViolationDao.instance.findOne(NhiViolation.ID, new ObjectId(violationId));
 
                 if (violation == null) {
@@ -111,8 +139,6 @@ public class NhiGovernanceViolationsAction extends UserAction {
 
             // Handle multiple violations fetch
             if (violationIds != null && !violationIds.isEmpty()) {
-                loggerMaker.infoAndAddToDb("Fetching " + violationIds.size() + " violations for account: " + accountId);
-
                 // Convert string IDs to ObjectIds using standard pattern
                 List<ObjectId> objectIds = new ArrayList<>();
                 for (String id : violationIds) {
@@ -121,8 +147,6 @@ public class NhiGovernanceViolationsAction extends UserAction {
 
                 Bson filter = Filters.in(NhiViolation.ID, objectIds);
                 violations = NhiViolationDao.instance.findAll(filter);
-
-                loggerMaker.infoAndAddToDb("Found " + violations.size() + " violations for provided IDs");
                 return Action.SUCCESS.toUpperCase();
             }
 
@@ -142,7 +166,6 @@ public class NhiGovernanceViolationsAction extends UserAction {
             long currentTime = Context.now();
 
             if (violationId == null || violationId.isEmpty()) {
-                loggerMaker.errorAndAddToDb("Violation ID not provided");
                 addActionError("Violation ID is required");
                 success = false;
                 return Action.ERROR.toUpperCase();
@@ -155,8 +178,6 @@ public class NhiGovernanceViolationsAction extends UserAction {
                 return Action.ERROR.toUpperCase();
             }
 
-            loggerMaker.infoAndAddToDb("Marking violation as fixed: " + violationId + " by user: " + userEmail);
-
             // Update violation status to Fixed with updatedAt and updatedBy
             Bson filter = Filters.eq(NhiViolation.ID, new ObjectId(violationId));
             Bson update = Updates.combine(
@@ -166,7 +187,6 @@ public class NhiGovernanceViolationsAction extends UserAction {
             );
 
             NhiViolationDao.instance.updateOne(filter, update);
-            loggerMaker.infoAndAddToDb("Successfully marked violation as fixed: " + violationId);
 
             success = true;
             return Action.SUCCESS.toUpperCase();
@@ -201,8 +221,6 @@ public class NhiGovernanceViolationsAction extends UserAction {
                 success = false;
                 return Action.ERROR.toUpperCase();
             }
-
-            loggerMaker.infoAndAddToDb("Creating Jira ticket from violation: " + violationId);
 
             // Fetch Jira integration from database
             JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());

@@ -1147,6 +1147,42 @@ export default {
             data: { violationId, aktoDashboardHost, projId, issueType, jiraMetaData }
         })
         return resp
+    },
+
+    async fetchNhiPolicies(contextSource) {
+        const resp = await request({
+            url: '/api/fetchNhiPolicies',
+            method: 'post',
+            data: { contextSource }
+        })
+        return resp?.policies || []
+    },
+
+    async createNhiPolicy(policy, userEmail) {
+        const resp = await request({
+            url: '/api/createNhiPolicy',
+            method: 'post',
+            data: { policy, userEmail }
+        })
+        return resp
+    },
+
+    async updateNhiPolicy(policyId, policy, userEmail) {
+        const resp = await request({
+            url: '/api/updateNhiPolicy',
+            method: 'post',
+            data: { policyId, policy, userEmail }
+        })
+        return resp
+    },
+
+    async disableNhiPolicy(policyId, userEmail) {
+        const resp = await request({
+            url: '/api/disableNhiPolicy',
+            method: 'post',
+            data: { policyId, userEmail }
+        })
+        return resp?.success || false
     }
 
 }

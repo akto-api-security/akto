@@ -14,15 +14,12 @@ import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import values from "@/util/values";
 import { isAgenticSecurityCategory } from "../../../main/labelHelper";
-import { violationsTableData as fallbackViolationsData, violationsHeaders, violationsSortOptions, SEV_ORD, sevBadge, IdentityIcon, AgentIcon, PolicyCell } from "./nhiViolationsData";
+import { violationsHeaders, violationsSortOptions, SEV_ORD, sevBadge, IdentityIcon, AgentIcon, PolicyCell } from "./nhiViolationsData";
 import ViolationDetailsPanel from "./ViolationDetailsPanel";
-import { atlasViolationsOverTimeData, argusViolationsOverTimeData } from "./nhiData";
 import observeRequests from "../observe/api";
+import { formatRelativeTime } from "./nhiUtils";
 import SpinnerCentered from "../../components/progress/SpinnerCentered";
 import { extractIdentityName, getFirstIdentityName } from "./identityHelper";
-
-// Note: This is kept for fallback/reference only. We generate dynamic data below.
-const staticViolationsOverTimeData = isAgenticSecurityCategory() ? argusViolationsOverTimeData : atlasViolationsOverTimeData;
 
 const definedTableTabs = ["All", "Open", "Fixed"];
 const resourceName = { singular: "violation", plural: "violations" };
@@ -54,19 +51,6 @@ function DonutCard({ title, donutData }) {
 }
 
 // ── Transform API violations to table format ───────────────────────────────────
-const formatTimestampRelative = (timestamp) => {
-    if (!timestamp) return "Unknown";
-    const now = Math.floor(Date.now() / 1000);
-    const diff = now - timestamp;
-    const minutes = Math.floor(diff / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) return `${days}d ago`;
-    if (hours > 0) return `${hours}h ago`;
-    if (minutes > 0) return `${minutes}m ago`;
-    return "Now";
-};
 
 const transformApiViolations = (apiViolations) => {
     return apiViolations
@@ -93,7 +77,7 @@ const transformApiViolations = (apiViolations) => {
                 violation: v.violationType,
                 identity: firstIdentityName,
                 identities: v.identities,
-                discovered: formatTimestampRelative(v.discoveredAt),
+                discovered: formatRelativeTime(v.discoveredAt, "Unknown"),
                 severityOrder: SEV_ORD[v.severity] || 0,
                 policy: policyObj,
                 violationComp: <Text variant="bodyMd" fontWeight="medium">{v.violationType}</Text>,
@@ -209,15 +193,12 @@ export default function ViolationsPage() {
                     // Empty array response
                     setRawViolations([]);
                 } else {
-                    // Fallback to hardcoded data if API fails
-                    console.warn("API response format unexpected, using fallback data");
-                    setRawViolations(fallbackViolationsData);
+                    setRawViolations([]);
                 }
             } catch (err) {
                 console.error("Error fetching violations:", err);
-                // Fallback to hardcoded data on error
                 setError(err.message);
-                setRawViolations(fallbackViolationsData);
+                setRawViolations([]);
             } finally {
                 setLoading(false);
             }
@@ -226,13 +207,7 @@ export default function ViolationsPage() {
         fetchViolations();
     }, []);
 
-    // Transform API data to table format, or use fallback
-    const violationsTableData = useMemo(() => {
-        if (rawViolations.length > 0) {
-            return transformApiViolations(rawViolations);
-        }
-        return fallbackViolationsData;
-    }, [rawViolations]);
+    const violationsTableData = useMemo(() => transformApiViolations(rawViolations), [rawViolations]);
 
     // Compute donut from actual violations data so chart always matches the table
     const severityDonutData = useMemo(() => {
@@ -255,8 +230,7 @@ export default function ViolationsPage() {
             const dynamicData = generateViolationsOverTimeData(rawViolations);
             if (dynamicData) return dynamicData;
         }
-        // Fallback to static data
-        return staticViolationsOverTimeData;
+        return [];
     }, [rawViolations]);
 
     useEffect(() => {

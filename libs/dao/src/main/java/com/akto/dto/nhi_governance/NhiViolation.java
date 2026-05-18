@@ -3,11 +3,16 @@ package com.akto.dto.nhi_governance;
 import java.util.List;
 import java.util.Map;
 import org.bson.types.ObjectId;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
+@Getter
+@Setter
+@NoArgsConstructor
 public class NhiViolation {
     public static final String COLLECTION_NAME = "nhi_violations";
 
-    // Field names for MongoDB
     public static final String ID = "_id";
     public static final String VIOLATION_TYPE = "violationType";
     public static final String IDENTITIES = "identities";
@@ -33,6 +38,7 @@ public class NhiViolation {
     public static final String RESOLUTION_NOTES = "resolutionNotes";
     public static final String RESOLUTION_TYPE = "resolutionType";
     public static final String METADATA = "metadata";
+    public static final String POLICY_IDS = "policyIds";
 
     private ObjectId id;
     private String violationType;
@@ -59,8 +65,7 @@ public class NhiViolation {
     private String resolutionNotes;
     private String resolutionType;
     private Map<String, Object> metadata;
-
-    public NhiViolation() {}
+    private List<String> policyIds;
 
     public NhiViolation(String violationType, List<IdentityReference> identities, String agentName, String severity) {
         this.violationType = violationType;
@@ -69,269 +74,36 @@ public class NhiViolation {
         this.severity = severity;
     }
 
-    // Getters and Setters
-    public ObjectId getId() {
-        return id;
-    }
-
-    public void setId(ObjectId id) {
-        this.id = id;
-    }
-
     public String getHexId() {
         return this.id != null ? this.id.toHexString() : null;
     }
 
-    public String getViolationType() {
-        return violationType;
-    }
-
-    public void setViolationType(String violationType) {
-        this.violationType = violationType;
-    }
-
-    public List<IdentityReference> getIdentities() {
-        return identities;
-    }
-
-    public void setIdentities(List<IdentityReference> identities) {
-        this.identities = identities;
-    }
-
-    public String getAgentName() {
-        return agentName;
-    }
-
-    public void setAgentName(String agentName) {
-        this.agentName = agentName;
-    }
-
-    public String getAgentType() {
-        return agentType;
-    }
-
-    public void setAgentType(String agentType) {
-        this.agentType = agentType;
-    }
-
-    public List<String> getPolicy() {
-        return policy;
-    }
-
-    public void setPolicy(List<String> policy) {
-        this.policy = policy;
-    }
-
-    public String getSeverity() {
-        return severity;
-    }
-
-    public void setSeverity(String severity) {
-        this.severity = severity;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public String getContextSource() {
-        return contextSource;
-    }
-
-    public void setContextSource(String contextSource) {
-        this.contextSource = contextSource;
-    }
-
-    public int getDiscoveredAt() {
-        return discoveredAt;
-    }
-
-    public void setDiscoveredAt(int discoveredAt) {
-        this.discoveredAt = discoveredAt;
-    }
-
-    public Integer getAcknowledgedAt() {
-        return acknowledgedAt;
-    }
-
-    public void setAcknowledgedAt(Integer acknowledgedAt) {
-        this.acknowledgedAt = acknowledgedAt;
-    }
-
-    public String getAcknowledgedBy() {
-        return acknowledgedBy;
-    }
-
-    public void setAcknowledgedBy(String acknowledgedBy) {
-        this.acknowledgedBy = acknowledgedBy;
-    }
-
-    public Integer getResolvedAt() {
-        return resolvedAt;
-    }
-
-    public void setResolvedAt(Integer resolvedAt) {
-        this.resolvedAt = resolvedAt;
-    }
-
-    public String getResolvedBy() {
-        return resolvedBy;
-    }
-
-    public void setResolvedBy(String resolvedBy) {
-        this.resolvedBy = resolvedBy;
-    }
-
-    public Integer getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Integer updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
-    public String getUpdatedBy() {
-        return updatedBy;
-    }
-
-    public void setUpdatedBy(String updatedBy) {
-        this.updatedBy = updatedBy;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public List<String> getAffectedResources() {
-        return affectedResources;
-    }
-
-    public void setAffectedResources(List<String> affectedResources) {
-        this.affectedResources = affectedResources;
-    }
-
-    public List<String> getBlastRadius() {
-        return blastRadius;
-    }
-
-    public void setBlastRadius(List<String> blastRadius) {
-        this.blastRadius = blastRadius;
-    }
-
-    public List<String> getRemediationSteps() {
-        return remediationSteps;
-    }
-
-    public void setRemediationSteps(List<String> remediationSteps) {
-        this.remediationSteps = remediationSteps;
-    }
-
-    public List<TimelineEntry> getTimeline() {
-        return timeline;
-    }
-
-    public void setTimeline(List<TimelineEntry> timeline) {
-        this.timeline = timeline;
-    }
-
-    public String getAcknowledgmentNotes() {
-        return acknowledgmentNotes;
-    }
-
-    public void setAcknowledgmentNotes(String acknowledgmentNotes) {
-        this.acknowledgmentNotes = acknowledgmentNotes;
-    }
-
-    public String getResolutionNotes() {
-        return resolutionNotes;
-    }
-
-    public void setResolutionNotes(String resolutionNotes) {
-        this.resolutionNotes = resolutionNotes;
-    }
-
-    public String getResolutionType() {
-        return resolutionType;
-    }
-
-    public void setResolutionType(String resolutionType) {
-        this.resolutionType = resolutionType;
-    }
-
-    public Map<String, Object> getMetadata() {
-        return metadata;
-    }
-
-    public void setMetadata(Map<String, Object> metadata) {
-        this.metadata = metadata;
-    }
-
-    // Inner class for Identity Reference
+    @Getter
+    @Setter
+    @NoArgsConstructor
     public static class IdentityReference {
         private ObjectId id;
         private String identityName;
-
-        public IdentityReference() {}
 
         public IdentityReference(ObjectId id, String identityName) {
             this.id = id;
             this.identityName = identityName;
         }
 
-        public ObjectId getId() {
-            return id;
-        }
-
-        public void setId(ObjectId id) {
-            this.id = id;
-        }
-
         public String getHexId() {
             return this.id != null ? this.id.toHexString() : null;
         }
-
-        public String getIdentityName() {
-            return identityName;
-        }
-
-        public void setIdentityName(String identityName) {
-            this.identityName = identityName;
-        }
     }
 
-    // Inner class for Timeline
+    @Getter
+    @Setter
+    @NoArgsConstructor
     public static class TimelineEntry {
         private int timestamp;
         private String event;
 
-        public TimelineEntry() {}
-
         public TimelineEntry(int timestamp, String event) {
             this.timestamp = timestamp;
-            this.event = event;
-        }
-
-        public int getTimestamp() {
-            return timestamp;
-        }
-
-        public void setTimestamp(int timestamp) {
-            this.timestamp = timestamp;
-        }
-
-        public String getEvent() {
-            return event;
-        }
-
-        public void setEvent(String event) {
             this.event = event;
         }
     }

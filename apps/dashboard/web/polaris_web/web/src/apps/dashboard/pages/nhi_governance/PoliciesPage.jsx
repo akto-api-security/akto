@@ -1,25 +1,24 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { IndexFiltersMode } from "@shopify/polaris";
-import { Badge, Box, Button, HorizontalStack, Modal, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, Modal, Text, Tooltip, VerticalStack } from "@shopify/polaris";
+import { CancelMinor, ViewMinor } from "@shopify/polaris-icons";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "../../components/tables/rows/GithubRow";
 import SummaryCardInfo from "../../components/shared/SummaryCardInfo";
-import SampleData from "../../components/shared/SampleData";
-import DropdownSearch from "../../components/shared/DropdownSearch";
 import useTable from "../../components/tables/TableContext";
 import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import { isAgenticSecurityCategory } from "../../../main/labelHelper";
-import PolicyDetailsPanel from "./PolicyDetailsPanel";
-import { violationsTableData, unresolvedPolicyName, ViolationBubbles } from "./nhiViolationsData";
-import { INITIAL_POLICIES, ARGUS_INITIAL_POLICIES, BLANK_YAML, AGENT_OPTIONS, ARGUS_AGENT_OPTIONS } from "./nhiData";
+import { ViolationBubbles } from "./nhiViolationsData";
+import observeRequests from "../observe/api";
+import CreateNhiPolicyModal from "./CreateNhiPolicyModal";
+import SpinnerCentered from "../../components/progress/SpinnerCentered";
+import Store from "../../store";
+import { formatRelativeTime } from "./nhiUtils";
 
-const IS_ARGUS        = isAgenticSecurityCategory();
-const DEFAULT_POLICIES = IS_ARGUS ? ARGUS_INITIAL_POLICIES : INITIAL_POLICIES;
-const ACTIVE_AGENT_OPTIONS = IS_ARGUS ? ARGUS_AGENT_OPTIONS : AGENT_OPTIONS;
-const STORAGE_KEY     = IS_ARGUS ? "nhi_policies_argus_v1" : "nhi_policies_atlas_v1";
+const IS_ARGUS = isAgenticSecurityCategory();
 
 const definedTableTabs = ["All", "Active", "Inactive", "Draft"];
 const resourceName = { singular: "policy", plural: "policies" };
@@ -51,50 +50,38 @@ function ScopeCell({ scope, agents }) {
 const STATUS_COLOR = { Active: "success", Inactive: "", Draft: "warning" };
 const statusBadge = (s) => <Badge status={STATUS_COLOR[s] || ""}>{s}</Badge>;
 
-// ── Last-triggered derived from violations ─────────────────────────────────────
-function parseMins(discovered) {
-    if (!discovered || discovered === "Never") return Infinity;
-    if (discovered === "Now") return 0;
-    const m = discovered.match(/^(\d+)(m|h|d)\s+ago$/);
-    if (!m) return Infinity;
-    const n = parseInt(m[1]);
-    return m[2] === "m" ? n : m[2] === "h" ? n * 60 : n * 1440;
-}
+// ── Transform API policy to table format ───────────────────────────────────────
+const STATUS_MAP = { ACTIVE: "Active", INACTIVE: "Inactive", DRAFT: "Draft" };
 
-function getPolicyViolations(policyName) {
-    const originalName = unresolvedPolicyName(policyName);
-    return violationsTableData.filter((v) => {
-        const names = typeof v.policy === "object"
-            ? [v.policy.primary, ...(v.policy.extras || [])]
-            : [v.policy];
-        return names.some((n) => n === originalName || n === policyName);
-    });
-}
+function transformApiPolicy(apiPolicy, idx) {
+    const agents  = apiPolicy.scope?.agents  || [];
+    const nhiIds  = apiPolicy.scope?.nhiIds  || [];
+    const scope = agents.length === 0
+        ? { primary: "All Agents" }
+        : { primary: agents[0], extra: Math.max(0, agents.length - 1), extras: agents.slice(1) };
 
-function getLastTriggered(viols) {
-    if (!viols.length) return "Never";
-    return viols.reduce((best, v) => parseMins(v.discovered) < parseMins(best.discovered) ? v : best).discovered;
-}
+    const status = STATUS_MAP[apiPolicy.status] || apiPolicy.status || "Active";
+    const totalViolations = apiPolicy.violationIds?.length || 0;
 
-function buildTableData(rawList) {
-    return rawList.map((r, i) => {
-        const viols    = getPolicyViolations(r.policyName);
-        const violCrit = viols.filter((v) => v.severity === "Critical").length;
-        const violHigh = viols.filter((v) => v.severity === "High").length;
-        const violMed  = viols.filter((v) => v.severity === "Medium").length;
-        const violLow  = viols.filter((v) => v.severity === "Low").length;
-        return {
-        ...r,
-        id:              i + 1,
-        violCrit, violHigh, violMed, violLow,
-        totalViolations: violCrit + violHigh + violMed + violLow,
-        lastTriggered:   getLastTriggered(viols),
-        policyNameComp:  <Text variant="bodyMd" fontWeight="medium">{r.policyName}</Text>,
-        violationsComp:  <ViolationBubbles critical={violCrit} high={violHigh} medium={violMed} low={violLow} />,
-        scopeComp:       <ScopeCell scope={r.scope} agents={r.agents} />,
-        statusComp:      statusBadge(r.status),
-        };
-    });
+    return {
+        ...apiPolicy,
+        hexId: apiPolicy.hexId,
+        id: idx + 1,
+        policyName: apiPolicy.policyName,
+        agents,
+        nhiIds,
+        scope,
+        status,
+        totalViolations,
+        violCrit: 0, violHigh: 0, violMed: 0, violLow: totalViolations,
+        lastTriggered: apiPolicy.lastTriggeredAt ? formatRelativeTime(apiPolicy.lastTriggeredAt) : "Never",
+        lastModified: apiPolicy.updatedAt ? formatRelativeTime(apiPolicy.updatedAt) : "—",
+        created: apiPolicy.createdAt ? formatRelativeTime(apiPolicy.createdAt) : "—",
+        policyNameComp: <Text variant="bodyMd" fontWeight="medium">{apiPolicy.policyName}</Text>,
+        violationsComp: <ViolationBubbles critical={0} high={0} medium={0} low={totalViolations} />,
+        scopeComp: <ScopeCell scope={scope} agents={agents} />,
+        statusComp: statusBadge(status),
+    };
 }
 
 // ── Headers ────────────────────────────────────────────────────────────────────
@@ -113,103 +100,6 @@ const sortOptions = [
     { label: "Violations", value: "violations desc", directionLabel: "Least first", sortKey: "totalViolations", columnIndex: 1 },
 ];
 
-const TEMPLATE_OPTIONS = [
-    { label: "Select Template",      value: "" },
-    { label: "Credential Security",  value: "credential_security" },
-    { label: "Access Control",       value: "access_control" },
-    { label: "Usage Monitoring",     value: "usage_monitoring" },
-    { label: "Automation Controls",  value: "automation_controls" },
-    { label: "Lifecycle Management", value: "lifecycle_management" },
-];
-
-const MAX_NAME = 64;
-
-function CreatePolicyModal({ open, onClose, onCreatePolicy }) {
-    const [name, setName]                     = useState("");
-    const [selectedAgents, setSelectedAgents] = useState([]);
-    const [yamlKey, setYamlKey]               = useState(0);
-    const yamlRef                             = useRef(BLANK_YAML);
-
-    const handleClose = () => {
-        setName(""); setSelectedAgents([]); yamlRef.current = BLANK_YAML; setYamlKey(0);
-        onClose();
-    };
-
-    const buildAndCreate = (status) => {
-        const policyName = name.trim() || "Untitled Policy";
-        const allSelected = selectedAgents.length === 0 || selectedAgents.length === ACTIVE_AGENT_OPTIONS.length;
-        const agents = allSelected ? ["All Agents"] : selectedAgents;
-        const scope  = allSelected
-            ? { primary: "All Agents" }
-            : { primary: agents[0], ...(agents.length > 1 ? { extra: agents.length - 1 } : {}) };
-        onCreatePolicy({
-            policyName, agents, scope, status, yaml: yamlRef.current,
-            violCrit: 0, violHigh: 0, violMed: 0,
-            lastModified: "Fenil Shah",
-            created: "Just now",
-        });
-        handleClose();
-    };
-
-    return (
-        <Modal
-            open={open}
-            onClose={handleClose}
-            title="Create Policy"
-            large
-        >
-            <Modal.Section>
-                <VerticalStack gap="4">
-                    <HorizontalStack gap="4" blockAlign="end" wrap={false}>
-                        <Box style={{ flex: "1 1 0", minWidth: 0 }}>
-                            <TextField
-                                label="Name"
-                                value={name}
-                                onChange={setName}
-                                maxLength={MAX_NAME}
-                                showCharacterCount
-                                autoComplete="off"
-                                placeholder="e.g. Enforce Least Privilege on Credentials"
-                            />
-                        </Box>
-                        <Box style={{ flex: "0 0 220px" }}>
-                            <VerticalStack gap="1">
-                                <Text variant="bodySm" fontWeight="medium">Select Agents</Text>
-                                <DropdownSearch
-                                    id="create-policy-agents"
-                                    optionsList={ACTIVE_AGENT_OPTIONS}
-                                    setSelected={setSelectedAgents}
-                                    preSelected={selectedAgents}
-                                    allowMultiple
-                                    placeholder="All Selected"
-                                    itemName="agent"
-                                />
-                            </VerticalStack>
-                        </Box>
-                    </HorizontalStack>
-                    <Box style={{ height: 420 }}>
-                        <SampleData
-                            key={yamlKey}
-                            data={{ message: yamlRef.current }}
-                            editorLanguage="custom_yaml"
-                            readOnly={false}
-                            getEditorData={(val) => { yamlRef.current = val; }}
-                            minHeight="420px"
-                        />
-                    </Box>
-                    <HorizontalStack align="space-between" blockAlign="center">
-                        <Button onClick={() => buildAndCreate("Draft")}>Create Draft</Button>
-                        <HorizontalStack gap="2">
-                            <Button onClick={handleClose}>Cancel</Button>
-                            <Button primary onClick={() => buildAndCreate("Active")}>Create Policy</Button>
-                        </HorizontalStack>
-                    </HorizontalStack>
-                </VerticalStack>
-            </Modal.Section>
-        </Modal>
-    );
-}
-
 // ── Page ───────────────────────────────────────────────────────────────────────
 const policiesPageTitle = (
     <TitleWithInfo
@@ -224,73 +114,122 @@ export default function PoliciesPage() {
     const tableSelectedTab    = PersistStore((state) => state.tableSelectedTab);
     const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
     const initialSelectedTab  = tableSelectedTab[window.location.pathname] || "all";
+    const userEmail           = Store((state) => state.username);
 
-    const [rawPolicies, setRawPolicies]           = useState(() => {
-        try {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) return JSON.parse(stored);
-        } catch (_) {}
-        return DEFAULT_POLICIES;
-    });
-    const [selectedTab, setSelectedTab]           = useState(initialSelectedTab);
-    const [selected, setSelected]                 = useState(
+    // API state
+    const [rawPolicies, setRawPolicies]   = useState([]);
+    const [loading, setLoading]           = useState(true);
+
+    // UI state
+    const [selectedTab, setSelectedTab]   = useState(initialSelectedTab);
+    const [selected, setSelected]         = useState(
         func.getTableTabIndexById(0, definedTableTabs, initialSelectedTab)
     );
     const [showDeleteModal, setShowDeleteModal]   = useState(false);
     const [showCreateModal, setShowCreateModal]   = useState(false);
-    const [selectedPolicy, setSelectedPolicy]     = useState(null);
-    const [showPolicyPanel, setShowPolicyPanel]   = useState(false);
+    const [isEditMode, setIsEditMode]             = useState(false);
+    const [editingPolicy, setEditingPolicy]       = useState(null);
 
-    useEffect(() => {
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rawPolicies)); } catch (_) {}
-    }, [rawPolicies]);
+    const contextSource = IS_ARGUS ? "AGENTIC" : "ENDPOINT";
 
-    const tableData = useMemo(() => buildTableData(rawPolicies), [rawPolicies]);
-
-    useEffect(() => {
-        const pending = sessionStorage.getItem("nhi_pending_policy");
-        if (!pending) return;
-        sessionStorage.removeItem("nhi_pending_policy");
-        const match = tableData.find((r) => r.policyName === pending);
-        if (match) { setSelectedPolicy(match); setShowPolicyPanel(true); }
-    }, [tableData]);
-
-    const summaryItems = useMemo(() => [
-        { title: "Total Policies",             data: tableData.length.toLocaleString() },
-        { title: "Total Violations Triggered", data: tableData.reduce((s, r) => s + r.totalViolations, 0).toLocaleString() },
-    ], [tableData]);
-
-    const handleCreatePolicy = (newPolicy) => {
-        setRawPolicies((prev) => [...prev, newPolicy]);
+    const fetchPolicies = async () => {
+        try {
+            setLoading(true);
+            const resp = await observeRequests.fetchNhiPolicies(contextSource);
+            setRawPolicies(Array.isArray(resp) ? resp : []);
+        } catch (err) {
+            console.error("Error fetching NHI policies:", err);
+            setRawPolicies([]);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handlePolicySave = ({ policyName, yaml }) => {
-        const lastModified = "Fenil Shah";
-        const oldName = selectedPolicy.policyName;
+    useEffect(() => { fetchPolicies(); }, []);
 
-        // Persist old→new name remap so violations table/panel can resolve it at render time
-        if (oldName !== policyName) {
-            try {
-                const map = JSON.parse(localStorage.getItem("nhi_policy_name_map") || "{}");
-                // If oldName is itself a renamed version, find the original key
-                const originalKey = Object.entries(map).find(([, v]) => v === oldName)?.[0] ?? oldName;
-                if (originalKey !== policyName) {
-                    map[originalKey] = policyName;
-                } else {
-                    delete map[originalKey]; // renamed back to original — clear the entry
-                }
-                localStorage.setItem("nhi_policy_name_map", JSON.stringify(map));
-            } catch (_) {}
+    const tableData = useMemo(
+        () => rawPolicies.map((p, i) => transformApiPolicy(p, i)),
+        [rawPolicies]
+    );
+
+    // Cross-page navigation: open edit modal for a specific policy
+    useEffect(() => {
+        if (loading || tableData.length === 0) return;
+
+        // From ViolationDetailsPanel "Update Policy"
+        const editName = sessionStorage.getItem("nhi_policy_edit_name");
+        if (editName) {
+            sessionStorage.removeItem("nhi_policy_edit_name");
+            const match = tableData.find((r) => r.policyName === editName);
+            if (match) { openEditModal(match); }
+            return;
         }
 
-        setRawPolicies((prev) =>
-            prev.map((p) =>
-                p.policyName === oldName
-                    ? { ...p, policyName, yaml, lastModified }
-                    : p
-            )
-        );
-        setSelectedPolicy((prev) => ({ ...prev, policyName, yaml, lastModified }));
+        // Legacy: clicking policy name link in violation panel (view mode)
+        const pending = sessionStorage.getItem("nhi_pending_policy");
+        if (pending) {
+            sessionStorage.removeItem("nhi_pending_policy");
+            const match = tableData.find((r) => r.policyName === pending);
+            if (match) { openEditModal(match); }
+        }
+    }, [loading, tableData]);
+
+    const openEditModal = (policy) => {
+        setEditingPolicy(policy);
+        setIsEditMode(true);
+        setShowCreateModal(true);
+    };
+
+    const openCreateModal = () => {
+        setEditingPolicy(null);
+        setIsEditMode(false);
+        setShowCreateModal(true);
+    };
+
+    const handleSavePolicy = async (payload, policyId) => {
+        try {
+            if (policyId) {
+                await observeRequests.updateNhiPolicy(policyId, payload, userEmail);
+            } else {
+                await observeRequests.createNhiPolicy(payload, userEmail);
+            }
+            await fetchPolicies();
+        } catch (err) {
+            console.error("Error saving NHI policy:", err);
+        }
+    };
+
+    const handleDisablePolicy = async (row) => {
+        const policyId = row.hexId || row._id?.$oid;
+        if (!policyId) return;
+        try {
+            await observeRequests.disableNhiPolicy(policyId, userEmail);
+            await fetchPolicies();
+        } catch (err) {
+            console.error("Error disabling NHI policy:", err);
+        }
+    };
+
+    const getActionsList = (item) => {
+        const isActive = item.status === "Active";
+        return [{
+            title: "Actions",
+            items: [
+                {
+                    content: isActive
+                        ? <span style={{ color: "#D72C0D" }}>Disable policy</span>
+                        : <span style={{ color: "#008060" }}>Enable policy</span>,
+                    icon: CancelMinor,
+                    onAction: () => handleDisablePolicy(item),
+                    destructive: isActive,
+                },
+                {
+                    content: "View details",
+                    icon: ViewMinor,
+                    onAction: () => openEditModal(item),
+                },
+            ],
+        }];
     };
 
     const dataByTab = useMemo(() => ({
@@ -310,12 +249,32 @@ export default function PoliciesPage() {
         selectedTab, tabsInfo
     );
 
+    const summaryItems = useMemo(() => [
+        { title: "Total Policies",             data: tableData.length.toLocaleString() },
+        { title: "Total Violations Triggered", data: tableData.reduce((s, r) => s + r.totalViolations, 0).toLocaleString() },
+    ], [tableData]);
+
+    if (loading) return <SpinnerCentered />;
+
+    if (showCreateModal) {
+        const closeModal = () => { setShowCreateModal(false); setEditingPolicy(null); setIsEditMode(false); };
+        return (
+            <CreateNhiPolicyModal
+                onClose={closeModal}
+                onSave={handleSavePolicy}
+                onDisable={isEditMode && editingPolicy ? async () => { await handleDisablePolicy(editingPolicy); closeModal(); } : undefined}
+                editingPolicy={editingPolicy}
+                isEditMode={isEditMode}
+            />
+        );
+    }
+
     return (
         <>
         <PageWithMultipleCards
             title={policiesPageTitle}
             isFirstPage
-            primaryAction={{ content: "Create Policy", onAction: () => setShowCreateModal(true) }}
+            primaryAction={{ content: "Create Policy", onAction: openCreateModal }}
             components={[
                 <SummaryCardInfo key="summary" summaryItems={summaryItems} />,
 
@@ -334,18 +293,12 @@ export default function PoliciesPage() {
                     tableTabs={tableTabs}
                     onSelect={(i) => setSelected(i)}
                     selected={selected}
-                    onRowClick={(r) => { setSelectedPolicy(r); setShowPolicyPanel(true); }}
+                    onRowClick={(r) => openEditModal(r)}
                     rowClickable={true}
-                    promotedBulkActions={(selectedIds) => {
-                        const selectedRows = dataByTab[selectedTab].filter((r) => selectedIds.includes(r.id) || selectedIds.includes(String(r.id)));
-                        const hasActive = selectedRows.length === 0 || selectedRows.some((r) => r.status === "Active");
-                        const hasDraft  = selectedRows.some((r) => r.status === "Draft");
-                        return [
-                            ...(hasActive ? [{ content: "Mark as inactive", onAction: () => {} }] : []),
-                            ...(hasDraft  ? [{ content: "Mark as active",   onAction: () => {} }] : []),
-                            { content: "Delete policy", destructive: true, onAction: () => setShowDeleteModal(true) },
-                        ];
-                    }}
+                    getActions={getActionsList}
+                    promotedBulkActions={() => [
+                        { content: "Delete policy", destructive: true, onAction: () => setShowDeleteModal(true) },
+                    ]}
                 />,
             ]}
         />
@@ -366,16 +319,6 @@ export default function PoliciesPage() {
                 </Text>
             </Modal.Section>
         </Modal>
-        <CreatePolicyModal open={showCreateModal} onClose={() => setShowCreateModal(false)} onCreatePolicy={handleCreatePolicy} />
-        {selectedPolicy && (
-            <PolicyDetailsPanel
-                key={selectedPolicy.id}
-                row={selectedPolicy}
-                show={showPolicyPanel}
-                setShow={setShowPolicyPanel}
-                onSave={handlePolicySave}
-            />
-        )}
         </>
     );
 }

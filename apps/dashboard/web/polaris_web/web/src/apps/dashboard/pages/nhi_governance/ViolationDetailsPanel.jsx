@@ -23,15 +23,11 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
 
     const handleMarkAsFixed = async () => {
         try {
-            if (!userEmail) {
-                console.error("User email not found");
-                return;
-            }
+            if (!userEmail) return;
 
             setMarking(true);
 
-            const result = await observeRequests.markViolationAsFixed(row.id, userEmail);
-            console.log("Mark as fixed result:", result);
+            await observeRequests.markViolationAsFixed(row.id, userEmail);
 
             setMarking(false);
             setActionActive(false);
@@ -71,23 +67,16 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                 jiraMetaData.labels = labels.trim();
             }
         } catch (error) {
-            console.error("Please fill all required fields before creating a Jira ticket.");
             return;
         }
 
         setJiraModalActive(false);
-        // Create Jira ticket from violation
         observeRequests.createJiraTicketFromViolation(row.id, window.location.origin, projId, issueType, jiraMetaData).then((res) => {
-            if (res?.errorMessage) {
-                console.error("Error creating Jira ticket:", res.errorMessage);
-            } else {
-                console.log("Jira ticket created successfully");
+            if (!res?.errorMessage) {
                 setShow(false);
                 window.location.reload();
             }
-        }).catch((err) => {
-            console.error("Error creating Jira ticket:", err);
-        });
+        }).catch(() => {});
     };
 
     // ── TitleComponent ────────────────────────────────────────────────────────
@@ -129,7 +118,19 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                     <ActionList items={[
                         { content: "Open Jira Ticket",  onAction: handleOpenJiraModal },
                         { content: "Mark as Fixed",     onAction: handleMarkAsFixed },
-                        { content: "Update Policy",     onAction: () => setActionActive(false) },
+                        {
+                            content: "Update Policy",
+                            onAction: () => {
+                                setActionActive(false);
+                                const policyName = typeof row.policy === "object"
+                                    ? row.policy.primary
+                                    : row.policy;
+                                if (policyName) {
+                                    sessionStorage.setItem("nhi_policy_edit_name", policyName);
+                                }
+                                window.location.href = "/dashboard/nhi/policies";
+                            },
+                        },
                     ]} />
                 </Popover>
             </HorizontalStack>

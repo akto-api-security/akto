@@ -40,22 +40,10 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
 
     public String fetchNhiIdentities() {
         try {
-            int accountId = Context.accountId.get();
-            loggerMaker.infoAndAddToDb("Fetching NHI identities for account: " + accountId);
-
-            // Build filter based on contextSource if provided
-            Bson filter;
-            if (contextSource != null && !contextSource.isEmpty()) {
-                filter = Filters.eq(NhiIdentity.CONTEXT_SOURCE, contextSource);
-                loggerMaker.infoAndAddToDb("Applied filter for contextSource: " + contextSource);
-            } else {
-                filter = Filters.empty();
-            }
-
-            // Fetch all identities
+            Bson filter = (contextSource != null && !contextSource.isEmpty())
+                    ? Filters.eq(NhiIdentity.CONTEXT_SOURCE, contextSource)
+                    : Filters.empty();
             identities = NhiIdentityDao.instance.findAll(filter);
-            loggerMaker.infoAndAddToDb("Found " + identities.size() + " identities");
-
             return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
@@ -65,58 +53,22 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
         }
     }
 
-    public String fetchNhiIdentityById() {
-        try {
-            int accountId = Context.accountId.get();
-
-            if (identity == null || identity.getId() == null) {
-                loggerMaker.errorAndAddToDb("Identity ID not provided");
-                addActionError("Identity ID is required");
-                return Action.ERROR.toUpperCase();
-            }
-
-            loggerMaker.infoAndAddToDb("Fetching NHI identity by ID: " + identity.getId() + " for account: " + accountId);
-
-            // Fetch identity by ID
-            identity = NhiIdentityDao.instance.findOne(NhiIdentity.ID, identity.getId());
-
-            if (identity == null) {
-                loggerMaker.errorAndAddToDb("Identity not found");
-                addActionError("Identity not found");
-                return Action.ERROR.toUpperCase();
-            }
-
-            return Action.SUCCESS.toUpperCase();
-
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error fetching NHI identity: " + e.getMessage());
-            addActionError(e.getMessage());
-            return Action.ERROR.toUpperCase();
-        }
-    }
-
     public String disableNhiIdentity() {
         try {
-            int accountId = Context.accountId.get();
-            long currentTime = System.currentTimeMillis() / 1000; // Unix timestamp in seconds
+            long currentTime = System.currentTimeMillis() / 1000;
 
             if (identityId == null || identityId.isEmpty()) {
-                loggerMaker.errorAndAddToDb("Identity ID not provided");
                 addActionError("Identity ID is required");
                 success = false;
                 return Action.ERROR.toUpperCase();
             }
 
             if (userEmail == null || userEmail.isEmpty()) {
-                loggerMaker.errorAndAddToDb("User email not provided");
                 addActionError("User email is required");
                 success = false;
                 return Action.ERROR.toUpperCase();
             }
 
-            loggerMaker.infoAndAddToDb("Disabling NHI identity: " + identityId + " by user: " + userEmail);
-
-            // Update identity status to INACTIVE with updatedAt and updatedBy
             Bson filter = Filters.eq(NhiIdentity.ID, new ObjectId(identityId));
             Bson update = Updates.combine(
                 Updates.set(NhiIdentity.STATUS, "INACTIVE"),
@@ -125,7 +77,6 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
             );
 
             NhiIdentityDao.instance.updateOne(filter, update);
-            loggerMaker.infoAndAddToDb("Successfully disabled identity: " + identityId);
 
             success = true;
             return Action.SUCCESS.toUpperCase();

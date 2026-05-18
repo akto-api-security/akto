@@ -13,10 +13,10 @@ import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import values from "@/util/values";
 import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "../../../main/labelHelper";
+import { formatRelativeTime } from "./nhiUtils";
 import IdentityDetailsPanel from "./IdentityDetailsPanel";
 import IdentityOverviewGraph from "./IdentityOverviewGraph";
-import { violationsTableData, IdentityIcon, AgentIcon, ViolationBubbles } from "./nhiViolationsData";
-import { CRITICAL_CURATED, NON_CRITICAL_CURATED, ARGUS_CRITICAL_CURATED, ARGUS_NON_CRITICAL_CURATED, GENERATED } from "./nhiData";
+import { IdentityIcon, AgentIcon, ViolationBubbles } from "./nhiViolationsData";
 import observeRequests from "../observe/api";
 import SpinnerCentered from "../../components/progress/SpinnerCentered";
 
@@ -55,20 +55,6 @@ const buildTableData = (rawRows, violationIndex = {}) =>
             expiryComp:    expiryComp(r.expiryStatus),
         }));
 
-// Helper to convert timestamp (epoch seconds) to relative time string
-const formatRelativeTime = (timestamp) => {
-    if (!timestamp) return "Never";
-    const now = Math.floor(Date.now() / 1000); // Convert to seconds
-    const diff = now - timestamp; // Both in seconds
-    const minutes = Math.floor(diff / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) return `${days}d ago`;
-    if (hours > 0) return `${hours}h ago`;
-    if (minutes > 0) return `${minutes}m ago`;
-    return "Now";
-};
 
 // Helper to format expiry status (expiryDate is epoch seconds)
 const formatExpiryStatus = (expiryDate) => {
@@ -185,7 +171,6 @@ export default function IdentitiesPage() {
                 } else if (Array.isArray(identitiesResponse)) {
                     setRawIdentities([]);
                 } else {
-                    console.warn("API identities response format unexpected, using fallback data");
                     setRawIdentities([]);
                 }
 
@@ -204,10 +189,7 @@ export default function IdentitiesPage() {
             } catch (err) {
                 console.error("Error fetching identities:", err);
                 setError(err.message);
-                const fallbackData = isAgenticSecurityCategory()
-                    ? [...ARGUS_CRITICAL_CURATED, ...ARGUS_NON_CRITICAL_CURATED]
-                    : [...CRITICAL_CURATED, ...NON_CRITICAL_CURATED, ...GENERATED];
-                setRawIdentities(fallbackData);
+                setRawIdentities([]);
             } finally {
                 setLoading(false);
             }
