@@ -343,6 +343,7 @@ public class GuardrailPolicies {
         private boolean strictAllow;
         private ModelRole modelRole;
         private String attackType;
+        private double safeDecisionThreshold;
     }
 
 }
