@@ -1039,7 +1039,7 @@ public class IssuesAction extends UserAction {
         Bson combinedFilter = buildIssueFilter(issueIds);
 
         // Query both collections
-        List<TestingRunResult> vulnerableResults = VulnerableTestingRunResultDao.instance.findAll(
+        List<TestingRunResult> vulnerableResults = VulnerableTestingRunResultDao.instance.findAllWithSummaryContext(
             combinedFilter,
             Projections.include(
                 Constants.ID,
@@ -1050,7 +1050,7 @@ public class IssuesAction extends UserAction {
             )
         );
 
-        List<TestingRunResult> regularResults = TestingRunResultDao.instance.findAll(
+        List<TestingRunResult> regularResults = TestingRunResultDao.instance.findAllWithSummaryContext(
             combinedFilter,
             Projections.include(
                 Constants.ID,
@@ -1101,7 +1101,7 @@ public class IssuesAction extends UserAction {
     private List<TestingRunResult> fetchTestResultsByIds(List<ObjectId> testResultIds) {
         List<TestingRunResult> results = new ArrayList<>();
 
-        List<TestingRunResult> vulnerable = VulnerableTestingRunResultDao.instance.findAll(
+        List<TestingRunResult> vulnerable = VulnerableTestingRunResultDao.instance.findAllWithSummaryContext(
             Filters.in(Constants.ID, testResultIds),
             Projections.include(TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE)
         );
@@ -1109,7 +1109,7 @@ public class IssuesAction extends UserAction {
             results.addAll(vulnerable);
         }
 
-        List<TestingRunResult> regular = TestingRunResultDao.instance.findAll(
+        List<TestingRunResult> regular = TestingRunResultDao.instance.findAllWithSummaryContext(
             Filters.in(Constants.ID, testResultIds),
             Projections.include(TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE)
         );
