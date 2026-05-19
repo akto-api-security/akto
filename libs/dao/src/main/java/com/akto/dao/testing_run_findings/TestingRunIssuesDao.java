@@ -326,7 +326,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
      * Returns Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, matchingSummaryIds) or Filters.empty() if no matches
      */
 
-    private Bson getSummaryIdsFilterForTestRuns(Bson testRunFilter) {
+    private Bson getSummaryIdsFilterForTestRuns(String filterKey, Bson testRunFilter) {
         List<ObjectId> matchingTestRunIds = TestingRunDao.instance.getMCollection().find(testRunFilter)
             .projection(Projections.include(Constants.ID))
             .into(new ArrayList<>())
@@ -350,14 +350,18 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
             return Filters.empty();
         }
 
-        return Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, matchingSummaryIds);
+        return Filters.in(filterKey, matchingSummaryIds);
     }
 
     private Bson getDashboardContextFilterForIssues(CONTEXT_SOURCE contextSource) {
+        return getSummaryIdsFilterForDashboardContext(contextSource, TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID);
+    }
+
+    public Bson getSummaryIdsFilterForDashboardContext(CONTEXT_SOURCE contextSource, String filterKey) {
         if (contextSource == null) {
             return Filters.empty();
         }
-        return getSummaryIdsFilterForTestRuns(Filters.eq(TestingRun.DASHBOARD_CONTEXT, contextSource));
+        return getSummaryIdsFilterForTestRuns(filterKey, Filters.eq(TestingRun.DASHBOARD_CONTEXT, contextSource));
     }
 
     /** Issues linked to test runs with an explicit dashboardContext different from the current dashboard. */
@@ -369,7 +373,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
             Filters.exists(TestingRun.DASHBOARD_CONTEXT, true),
             Filters.ne(TestingRun.DASHBOARD_CONTEXT, contextSource)
         );
-        return getSummaryIdsFilterForTestRuns(otherContextTestRuns);
+        return getSummaryIdsFilterForTestRuns(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, otherContextTestRuns);
     }
 
     /**

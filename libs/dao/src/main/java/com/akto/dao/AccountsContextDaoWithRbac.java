@@ -9,6 +9,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunResultDao;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.DeleteManyModel;
 import com.mongodb.client.model.Filters;
@@ -39,7 +40,7 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
 
     abstract public String getFilterKeyString();
 
-    protected Bson modifyFilters(Bson originalQuery, boolean ignoreGroupFilter){
+    protected Bson modifyFilters(Bson originalQuery, boolean ignoreGroupFilter, boolean ignoreSummaryIdFilter){
         try {
             if ((Context.userId.get() != null || Context.contextSource.get() != null) && Context.accountId.get() != null) {
                 List<Integer> apiCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
@@ -52,6 +53,10 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
                         filters.add(Filters.and(Filters.exists(SingleTypeInfo._COLLECTION_IDS),
                             Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds)));
                     }
+
+                    if(!ignoreSummaryIdFilter){
+                        filters.add(TestingRunResultDao.instance.getSummaryIdFilterWithContextSource());
+                    }
                     
                     Bson rbacFilter = Filters.or(filters);
                     return Filters.and(originalQuery, rbacFilter);
@@ -60,6 +65,10 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
         } catch (Exception e) {
         }
         return originalQuery;
+    }
+
+    protected Bson modifyFilters(Bson originalQuery, boolean ignoreGroupFilter){
+        return modifyFilters(originalQuery, ignoreGroupFilter, true);
     }
 
     protected Bson countRbacFilter(Bson originalQuery){
@@ -74,6 +83,10 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
     public List<T> findAll(Bson q, int skip, int limit, Bson sort, Bson projection) {
         Bson filteredQuery = addRbacFilter(q);
         return super.findAll(filteredQuery, skip, limit, sort, projection);
+    }
+
+    public List<T> findAllNoRbacFilter(Bson q, Bson projection) {
+        return super.findAll(q, 0, 1_000_000, null, projection);
     }
 
     @Override
