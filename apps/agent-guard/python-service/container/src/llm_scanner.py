@@ -18,7 +18,9 @@ from model_map import ModelMapScanner
 from prompts import build_scan_prompt
 from providers import (
     LLMProvider,
+    Qwen3GuardProvider,
     build_provider_from_env,
+    parse_qwen3guard_result,
 )
 
 logger = logging.getLogger(__name__)
@@ -104,18 +106,24 @@ class LLMScanner:
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Return a result dict whose keys match the ScanResponse fields. Raises on hard failure."""
-        prompt = build_scan_prompt(
-            scanner_name, scanner_type, config, text,
-            provider_name=self.provider.name,
-        )
-        if prompt is None:
+        if scanner_name not in LLM_SUPPORTED_SCANNERS:
             raise ValueError(f"Scanner {scanner_name} not supported by LLM path")
 
         start = time.time()
-        raw = self.provider.complete(prompt)
-        elapsed_ms = (time.time() - start) * 1000
+        if isinstance(self.provider, Qwen3GuardProvider):
+            raw, logprobs = self.provider.complete_with_logprobs(text)
+            result = parse_qwen3guard_result(scanner_name, raw, logprobs)
+        else:
+            prompt = build_scan_prompt(
+                scanner_name, scanner_type, config, text,
+                provider_name=self.provider.name,
+            )
+            if prompt is None:
+                raise ValueError(f"Scanner {scanner_name} not supported by LLM path")
+            raw = self.provider.complete(prompt)
+            result = parse_llm_result(scanner_name, raw)
 
-        result = parse_llm_result(scanner_name, raw)
+        elapsed_ms = (time.time() - start) * 1000
         result["details"]["llm_provider"] = self.provider.name
         result["details"]["scanner_type"] = scanner_type
         result["execution_time_ms"] = round(elapsed_ms, 2)
