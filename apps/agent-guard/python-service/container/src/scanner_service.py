@@ -29,7 +29,13 @@ except:
 
 from llm_guard import input_scanners, output_scanners
 from intent_analyzer import IntentAnalysisScanner
-from llm_scanner import init_llm_scanner, is_truthy, LLM_SUPPORTED_SCANNERS, scan_with_model_map
+from constants import DEFAULT_CONFIG
+from llm_scanner import (
+    LLM_SUPPORTED_SCANNERS,
+    init_llm_scanner,
+    is_truthy,
+    scan_with_model_map,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -196,6 +202,10 @@ async def scan_text(request: ScanRequest):
 
     try:
         logger.info(f"Starting scan: scanner={request.scanner_name}, type={request.scanner_type}, text_length={len(request.text)}")
+
+        if not request.config.get("modelConfigs"):
+            request.config = {**DEFAULT_CONFIG, **request.config, "modelConfigs": DEFAULT_CONFIG["modelConfigs"]}
+            logger.info("[Service] modelConfigs missing or empty; applied DEFAULT_CONFIG")
 
         # ── modelMap dispatch (multi-model parallel) ──────────────────
         if (

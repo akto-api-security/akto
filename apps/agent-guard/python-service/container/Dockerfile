@@ -24,6 +24,7 @@ COPY src/intent_analyzer.py .
 COPY src/llm_scanner.py .
 COPY src/model_map.py .
 COPY src/providers.py .
+COPY src/constants.py .
 COPY src/prompts/ ./prompts/
 
 # Create cache directory for HuggingFace models
