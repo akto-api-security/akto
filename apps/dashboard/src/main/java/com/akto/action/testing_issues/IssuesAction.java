@@ -1383,7 +1383,7 @@ public class IssuesAction extends UserAction {
         }
     }
 
-    public String getReportFilters () {
+    public String fetchReportFilters () {
         if(this.generatedReportId == null){
             addActionError("Report id cannot be null");
             return ERROR.toUpperCase();

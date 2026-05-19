@@ -13,7 +13,6 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.ApiCollectionUsers;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.rbac.UsersCollectionsList;
@@ -326,26 +325,19 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
      * Issues are linked via: latestTestingRunSummaryId -> TestingRunResultSummary.testingRunId -> TestingRun.dashboardContext
      * Returns Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, matchingSummaryIds) or Filters.empty() if no matches
      */
-    private Bson getDashboardContextFilterForIssues(CONTEXT_SOURCE contextSource) {
-        // If contextSource is null, return empty filter (no dashboard context filtering)
-        if (contextSource == null) {
-            return Filters.empty();
-        }
-        
-        // Find all test runs with exact matching dashboardContext
-        List<ObjectId> matchingTestRunIds = TestingRunDao.instance.getMCollection().find(
-            Filters.eq(TestingRun.DASHBOARD_CONTEXT, contextSource)
-        ).projection(Projections.include(Constants.ID))
-        .into(new ArrayList<>())
-        .stream()
+
+    private Bson getSummaryIdsFilterForTestRuns(Bson testRunFilter) {
+        List<ObjectId> matchingTestRunIds = TestingRunDao.instance.getMCollection().find(testRunFilter)
+            .projection(Projections.include(Constants.ID))
+            .into(new ArrayList<>())
+            .stream()
             .map(TestingRun::getId)
             .collect(Collectors.toList());
-        
+
         if (matchingTestRunIds.isEmpty()) {
             return Filters.empty();
         }
-        
-        // Find all summaries for those test runs
+
         List<ObjectId> matchingSummaryIds = TestingRunResultSummariesDao.instance.getMCollection().find(
             Filters.in(TestingRunResultSummary.TESTING_RUN_ID, matchingTestRunIds)
         ).projection(Projections.include(Constants.ID))
@@ -353,12 +345,31 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         .stream()
             .map(TestingRunResultSummary::getId)
             .collect(Collectors.toList());
-        
+
         if (matchingSummaryIds.isEmpty()) {
             return Filters.empty();
         }
-        
+
         return Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, matchingSummaryIds);
+    }
+
+    private Bson getDashboardContextFilterForIssues(CONTEXT_SOURCE contextSource) {
+        if (contextSource == null) {
+            return Filters.empty();
+        }
+        return getSummaryIdsFilterForTestRuns(Filters.eq(TestingRun.DASHBOARD_CONTEXT, contextSource));
+    }
+
+    /** Issues linked to test runs with an explicit dashboardContext different from the current dashboard. */
+    private Bson getOtherDashboardContextFilterForIssues(CONTEXT_SOURCE contextSource) {
+        if (contextSource == null) {
+            return Filters.empty();
+        }
+        Bson otherContextTestRuns = Filters.and(
+            Filters.exists(TestingRun.DASHBOARD_CONTEXT, true),
+            Filters.ne(TestingRun.DASHBOARD_CONTEXT, contextSource)
+        );
+        return getSummaryIdsFilterForTestRuns(otherContextTestRuns);
     }
 
     /**
@@ -413,12 +424,18 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         
         // Filter by dashboardContext if contextSource is set (for deleted collections)
         if (contextSource != null && isAdmin) {
-            // Admin: accessible collections OR issues with matching dashboardContext
+            // Admin: accessible collections OR matching dashboardContext.
+            // Exclude collection-scoped issues only when resolvable to a different dashboardContext
+            // (missing/deleted summaries are unchanged and still match accessible collections).
             Bson dashboardContextFilter = getDashboardContextFilterForIssues(contextSource);
+            Bson otherContextIssuesFilter = getOtherDashboardContextFilterForIssues(contextSource);
+            Bson accessibleCollectionsWithContextGuard = otherContextIssuesFilter.equals(Filters.empty())
+                ? accessibleCollectionsFilter
+                : Filters.and(accessibleCollectionsFilter, Filters.not(otherContextIssuesFilter));
             if (dashboardContextFilter.equals(Filters.empty())) {
-                return Filters.and(q, accessibleCollectionsFilter);
+                return Filters.and(q, accessibleCollectionsWithContextGuard);
             }
-            return Filters.and(q, Filters.or(accessibleCollectionsFilter, dashboardContextFilter));
+            return Filters.and(q, Filters.or(accessibleCollectionsWithContextGuard, dashboardContextFilter));
         }
         
         // No contextSource: return accessible collections only
