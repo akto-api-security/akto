@@ -89,9 +89,9 @@ class ModelMapScanner:
     # ── Public entry point ──────────────────────────────────────────────────
 
     def run(self) -> Dict[str, Any]:
-        model_map: list = self.config.get("modelMap", [])
+        model_map: list = self.config.get("modelConfigs", [])
         if not model_map:
-            raise ValueError("ModelMapScanner: empty modelMap")
+            raise ValueError("ModelMapScanner: empty modelConfigs")
 
         # Imported lazily to avoid a circular import (llm_scanner imports us).
         from llm_scanner import LLMScanner
@@ -102,7 +102,7 @@ class ModelMapScanner:
             if provider is not None:
                 scanners.append((LLMScanner(provider), entry))
         if not scanners:
-            raise ValueError("ModelMapScanner: no usable providers in modelMap")
+            raise ValueError("ModelMapScanner: no usable providers in modelConfigs")
 
         start = time.time()
         result = self._run_pipeline(scanners)
@@ -183,14 +183,14 @@ class ModelMapScanner:
             "cascade_decision": f"{winner_stem}_authority" if winner_stem else "no_authority",
         }
 
-        # Per-model summaries: every modelMap entry gets a slot; missing → completed=False.
+        # Per-model summaries: every modelConfigs entry gets a slot; missing → completed=False.
         completed_by_stem: Dict[str, Dict[str, Any]] = {}
         for r in self.completed_all:
             stem = self._stem((r.get("details") or {}).get("llm_provider", ""))
             if stem:
                 completed_by_stem[stem] = r
 
-        for entry in self.config.get("modelMap", []):
+        for entry in self.config.get("modelConfigs", []):
             stem = self._stem(entry.get("provider", ""))
             if not stem:
                 continue
