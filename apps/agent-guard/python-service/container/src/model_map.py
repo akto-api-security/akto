@@ -23,9 +23,7 @@ from providers import build_provider_from_config
 
 logger = logging.getLogger(__name__)
 
-# Risk-score thresholds used to classify a single scan result.
-_DEFAULT_UNSAFE_THRESHOLD = 0.7
-_DEFAULT_SAFE_THRESHOLD = 0.3
+_DEFAULT_SAFE_THRESHOLD = 0.8
 
 # modelRole values
 _ROLE_TIER1 = "FAST_THREAT_FILTER"
@@ -45,23 +43,19 @@ _DEFAULT_ARBITER_TIMEOUT_MS = 10000
 ScannerEntry = Tuple[Any, Dict[str, Any]]
 
 
-def _annotate(result: Dict[str, Any], entry: Dict[str, Any]) -> None:
-    """Stamp provider/role metadata onto a scan result in-place."""
-    result.setdefault("details", {})["provider"] = entry.get("provider", "")
-    result["provider"] = entry.get("provider", "")
-    result["role"] = entry.get("role", "")
+def _classify(result: Dict[str, Any], entry: Dict[str, Any]) -> bool:
+    """Return True if this scan result should count as unsafe, else False.
 
-
-def _classify(result: Dict[str, Any], entry: Dict[str, Any]) -> Optional[bool]:
-    """Return True (unsafe), False (safe), or None (inconclusive) for a scan result."""
-    risk = float(result.get("risk_score", 0.0))
-    unsafe_threshold = float(entry.get("unsafeThreshold") or _DEFAULT_UNSAFE_THRESHOLD)
-    safe_threshold = float(entry.get("safeThreshold") or _DEFAULT_SAFE_THRESHOLD)
-    if risk >= unsafe_threshold:
+    - is_valid=False (model classified the input as unsafe) → unsafe without
+      consulting the threshold.
+    - is_valid=True  (model classified the input as safe)  → unsafe only when
+      decision_confidence >= the entry's safeDecisionThreshold (or _DEFAULT_SAFE_THRESHOLD).
+    """
+    if not result.get("is_valid", True):
         return True
-    if risk <= safe_threshold:
-        return False
-    return None
+    risk = float(result.get("decision_confidence", 0.0))
+    safe_threshold = float(entry.get("safeDecisionThreshold") or _DEFAULT_SAFE_THRESHOLD)
+    return risk >= safe_threshold
 
 
 def _fire_store(store_fn: Optional[Any], completed: List[Dict[str, Any]], scanner_name: str) -> None:
@@ -142,28 +136,80 @@ class ModelMapScanner:
 
         t1_verdict = self._collect_majority(t1_futures, label=_ROLE_TIER1)
 
-        if t1_verdict["majority"] == _UNSAFE:
+        if t1_verdict["majority"] == _UNSAFE or t1_verdict["majority"] == _INCONCLUSIVE:
             logger.info(f"[ModelMap] {_ROLE_TIER1} majority=UNSAFE → escalating, skipping {_ROLE_TIER2}")
-            return self._run_arbiters(arbiters)
+            winner = self._run_arbiters(arbiters)
+        else:
+            # tier1 majority SAFE → consult tier2
+            logger.info(f"[ModelMap] {_ROLE_TIER1} majority=SAFE → waiting for {_ROLE_TIER2}")
+            t2_verdict = self._collect_majority(t2_futures, label=_ROLE_TIER2)
 
-        if t1_verdict["majority"] == _INCONCLUSIVE:
-            logger.info(f"[ModelMap] {_ROLE_TIER1} all inconclusive → escalating, skipping {_ROLE_TIER2}")
-            return self._run_arbiters(arbiters)
+            if t2_verdict["majority"] == _UNSAFE:
+                logger.info(f"[ModelMap] {_ROLE_TIER2} majority=UNSAFE → escalating to {_ROLE_ARBITER}")
+                winner = self._run_arbiters(arbiters)
+            else:
+                # tier2 SAFE or INCONCLUSIVE → allow without invoking arbiter
+                logger.info(f"[ModelMap] {_ROLE_TIER2} majority={t2_verdict['majority']} → returning SAFE")
+                source = t2_verdict["completed"] or t1_verdict["completed"]
+                best_safe = max(source, key=lambda r: r["risk_score"])
+                best_safe["is_valid"] = True
+                winner = best_safe
 
-        # tier1 majority SAFE → consult tier2
-        logger.info(f"[ModelMap] {_ROLE_TIER1} majority=SAFE → waiting for {_ROLE_TIER2}")
-        t2_verdict = self._collect_majority(t2_futures, label=_ROLE_TIER2)
+        return self._shape_result(winner)
 
-        if t2_verdict["majority"] == _UNSAFE:
-            logger.info(f"[ModelMap] {_ROLE_TIER2} majority=UNSAFE → escalating to {_ROLE_ARBITER}")
-            return self._run_arbiters(arbiters)
+    # ── Result shaping ──────────────────────────────────────────────────────
 
-        # tier2 SAFE or INCONCLUSIVE → allow without invoking arbiter
-        logger.info(f"[ModelMap] {_ROLE_TIER2} majority={t2_verdict['majority']} → returning SAFE")
-        source = t2_verdict["completed"] or t1_verdict["completed"]
-        best_safe = max(source, key=lambda r: r["risk_score"])
-        best_safe["is_valid"] = True
-        return best_safe
+    @staticmethod
+    def _stem(provider_name: str) -> str:
+        """Short stem for grouping per-model details: 'gemma_vertexai' → 'gemma'."""
+        n = (provider_name or "").lower()
+        if not n:
+            return ""
+        if n.startswith("gemma"):
+            return "gemma"
+        if n.startswith("qwen"):
+            return "qwen"
+        return n.split("_")[0]
+
+    def _shape_result(self, winner: Dict[str, Any]) -> Dict[str, Any]:
+        """Aggregate completed_all + winner into the response shape callers expect."""
+        winner_details = winner.get("details") or {}
+        winner_stem = self._stem(winner_details.get("llm_provider", ""))
+
+        details: Dict[str, Any] = {
+            "reason": winner_details.get("reason", ""),
+            "llm_provider": winner_details.get("llm_provider", ""),
+            "scanner_type": self.scanner_type,
+            "cascade_decision": f"{winner_stem}_authority" if winner_stem else "no_authority",
+        }
+
+        # Per-model summaries: every modelMap entry gets a slot; missing → completed=False.
+        completed_by_stem: Dict[str, Dict[str, Any]] = {}
+        for r in self.completed_all:
+            stem = self._stem((r.get("details") or {}).get("llm_provider", ""))
+            if stem:
+                completed_by_stem[stem] = r
+
+        for entry in self.config.get("modelMap", []):
+            stem = self._stem(entry.get("provider", ""))
+            if not stem:
+                continue
+            r = completed_by_stem.get(stem)
+            if r is not None:
+                details[stem] = {
+                    "completed": True,
+                    "is_valid": r.get("is_valid"),
+                    "risk_score": r.get("risk_score"),
+                    "decision_confidence": r.get("decision_confidence"),
+                }
+            else:
+                details.setdefault(stem, {"completed": False})
+
+        return {
+            "is_valid": winner.get("is_valid", True),
+            "risk_score": float(winner.get("risk_score", 0.0)),
+            "details": details,
+        }
 
     # ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -190,7 +236,6 @@ class ModelMapScanner:
             timeout_s = (entry.get("timeoutMs") or _DEFAULT_TIER_TIMEOUT_MS) / 1000.0
             try:
                 result = future.result(timeout=timeout_s)
-                _annotate(result, entry)
                 completed.append(result)
                 decision = _classify(result, entry)
                 if decision is True:
@@ -205,7 +250,7 @@ class ModelMapScanner:
 
         total = len(future_map)
         majority = (
-            _UNSAFE if unsafe > total / 2
+            _UNSAFE if unsafe >= total / 2
             else _SAFE if safe > total / 2
             else _INCONCLUSIVE
         )
@@ -238,7 +283,6 @@ class ModelMapScanner:
             timeout_s = (entry.get("timeoutMs") or _DEFAULT_ARBITER_TIMEOUT_MS) / 1000.0
             try:
                 result = future.result(timeout=timeout_s)
-                _annotate(result, entry)
                 completed.append(result)
                 completed_entries.append(entry)
             except Exception as exc:
@@ -259,16 +303,7 @@ class ModelMapScanner:
         if unsafe_results:
             winner = max(unsafe_results, key=lambda r: r["risk_score"])
             winner["is_valid"] = False
-            logger.info(
-                f"[ModelMap] {_ROLE_ARBITER} any-unsafe=BLOCK "
-                f"unsafe_count={len(unsafe_results)}/{len(completed)} "
-                f"winner='{winner.get('provider')}' risk={winner['risk_score']:.2f}"
-            )
         else:
             winner = max(completed, key=lambda r: r["risk_score"])
             winner["is_valid"] = True
-            logger.info(
-                f"[ModelMap] {_ROLE_ARBITER} all-safe=ALLOW "
-                f"winner='{winner.get('provider')}' risk={winner['risk_score']:.2f}"
-            )
         return winner

@@ -8,9 +8,10 @@ Each provider exposes:
 import base64
 import json
 import logging
+import math
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import google.auth.transport.requests
 import httpx
@@ -176,6 +177,172 @@ class GemmaVertexProvider(VertexAIProvider):
     _log_tag = "[LLMScanner/GemmaVertex]"
 
 
+class Qwen3GuardProvider(VertexAIProvider):
+    """Vertex AI provider for Qwen3Guard — a specialised guard classifier that
+    emits `Safety: Safe|Unsafe|Controversial` plus `Categories: …` and exposes a
+    real probability distribution via the first-token top_logprobs.
+
+    Unlike chat LLMs, Qwen3Guard ignores prompt-format instructions, so callers
+    must pass raw user text (no JSON wrapper) and use `complete_with_logprobs`
+    to get back the logprob payload needed for confidence scoring.
+    """
+
+    name = "qwen3guard"
+    _log_tag = "[LLMScanner/Qwen3Guard]"
+
+    def complete(self, prompt: str) -> str:
+        # Satisfy the LLMProvider abstract contract; logprob-aware callers
+        # should use complete_with_logprobs() directly.
+        content, _ = self.complete_with_logprobs(prompt, top_logprobs=0)
+        return content
+
+    def complete_with_logprobs(
+        self, text: str, top_logprobs: int = 5, temperature: float = 0.0
+    ) -> Tuple[str, Optional[list]]:
+        if not self.credentials.valid:
+            self.credentials.refresh(google.auth.transport.requests.Request())
+        instance: Dict[str, Any] = {
+            "@requestFormat": "chatCompletions",
+            "messages": [{"role": "user", "content": text}],
+            "max_tokens": 64,
+            "temperature": temperature,
+        }
+        if top_logprobs > 0:
+            instance["logprobs"] = True
+            instance["top_logprobs"] = top_logprobs
+        resp = self._client.post(
+            self._predict_url(),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.credentials.token}",
+            },
+            json={"instances": [instance]},
+        )
+        resp.raise_for_status()
+        choice = resp.json()["predictions"]["choices"][0]
+        content = choice["message"]["content"]
+        lp = (choice.get("logprobs") or {}).get("content")
+        return content, lp
+
+
+# ── Qwen3Guard parser ────────────────────────────────────────────────────────
+
+
+def _confidence_from_logprobs(
+    content_lp: Optional[list], chosen_label: str
+) -> Tuple[Optional[float], Optional[Dict[str, float]], str]:
+    """Distribution over {safe, unsafe, controversial} from the safety-label
+    token's top_logprobs. Ported from qwen_prompt_injection_bench/qwen_guard.py.
+
+    Returns (confidence_in_chosen_label, distribution, source). `source` is
+    "logprobs" on success, otherwise a fallback reason string.
+    """
+    if not content_lp:
+        return None, None, "unavailable"
+    text = ""
+    label_idx = None
+    for i, tok in enumerate(content_lp):
+        before = text.lower()
+        text += tok.get("token", "")
+        if "safety:" not in text.lower():
+            continue
+        if "safety:" in before:
+            if tok.get("token", "").strip():
+                label_idx = i
+                break
+        elif text.lower().split("safety:", 1)[1].strip():
+            label_idx = i
+            break
+    if label_idx is None:
+        return None, None, "no-safety-token"
+    entry = content_lp[label_idx]
+    pool: List[Dict[str, Any]] = list(entry.get("top_logprobs") or [])
+    if entry.get("token") is not None and entry.get("logprob") is not None:
+        pool.append({"token": entry["token"], "logprob": entry["logprob"]})
+    if not pool:
+        return None, None, "no-top-logprobs"
+    labels = ("safe", "unsafe", "controversial")
+    agg = {label: 0.0 for label in labels}
+    mapped = False
+    for cand in pool:
+        ct = cand.get("token", "").strip().lower()
+        if "safety:" in ct:
+            ct = ct.split("safety:")[-1].strip()
+        ct = ct.lstrip(":").strip().strip("\"'")
+        if not ct:
+            continue
+        for label in labels:
+            if label.startswith(ct) or ct.startswith(label):
+                try:
+                    agg[label] += math.exp(cand["logprob"])
+                    mapped = True
+                except (KeyError, TypeError, OverflowError):
+                    pass
+                break
+    total = sum(agg.values())
+    if not mapped or total <= 0:
+        return None, None, "unmapped"
+    dist = {label: round(v / total, 4) for label, v in agg.items()}
+    return dist.get((chosen_label or "").lower()), dist, "logprobs"
+
+
+def parse_qwen3guard_result(
+    scanner_name: str, raw: str, logprobs_content: Optional[list] = None
+) -> Dict[str, Any]:
+    """Parse Qwen3Guard output (Safety:/Categories: format) into the same
+    uniform shape as parse_llm_result. risk_score = p(unsafe ∪ controversial)."""
+    if not raw:
+        raise ValueError("empty Qwen3Guard response")
+    safety = ""
+    categories = ""
+    for line in raw.strip().splitlines():
+        if ":" not in line:
+            continue
+        key, _, val = line.partition(":")
+        key, val = key.strip().lower(), val.strip()
+        if key == "safety":
+            safety = val
+        elif key in ("categories", "category"):
+            categories = val
+    if not safety:
+        raise ValueError(f"no Safety line in Qwen3Guard response: {raw[:200]!r}")
+    s = safety.lower()
+    if s == "unsafe":
+        is_valid, discrete_risk = False, 1.0
+    elif s == "controversial":
+        is_valid, discrete_risk = False, 0.5
+    elif s == "safe":
+        is_valid, discrete_risk = True, 0.0
+    else:
+        raise ValueError(f"unknown Safety value: {safety!r}")
+
+    conf, dist, source = _confidence_from_logprobs(logprobs_content, s)
+    if dist is not None:
+        risk_score = round(dist["unsafe"] + dist["controversial"], 4)
+        decision_confidence = float(conf) if conf is not None else (1.0 - risk_score if is_valid else risk_score)
+    else:
+        risk_score = discrete_risk
+        decision_confidence = 1.0  # discrete label has no calibrated confidence; trust it fully
+
+    details: Dict[str, Any] = {
+        "safety": safety,
+        "confidence_source": source,
+    }
+    if categories and categories.lower() != "none":
+        details["categories"] = categories
+        if scanner_name == "BanTopics":
+            details["matchedTopic"] = categories
+    if dist is not None:
+        details["prob_distribution"] = dist
+
+    return {
+        "is_valid": is_valid,
+        "risk_score": risk_score,
+        "decision_confidence": decision_confidence,
+        "details": details,
+    }
+
+
 def _require_env(values: dict, label: str) -> Optional[dict]:
     """Return the dict if every value is truthy, else log + return None."""
     missing = [k for k, v in values.items() if not v]
@@ -247,6 +414,27 @@ def _build_gemma_vertexai() -> Optional[LLMProvider]:
     )
 
 
+def _build_qwen3guard() -> Optional[LLMProvider]:
+    env = _require_env(
+        {
+            "QWEN3GUARD_SA_KEY_JSON": os.getenv("QWEN3GUARD_SA_KEY_JSON", ""),
+            "QWEN3GUARD_PROJECT": os.getenv("QWEN3GUARD_PROJECT", ""),
+            "QWEN3GUARD_LOCATION": os.getenv("QWEN3GUARD_LOCATION", ""),
+            "QWEN3GUARD_ENDPOINT_ID": os.getenv("QWEN3GUARD_ENDPOINT_ID", ""),
+        },
+        label="[Providers] qwen3guard",
+    )
+    if env is None:
+        return None
+    return Qwen3GuardProvider(
+        env["QWEN3GUARD_SA_KEY_JSON"],
+        env["QWEN3GUARD_PROJECT"],
+        env["QWEN3GUARD_LOCATION"],
+        env["QWEN3GUARD_ENDPOINT_ID"],
+        dedicated_dns=os.getenv("QWEN3GUARD_DEDICATED_DNS", ""),
+    )
+
+
 def build_provider_from_env(provider_name: str, model: str = "") -> Optional[LLMProvider]:
     """Build a provider using *only* env vars. Used by the SCANNER_LLM_PROVIDER path."""
     provider_name = provider_name.strip().lower()
@@ -278,6 +466,8 @@ def build_provider_from_config(entry: Dict[str, Any]) -> Optional[LLMProvider]:
         return _build_vertexai()
     if provider_name == "gemma_vertexai":
         return _build_gemma_vertexai()
+    if provider_name == "qwen3guard":
+        return _build_qwen3guard()
 
     logger.warning(f"[ModelMap] Unknown provider '{provider_name}'; skipping entry")
     return None
