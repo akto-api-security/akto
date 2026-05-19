@@ -18,7 +18,6 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
 
 public class VulnerableTestingRunResultDao extends TestingRunResultDao {
 
