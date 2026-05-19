@@ -26,6 +26,7 @@ COPY src/model_map.py .
 COPY src/providers.py .
 COPY src/constants.py .
 COPY src/settings.py .
+COPY src/slack_alerter.py .
 COPY src/prompts/ ./prompts/
 
 # Create cache directory for HuggingFace models
