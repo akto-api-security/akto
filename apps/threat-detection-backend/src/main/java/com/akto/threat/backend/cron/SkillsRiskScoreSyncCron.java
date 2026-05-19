@@ -54,11 +54,11 @@ public class SkillsRiskScoreSyncCron {
                     public void accept(Account t) {
                         try {
                             int accountId = t.getId();
-                            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "ENDPOINT_SECURITY");
-                            if (featureAccess == null || !featureAccess.getIsGranted()) {
-                                loggerMaker.debugAndAddToDb("ENDPOINT_SECURITY feature not granted for account " + accountId + ", skipping skills risk score sync");
-                                return;
-                            }
+                            // FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "THREAT_DETECTION");
+                            // if (featureAccess == null || !featureAccess.getIsGranted()) {
+                            //     loggerMaker.debugAndAddToDb("THREAT_DETECTION feature not granted for account " + accountId + ", skipping skills risk score sync");
+                            //     return;
+                            // }
                             int startTimestamp = Context.now();
                             loggerMaker.debugAndAddToDb("Skills risk score sync cron started for account " + accountId + " at " + startTimestamp);
 
