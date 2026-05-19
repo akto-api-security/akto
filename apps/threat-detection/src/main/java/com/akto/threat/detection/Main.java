@@ -1,5 +1,6 @@
 package com.akto.threat.detection;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -51,6 +52,8 @@ import com.akto.dto.billing.Organization;
 public class Main {
 
   private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
+  private static final List<String> KAFKA_NUMERIC_METRICS = Arrays.asList(
+      "records-lag-max", "records-consumed-rate", "fetch-latency-avg", "bytes-consumed-rate");
   private static final LoggerMaker logger = new LoggerMaker(Main.class, LogDb.THREAT_DETECTION);
   private static boolean aggregationRulesEnabled = System.getenv().getOrDefault("AGGREGATION_RULES_ENABLED", "true").equals("true");
 
@@ -249,6 +252,10 @@ public class Main {
           Metric value = entry.getValue();
 
           if (key.tags().containsKey("partition") || key.tags().containsKey("topic")) {
+            continue;
+          }
+
+          if (!KAFKA_NUMERIC_METRICS.contains(key.name())) {
             continue;
           }
 
