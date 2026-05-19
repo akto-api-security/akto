@@ -67,8 +67,15 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
     private final Set<String> createdCollectionIds = ConcurrentHashMap.newKeySet();
 
     public static final List<String> APPS_TOOL_LIST = Arrays.asList(
-        "Claude", "Cursor", "Copilot", "Windsurf", "Antigravity", "Codex", "Ollama, VSCode"
+        "Claude", "Cursor", "Copilot", "Windsurf", "Antigravity", "Codex", "Ollama", "VSCode"
     );
+
+    // CLI tool names to match against process command lines (mirrors SentinelOne DV_TOOL_LIST)
+    public static final List<String> PROCESS_TOOL_LIST = Arrays.asList(
+        "openclaw", "clawdbot", "moltbot", "gateway", "claude", "gemini", "ollama", "cursor"
+    );
+
+    private static final int PROCESS_LOOKBACK_HOURS = 6;
 
     private CrowdStrikeExecutor() {}
 
@@ -108,7 +115,14 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
             loggerMaker.error("CrowdStrike software inventory phase failed for jobId=" + job.getId() + ": " + e.getMessage(), LogDb.DASHBOARD);
         }
 
-        // Phase 2: MCP config + skills discovery via RTR
+        // Phase 2: Process events via Falcon Event Streams
+        try {
+            runProcessEventsPhase(accessToken, baseUrl, ingestUrl, job);
+        } catch (Exception e) {
+            loggerMaker.error("CrowdStrike process events phase failed for jobId=" + job.getId() + ": " + e.getMessage(), LogDb.DASHBOARD);
+        }
+
+        // Phase 3: MCP config + skills discovery via RTR
         try {
             discoverMCPConfigsAndSkills(accessToken, baseUrl, ingestUrl, job);
         } catch (Exception e) {
@@ -390,6 +404,225 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                 deleteRtrSession(accessToken, baseUrl, sessionId);
             }
         }
+    }
+
+    // ── Phase 2: Process events via Falcon Event Streams ─────────────────────
+
+    /**
+     * Uses Falcon Event Streams API to get a short-lived stream URL, then fetches
+     * ProcessRollup2 events and filters for AI CLI tool executions.
+     * Falls back gracefully if Event Streams is not licensed.
+     */
+    @SuppressWarnings("unchecked")
+    private void runProcessEventsPhase(String accessToken, String baseUrl, String ingestUrl, AccountJob job) throws IOException {
+        loggerMaker.info("CrowdStrike: starting process events phase for jobId=" + job.getId(), LogDb.DASHBOARD);
+
+        List<Map<String, Object>> events = fetchProcessEvents(accessToken, baseUrl);
+        if (events.isEmpty()) {
+            loggerMaker.info("CrowdStrike: no process events returned", LogDb.DASHBOARD);
+            return;
+        }
+
+        Map<String, List<Map<String, Object>>> eventsByTool = groupProcessEventsByTool(events, PROCESS_TOOL_LIST);
+        for (Map.Entry<String, List<Map<String, Object>>> entry : eventsByTool.entrySet()) {
+            String tool = entry.getKey();
+            List<Map<String, Object>> toolEvents = entry.getValue();
+            if (!toolEvents.isEmpty()) {
+                ingestProcessEvents(toolEvents, tool, ingestUrl);
+            }
+        }
+    }
+
+    /**
+     * Opens a Falcon Event Streams feed, reads up to PROCESS_LOOKBACK_HOURS worth of
+     * ProcessRollup2 events, then closes the partition. Returns raw event maps.
+     */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> fetchProcessEvents(String accessToken, String baseUrl) throws IOException {
+        RequestConfig cfg = buildRequestConfig();
+        List<Map<String, Object>> results = new ArrayList<>();
+
+        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+            // Step 1: discover available partitions
+            HttpGet discover = new HttpGet(baseUrl + "/sensors/entities/datafeed/v2?appId=akto-process-scan");
+            discover.setHeader("Authorization", "Bearer " + accessToken);
+            discover.setHeader("Accept", "application/json");
+
+            String feedUrl;
+            String sessionToken;
+            try (CloseableHttpResponse resp = client.execute(discover)) {
+                int status = resp.getStatusLine().getStatusCode();
+                String body = EntityUtils.toString(resp.getEntity());
+                if (status == 404 || status == 403) {
+                    loggerMaker.info("CrowdStrike: Event Streams not available (HTTP " + status + ") — skipping process events phase", LogDb.DASHBOARD);
+                    return results;
+                }
+                if (status != 200) {
+                    loggerMaker.error("CrowdStrike: Event Streams discover failed HTTP " + status + ": " + body, LogDb.DASHBOARD);
+                    return results;
+                }
+                JsonNode json = OBJECT_MAPPER.readTree(body);
+                JsonNode resources = json.path("resources");
+                if (!resources.isArray() || resources.size() == 0) {
+                    loggerMaker.info("CrowdStrike: no Event Stream partitions available", LogDb.DASHBOARD);
+                    return results;
+                }
+                JsonNode partition = resources.get(0);
+                feedUrl = partition.path("dataFeedURL").asText(null);
+                sessionToken = partition.path("sessionToken").path("token").asText(null);
+                if (feedUrl == null || feedUrl.isEmpty()) {
+                    loggerMaker.info("CrowdStrike: no dataFeedURL in Event Streams response", LogDb.DASHBOARD);
+                    return results;
+                }
+            }
+
+            // Step 2: read events from the stream (bounded by time window)
+            long cutoffMs = System.currentTimeMillis() - (PROCESS_LOOKBACK_HOURS * 3600L * 1000L);
+            HttpGet streamGet = new HttpGet(feedUrl);
+            streamGet.setHeader("Authorization", "Bearer " + accessToken);
+            if (sessionToken != null && !sessionToken.isEmpty()) {
+                streamGet.setHeader("X-CS-Session-Token", sessionToken);
+            }
+            streamGet.setHeader("Accept", "application/json");
+
+            try (CloseableHttpResponse resp = client.execute(streamGet)) {
+                int status = resp.getStatusLine().getStatusCode();
+                if (status != 200) {
+                    loggerMaker.error("CrowdStrike: Event Stream read failed HTTP " + status, LogDb.DASHBOARD);
+                    return results;
+                }
+                java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(resp.getEntity().getContent(), java.nio.charset.StandardCharsets.UTF_8));
+                String line;
+                int linesRead = 0;
+                while ((line = reader.readLine()) != null && linesRead < 10000) {
+                    line = line.trim();
+                    if (line.isEmpty()) continue;
+                    try {
+                        JsonNode event = OBJECT_MAPPER.readTree(line);
+                        // Only keep ProcessRollup2 events
+                        String eventType = event.path("metadata").path("eventType").asText(
+                            event.path("event_type").asText(""));
+                        if (!"ProcessRollup2".equals(eventType)) { linesRead++; continue; }
+                        // Drop events outside our lookback window
+                        long eventTs = event.path("metadata").path("eventCreationTime").asLong(0);
+                        if (eventTs == 0) eventTs = event.path("timestamp").asLong(0);
+                        if (eventTs > 0 && eventTs < cutoffMs) { linesRead++; continue; }
+                        results.add(OBJECT_MAPPER.convertValue(event, Map.class));
+                    } catch (Exception ignored) {}
+                    linesRead++;
+                }
+            }
+        }
+
+        loggerMaker.info("CrowdStrike: fetched " + results.size() + " ProcessRollup2 event(s) from Event Streams", LogDb.DASHBOARD);
+        return results;
+    }
+
+    private static Map<String, List<Map<String, Object>>> groupProcessEventsByTool(
+            List<Map<String, Object>> events, List<String> tools) {
+        Map<String, List<Map<String, Object>>> result = new HashMap<>();
+        for (String tool : tools) result.put(tool, new ArrayList<>());
+
+        for (Map<String, Object> event : events) {
+            // CrowdStrike ProcessRollup2 fields
+            Object cmdObj = event.get("CommandLine");
+            if (cmdObj == null) {
+                // nested under event.event
+                Object nested = event.get("event");
+                if (nested instanceof Map) {
+                    cmdObj = ((Map<?, ?>) nested).get("CommandLine");
+                }
+            }
+            String cmdLine = cmdObj != null ? cmdObj.toString().toLowerCase() : "";
+
+            Object nameObj = event.get("FileName");
+            if (nameObj == null) {
+                Object nested = event.get("event");
+                if (nested instanceof Map) nameObj = ((Map<?, ?>) nested).get("FileName");
+            }
+            String fileName = nameObj != null ? nameObj.toString().toLowerCase() : "";
+
+            for (String tool : tools) {
+                String t = tool.toLowerCase();
+                if (cmdLine.contains(t) || fileName.contains(t)) {
+                    result.get(tool).add(event);
+                    break;
+                }
+            }
+        }
+        return result;
+    }
+
+    private void ingestProcessEvents(List<Map<String, Object>> events, String tool, String ingestUrl) throws IOException {
+        List<Map<String, Object>> batch = new ArrayList<>();
+        for (Map<String, Object> event : events) {
+            batch.add(toProcessEventIngestionRecord(event, tool));
+        }
+        if (!batch.isEmpty()) {
+            sendBatch(batch, ingestUrl);
+            loggerMaker.info("CrowdStrike: ingested " + batch.size() + " process event(s) for tool=" + tool, LogDb.DASHBOARD);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> toProcessEventIngestionRecord(Map<String, Object> event, String tool) throws IOException {
+        // Unwrap nested event object if present (Event Streams wraps payload under "event")
+        Map<String, Object> payload = event;
+        Object nested = event.get("event");
+        if (nested instanceof Map) {
+            payload = (Map<String, Object>) nested;
+        }
+
+        String deviceName = getStringOrDefault(payload, "ComputerName", null);
+        if (deviceName == null) deviceName = getStringOrDefault(event, "ComputerName", null);
+        if (deviceName == null) deviceName = getStringOrDefault(payload, "HostName", "unknown-device");
+        String pathSeg = deviceName.replaceAll("[^a-zA-Z0-9_\\-]+", "-");
+        String hostName = deviceName + "." + tool;
+
+        Map<String, Object> record = new HashMap<>();
+        record.put("path", "/crowdstrike/process-events/" + pathSeg);
+        record.put("method", "GET");
+        record.put("statusCode", "200");
+        record.put("type", "HTTP/1.1");
+        record.put("status", "OK");
+        record.put("requestPayload", "{}");
+        record.put("responsePayload", OBJECT_MAPPER.writeValueAsString(event));
+
+        Map<String, String> reqH = new HashMap<>();
+        reqH.put("host", hostName);
+        reqH.put("content-type", "application/json");
+        record.put("requestHeaders", OBJECT_MAPPER.writeValueAsString(reqH));
+        record.put("responseHeaders", OBJECT_MAPPER.writeValueAsString(new HashMap<String, String>()));
+
+        Object ts = event.get("timestamp");
+        if (ts == null) {
+            Object meta = event.get("metadata");
+            if (meta instanceof Map) ts = ((Map<?, ?>) meta).get("eventCreationTime");
+        }
+        record.put("time", ts != null ? ts.toString() : String.valueOf(System.currentTimeMillis()));
+
+        record.put("source", "MIRRORING");
+        record.put("akto_account_id", String.valueOf(com.akto.dao.context.Context.accountId.get()));
+        record.put("akto_vxlan_id", "");
+        record.put("is_pending", "false");
+        record.put("ip", "");
+        record.put("destIp", "");
+        record.put("direction", "");
+        record.put("process_id", "");
+        record.put("socket_id", "");
+        record.put("daemonset_id", "");
+        record.put("enabled_graph", "false");
+
+        Map<String, String> tags = new HashMap<>();
+        tags.put("gen-ai", "Gen AI");
+        tags.put("source", "ENDPOINT");
+        tags.put("connector", "CROWDSTRIKE");
+        tags.put("ai-agent", tool);
+        tags.put("bot-name", deviceName);
+        record.put("tag", OBJECT_MAPPER.writeValueAsString(tags));
+
+        return record;
     }
 
     // ── RTR helpers ───────────────────────────────────────────────────────────
