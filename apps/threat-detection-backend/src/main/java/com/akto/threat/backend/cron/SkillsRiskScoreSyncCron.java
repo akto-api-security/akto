@@ -125,7 +125,7 @@ public class SkillsRiskScoreSyncCron {
 
                                 Integer collectionId = hostToCollectionId.get(host);
                                 if (collectionId == null) {
-                                    loggerMaker.debugAndAddToDb("No collection found for host: " + host);
+                                    loggerMaker.warnAndAddToDb("No collection found for host: " + host);
                                     continue;
                                 }
 
