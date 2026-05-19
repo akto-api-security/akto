@@ -119,47 +119,65 @@ class ModelMapScanner:
         tier2 = [se for se in scanners if se[1].get("modelRole") == _ROLE_TIER2]
         arbiters = [se for se in scanners if se[1].get("modelRole") == _ROLE_ARBITER]
 
-        # When parallelExecution=true, arbiter futures are also fired upfront so
-        # the cascade can consult them without paying the serial-escalation cost.
-        # Unused futures (e.g. when tier1 SAFE + tier2 SAFE) finish in the
-        # background and their results are discarded.
-        eager_arbiters = bool(self.config.get("parallelExecution", False)) and bool(arbiters)
-        worker_count = len(tier1) + len(tier2) + (len(arbiters) if eager_arbiters else 0)
+        t1_futures, t2_futures, arb_futures = self._submit_tiers(tier1, tier2, arbiters)
+        winner = self._cascade(t1_futures, t2_futures, arbiters, arb_futures)
+        return self._shape_result(winner)
+
+    def _submit_tiers(
+        self,
+        tier1: List[ScannerEntry],
+        tier2: List[ScannerEntry],
+        arbiters: List[ScannerEntry],
+    ) -> Tuple[
+        Dict[concurrent.futures.Future, Dict[str, Any]],
+        Dict[concurrent.futures.Future, Dict[str, Any]],
+        Optional[Dict[concurrent.futures.Future, Dict[str, Any]]],
+    ]:
+        """Fire tier1 + tier2 in one executor. When parallelExecution=true,
+        arbiters are submitted alongside so the cascade can consult them
+        without paying the serial-escalation cost. Unused futures finish in
+        the background and their results are discarded."""
+        eager = bool(self.config.get("parallelExecution", False)) and bool(arbiters)
+        worker_count = max(1, len(tier1) + len(tier2) + (len(arbiters) if eager else 0))
 
         executor = concurrent.futures.ThreadPoolExecutor(
-            max_workers=max(1, worker_count),
+            max_workers=worker_count,
             thread_name_prefix="modelmap",
         )
         t1_futures = self._submit(executor, tier1)
         t2_futures = self._submit(executor, tier2)
-        arb_futures = self._submit(executor, arbiters) if eager_arbiters else None
+        arb_futures = self._submit(executor, arbiters) if eager else None
         executor.shutdown(wait=False)
 
-        if eager_arbiters:
+        if eager:
             logger.info(f"[ModelMap] parallelExecution=true → {_ROLE_ARBITER} fired alongside tier1/tier2")
+        return t1_futures, t2_futures, arb_futures
 
-        t1_verdict = self._collect_majority(t1_futures, label=_ROLE_TIER1)
+    def _cascade(
+        self,
+        t1_futures: Dict[concurrent.futures.Future, Dict[str, Any]],
+        t2_futures: Dict[concurrent.futures.Future, Dict[str, Any]],
+        arbiters: List[ScannerEntry],
+        arb_futures: Optional[Dict[concurrent.futures.Future, Dict[str, Any]]],
+    ) -> Dict[str, Any]:
+        """Walk the verdict cascade and return the winning result dict."""
+        t1 = self._collect_majority(t1_futures, label=_ROLE_TIER1)
 
-        if t1_verdict["majority"] == _UNSAFE or t1_verdict["majority"] == _INCONCLUSIVE:
-            logger.info(f"[ModelMap] {_ROLE_TIER1} majority=UNSAFE → escalating, skipping {_ROLE_TIER2}")
-            winner = self._run_arbiters(arbiters, pre_submitted=arb_futures)
-        else:
-            # tier1 majority SAFE → consult tier2
-            logger.info(f"[ModelMap] {_ROLE_TIER1} majority=SAFE → waiting for {_ROLE_TIER2}")
-            t2_verdict = self._collect_majority(t2_futures, label=_ROLE_TIER2)
+        if t1["majority"] != _SAFE:
+            logger.info(f"[ModelMap] {_ROLE_TIER1} majority={t1['majority']} → escalating to {_ROLE_ARBITER}, skipping {_ROLE_TIER2}")
+            return self._run_arbiters(arbiters, pre_submitted=arb_futures)
 
-            if t2_verdict["majority"] == _UNSAFE:
-                logger.info(f"[ModelMap] {_ROLE_TIER2} majority=UNSAFE → escalating to {_ROLE_ARBITER}")
-                winner = self._run_arbiters(arbiters, pre_submitted=arb_futures)
-            else:
-                # tier2 SAFE or INCONCLUSIVE → allow without invoking arbiter
-                logger.info(f"[ModelMap] {_ROLE_TIER2} majority={t2_verdict['majority']} → returning SAFE")
-                source = t2_verdict["completed"] or t1_verdict["completed"]
-                best_safe = max(source, key=lambda r: r["risk_score"])
-                best_safe["is_valid"] = True
-                winner = best_safe
+        logger.info(f"[ModelMap] {_ROLE_TIER1} majority=SAFE → waiting for {_ROLE_TIER2}")
+        t2 = self._collect_majority(t2_futures, label=_ROLE_TIER2)
 
-        return self._shape_result(winner)
+        if t2["majority"] == _UNSAFE:
+            logger.info(f"[ModelMap] {_ROLE_TIER2} majority=UNSAFE → escalating to {_ROLE_ARBITER}")
+            return self._run_arbiters(arbiters, pre_submitted=arb_futures)
+
+        logger.info(f"[ModelMap] {_ROLE_TIER2} majority={t2['majority']} → returning SAFE")
+        winner = max(t2["completed"] or t1["completed"], key=lambda r: r["risk_score"])
+        winner["is_valid"] = True
+        return winner
 
     # ── Result shaping ──────────────────────────────────────────────────────
 
@@ -187,32 +205,38 @@ class ModelMapScanner:
             "cascade_decision": f"{winner_stem}_authority" if winner_stem else "no_authority",
         }
 
-        # Per-model summaries: every modelConfigs entry gets a slot; missing → completed=False.
-        completed_by_stem: Dict[str, Dict[str, Any]] = {}
-        for r in self.completed_all:
-            stem = self._stem((r.get("details") or {}).get("llm_provider", ""))
-            if stem:
-                completed_by_stem[stem] = r
-
+        # One slot per modelConfigs entry, keyed by stem; missing → {completed: false}.
+        completed_by_stem = self._index_completed_by_stem()
         for entry in self.config.get("modelConfigs", []):
             stem = self._stem(entry.get("provider", ""))
-            if not stem:
-                continue
-            r = completed_by_stem.get(stem)
-            if r is not None:
-                details[stem] = {
-                    "completed": True,
-                    "is_valid": r.get("is_valid"),
-                    "risk_score": r.get("risk_score"),
-                    "decision_confidence": r.get("decision_confidence"),
-                }
-            else:
-                details.setdefault(stem, {"completed": False})
+            if stem:
+                details.setdefault(stem, self._summarize(completed_by_stem.get(stem)))
 
         return {
             "is_valid": winner.get("is_valid", True),
             "risk_score": float(winner.get("risk_score", 0.0)),
             "details": details,
+        }
+
+    def _index_completed_by_stem(self) -> Dict[str, Dict[str, Any]]:
+        """Index completed results by short provider stem (gemma_vertexai → gemma)."""
+        out: Dict[str, Dict[str, Any]] = {}
+        for r in self.completed_all:
+            stem = self._stem((r.get("details") or {}).get("llm_provider", ""))
+            if stem:
+                out[stem] = r
+        return out
+
+    @staticmethod
+    def _summarize(r: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Per-model entry for the response; None means the model never ran."""
+        if r is None:
+            return {"completed": False}
+        return {
+            "completed": True,
+            "is_valid": r.get("is_valid"),
+            "risk_score": r.get("risk_score"),
+            "decision_confidence": r.get("decision_confidence"),
         }
 
     # ── Helpers ─────────────────────────────────────────────────────────────
@@ -269,23 +293,13 @@ class ModelMapScanner:
         arbiters: List[ScannerEntry],
         pre_submitted: Optional[Dict[concurrent.futures.Future, Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
+        """Consult FINAL_ARBITER models. Reuses `pre_submitted` futures when
+        parallelExecution fired them upfront; otherwise submits them now."""
         if not arbiters:
             logger.error(f"[ModelMap] No {_ROLE_ARBITER} configured for scanner={self.scanner_name}")
-            return {
-                "is_valid": False,
-                "risk_score": 1.0,
-                "details": {"error": "no arbiter configured"},
-            }
+            return self._error_result("no arbiter configured")
 
-        if pre_submitted is not None:
-            future_map = pre_submitted
-        else:
-            executor = concurrent.futures.ThreadPoolExecutor(
-                max_workers=len(arbiters),
-                thread_name_prefix="modelmap-arbiter",
-            )
-            future_map = self._submit(executor, arbiters)
-            executor.shutdown(wait=False)
+        future_map = pre_submitted if pre_submitted is not None else self._submit_arbiters_lazily(arbiters)
 
         completed: List[Dict[str, Any]] = []
         completed_entries: List[Dict[str, Any]] = []
@@ -293,28 +307,33 @@ class ModelMapScanner:
             entry = future_map[future]
             timeout_s = (entry.get("timeoutMs") or _DEFAULT_ARBITER_TIMEOUT_MS) / 1000.0
             try:
-                result = future.result(timeout=timeout_s)
-                completed.append(result)
+                completed.append(future.result(timeout=timeout_s))
                 completed_entries.append(entry)
             except Exception as exc:
                 logger.error(f"[ModelMap] {_ROLE_ARBITER} '{entry.get('provider')}' failed: {exc}")
 
         self.completed_all.extend(completed)
-
         if not completed:
-            return {
-                "is_valid": False,
-                "risk_score": 1.0,
-                "details": {"error": "all arbiters failed"},
-            }
+            return self._error_result("all arbiters failed")
 
-        unsafe_results = [
-            r for r, e in zip(completed, completed_entries) if _classify(r, e) is True
-        ]
-        if unsafe_results:
-            winner = max(unsafe_results, key=lambda r: r["risk_score"])
-            winner["is_valid"] = False
-        else:
-            winner = max(completed, key=lambda r: r["risk_score"])
-            winner["is_valid"] = True
+        # Any arbiter that classifies unsafe blocks; else allow on highest-risk result.
+        unsafe = [r for r, e in zip(completed, completed_entries) if _classify(r, e)]
+        winner = max(unsafe or completed, key=lambda r: r["risk_score"])
+        winner["is_valid"] = not unsafe
         return winner
+
+    def _submit_arbiters_lazily(
+        self, arbiters: List[ScannerEntry]
+    ) -> Dict[concurrent.futures.Future, Dict[str, Any]]:
+        executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=len(arbiters),
+            thread_name_prefix="modelmap-arbiter",
+        )
+        future_map = self._submit(executor, arbiters)
+        executor.shutdown(wait=False)
+        return future_map
+
+    @staticmethod
+    def _error_result(error: str) -> Dict[str, Any]:
+        """Fail-closed stub used when arbitration cannot produce a verdict."""
+        return {"is_valid": False, "risk_score": 1.0, "details": {"error": error}}
