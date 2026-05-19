@@ -60,7 +60,7 @@ public class CrowdStrikeIntegrationAction extends UserAction {
     private String dataIngestionUrl;
     private Integer recurringIntervalSeconds;
 
-    // Guardrails fields (mirrors SentinelOneIntegrationAction)
+    // Guardrails fields
     private List<String> guardrailType;
     private Map<String, String> guardrailEnvVars;
     private String guardrailTargetMode;
