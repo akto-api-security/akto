@@ -351,6 +351,12 @@ public class GuardrailPolicies {
         }
     }
 
+    public enum ModelRole {
+        FAST_THREAT_FILTER,     
+        FAST_FALLBACK_SAFE_FILTER,  
+        FINAL_ARBITER    
+    }
+
 
     @Getter
     @Setter
@@ -360,11 +366,10 @@ public class GuardrailPolicies {
         private String provider;
         private String model;
         private String baseUrl;
-        private double blockThreshold;
-        private double allowThreshold;
         private int timeoutMs;
         private boolean strictBlock;
         private boolean strictAllow;
+        private ModelRole modelRole;
     }
 
 }

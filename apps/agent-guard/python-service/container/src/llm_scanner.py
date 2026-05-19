@@ -6,6 +6,7 @@ from scanner_service.py when FORCE_LLM_MODE is on or config.use_llm is truthy.
 """
 
 import base64
+import concurrent.futures
 import json
 import logging
 import os
@@ -507,6 +508,42 @@ class LLMScanner:
 
 # ── Multi-model parallel scanner ─────────────────────────────────────────────
 
+# Thresholds used by _is_confident_decision
+_DEFAULT_UNSAFE_THRESHOLD = 0.7
+_DEFAULT_SAFE_THRESHOLD = 0.3
+
+
+def _annotate(result: Dict[str, Any], entry: Dict[str, Any]) -> None:
+    """Stamp provider/model metadata onto a scan result in-place."""
+    result.setdefault("details", {})["provider"] = entry.get("provider", "")
+    result["provider"] = entry.get("provider", "")
+    result["role"] = entry.get("role", "")
+
+
+def _is_confident_decision(result: Dict[str, Any], entry: Dict[str, Any]) -> Optional[bool]:
+    """
+    Return True (unsafe), False (safe), or None (inconclusive) based on
+    risk_score vs per-entry or default thresholds.
+    """
+    risk = float(result.get("risk_score", 0.0))
+    unsafe_threshold = float(entry.get("unsafeThreshold") or _DEFAULT_UNSAFE_THRESHOLD)
+    safe_threshold = float(entry.get("safeThreshold") or _DEFAULT_SAFE_THRESHOLD)
+    if risk >= unsafe_threshold:
+        return True
+    if risk <= safe_threshold:
+        return False
+    return None
+
+
+def _fire_store(store_fn: Optional[Any], completed: list, scanner_name: str) -> None:
+    """Invoke optional store callback; swallow errors so they never affect the scan result."""
+    if store_fn is None:
+        return
+    try:
+        store_fn(completed, scanner_name)
+    except Exception as exc:
+        logger.warning(f"[ModelMap] store_fn failed for scanner={scanner_name}: {exc}")
+
 
 def build_provider_from_config(entry: Dict[str, Any]) -> Optional[Any]:
     """Build a provider instance from a modelMap entry using env-var credentials."""
@@ -558,25 +595,123 @@ def build_provider_from_config(entry: Dict[str, Any]) -> Optional[Any]:
     return None
 
 
-def _is_confident_decision(result: Dict[str, Any], entry: Dict[str, Any]) -> Optional[bool]:
+def _collect_majority(
+    future_map: dict,
+    label: str,
+    scanner_name: str,
+) -> Dict[str, Any]:
     """
-    Return True (definitive block), False (definitive allow), or None (inconclusive)
-    based on the model result and the entry's blockThreshold / allowThreshold.
-
-    blockThreshold: risk_score >= this → definitive block
-    allowThreshold: risk_score <= this → definitive allow
-    If neither threshold is crossed the result is inconclusive.
+    Wait for all futures in this tier. Returns:
+      majority  : "SAFE" | "UNSAFE" | "INCONCLUSIVE"
+      completed : list of annotated results
     """
-    risk = result["risk_score"]
-    block_threshold = entry.get("blockThreshold")
-    allow_threshold = entry.get("allowThreshold")
+    completed = []
+    safe_count = 0
+    unsafe_count = 0
 
-    if block_threshold is not None and risk >= float(block_threshold):
-        return True   # definitive block
-    if allow_threshold is not None and risk <= float(allow_threshold):
-        return False  # definitive allow
-    return None       # inconclusive
+    for future in concurrent.futures.as_completed(future_map):
+        entry = future_map[future]
+        timeout_s = (entry.get("timeoutMs") or 5000) / 1000.0
+        try:
+            result = future.result(timeout=timeout_s)
+            _annotate(result, entry)
+            completed.append(result)
+            decision = _is_confident_decision(result, entry)
+            if decision is True:
+                unsafe_count += 1
+            elif decision is False:
+                safe_count += 1
+            # None = inconclusive, counts neither
+        except Exception as exc:
+            logger.error(f"[ModelMap] {label} '{entry.get('provider')}' failed: {exc}")
+            # Failed model counts as unsafe (conservative)
+            unsafe_count += 1
 
+    total = len(future_map)
+    majority = (
+        "UNSAFE" if unsafe_count > total / 2
+        else "SAFE" if safe_count > total / 2
+        else "INCONCLUSIVE"
+    )
+
+    logger.info(
+        f"[ModelMap] {label} verdict={majority} "
+        f"safe={safe_count} unsafe={unsafe_count} total={total} scanner={scanner_name}"
+    )
+    return {"majority": majority, "completed": completed}
+
+
+def _run_arbiters(
+    scanners: list,
+    scanner_name: str,
+    scanner_type: str,
+    text: str,
+    config: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Run all FINAL_ARBITER models in parallel.
+    Any arbiter calling unsafe blocks; otherwise SAFE.
+    """
+    if not scanners:
+        logger.error(f"[ModelMap] No FINAL_ARBITER configured for scanner={scanner_name}")
+        return {
+            "result": {"is_valid": False, "risk_score": 1.0,
+                       "details": {"error": "no arbiter configured"}},
+            "completed": [],
+        }
+
+    executor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=len(scanners),
+        thread_name_prefix="modelmap-arbiter",
+    )
+    arb_future_map = {
+        executor.submit(s.scan, scanner_name, scanner_type, text, config): e
+        for s, e in scanners
+    }
+    executor.shutdown(wait=False)
+
+    completed = []
+    arb_entries = []
+    for future in concurrent.futures.as_completed(arb_future_map):
+        entry = arb_future_map[future]
+        timeout_s = (entry.get("timeoutMs") or 10000) / 1000.0
+        try:
+            result = future.result(timeout=timeout_s)
+            _annotate(result, entry)
+            completed.append(result)
+            arb_entries.append(entry)
+        except Exception as exc:
+            logger.error(f"[ModelMap] FINAL_ARBITER '{entry.get('provider')}' failed: {exc}")
+
+    if not completed:
+        return {
+            "result": {"is_valid": False, "risk_score": 1.0,
+                       "details": {"error": "all arbiters failed"}},
+            "completed": [],
+        }
+
+    unsafe_results = [
+        r for r, e in zip(completed, arb_entries)
+        if _is_confident_decision(r, e) is True
+    ]
+
+    if unsafe_results:
+        winner = max(unsafe_results, key=lambda r: r["risk_score"])
+        winner["is_valid"] = False
+        logger.info(
+            f"[ModelMap] FINAL_ARBITER any-unsafe=BLOCK "
+            f"unsafe_count={len(unsafe_results)}/{len(completed)} "
+            f"winner='{winner.get('provider')}' risk={winner['risk_score']:.2f}"
+        )
+    else:
+        winner = max(completed, key=lambda r: r["risk_score"])
+        winner["is_valid"] = True
+        logger.info(
+            f"[ModelMap] FINAL_ARBITER all-safe=ALLOW "
+            f"winner='{winner.get('provider')}' risk={winner['risk_score']:.2f}"
+        )
+
+    return {"result": winner, "completed": completed}
 
 def scan_with_model_map(
     scanner_name: str,
@@ -585,25 +720,6 @@ def scan_with_model_map(
     config: Dict[str, Any],
     store_fn: Optional[Any] = None,
 ) -> Dict[str, Any]:
-    """
-    Run multiple LLM models in parallel for a single scanner.
-
-    Each model entry carries blockThreshold and allowThreshold:
-      - risk_score >= blockThreshold  → definitive block, return immediately
-      - risk_score <= allowThreshold  → definitive allow, return immediately
-      - otherwise                     → inconclusive, keep waiting
-
-    As soon as a confident decision arrives the response is built and returned.
-    All remaining in-flight futures continue running in a daemon thread; when
-    they finish their results are passed to store_fn (fire-and-forget DB store).
-    If every model is inconclusive the result with the highest risk_score wins.
-    On total failure the function fails open (is_valid=True, risk_score=0.0).
-
-    store_fn(all_results, scanner_name) is called in a background thread for any
-    results that arrive after the winner — never on the calling thread.
-    """
-    import concurrent.futures
-    import threading
 
     model_map: list = config.get("modelMap", [])
     if not model_map:
@@ -611,7 +727,6 @@ def scan_with_model_map(
 
     overall_start = time.time()
 
-    # Build (LLMScanner, entry) pairs; skip entries whose credentials are missing.
     scanners: list = []
     for entry in model_map:
         provider = build_provider_from_config(entry)
@@ -622,150 +737,108 @@ def scan_with_model_map(
     if not scanners:
         raise ValueError("scan_with_model_map: no usable providers found in modelMap")
 
-    # Use a persistent executor (not a context-manager) so we can return early
-    # without killing in-flight threads. Daemon threads are cleaned up on process exit.
+    # ── Bucket by role ───────────────────────────────────────────────────────
+    tier1     = [(s, e) for s, e in scanners if e.get("modelRole") == "FAST_THREAT_FILTER"]
+    tier2     = [(s, e) for s, e in scanners if e.get("modelRole") == "FAST_FALLBACK_SAFE_FILTER"]
+    arbiters  = [(s, e) for s, e in scanners if e.get("modelRole") == "FINAL_ARBITER"]
+
+    all_completed: list = []
+
+    # ── Fire Tier 1 and Tier 2 in parallel immediately ───────────────────────
+    # Tier 2 futures start now but we only read their results if Tier 1 = SAFE.
     executor = concurrent.futures.ThreadPoolExecutor(
-        max_workers=len(scanners),
+        max_workers=max(1, len(tier1) + len(tier2)),
         thread_name_prefix="modelmap",
     )
 
-    future_to_entry: Dict[concurrent.futures.Future, Dict[str, Any]] = {
-        executor.submit(scanner.scan, scanner_name, scanner_type, text, config): entry
-        for scanner, entry in scanners
+    t1_future_map = {
+        executor.submit(s.scan, scanner_name, scanner_type, text, config): e
+        for s, e in tier1
     }
-    # Don't accept new work; existing futures keep running after we return.
+    t2_future_map = {
+        executor.submit(s.scan, scanner_name, scanner_type, text, config): e
+        for s, e in tier2
+    }
     executor.shutdown(wait=False)
 
-    completed_results: list = []
-    inconclusive_results: list = []
-    winner: Optional[Dict[str, Any]] = None
-    winner_elapsed_ms: float = 0.0
+    # ── Collect Tier 1 results, majority vote ────────────────────────────────
+    t1_verdict = _collect_majority(
+        future_map=t1_future_map,
+        label="FAST_THREAT_FILTER",
+        scanner_name=scanner_name,
+    )
+    all_completed.extend(t1_verdict["completed"])
 
-    def _annotate(result: Dict[str, Any], entry: Dict[str, Any]) -> Dict[str, Any]:
-        result["provider"] = entry.get("provider", "")
-        result["model"] = entry.get("model", "")
-        return result
+    if t1_verdict["majority"] == "UNSAFE":
+        # Tier 1 majority unsafe → skip Tier 2 results, go straight to arbiters.
+        # cancel() is a no-op on already-running futures; threads finish in background.
+        logger.info(f"[ModelMap] FAST_THREAT_FILTER majority=UNSAFE → escalating, skipping FAST_FALLBACK_SAFE_FILTER")
 
-    # Drain futures as they complete; stop as soon as we have a confident answer.
-    for future in concurrent.futures.as_completed(future_to_entry):
-        entry = future_to_entry[future]
-        timeout_s = (entry.get("timeoutMs") or 5000) / 1000.0
-
-        try:
-            result = future.result(timeout=timeout_s)
-        except concurrent.futures.TimeoutError:
-            logger.warning(
-                f"[ModelMap] Provider '{entry.get('provider')}' timed out "
-                f"after {timeout_s}s for scanner={scanner_name}"
-            )
-            continue
-        except Exception as exc:
-            logger.error(f"[ModelMap] Provider '{entry.get('provider')}' raised: {exc}")
-            continue
-
-        _annotate(result, entry)
-        completed_results.append(result)
-
-        decision = _is_confident_decision(result, entry)
-
-        if decision is True:
-            # Definitive block — return immediately.
-            winner = result
-            winner["is_valid"] = False
-            winner_elapsed_ms = round((time.time() - overall_start) * 1000, 2)
-            logger.info(
-                f"[ModelMap] Definitive BLOCK: provider='{entry.get('provider')}' "
-                f"risk={result['risk_score']:.2f} blockThreshold={entry.get('blockThreshold')} "
-                f"scanner={scanner_name} elapsed_ms={winner_elapsed_ms:.0f}"
-            )
-            break
-
-        if decision is False:
-            # Definitive allow — return immediately.
-            winner = result
-            winner["is_valid"] = True
-            winner_elapsed_ms = round((time.time() - overall_start) * 1000, 2)
-            logger.info(
-                f"[ModelMap] Definitive ALLOW: provider='{entry.get('provider')}' "
-                f"risk={result['risk_score']:.2f} allowThreshold={entry.get('allowThreshold')} "
-                f"scanner={scanner_name} elapsed_ms={winner_elapsed_ms:.0f}"
-            )
-            break
-
-        # Inconclusive — keep waiting for other models.
-        inconclusive_results.append(result)
-        logger.debug(
-            f"[ModelMap] Inconclusive: provider='{entry.get('provider')}' "
-            f"risk={result['risk_score']:.2f} scanner={scanner_name}"
+        winner = _run_arbiters(
+            scanners=arbiters,
+            scanner_name=scanner_name,
+            scanner_type=scanner_type,
+            text=text,
+            config=config,
         )
+        all_completed.extend(winner["completed"])
+        result = winner["result"]
 
-    # Tiebreaker: all models inconclusive — use highest risk_score.
-    if winner is None:
-        if inconclusive_results:
-            winner = max(inconclusive_results, key=lambda r: r["risk_score"])
-            winner_elapsed_ms = round((time.time() - overall_start) * 1000, 2)
-            logger.info(
-                f"[ModelMap] All inconclusive; tiebreaker provider='{winner.get('provider')}' "
-                f"risk={winner['risk_score']:.2f} scanner={scanner_name}"
+    elif t1_verdict["majority"] == "SAFE":
+        # Tier 1 majority safe → now wait for all Tier 2 futures
+        logger.info(f"[ModelMap] FAST_THREAT_FILTER majority=SAFE → waiting for FAST_FALLBACK_SAFE_FILTER")
+        t2_verdict = _collect_majority(
+            future_map=t2_future_map,
+            label="FAST_FALLBACK_SAFE_FILTER",
+            scanner_name=scanner_name,
+        )
+        all_completed.extend(t2_verdict["completed"])
+
+        if t2_verdict["majority"] == "UNSAFE":
+            # Tier 2 majority unsafe → escalate to arbiters
+            logger.info(f"[ModelMap] FAST_FALLBACK_SAFE_FILTER majority=UNSAFE → escalating to FINAL_ARBITER")
+            winner = _run_arbiters(
+                scanners=arbiters,
+                scanner_name=scanner_name,
+                scanner_type=scanner_type,
+                text=text,
+                config=config,
             )
+            all_completed.extend(winner["completed"])
+            result = winner["result"]
+
         else:
-            # Every model failed or timed out — fail open.
-            logger.error(f"[ModelMap] All providers failed for scanner={scanner_name}; failing open")
-            winner = {"is_valid": True, "risk_score": 0.0, "details": {"error": "all providers failed"}}
-            winner_elapsed_ms = round((time.time() - overall_start) * 1000, 2)
+            # Tier 2 SAFE or INCONCLUSIVE → ALLOW without invoking arbiter
+            logger.info(f"[ModelMap] FAST_FALLBACK_SAFE_FILTER majority={t2_verdict['majority']} → returning SAFE")
+            best_safe = max(t2_verdict["completed"], key=lambda r: r["risk_score"]) \
+                        if t2_verdict["completed"] else \
+                        max(t1_verdict["completed"], key=lambda r: r["risk_score"])
+            best_safe["is_valid"] = True
+            result = best_safe
 
-    winner["execution_time_ms"] = winner_elapsed_ms
+    else:
+        # Tier 1 all inconclusive (every model between thresholds) → escalate.
+        # Tier 2 threads finish in background; no need to wait on or cancel them.
+        logger.info(f"[ModelMap] FAST_THREAT_FILTER all inconclusive → escalating, skipping FAST_FALLBACK_SAFE_FILTER")
+        winner = _run_arbiters(
+            scanners=arbiters,
+            scanner_name=scanner_name,
+            scanner_type=scanner_type,
+            text=text,
+            config=config,
+        )
+        all_completed.extend(winner["completed"])
+        result = winner["result"]
 
-    # Remaining futures are still running. Collect them in a background thread
-    # and pass results to store_fn so they are persisted without blocking the caller.
-    remaining = [f for f in future_to_entry if not f.done()]
-    if remaining and store_fn is not None:
-        def _collect_and_store(
-            futures: list,
-            entry_map: Dict,
-            already_done: list,
-            fn: Any,
-            sname: str,
-        ) -> None:
-            late_results = list(already_done)
-            for fut in concurrent.futures.as_completed(futures):
-                ent = entry_map[fut]
-                try:
-                    r = fut.result(timeout=(ent.get("timeoutMs") or 5000) / 1000.0)
-                    _annotate(r, ent)
-                    late_results.append(r)
-                except Exception as exc:
-                    logger.warning(f"[ModelMap] Late result failed provider='{ent.get('provider')}': {exc}")
-            if late_results:
-                try:
-                    fn(late_results, sname)
-                except Exception as exc:
-                    logger.warning(f"[ModelMap] store_fn raised: {exc}")
-
-        threading.Thread(
-            target=_collect_and_store,
-            args=(remaining, future_to_entry, list(completed_results), store_fn, scanner_name),
-            daemon=True,
-            name="modelmap-store",
-        ).start()
-    elif store_fn is not None and completed_results:
-        # All futures already done — store synchronously in a daemon thread.
-        threading.Thread(
-            target=store_fn,
-            args=(completed_results, scanner_name),
-            daemon=True,
-            name="modelmap-store",
-        ).start()
+    result["execution_time_ms"] = round((time.time() - overall_start) * 1000, 2)
+    _fire_store(store_fn, all_completed, scanner_name)
 
     logger.info(
-        f"[ModelMap] scan_with_model_map returning scanner={scanner_name} "
-        f"isValid={winner['is_valid']} risk={winner['risk_score']:.2f} "
-        f"completed_so_far={len(completed_results)} remaining={len(remaining)} "
-        f"elapsed_ms={winner_elapsed_ms:.0f}"
+        f"[ModelMap] returning scanner={scanner_name} "
+        f"isValid={result['is_valid']} risk={result['risk_score']:.2f} "
+        f"elapsed_ms={result['execution_time_ms']:.0f}"
     )
-    return winner
-
-
+    return result
 # ── Module-level initializer ─────────────────────────────────────────────────
 
 
