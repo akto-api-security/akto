@@ -163,12 +163,12 @@ public class SkillsRiskScoreSyncCron {
                             }
 
                             if (!updates.isEmpty()) {
-                                loggerMaker.warnAndAddToDb("Updating risk score for " + updates.size() + " api infos from skills events");
+                                loggerMaker.debugAndAddToDb("Updating risk score for " + updates.size() + " api infos from skills events");
                                 ApiInfoDao.instance.bulkWrite(updates, new BulkWriteOptions().ordered(false));
                             }
 
                             AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), updateForLastCronRunInfo);
-                            loggerMaker.warnAndAddToDb("Skills risk score sync cron completed for account " + accountId + " in " + (Context.now() - startTimestamp) + " seconds");
+                            loggerMaker.debugAndAddToDb("Skills risk score sync cron completed for account " + accountId + " in " + (Context.now() - startTimestamp) + " seconds");
                         } catch (Exception e) {
                             loggerMaker.errorAndAddToDb(e, "Error in skills risk score sync cron: " + e.getMessage());
                         }
