@@ -637,9 +637,9 @@ const microsoftDefenderObj = {
 }
 
 const crowdStrikeObj = {
-    icon: '/public/crowdstrike.png',
-    label: "CrowdStrike Falcon",
-    text: "Connect CrowdStrike Falcon to Akto to detect AI coding tools (Claude, Cursor, Copilot) running on managed endpoints.",
+    icon: '/public/crowdstrike.svg',
+    label: "CrowdStrike",
+    text: "Connect CrowdStrike to Akto to detect AI coding tools (Claude, Cursor, Copilot) running on managed endpoints.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-crowdstrike',
     key: "CROWDSTRIKE",
     component: <CrowdStrikeConnector/>
