@@ -10,7 +10,6 @@ Public API (imported by scanner_service.py):
 
 import json
 import logging
-import os
 import time
 from typing import Any, Dict, Optional
 
@@ -22,6 +21,7 @@ from providers import (
     build_provider_from_env,
     parse_qwen3guard_result,
 )
+from settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +158,7 @@ def init_llm_scanner() -> Optional[LLMScanner]:
     Returns None when no provider is configured or required credentials are
     missing — callers should treat that as "LLM mode disabled".
     """
-    provider_name = (os.getenv("SCANNER_LLM_PROVIDER") or "").strip().lower()
+    provider_name = settings.SCANNER_LLM_PROVIDER.strip().lower()
     if not provider_name:
         logger.info("[LLMScanner] SCANNER_LLM_PROVIDER not set; LLM mode disabled")
         return None

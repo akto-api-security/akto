@@ -1,10 +1,12 @@
 import logging
-import os
+import threading
 import time
 from typing import Dict, Any, List
 from fastapi import FastAPI, HTTPException
 import httpx
 from pydantic import BaseModel
+
+from settings import settings
 
 # Fix for optimum 2.0+ and transformers 4.57+ compatibility
 try:
@@ -50,7 +52,9 @@ logger.setLevel(logging.INFO)
 app = FastAPI(title="Agent Guard Scanner Service", version="1.0.0")
 scanner_cache = {}
 
-_DB_ABSTRACTOR_URL = (os.getenv("DATABASE_ABSTRACTOR_SERVICE_URL") or "").rstrip("/")
+_DB_ABSTRACTOR_URL = settings.DATABASE_ABSTRACTOR_SERVICE_URL.rstrip("/")
+_SLACK_WEBHOOK_URL = settings.SLACK_WEBHOOK_URL.strip()
+_SLACK_TEXT_PREVIEW_CHARS = 1500
 
 
 def store_model_results(
@@ -81,9 +85,92 @@ def store_model_results(
     except Exception as exc:
         logger.warning(f"[ModelMap] DB store failed for scanner={scanner_name}: {exc}")
 
+
+def _fmt_num(v: Any) -> str:
+    """Render a numeric field for Slack; gracefully handle None/non-numeric."""
+    try:
+        return f"{float(v):.3f}"
+    except (TypeError, ValueError):
+        return "—"
+
+
+def _build_slack_blocks(scanner_name: str, scanner_type: str, text: str, result: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Slack Block Kit payload summarizing the final verdict + each model's vote."""
+    details = result.get("details") or {}
+    is_valid = bool(result.get("is_valid", True))
+    verdict = "✅ ALLOWED" if is_valid else "🚫 BLOCKED"
+    risk = _fmt_num(result.get("risk_score", 0.0))
+    cascade = details.get("cascade_decision", "—")
+    reason = details.get("reason", "")
+    provider = details.get("llm_provider", "—")
+
+    preview = text if len(text) <= _SLACK_TEXT_PREVIEW_CHARS else text[:_SLACK_TEXT_PREVIEW_CHARS] + "…"
+
+    # Per-model entries are dicts under details that carry a "completed" key.
+    model_rows: List[str] = []
+    for key, val in details.items():
+        if not isinstance(val, dict) or "completed" not in val:
+            continue
+        if val.get("completed"):
+            model_rows.append(
+                f"• `{key}` — is_valid=`{val.get('is_valid')}` "
+                f"risk=`{_fmt_num(val.get('risk_score'))}` "
+                f"conf=`{_fmt_num(val.get('decision_confidence'))}`"
+            )
+        else:
+            model_rows.append(f"• `{key}` — _not consulted_")
+
+    blocks: List[Dict[str, Any]] = [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": (
+                    f"*{verdict}* — `{scanner_name}` ({scanner_type})\n"
+                    f"*winner:* `{provider}`   *cascade:* `{cascade}`   *risk:* `{risk}`"
+                ),
+            },
+        },
+        {
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": f"*Input:*\n```{preview}```"},
+        },
+    ]
+    if reason:
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*Reason:* {reason}"}})
+    if model_rows:
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "*Per-model decisions:*\n" + "\n".join(model_rows)}})
+    return blocks
+
+
+def send_slack_alert(scanner_name: str, scanner_type: str, text: str, result: Dict[str, Any]) -> None:
+    """Sync POST to Slack incoming webhook. Spawned in a daemon thread so it
+    never blocks the /scan response; swallows all errors."""
+    if not _SLACK_WEBHOOK_URL:
+        return
+    try:
+        payload = {"blocks": _build_slack_blocks(scanner_name, scanner_type, text, result)}
+        resp = httpx.post(_SLACK_WEBHOOK_URL, json=payload, timeout=5.0)
+        if resp.status_code >= 400:
+            logger.warning(f"[Slack] webhook returned {resp.status_code}: {resp.text[:200]}")
+    except Exception as exc:
+        logger.warning(f"[Slack] post failed: {exc}")
+
+
+def _fire_slack(scanner_name: str, scanner_type: str, text: str, result: Dict[str, Any]) -> None:
+    """Spawn the Slack post in a daemon thread; no-op if SLACK_WEBHOOK_URL is unset."""
+    if not _SLACK_WEBHOOK_URL:
+        return
+    threading.Thread(
+        target=send_slack_alert,
+        args=(scanner_name, scanner_type, text, result),
+        daemon=True,
+    ).start()
+
+
 # LLM scanner — initialized once from env vars. None if no provider configured.
 _llm_scanner = init_llm_scanner()
-_force_llm = is_truthy(os.getenv("FORCE_LLM_MODE"))
+_force_llm = settings.FORCE_LLM_MODE
 if _force_llm:
     logger.info("[Service] FORCE_LLM_MODE=true — PromptInjection/BanTopics will use LLM path")
 
@@ -221,6 +308,7 @@ async def scan_text(request: ScanRequest):
                     request.config,
                     store_fn=store_fn,
                 )
+                _fire_slack(request.scanner_name, request.scanner_type, request.text, result)
                 return ScanResponse(
                     scanner_name=request.scanner_name,
                     is_valid=result["is_valid"],
@@ -343,6 +431,4 @@ async def scan_batch(requests: List[ScanRequest]):
 
 if __name__ == "__main__":
     import uvicorn
-    import os
-    port = int(os.getenv("PORT", 8092))
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+    uvicorn.run(app, host="0.0.0.0", port=settings.PORT, log_level="warning")

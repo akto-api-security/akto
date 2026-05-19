@@ -9,13 +9,14 @@ import base64
 import json
 import logging
 import math
-import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple
 
 import google.auth.transport.requests
 import httpx
 from google.oauth2 import service_account
+
+from settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -356,7 +357,7 @@ def _require_env(values: dict, label: str) -> Optional[dict]:
 
 
 def _build_openai_compatible(model: str, base_url: str) -> Optional[LLMProvider]:
-    api_key = os.getenv("OPENAI_API_KEY", "")
+    api_key = settings.OPENAI_API_KEY
     # Ollama and other local OpenAI-compatible servers don't require a key,
     # but we still need *some* way to reach them.
     if not api_key and not base_url:
@@ -366,7 +367,7 @@ def _build_openai_compatible(model: str, base_url: str) -> Optional[LLMProvider]
 
 
 def _build_anthropic(model: str) -> Optional[LLMProvider]:
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    api_key = settings.ANTHROPIC_API_KEY
     if not api_key:
         logger.warning("[Providers] ANTHROPIC_API_KEY not set; skipping anthropic")
         return None
@@ -376,10 +377,10 @@ def _build_anthropic(model: str) -> Optional[LLMProvider]:
 def _build_vertexai() -> Optional[LLMProvider]:
     env = _require_env(
         {
-            "VERTEX_AI_SA_KEY_JSON": os.getenv("VERTEX_AI_SA_KEY_JSON", ""),
-            "VERTEX_AI_PROJECT": os.getenv("VERTEX_AI_PROJECT", ""),
-            "VERTEX_AI_LOCATION": os.getenv("VERTEX_AI_LOCATION", ""),
-            "VERTEX_AI_ENDPOINT_ID": os.getenv("VERTEX_AI_ENDPOINT_ID", ""),
+            "VERTEX_AI_SA_KEY_JSON": settings.VERTEX_AI_SA_KEY_JSON,
+            "VERTEX_AI_PROJECT": settings.VERTEX_AI_PROJECT,
+            "VERTEX_AI_LOCATION": settings.VERTEX_AI_LOCATION,
+            "VERTEX_AI_ENDPOINT_ID": settings.VERTEX_AI_ENDPOINT_ID,
         },
         label="[Providers] vertexai",
     )
@@ -396,10 +397,10 @@ def _build_vertexai() -> Optional[LLMProvider]:
 def _build_gemma_vertexai() -> Optional[LLMProvider]:
     env = _require_env(
         {
-            "GEMMA_VERTEX_SA_KEY_JSON": os.getenv("GEMMA_VERTEX_SA_KEY_JSON", ""),
-            "GEMMA_VERTEX_PROJECT": os.getenv("GEMMA_VERTEX_PROJECT", ""),
-            "GEMMA_VERTEX_LOCATION": os.getenv("GEMMA_VERTEX_LOCATION", ""),
-            "GEMMA_VERTEX_ENDPOINT_ID": os.getenv("GEMMA_VERTEX_ENDPOINT_ID", ""),
+            "GEMMA_VERTEX_SA_KEY_JSON": settings.GEMMA_VERTEX_SA_KEY_JSON,
+            "GEMMA_VERTEX_PROJECT": settings.GEMMA_VERTEX_PROJECT,
+            "GEMMA_VERTEX_LOCATION": settings.GEMMA_VERTEX_LOCATION,
+            "GEMMA_VERTEX_ENDPOINT_ID": settings.GEMMA_VERTEX_ENDPOINT_ID,
         },
         label="[Providers] gemma_vertexai",
     )
@@ -410,17 +411,17 @@ def _build_gemma_vertexai() -> Optional[LLMProvider]:
         env["GEMMA_VERTEX_PROJECT"],
         env["GEMMA_VERTEX_LOCATION"],
         env["GEMMA_VERTEX_ENDPOINT_ID"],
-        dedicated_dns=os.getenv("GEMMA_VERTEX_DEDICATED_DNS", ""),
+        dedicated_dns=settings.GEMMA_VERTEX_DEDICATED_DNS,
     )
 
 
 def _build_qwen3guard() -> Optional[LLMProvider]:
     env = _require_env(
         {
-            "QWEN3GUARD_SA_KEY_JSON": os.getenv("QWEN3GUARD_SA_KEY_JSON", ""),
-            "QWEN3GUARD_PROJECT": os.getenv("QWEN3GUARD_PROJECT", ""),
-            "QWEN3GUARD_LOCATION": os.getenv("QWEN3GUARD_LOCATION", ""),
-            "QWEN3GUARD_ENDPOINT_ID": os.getenv("QWEN3GUARD_ENDPOINT_ID", ""),
+            "QWEN3GUARD_SA_KEY_JSON": settings.QWEN3GUARD_SA_KEY_JSON,
+            "QWEN3GUARD_PROJECT": settings.QWEN3GUARD_PROJECT,
+            "QWEN3GUARD_LOCATION": settings.QWEN3GUARD_LOCATION,
+            "QWEN3GUARD_ENDPOINT_ID": settings.QWEN3GUARD_ENDPOINT_ID,
         },
         label="[Providers] qwen3guard",
     )
@@ -431,7 +432,7 @@ def _build_qwen3guard() -> Optional[LLMProvider]:
         env["QWEN3GUARD_PROJECT"],
         env["QWEN3GUARD_LOCATION"],
         env["QWEN3GUARD_ENDPOINT_ID"],
-        dedicated_dns=os.getenv("QWEN3GUARD_DEDICATED_DNS", ""),
+        dedicated_dns=settings.QWEN3GUARD_DEDICATED_DNS,
     )
 
 
@@ -439,9 +440,9 @@ def build_provider_from_env(provider_name: str, model: str = "") -> Optional[LLM
     """Build a provider using *only* env vars. Used by the SCANNER_LLM_PROVIDER path."""
     provider_name = provider_name.strip().lower()
     if provider_name == "openai":
-        return _build_openai_compatible(model or os.getenv("OPENAI_MODEL", ""), base_url="")
+        return _build_openai_compatible(model or settings.OPENAI_MODEL, base_url="")
     if provider_name == "anthropic":
-        return _build_anthropic(model or os.getenv("ANTHROPIC_MODEL", ""))
+        return _build_anthropic(model or settings.ANTHROPIC_MODEL)
     if provider_name == "vertexai":
         return _build_vertexai()
     if provider_name == "gemma_vertexai":
@@ -452,13 +453,13 @@ def build_provider_from_env(provider_name: str, model: str = "") -> Optional[LLM
 
 def build_provider_from_config(entry: Dict[str, Any]) -> Optional[LLMProvider]:
     """Build a provider from a modelMap entry. Reads name/model/baseUrl from the
-    entry; credentials still come from env vars."""
+    entry; credentials still come from settings."""
     provider_name = (entry.get("provider") or "").strip().lower()
     model = (entry.get("model") or "").strip()
 
     if provider_name in ("openai", "ollama", "openai_compatible"):
         # Entry-level baseUrl wins, then OPENAI_COMPATIBLE_BASE_URL, then default.
-        base_url = (entry.get("baseUrl") or "").strip() or os.getenv("OPENAI_COMPATIBLE_BASE_URL", "")
+        base_url = (entry.get("baseUrl") or "").strip() or settings.OPENAI_COMPATIBLE_BASE_URL
         return _build_openai_compatible(model, base_url)
     if provider_name == "anthropic":
         return _build_anthropic(model)
