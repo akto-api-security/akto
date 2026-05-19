@@ -94,7 +94,6 @@ class ScanResponse(BaseModel):
     risk_score: float
     sanitized_text: str
     details: Dict[str, Any] = {}
-    all_results: List[Dict[str, Any]] = []
 
 PROMPT_SCANNERS = {
     "Anonymize": input_scanners.Anonymize,
@@ -218,7 +217,6 @@ async def scan_text(request: ScanRequest):
                     risk_score=result["risk_score"],
                     sanitized_text=request.text,
                     details=result.get("details", {}),
-                    all_results=result.get("all_results", []),
                 )
             except Exception as model_map_err:
                 total_duration = (time.time() - start_time) * 1000
