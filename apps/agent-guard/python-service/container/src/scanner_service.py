@@ -200,7 +200,7 @@ async def scan_text(request: ScanRequest):
 
         # ── modelMap dispatch (multi-model parallel) ──────────────────
         if (
-            request.config.get("modelMap")
+            request.config.get("modelConfigs")
             and request.scanner_name in LLM_SUPPORTED_SCANNERS
         ):
             try:

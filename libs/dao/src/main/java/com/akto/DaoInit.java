@@ -96,7 +96,7 @@ import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.DependencyNode.ParamInfo;
-import com.akto.dto.GuardrailPolicies.ModalConfig;
+import com.akto.dto.GuardrailPolicies.ModelConfig;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.agents.Model;
 import com.akto.dto.agents.ModelType;
@@ -349,7 +349,7 @@ public class DaoInit {
         ClassModel<WizSyncJobParams> wizSyncJobParamsClassModel = ClassModel.builder(WizSyncJobParams.class).enableDiscriminator(true).build();
         ClassModel<EndpointMcpConfig> endpointMcpConfigClassModel = ClassModel.builder(EndpointMcpConfig.class).enableDiscriminator(true).build();
         ClassModel<NewRelicIntegration> newRelicIntegrationClassModel = ClassModel.builder(NewRelicIntegration.class).enableDiscriminator(true).build();
-        ClassModel<ModalConfig> modalConfigClassModel = ClassModel.builder(ModalConfig.class).enableDiscriminator(true).build();
+        ClassModel<ModelConfig> modelConfigClassModel = ClassModel.builder(ModelConfig.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -394,7 +394,7 @@ public class DaoInit {
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
                 traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
                 wizIntegrationClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel,
-                mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel, newRelicIntegrationClassModel, modalConfigClassModel)
+                mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel, newRelicIntegrationClassModel, modelConfigClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(

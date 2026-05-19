@@ -99,7 +99,7 @@ public class GuardrailPolicies {
     private String sourceHash;
 
     // Modal config
-    private ArrayList<ModalConfig> modalConfigs;
+    private ArrayList<ModelConfig> modelConfigs;
 
     public String getHexId() {
         if (this.id != null) {
@@ -362,7 +362,7 @@ public class GuardrailPolicies {
     @Setter
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class ModalConfig {
+    public static class ModelConfig {
         private String provider;
         private String model;
         private String baseUrl;
@@ -370,6 +370,7 @@ public class GuardrailPolicies {
         private boolean strictBlock;
         private boolean strictAllow;
         private ModelRole modelRole;
+        private String attackType;
     }
 
 }
