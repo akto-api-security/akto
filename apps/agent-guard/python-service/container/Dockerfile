@@ -22,7 +22,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/scanner_service.py .
 COPY src/intent_analyzer.py .
 COPY src/llm_scanner.py .
-COPY src/warmup.py .
+COPY src/model_map.py .
+COPY src/providers.py .
+COPY src/prompts/ ./prompts/
 
 # Create cache directory for HuggingFace models
 RUN mkdir -p /app/.cache/huggingface
@@ -33,9 +35,6 @@ ENV PORT=8092
 ENV HF_HOME=/app/.cache/huggingface
 ENV TRANSFORMERS_VERBOSITY=error
 ENV HF_HUB_VERBOSITY=error
-
-# Pre-download all models during build (makes container work offline and first request fast)
-RUN python warmup.py
 
 # Expose the service port
 EXPOSE 8092
