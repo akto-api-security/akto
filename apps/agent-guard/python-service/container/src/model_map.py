@@ -45,17 +45,12 @@ ScannerEntry = Tuple[Any, Dict[str, Any]]
 
 def _classify(result: Dict[str, Any], entry: Dict[str, Any]) -> bool:
     """Return True if this scan result should count as unsafe, else False.
-
-    - is_valid=False (model classified the input as unsafe) → unsafe without
-      consulting the threshold.
-    - is_valid=True  (model classified the input as safe)  → unsafe only when
-      decision_confidence >= the entry's safeDecisionThreshold (or _DEFAULT_SAFE_THRESHOLD).
     """
     if not result.get("is_valid", True):
         return True
-    risk = float(result.get("decision_confidence", 0.0))
+    confidence = float(result.get("decision_confidence", 0.0))
     safe_threshold = float(entry.get("safeDecisionThreshold") or _DEFAULT_SAFE_THRESHOLD)
-    return risk >= safe_threshold
+    return confidence < safe_threshold
 
 
 def _fire_store(store_fn: Optional[Any], completed: List[Dict[str, Any]], scanner_name: str) -> None:
