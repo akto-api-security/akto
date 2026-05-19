@@ -157,7 +157,7 @@ public class SkillsRiskScoreSyncCron {
                                     Filters.eq("_id.apiCollectionId", key.getApiCollectionId())
                                 );
                                 updates.add(new UpdateManyModel<>(filter, Updates.combine(
-                                    Updates.set(ApiInfo.RISK_SCORE, entry.getValue()),
+                                    Updates.set(ApiInfo.THREAT_SCORE, entry.getValue()),
                                     Updates.set(ApiInfo.TAGS_LIST, maliciousTags)
                                 )));
                             }
