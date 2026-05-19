@@ -478,6 +478,30 @@ const api = {
         })
     },
 
+    fetchCrowdStrikeGuardrailTypes() {
+        return request({
+            url: '/api/fetchCrowdStrikeGuardrailTypes',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    saveCrowdStrikeGuardrailsConfig(guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailDeviceIds) {
+        return request({
+            url: '/api/saveCrowdStrikeGuardrailsConfig',
+            method: 'post',
+            data: { guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailDeviceIds }
+        })
+    },
+
+    executeCrowdStrikeGuardrails(guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailDeviceIds) {
+        return request({
+            url: '/api/executeCrowdStrikeGuardrails',
+            method: 'post',
+            data: { guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailDeviceIds }
+        })
+    },
+
 }
 
 export default api
