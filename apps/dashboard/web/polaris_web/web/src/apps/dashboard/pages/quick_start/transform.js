@@ -89,6 +89,7 @@ import MicrosoftDefenderConnector from "./components/MicrosoftDefenderConnector"
 import MicrosoftDefenderRunQueriesConnector from "./components/MicrosoftDefenderRunQueriesConnector"
 import SentinelOneConnector from "./components/SentinelOneConnector"
 import WizSource from "./components/WizSource"
+import CrowdStrikeConnector from "./components/CrowdStrikeConnector"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -633,6 +634,15 @@ const microsoftDefenderObj = {
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-microsoft-defender',
     key: "MICROSOFT_DEFENDER",
     component: <MicrosoftDefenderConnector/>
+}
+
+const crowdStrikeObj = {
+    icon: '/public/crowdstrike.png',
+    label: "CrowdStrike Falcon",
+    text: "Connect CrowdStrike Falcon to Akto to detect AI coding tools (Claude, Cursor, Copilot) running on managed endpoints.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-crowdstrike',
+    key: "CROWDSTRIKE",
+    component: <CrowdStrikeConnector/>
 }
 
 const microsoftDefenderRunQueriesObj = {
@@ -2237,7 +2247,7 @@ const quickStartFunc = {
         ]
 
         const endpointManagement = [
-            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj, crowdStrikeObj
         ]
 
         const mdmTools = [
@@ -2331,7 +2341,7 @@ const quickStartFunc = {
             cloudflareWarpObj, zscalerObj, snowflakeObj,
             intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
             jamfEndpointObj, kandjiEndpointObj, customEndpointObj,
-            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj, crowdStrikeObj
         ]
 
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
@@ -2342,7 +2352,7 @@ const quickStartFunc = {
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj,
                 intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
                 jamfEndpointObj, kandjiEndpointObj, customEndpointObj,
-                microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
+                microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj, crowdStrikeObj
             ])
         }
 
