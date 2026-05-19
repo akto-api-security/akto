@@ -414,6 +414,38 @@ const api = {
         })
     },
 
+    fetchCrowdStrikeIntegration() {
+        return request({
+            url: '/api/fetchCrowdStrikeIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addCrowdStrikeIntegration(clientId, clientSecret, baseUrl, dataIngestionUrl, recurringIntervalSeconds) {
+        return request({
+            url: '/api/addCrowdStrikeIntegration',
+            method: 'post',
+            data: { clientId, clientSecret, baseUrl, dataIngestionUrl, recurringIntervalSeconds }
+        })
+    },
+
+    removeCrowdStrikeIntegration() {
+        return request({
+            url: '/api/removeCrowdStrikeIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchCrowdStrikeDevices() {
+        return request({
+            url: '/api/fetchCrowdStrikeDevices',
+            method: 'post',
+            data: {}
+        })
+    },
+
 }
 
 export default api
