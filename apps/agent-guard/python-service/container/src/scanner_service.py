@@ -1,10 +1,12 @@
 import logging
-import os
 import time
 from typing import Dict, Any, List
 from fastapi import FastAPI, HTTPException
 import httpx
 from pydantic import BaseModel
+
+from settings import settings
+from slack_alerter import slack_alerter
 
 # Fix for optimum 2.0+ and transformers 4.57+ compatibility
 try:
@@ -29,7 +31,13 @@ except:
 
 from llm_guard import input_scanners, output_scanners
 from intent_analyzer import IntentAnalysisScanner
-from llm_scanner import init_llm_scanner, is_truthy, LLM_SUPPORTED_SCANNERS, scan_with_model_map
+from constants import DEFAULT_CONFIG
+from llm_scanner import (
+    LLM_SUPPORTED_SCANNERS,
+    init_llm_scanner,
+    is_truthy,
+    scan_with_model_map,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,7 +52,7 @@ logger.setLevel(logging.INFO)
 app = FastAPI(title="Agent Guard Scanner Service", version="1.0.0")
 scanner_cache = {}
 
-_DB_ABSTRACTOR_URL = (os.getenv("DATABASE_ABSTRACTOR_SERVICE_URL") or "").rstrip("/")
+_DB_ABSTRACTOR_URL = settings.DATABASE_ABSTRACTOR_SERVICE_URL.rstrip("/")
 
 
 def store_model_results(
@@ -75,9 +83,10 @@ def store_model_results(
     except Exception as exc:
         logger.warning(f"[ModelMap] DB store failed for scanner={scanner_name}: {exc}")
 
+
 # LLM scanner — initialized once from env vars. None if no provider configured.
 _llm_scanner = init_llm_scanner()
-_force_llm = is_truthy(os.getenv("FORCE_LLM_MODE"))
+_force_llm = settings.FORCE_LLM_MODE
 if _force_llm:
     logger.info("[Service] FORCE_LLM_MODE=true — PromptInjection/BanTopics will use LLM path")
 
@@ -94,7 +103,6 @@ class ScanResponse(BaseModel):
     risk_score: float
     sanitized_text: str
     details: Dict[str, Any] = {}
-    all_results: List[Dict[str, Any]] = []
 
 PROMPT_SCANNERS = {
     "Anonymize": input_scanners.Anonymize,
@@ -198,6 +206,10 @@ async def scan_text(request: ScanRequest):
     try:
         logger.info(f"Starting scan: scanner={request.scanner_name}, type={request.scanner_type}, text_length={len(request.text)}")
 
+        if not request.config.get("modelConfigs"):
+            request.config = {**DEFAULT_CONFIG, **request.config, "modelConfigs": DEFAULT_CONFIG["modelConfigs"]}
+            logger.info("[Service] modelConfigs missing or empty; applied DEFAULT_CONFIG")
+
         # ── modelMap dispatch (multi-model parallel) ──────────────────
         if (
             request.config.get("modelConfigs")
@@ -212,13 +224,13 @@ async def scan_text(request: ScanRequest):
                     request.config,
                     store_fn=store_fn,
                 )
+                slack_alerter.fire(request.scanner_name, request.scanner_type, request.text, result)
                 return ScanResponse(
                     scanner_name=request.scanner_name,
                     is_valid=result["is_valid"],
                     risk_score=result["risk_score"],
                     sanitized_text=request.text,
                     details=result.get("details", {}),
-                    all_results=result.get("all_results", []),
                 )
             except Exception as model_map_err:
                 total_duration = (time.time() - start_time) * 1000
@@ -335,6 +347,4 @@ async def scan_batch(requests: List[ScanRequest]):
 
 if __name__ == "__main__":
     import uvicorn
-    import os
-    port = int(os.getenv("PORT", 8092))
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+    uvicorn.run(app, host="0.0.0.0", port=settings.PORT, log_level="warning")

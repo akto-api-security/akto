@@ -14,22 +14,35 @@ services:
       # When SCANNER_LLM_PROVIDER is unset, only the local ML path runs.
       - SCANNER_LLM_PROVIDER=${SCANNER_LLM_PROVIDER:-}
       - FORCE_LLM_MODE=${FORCE_LLM_MODE:-}
+      
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_MODEL=${OPENAI_MODEL:-}
+      
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}
+      
       - VERTEX_AI_PROJECT=${VERTEX_AI_PROJECT:-}
       - VERTEX_AI_LOCATION=${VERTEX_AI_LOCATION:-}
       - VERTEX_AI_ENDPOINT_ID=${VERTEX_AI_ENDPOINT_ID:-}
       - VERTEX_AI_SA_KEY_JSON=${VERTEX_AI_SA_KEY_JSON:-}
+      
       - GEMMA_VERTEX_SA_KEY_JSON=${GEMMA_VERTEX_SA_KEY_JSON:-}
       - GEMMA_VERTEX_PROJECT=${GEMMA_VERTEX_PROJECT:-}
       - GEMMA_VERTEX_LOCATION=${GEMMA_VERTEX_LOCATION:-}
       - GEMMA_VERTEX_ENDPOINT_ID=${GEMMA_VERTEX_ENDPOINT_ID:-}
       - GEMMA_VERTEX_DEDICATED_DNS=${GEMMA_VERTEX_DEDICATED_DNS:-}
+      
+      - QWEN3GUARD_SA_KEY_JSON=${QWEN3GUARD_SA_KEY_JSON:-}
+      - QWEN3GUARD_PROJECT=${QWEN3GUARD_PROJECT:-}
+      - QWEN3GUARD_LOCATION=${QWEN3GUARD_LOCATION:-}
+      - QWEN3GUARD_ENDPOINT_ID=${QWEN3GUARD_ENDPOINT_ID:-}
+      - QWEN3GUARD_DEDICATED_DNS=${QWEN3GUARD_DEDICATED_DNS:-}
       # OpenAI-compatible base URL — set to http://host.docker.internal:11434/v1
       # to use a locally running Ollama instance from inside the container.
       - OPENAI_COMPATIBLE_BASE_URL=${OPENAI_COMPATIBLE_BASE_URL:-}
+      # DB abstractor endpoint for persisting per-model results when
+      # config.storeAllResults=true (POST /api/storeGuardrailModelResults).
+      - DATABASE_ABSTRACTOR_SERVICE_URL=${DATABASE_ABSTRACTOR_SERVICE_URL:-}
     volumes:
       - model-cache:/app/.cache/huggingface
     deploy:
@@ -45,40 +58,6 @@ services:
       timeout: 10s
       retries: 10
       start_period: 30s
-    networks:
-      - agent-guard-network
-
-  go-service:
-    build:
-      context: ./go-service/container
-      dockerfile: Dockerfile
-    container_name: agent-guard-go
-    ports:
-      - "127.0.0.1:8091:8091"
-    depends_on:
-      python-service:
-        condition: service_healthy
-    environment:
-      - GIN_MODE=release
-      - PORT=8091
-      - PYTHON_SERVICE_URL=http://python-service:8092
-      # Optional LLM scanner config (PromptInjection / BanTopics).
-      # When SCANNER_LLM_PROVIDER is unset, all requests use the Python ML path.
-      # When set, requests with config.use_llm=true are routed to the provider.
-      - SCANNER_LLM_PROVIDER=${SCANNER_LLM_PROVIDER:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - OPENAI_MODEL=${OPENAI_MODEL:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}
-      - VERTEX_AI_PROJECT=${VERTEX_AI_PROJECT:-}
-      - VERTEX_AI_LOCATION=${VERTEX_AI_LOCATION:-}
-      - VERTEX_AI_ENDPOINT_ID=${VERTEX_AI_ENDPOINT_ID:-}
-      - VERTEX_AI_SA_KEY_JSON=${VERTEX_AI_SA_KEY_JSON:-}
-      - GEMMA_VERTEX_SA_KEY_JSON=${GEMMA_VERTEX_SA_KEY_JSON:-}
-      - GEMMA_VERTEX_PROJECT=${GEMMA_VERTEX_PROJECT:-}
-      - GEMMA_VERTEX_LOCATION=${GEMMA_VERTEX_LOCATION:-}
-      - GEMMA_VERTEX_ENDPOINT_ID=${GEMMA_VERTEX_ENDPOINT_ID:-}
-      - GEMMA_VERTEX_DEDICATED_DNS=${GEMMA_VERTEX_DEDICATED_DNS:-}
     networks:
       - agent-guard-network
 
