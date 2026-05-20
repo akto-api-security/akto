@@ -275,6 +275,10 @@ public class InitializerListener implements ServletContextListener {
 
     private static final int THREE_HOURS = 3*60*60;
     private static final int CONNECTION_TIMEOUT = 10 * 1000;
+    private static final Set<Integer> TRAFFIC_ALERT_SLACK_EXCLUDED_ACCOUNTS = new HashSet<>(Arrays.asList(
+            1718042191, // Customer Prod
+            1736798101  // Customer Staging
+    ));
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     public static String aktoVersion;
     private final ScheduledExecutorService telemetryExecutorService = Executors.newSingleThreadScheduledExecutor();
@@ -376,7 +380,8 @@ public class InitializerListener implements ServletContextListener {
 
                             if (thresholdSeconds > 0) {
                                 Map<AlertType, AlertResult> alertMap = trafficUpdates.createAlerts(thresholdSeconds, deactivatedHosts);
-                                if (slackWebhookFound && listWebhooks != null && !listWebhooks.isEmpty()) {
+                                if (slackWebhookFound && listWebhooks != null && !listWebhooks.isEmpty()
+                                        && !TRAFFIC_ALERT_SLACK_EXCLUDED_ACCOUNTS.contains(t.getId())) {
                                     SlackWebhook webhook = listWebhooks.get(0);
                                     logger.debugAndAddToDb("Slack Webhook found: " + webhook.getWebhook(),
                                             LogDb.DASHBOARD);
