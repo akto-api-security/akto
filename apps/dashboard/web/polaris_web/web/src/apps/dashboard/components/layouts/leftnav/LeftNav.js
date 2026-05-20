@@ -245,6 +245,14 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_users_and_devices",
+                    }, {
+                        label: "Endpoints",
+                        onClick: () => {
+                            navigate("/dashboard/observe/endpoints");
+                            handleSelect("dashboard_observe_endpoints");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_observe_endpoints",
                     }] : [{
                         label: "Collections",
                         onClick: () => {
