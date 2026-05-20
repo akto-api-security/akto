@@ -60,7 +60,7 @@ public class SkillsRiskScoreSyncCron {
                             //     return;
                             // }
                             int startTimestamp = Context.now();
-                            loggerMaker.debugAndAddToDb("Skills risk score sync cron started for account " + accountId + " at " + startTimestamp);
+                            loggerMaker.infoAndAddToDb("Skills risk score sync cron started for account " + accountId + " at " + startTimestamp);
 
                             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                             LastCronRunInfo lastRunTimerInfo = accountSettings.getLastUpdatedCronInfo();
@@ -125,7 +125,7 @@ public class SkillsRiskScoreSyncCron {
 
                                 Integer collectionId = hostToCollectionId.get(host);
                                 if (collectionId == null) {
-                                    loggerMaker.debugAndAddToDb("No collection found for host: " + host);
+                                    loggerMaker.infoAndAddToDb("No collection found for host: " + host);
                                     continue;
                                 }
 
@@ -140,7 +140,7 @@ public class SkillsRiskScoreSyncCron {
                                 apiInfoKeyToRiskScore.put(apiInfoKey, Math.max(apiInfoKeyToRiskScore.getOrDefault(apiInfoKey, 0.0f), riskScore));
                             }
 
-                            loggerMaker.debugAndAddToDb("Skills malicious events count: " + apiInfoKeyToRiskScore.size());
+                            loggerMaker.infoAndAddToDb("Skills malicious events count: " + apiInfoKeyToRiskScore.size());
 
                             List<ApiInfo.ApiInfoTag> maliciousTags = Collections.singletonList(
                                 new ApiInfo.ApiInfoTag("malicious-skill", "true")
@@ -157,18 +157,18 @@ public class SkillsRiskScoreSyncCron {
                                     Filters.eq("_id.apiCollectionId", key.getApiCollectionId())
                                 );
                                 updates.add(new UpdateManyModel<>(filter, Updates.combine(
-                                    Updates.set(ApiInfo.RISK_SCORE, entry.getValue()),
+                                    Updates.set(ApiInfo.THREAT_SCORE, entry.getValue()),
                                     Updates.set(ApiInfo.TAGS_LIST, maliciousTags)
                                 )));
                             }
 
                             if (!updates.isEmpty()) {
-                                loggerMaker.warnAndAddToDb("Updating risk score for " + updates.size() + " api infos from skills events");
+                                loggerMaker.infoAndAddToDb("Updating risk score for " + updates.size() + " api infos from skills events");
                                 ApiInfoDao.instance.bulkWrite(updates, new BulkWriteOptions().ordered(false));
                             }
 
                             AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), updateForLastCronRunInfo);
-                            loggerMaker.warnAndAddToDb("Skills risk score sync cron completed for account " + accountId + " in " + (Context.now() - startTimestamp) + " seconds");
+                            loggerMaker.infoAndAddToDb("Skills risk score sync cron completed for account " + accountId + " in " + (Context.now() - startTimestamp) + " seconds");
                         } catch (Exception e) {
                             loggerMaker.errorAndAddToDb(e, "Error in skills risk score sync cron: " + e.getMessage());
                         }
