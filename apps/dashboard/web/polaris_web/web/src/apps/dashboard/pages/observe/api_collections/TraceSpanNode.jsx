@@ -1,11 +1,11 @@
-import { Box, Badge, Text, VerticalStack } from '@shopify/polaris';
+import { Box, Badge, Text, VerticalStack, Tooltip } from '@shopify/polaris';
 import React from 'react';
 import { Handle, Position } from 'react-flow-renderer';
 
 function TraceSpanNode({ data }) {
     const { name, spanKind, output, isRootNode, hasChildren } = data;
 
-    // Format output for display (first 4 lines)
+    // Format output for display (first 4 lines, truncated for node)
     const formatOutput = (outputData) => {
         if (!outputData || Object.keys(outputData).length === 0) {
             return 'No output';
@@ -23,6 +23,16 @@ function TraceSpanNode({ data }) {
             count++;
         }
         return lines.join('\n');
+    };
+
+    // Full output text shown in hover tooltip
+    const formatFullOutput = (outputData) => {
+        if (!outputData || Object.keys(outputData).length === 0) {
+            return 'No output';
+        }
+        return Object.entries(outputData)
+            .map(([key, value]) => `${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`)
+            .join('\n');
     };
 
     // Get span kind color
@@ -77,9 +87,11 @@ function TraceSpanNode({ data }) {
             }}>
                 <VerticalStack gap="2">
                     {/* Span Name */}
-                    <Text variant="bodyMd" fontWeight="semibold" as="div" truncate>
-                        {name}
-                    </Text>
+                    <Tooltip content={name} dismissOnMouseOut>
+                        <Text variant="bodyMd" fontWeight="semibold" as="div" truncate>
+                            {name}
+                        </Text>
+                    </Tooltip>
 
                     {/* Span Kind Badge */}
                     <Box>
@@ -89,22 +101,24 @@ function TraceSpanNode({ data }) {
                     </Box>
 
                     {/* Output Section - Compact */}
-                    <Box
-                        background="bg-surface-secondary"
-                        padding="1"
-                        borderRadius="100"
-                        style={{ maxHeight: '60px', overflowY: 'hidden' }}
-                    >
-                        <Text
-                            variant="bodySm"
-                            as="div"
-                            fontFamily="monospace"
-                            color="subdued"
-                            breakWord
+                    <Tooltip content={formatFullOutput(output)} dismissOnMouseOut>
+                        <Box
+                            background="bg-surface-secondary"
+                            padding="1"
+                            borderRadius="100"
+                            style={{ maxHeight: '60px', overflowY: 'hidden' }}
                         >
-                            {formatOutput(output)}
-                        </Text>
-                    </Box>
+                            <Text
+                                variant="bodySm"
+                                as="div"
+                                fontFamily="monospace"
+                                color="subdued"
+                                breakWord
+                            >
+                                {formatOutput(output)}
+                            </Text>
+                        </Box>
+                    </Tooltip>
                 </VerticalStack>
             </div>
             {hasChildren && <Handle type="source" position={Position.Bottom} id="b" style={{ background: borderColor, width: '8px', height: '8px' }} />}
