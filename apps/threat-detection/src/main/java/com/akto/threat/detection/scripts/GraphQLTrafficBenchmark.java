@@ -37,7 +37,7 @@ public class GraphQLTrafficBenchmark {
                     .setPollDurationMilli(100)
                     .build())
             .setProducerConfig(
-                KafkaProducerConfig.newBuilder().setBatchSize(16384).setLingerMs(100).build())
+                KafkaProducerConfig.newBuilder().setBatchSize(1048576).setLingerMs(5).build())
             .setKeySerializer(Serializer.STRING)
             .setValueSerializer(Serializer.BYTE_ARRAY)
             .build();
@@ -97,6 +97,22 @@ public class GraphQLTrafficBenchmark {
         runMixedTraffic();
     }
 
+    // Pre-built records per IP (normal + malicious), keyed by index, to avoid rebuilding protos in the hot loop
+    private static final HttpResponseParam[] NORMAL_RECORDS;
+    private static final HttpResponseParam[][] MALICIOUS_RECORDS;
+    static {
+        NORMAL_RECORDS = new HttpResponseParam[CLEAN_IPS.length];
+        for (int i = 0; i < CLEAN_IPS.length; i++) {
+            NORMAL_RECORDS[i] = buildGraphQLRecord(CLEAN_IPS[i], GRAPHQL_BODY);
+        }
+        MALICIOUS_RECORDS = new HttpResponseParam[CLEAN_IPS.length][MALICIOUS_BODIES.length];
+        for (int i = 0; i < CLEAN_IPS.length; i++) {
+            for (int j = 0; j < MALICIOUS_BODIES.length; j++) {
+                MALICIOUS_RECORDS[i][j] = buildGraphQLRecord(CLEAN_IPS[i], MALICIOUS_BODIES[j]);
+            }
+        }
+    }
+
     private static void runMixedTraffic() throws Exception {
         System.out.println("\n******* Mixed Traffic — 10% malicious, 90% normal (~20KB per record) *******\n");
         System.out.printf("Request body size: %d bytes (%.1f KB)%n", GRAPHQL_BODY.length(), GRAPHQL_BODY.length() / 1024.0);
@@ -105,26 +121,27 @@ public class GraphQLTrafficBenchmark {
 
         int maliciousCount = 0;
         int normalCount = 0;
+        long windowStart = System.currentTimeMillis();
+        final long reportInterval = 10_000;
 
         for (long i = 0; i < numRecords; i++) {
             boolean isMalicious = random.nextDouble() < 0.10;
-            String ip = CLEAN_IPS[random.nextInt(CLEAN_IPS.length)];
-            HttpResponseParam record;
+            int ipIdx = random.nextInt(CLEAN_IPS.length);
 
             if (isMalicious) {
-                String payload = MALICIOUS_BODIES[random.nextInt(MALICIOUS_BODIES.length)];
-                record = buildGraphQLRecord(ip, payload);
+                producer.send(THREAT_TOPIC, MALICIOUS_RECORDS[ipIdx][random.nextInt(MALICIOUS_BODIES.length)]);
                 maliciousCount++;
             } else {
-                record = buildGraphQLRecord(ip, GRAPHQL_BODY);
+                producer.send(THREAT_TOPIC, NORMAL_RECORDS[ipIdx]);
                 normalCount++;
             }
 
-            producer.send(THREAT_TOPIC, record);
-
-            if ((i + 1) % 100 == 0) {
-                System.out.printf("Sent %d/%d (malicious: %d, normal: %d)%n",
-                    i + 1, numRecords, maliciousCount, normalCount);
+            if ((i + 1) % reportInterval == 0) {
+                long elapsed = System.currentTimeMillis() - windowStart;
+                double msgPerSec = reportInterval * 1000.0 / elapsed;
+                System.out.printf("Sent %d/%d | %.0f msg/sec (malicious: %d, normal: %d)%n",
+                    i + 1, numRecords, msgPerSec, maliciousCount, normalCount);
+                windowStart = System.currentTimeMillis();
             }
         }
 
