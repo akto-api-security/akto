@@ -2,6 +2,9 @@ package com.akto;
 
 import com.akto.dao.*;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
+import com.akto.dao.nhi_governance.NhiIdentityDao;
+import com.akto.dao.nhi_governance.NhiPolicyDao;
+import com.akto.dao.nhi_governance.NhiViolationDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.jobs.AccountJobDao;
 import com.akto.dao.jobs.JobsDao;
@@ -539,6 +542,9 @@ public class DaoInit {
         MetricDataDao.instance.createIndicesIfAbsent();
         SensitiveSampleDataDao.instance.createIndicesIfAbsent();
         McpAuditInfoDao.instance.createIndicesIfAbsent();
+        NhiIdentityDao.instance.createIndicesIfAbsent();
+        NhiPolicyDao.instance.createIndicesIfAbsent();
+        NhiViolationDao.instance.createIndicesIfAbsent();
         McpReconRequestDao.instance.createIndicesIfAbsent();
         GuardrailPoliciesDao.instance.createIndicesIfAbsent();
         McpAllowlistDao.instance.createIndicesIfAbsent();

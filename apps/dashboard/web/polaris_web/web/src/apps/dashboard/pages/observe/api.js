@@ -1102,6 +1102,78 @@ export default {
             method: 'post',
             data: { hostnames }
         })
+    },
+
+    async fetchNhiIdentities() {
+        const resp = await request({
+            url: '/api/fetchNhiIdentities',
+            method: 'post',
+            data: {}
+        })
+        return resp?.identities || []
+    },
+
+    async fetchAllNhiViolations() {
+        const resp = await request({
+            url: '/api/fetchAllNhiViolations',
+            method: 'post',
+            data: {}
+        })
+        return resp?.violations || []
+    },
+
+    async fetchViolationCountsByIdentity() {
+        const resp = await request({
+            url: '/api/fetchViolationCountsByIdentity',
+            method: 'post',
+            data: {}
+        })
+        return resp?.violations || []
+    },
+
+    async disableNhiIdentity(identityId) {
+        const resp = await request({
+            url: '/api/disableNhiIdentity',
+            method: 'post',
+            data: { identityId }
+        })
+        return resp?.success || false
+    },
+
+    async markViolationAsFixed(violationId) {
+        const resp = await request({
+            url: '/api/markViolationAsFixed',
+            method: 'post',
+            data: { violationId }
+        })
+        return resp?.success || false
+    },
+
+    async createJiraTicketFromViolation(violationId, aktoDashboardHost, projId, issueType, jiraMetaData) {
+        const resp = await request({
+            url: '/api/createJiraTicketFromViolation',
+            method: 'post',
+            data: { violationId, aktoDashboardHost, projId, issueType, jiraMetaData }
+        })
+        return resp
+    },
+
+    async fetchNhiPolicies() {
+        const resp = await request({
+            url: '/api/fetchNhiPolicies',
+            method: 'post',
+            data: {}
+        })
+        return resp?.policies || []
+    },
+
+    async saveNhiPolicy(policy, policyId) {
+        const resp = await request({
+            url: '/api/saveNhiPolicy',
+            method: 'post',
+            data: { policy, policyId }
+        })
+        return resp
     }
 
 }
