@@ -480,8 +480,27 @@ public class DbLayer {
         );
     }
 
+    private static final int FETCH_API_INFO_LAST_SEEN_CUTOFF_DAYS = 15;
+
     public static List<ApiInfo> fetchApiInfos() {
-        return ApiInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(ApiInfo.RATELIMITS));
+        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(ApiInfo.RATELIMITS));
+        Set<Integer> deactivated = UsageMetricCalculator.getDeactivated();
+        int cutoffEpoch = Context.now() - FETCH_API_INFO_LAST_SEEN_CUTOFF_DAYS * 24 * 60 * 60;
+
+        apiInfos.removeIf(apiInfo -> {
+            // Never skip template URLs — they prevent URL explosion in the policy engine
+            if (APICatalog.isTemplateUrl(apiInfo.getId().getUrl())) {
+                return false;
+            }
+            // Skip static URLs from deactivated collections
+            if (!deactivated.isEmpty() && deactivated.contains(apiInfo.getId().getApiCollectionId())) {
+                return true;
+            }
+            // Skip static URLs with lastSeen older than cutoff
+            return apiInfo.getLastSeen() < cutoffEpoch;
+        });
+
+        return apiInfos;
     }
 
     public static List<ApiInfo> fetchApiInfosByCollection(int apiCollectionId) {
