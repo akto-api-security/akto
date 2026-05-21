@@ -8,6 +8,7 @@ import {
   Pagination, Key, Badge} from '@shopify/polaris';
 import SampleDataComponent from './SampleDataComponent';
 import SampleData from './SampleData';
+import ValidationReasonBanner from './ValidationReasonBanner';
 import func from '../../../../util/func';
 import { getDashboardCategory, mapLabel, isAgenticSecurityCategory, isEndpointSecurityCategory } from '../../../main/labelHelper';
 
@@ -67,9 +68,11 @@ function SampleDataList(props) {
       setPage(0);
     }, [sampleData])
   
+    const currentSample = sampleData[Math.min(page, sampleData.length - 1)];
+
     return (
       <VerticalStack gap="3">
-         <SchemaValidationError sampleData={sampleData[Math.min(page, sampleData.length - 1)]} />
+         <SchemaValidationError sampleData={currentSample} />
         <HorizontalStack align='space-between'>
           <HorizontalStack gap="2">
             <Text variant='headingMd'>
@@ -131,6 +134,10 @@ function SampleDataList(props) {
             })
           }
         </HorizontalGrid>
+        <ValidationReasonBanner
+          validationReason={currentSample?.validationReason}
+          isVulnerable={isVulnerable}
+        />
       </VerticalStack>
     )
   }

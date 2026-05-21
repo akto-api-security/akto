@@ -824,9 +824,10 @@ function TestRunResultFlyout(props) {
                             vertical={true}
                             sampleData={
                                 selectedTestRunResult?.testResults.map((result, idx) => {
+                                    const validationReason = result.validationReason || "";
                                     if (result.errors && result.errors.length > 0) {
                                         let errorList = result.errors.join(", ");
-                                        return { errorList: errorList }
+                                        return { errorList: errorList, validationReason }
                                     }
                                     // Add vulnerability highlights only for response
                                     let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
@@ -834,16 +835,18 @@ function TestRunResultFlyout(props) {
                                         if(isAgentic){
                                             return {
                                                 originalMessage: result.message,
-                                                message: result.message
+                                                message: result.message,
+                                                validationReason,
                                             }
                                         }
                                         return {
                                             originalMessage: result.originalMessage,
                                             message: result.message,
-                                            vulnerabilitySegments
+                                            vulnerabilitySegments,
+                                            validationReason,
                                         }
                                     }
-                                    return { errorList: "No data found" }
+                                    return { errorList: "No data found", validationReason }
                                 })}
                             isNewDiff={true}
                             vulnerable={selectedTestRunResult?.vulnerable}

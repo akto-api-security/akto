@@ -37,6 +37,7 @@ import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.TestingUtilsSingleton;
 import com.akto.test_editor.Utils;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.util.Constants;
 import com.akto.util.CookieTransformer;
 import com.akto.util.HttpRequestResponseUtils;
@@ -248,13 +249,13 @@ public class Executor {
                 }
                 if (res != null) {
                     result.add(res);
+                    vulnerable = res.getVulnerable();
                 }
-                vulnerable = res.getVulnerable();
                 
             } catch(Exception e) {
                 testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
                 error_messages.add("Error executing test request: " + e.getMessage());
-                loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage());
             }
         }
         
@@ -442,9 +443,9 @@ public class Executor {
 
         String msg = convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
         RawApi testRawApi = new RawApi(attempt.getRequest(), attempt.getResponse(), msg);
-        boolean vulnerable = TestPlugin.validateValidator(validatorNode, rawApi, testRawApi , apiInfoKey, varMap, logId);
-        if (vulnerable) {
-            loggerMaker.debugAndAddToDb("found vulnerable " + logId, LogDb.TESTING);
+        ValidationResult vulnerable = TestPlugin.validateValidator(validatorNode, rawApi, testRawApi , apiInfoKey, varMap, logId);
+        if (vulnerable.getIsValid()) {
+            loggerMaker.debugAndAddToDb("found vulnerable " + logId);
         }
         double percentageMatch = 0;
         if (rawApi.getResponse() != null && testRawApi.getResponse() != null) {
@@ -453,8 +454,9 @@ public class Executor {
             );
         }
         TestResult testResult = new TestResult(
-                msg, rawApi.getOriginalMessage(), new ArrayList<>(), percentageMatch, vulnerable, TestResult.Confidence.HIGH, null
+                msg, rawApi.getOriginalMessage(), new ArrayList<>(), percentageMatch, vulnerable.getIsValid(), TestResult.Confidence.HIGH, null
         );
+        testResult.setValidationReason(vulnerable.getValidationReason());
 
         return testResult;
     }

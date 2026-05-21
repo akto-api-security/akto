@@ -120,14 +120,15 @@ function TestRunResultFull(props) {
         <SampleDataList
           key={"sampleData"}
           sampleData={selectedTestRunResult?.testResults.map((result) => {
+            const validationReason = result.validationReason || "";
             if (result.errors && result.errors.length > 0) {
               let errorList = result.errors.join(", ");
-              return { errorList: errorList }
+              return { errorList: errorList, validationReason }
             }
             if (result.originalMessage || result.message) {
-              return { originalMessage: result.originalMessage, message: result.message, highlightPaths: [] }
+              return { originalMessage: result.originalMessage, message: result.message, highlightPaths: [], validationReason }
             }
-            return { errorList: "No data found" }
+            return { errorList: "No data found", validationReason }
           })}
           isNewDiff={true}
           vertical={errorsPresent}
@@ -140,14 +141,15 @@ function TestRunResultFull(props) {
         <SampleDataList
           key={"sampleDataAgentic"}
           sampleData={selectedTestRunResult?.testResults.map((result) => {
+            const validationReason = result.validationReason || "";
             if (result.errors && result.errors.length > 0) {
               let errorList = result.errors.join(", ");
-              return { errorList: errorList }
+              return { errorList: errorList, validationReason }
             }
             if (result.message) {
-              return { originalMessage: result.message, message: result.message, highlightPaths: [] }
+              return { originalMessage: result.message, message: result.message, highlightPaths: [], validationReason }
             }
-            return { errorList: "No data found" }
+            return { errorList: "No data found", validationReason }
           })}
           isNewDiff={true}
           vertical={false}
