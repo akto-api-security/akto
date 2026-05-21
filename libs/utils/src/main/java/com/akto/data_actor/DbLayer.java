@@ -481,7 +481,11 @@ public class DbLayer {
     }
 
     public static List<ApiInfo> fetchApiInfos() {
-        return ApiInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(ApiInfo.RATELIMITS));
+        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(ApiInfo.RATELIMITS));
+        Set<Integer> deactivated = UsageMetricCalculator.getDeactivated();
+        if (deactivated.isEmpty()) return apiInfos;
+        apiInfos.removeIf(apiInfo -> deactivated.contains(apiInfo.getId().getApiCollectionId()));
+        return apiInfos;
     }
 
     public static List<ApiInfo> fetchApiInfosByCollection(int apiCollectionId) {
