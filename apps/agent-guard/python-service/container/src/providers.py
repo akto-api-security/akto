@@ -462,53 +462,48 @@ def _build_qwen3guard() -> Optional[LLMProvider]:
     )
 
 
+# Registry of provider builders, keyed by canonical provider name. Inputs are
+# (model, base_url); credentials and other static config come from settings
+# inside each builder. Adding a new provider means adding one row here.
+_BUILDERS: Dict[str, Callable[[str, str], Optional[LLMProvider]]] = {
+    "openai":            lambda model, _: _build_openai_compatible(model, base_url=""),
+    "openai_compatible": _build_openai_compatible,
+    "anthropic":         lambda model, _: _build_anthropic(model),
+    "vertexai":          lambda _m, _b:   _build_vertexai(),
+    "gemma_vertexai":    lambda _m, _b:   _build_gemma_vertexai(),
+    "qwen3guard":        lambda _m, _b:   _build_qwen3guard(),
+}
+
+
+def _dispatch(provider_name: str, model: str, base_url: str) -> Optional[LLMProvider]:
+    """Route a canonical provider name to its builder, returning the cached instance."""
+    builder = _BUILDERS.get(provider_name)
+    if builder is None:
+        logger.warning(f"[Providers] Unknown provider '{provider_name}'; skipping")
+        return None
+    return _cached_provider(
+        (provider_name, model, base_url),
+        lambda: builder(model, base_url),
+    )
+
+
 def build_provider_from_env(provider_name: str, model: str = "") -> Optional[LLMProvider]:
     """Build a provider using *only* env vars. Used by the SCANNER_LLM_PROVIDER path."""
-    provider_name = provider_name.strip().lower()
-    if provider_name == "openai":
-        resolved_model = model or settings.OPENAI_MODEL
-        return _cached_provider(
-            ("openai", resolved_model, ""),
-            lambda: _build_openai_compatible(resolved_model, base_url=""),
-        )
-    if provider_name == "anthropic":
-        resolved_model = model or settings.ANTHROPIC_MODEL
-        return _cached_provider(
-            ("anthropic", resolved_model, ""),
-            lambda: _build_anthropic(resolved_model),
-        )
-    if provider_name == "vertexai":
-        return _cached_provider(("vertexai", "", ""), _build_vertexai)
-    if provider_name == "gemma_vertexai":
-        return _cached_provider(("gemma_vertexai", "", ""), _build_gemma_vertexai)
-    logger.warning(f'[Providers] Unknown provider "{provider_name}"; skipping')
-    return None
+    name = provider_name.strip().lower()
+    if name == "openai":
+        model = model or settings.OPENAI_MODEL
+    elif name == "anthropic":
+        model = model or settings.ANTHROPIC_MODEL
+    return _dispatch(name, model, "")
 
 
 def build_provider_from_config(entry: Dict[str, Any]) -> Optional[LLMProvider]:
     """Build a provider from a modelMap entry. Reads name/model/baseUrl from the
     entry; credentials still come from settings."""
-    provider_name = (entry.get("provider") or "").strip().lower()
+    name = (entry.get("provider") or "").strip().lower()
     model = (entry.get("model") or "").strip()
-
-    if provider_name in ("openai", "ollama", "openai_compatible"):
+    if name in ("openai", "ollama", "openai_compatible"):
         # Entry-level baseUrl wins, then OPENAI_COMPATIBLE_BASE_URL, then default.
         base_url = (entry.get("baseUrl") or "").strip() or settings.OPENAI_COMPATIBLE_BASE_URL
-        return _cached_provider(
-            ("openai_compatible", model, base_url),
-            lambda: _build_openai_compatible(model, base_url),
-        )
-    if provider_name == "anthropic":
-        return _cached_provider(
-            ("anthropic", model, ""),
-            lambda: _build_anthropic(model),
-        )
-    if provider_name == "vertexai":
-        return _cached_provider(("vertexai", "", ""), _build_vertexai)
-    if provider_name == "gemma_vertexai":
-        return _cached_provider(("gemma_vertexai", "", ""), _build_gemma_vertexai)
-    if provider_name == "qwen3guard":
-        return _cached_provider(("qwen3guard", "", ""), _build_qwen3guard)
-
-    logger.warning(f"[ModelMap] Unknown provider '{provider_name}'; skipping entry")
-    return None
+        return _dispatch("openai_compatible", model, base_url)
+    return _dispatch(name, model, "")
