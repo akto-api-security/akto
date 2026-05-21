@@ -2,7 +2,7 @@ package com.akto.hybrid_parsers;
 
 import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
-import com.akto.dao.agentic_sessions.AgentQueryDataDao;
+import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.traffic.CollectionTags.TagSource;
@@ -13,7 +13,6 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.*;
 import com.akto.dto.ApiCollection.ServiceGraphEdgeInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.agentic_sessions.AgentQueryData;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.bulk_updates.BulkUpdates;
@@ -85,6 +84,10 @@ public class HttpCallParser {
     private static final List<Integer> INPROCESS_ADVANCED_FILTERS_ACCOUNTS = Arrays.asList(1736798101, 1718042191, 1759692400);
     private DataActor dataActor = DataActorFactory.fetchInstance();
     private Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
+
+    private Map<String, String> deviceUserMapCache = new HashMap<>();
+    private int deviceUserMapLastFetchTs = 0;
+    private static final int DEVICE_USER_MAP_REFRESH_INTERVAL = 60 * 10;
 
     // Track which hostnames have been added to each service-tag collection to avoid redundant DB calls
     // Key: collectionId, Value: Set of hostnames already added
@@ -1500,8 +1503,11 @@ public class HttpCallParser {
 
             // if traffic is agentic, then send the data to cyborg
             if (isAgenticTraffic(tagsMap) && allowAnalysis) {
-                AgentQueryData agentQueryData = AgentQueryDataDao.instance.createAgentQueryDataFromHttpResponseParams(httpResponseParam);
-                dataActor.storeAgentQueryData(agentQueryData);
+                AgentQueryRecord record = AgentQueryRecord.fromHttpResponseParams(
+                        httpResponseParam, tagsMap, getDeviceUserMap());
+                if (record != null) {
+                    dataActor.storeAgentQueryData(record);
+                }
             }
 
             // Parse N8N trace metadata if this is N8N traffic
@@ -1617,6 +1623,14 @@ public class HttpCallParser {
 
     public void setTrafficMetricsMap(Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap) {
         this.trafficMetricsMap = trafficMetricsMap;
+    }
+
+    private Map<String, String> getDeviceUserMap() {
+        if (Context.now() - deviceUserMapLastFetchTs > DEVICE_USER_MAP_REFRESH_INTERVAL) {
+            deviceUserMapCache = dataActor.fetchDeviceUserMap();
+            deviceUserMapLastFetchTs = Context.now();
+        }
+        return deviceUserMapCache;
     }
 
     private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {

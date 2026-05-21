@@ -5,7 +5,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.agentic_sessions.AgentQueryData;
+import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
@@ -56,6 +56,7 @@ import com.mongodb.client.model.WriteModel;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -818,7 +819,11 @@ public class DbActor extends DataActor {
         ApiSequencesDao.instance.getMCollection().bulkWrite(writeModels, new BulkWriteOptions().ordered(false));
     } 
     
-    public void storeAgentQueryData(AgentQueryData agentQueryData) {
-        DbLayer.storeAgentQueryData(agentQueryData);
+    public void storeAgentQueryData(AgentQueryRecord agentQueryRecord) {
+        // no-op: agent query records are sent to ES via ClientActor; DbActor has no local store
+    }
+
+    public Map<String, String> fetchDeviceUserMap() {
+        return new HashMap<>();
     }
 }
