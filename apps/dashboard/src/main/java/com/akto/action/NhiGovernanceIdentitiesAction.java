@@ -30,20 +30,11 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
     private boolean success = false;
 
     @Setter
-    private String contextSource;
-
-    @Setter
     private String identityId;
-
-    @Setter
-    private String userEmail;
 
     public String fetchNhiIdentities() {
         try {
-            Bson filter = (contextSource != null && !contextSource.isEmpty())
-                    ? Filters.eq(NhiIdentity.CONTEXT_SOURCE, contextSource)
-                    : Filters.empty();
-            identities = NhiIdentityDao.instance.findAll(filter);
+            identities = NhiIdentityDao.instance.findAll(Filters.empty());
             return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
@@ -63,17 +54,11 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
                 return Action.ERROR.toUpperCase();
             }
 
-            if (userEmail == null || userEmail.isEmpty()) {
-                addActionError("User email is required");
-                success = false;
-                return Action.ERROR.toUpperCase();
-            }
-
             Bson filter = Filters.eq(NhiIdentity.ID, new ObjectId(identityId));
             Bson update = Updates.combine(
                 Updates.set(NhiIdentity.STATUS, "INACTIVE"),
                 Updates.set(NhiIdentity.UPDATED_AT, (int)currentTime),
-                Updates.set(NhiIdentity.UPDATED_BY, userEmail)
+                Updates.set(NhiIdentity.UPDATED_BY, getSUser().getLogin())
             );
 
             NhiIdentityDao.instance.updateOne(filter, update);

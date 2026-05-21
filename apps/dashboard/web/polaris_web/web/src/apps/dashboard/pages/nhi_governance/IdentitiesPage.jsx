@@ -12,7 +12,7 @@ import useTable from "../../components/tables/TableContext";
 import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import values from "@/util/values";
-import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "../../../main/labelHelper";
+import { isEndpointSecurityCategory } from "../../../main/labelHelper";
 import { formatRelativeTime } from "./nhiUtils";
 import IdentityDetailsPanel from "./IdentityDetailsPanel";
 import IdentityOverviewGraph from "./IdentityOverviewGraph";
@@ -160,11 +160,8 @@ export default function IdentitiesPage() {
                 setLoading(true);
                 setError(null);
 
-                // Determine context source based on category
-                const contextSource = isAgenticSecurityCategory() ? "AGENTIC" : "ENDPOINT";
-
                 // Fetch identities from API
-                const identitiesResponse = await observeRequests.fetchNhiIdentities(contextSource);
+                const identitiesResponse = await observeRequests.fetchNhiIdentities();
                 if (identitiesResponse && identitiesResponse.length > 0) {
                     const transformed = identitiesResponse.map(transformIdentityForUI);
                     setRawIdentities(transformed);
@@ -174,9 +171,9 @@ export default function IdentitiesPage() {
                     setRawIdentities([]);
                 }
 
-                // Fetch violations from API for violation counts
+                // Fetch slim violation projection for per-identity counts
                 try {
-                    const violationsResponse = await observeRequests.fetchAllNhiViolations(contextSource);
+                    const violationsResponse = await observeRequests.fetchViolationCountsByIdentity();
                     if (Array.isArray(violationsResponse) && violationsResponse.length > 0) {
                         setRawViolations(violationsResponse);
                     } else {

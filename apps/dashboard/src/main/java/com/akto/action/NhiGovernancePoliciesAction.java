@@ -13,6 +13,7 @@ import lombok.Setter;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class NhiGovernancePoliciesAction extends UserAction {
@@ -23,16 +24,11 @@ public class NhiGovernancePoliciesAction extends UserAction {
     @Getter @Setter private NhiPolicy policy;
     @Getter private boolean success = false;
 
-    @Setter private String contextSource;
     @Setter private String policyId;
-    @Setter private String userEmail;
 
     public String fetchNhiPolicies() {
         try {
-            Bson filter = (contextSource != null && !contextSource.isEmpty())
-                    ? Filters.eq(NhiPolicy.CONTEXT_SOURCE, contextSource)
-                    : Filters.empty();
-            policies = NhiPolicyDao.instance.findAll(filter);
+            policies = NhiPolicyDao.instance.findAll(Filters.empty());
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching NHI policies: " + e.getMessage());
@@ -41,89 +37,59 @@ public class NhiGovernancePoliciesAction extends UserAction {
         }
     }
 
-    public String createNhiPolicy() {
+    public String saveNhiPolicy() {
         try {
-            if (policy == null || policy.getPolicyName() == null || policy.getPolicyName().trim().isEmpty()) {
-                return Action.ERROR.toUpperCase();
-            }
-
-            int now = Context.now();
-            String creator = userEmail != null ? userEmail : "unknown";
-
-            policy.setCreatedAt(now);
-            policy.setCreatedBy(creator);
-            policy.setUpdatedAt(now);
-            policy.setUpdatedBy(creator);
-
-            if (policy.getStatus() == null || policy.getStatus().isEmpty()) {
-                policy.setStatus("ACTIVE");
-            }
-
-            NhiPolicyDao.instance.insertOne(policy);
-            success = true;
-            return Action.SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            addActionError(e.getMessage());
-            return Action.ERROR.toUpperCase();
-        }
-    }
-
-    public String updateNhiPolicy() {
-        try {
-            if (policyId == null || policyId.isEmpty()) {
-                return Action.ERROR.toUpperCase();
-            }
             if (policy == null) {
+                addActionError("Policy is required");
                 return Action.ERROR.toUpperCase();
             }
 
-            int now = Context.now();
-            String updater = userEmail != null ? userEmail : "unknown";
-
-            Bson filter = Filters.eq(NhiPolicy.ID, new ObjectId(policyId));
-            Bson update = Updates.combine(
-                Updates.set(NhiPolicy.POLICY_NAME, policy.getPolicyName()),
-                Updates.set(NhiPolicy.DESCRIPTION, policy.getDescription()),
-                Updates.set(NhiPolicy.STATUS, policy.getStatus()),
-                Updates.set(NhiPolicy.SCOPE, policy.getScope()),
-                Updates.set(NhiPolicy.TOKEN_SEGREGATION, policy.getTokenSegregation()),
-                Updates.set(NhiPolicy.EXPIRATION_TRACKING, policy.getExpirationTracking()),
-                Updates.set(NhiPolicy.UPDATED_AT, now),
-                Updates.set(NhiPolicy.UPDATED_BY, updater)
-            );
-
-            NhiPolicyDao.instance.updateOne(filter, update);
-            loggerMaker.infoAndAddToDb("Updated NHI policy: " + policyId);
-            success = true;
-            return Action.SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error updating NHI policy: " + e.getMessage());
-            addActionError(e.getMessage());
-            return Action.ERROR.toUpperCase();
-        }
-    }
-
-    public String disableNhiPolicy() {
-        try {
-            if (policyId == null || policyId.isEmpty()) {
+            boolean isNew = (policyId == null || policyId.isEmpty());
+            if (isNew && (policy.getPolicyName() == null || policy.getPolicyName().trim().isEmpty())) {
+                addActionError("Policy name is required");
                 return Action.ERROR.toUpperCase();
             }
 
+            ObjectId id = isNew ? new ObjectId() : new ObjectId(policyId);
             int now = Context.now();
-            String updater = userEmail != null ? userEmail : "unknown";
+            String user = getSUser().getLogin();
 
-            Bson filter = Filters.eq(NhiPolicy.ID, new ObjectId(policyId));
-            Bson update = Updates.combine(
-                Updates.set(NhiPolicy.STATUS, "INACTIVE"),
-                Updates.set(NhiPolicy.UPDATED_AT, now),
-                Updates.set(NhiPolicy.UPDATED_BY, updater)
-            );
+            List<Bson> updates = new ArrayList<>();
+            if (policy.getPolicyName() != null) {
+                updates.add(Updates.set(NhiPolicy.POLICY_NAME, policy.getPolicyName()));
+            }
+            if (policy.getDescription() != null) {
+                updates.add(Updates.set(NhiPolicy.DESCRIPTION, policy.getDescription()));
+            }
+            if (policy.getStatus() != null && !policy.getStatus().isEmpty()) {
+                updates.add(Updates.set(NhiPolicy.STATUS, policy.getStatus()));
+            } else {
+                updates.add(Updates.setOnInsert(NhiPolicy.STATUS, "ACTIVE"));
+            }
+            if (policy.getScope() != null) {
+                updates.add(Updates.set(NhiPolicy.SCOPE, policy.getScope()));
+            }
+            if (policy.getTokenSegregation() != null) {
+                updates.add(Updates.set(NhiPolicy.TOKEN_SEGREGATION, policy.getTokenSegregation()));
+            }
+            if (policy.getExpirationTracking() != null) {
+                updates.add(Updates.set(NhiPolicy.EXPIRATION_TRACKING, policy.getExpirationTracking()));
+            }
+            if (policy.getContextSource() != null) {
+                updates.add(Updates.set(NhiPolicy.CONTEXT_SOURCE, policy.getContextSource()));
+            }
+            updates.add(Updates.set(NhiPolicy.UPDATED_AT, now));
+            updates.add(Updates.set(NhiPolicy.UPDATED_BY, user));
+            updates.add(Updates.setOnInsert(NhiPolicy.CREATED_AT, now));
+            updates.add(Updates.setOnInsert(NhiPolicy.CREATED_BY, user));
 
-            NhiPolicyDao.instance.updateOne(filter, update);
+            Bson filter = Filters.eq(NhiPolicy.ID, id);
+            NhiPolicyDao.instance.updateOne(filter, Updates.combine(updates));
+
             success = true;
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error disabling NHI policy: " + e.getMessage());
+            loggerMaker.errorAndAddToDb("Error saving NHI policy: " + e.getMessage());
             addActionError(e.getMessage());
             return Action.ERROR.toUpperCase();
         }

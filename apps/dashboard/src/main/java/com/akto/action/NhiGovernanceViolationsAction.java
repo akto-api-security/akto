@@ -2,7 +2,6 @@ package com.akto.action;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.nhi_governance.NhiViolationDao;
-import com.akto.dao.nhi_governance.NhiPolicyDao;
 import com.akto.dao.JiraIntegrationDao;
 import com.akto.dto.nhi_governance.NhiViolation;
 import com.akto.dto.nhi_governance.NhiPolicy;
@@ -12,24 +11,32 @@ import com.akto.dto.jira_integration.JiraIntegration;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.Pair;
+import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.utils.jira.Utils;
 import com.mongodb.BasicDBObject;
-import com.mongodb.BasicDBList;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Field;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.Variable;
 import com.opensymphony.xwork2.Action;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.commons.lang3.StringUtils;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
-import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Base64;
 
 public class NhiGovernanceViolationsAction extends UserAction {
 
@@ -43,16 +50,10 @@ public class NhiGovernanceViolationsAction extends UserAction {
     private NhiViolation violation;
 
     @Setter
-    private String contextSource;
-
-    @Setter
     private List<String> violationIds;
 
     @Setter
     private String violationId;
-
-    @Setter
-    private String userEmail;
 
     @Setter
     private String projId;
@@ -74,47 +75,84 @@ public class NhiGovernanceViolationsAction extends UserAction {
 
     public String fetchAllViolations() {
         try {
-            Bson filter = (contextSource != null && !contextSource.isEmpty())
-                    ? Filters.eq(NhiViolation.CONTEXT_SOURCE, contextSource)
-                    : Filters.empty();
+            List<Bson> pipeline = new ArrayList<>();
 
-            violations = NhiViolationDao.instance.findAll(filter);
-
-            // Collect all unique policyIds across violations
-            Set<String> allPolicyIds = violations.stream()
-                    .filter(v -> v.getPolicyIds() != null)
-                    .flatMap(v -> v.getPolicyIds().stream())
-                    .collect(Collectors.toSet());
-
-            // Build hexId → policyName map from a single DB query
-            Map<String, String> policyIdToName = new HashMap<>();
-            if (!allPolicyIds.isEmpty()) {
-                List<ObjectId> objectIds = allPolicyIds.stream()
-                        .map(ObjectId::new)
-                        .collect(Collectors.toList());
-                List<NhiPolicy> policies = NhiPolicyDao.instance.findAll(
-                        Filters.in(NhiPolicy.ID, objectIds)
-                );
-                for (NhiPolicy p : policies) {
-                    if (p.getId() != null) {
-                        policyIdToName.put(p.getId().toHexString(), p.getPolicyName());
-                    }
-                }
+            // Aggregation bypasses AccountsContextDaoWithContextSource — apply contextSource filter explicitly.
+            if (Context.contextSource.get() != null) {
+                pipeline.add(Aggregates.match(
+                        Filters.eq(NhiViolation.CONTEXT_SOURCE, Context.contextSource.get().name())
+                ));
             }
 
-            // Populate policy names in each violation from policyIds
-            for (NhiViolation v : violations) {
-                if (v.getPolicyIds() != null && !v.getPolicyIds().isEmpty()) {
-                    List<String> names = v.getPolicyIds().stream()
-                            .map(id -> policyIdToName.getOrDefault(id, id))
-                            .collect(Collectors.toList());
-                    v.setPolicy(names);
-                }
+            // Join nhi_policies. policyIds is List<String>, _id is ObjectId — match via $toString.
+            pipeline.add(Aggregates.lookup(
+                    NhiPolicy.COLLECTION_NAME,
+                    Arrays.asList(new Variable<>("vPolicyIds", "$" + NhiViolation.POLICY_IDS)),
+                    Arrays.asList(
+                            Aggregates.match(Filters.expr(new Document("$in", Arrays.asList(
+                                    new Document("$toString", "$_id"),
+                                    new Document("$ifNull", Arrays.asList("$$vPolicyIds", Collections.emptyList()))
+                            )))),
+                            Aggregates.project(Projections.fields(
+                                    Projections.excludeId(),
+                                    Projections.include(NhiPolicy.POLICY_NAME)
+                            ))
+                    ),
+                    "policyDocs"
+            ));
+
+            // Replace policy field with the resolved name list.
+            pipeline.add(Aggregates.addFields(new Field<>(
+                    NhiViolation.POLICY,
+                    new Document("$map", new Document("input", "$policyDocs")
+                            .append("as", "p")
+                            .append("in", "$$p." + NhiPolicy.POLICY_NAME))
+            )));
+
+            // Drop heavy fields no UI consumer reads, plus temporary join fields.
+            pipeline.add(Aggregates.project(Projections.fields(
+                    Projections.exclude(
+                            NhiViolation.ACKNOWLEDGED_AT, NhiViolation.ACKNOWLEDGED_BY,
+                            NhiViolation.RESOLVED_AT, NhiViolation.RESOLVED_BY,
+                            NhiViolation.AGENT_TYPE,
+                            NhiViolation.ACKNOWLEDGMENT_NOTES,
+                            NhiViolation.RESOLUTION_NOTES,
+                            NhiViolation.RESOLUTION_TYPE,
+                            NhiViolation.METADATA,
+                            NhiViolation.POLICY_IDS,
+                            "policyDocs"
+                    )
+            )));
+
+            MongoCursor<NhiViolation> cursor = NhiViolationDao.instance.getMCollection()
+                    .aggregate(pipeline, NhiViolation.class).cursor();
+
+            violations = new ArrayList<>();
+            while (cursor.hasNext()) {
+                violations.add(cursor.next());
             }
 
             return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching NHI violations: " + e.getMessage());
+            addActionError(e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchViolationCountsByIdentity() {
+        try {
+            violations = NhiViolationDao.instance.findAll(
+                    Filters.empty(),
+                    Projections.fields(
+                            Projections.excludeId(),
+                            Projections.include(NhiViolation.SEVERITY, NhiViolation.IDENTITIES + ".identityName")
+                    )
+            );
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching violation counts: " + e.getMessage());
             addActionError(e.getMessage());
             return Action.ERROR.toUpperCase();
         }
@@ -171,19 +209,12 @@ public class NhiGovernanceViolationsAction extends UserAction {
                 return Action.ERROR.toUpperCase();
             }
 
-            if (userEmail == null || userEmail.isEmpty()) {
-                loggerMaker.errorAndAddToDb("User email not provided");
-                addActionError("User email is required");
-                success = false;
-                return Action.ERROR.toUpperCase();
-            }
-
             // Update violation status to Fixed with updatedAt and updatedBy
             Bson filter = Filters.eq(NhiViolation.ID, new ObjectId(violationId));
             Bson update = Updates.combine(
                 Updates.set(NhiViolation.STATUS, "Fixed"),
                 Updates.set(NhiViolation.UPDATED_AT, currentTime),
-                Updates.set(NhiViolation.UPDATED_BY, userEmail)
+                Updates.set(NhiViolation.UPDATED_BY, getSUser().getLogin())
             );
 
             NhiViolationDao.instance.updateOne(filter, update);
@@ -222,7 +253,6 @@ public class NhiGovernanceViolationsAction extends UserAction {
                 return Action.ERROR.toUpperCase();
             }
 
-            // Fetch Jira integration from database
             JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
             if (jiraIntegration == null) {
                 errorMessage = "Jira is not integrated";
@@ -232,7 +262,6 @@ public class NhiGovernanceViolationsAction extends UserAction {
                 return Action.ERROR.toUpperCase();
             }
 
-            // Fetch the violation
             NhiViolation violation = NhiViolationDao.instance.findOne(NhiViolation.ID, new ObjectId(violationId));
             if (violation == null) {
                 errorMessage = "Violation not found";
@@ -242,80 +271,88 @@ public class NhiGovernanceViolationsAction extends UserAction {
                 return Action.ERROR.toUpperCase();
             }
 
-            // Build Jira fields object
-            BasicDBObject fields = new BasicDBObject();
-            fields.put("project", new BasicDBObject("key", projId));
-            fields.put("issuetype", new BasicDBObject("name", issueType));
-            fields.put("summary", violation.getViolationType());
-
-            // Build description with violation details
-            StringBuilder description = new StringBuilder();
-            description.append(violation.getDescription()).append("\n\n");
-            description.append("Severity: ").append(violation.getSeverity()).append("\n");
-            description.append("Agent: ").append(violation.getAgentName()).append("\n");
-            if (violation.getAffectedResources() != null && !violation.getAffectedResources().isEmpty()) {
-                description.append("Affected Resources: ").append(String.join(", ", violation.getAffectedResources())).append("\n");
-            }
-            description.append("\nViolation Details: ").append(aktoDashboardHost).append("/dashboard/nhi/violations?id=").append(violationId);
-            fields.put("description", description.toString());
-
-            // Add custom fields from jiraMetaData if present
-            if (jiraMetaData != null && jiraMetaData.containsKey("additionalIssueFields")) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> additionalFields = (Map<String, Object>) jiraMetaData.get("additionalIssueFields");
-                if (additionalFields != null) {
-                    additionalFields.forEach(fields::put);
-                }
-            }
-
-            // Add labels if present
-            if (jiraMetaData != null && jiraMetaData.containsKey("labels")) {
-                String labels = (String) jiraMetaData.get("labels");
-                if (labels != null && !labels.isEmpty()) {
-                    BasicDBObject labelsObj = new BasicDBObject();
-                    fields.put("labels", labels.split(",\\s*"));
-                }
-            }
-
-            // Build the request payload (single issue creation endpoint)
-            BasicDBObject reqPayload = new BasicDBObject();
-            reqPayload.put("fields", fields);
-
-            // Build Jira API URL
-            String url = jiraIntegration.getBaseUrl() + "/rest/api/3/issues";
-
-            // Build authentication headers
-            Map<String, List<String>> headers = new HashMap<>();
             JiraIntegration.JiraType jiraType = jiraIntegration.getJiraType();
             if (jiraType == null) {
                 jiraType = JiraIntegration.JiraType.CLOUD;
             }
 
-            if (jiraType == JiraIntegration.JiraType.DATA_CENTER) {
-                // Data Center uses Bearer token
+            List<BasicDBObject> baseContent = new ArrayList<>();
+            baseContent.add(buildContentParagraph(violation.getDescription(), jiraType));
+            baseContent.add(buildContentParagraph("Severity: " + violation.getSeverity(), jiraType));
+            baseContent.add(buildContentParagraph("Agent: " + violation.getAgentName(), jiraType));
+            if (violation.getAffectedResources() != null && !violation.getAffectedResources().isEmpty()) {
+                baseContent.add(buildContentParagraph(
+                        "Affected Resources: " + String.join(", ", violation.getAffectedResources()), jiraType));
+            }
+            baseContent.add(buildContentParagraph(
+                    "Violation Details: " + aktoDashboardHost + "/dashboard/nhi/violations?id=" + violationId, jiraType));
+
+            Object description = Utils.buildJiraDescription(baseContent, new ArrayList<>(), jiraType);
+
+            Severity severity = null;
+            try {
+                if (violation.getSeverity() != null) {
+                    severity = Severity.valueOf(violation.getSeverity().toUpperCase());
+                }
+            } catch (IllegalArgumentException ignored) {
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> additionalIssueFields = jiraMetaData != null
+                    ? (Map<String, Object>) jiraMetaData.get("additionalIssueFields")
+                    : null;
+
+            BasicDBObject fields = Utils.buildPayloadForJiraTicket(
+                    violation.getViolationType(), projId, issueType, description,
+                    additionalIssueFields, severity, jiraIntegration);
+
+            List<String> labelsList = parseJiraLabels(jiraMetaData);
+            if (!labelsList.isEmpty()) {
+                fields.put("labels", labelsList.toArray(new String[0]));
+            }
+
+            BasicDBObject reqPayload = new BasicDBObject();
+            reqPayload.put("fields", fields);
+
+            String url = jiraIntegration.getBaseUrl() + "/rest/api/3/issue";
+
+            Map<String, List<String>> headers = new HashMap<>();
+            if (Utils.isDataCenter(jiraType)) {
                 headers.put("Authorization", Collections.singletonList("Bearer " + jiraIntegration.getApiToken()));
             } else {
-                // Cloud uses Basic auth (email:token in base64)
-                String auth = jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken();
-                String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes());
-                headers.put("Authorization", Collections.singletonList("Basic " + encodedAuth));
+                String authHeader = Base64.getEncoder()
+                        .encodeToString((jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes());
+                headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
             }
             headers.put("Content-Type", Collections.singletonList("application/json"));
 
-            // Create and send request
             OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
-
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            String responseBody = response.getBody();
+
+            // Retry without labels if Jira rejected them
+            if (response.getStatusCode() > 201 && Utils.isLabelsFieldError(responseBody)) {
+                loggerMaker.infoAndAddToDb("Labels field error from Jira; retrying without labels for violation: " + violationId);
+                fields.remove("labels");
+                reqPayload.put("fields", fields);
+                OriginalHttpRequest retry = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
+                response = ApiExecutor.sendRequest(retry, true, null, false, new ArrayList<>());
+                responseBody = response.getBody();
+            }
 
             if (response.getStatusCode() > 201) {
-                errorMessage = "Error creating Jira ticket: " + response.getStatusCode() + " - " + response.getBody();
+                String parsedError = Utils.handleError(responseBody);
+                errorMessage = "Error creating Jira ticket: "
+                        + (parsedError != null ? parsedError : response.getStatusCode() + " - " + responseBody);
                 loggerMaker.errorAndAddToDb(errorMessage);
                 addActionError("Failed to create Jira ticket");
                 success = false;
                 return Action.ERROR.toUpperCase();
             }
 
-            loggerMaker.infoAndAddToDb("Successfully created Jira ticket from violation: " + violationId);
+            Pair<String, String> ticket = Utils.getJiraTicketUrlPair(responseBody, jiraIntegration.getBaseUrl());
+            String ticketUrl = ticket != null ? ticket.getFirst() : "";
+            loggerMaker.infoAndAddToDb("Created Jira ticket from violation " + violationId + ": " + ticketUrl);
             success = true;
             return Action.SUCCESS.toUpperCase();
 
@@ -326,5 +363,32 @@ public class NhiGovernanceViolationsAction extends UserAction {
             success = false;
             return Action.ERROR.toUpperCase();
         }
+    }
+
+    // Build a paragraph node in the shape buildJiraDescription expects (ADF for Cloud, plain-text for Data Center).
+    private static BasicDBObject buildContentParagraph(String text, JiraIntegration.JiraType jiraType) {
+        String safe = StringUtils.defaultString(text, "");
+        if (Utils.isDataCenter(jiraType)) {
+            return new BasicDBObject("type", "paragraph").append("text", safe);
+        }
+        return new BasicDBObject("type", "paragraph").append("content",
+                Collections.singletonList(new BasicDBObject("type", "text").append("text", safe)));
+    }
+
+    private static List<String> parseJiraLabels(Map<String, Object> jiraMetaData) {
+        List<String> labelsList = new ArrayList<>();
+        if (jiraMetaData == null) return labelsList;
+        Object raw = jiraMetaData.get("labels");
+        if (!(raw instanceof String) || ((String) raw).trim().isEmpty()) return labelsList;
+        for (String label : ((String) raw).split(",")) {
+            String trimmed = label.trim();
+            if (trimmed.isEmpty()) continue;
+            // Jira labels cannot contain spaces — replace with underscores.
+            String sanitized = trimmed.replaceAll("\\s+", "_");
+            if (!labelsList.contains(sanitized)) {
+                labelsList.add(sanitized);
+            }
+        }
+        return labelsList;
     }
 }

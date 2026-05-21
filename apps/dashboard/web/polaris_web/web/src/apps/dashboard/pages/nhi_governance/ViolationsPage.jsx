@@ -13,7 +13,6 @@ import useTable from "../../components/tables/TableContext";
 import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import values from "@/util/values";
-import { isAgenticSecurityCategory } from "../../../main/labelHelper";
 import { violationsHeaders, violationsSortOptions, SEV_ORD, sevBadge, IdentityIcon, AgentIcon, PolicyCell } from "./nhiViolationsData";
 import ViolationDetailsPanel from "./ViolationDetailsPanel";
 import observeRequests from "../observe/api";
@@ -181,11 +180,8 @@ export default function ViolationsPage() {
                 setLoading(true);
                 setError(null);
 
-                // Determine context source based on category
-                const contextSource = isAgenticSecurityCategory() ? "AGENTIC" : "ENDPOINT";
-
                 // Fetch violations from API
-                const response = await observeRequests.fetchAllNhiViolations(contextSource);
+                const response = await observeRequests.fetchAllNhiViolations();
 
                 if (response && Array.isArray(response) && response.length > 0) {
                     setRawViolations(response);

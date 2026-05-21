@@ -15273,8 +15273,11 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">SENSITIVE_DATA</param>
+                <param name="featureLabel">NHI_DATA</param>
                 <param name="accessType">READ</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -15289,54 +15292,15 @@
             </result>
         </action>
 
-        <action name="api/createNhiPolicy" class="com.akto.action.NhiGovernancePoliciesAction" method="createNhiPolicy">
+        <action name="api/saveNhiPolicy" class="com.akto.action.NhiGovernancePoliciesAction" method="saveNhiPolicy">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">SENSITIVE_DATA</param>
-                <param name="accessType">READ</param>
+                <param name="featureLabel">NHI_DATA</param>
+                <param name="accessType">READ_WRITE</param>
             </interceptor-ref>
-
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/updateNhiPolicy" class="com.akto.action.NhiGovernancePoliciesAction" method="updateNhiPolicy">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">SENSITIVE_DATA</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/disableNhiPolicy" class="com.akto.action.NhiGovernancePoliciesAction" method="disableNhiPolicy">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">SENSITIVE_DATA</param>
-                <param name="accessType">READ</param>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -15356,8 +15320,11 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">SENSITIVE_DATA</param>
+                <param name="featureLabel">NHI_DATA</param>
                 <param name="accessType">READ</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -15377,8 +15344,35 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">SENSITIVE_DATA</param>
+                <param name="featureLabel">NHI_DATA</param>
                 <param name="accessType">READ</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">NHI_GOVERNANCE</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchViolationCountsByIdentity" class="com.akto.action.NhiGovernanceViolationsAction" method="fetchViolationCountsByIdentity">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">NHI_DATA</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -15398,8 +15392,11 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">SENSITIVE_DATA</param>
+                <param name="featureLabel">NHI_DATA</param>
                 <param name="accessType">READ</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -15419,8 +15416,11 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">SENSITIVE_DATA</param>
-                <param name="accessType">READ</param>
+                <param name="featureLabel">NHI_DATA</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -15440,8 +15440,11 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">SENSITIVE_DATA</param>
-                <param name="accessType">READ</param>
+                <param name="featureLabel">NHI_DATA</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -15461,8 +15464,11 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">SENSITIVE_DATA</param>
-                <param name="accessType">READ</param>
+                <param name="featureLabel">NHI_DATA</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">

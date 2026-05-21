@@ -10,15 +10,11 @@ import SummaryCardInfo from "../../components/shared/SummaryCardInfo";
 import useTable from "../../components/tables/TableContext";
 import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
-import { isAgenticSecurityCategory } from "../../../main/labelHelper";
 import { ViolationBubbles } from "./nhiViolationsData";
 import observeRequests from "../observe/api";
 import CreateNhiPolicyModal from "./CreateNhiPolicyModal";
 import SpinnerCentered from "../../components/progress/SpinnerCentered";
-import Store from "../../store";
 import { formatRelativeTime } from "./nhiUtils";
-
-const IS_ARGUS = isAgenticSecurityCategory();
 
 const definedTableTabs = ["All", "Active", "Inactive", "Draft"];
 const resourceName = { singular: "policy", plural: "policies" };
@@ -114,7 +110,6 @@ export default function PoliciesPage() {
     const tableSelectedTab    = PersistStore((state) => state.tableSelectedTab);
     const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
     const initialSelectedTab  = tableSelectedTab[window.location.pathname] || "all";
-    const userEmail           = Store((state) => state.username);
 
     // API state
     const [rawPolicies, setRawPolicies]   = useState([]);
@@ -130,12 +125,10 @@ export default function PoliciesPage() {
     const [isEditMode, setIsEditMode]             = useState(false);
     const [editingPolicy, setEditingPolicy]       = useState(null);
 
-    const contextSource = IS_ARGUS ? "AGENTIC" : "ENDPOINT";
-
     const fetchPolicies = async () => {
         try {
             setLoading(true);
-            const resp = await observeRequests.fetchNhiPolicies(contextSource);
+            const resp = await observeRequests.fetchNhiPolicies();
             setRawPolicies(Array.isArray(resp) ? resp : []);
         } catch (err) {
             console.error("Error fetching NHI policies:", err);
@@ -188,11 +181,7 @@ export default function PoliciesPage() {
 
     const handleSavePolicy = async (payload, policyId) => {
         try {
-            if (policyId) {
-                await observeRequests.updateNhiPolicy(policyId, payload, userEmail);
-            } else {
-                await observeRequests.createNhiPolicy(payload, userEmail);
-            }
+            await observeRequests.saveNhiPolicy(payload, policyId);
             await fetchPolicies();
         } catch (err) {
             console.error("Error saving NHI policy:", err);
@@ -203,7 +192,7 @@ export default function PoliciesPage() {
         const policyId = row.hexId || row._id?.$oid;
         if (!policyId) return;
         try {
-            await observeRequests.disableNhiPolicy(policyId, userEmail);
+            await observeRequests.saveNhiPolicy({ status: "INACTIVE" }, policyId);
             await fetchPolicies();
         } catch (err) {
             console.error("Error disabling NHI policy:", err);

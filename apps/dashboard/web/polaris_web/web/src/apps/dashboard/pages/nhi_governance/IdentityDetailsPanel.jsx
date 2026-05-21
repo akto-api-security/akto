@@ -7,8 +7,6 @@ import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { IdentityIcon, violationsHeaders, violationsSortOptions, SEV_ORD, sevBadge, AgentIcon, PolicyCell } from "./nhiViolationsData";
 import IdentityGraph from "./IdentityGraph";
 import observeRequests from "../observe/api";
-import { isAgenticSecurityCategory } from "../../../main/labelHelper";
-import Store from "../../store";
 import { extractIdentityName, violationIncludesIdentity, getFirstIdentityName } from "./identityHelper";
 
 const NHI_VIOLATIONS_PATH = "/dashboard/nhi/violations";
@@ -78,15 +76,13 @@ export default function IdentityDetailsPanel({ row, show, setShow }) {
     const [allViolations, setAllViolations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [disabling, setDisabling] = useState(false);
-    const userEmail = Store((state) => state.username);
 
     // Fetch all violations for filtering
     useEffect(() => {
         const fetchViolations = async () => {
             try {
                 setLoading(true);
-                const contextSource = isAgenticSecurityCategory() ? "AGENTIC" : "ENDPOINT";
-                const response = await observeRequests.fetchAllNhiViolations(contextSource);
+                const response = await observeRequests.fetchAllNhiViolations();
 
                 if (Array.isArray(response)) {
                     setAllViolations(response);
@@ -124,11 +120,9 @@ export default function IdentityDetailsPanel({ row, show, setShow }) {
 
     const handleDisableIdentity = async () => {
         try {
-            if (!userEmail) return;
-
             setDisabling(true);
 
-            await observeRequests.disableNhiIdentity(row.hexId, userEmail);
+            await observeRequests.disableNhiIdentity(row.hexId);
 
             setDisabling(false);
             setActionActive(false);

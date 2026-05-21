@@ -5,7 +5,6 @@ import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
 import { IdentityIcon, AgentIcon, resolvePolicyName } from "./nhiViolationsData";
 import func from "@/util/func";
 import observeRequests from "../observe/api";
-import Store from "../../store";
 import JiraTicketCreationModal from "../../components/shared/JiraTicketCreationModal.jsx";
 import issuesFunctions from "@/apps/dashboard/pages/issues/module";
 import settingFunctions from "@/apps/dashboard/pages/settings/module";
@@ -18,14 +17,11 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
     const [issueType, setIssueType] = useState("");
     const [labelsText, setLabelsText] = useState("");
     const [jiraProjectMap, setJiraProjectMap] = useState({});
-    const userEmail = Store((state) => state.username);
     const handleMarkAsFixed = async () => {
         try {
-            if (!userEmail) return;
-
             setMarking(true);
 
-            await observeRequests.markViolationAsFixed(row.id, userEmail);
+            await observeRequests.markViolationAsFixed(row.id);
 
             setMarking(false);
             setActionActive(false);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import {
     Box, Button, Checkbox, HorizontalStack, Icon, Select, Text,
     TextField, VerticalStack
@@ -7,6 +7,7 @@ import { CancelMajor, SettingsMajor } from "@shopify/polaris-icons";
 import DropdownSearch from "../../components/shared/DropdownSearch";
 import AgenticSearchInput from "../agentic/components/AgenticSearchInput";
 import { isAgenticSecurityCategory } from "../../../main/labelHelper";
+import { useBodyClass } from "../../hooks/useBodyClass";
 import observeRequests from "../observe/api";
 import "../guardrails/components/createGuardrailPage.css";
 
@@ -169,7 +170,7 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
     const [playgroundInput, setPlaygroundInput]       = useState("");
     const [playgroundLoading, setPlaygroundLoading]   = useState(false);
     const [playgroundMessages, setPlaygroundMessages] = useState([]);
-    const playgroundScrollRef = useRef(null);
+    const bottomRef = useRef(null);
 
     // Dynamic dropdown options fetched from nhi_identities
     const [agentOptions, setAgentOptions] = useState([]);
@@ -189,22 +190,18 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
     const [warningThreshold, setWarningThreshold] = useState(3);
     const [flagExpired, setFlagExpired]           = useState(true);
 
-    useEffect(() => {
-        document.body.classList.add('guardrail-page-open');
-        return () => document.body.classList.remove('guardrail-page-open');
-    }, []);
+    useBodyClass('guardrail-page-open');
 
-    // Auto-scroll playground to bottom on new messages
-    useEffect(() => {
-        if (playgroundScrollRef.current && playgroundMessages.length > 0) {
-            playgroundScrollRef.current.scrollTop = playgroundScrollRef.current.scrollHeight;
-        }
+    // Auto-scroll playground to bottom on new messages. useLayoutEffect (not useEffect) so the
+    // scroll lands before the browser paints — avoids a one-frame flash of the un-scrolled state.
+    useLayoutEffect(() => {
+        if (playgroundMessages.length === 0) return;
+        bottomRef.current?.scrollIntoView({ block: "end" });
     }, [playgroundMessages]);
 
     // Fetch unique agent names and identity hexIds from nhi_identities
     useEffect(() => {
-        const contextSource = IS_ARGUS ? "AGENTIC" : "ENDPOINT";
-        observeRequests.fetchNhiIdentities(contextSource).then((identities) => {
+        observeRequests.fetchNhiIdentities().then((identities) => {
             if (!Array.isArray(identities)) return;
 
             const agents = [...new Set(
@@ -295,6 +292,39 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
         setPlaygroundLoading(false);
     };
 
+    const renderCurrentStep = () => {
+        switch (currentStep) {
+            case 1:
+                return (
+                    <PolicyDetailsStep
+                        name={name} setName={setName}
+                        description={description} setDescription={setDescription}
+                        selectedAgents={selectedAgents} setSelectedAgents={setSelectedAgents}
+                        selectedNhis={selectedNhis} setSelectedNhis={setSelectedNhis}
+                        agentOptions={agentOptions}
+                        nhiOptions={nhiOptions}
+                    />
+                );
+            case 2:
+                return (
+                    <TokenSegregationStep
+                        tokenSegEnabled={tokenSegEnabled}
+                        setTokenSegEnabled={setTokenSegEnabled}
+                    />
+                );
+            case 3:
+                return (
+                    <ExpirationTrackingStep
+                        expiryEnabled={expiryEnabled} setExpiryEnabled={setExpiryEnabled}
+                        warningThreshold={warningThreshold} setWarningThreshold={setWarningThreshold}
+                        flagExpired={flagExpired} setFlagExpired={setFlagExpired}
+                    />
+                );
+            default:
+                return null;
+        }
+    };
+
     return (
         <div className="guardrail-page-wrapper">
             {/* Header */}
@@ -324,13 +354,13 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
                                 const isCompleted = completedSteps.includes(step.id);
                                 const isActive    = currentStep === step.id;
                                 return (
-                                    <div
+                                    <Box
                                         key={step.id}
                                         className={`guardrail-nav-item ${isActive ? "active" : ""}`}
                                         onClick={() => isCompleted && setCurrentStep(step.id)}
                                         data-completed={isCompleted}
                                     >
-                                        <div className={`step-indicator ${
+                                        <Box className={`step-indicator ${
                                             isActive     ? "current"    :
                                             isCompleted  ? "configured" : "pending"
                                         }`} />
@@ -340,7 +370,7 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
                                         >
                                             {step.label}
                                         </Text>
-                                    </div>
+                                    </Box>
                                 );
                             })}
                         </VerticalStack>
@@ -355,31 +385,7 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
                                 <Text variant="headingMd" as="h2" fontWeight="semibold">
                                     {STEPS.find((s) => s.id === currentStep)?.label}
                                 </Text>
-                                <Box>
-                                    {currentStep === 1 && (
-                                        <PolicyDetailsStep
-                                            name={name} setName={setName}
-                                            description={description} setDescription={setDescription}
-                                            selectedAgents={selectedAgents} setSelectedAgents={setSelectedAgents}
-                                            selectedNhis={selectedNhis} setSelectedNhis={setSelectedNhis}
-                                            agentOptions={agentOptions}
-                                            nhiOptions={nhiOptions}
-                                        />
-                                    )}
-                                    {currentStep === 2 && (
-                                        <TokenSegregationStep
-                                            tokenSegEnabled={tokenSegEnabled}
-                                            setTokenSegEnabled={setTokenSegEnabled}
-                                        />
-                                    )}
-                                    {currentStep === 3 && (
-                                        <ExpirationTrackingStep
-                                            expiryEnabled={expiryEnabled} setExpiryEnabled={setExpiryEnabled}
-                                            warningThreshold={warningThreshold} setWarningThreshold={setWarningThreshold}
-                                            flagExpired={flagExpired} setFlagExpired={setFlagExpired}
-                                        />
-                                    )}
-                                </Box>
+                                <Box>{renderCurrentStep()}</Box>
                             </VerticalStack>
                         </Box>
                     </div>
@@ -411,7 +417,6 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
 
                     {/* Messages area */}
                     <div
-                        ref={playgroundScrollRef}
                         style={{
                             flex: 1,
                             overflowY: "auto",
@@ -462,6 +467,7 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
                                 ))}
                             </VerticalStack>
                         )}
+                        <div ref={bottomRef} />
                     </div>
 
                     {/* Input area */}

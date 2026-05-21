@@ -1104,38 +1104,47 @@ export default {
         })
     },
 
-    async fetchNhiIdentities(contextSource) {
+    async fetchNhiIdentities() {
         const resp = await request({
             url: '/api/fetchNhiIdentities',
             method: 'post',
-            data: { contextSource }
+            data: {}
         })
         return resp?.identities || []
     },
 
-    async fetchAllNhiViolations(contextSource) {
+    async fetchAllNhiViolations() {
         const resp = await request({
             url: '/api/fetchAllNhiViolations',
             method: 'post',
-            data: { contextSource }
+            data: {}
         })
         return resp?.violations || []
     },
 
-    async disableNhiIdentity(identityId, userEmail) {
+    async fetchViolationCountsByIdentity() {
+        const resp = await request({
+            url: '/api/fetchViolationCountsByIdentity',
+            method: 'post',
+            data: {}
+        })
+        return resp?.violations || []
+    },
+
+    async disableNhiIdentity(identityId) {
         const resp = await request({
             url: '/api/disableNhiIdentity',
             method: 'post',
-            data: { identityId, userEmail }
+            data: { identityId }
         })
         return resp?.success || false
     },
 
-    async markViolationAsFixed(violationId, userEmail) {
+    async markViolationAsFixed(violationId) {
         const resp = await request({
             url: '/api/markViolationAsFixed',
             method: 'post',
-            data: { violationId, userEmail }
+            data: { violationId }
         })
         return resp?.success || false
     },
@@ -1149,40 +1158,22 @@ export default {
         return resp
     },
 
-    async fetchNhiPolicies(contextSource) {
+    async fetchNhiPolicies() {
         const resp = await request({
             url: '/api/fetchNhiPolicies',
             method: 'post',
-            data: { contextSource }
+            data: {}
         })
         return resp?.policies || []
     },
 
-    async createNhiPolicy(policy, userEmail) {
+    async saveNhiPolicy(policy, policyId) {
         const resp = await request({
-            url: '/api/createNhiPolicy',
+            url: '/api/saveNhiPolicy',
             method: 'post',
-            data: { policy, userEmail }
+            data: { policy, policyId }
         })
         return resp
-    },
-
-    async updateNhiPolicy(policyId, policy, userEmail) {
-        const resp = await request({
-            url: '/api/updateNhiPolicy',
-            method: 'post',
-            data: { policyId, policy, userEmail }
-        })
-        return resp
-    },
-
-    async disableNhiPolicy(policyId, userEmail) {
-        const resp = await request({
-            url: '/api/disableNhiPolicy',
-            method: 'post',
-            data: { policyId, userEmail }
-        })
-        return resp?.success || false
     }
 
 }

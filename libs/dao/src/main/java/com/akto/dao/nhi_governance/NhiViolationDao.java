@@ -1,11 +1,11 @@
 package com.akto.dao.nhi_governance;
 
-import com.akto.dao.AccountsContextDao;
+import com.akto.dao.AccountsContextDaoWithContextSource;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.nhi_governance.NhiViolation;
 
-public class NhiViolationDao extends AccountsContextDao<NhiViolation> {
+public class NhiViolationDao extends AccountsContextDaoWithContextSource<NhiViolation> {
 
     public static NhiViolationDao instance = new NhiViolationDao();
 
