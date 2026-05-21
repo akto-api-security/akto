@@ -147,7 +147,9 @@ func GetModifiedPayloadWithSummary(sessionMgr *SessionManager, logger *zap.Logge
 
 	modifiedPayload, err := InjectSessionSummary(payload, sessionSummary, logger)
 	if err != nil {
-		logger.Debug("Failed to inject session summary",
+		// Warn (not Debug): silent failures here mean the session summary is
+		// computed but never reaches the validator, defeating session guardrails.
+		logger.Warn("Failed to inject session summary",
 			zap.String("sessionID", sessionID),
 			zap.Error(err))
 		return payload
@@ -160,51 +162,82 @@ func GetModifiedPayloadWithSummary(sessionMgr *SessionManager, logger *zap.Logge
 	return modifiedPayload
 }
 
-// InjectSessionSummary injects session summary into request_body.prompt field
+// InjectSessionSummary prepends the session summary to the user-facing prompt in
+// the validate-request payload.
 func InjectSessionSummary(payload, sessionSummary string, logger *zap.Logger) (string, error) {
 	if sessionSummary == "" {
 		return payload, nil
 	}
 
-	// Parse outer payload
 	var payloadObj map[string]interface{}
 	if err := json.Unmarshal([]byte(payload), &payloadObj); err != nil {
 		return payload, fmt.Errorf("failed to parse outer payload: %w", err)
 	}
 
-	// Get request_body string
-	requestBodyStr, ok := payloadObj["request_body"].(string)
-	if !ok {
-		return payload, fmt.Errorf("request_body not found or not a string")
+	// Case 1: wrapped — request_body is itself a JSON string.
+	if requestBodyStr, ok := payloadObj["request_body"].(string); ok {
+		var requestBodyObj map[string]interface{}
+		if err := json.Unmarshal([]byte(requestBodyStr), &requestBodyObj); err != nil {
+			return payload, fmt.Errorf("failed to parse request_body JSON: %w", err)
+		}
+		if !injectIntoBody(requestBodyObj, sessionSummary) {
+			return payload, fmt.Errorf("request_body has neither prompt nor messages to inject into")
+		}
+		modifiedRequestBodyBytes, err := json.Marshal(requestBodyObj)
+		if err != nil {
+			return payload, fmt.Errorf("failed to re-encode request_body: %w", err)
+		}
+		payloadObj["request_body"] = string(modifiedRequestBodyBytes)
+		modifiedPayloadBytes, err := json.Marshal(payloadObj)
+		if err != nil {
+			return payload, fmt.Errorf("failed to re-encode outer payload: %w", err)
+		}
+		return string(modifiedPayloadBytes), nil
 	}
 
-	// Parse request_body JSON
-	var requestBodyObj map[string]interface{}
-	if err := json.Unmarshal([]byte(requestBodyStr), &requestBodyObj); err != nil {
-		return payload, fmt.Errorf("failed to parse request_body JSON: %w", err)
+	// Cases 2 & 3: bare — prompt or messages live at the top level.
+	if !injectIntoBody(payloadObj, sessionSummary) {
+		return payload, fmt.Errorf("payload has neither request_body, prompt, nor messages to inject into")
 	}
-
-	// Get prompt field
-	originalPrompt, ok := requestBodyObj["prompt"].(string)
-	if !ok {
-		return payload, fmt.Errorf("prompt field not found or not a string")
-	}
-
-	// Inject session summary at the beginning of the prompt
-	requestBodyObj["prompt"] = sessionSummary + "\n\n" + originalPrompt
-
-	// Re-encode request_body
-	modifiedRequestBodyBytes, err := json.Marshal(requestBodyObj)
-	if err != nil {
-		return payload, fmt.Errorf("failed to re-encode request_body: %w", err)
-	}
-	payloadObj["request_body"] = string(modifiedRequestBodyBytes)
-
-	// Re-encode outer payload
 	modifiedPayloadBytes, err := json.Marshal(payloadObj)
 	if err != nil {
-		return payload, fmt.Errorf("failed to re-encode outer payload: %w", err)
+		return payload, fmt.Errorf("failed to re-encode payload: %w", err)
 	}
-
 	return string(modifiedPayloadBytes), nil
+}
+
+// injectIntoBody prepends sessionSummary into either the "prompt" string field
+// or the last user-role entry of a "messages" array. Returns true on success.
+// Callers are responsible for re-encoding the mutated map.
+func injectIntoBody(body map[string]interface{}, sessionSummary string) bool {
+	// Completions shape: top-level "prompt" string.
+	if originalPrompt, ok := body["prompt"].(string); ok {
+		body["prompt"] = sessionSummary + "\n\n" + originalPrompt
+		return true
+	}
+	// Chat completions shape: "messages" array — prepend to the last user
+	// message with string content. Walking from the end keeps the summary
+	// adjacent to the freshest user turn the model will respond to.
+	rawMessages, ok := body["messages"].([]interface{})
+	if !ok {
+		return false
+	}
+	for i := len(rawMessages) - 1; i >= 0; i-- {
+		msg, ok := rawMessages[i].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		role, _ := msg["role"].(string)
+		if role != "user" {
+			continue
+		}
+		content, ok := msg["content"].(string)
+		if !ok {
+			// Non-string content (e.g. multi-modal: [{"type":"text",...}]) — skip.
+			continue
+		}
+		msg["content"] = sessionSummary + "\n\n" + content
+		return true
+	}
+	return false
 }
