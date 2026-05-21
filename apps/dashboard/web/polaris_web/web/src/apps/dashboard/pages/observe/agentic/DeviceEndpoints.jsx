@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import Highcharts from "highcharts";
 import { HighchartsReact } from "highcharts-react-official";
 import {
     Card, HorizontalStack, Text,
-    Popover, ActionList,
 } from "@shopify/polaris";
 import { AgGridReact } from "ag-grid-react";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
@@ -40,6 +40,12 @@ const myTheme = themeQuartz.withParams({
     checkboxBorderRadius: 4,
 });
 
+// Theme variant used when a search bar sits above the grid inside a shared container
+const myThemeInner = myTheme.withParams({
+    wrapperBorder: false,
+    wrapperBorderRadius: 0,
+});
+
 // ─── Chart data ─────────────────────────────────────────────────────────────
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -66,7 +72,11 @@ const VIOLATIONS_BY_SEVERITY = [
 // ─── Dummy data ──────────────────────────────────────────────────────────────
 
 const DEVICE_FLAT_DATA = [
-    { path: ["NYC-JDOE-MAC01"], endpoint: "NYC-JDOE-MAC01", os: "mac", userCount: 5, riskScore: 4.8, username: "John Doe", group: "Engineering", role: "Software Engineer", violations: { critical:2, high:0, medium:0, low:0 }, lastTraffic: "2h ago" },
+    { path: ["NYC-JDOE-MAC01"], endpoint: "NYC-JDOE-MAC01", os: "mac", userCount: 5, riskScore: 4.8, username: "John Doe", group: "Engineering", role: "Software Engineer", violations: { critical:2, high:0, medium:0, low:0 }, lastTraffic: "2h ago", hasPersonalAccount: true },
+    { path: ["NYC-JDOE-WIN11"], endpoint: "NYC-JDOE-WIN11", os: "windows", userCount: 2, riskScore: 3.2, username: "John Doe", group: "Engineering", role: "Software Engineer", violations: { critical:0, high:0, medium:1, low:0 }, lastTraffic: "1d ago" },
+    { path: ["NYC-JDOE-WIN11","copilot365-jdoe"], endpoint: "Microsoft Copilot 365", type: "AI Agent" },
+    { path: ["NYC-JDOE-WIN11","mcp-github-jdoe"], endpoint: "github-mcp",            type: "MCP Server" },
+    { path: ["NYC-JDOE-WIN11","gpt4-jdoe"],       endpoint: "GPT-4o",                type: "LLM" },
     { path: ["NYC-JDOE-MAC01","cursor-cli"],     endpoint: "Cursor CLI",             type: "AI Agent",   skillCount: 1   },
     { path: ["NYC-JDOE-MAC01","cursor-code"],    endpoint: "Cursor code",            type: "AI Agent",   skillCount: 407 },
     { path: ["NYC-JDOE-MAC01","mcp-akto"],       endpoint: "mcp.akto.io",            type: "MCP Server"                  },
@@ -74,12 +84,15 @@ const DEVICE_FLAT_DATA = [
     { path: ["NYC-JDOE-MAC01","razorpay-stdio"], endpoint: "razorpay-stdio",         type: "MCP Server"                  },
     { path: ["NYC-JDOE-MAC01","gemini"],         endpoint: "gemini",                 type: "LLM"                         },
 
-    { path: ["BER-TSMITH-MAC02"], endpoint: "BER-TSMITH-MAC02", os: "mac", userCount: 23, riskScore: 4.7, username: "Traun Smith", group: "Engineering", role: "Frontend Developer", violations: { critical:1, high:1, medium:3, low:2 }, lastTraffic: "45m ago" },
+    { path: ["BER-TSMITH-MAC02"], endpoint: "BER-TSMITH-MAC02", os: "mac", userCount: 23, riskScore: 4.7, username: "Traun Smith", group: "Engineering", role: "Frontend Developer", violations: { critical:1, high:1, medium:3, low:2 }, lastTraffic: "45m ago", hasPersonalAccount: true },
     { path: ["BER-TSMITH-MAC02","vscode"],         endpoint: "VS Code",        type: "AI Agent",   skillCount: 12 },
     { path: ["BER-TSMITH-MAC02","github-copilot"], endpoint: "GitHub Copilot", type: "AI Agent"                   },
     { path: ["BER-TSMITH-MAC02","mcp-github"],     endpoint: "github-mcp",     type: "MCP Server"                 },
 
     { path: ["SF-MWILSON-WIN10"], endpoint: "SF-MWILSON-WIN10", os: "windows", userCount: 23, riskScore: 4.5, username: "Mark Wilson", group: "Human Resources", role: "Lead HR", violations: { critical:2, high:4, medium:0, low:1 }, lastTraffic: "1d ago" },
+    { path: ["SF-MWILSON-MAC01"], endpoint: "SF-MWILSON-MAC01", os: "mac", userCount: 1, riskScore: 2.8, username: "Mark Wilson", group: "Human Resources", role: "Lead HR", violations: { critical:0, high:0, medium:0, low:1 }, lastTraffic: "3d ago" },
+    { path: ["SF-MWILSON-MAC01","claude-mwilson"], endpoint: "Claude Desktop", type: "AI Agent" },
+    { path: ["SF-MWILSON-MAC01","mcp-notion-mw"],  endpoint: "notion-mcp",     type: "MCP Server" },
     { path: ["SF-MWILSON-WIN10","copilot365"],     endpoint: "Microsoft Copilot 365", type: "AI Agent"   },
     { path: ["SF-MWILSON-WIN10","teams-bot"],      endpoint: "Teams AI Bot",          type: "AI Agent"   },
     { path: ["SF-MWILSON-WIN10","mcp-sharepoint"], endpoint: "sharepoint-mcp",        type: "MCP Server" },
@@ -106,7 +119,14 @@ const DEVICE_FLAT_DATA = [
     { path: ["SF-RCLARK-MAC01","mcp-xcode"],    endpoint: "xcode-mcp",   type: "MCP Server"               },
     { path: ["SF-RCLARK-MAC01","claude-haiku"], endpoint: "claude-haiku",type: "LLM"                      },
 
-    { path: ["SF-JLEWIS-WIN10"], endpoint: "SF-JLEWIS-WIN10", os: "windows", userCount: 34, riskScore: 4.3, username: "Jennifer Lewis", group: "Engineering", role: "Data Engineer", violations: { critical:4, high:1, medium:0, low:0 }, lastTraffic: "6h ago" },
+    { path: ["SF-JLEWIS-WIN10"], endpoint: "SF-JLEWIS-WIN10", os: "windows", userCount: 34, riskScore: 4.3, username: "Jennifer Lewis", group: "Engineering", role: "Data Engineer", violations: { critical:4, high:1, medium:0, low:0 }, lastTraffic: "6h ago", hasPersonalAccount: true },
+    { path: ["SF-JLEWIS-LIN01"], endpoint: "SF-JLEWIS-LIN01", os: "linux", userCount: 5, riskScore: 3.1, username: "Jennifer Lewis", group: "Engineering", role: "Data Engineer", violations: { critical:0, high:1, medium:0, low:0 }, lastTraffic: "2d ago" },
+    { path: ["SF-JLEWIS-LIN01","jupyter-jlewis"],  endpoint: "Jupyter AI",    type: "AI Agent",   skillCount: 4 },
+    { path: ["SF-JLEWIS-LIN01","ollama-jlewis"],   endpoint: "Ollama",        type: "LLM" },
+    { path: ["SF-JLEWIS-LIN01","mcp-pg-jlewis"],   endpoint: "postgres-mcp",  type: "MCP Server" },
+    { path: ["SF-JLEWIS-MAC01"], endpoint: "SF-JLEWIS-MAC01", os: "mac", userCount: 3, riskScore: 2.4, username: "Jennifer Lewis", group: "Engineering", role: "Data Engineer", violations: { critical:0, high:0, medium:1, low:0 }, lastTraffic: "5d ago" },
+    { path: ["SF-JLEWIS-MAC01","cursor-jlewis"],   endpoint: "Cursor AI",     type: "AI Agent",   skillCount: 6 },
+    { path: ["SF-JLEWIS-MAC01","claude-jlewis"],   endpoint: "claude-3.7-sonnet", type: "LLM" },
     { path: ["SF-JLEWIS-WIN10","copilot-data"],   endpoint: "GitHub Copilot", type: "AI Agent"   },
     { path: ["SF-JLEWIS-WIN10","mcp-databricks"], endpoint: "databricks-mcp", type: "MCP Server" },
     { path: ["SF-JLEWIS-WIN10","gpt4-data"],      endpoint: "GPT-4o",         type: "LLM"        },
@@ -138,13 +158,14 @@ const DEVICE_FLAT_DATA = [
     { path: ["TKY-AMATSUDA-LIN01","mcp-postgres"], endpoint: "postgres-mcp", type: "MCP Server"              },
 ];
 
-// Build lookup: username → primary device row, device path → child count
+// Build lookups: username → all device rows (array), device path → child count
 const devicesByUsername = {};
 const deviceChildCount = {};
 
 DEVICE_FLAT_DATA.forEach(row => {
     if (row.path.length === 1 && row.username) {
-        devicesByUsername[row.username] = row; // keyed by device's username field
+        if (!devicesByUsername[row.username]) devicesByUsername[row.username] = [];
+        devicesByUsername[row.username].push(row);
     }
     if (row.path.length === 2) {
         const id = row.path[0];
@@ -153,14 +174,14 @@ DEVICE_FLAT_DATA.forEach(row => {
 });
 
 const USER_FLAT_DATA = [
-    { path: ["john-doe"],       username: "John Doe",       riskScore: 4.8, group: "Engineering",    role: "Software Engineer",   violations: { critical:2, high:0, medium:0, low:0 }, lastTraffic: "2h ago"  },
-    { path: ["traun-smith"],    username: "Traun Smith",    riskScore: 4.7, group: "Engineering",    role: "Frontend Developer",  violations: { critical:1, high:1, medium:3, low:2 }, lastTraffic: "45m ago" },
+    { path: ["john-doe"],       username: "John Doe",       riskScore: 4.8, group: "Engineering",    role: "Software Engineer",   violations: { critical:2, high:0, medium:0, low:0 }, lastTraffic: "2h ago",  hasPersonalAccount: true },
+    { path: ["traun-smith"],    username: "Traun Smith",    riskScore: 4.7, group: "Engineering",    role: "Frontend Developer",  violations: { critical:1, high:1, medium:3, low:2 }, lastTraffic: "45m ago", hasPersonalAccount: true },
     { path: ["mark-wilson"],    username: "Mark Wilson",    riskScore: 4.5, group: "Human Resources",role: "Lead HR",             violations: { critical:2, high:4, medium:0, low:1 }, lastTraffic: "1d ago"  },
     { path: ["david-wilson"],   username: "David Wilson",   riskScore: 4.5, group: "Engineering",    role: "Full Stack Developer",violations: { critical:0, high:1, medium:0, low:0 }, lastTraffic: "3h ago"  },
     { path: ["sarah-taylor"],   username: "Sarah Taylor",   riskScore: 4.5, group: "Engineering",    role: "DevOps Engineer",     violations: { critical:0, high:0, medium:0, low:5 }, lastTraffic: "6h ago"  },
     { path: ["linda-thomas"],   username: "Linda Thomas",   riskScore: 4.3, group: "Engineering",    role: "QA Engineer",         violations: { critical:1, high:2, medium:1, low:0 }, lastTraffic: "6h ago"  },
     { path: ["robert-clark"],   username: "Robert Clark",   riskScore: 4.3, group: "Engineering",    role: "Mobile App Developer",violations: { critical:0, high:1, medium:0, low:0 }, lastTraffic: "6h ago"  },
-    { path: ["jennifer-lewis"], username: "Jennifer Lewis", riskScore: 4.3, group: "Engineering",    role: "Data Engineer",       violations: { critical:4, high:1, medium:0, low:0 }, lastTraffic: "6h ago"  },
+    { path: ["jennifer-lewis"], username: "Jennifer Lewis", riskScore: 4.3, group: "Engineering",    role: "Data Engineer",       violations: { critical:4, high:1, medium:0, low:0 }, lastTraffic: "6h ago",  hasPersonalAccount: true },
     { path: ["william-hall"],   username: "William Hall",   riskScore: 4.1, group: "Engineering",    role: "Product Manager",     violations: { critical:0, high:0, medium:1, low:0 }, lastTraffic: "6h ago"  },
     { path: ["patricia-young"], username: "Patricia Young", riskScore: 4.1, group: "Finance",        role: "Finance Manager",     violations: { critical:0, high:0, medium:1, low:1 }, lastTraffic: "6h ago"  },
     { path: ["charles-king"],   username: "Charles King",   riskScore: 4.1, group: "Finance",        role: "Finance Manager",     violations: { critical:0, high:0, medium:1, low:1 }, lastTraffic: "6h ago"  },
@@ -232,22 +253,11 @@ function StatRow({ label, value, delta, sparklineData, color, hasBorder }) {
     );
 }
 
-const DotsIcon = () => (
-    <svg width="16" height="16" viewBox="0 0 4 16" fill="#8C9196">
-        <circle cx="2" cy="2" r="1.5"/><circle cx="2" cy="8" r="1.5"/><circle cx="2" cy="14" r="1.5"/>
-    </svg>
-);
 
 function ChartPanel({ title, children }) {
-    const [open, setOpen] = useState(false);
     return (
         <div style={{ padding:"16px 20px", display:"flex", flexDirection:"column" }}>
-            <HorizontalStack align="space-between" blockAlign="center">
-                <Text variant="headingMd" fontWeight="semibold">{title}</Text>
-                <Popover active={open} activator={<button onClick={() => setOpen(v=>!v)} style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 2px", display:"flex", alignItems:"center", borderRadius:4 }}><DotsIcon/></button>} onClose={() => setOpen(false)}>
-                    <ActionList items={[{content:"Download PNG",onAction:()=>setOpen(false)},{content:"Download CSV",onAction:()=>setOpen(false)}]}/>
-                </Popover>
-            </HorizontalStack>
+            <Text variant="headingMd" fontWeight="semibold">{title}</Text>
             <div style={{ flex:1 }}>{children}</div>
         </div>
     );
@@ -385,10 +395,10 @@ function RiskScoreCellRenderer({ value }) {
 }
 
 const SEVERITY_COLORS = {
-    critical: { bg: "#DC2626", text: "white" },
-    high:     { bg: "#F97316", text: "white" },
-    medium:   { bg: "#FEF9C3", text: "#92400E" },
-    low:      { bg: "#F3F4F6", text: "#374151" },
+    critical: { bg: "#DF2909", text: "#FFFBFB" },
+    high:     { bg: "#FED3D1", text: "#202223" },
+    medium:   { bg: "#FFD79D", text: "#202223" },
+    low:      { bg: "#E4E5E7", text: "#202223" },
 };
 
 function ViolationsCellRenderer({ data }) {
@@ -420,10 +430,62 @@ function ViolationsCellRenderer({ data }) {
     );
 }
 
+// ─── Endpoint count badge with hover tooltip ─────────────────────────────────
+
+function EndpointCountBadge({ count, children }) {
+    const [show, setShow] = useState(false);
+    const ref = useRef(null);
+    const [pos, setPos] = useState({ top: 0, left: 0 });
+
+    const handleEnter = () => {
+        if (ref.current) {
+            const r = ref.current.getBoundingClientRect();
+            setPos({ top: r.bottom + 6, left: r.left });
+        }
+        setShow(true);
+    };
+
+    return (
+        <>
+            <span
+                ref={ref}
+                onMouseEnter={handleEnter}
+                onMouseLeave={() => setShow(false)}
+                style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    minWidth: 20, height: 20, padding: "0 6px", borderRadius: 10,
+                    fontSize: 11, fontWeight: 600,
+                    background: "#F1F2F3", color: "#6D7175",
+                    cursor: "default",
+                }}
+            >
+                +{count}
+            </span>
+            {show && createPortal(
+                <div style={{
+                    position: "fixed", top: pos.top, left: pos.left,
+                    background: "white",
+                    border: "1px solid #E1E3E5",
+                    borderRadius: 8,
+                    padding: "6px 0",
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
+                    zIndex: 99999,
+                    minWidth: 200,
+                    fontFamily: "Inter, sans-serif",
+                    pointerEvents: "none",
+                }}>
+                    {children}
+                </div>,
+                document.body
+            )}
+        </>
+    );
+}
+
 // ─── Devices: endpoint cell (used as innerRenderer in autoGroupColumnDef) ────
 
-const GroupUsersIcon = () => (
-    <svg width="14" height="14" viewBox="0 0 20 20" fill="#8C9196" style={{ flexShrink: 0 }}>
+const GroupUsersIcon = ({ color = "#8C9196" }) => (
+    <svg width="14" height="14" viewBox="0 0 20 20" fill={color} style={{ flexShrink: 0 }}>
         <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
     </svg>
 );
@@ -457,15 +519,15 @@ function DeviceEndpointCellRenderer({ data, node }) {
                     {childCount}
                 </span>
             )}
-            <GroupUsersIcon />
+            {data.hasPersonalAccount && <UserPersonIcon color="#FCA5A5" />}
         </div>
     );
 }
 
 // ─── Users: username cell ────────────────────────────────────────────────────
 
-const UserPersonIcon = () => (
-    <svg width="14" height="14" viewBox="0 0 20 20" fill="#8C9196" style={{ flexShrink: 0 }}>
+const UserPersonIcon = ({ color = "#8C9196" }) => (
+    <svg width="14" height="14" viewBox="0 0 20 20" fill={color} style={{ flexShrink: 0 }}>
         <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd"/>
     </svg>
 );
@@ -474,7 +536,7 @@ function UsernameCellRenderer({ data }) {
     return (
         <div style={{ display: "flex", alignItems: "center", gap: 6, height: "100%" }}>
             <span style={{ fontSize: 13, fontWeight: 500, color: "#202223" }}>{data.username}</span>
-            <UserPersonIcon />
+            {data.hasPersonalAccount && <UserPersonIcon color="#FCA5A5" />}
         </div>
     );
 }
@@ -482,16 +544,29 @@ function UsernameCellRenderer({ data }) {
 // ─── Users: endpoints cell ────────────────────────────────────────────────────
 
 function UserEndpointsCellRenderer({ data }) {
-    const device = devicesByUsername[data.username];
-    if (!device) return null;
+    const devices = devicesByUsername[data.username];
+    if (!devices || devices.length === 0) return null;
 
-    const childCount = deviceChildCount[device.path[0]] || 0;
+    const primary = devices[0];
+    const others = devices.slice(1);
 
     return (
         <div style={{ display: "flex", alignItems: "center", gap: 6, height: "100%" }}>
-            <OsIcon os={device.os} />
-            <span style={{ fontSize: 13, color: "#202223" }}>{device.endpoint}</span>
-            {childCount > 0 && <CountBadge count={childCount} />}
+            <OsIcon os={primary.os} />
+            <span style={{ fontSize: 13, color: "#202223" }}>{primary.endpoint}</span>
+            {others.length > 0 && (
+                <EndpointCountBadge count={others.length}>
+                    {others.map((d, i) => (
+                        <div key={i} style={{
+                            display: "flex", alignItems: "center", gap: 8,
+                            padding: "5px 12px",
+                        }}>
+                            <OsIcon os={d.os} />
+                            <span style={{ fontSize: 12, color: "#202223" }}>{d.endpoint}</span>
+                        </div>
+                    ))}
+                </EndpointCountBadge>
+            )}
         </div>
     );
 }
@@ -500,7 +575,7 @@ function UserEndpointsCellRenderer({ data }) {
 
 const DEVICE_COL_DEFS = [
     // endpoint column is handled by autoGroupColumnDef in tree mode
-    { field: "riskScore",   headerName: "Risk score",    width: 110,             cellRenderer: RiskScoreCellRenderer },
+    { field: "riskScore",   headerName: "Risk score",    width: 110,             cellRenderer: RiskScoreCellRenderer, sort: "desc" },
     { field: "username",    headerName: "Username",      flex: 1, minWidth: 120                                      },
     { field: "group",       headerName: "Group",         flex: 1, minWidth: 120                                      },
     { field: "role",        headerName: "Role",          flex: 1.2, minWidth: 150                                    },
@@ -514,6 +589,7 @@ const USER_COL_DEFS = [
         headerName: "Username",
         flex: 1.5,
         minWidth: 180,
+        pinned: "left",
         checkboxSelection: true,
         headerCheckboxSelection: true,
         cellRenderer: UsernameCellRenderer,
@@ -535,13 +611,109 @@ const USER_COL_DEFS = [
 const DEFAULT_COL_DEF = {
     sortable: true,
     resizable: true,
+    filter: true,
     cellStyle: { display: "flex", alignItems: "center" },
 };
 
 // ─── Table section ───────────────────────────────────────────────────────────
 
+function BulkActionBar({ count, onClear }) {
+    if (!count) return null;
+    return (
+        <div style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 14px",
+            background: "#F5F0FF",
+            border: "1px solid #DDD3FA",
+            borderRadius: 8,
+            marginBottom: 10,
+        }}>
+            <span style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                minWidth: 24, height: 24, padding: "0 7px", borderRadius: 12,
+                fontSize: 12, fontWeight: 700,
+                background: "#7C3AED", color: "white",
+            }}>
+                {count}
+            </span>
+            <span style={{ fontSize: 13, color: "#4B5563", fontWeight: 500 }}>
+                {count === 1 ? "row" : "rows"} selected
+            </span>
+            <div style={{ width: 1, height: 16, background: "#DDD3FA", margin: "0 2px" }} />
+            <div style={{ display: "flex", gap: 8 }}>
+                <button style={{
+                    padding: "5px 14px", borderRadius: 6, cursor: "pointer",
+                    fontSize: 13, fontWeight: 500,
+                    background: "white", color: "#202223",
+                    border: "1px solid #D1D5DB",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+                }}>
+                    Edit Team
+                </button>
+                <button style={{
+                    padding: "5px 14px", borderRadius: 6, cursor: "pointer",
+                    fontSize: 13, fontWeight: 500,
+                    background: "white", color: "#202223",
+                    border: "1px solid #D1D5DB",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+                }}>
+                    Edit Role
+                </button>
+            </div>
+            <button
+                onClick={onClear}
+                style={{
+                    marginLeft: "auto", background: "none", border: "none",
+                    cursor: "pointer", color: "#6D7175", fontSize: 18, lineHeight: 1,
+                    padding: "0 4px",
+                }}
+            >×</button>
+        </div>
+    );
+}
+
+function SearchBar({ value, onChange }) {
+    return (
+        <div style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "7px 12px",
+            borderBottom: "1px solid #E1E3E5",
+            borderRadius: "8px 8px 0 0",
+            background: "white",
+            flexShrink: 0,
+        }}>
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="#8C9196" style={{ flexShrink: 0 }}>
+                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+            </svg>
+            <input
+                type="text"
+                placeholder="Search…"
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                style={{
+                    flex: 1, border: "none", outline: "none",
+                    fontSize: 13, color: "#202223",
+                    background: "transparent",
+                    fontFamily: "Inter, sans-serif",
+                }}
+            />
+            {value && (
+                <button onClick={() => onChange("")} style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    color: "#8C9196", fontSize: 16, lineHeight: 1, padding: 0,
+                }}>×</button>
+            )}
+        </div>
+    );
+}
+
 function TableSection() {
     const [activeTab, setActiveTab] = useState("devices");
+    const [deviceQuickFilter, setDeviceQuickFilter] = useState("");
+    const [userQuickFilter, setUserQuickFilter] = useState("");
+    const [selectedCount, setSelectedCount] = useState(0);
+    const deviceGridRef = useRef(null);
+    const userGridRef = useRef(null);
     const isDevices = activeTab === "devices";
 
     const getDataPath = useCallback((data) => data.path, []);
@@ -550,6 +722,7 @@ function TableSection() {
         headerName: "Endpoint",
         flex: 2.5,
         minWidth: 300,
+        pinned: "left",
         checkboxSelection: true,
         headerCheckboxSelection: true,
         cellRendererParams: {
@@ -562,37 +735,41 @@ function TableSection() {
     return (
         <div>
             {/* Tab bar */}
-            <div style={{ display: "flex", marginBottom: 12 }}>
+            <div style={{
+                display: "inline-flex",
+                background: "#F1F2F3",
+                borderRadius: 10,
+                padding: 3,
+                marginBottom: 14,
+                gap: 2,
+            }}>
                 {[
                     { key: "devices", label: "Devices", count: 6403 },
                     { key: "users",   label: "Users",   count: 4203 },
-                ].map((tab, i) => (
+                ].map(tab => (
                     <button
                         key={tab.key}
-                        onClick={() => setActiveTab(tab.key)}
+                        onClick={() => { setActiveTab(tab.key); setSelectedCount(0); }}
                         style={{
                             display: "flex", alignItems: "center", gap: 6,
-                            padding: "6px 14px",
-                            borderRadius: i === 0 ? "6px 0 0 6px" : "0 6px 6px 0",
-                            border: activeTab === tab.key
-                                ? "1.5px solid #9642FC"
-                                : "1px solid #E1E3E5",
-                            background: activeTab === tab.key ? "#F5F0FF" : "white",
+                            padding: "5px 14px",
+                            borderRadius: 8,
+                            border: "none",
+                            background: activeTab === tab.key ? "white" : "transparent",
+                            boxShadow: activeTab === tab.key ? "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06)" : "none",
                             cursor: "pointer",
                             fontSize: 13,
                             fontWeight: activeTab === tab.key ? 600 : 400,
-                            color: activeTab === tab.key ? "#7C3AED" : "#202223",
+                            color: activeTab === tab.key ? "#202223" : "#6D7175",
                             fontFamily: "Inter, sans-serif",
                             outline: "none",
-                            zIndex: activeTab === tab.key ? 1 : 0,
-                            position: "relative",
-                            marginLeft: i === 1 ? -1 : 0,
+                            transition: "background 0.15s, box-shadow 0.15s",
                         }}
                     >
                         {tab.label}
                         <span style={{
                             fontSize: 11, fontWeight: 600,
-                            color: activeTab === tab.key ? "#7C3AED" : "#6D7175",
+                            color: activeTab === tab.key ? "#6D7175" : "#9CA3AF",
                         }}>
                             {tab.count.toLocaleString()}
                         </span>
@@ -600,50 +777,79 @@ function TableSection() {
                 ))}
             </div>
 
+            <BulkActionBar
+                count={selectedCount}
+                onClear={() => {
+                    const ref = isDevices ? deviceGridRef : userGridRef;
+                    ref.current?.api?.deselectAll();
+                    setSelectedCount(0);
+                }}
+            />
+
             {/* Grid */}
-            <div style={{ height: 600 }}>
+            <div style={{
+                height: selectedCount > 0 ? 754 : 800,
+                border: "1px solid #E1E3E5",
+                borderRadius: 8,
+                display: "flex",
+                flexDirection: "column",
+            }}>
                 {isDevices ? (
-                    <AgGridReact
-                        key="devices"
-                        theme={myTheme}
-                        rowData={DEVICE_FLAT_DATA}
-                        columnDefs={DEVICE_COL_DEFS}
-                        autoGroupColumnDef={autoGroupColumnDef}
-                        defaultColDef={DEFAULT_COL_DEF}
-                        treeData
-                        getDataPath={getDataPath}
-                        groupDefaultExpanded={1}
-                        rowSelection="multiple"
-                        suppressRowClickSelection
-                        animateRows
-                        rowHeight={44}
-                        headerHeight={40}
-                        suppressCellFocus
-                        sideBar={{ toolPanels: ["columns", "filters"] }}
-                        enableAdvancedFilter
-                        pagination
-                        paginationPageSize={10}
-                        paginationPageSizeSelector={[10, 20, 50]}
-                    />
+                    <>
+                        <SearchBar value={deviceQuickFilter} onChange={setDeviceQuickFilter} />
+                        <div style={{ flex: 1, minHeight: 0, borderRadius: "0 0 8px 8px", overflow: "hidden" }}>
+                            <AgGridReact
+                                key="devices"
+                                ref={deviceGridRef}
+                                theme={myThemeInner}
+                                rowData={DEVICE_FLAT_DATA}
+                                onSelectionChanged={e => setSelectedCount(e.api.getSelectedRows().length)}
+                                columnDefs={DEVICE_COL_DEFS}
+                                autoGroupColumnDef={autoGroupColumnDef}
+                                defaultColDef={DEFAULT_COL_DEF}
+                                treeData
+                                getDataPath={getDataPath}
+                                groupDefaultExpanded={0}
+                                rowSelection="multiple"
+                                suppressRowClickSelection
+                                animateRows
+                                rowHeight={44}
+                                headerHeight={40}
+                                suppressCellFocus
+                                sideBar={{ toolPanels: ["columns", "filters"] }}
+                                pagination
+                                paginationPageSize={20}
+                                paginationPageSizeSelector={[20, 50, 100]}
+                                quickFilterText={deviceQuickFilter}
+                            />
+                        </div>
+                    </>
                 ) : (
-                    <AgGridReact
-                        key="users"
-                        theme={myTheme}
-                        rowData={USER_FLAT_DATA}
-                        columnDefs={USER_COL_DEFS}
-                        defaultColDef={DEFAULT_COL_DEF}
-                        rowSelection="multiple"
-                        suppressRowClickSelection
-                        animateRows
-                        rowHeight={44}
-                        headerHeight={40}
-                        suppressCellFocus
-                        sideBar={{ toolPanels: ["columns", "filters"] }}
-                        enableAdvancedFilter
-                        pagination
-                        paginationPageSize={10}
-                        paginationPageSizeSelector={[10, 20, 50]}
-                    />
+                    <>
+                        <SearchBar value={userQuickFilter} onChange={setUserQuickFilter} />
+                        <div style={{ flex: 1, minHeight: 0, borderRadius: "0 0 8px 8px", overflow: "hidden" }}>
+                            <AgGridReact
+                                key="users"
+                                ref={userGridRef}
+                                theme={myThemeInner}
+                                rowData={USER_FLAT_DATA}
+                                onSelectionChanged={e => setSelectedCount(e.api.getSelectedRows().length)}
+                                columnDefs={USER_COL_DEFS}
+                                defaultColDef={DEFAULT_COL_DEF}
+                                rowSelection="multiple"
+                                suppressRowClickSelection
+                                animateRows
+                                rowHeight={44}
+                                headerHeight={40}
+                                suppressCellFocus
+                                sideBar={{ toolPanels: ["columns", "filters"] }}
+                                quickFilterText={userQuickFilter}
+                                pagination
+                                paginationPageSize={20}
+                                paginationPageSizeSelector={[20, 50, 100]}
+                            />
+                        </div>
+                    </>
                 )}
             </div>
         </div>
