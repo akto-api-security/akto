@@ -3932,11 +3932,27 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String storeAgentQueryData() {
+    @Getter @Setter
+    private List<com.akto.utils.elasticsearch.AgentQueryRecord> agentQueryRecords;
+
+    public String storeAgentQueryRecords() {
         try {
-            DbLayer.storeAgentQueryData(agentQueryData);
+            com.akto.utils.elasticsearch.ElasticSearchClient.instance().bulkIndexAgentQueryRecords(agentQueryRecords);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in storeAgentQueryData " + e.toString());
+            loggerMaker.errorAndAddToDb(e, "Error in storeAgentQueryRecords " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    @Getter @Setter
+    private Map<String, String> deviceUserMap;
+
+    public String fetchDeviceUserMap() {
+        try {
+            deviceUserMap = DbLayer.fetchDeviceUserMap();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchDeviceUserMap " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
