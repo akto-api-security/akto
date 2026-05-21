@@ -27,9 +27,23 @@ export class AktoAgentGuardExecutorContainer extends Container {
     HF_HOME: "/app/.cache/huggingface",
     // LLM guardrails — FORCE_LLM_MODE routes all PromptInjection/BanTopics
     // through the LLM without clients needing to send use_llm.
-    SCANNER_LLM_PROVIDER: "anthropic",
+    SCANNER_LLM_PROVIDER: "",
     ANTHROPIC_API_KEY: "", // TODO: set before deploy
-    FORCE_LLM_MODE: "true",
+    FORCE_LLM_MODE: "",
+    
+    GEMMA_VERTEX_SA_KEY_JSON: "",
+    GEMMA_VERTEX_PROJECT: "",
+    GEMMA_VERTEX_LOCATION: "",
+    GEMMA_VERTEX_ENDPOINT_ID: "",
+    GEMMA_VERTEX_DEDICATED_DNS: "",
+
+    QWEN3GUARD_SA_KEY_JSON: "",
+    QWEN3GUARD_PROJECT: "",
+    QWEN3GUARD_LOCATION: "",
+    QWEN3GUARD_ENDPOINT_ID: "",
+    QWEN3GUARD_DEDICATED_DNS: "",
+    
+    SLACK_WEBHOOK_URL: ""
   };
 
   override onStart() {
