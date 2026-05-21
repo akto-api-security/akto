@@ -208,6 +208,7 @@ import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.DbMode;
 import com.akto.util.EmailAccountName;
+import com.akto.util.GuardrailLatencyInfo;
 import com.akto.util.IntercomEventsUtil;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
@@ -235,6 +236,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.akto.utils.crons.TestingAlertsCron;
+import com.akto.notifications.slack.CustomTextAlert;
+import com.akto.notifications.slack.SlackSender;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.ReadPreference;
@@ -258,7 +261,11 @@ import com.slack.api.util.http.SlackHttpClient;
 import com.slack.api.webhook.WebhookResponse;
 
 import io.intercom.api.Intercom;
+import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 import java.io.UnsupportedEncodingException;
 
@@ -441,6 +448,105 @@ public class InitializerListener implements ServletContextListener {
                 }, "update-api-groups");
             }
         }, 0, 4, TimeUnit.HOURS);
+    }
+
+    public void setUpGuardrailServiceUrlLatencyScheduler() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                checkGuardrailServiceUrlLatency();
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
+
+    private void checkGuardrailServiceUrlLatency() {
+        long thresholdMs = 1000L;
+        String thresholdRaw = System.getenv("GUARDRAIL_SERVICE_URL_LATENCY_THRESHOLD_MS");
+        if (StringUtils.isNotBlank(thresholdRaw)) {
+            try {
+                thresholdMs = Long.parseLong(thresholdRaw.trim());
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        if (thresholdMs <= 0) {
+            thresholdMs = 1000L;
+        }
+
+        MediaType json = MediaType.parse("application/json; charset=utf-8");
+        OkHttpClient client = CoreHTTPClient.client.newBuilder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .build();
+
+        String webhookUrl = null;
+        Config slackInternalConfig = ConfigsDao.instance.findOne(
+                Filters.eq("configType", ConfigType.SLACK_ALERT_INTERNAL.name()));
+        if (slackInternalConfig instanceof Config.SlackAlertInternalConfig) {
+            webhookUrl = StringUtils.trimToNull(
+                    ((Config.SlackAlertInternalConfig) slackInternalConfig).getGuardrailSlackWebhookUrl());
+        }
+
+        try {
+            for (GuardrailLatencyInfo.GuardrailServiceTarget target : GuardrailLatencyInfo.GUARDRAIL_SERVICE_TARGETS) {
+                String baseUrl = target.getUrl();
+                String url = baseUrl.endsWith("/")
+                        ? baseUrl.substring(0, baseUrl.length() - 1) + GuardrailLatencyInfo.GUARDRAIL_VALIDATE_REQUEST_PATH
+                        : baseUrl + GuardrailLatencyInfo.GUARDRAIL_VALIDATE_REQUEST_PATH;
+                String requestBody = GuardrailLatencyInfo.buildGuardrailValidateRequestBody(target.getAccountId());
+                long startMs = System.currentTimeMillis();
+                int statusCode = -1;
+                String error = null;
+
+                Request request = new Request.Builder()
+                        .url(url)
+                        .post(RequestBody.create(requestBody, json))
+                        .header("Content-Type", "application/json")
+                        .build();
+
+                try (Response response = client.newCall(request).execute()) {
+                    statusCode = response.code();
+                    String responseBody = response.body() != null ? response.body().string() : "";
+                    logger.infoAndAddToDb(
+                            "Guardrail validate response: " + url + " HTTP " + statusCode + " body: " + responseBody,
+                            LogDb.DASHBOARD);
+                } catch (Exception e) {
+                    error = e.getMessage();
+                }
+
+                long latencyMs = System.currentTimeMillis() - startMs;
+                if (latencyMs <= thresholdMs) {
+                    logger.infoAndAddToDb(
+                            "Guardrail URL probe ok: " + url + " — " + latencyMs + " ms (threshold " + thresholdMs + " ms)",
+                            LogDb.DASHBOARD);
+                    continue;
+                }
+
+                logger.warnAndAddToDb(
+                        "Guardrail URL probe slow: " + url + " — " + latencyMs + " ms (threshold " + thresholdMs + " ms)",
+                        LogDb.DASHBOARD);
+
+                StringBuilder slackMessage = new StringBuilder();
+                slackMessage.append(":warning: *Guardrail service URL latency alert*\n");
+                slackMessage.append("Threshold: *").append(thresholdMs).append(" ms*\n\n");
+                slackMessage.append("• `").append(url).append("` — *").append(latencyMs).append(" ms*");
+                if (statusCode > 0) {
+                    slackMessage.append(" (HTTP ").append(statusCode).append(")");
+                }
+                if (error != null) {
+                    slackMessage.append("\n  _").append(error).append("_");
+                }
+
+                if (StringUtils.isNotBlank(webhookUrl)) {
+                    Slack.getInstance().send(webhookUrl, new CustomTextAlert(slackMessage.toString()).toJson());
+                    logger.warnAndAddToDb("Guardrail service URL latency: Slack alert sent for " + url, LogDb.DASHBOARD);
+                } else {
+                    logger.warnAndAddToDb(
+                            "Guardrail service URL latency: no Slack webhook; alert not sent for " + url,
+                            LogDb.DASHBOARD);
+                }
+            }
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Guardrail service URL latency check failed: " + e.getMessage(), LogDb.DASHBOARD);
+        }
     }
 
     private static void raiseMixpanelEvent() {
@@ -2621,6 +2727,7 @@ public class InitializerListener implements ServletContextListener {
 
                     syncCronInfo.setUpUpdateCronScheduler();
                     syncCronInfo.setUpMcpMaliciousnessCronScheduler();
+                    setUpGuardrailServiceUrlLatencyScheduler();
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
 //                        crons.insertHistoricalDataJob();
