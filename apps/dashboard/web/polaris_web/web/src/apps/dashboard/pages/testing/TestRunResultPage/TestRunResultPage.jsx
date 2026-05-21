@@ -14,6 +14,7 @@ import observeFunc from "../../observe/transform"
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import issuesApi from "../../issues/api";
 import { sendQuery } from '../../agentic/services/agenticService';
+import { isRunAutomatedTestsEnabled } from './smartTestingUtils';
 
 let headerDetails = [
   {
@@ -58,7 +59,7 @@ let headerDetails = [
 
 function TestRunResultPage(props) {
 
-  let { testingRunResult, runIssues, testSubCategoryMap } = props;
+  let { testingRunResult, runIssues, testSubCategoryMap, runAutomatedTests: runAutomatedTestsProp } = props;
 
   const location = useLocation()
   const selectedTestRunResult = TestingStore(state => state.selectedTestRunResult);
@@ -88,6 +89,10 @@ function TestRunResultPage(props) {
 
   // store key: {mcp/agent name} -> value: {tools for that mcp/agent}
   const [toolsCalls, setToolsCalls] = useState({})
+  const [runAutomatedTestsFetched, setRunAutomatedTestsFetched] = useState(false)
+  const runAutomatedTests =
+    isRunAutomatedTestsEnabled(runAutomatedTestsProp) ||
+    isRunAutomatedTestsEnabled(runAutomatedTestsFetched)
 
   // AI Chat state
   const [aiConversationId, setAiConversationId] = useState(null)
@@ -317,7 +322,24 @@ function TestRunResultPage(props) {
     }
   }
 
+  async function fetchTestingRunConfig() {
+    if (!hexId) {
+      setRunAutomatedTestsFetched(false)
+      return
+    }
+    try {
+      const resp = await api.fetchTestingRunResultSummaries(hexId)
+      const testingRun = resp?.testingRun
+      setRunAutomatedTestsFetched(isRunAutomatedTestsEnabled(testingRun?.runAutomatedTests))
+    } catch {
+      setRunAutomatedTestsFetched(false)
+    }
+  }
+
   async function fetchData() {
+    if (hexId) {
+      await fetchTestingRunConfig()
+    }
     if (hexId2 !== undefined) {
       try {
         if (testingRunResult === undefined) {
@@ -503,8 +525,9 @@ function TestRunResultPage(props) {
     setAiSummaryLoading(false);
     setAiSummaryChecked(false);
     setSelectedTestRunResult({});
+    setRunAutomatedTestsFetched(false);
     fetchData();
-  }, [subCategoryMap, subCategoryFromSourceConfigMap, props?.testingRunResult, props?.runIssues, hexId2])
+  }, [subCategoryMap, subCategoryFromSourceConfigMap, props?.testingRunResult, props?.runIssues, hexId2, hexId, runAutomatedTestsProp])
 
   return (
     useFlyout ?
@@ -539,6 +562,7 @@ function TestRunResultPage(props) {
           onGenerateAiOverview={handleGenerateAiOverview}
           onSendFollowUp={handleSendFollowUp}
           toolsCalls={toolsCalls}
+          runAutomatedTests={runAutomatedTests}
         />
       </>
       :
@@ -556,6 +580,7 @@ function TestRunResultPage(props) {
         conversations={conversations}
         conversationRemediationText={conversationRemediationText}
         showForbidden={showForbidden}
+        runAutomatedTests={runAutomatedTests}
       />
   )
 }

@@ -47,7 +47,7 @@ function TestRunResultFull(props) {
     const {
         selectedTestRunResult, testingRunResult, loading, issueDetails, getDescriptionText, infoState, headerDetails,
         hexId, source,
-        remediationSrc, conversations, conversationRemediationText, showForbidden    } = props
+        remediationSrc, conversations, conversationRemediationText, showForbidden, runAutomatedTests    } = props
 
     const [fullDescription, setFullDescription] = useState(false)
     const [remediationText, setRemediationText] = useState("")
@@ -112,6 +112,8 @@ function TestRunResultFull(props) {
                 conversations={conversations}
                 onSendMessage={() => {}}
                 isStreaming={false}
+                testResults={selectedTestRunResult?.testResults || []}
+                runAutomatedTests={runAutomatedTests}
             />
         </LegacyCard>
     )
