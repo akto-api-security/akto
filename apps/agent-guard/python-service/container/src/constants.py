@@ -34,6 +34,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "modelRole": "FINAL_ARBITER",
         }
 ],
-    "parallelExecution": True,
+    "parallelExecution": False,
     "storeAllResults": False,
 }
