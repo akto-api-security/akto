@@ -1,8 +1,10 @@
 package com.akto.action.settings;
 
 import com.akto.action.UserAction;
+import com.akto.dao.AgentUsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dto.AgenticUsers;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.akto.dto.monitoring.ModuleInfoConstants;
@@ -45,6 +47,12 @@ public class ModuleInfoAction extends UserAction {
     @Getter
     @Setter
     private String userRole;
+    @Getter
+    @Setter
+    private String userEmail;
+
+    @Getter
+    private List<AgenticUsers> agenticUsers;
 
     @Override
     public String execute() {
@@ -257,16 +265,12 @@ public class ModuleInfoAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        List<Bson> updates = new ArrayList<>();
-        updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".team", team != null ? team.trim() : ""));
-        updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".userRole", userRole != null ? userRole.trim() : ""));
+        AgentUsersDao.instance.upsertTag(username, userEmail, team, userRole);
+        return SUCCESS.toUpperCase();
+    }
 
-        Bson filter = Filters.and(
-            Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD),
-            Filters.eq(ModuleInfo.ADDITIONAL_DATA + ".username", username)
-        );
-
-        ModuleInfoDao.instance.updateMany(filter, Updates.combine(updates));
+    public String fetchAgenticUsers() {
+        agenticUsers = AgentUsersDao.instance.findAll(Filters.empty());
         return SUCCESS.toUpperCase();
     }
 

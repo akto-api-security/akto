@@ -872,6 +872,13 @@ const settingRequests = {
             data: { username, team, userRole }
         })
     },
+    async fetchAgenticUsers() {
+        return await request({
+            url: '/api/fetchAgenticUsers',
+            method: 'post',
+            data: {}
+        })
+    },
     async fetchCloudflareWafIntegration() {
         return await request({
             url: '/api/fetchCloudflareWafIntegration',

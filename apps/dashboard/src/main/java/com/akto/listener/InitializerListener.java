@@ -182,6 +182,7 @@ public class InitializerListener implements ServletContextListener {
     TokenGeneratorCron tokenGeneratorCron = new TokenGeneratorCron();
     UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
     AgentBasePromptDetectionCron agentBasePromptDetectionCron = new AgentBasePromptDetectionCron();
+    UserAnalysisCron userAnalysisCron = new UserAnalysisCron();
 
     private static String domain = null;
     public static String subdomain = "https://app.akto.io";
@@ -2586,6 +2587,7 @@ public class InitializerListener implements ServletContextListener {
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                         syncCronInfo.setUpMcpMaliciousnessCronScheduler();
                         agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
+                        userAnalysisCron.setUpUserAnalysisCronScheduler();
                         setupAutomatedApiGroupsScheduler();
                     }
 

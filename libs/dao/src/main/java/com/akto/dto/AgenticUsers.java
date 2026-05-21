@@ -10,6 +10,13 @@ import lombok.Setter;
 @Getter
 @Setter
 public class AgenticUsers {
+
+    public static final String ID = "_id";
+    public static final String USER_NAME = "userName";
+    public static final String USER_EMAIL = "userEmail";
+    public static final String USER_ROLE = "userRole";
+    public static final String TEAM_NAME = "teamName";
+
     private String id; // same as username
     private String userName;
     private String userEmail;
