@@ -23,6 +23,13 @@ from providers import build_provider_from_config
 
 logger = logging.getLogger(__name__)
 
+# Shared across all requests so we don't pay thread-creation cost per /scan.
+# 32 workers ≈ 10 concurrent scans against the default 3-provider modelMap.
+_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
+    max_workers=32,
+    thread_name_prefix="modelmap",
+)
+
 _DEFAULT_SAFE_THRESHOLD = 0.8
 
 # modelRole values
@@ -133,21 +140,15 @@ class ModelMapScanner:
         Dict[concurrent.futures.Future, Dict[str, Any]],
         Optional[Dict[concurrent.futures.Future, Dict[str, Any]]],
     ]:
-        """Fire tier1 + tier2 in one executor. When parallelExecution=true,
+        """Fire tier1 + tier2 on the shared executor. When parallelExecution=true,
         arbiters are submitted alongside so the cascade can consult them
         without paying the serial-escalation cost. Unused futures finish in
         the background and their results are discarded."""
         eager = bool(self.config.get("parallelExecution", False)) and bool(arbiters)
-        worker_count = max(1, len(tier1) + len(tier2) + (len(arbiters) if eager else 0))
 
-        executor = concurrent.futures.ThreadPoolExecutor(
-            max_workers=worker_count,
-            thread_name_prefix="modelmap",
-        )
-        t1_futures = self._submit(executor, tier1)
-        t2_futures = self._submit(executor, tier2)
-        arb_futures = self._submit(executor, arbiters) if eager else None
-        executor.shutdown(wait=False)
+        t1_futures = self._submit(_EXECUTOR, tier1)
+        t2_futures = self._submit(_EXECUTOR, tier2)
+        arb_futures = self._submit(_EXECUTOR, arbiters) if eager else None
 
         if eager:
             logger.info(f"[ModelMap] parallelExecution=true → {_ROLE_ARBITER} fired alongside tier1/tier2")
@@ -325,13 +326,7 @@ class ModelMapScanner:
     def _submit_arbiters_lazily(
         self, arbiters: List[ScannerEntry]
     ) -> Dict[concurrent.futures.Future, Dict[str, Any]]:
-        executor = concurrent.futures.ThreadPoolExecutor(
-            max_workers=len(arbiters),
-            thread_name_prefix="modelmap-arbiter",
-        )
-        future_map = self._submit(executor, arbiters)
-        executor.shutdown(wait=False)
-        return future_map
+        return self._submit(_EXECUTOR, arbiters)
 
     @staticmethod
     def _error_result(error: str) -> Dict[str, Any]:
