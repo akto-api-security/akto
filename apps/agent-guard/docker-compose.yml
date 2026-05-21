@@ -43,6 +43,7 @@ services:
       # DB abstractor endpoint for persisting per-model results when
       # config.storeAllResults=true (POST /api/storeGuardrailModelResults).
       - DATABASE_ABSTRACTOR_SERVICE_URL=${DATABASE_ABSTRACTOR_SERVICE_URL:-}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
     volumes:
       - model-cache:/app/.cache/huggingface
     deploy:

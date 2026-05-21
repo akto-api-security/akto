@@ -32,8 +32,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "safeDecisionThreshold": 0.9,
             "timeoutMs": 30000,
             "modelRole": "FINAL_ARBITER",
-        },
-    ],
-    "parallelExecution": False,
+        }
+],
+    "parallelExecution": True,
     "storeAllResults": False,
 }
