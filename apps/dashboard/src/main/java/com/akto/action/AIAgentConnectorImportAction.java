@@ -252,6 +252,8 @@ public class AIAgentConnectorImportAction extends UserAction {
                 if (snowflakeSchema != null && !snowflakeSchema.isEmpty()) {
                     config.put(CONFIG_SNOWFLAKE_SCHEMA, snowflakeSchema);
                 }
+
+                config.put(CONFIG_SNOWFLAKE_OBS_LOOKBACK_SECONDS, String.valueOf(DEFAULT_SNOWFLAKE_OBS_LOOKBACK_SECONDS));
                 break;
 
             case CONNECTOR_TYPE_DATABRICKS:
