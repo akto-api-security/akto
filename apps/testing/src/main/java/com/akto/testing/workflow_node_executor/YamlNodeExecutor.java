@@ -153,7 +153,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         int statusCode;
         List<Integer> responseTimeArr;
         List<Integer> responseLenArr;
-
+        String validationReason = "";
         // Prepare test requests and execute
         TestingUtilsSingleton.getInstance().clearApiCallExecutorService();
         ExecutorService apiCallExecutor = TestingUtilsSingleton.getInstance().getApiCallExecutorService();
@@ -170,6 +170,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         
         // Extract results from context
         vulnerable = execContext.vulnerable;
+        validationReason = execContext.validationReason;
         message = execContext.messages;
         responseTimeArr = execContext.responseTimes;
         responseLenArr = execContext.responseSizes;
@@ -197,7 +198,7 @@ public class YamlNodeExecutor extends NodeExecutor {
 
         // 
 
-        return new WorkflowTestResult.NodeResult(message.toString(), vulnerable, testErrors);
+        return new WorkflowTestResult.NodeResult(message.toString(), vulnerable, testErrors, validationReason);
 
     }
 
@@ -333,6 +334,7 @@ public class YamlNodeExecutor extends NodeExecutor {
             context.results.add(callResult.getTestResult());
             if (callResult.getTestResult().getVulnerable()) {
                 context.vulnerable = true;
+                context.validationReason = callResult.getTestResult().getValidationReason();
                 if (vulnerabilityFound != null) {
                     vulnerabilityFound.set(true);
                 }
@@ -363,6 +365,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<Integer> responseTimes = Collections.synchronizedList(new ArrayList<>());
         List<Integer> responseSizes = Collections.synchronizedList(new ArrayList<>());
         boolean vulnerable = false;
+        String validationReason = "";
         String lastResponseBody = null;
         int lastStatusCode = 0;
         String lastEventStream = null;
@@ -594,15 +597,19 @@ public class YamlNodeExecutor extends NodeExecutor {
 
         List<String> errors = new ArrayList<>();
         List<String> messages = new ArrayList<>();
+        String validationReason = "";
         if (testingRunResult.isVulnerable()) {
             List<GenericTestResult> testResults = testingRunResult.getTestResults();
             for (GenericTestResult testResult: testResults) {
                 TestResult t = (TestResult) testResult;
                 messages.add(t.getMessage());
+                if (validationReason.isEmpty() && t.getValidationReason() != null && !t.getValidationReason().isEmpty()) {
+                    validationReason = t.getValidationReason();
+                }
             }
         }
 
-        return new WorkflowTestResult.NodeResult(messages.toString(), testingRunResult.isVulnerable(), errors);
+        return new WorkflowTestResult.NodeResult(messages.toString(), testingRunResult.isVulnerable(), errors, validationReason);
     }
     
 }

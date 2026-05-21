@@ -38,3 +38,4 @@ THREAT_DETECTION_API_CHAIN_PATTERN.md
 run-guardrails-service.sh
 .github/hooks
 **/CLAUDE.md
+scripts/**
