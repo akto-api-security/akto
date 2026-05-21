@@ -162,8 +162,71 @@ func GetModifiedPayloadWithSummary(sessionMgr *SessionManager, logger *zap.Logge
 	return modifiedPayload
 }
 
-// InjectSessionSummary prepends the session summary to the user-facing prompt in
-// the validate-request payload.
+// summaryInjector prepends a session summary into one specific user-visible
+// field of a parsed request body. Implementations return true only when they
+// recognized the shape AND mutated body in place.
+type summaryInjector interface {
+	Inject(body map[string]interface{}, summary string) bool
+}
+
+// promptStringInjector handles legacy text-completions: {"prompt": "<text>"}.
+type promptStringInjector struct{}
+
+func (promptStringInjector) Inject(body map[string]interface{}, summary string) bool {
+	originalPrompt, ok := body["prompt"].(string)
+	if !ok {
+		return false
+	}
+	body["prompt"] = summary + "\n\n" + originalPrompt
+	return true
+}
+
+// chatMessagesInjector handles chat-completions: {"messages": [{role, content}, ...]}.
+// Walks from the end so the summary attaches to the freshest user turn.
+type chatMessagesInjector struct{}
+
+func (chatMessagesInjector) Inject(body map[string]interface{}, summary string) bool {
+	rawMessages, ok := body["messages"].([]interface{})
+	if !ok {
+		return false
+	}
+	for i := len(rawMessages) - 1; i >= 0; i-- {
+		msg, ok := rawMessages[i].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if role, _ := msg["role"].(string); role != "user" {
+			continue
+		}
+		content, ok := msg["content"].(string)
+		if !ok {
+			// Non-string content (multi-modal arrays) — skip and keep searching.
+			continue
+		}
+		msg["content"] = summary + "\n\n" + content
+		return true
+	}
+	return false
+}
+
+// summaryInjectors is the ordered registry of body-shape strategies.
+var summaryInjectors = []summaryInjector{
+	promptStringInjector{},
+	chatMessagesInjector{},
+}
+
+// applySummaryInjectors tries each registered strategy and returns true on
+// the first that handles the body.
+func applySummaryInjectors(body map[string]interface{}, summary string) bool {
+	for _, inj := range summaryInjectors {
+		if inj.Inject(body, summary) {
+			return true
+		}
+	}
+	return false
+}
+
+// InjectSessionSummary prepends the session summary to the user-facing prompt
 func InjectSessionSummary(payload, sessionSummary string, logger *zap.Logger) (string, error) {
 	if sessionSummary == "" {
 		return payload, nil
@@ -174,13 +237,14 @@ func InjectSessionSummary(payload, sessionSummary string, logger *zap.Logger) (s
 		return payload, fmt.Errorf("failed to parse outer payload: %w", err)
 	}
 
-	// Case 1: wrapped — request_body is itself a JSON string.
+	// Wrapped envelope: request_body is itself a JSON string. Unwrap, inject,
+	// re-wrap.
 	if requestBodyStr, ok := payloadObj["request_body"].(string); ok {
 		var requestBodyObj map[string]interface{}
 		if err := json.Unmarshal([]byte(requestBodyStr), &requestBodyObj); err != nil {
 			return payload, fmt.Errorf("failed to parse request_body JSON: %w", err)
 		}
-		if !injectIntoBody(requestBodyObj, sessionSummary) {
+		if !applySummaryInjectors(requestBodyObj, sessionSummary) {
 			return payload, fmt.Errorf("request_body has neither prompt nor messages to inject into")
 		}
 		modifiedRequestBodyBytes, err := json.Marshal(requestBodyObj)
@@ -195,8 +259,8 @@ func InjectSessionSummary(payload, sessionSummary string, logger *zap.Logger) (s
 		return string(modifiedPayloadBytes), nil
 	}
 
-	// Cases 2 & 3: bare — prompt or messages live at the top level.
-	if !injectIntoBody(payloadObj, sessionSummary) {
+	// Bare envelope: prompt or messages live at the top level.
+	if !applySummaryInjectors(payloadObj, sessionSummary) {
 		return payload, fmt.Errorf("payload has neither request_body, prompt, nor messages to inject into")
 	}
 	modifiedPayloadBytes, err := json.Marshal(payloadObj)
@@ -204,40 +268,4 @@ func InjectSessionSummary(payload, sessionSummary string, logger *zap.Logger) (s
 		return payload, fmt.Errorf("failed to re-encode payload: %w", err)
 	}
 	return string(modifiedPayloadBytes), nil
-}
-
-// injectIntoBody prepends sessionSummary into either the "prompt" string field
-// or the last user-role entry of a "messages" array. Returns true on success.
-// Callers are responsible for re-encoding the mutated map.
-func injectIntoBody(body map[string]interface{}, sessionSummary string) bool {
-	// Completions shape: top-level "prompt" string.
-	if originalPrompt, ok := body["prompt"].(string); ok {
-		body["prompt"] = sessionSummary + "\n\n" + originalPrompt
-		return true
-	}
-	// Chat completions shape: "messages" array — prepend to the last user
-	// message with string content. Walking from the end keeps the summary
-	// adjacent to the freshest user turn the model will respond to.
-	rawMessages, ok := body["messages"].([]interface{})
-	if !ok {
-		return false
-	}
-	for i := len(rawMessages) - 1; i >= 0; i-- {
-		msg, ok := rawMessages[i].(map[string]interface{})
-		if !ok {
-			continue
-		}
-		role, _ := msg["role"].(string)
-		if role != "user" {
-			continue
-		}
-		content, ok := msg["content"].(string)
-		if !ok {
-			// Non-string content (e.g. multi-modal: [{"type":"text",...}]) — skip.
-			continue
-		}
-		msg["content"] = sessionSummary + "\n\n" + content
-		return true
-	}
-	return false
 }
