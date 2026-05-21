@@ -163,6 +163,9 @@ public class AccountSettings {
     private List<String> filterLogPolicy;
     public static final String FILTER_LOG_POLICY = "filterLogPolicy";
 
+    public static final String ENDPOINT_SHIELD_SETTINGS = "endpointShieldSettings";
+    @Getter @Setter private EndpointShieldSettings endpointShieldSettings;
+
     public static final String MATCHING_PATTERNS_FOR_PROXY = "matchingPatternsForProxy";
     private Map<String, ProxyPatternInfo> matchingPatternsForProxy;
 

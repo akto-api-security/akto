@@ -257,7 +257,7 @@ function UserConfig() {
                     minHeight="500px"
                     readOnly={false}
                     getEditorData={handlePreRequestScriptChange}
-                    wordWrap={false}
+                    wordWrap={true}
                 />
             </LegacyCard.Section>
         </LegacyCard>
@@ -277,7 +277,7 @@ function UserConfig() {
                     minHeight="500px"
                     readOnly={false}
                     getEditorData={handlePostRequestScriptChange}
-                    wordWrap={false}
+                    wordWrap={true}
                 />
             </LegacyCard.Section>
         </LegacyCard>

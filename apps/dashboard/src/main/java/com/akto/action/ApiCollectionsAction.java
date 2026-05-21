@@ -281,11 +281,13 @@ public class ApiCollectionsAction extends UserAction {
 
     private boolean isValidApiCollectionName(){
         if (this.collectionName == null || this.collectionName.length() == 0) {
+            loggerMaker.infoAndAddToDb("DAST createCollection: invalid - null or empty name");
             addActionError("Invalid collection name");
             return false;
         }
 
         if (this.collectionName.length() > maxCollectionNameLength) {
+            loggerMaker.infoAndAddToDb("DAST createCollection: invalid - name too long length=" + this.collectionName.length());
             addActionError("Custom collections max length: " + maxCollectionNameLength);
             return false;
         }
@@ -297,13 +299,18 @@ public class ApiCollectionsAction extends UserAction {
             boolean spaces = c == ' ';
 
             if (!(alphabets || numbers || specialChars || spaces)) {
+                loggerMaker.infoAndAddToDb("DAST createCollection: invalid - illegal character '" + c + "' (code=" + (int)c + ") in name='" + this.collectionName + "'");
                 addActionError("Collection names can only be alphanumeric and contain '-','.' and '_'");
                 return false;
             }
         }
 
         // unique names
+        int visibleCollectionCount = (int) ApiCollectionsDao.instance.count(new BasicDBObject());
+        loggerMaker.infoAndAddToDb("DAST createCollection: checking uniqueness for name='" + collectionName + "' visibleCollections=" + visibleCollectionCount);
         ApiCollection sameNameCollection = ApiCollectionsDao.instance.findByName(collectionName);
+        loggerMaker.infoAndAddToDb("DAST createCollection: findByName('" + collectionName + "') returned " +
+            (sameNameCollection == null ? "null (unique, proceeding)" : "id=" + sameNameCollection.getId() + " name=" + sameNameCollection.getName() + " hostName=" + sameNameCollection.getHostName() + " displayName=" + sameNameCollection.getDisplayName()));
         if (sameNameCollection != null){
             addActionError("Collection names must be unique");
             return false;
@@ -321,7 +328,9 @@ public class ApiCollectionsAction extends UserAction {
 
         // do not change hostName or vxlanId here
         ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName,Context.now(),new HashSet<>(), null, 0, false, true);
+        loggerMaker.infoAndAddToDb("DAST createCollection: inserting new collection id=" + apiCollection.getId() + " name=" + collectionName);
         ApiCollectionsDao.instance.insertOne(apiCollection);
+        loggerMaker.infoAndAddToDb("DAST createCollection: insert succeeded id=" + apiCollection.getId() + " name=" + collectionName);
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);
 

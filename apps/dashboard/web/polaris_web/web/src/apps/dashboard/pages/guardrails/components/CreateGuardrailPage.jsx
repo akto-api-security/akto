@@ -323,7 +323,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         try {
             const mcpServerCollections = allCollections.filter(collection => {
                 const hasMcpEnvType = collection.envType && collection.envType.some(envType =>
-                    envType.keyName === 'mcp-server' && envType.value === 'MCP Server'
+                    envType.keyName === 'mcp-server'
                 );
                 return hasMcpEnvType && !isVisibilityOnly(collection);
             })
@@ -336,7 +336,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
             const agentServerCollections = allCollections.filter(collection => {
                 const hasGenAiEnvType = collection.envType && collection.envType.some(envType =>
-                    envType.keyName === 'gen-ai' && envType.value === 'Gen AI'
+                    envType.keyName === 'gen-ai'
                 );
                 return hasGenAiEnvType && !isVisibilityOnly(collection);
             })
