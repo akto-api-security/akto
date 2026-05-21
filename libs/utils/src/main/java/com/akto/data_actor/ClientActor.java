@@ -3,12 +3,14 @@ package com.akto.data_actor;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.agentic_sessions.AgentQueryData;
+import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.bulk_updates.BulkUpdates;
@@ -82,6 +84,21 @@ public class ClientActor extends DataActor {
      */
     private static final int maxAgentTrafficLogWrites = 5;
     private static ExecutorService agentTrafficLogThreadPool = Executors.newFixedThreadPool(maxAgentTrafficLogWrites);
+
+    private static final int AGENT_QUERY_BATCH_SIZE = 100;
+    private static final List<AgentQueryRecord> agentQueryRecordBuffer = new ArrayList<>();
+    private static final ScheduledExecutorService agentQueryFlushScheduler =
+            Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "agent-query-flush");
+                t.setDaemon(true);
+                return t;
+            });
+
+    static {
+        agentQueryFlushScheduler.scheduleAtFixedRate(
+                ClientActor::flushAgentQueryRecords, 5, 5, TimeUnit.SECONDS);
+    }
+
     private static AccountSettings accSettings;
 
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
@@ -3573,7 +3590,7 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public Map<String, List<String>> buildHeaders() {
+    public static Map<String, List<String>> buildHeaders() {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put(AUTHORIZATION, Collections.singletonList(getAuthToken()));
         return headers;
@@ -4670,17 +4687,52 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb(e, "error in writeApiSequences: " + e, LoggerMaker.LogDb.RUNTIME);
         }
     }
-    public void storeAgentQueryData(AgentQueryData agentQueryData) {
+    public Map<String, String> fetchDeviceUserMap() {
         Map<String, List<String>> headers = buildHeaders();
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("agentQueryData", agentQueryData);
-        String jsonBody = gson.toJson(obj);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeAgentQueryData", "", "POST", jsonBody, headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDeviceUserMap", "", "POST", null, headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String body = response.getBody();
+            if (response.getStatusCode() != 200 || body == null) {
+                return new HashMap<>();
+            }
+            Map<String, String> result = gson.fromJson(body, Map.class);
+            return result != null ? result : new HashMap<>();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in storeAgentQueryData" + e, LoggerMaker.LogDb.RUNTIME);
-            return;
+            loggerMaker.errorAndAddToDb("error in fetchDeviceUserMap: " + e, LoggerMaker.LogDb.RUNTIME);
+            return new HashMap<>();
         }
-    }   
+    }
+
+    public void storeAgentQueryData(AgentQueryRecord agentQueryRecord) {
+        boolean shouldFlush;
+        synchronized (agentQueryRecordBuffer) {
+            agentQueryRecordBuffer.add(agentQueryRecord);
+            shouldFlush = agentQueryRecordBuffer.size() >= AGENT_QUERY_BATCH_SIZE;
+        }
+        if (shouldFlush) {
+            agentTrafficLogThreadPool.submit(ClientActor::flushAgentQueryRecords);
+        }
+    }
+
+    private static void flushAgentQueryRecords() {
+        List<AgentQueryRecord> batch;
+        synchronized (agentQueryRecordBuffer) {
+            if (agentQueryRecordBuffer.isEmpty()) return;
+            batch = new ArrayList<>(agentQueryRecordBuffer);
+            agentQueryRecordBuffer.clear();
+        }
+        try {
+            Map<String, List<String>> headers = buildHeaders();
+            BasicDBObject obj = new BasicDBObject();
+            obj.put("agentQueryRecords", batch);
+            String jsonBody = gson.toJson(obj);
+            OriginalHttpRequest request = new OriginalHttpRequest(
+                    url + "/storeAgentQueryData", "", "POST", jsonBody, headers, "");
+            ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in flushAgentQueryRecords: " + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
 }
