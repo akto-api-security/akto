@@ -2,6 +2,7 @@ package com.akto.dto.nhi_governance;
 
 import java.util.List;
 import java.util.Map;
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -76,6 +77,7 @@ public class NhiViolation {
         this.severity = severity;
     }
 
+    @BsonIgnore
     public String getHexId() {
         return this.id != null ? this.id.toHexString() : null;
     }
@@ -92,6 +94,7 @@ public class NhiViolation {
             this.identityName = identityName;
         }
 
+        @BsonIgnore
         public String getHexId() {
             return this.id != null ? this.id.toHexString() : null;
         }

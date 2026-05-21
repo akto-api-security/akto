@@ -1,6 +1,7 @@
 package com.akto.dto.nhi_governance;
 
 import java.util.List;
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -49,6 +50,7 @@ public class NhiPolicy {
         this.contextSource = contextSource;
     }
 
+    @BsonIgnore
     public String getHexId() {
         return id != null ? id.toHexString() : null;
     }
