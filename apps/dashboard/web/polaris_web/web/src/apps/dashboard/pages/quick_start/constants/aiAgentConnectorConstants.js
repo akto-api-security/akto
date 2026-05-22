@@ -64,6 +64,7 @@ export const FIELD_DATAVERSE_ENVIRONMENT_URL = 'dataverseEnvironmentUrl';
 export const FIELD_DATAVERSE_TENANT_ID = 'dataverseTenantId';
 export const FIELD_DATAVERSE_CLIENT_ID = 'dataverseClientId';
 export const FIELD_DATAVERSE_CLIENT_SECRET = 'dataverseClientSecret';
+export const FIELD_DATAVERSE_BOT_IDS = 'dataverseBotIds';
 export const FIELD_SNOWFLAKE_ACCOUNT_URL = 'snowflakeAccountUrl';
 export const FIELD_SNOWFLAKE_AUTH_TYPE = 'snowflakeAuthType';
 export const FIELD_SNOWFLAKE_USERNAME = 'snowflakeUsername';
@@ -305,6 +306,15 @@ export const COPILOT_STUDIO_FIELDS = [
         type: FIELD_TYPE_PASSWORD,
         placeholder: '*******',
         configKey: FIELD_DATAVERSE_CLIENT_SECRET
+    },
+    {
+        name: FIELD_DATAVERSE_BOT_IDS,
+        label: 'Bot IDs (Optional)',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'bot-guid-1,bot-guid-2',
+        configKey: FIELD_DATAVERSE_BOT_IDS,
+        helpText: 'Comma-separated Copilot Studio bot GUIDs. If set, only these bots are ingested; others are filtered out. Find the GUID in the agent URL after /bots/.',
+        required: false
     },
     {
         name: FIELD_DATA_INGESTION_URL,
