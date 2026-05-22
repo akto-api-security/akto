@@ -202,61 +202,6 @@ public class DbLayer {
         );
     }
 
-    private static final int rebootThresholdSeconds = 2 * 60; // 2 minutes 
-    private static void updateModuleEnvAndReboot(ModuleInfo moduleInfo) {
-
-        try {
-            Map<String, Object> additionalData = moduleInfo.getAdditionalData();
-            if (additionalData == null || !(additionalData.get("env") instanceof Map)) {
-                return;
-            }
-            Map<?, ?> env = (Map<?, ?>) additionalData.get("env");
-            Object val = env.get("AGGREGATION_RULES_ENABLED");
-            if (!"true".equalsIgnoreCase(String.valueOf(val))) {
-                return;
-            }
-        } catch (Exception ignored) {
-            return;
-        }
-
-        try {
-            int deltaTimeForReboot = Context.now() - rebootThresholdSeconds;
-
-
-            Bson moduleFilter = Filters.and(
-                Filters.eq(ModuleInfo.NAME, moduleInfo.getName()),
-                Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, deltaTimeForReboot),
-                Filters.ne(ModuleInfo.ADDITIONAL_DATA, null),
-                Filters.eq(ModuleInfo.ADDITIONAL_DATA + ".env.AGGREGATION_RULES_ENABLED", "true")
-            );
-
-
-            List<Bson> updates = new ArrayList<>();
-            updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".env.AGGREGATION_RULES_ENABLED", false));
-            updates.add(Updates.set(ModuleInfo._REBOOT, true));
-
-
-            ModuleInfoDao.instance.updateMany(moduleFilter, Updates.combine(updates));
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> env = (Map<String, Object>) moduleInfo.getAdditionalData().get("env");
-            env.put("AGGREGATION_RULES_ENABLED", "false");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private static List<Bson> buildAdditionalDataUpdates(Map<String, Object> additionalData) {
-        List<Bson> updates = new ArrayList<>();
-        if (additionalData == null || additionalData.isEmpty()) {
-            return updates;
-        }
-        for (Map.Entry<String, Object> entry : additionalData.entrySet()) {
-            updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + "." + entry.getKey(), entry.getValue()));
-        }
-        return updates;
-    }
-
     public static ModuleInfo updateModuleInfo(ModuleInfo moduleInfo) {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
@@ -269,38 +214,17 @@ public class DbLayer {
             moduleInfo.getAdditionalData().put("tokenExpired", true);
         }
 
-        if(Context.accountId.get() == 1758787662){
-           updateModuleEnvAndReboot(moduleInfo);
-        }
-
-        boolean forwardToNewRelic = NewRelicIntegrationDao.instance.findOne(new BasicDBObject()) != null;
-        if (forwardToNewRelic) {
-            int accountId = Context.accountId.get();
-            loggerMaker.infoAndAddToDb(String.format("Forwarding module heartbeat to New Relic for module %s (account %d)", moduleInfo.getName(), accountId), LogDb.DB_ABS);
-
-            try {
-                newRelicExecutorService.submit(() -> {
-                    Context.accountId.set(accountId);
-                    NewRelicUtils.forwardModuleHeartbeatEvent(moduleInfo);
-                });
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error submitting module heartbeat forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
-            }
-        }
-        
-        List<Bson> updateList = new ArrayList<>();
-        updateList.add(Updates.setOnInsert("_t", moduleInfo.getClass().getName()));
-        updateList.add(Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()));
-        updateList.add(Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()));
-        updateList.add(Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()));
-        updateList.add(Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()));
-        updateList.add(Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()));
-        updateList.addAll(buildAdditionalDataUpdates(moduleInfo.getAdditionalData()));
-
-        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(
-                Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
-                Updates.combine(updateList),
-                updateOptions);
+        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
+                Updates.combine(
+                        //putting class name because findOneAndUpdate doesn't put class name by default
+                        Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
+                        Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
+                        Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
+                        Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+                        Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
+                        Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
+                        Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
+                ), updateOptions);
     }
 
     public static void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList) {
