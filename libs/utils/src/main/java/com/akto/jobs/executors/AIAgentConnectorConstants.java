@@ -47,6 +47,7 @@ public final class AIAgentConnectorConstants {
     public static final String CONFIG_DATAVERSE_TENANT_ID = "DATAVERSE_TENANT_ID";
     public static final String CONFIG_DATAVERSE_CLIENT_ID = "DATAVERSE_CLIENT_ID";
     public static final String CONFIG_DATAVERSE_CLIENT_SECRET = "DATAVERSE_CLIENT_SECRET";
+    public static final String CONFIG_DATAVERSE_BOT_IDS = "COPILOT_BOT_ID";
 
     // Configuration Keys - Snowflake
     public static final String CONFIG_SNOWFLAKE_ACCOUNT_URL = "SNOWFLAKE_ACCOUNT_URL";

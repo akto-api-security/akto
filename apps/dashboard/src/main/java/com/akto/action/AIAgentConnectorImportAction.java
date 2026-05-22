@@ -46,6 +46,7 @@ public class AIAgentConnectorImportAction extends UserAction {
     private String dataverseTenantId;
     private String dataverseClientId;
     private String dataverseClientSecret;
+    private String dataverseBotIds;
 
     // Snowflake-specific parameters
     private String snowflakeAccountUrl;
@@ -196,6 +197,9 @@ public class AIAgentConnectorImportAction extends UserAction {
                 config.put(CONFIG_DATAVERSE_TENANT_ID, dataverseTenantId);
                 config.put(CONFIG_DATAVERSE_CLIENT_ID, dataverseClientId);
                 config.put(CONFIG_DATAVERSE_CLIENT_SECRET, dataverseClientSecret);
+                if (dataverseBotIds != null && !dataverseBotIds.trim().isEmpty()) {
+                    config.put(CONFIG_DATAVERSE_BOT_IDS, dataverseBotIds.trim());
+                }
                 break;
 
             case CONNECTOR_TYPE_SNOWFLAKE:
