@@ -119,6 +119,11 @@ export default function LeftNav() {
     ];
     const isAllowedDashboardUser = window.USER_NAME && allowedDashboardUsers.includes(window.USER_NAME.toLowerCase());
 
+
+    // Allowed users to for NHI Data
+    const allowedNhiUsers = ["ankush@akto.io"];
+    const isAllowedNhiUser = window.USER_NAME && allowedNhiUsers.includes(window.USER_NAME.toLowerCase());
+
     const navItems = useMemo(() => {
         let items = [
             {
@@ -403,7 +408,7 @@ export default function LeftNav() {
                 ],
                 key: "5",
             }] : []),
-            ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && func.isDemoAccount()  ? [{
+            ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && func.isDemoAccount() && isAllowedNhiUser  ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
                         NHI Governance
