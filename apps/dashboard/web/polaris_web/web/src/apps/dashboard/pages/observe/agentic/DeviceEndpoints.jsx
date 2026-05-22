@@ -10,6 +10,7 @@ import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, themeQuartz, AllEnterpriseModule } from "ag-grid-enterprise";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
+import SkillsFlyout from "./SkillsFlyout";
 
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
@@ -712,9 +713,19 @@ function TableSection() {
     const [deviceQuickFilter, setDeviceQuickFilter] = useState("");
     const [userQuickFilter, setUserQuickFilter] = useState("");
     const [selectedCount, setSelectedCount] = useState(0);
+    const [flyout, setFlyout] = useState(null); // { agent, device }
     const deviceGridRef = useRef(null);
     const userGridRef = useRef(null);
     const isDevices = activeTab === "devices";
+
+    const handleRowClick = useCallback((e) => {
+        const { data, node } = e;
+        if (node.level > 0 && data?.skillCount) {
+            const deviceId = data.path[0];
+            const device = DEVICE_FLAT_DATA.find(r => r.path.length === 1 && r.path[0] === deviceId);
+            setFlyout({ agent: data, device });
+        }
+    }, []);
 
     const getDataPath = useCallback((data) => data.path, []);
 
@@ -803,6 +814,7 @@ function TableSection() {
                                 ref={deviceGridRef}
                                 theme={myThemeInner}
                                 rowData={DEVICE_FLAT_DATA}
+                                onRowClicked={handleRowClick}
                                 onSelectionChanged={e => setSelectedCount(e.api.getSelectedRows().length)}
                                 columnDefs={DEVICE_COL_DEFS}
                                 autoGroupColumnDef={autoGroupColumnDef}
@@ -852,6 +864,13 @@ function TableSection() {
                     </>
                 )}
             </div>
+
+            <SkillsFlyout
+                agent={flyout?.agent}
+                device={flyout?.device}
+                show={flyout !== null}
+                onClose={() => setFlyout(null)}
+            />
         </div>
     );
 }
