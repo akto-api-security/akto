@@ -681,6 +681,7 @@ public abstract class Config {
     public static class SlackAlertInternalConfig extends Config {
         private String slackWebhookUrl;
         private String dastSlackWebhookUrl;
+        private String guardrailSlackWebhookUrl;
 
         public static final String CONFIG_ID = ConfigType.SLACK_ALERT_INTERNAL.name() + CONFIG_SALT;
 
@@ -703,6 +704,14 @@ public abstract class Config {
 
         public void setDastSlackWebhookUrl(String dastSlackWebhookUrl) {
             this.dastSlackWebhookUrl = dastSlackWebhookUrl;
+        }
+
+        public String getGuardrailSlackWebhookUrl() {
+            return guardrailSlackWebhookUrl;
+        }
+
+        public void setGuardrailSlackWebhookUrl(String guardrailSlackWebhookUrl) {
+            this.guardrailSlackWebhookUrl = guardrailSlackWebhookUrl;
         }
     }
 
