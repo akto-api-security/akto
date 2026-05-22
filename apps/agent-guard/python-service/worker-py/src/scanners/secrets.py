@@ -11,6 +11,7 @@ files. The built-in detectors below cover the common, high-impact secret types.
 """
 
 import os
+import re
 import tempfile
 from typing import Any, Dict, List
 
@@ -33,16 +34,34 @@ _PLUGINS = [
     {"name": "SquareOAuthDetector"},
     {"name": "PrivateKeyDetector"},
     {"name": "TwilioKeyDetector"},
+    # Modern prefix-anchored detectors built into detect-secrets but absent from
+    # llm_guard's default list. All regex/prefix based (low false-positive), so
+    # safe to add and they close real coverage gaps (GitHub/GitLab/OpenAI/etc).
+    {"name": "GitHubTokenDetector"},
+    {"name": "GitLabTokenDetector"},
+    {"name": "OpenAIDetector"},
+    {"name": "SlackDetector"},
+    {"name": "SendGridDetector"},
+    {"name": "PypiTokenDetector"},
+    {"name": "TelegramBotTokenDetector"},
     {"name": "Base64HighEntropyString", "limit": 4.5},
     {"name": "HexHighEntropyString", "limit": 3.0},
 ]
 
 
 def _redact(text: str, values: List[str]) -> str:
+    """Mask each detected secret.
+
+    detect-secrets returns only the captured group for regex detectors with a
+    group (e.g. GitHubTokenDetector yields "ghp", not the full token), so we
+    mask the entire non-whitespace token containing each hit — never leave part
+    of a secret visible. Longest values first so short hits don't pre-empt them.
+    """
     out = text
     for v in sorted(set(values), key=len, reverse=True):
-        if v:
-            out = out.replace(v, REDACT_MASK)
+        if not v:
+            continue
+        out = re.sub(r"\S*" + re.escape(v) + r"\S*", REDACT_MASK, out)
     return out
 
 
