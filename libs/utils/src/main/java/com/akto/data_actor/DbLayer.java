@@ -3092,7 +3092,7 @@ public class DbLayer {
 
     public static Map<String, String> fetchDeviceUserMap() {
         List<ModuleInfo> modules = ModuleInfoDao.instance.findAll(
-            new BasicDBObject(),
+            Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD.name()),
             Projections.include(ModuleInfo.NAME, ModuleInfo.ADDITIONAL_DATA + ".username")
         );
         Map<String, String> result = new HashMap<>();

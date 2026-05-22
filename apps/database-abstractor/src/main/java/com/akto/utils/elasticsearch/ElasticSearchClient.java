@@ -14,7 +14,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -29,8 +28,7 @@ public class ElasticSearchClient {
     private static final LoggerMaker logger = new LoggerMaker(ElasticSearchClient.class, LogDb.DB_ABS);
 
     private static final String ES_HOST = System.getenv("ES_HOST");
-    private static final String ES_USERNAME = System.getenv("ES_USERNAME");
-    private static final String ES_PASSWORD = System.getenv("ES_PASSWORD");
+    private static final String ES_API_KEY = System.getenv("ES_API_KEY");
     private static final String ES_INDEX = System.getenv("ES_INDEX_AGENT_QUERY");
 
     private static final String SCROLL_KEEP_ALIVE = "2m";
@@ -60,6 +58,7 @@ public class ElasticSearchClient {
      * Maps timeStampMs → timestamp at write time. Fire-and-forget; errors are logged only.
      */
     public void bulkIndexAgentQueryRecords(List<AgentQueryRecord> records) {
+        logger.info("Bulk indexing agent query records: " + records.size());
         if (!isConfigured() || records == null || records.isEmpty()) return;
 
         StringBuilder ndjson = new StringBuilder();
@@ -94,6 +93,7 @@ public class ElasticSearchClient {
             if (!resp.isSuccessful()) {
                 logger.error("ES bulk index failed (" + resp.code() + ") for " + url);
             }
+            logger.info("ES bulk index successful for " + url);
         } catch (Exception e) {
             logger.error("ES bulk index error: " + e.getMessage());
         }
@@ -229,11 +229,8 @@ public class ElasticSearchClient {
     }
 
     private void addAuthHeader(Request.Builder rb) {
-        if (ES_USERNAME != null && !ES_USERNAME.isEmpty()) {
-            String token = Base64.getEncoder().encodeToString(
-                (ES_USERNAME + ":" + (ES_PASSWORD == null ? "" : ES_PASSWORD)).getBytes()
-            );
-            rb.addHeader("Authorization", "Basic " + token);
+        if (ES_API_KEY != null && !ES_API_KEY.isEmpty()) {
+            rb.addHeader("Authorization", "ApiKey " + ES_API_KEY);
         }
     }
 

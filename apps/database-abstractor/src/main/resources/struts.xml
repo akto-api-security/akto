@@ -2541,7 +2541,7 @@
             </result>
         </action>
 
-        <action name="api/storeAgentQueryRecords" class="com.akto.action.DbAction" method="storeAgentQueryRecords">
+        <action name="api/storeAgentQueryData" class="com.akto.action.DbAction" method="storeAgentQueryRecords">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
