@@ -9,8 +9,9 @@ import base64
 import json
 import logging
 import math
+import threading
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import google.auth.transport.requests
 import httpx
@@ -26,6 +27,30 @@ DEFAULT_VERTEX_AI_MODEL = "publishers/qwen/models/qwen3guard"
 
 _HTTP_TIMEOUT_SECONDS = 120.0
 _VERTEX_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
+
+# Process-wide cache of built providers. Vertex credentials, httpx connection
+# pools, and base64/JSON decoding of SA keys are all expensive — building once
+# per (provider, model, base_url) and reusing across requests is the win.
+_PROVIDER_CACHE: Dict[Tuple[str, str, str], "LLMProvider"] = {}
+_PROVIDER_CACHE_LOCK = threading.Lock()
+
+
+def _cached_provider(
+    cache_key: Tuple[str, str, str], builder: Callable[[], Optional["LLMProvider"]]
+) -> Optional["LLMProvider"]:
+    """Return the cached provider for cache_key, or build + store on miss.
+    Failed builds (None) are not cached so transient credential issues recover."""
+    cached = _PROVIDER_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    with _PROVIDER_CACHE_LOCK:
+        cached = _PROVIDER_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
+        built = builder()
+        if built is not None:
+            _PROVIDER_CACHE[cache_key] = built
+        return built
 
 
 class LLMProvider(ABC):
@@ -151,7 +176,8 @@ class VertexAIProvider(LLMProvider):
         )
 
     def complete(self, prompt: str) -> str:
-        self.credentials.refresh(google.auth.transport.requests.Request())
+        if not self.credentials.valid:
+            self.credentials.refresh(google.auth.transport.requests.Request())
         resp = self._client.post(
             self._predict_url(),
             headers={
@@ -436,39 +462,48 @@ def _build_qwen3guard() -> Optional[LLMProvider]:
     )
 
 
+# Registry of provider builders, keyed by canonical provider name. Inputs are
+# (model, base_url); credentials and other static config come from settings
+# inside each builder. Adding a new provider means adding one row here.
+_BUILDERS: Dict[str, Callable[[str, str], Optional[LLMProvider]]] = {
+    "openai":            lambda model, _: _build_openai_compatible(model, base_url=""),
+    "openai_compatible": _build_openai_compatible,
+    "anthropic":         lambda model, _: _build_anthropic(model),
+    "vertexai":          lambda _m, _b:   _build_vertexai(),
+    "gemma_vertexai":    lambda _m, _b:   _build_gemma_vertexai(),
+    "qwen3guard":        lambda _m, _b:   _build_qwen3guard(),
+}
+
+
+def _dispatch(provider_name: str, model: str, base_url: str) -> Optional[LLMProvider]:
+    """Route a canonical provider name to its builder, returning the cached instance."""
+    builder = _BUILDERS.get(provider_name)
+    if builder is None:
+        logger.warning(f"[Providers] Unknown provider '{provider_name}'; skipping")
+        return None
+    return _cached_provider(
+        (provider_name, model, base_url),
+        lambda: builder(model, base_url),
+    )
+
+
 def build_provider_from_env(provider_name: str, model: str = "") -> Optional[LLMProvider]:
     """Build a provider using *only* env vars. Used by the SCANNER_LLM_PROVIDER path."""
-    provider_name = provider_name.strip().lower()
-    if provider_name == "openai":
-        return _build_openai_compatible(model or settings.OPENAI_MODEL, base_url="")
-    if provider_name == "anthropic":
-        return _build_anthropic(model or settings.ANTHROPIC_MODEL)
-    if provider_name == "vertexai":
-        return _build_vertexai()
-    if provider_name == "gemma_vertexai":
-        return _build_gemma_vertexai()
-    logger.warning(f'[Providers] Unknown provider "{provider_name}"; skipping')
-    return None
+    name = provider_name.strip().lower()
+    if name == "openai":
+        model = model or settings.OPENAI_MODEL
+    elif name == "anthropic":
+        model = model or settings.ANTHROPIC_MODEL
+    return _dispatch(name, model, "")
 
 
 def build_provider_from_config(entry: Dict[str, Any]) -> Optional[LLMProvider]:
     """Build a provider from a modelMap entry. Reads name/model/baseUrl from the
     entry; credentials still come from settings."""
-    provider_name = (entry.get("provider") or "").strip().lower()
+    name = (entry.get("provider") or "").strip().lower()
     model = (entry.get("model") or "").strip()
-
-    if provider_name in ("openai", "ollama", "openai_compatible"):
+    if name in ("openai", "ollama", "openai_compatible"):
         # Entry-level baseUrl wins, then OPENAI_COMPATIBLE_BASE_URL, then default.
         base_url = (entry.get("baseUrl") or "").strip() or settings.OPENAI_COMPATIBLE_BASE_URL
-        return _build_openai_compatible(model, base_url)
-    if provider_name == "anthropic":
-        return _build_anthropic(model)
-    if provider_name == "vertexai":
-        return _build_vertexai()
-    if provider_name == "gemma_vertexai":
-        return _build_gemma_vertexai()
-    if provider_name == "qwen3guard":
-        return _build_qwen3guard()
-
-    logger.warning(f"[ModelMap] Unknown provider '{provider_name}'; skipping entry")
-    return None
+        return _dispatch("openai_compatible", model, base_url)
+    return _dispatch(name, model, "")
