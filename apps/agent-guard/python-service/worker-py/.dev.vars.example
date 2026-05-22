@@ -1,0 +1,29 @@
+# Copy to .dev.vars for local `pywrangler dev`, and set via `wrangler secret put`
+# for deployed environments. None are needed for /health or BanSubstrings;
+# the cascade (PromptInjection/BanTopics/Toxicity/Gibberish) needs the Vertex
+# service-account keys + optional Anthropic/OpenAI keys.
+
+# Vertex — Qwen3Guard (tier-1 fast filter)
+QWEN3GUARD_SA_KEY_JSON=
+QWEN3GUARD_PROJECT=
+QWEN3GUARD_LOCATION=
+QWEN3GUARD_ENDPOINT_ID=
+QWEN3GUARD_DEDICATED_DNS=
+
+# Vertex — Gemma (final arbiter)
+GEMMA_VERTEX_SA_KEY_JSON=
+GEMMA_VERTEX_PROJECT=
+GEMMA_VERTEX_LOCATION=
+GEMMA_VERTEX_ENDPOINT_ID=
+GEMMA_VERTEX_DEDICATED_DNS=
+
+# Optional providers
+ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=
+OPENAI_API_KEY=
+OPENAI_MODEL=
+OPENAI_COMPATIBLE_BASE_URL=
+
+# Optional integrations
+SLACK_WEBHOOK_URL=
+DATABASE_ABSTRACTOR_SERVICE_URL=

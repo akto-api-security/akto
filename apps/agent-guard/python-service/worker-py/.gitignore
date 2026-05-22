@@ -1,0 +1,14 @@
+# Local secrets — never commit
+.dev.vars
+
+# uv / pywrangler / pyodide build artifacts
+.venv/
+.venv-workers/
+python_modules/
+.wrangler/
+uv.lock
+
+# test artifacts
+.pytest_cache/
+__pycache__/
+*.pyc
