@@ -40,3 +40,10 @@ export const MESSAGE_TYPES = {
     REQUEST: 'request',
     RESPONSE: 'response',
 };
+
+export const JOURNEY_TEXT = {
+    HEADER: 'AI execution trace',
+    MOCK_BADGE: 'Sample data',
+    VULNERABLE_BADGE: 'Vulnerable',
+    TRACE_LOG: 'Execution log',
+};

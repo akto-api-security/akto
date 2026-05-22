@@ -59,6 +59,8 @@ public final class AIAgentConnectorConstants {
     public static final String CONFIG_SNOWFLAKE_WAREHOUSE = "SNOWFLAKE_WAREHOUSE";
     public static final String CONFIG_SNOWFLAKE_DATABASE = "SNOWFLAKE_DATABASE";
     public static final String CONFIG_SNOWFLAKE_SCHEMA = "SNOWFLAKE_SCHEMA";
+    public static final String CONFIG_SNOWFLAKE_OBS_LOOKBACK_SECONDS = "SNOWFLAKE_OBS_LOOKBACK_SECONDS";
+    public static final int DEFAULT_SNOWFLAKE_OBS_LOOKBACK_SECONDS = 300;
     
     // Snowflake Auth Types
     public static final String SNOWFLAKE_AUTH_TYPE_PASSWORD = "PASSWORD";

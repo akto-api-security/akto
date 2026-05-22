@@ -6343,7 +6343,7 @@
             </result>
         </action>
 
-        <action name="api/getReportFilters" class="com.akto.action.testing_issues.IssuesAction" method="getReportFilters">
+        <action name="api/getReportFilters" class="com.akto.action.testing_issues.IssuesAction" method="fetchReportFilters">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">

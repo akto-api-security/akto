@@ -135,8 +135,9 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		return
 	}
 
-	// Extract session and request IDs from headers
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
+	// Extract session and request IDs from headers (falling back to the body's
+	// requestHeaders JSON for traffic forwarded via /api/http-proxy).
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, req.RequestHeaders)
 
 	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Request received for guardrailing | Path: %s | Method: %s | Account: %s | Session: %s | Payload: %.300s",
 		req.Path, req.Method, req.AktoAccountID, sessionID, req.RequestPayload))
@@ -215,8 +216,7 @@ func (h *ValidationHandler) ValidateRequestWithPolicy(c *gin.Context) {
 		return
 	}
 
-	// Extract session and request IDs from headers
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, "")
 
 	// Default skipThreat to false if not provided
 	skipThreat := false
@@ -282,8 +282,7 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		return
 	}
 
-	// Extract session and request IDs from headers
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, req.RequestHeaders)
 
 	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Response received for guardrailing | Path: %s | Method: %s | Account: %s | Session: %s | Payload: %.300s",
 		req.Path, req.Method, req.AktoAccountID, sessionID, responseBody))

@@ -72,8 +72,6 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 		return
 	}
 
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
-
 	// Build request headers JSON from the hostname form field so that
 	// validationContextFromParams can extract McpServerName (Host header) and
 	// the threat dashboard shows the correct hostname — mirroring validate/request.
@@ -85,6 +83,8 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 			}
 		}
 	}
+
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, requestHeaders)
 
 	meta := &models.ValidateRequestParams{
 		ContextSource:  contextSource,
