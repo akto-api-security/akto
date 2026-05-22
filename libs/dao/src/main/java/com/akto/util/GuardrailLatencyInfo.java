@@ -33,20 +33,52 @@ public class GuardrailLatencyInfo {
                 + "}";
     }
 
-    public static final List<GuardrailServiceTarget> GUARDRAIL_SERVICE_TARGETS = Arrays.asList(
-            new GuardrailServiceTarget("https://1726615470-guardrails.akto.io", "1726615470"),
-            new GuardrailServiceTarget("https://ingest.akto.io", "1768175789")
-    );
-    public static final String GUARDRAIL_VALIDATE_REQUEST_PATH = "/api/validate/request";
+    public static String buildGuardrailScanRequestBody() {
+        return "{"
+                + "\"scanner_type\":\"prompt\","
+                + "\"scanner_name\":\"PromptInjection\","
+                + "\"text\":\"hi\""
+                + "}";
+    }
 
+    public static final String GUARDRAIL_VALIDATE_REQUEST_PATH = "/api/http-proxy?ingest_data=false&guardrails=true";
+    public static final String GUARDRAIL_SCAN_REQUEST_PATH = "/scan";
+
+    public enum GuardrailProbeType {
+        VALIDATE(GUARDRAIL_VALIDATE_REQUEST_PATH),
+        SCAN(GUARDRAIL_SCAN_REQUEST_PATH);
+
+        private final String requestPath;
+
+        GuardrailProbeType(String requestPath) {
+            this.requestPath = requestPath;
+        }
+
+        public String getRequestPath() {
+            return requestPath;
+        }
+    }
+
+    public static final List<GuardrailServiceTarget> GUARDRAIL_SERVICE_TARGETS = Arrays.asList(
+            new GuardrailServiceTarget(
+                    "https://1726615470-guardrails.akto.io",
+                    "1726615470",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://akto-agent-guard-executor.billing-53a.workers.dev",
+                    null,
+                    GuardrailProbeType.SCAN)
+    );
 
     public static final class GuardrailServiceTarget {
         private final String url;
         private final String accountId;
+        private final GuardrailProbeType probeType;
 
-        public GuardrailServiceTarget(String url, String accountId) {
+        public GuardrailServiceTarget(String url, String accountId, GuardrailProbeType probeType) {
             this.url = url;
             this.accountId = accountId;
+            this.probeType = probeType;
         }
 
         public String getUrl() {
@@ -55,6 +87,21 @@ public class GuardrailLatencyInfo {
 
         public String getAccountId() {
             return accountId;
+        }
+
+        public GuardrailProbeType getProbeType() {
+            return probeType;
+        }
+
+        public String getRequestPath() {
+            return probeType.getRequestPath();
+        }
+
+        public String buildRequestBody() {
+            if (probeType == GuardrailProbeType.SCAN) {
+                return buildGuardrailScanRequestBody();
+            }
+            return buildGuardrailValidateRequestBody(accountId);
         }
     }
 }

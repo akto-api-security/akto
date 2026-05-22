@@ -488,10 +488,11 @@ public class InitializerListener implements ServletContextListener {
         try {
             for (GuardrailLatencyInfo.GuardrailServiceTarget target : GuardrailLatencyInfo.GUARDRAIL_SERVICE_TARGETS) {
                 String baseUrl = target.getUrl();
+                String requestPath = target.getRequestPath();
                 String url = baseUrl.endsWith("/")
-                        ? baseUrl.substring(0, baseUrl.length() - 1) + GuardrailLatencyInfo.GUARDRAIL_VALIDATE_REQUEST_PATH
-                        : baseUrl + GuardrailLatencyInfo.GUARDRAIL_VALIDATE_REQUEST_PATH;
-                String requestBody = GuardrailLatencyInfo.buildGuardrailValidateRequestBody(target.getAccountId());
+                        ? baseUrl.substring(0, baseUrl.length() - 1) + requestPath
+                        : baseUrl + requestPath;
+                String requestBody = target.buildRequestBody();
                 long startMs = System.currentTimeMillis();
                 int statusCode = -1;
                 String error = null;
