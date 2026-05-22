@@ -272,6 +272,8 @@ import java.io.UnsupportedEncodingException;
 public class InitializerListener implements ServletContextListener {
 
     private static final LoggerMaker logger = new LoggerMaker(InitializerListener.class, LogDb.DASHBOARD);
+    private static final GuardrailLatencyInfo.GuardrailLatencyBucketTracker guardrailLatencyBucketTracker =
+            new GuardrailLatencyInfo.GuardrailLatencyBucketTracker();
 
     private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -455,7 +457,7 @@ public class InitializerListener implements ServletContextListener {
             public void run() {
                 checkGuardrailServiceUrlLatency();
             }
-        }, 0, 5, TimeUnit.MINUTES);
+        }, 0, 2, TimeUnit.MINUTES);
     }
 
     private void checkGuardrailServiceUrlLatency() {
@@ -506,7 +508,7 @@ public class InitializerListener implements ServletContextListener {
                 try (Response response = client.newCall(request).execute()) {
                     statusCode = response.code();
                     String responseBody = response.body() != null ? response.body().string() : "";
-                    logger.infoAndAddToDb(
+                    logger.info(
                             "Guardrail validate response: " + url + " HTTP " + statusCode + " body: " + responseBody,
                             LogDb.DASHBOARD);
                 } catch (Exception e) {
@@ -514,23 +516,39 @@ public class InitializerListener implements ServletContextListener {
                 }
 
                 long latencyMs = System.currentTimeMillis() - startMs;
+
                 if (latencyMs <= thresholdMs) {
-                    logger.infoAndAddToDb(
+                    guardrailLatencyBucketTracker.onFastSample(url);
+                    logger.info(
                             "Guardrail URL probe ok: " + url + " — " + latencyMs + " ms (threshold " + thresholdMs + " ms)",
                             LogDb.DASHBOARD);
                     continue;
                 }
 
-                logger.warnAndAddToDb(
+                guardrailLatencyBucketTracker.recordSlow(url, latencyMs);
+                logger.warn(
                         "Guardrail URL probe slow: " + url + " — " + latencyMs + " ms (threshold " + thresholdMs + " ms)",
                         LogDb.DASHBOARD);
 
+                if (!guardrailLatencyBucketTracker.shouldSendSlackAlert(url)) {
+                    List<Long> recent = guardrailLatencyBucketTracker.getRecentLatencies(url);
+                    logger.warn(
+                            "Guardrail URL probe slow (no Slack yet): " + url
+                                    + " — " + recent.size() + "/" + guardrailLatencyBucketTracker.getBucketSize()
+                                    + " consecutive slow probes",
+                            LogDb.DASHBOARD);
+                    continue;
+                }
+
+                List<Long> recentLatencies = guardrailLatencyBucketTracker.getRecentLatencies(url);
                 StringBuilder slackMessage = new StringBuilder();
                 slackMessage.append(":warning: *Guardrail service URL latency alert*\n");
-                slackMessage.append("Threshold: *").append(thresholdMs).append(" ms*\n\n");
-                slackMessage.append("• `").append(url).append("` — *").append(latencyMs).append(" ms*");
+                slackMessage.append("*").append(guardrailLatencyBucketTracker.getBucketSize())
+                        .append("* consecutive probes exceeded *").append(thresholdMs).append(" ms*\n\n");
+                slackMessage.append("• `").append(url).append("`\n");
+                slackMessage.append("  Latencies (ms): ").append(recentLatencies);
                 if (statusCode > 0) {
-                    slackMessage.append(" (HTTP ").append(statusCode).append(")");
+                    slackMessage.append("\n  Latest HTTP ").append(statusCode);
                 }
                 if (error != null) {
                     slackMessage.append("\n  _").append(error).append("_");
@@ -538,12 +556,13 @@ public class InitializerListener implements ServletContextListener {
 
                 if (StringUtils.isNotBlank(webhookUrl)) {
                     Slack.getInstance().send(webhookUrl, new CustomTextAlert(slackMessage.toString()).toJson());
-                    logger.warnAndAddToDb("Guardrail service URL latency: Slack alert sent for " + url, LogDb.DASHBOARD);
+                    logger.warn("Guardrail service URL latency: Slack alert sent for " + url, LogDb.DASHBOARD);
                 } else {
-                    logger.warnAndAddToDb(
+                    logger.warn(
                             "Guardrail service URL latency: no Slack webhook; alert not sent for " + url,
                             LogDb.DASHBOARD);
                 }
+                guardrailLatencyBucketTracker.resetAfterSlackAlert(url);
             }
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Guardrail service URL latency check failed: " + e.getMessage(), LogDb.DASHBOARD);

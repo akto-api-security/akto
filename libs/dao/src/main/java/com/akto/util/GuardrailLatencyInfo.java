@@ -1,7 +1,11 @@
 package com.akto.util;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class GuardrailLatencyInfo {
 
@@ -102,6 +106,80 @@ public class GuardrailLatencyInfo {
                 return buildGuardrailScanRequestBody();
             }
             return buildGuardrailValidateRequestBody(accountId);
+        }
+    }
+
+    public static final class GuardrailLatencyBucketTracker {
+        public static final int DEFAULT_BUCKET_SIZE = 5;
+
+        private final int bucketSize;
+        private final Map<String, ArrayDeque<Long>> consecutiveSlowByUrl = new ConcurrentHashMap<>();
+        private final Map<String, Boolean> slackAlertSentByUrl = new ConcurrentHashMap<>();
+
+        public GuardrailLatencyBucketTracker() {
+            this(DEFAULT_BUCKET_SIZE);
+        }
+
+        public GuardrailLatencyBucketTracker(int bucketSize) {
+            this.bucketSize = Math.max(1, bucketSize);
+        }
+
+
+        public void recordSlow(String url, long latencyMs) {
+            ArrayDeque<Long> streak = consecutiveSlowByUrl.computeIfAbsent(url, k -> new ArrayDeque<>(bucketSize));
+            synchronized (streak) {
+                streak.addLast(latencyMs);
+            }
+        }
+
+
+        public void onFastSample(String url) {
+            resetBucket(url);
+        }
+
+        public boolean hasConsecutiveSlowStreak(String url) {
+            ArrayDeque<Long> streak = consecutiveSlowByUrl.get(url);
+            if (streak == null) {
+                return false;
+            }
+            synchronized (streak) {
+                return streak.size() >= bucketSize;
+            }
+        }
+
+        public boolean shouldSendSlackAlert(String url) {
+            if (!hasConsecutiveSlowStreak(url)) {
+                return false;
+            }
+            if (Boolean.TRUE.equals(slackAlertSentByUrl.get(url))) {
+                return false;
+            }
+            slackAlertSentByUrl.put(url, true);
+            return true;
+        }
+
+        public List<Long> getRecentLatencies(String url) {
+            ArrayDeque<Long> streak = consecutiveSlowByUrl.get(url);
+            if (streak == null) {
+                return new ArrayList<>();
+            }
+            synchronized (streak) {
+                return new ArrayList<>(streak);
+            }
+        }
+
+        public int getBucketSize() {
+            return bucketSize;
+        }
+
+        /** Clears consecutive streak and alert state (after Slack or a fast probe). */
+        public void resetAfterSlackAlert(String url) {
+            resetBucket(url);
+        }
+
+        private void resetBucket(String url) {
+            consecutiveSlowByUrl.remove(url);
+            slackAlertSentByUrl.remove(url);
         }
     }
 }
