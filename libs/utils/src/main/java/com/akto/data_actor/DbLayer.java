@@ -214,17 +214,46 @@ public class DbLayer {
             moduleInfo.getAdditionalData().put("tokenExpired", true);
         }
 
-        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
-                Updates.combine(
-                        //putting class name because findOneAndUpdate doesn't put class name by default
-                        Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
-                        Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
-                        Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
-                        Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
-                        Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
-                        Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
-                        Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
-                ), updateOptions);
+        boolean forwardToNewRelic = NewRelicIntegrationDao.instance.findOne(new BasicDBObject()) != null;
+        if (forwardToNewRelic) {
+            int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb(String.format("Forwarding module heartbeat to New Relic for module %s (account %d)", moduleInfo.getName(), accountId), LogDb.DB_ABS);
+
+            try {
+                newRelicExecutorService.submit(() -> {
+                    Context.accountId.set(accountId);
+                    NewRelicUtils.forwardModuleHeartbeatEvent(moduleInfo);
+                });
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error submitting module heartbeat forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
+            }
+        }
+        
+        List<Bson> updateList = new ArrayList<>();
+        updateList.add(Updates.setOnInsert("_t", moduleInfo.getClass().getName()));
+        updateList.add(Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()));
+        updateList.add(Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()));
+        updateList.add(Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()));
+        updateList.add(Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()));
+        updateList.add(Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()));
+        updateList.addAll(buildAdditionalDataUpdates(moduleInfo.getAdditionalData()));
+
+        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(
+                Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
+                Updates.combine(updateList),
+                updateOptions);
+
+    }
+
+    private static List<Bson> buildAdditionalDataUpdates(Map<String, Object> additionalData) {
+        List<Bson> updates = new ArrayList<>();
+        if (additionalData == null || additionalData.isEmpty()) {
+            return updates;
+        }
+        for (Map.Entry<String, Object> entry : additionalData.entrySet()) {
+            updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + "." + entry.getKey(), entry.getValue()));
+        }
+        return updates;
     }
 
     public static void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList) {
