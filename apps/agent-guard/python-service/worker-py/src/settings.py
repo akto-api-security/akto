@@ -21,6 +21,8 @@ _FIELDS = (
     "QWEN3GUARD_ENDPOINT_ID", "QWEN3GUARD_DEDICATED_DNS",
     # Integrations
     "SLACK_WEBHOOK_URL", "DATABASE_ABSTRACTOR_SERVICE_URL",
+    # Per-deployment cascade default modelMap (JSON). Empty → built-in default.
+    "DEFAULT_MODEL_CONFIG_JSON",
 )
 
 

@@ -28,27 +28,3 @@ then seed from a vars file:
 ./scripts/set-secrets.sh .dev.vars       # or a prod-specific file
 npx wrangler secret list                 # verify
 ```
-
-## ⚠️ Rotate the committed keys
-
-The pre-existing `apps/agent-guard/.../docker-compose.yml` and the old
-`worker/src/index.ts` contain **live GCP SA keys and an Anthropic key in
-plaintext, committed to git history**. These must be rotated:
-
-### GCP service-account keys (`qwen-access@prod-433206`)
-1. GCP Console → IAM & Admin → Service Accounts → `qwen-access@prod-433206…`
-2. **Keys** tab → create a new JSON key.
-3. base64-encode it: `base64 -i key.json | tr -d '\n'`, set as the new
-   `QWEN3GUARD_SA_KEY_JSON` / `GEMMA_VERTEX_SA_KEY_JSON` secret.
-4. **Delete the old key** in the console (this is what revokes the leaked one).
-5. Delete the local `key.json`.
-
-### Anthropic key (`sk-ant-…`)
-1. console.anthropic.com → API keys → revoke the leaked key.
-2. Create a new key, set as the `ANTHROPIC_API_KEY` secret.
-
-### After rotating
-- Remove the plaintext creds from `docker-compose.yml` and `worker/src/index.ts`
-  (the old container/TS worker are retired by the cutover anyway).
-- Git history still contains the old keys — rotation (revocation) is what makes
-  them harmless; history rewriting is optional and separate.

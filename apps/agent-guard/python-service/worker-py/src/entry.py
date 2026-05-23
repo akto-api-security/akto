@@ -15,7 +15,7 @@ from pyodide.ffi import create_proxy
 from workers import Response, waitUntil
 
 import alerts
-from constants import CASCADE_SCANNERS, LOCAL_SCANNERS, SUPPORTED_SCANNERS, DEFAULT_CONFIG
+from constants import CASCADE_SCANNERS, LOCAL_SCANNERS, SUPPORTED_SCANNERS, get_default_config
 from scanners import scan_local
 from settings import settings
 from llm_scanner import scan_with_model_map
@@ -73,7 +73,8 @@ async def _scan(payload: dict) -> dict:
 
     if scanner_name in CASCADE_SCANNERS:
         if not config.get("modelConfigs"):
-            config = {**DEFAULT_CONFIG, **config, "modelConfigs": DEFAULT_CONFIG["modelConfigs"]}
+            default_cfg = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)
+            config = {**default_cfg, **config, "modelConfigs": default_cfg["modelConfigs"]}
         # Persist every model's output when asked (scheduled, never blocks).
         store_fn = None
         if config.get("storeAllResults"):

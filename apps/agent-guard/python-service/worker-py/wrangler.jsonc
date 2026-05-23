@@ -2,7 +2,7 @@
 	// Milestone 1: deploy under a STAGING name so the live URL is untouched.
 	// At cutover (Option B) this name becomes "akto-agent-guard-executor-v2"
 	// after the old worker is deleted.
-	"name": "akto-agent-guard-executor-v2-staging",
+	"name": "akto-agent-guard-executor-v2",
 	"main": "src/entry.py",
 	"compatibility_date": "2025-06-23",
 	"compatibility_flags": ["python_workers"],
