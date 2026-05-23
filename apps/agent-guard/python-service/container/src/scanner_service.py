@@ -31,6 +31,7 @@ except:
 
 from llm_guard import input_scanners, output_scanners
 from intent_analyzer import IntentAnalysisScanner
+from heuristic_code_scanner import HeuristicCodeScanner
 from constants import DEFAULT_CONFIG
 from llm_scanner import (
     LLM_SUPPORTED_SCANNERS,
@@ -106,7 +107,7 @@ class ScanResponse(BaseModel):
 
 PROMPT_SCANNERS = {
     "Anonymize": input_scanners.Anonymize,
-    "BanCode": input_scanners.BanCode,
+    "BanCode": HeuristicCodeScanner,
     "BanCompetitors": input_scanners.BanCompetitors,
     "BanSubstrings": input_scanners.BanSubstrings,
     "BanTopics": input_scanners.BanTopics,
