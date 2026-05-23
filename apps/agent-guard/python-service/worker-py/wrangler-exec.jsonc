@@ -1,7 +1,7 @@
 {
 	// Second deployment of the SAME code as wrangler.jsonc, differing only by
 	// name + env/secrets. The cascade modelMap differs via the
-	// DEFAULT_MODEL_CONFIG_JSON secret (see SECRETS.md / DEPLOYMENTS.md).
+	// DEFAULT_MODEL_CONFIG_JSON secret (see DEPLOYMENTS.md).
 	//   deploy:  pywrangler deploy -c wrangler-exec.jsonc
 	//   secrets: ./scripts/set-secrets.sh .dev.vars.exec -c wrangler-exec.jsonc
 	"name": "akto-agent-guard-executor",
