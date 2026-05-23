@@ -31,5 +31,4 @@ DATABASE_ABSTRACTOR_SERVICE_URL=
 # Per-deployment cascade default modelMap as a JSON string. Empty → built-in
 # default (qwen3guard tier1 + gemma_vertexai arbiter). Set this (per worker) to
 # run a different model lineup/thresholds without changing code. Example:
-# DEFAULT_MODEL_CONFIG_JSON={"modelConfigs":[{"provider":"qwen3guard","modelRole":"FAST_THREAT_FILTER","safeDecisionThreshold":0.9,"timeoutMs":5000},{"provider":"anthropic","modelRole":"FINAL_ARBITER","safeDecisionThreshold":0.9,"timeoutMs":30000}],"parallelExecution":false,"storeAllResults":false}
-DEFAULT_MODEL_CONFIG_JSON=
+DEFAULT_MODEL_CONFIG_JSON={"modelConfigs":[{"provider":"qwen3guard","modelRole":"FAST_THREAT_FILTER","safeDecisionThreshold":0.9,"timeoutMs":5000},{"provider":"gemma_vertexai","modelRole":"FAST_FALLBACK_SAFE_FILTER","safeDecisionThreshold":0.9,"timeoutMs":5000},{"provider":"anthropic","modelRole":"FINAL_ARBITER","safeDecisionThreshold":0.9,"timeoutMs":30000}],"parallelExecution":false,"storeAllResults":false}
