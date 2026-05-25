@@ -36,7 +36,7 @@ public class MergingLogic {
     private static final String AKTO_MCP_SERVER_TAG = "mcp-server";
     private static final LoggerMaker loggerMaker = new LoggerMaker(MergingLogic.class, LogDb.DB_ABS);
     private static final int OPTIMIZED_MERGING_ACCOUNT_ID = 1736798101;
-    private static final Set<Integer> OPTIMIZED_MERGING_COLLECTION_IDS = new HashSet<>(Arrays.asList(503341241, -1917146520));
+    private static final Set<Integer> OPTIMIZED_MERGING_COLLECTION_IDS = parseCollectionIds(System.getenv("OPTIMIZED_MERGING_COLLECTION_IDS"));
     private static final int MAX_WILDCARD_POSITIONS = 2;
     private static final boolean shouldUseOptimizedMerging = "true".equalsIgnoreCase(System.getenv("USE_OPTIMIZED_MERGING"));
 
@@ -733,6 +733,17 @@ public class MergingLogic {
     }
 
     // --- Optimized template-to-static matching ---
+
+    private static Set<Integer> parseCollectionIds(String env) {
+        Set<Integer> ids = new HashSet<>();
+        if (env == null || env.isEmpty()) return ids;
+        for (String s : env.split(",")) {
+            try {
+                ids.add(Integer.parseInt(s.trim()));
+            } catch (NumberFormatException ignored) {}
+        }
+        return ids;
+    }
 
     public static boolean isOptimizedMergingAccount() {
         return shouldUseOptimizedMerging
