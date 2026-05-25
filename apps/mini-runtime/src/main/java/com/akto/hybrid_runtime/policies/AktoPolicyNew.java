@@ -5,6 +5,8 @@ import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.traffic.CollectionTags;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.policies.*;
 import com.akto.runtime.utils.Utils;
 import com.akto.dto.type.APICatalog;
@@ -36,6 +38,28 @@ public class AktoPolicyNew {
     private DataActor dataActor = DataActorFactory.fetchInstance();
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoPolicyNew.class, LogDb.RUNTIME);
+
+    private static final List<String> BOT_KEYWORDS = Arrays.asList(
+        "bot", "crawler", "spider", "scraper", "slurp", "googlebot",
+        "bingbot", "yandex", "duckduckbot", "baiduspider", "semrush",
+        "ahrefsbot", "mj12bot", "facebookexternalhit", "twitterbot"
+    );
+
+    private static String classifyUserAgent(String ua) {
+        if (ua == null || ua.isEmpty()) return null;
+        String lower = ua.toLowerCase();
+        for (String keyword : BOT_KEYWORDS) {
+            if (lower.contains(keyword)) return "bot";
+        }
+        if (lower.contains("mobile") || lower.contains("android") || lower.contains("iphone") || lower.contains("ipad")) {
+            return "mobile";
+        }
+        if (lower.contains("mozilla") || lower.contains("chrome") || lower.contains("safari")
+                || lower.contains("firefox") || lower.contains("edge") || lower.contains("opera")) {
+            return "browser";
+        }
+        return "programmatic";
+    }
 
     public void fetchFilters() {
         this.filters = dataActor.fetchRuntimeFilters();
@@ -211,6 +235,24 @@ public class AktoPolicyNew {
         apiInfo.setLastSeen(httpResponseParams.getTimeOrNow());
 
         apiInfo.setParentMcpToolNames(httpResponseParams.getParentMcpToolNames());
+
+        String ua = RuntimeUtil.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "user-agent");
+        String uaCategory = classifyUserAgent(ua);
+        if (uaCategory != null) {
+            CollectionTags uaTag = new CollectionTags(Context.now(), "user-agent-category", uaCategory, CollectionTags.TagSource.KUBERNETES);
+            List<CollectionTags> existingTags = apiInfo.getTagsList();
+            if (existingTags == null) {
+                existingTags = new ArrayList<>();
+                apiInfo.setTagsList(existingTags);
+            }
+            boolean alreadyPresent = existingTags.stream().anyMatch(t ->
+                Objects.equals(t.getKeyName(), uaTag.getKeyName()) &&
+                Objects.equals(t.getValue(), uaTag.getValue())
+            );
+            if (!alreadyPresent) {
+                existingTags.add(uaTag);
+            }
+        }
 
     }
 
