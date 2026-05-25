@@ -26,10 +26,4 @@ public class UserAgentClassifier {
         }
         return null;
     }
-
-    public static String classifyReferer(String referer, String requestHost) {
-        if (referer == null || referer.isEmpty()) return null;
-        if (requestHost != null && referer.contains(requestHost)) return "Same-origin";
-        return "External";
-    }
 }

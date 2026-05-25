@@ -219,8 +219,7 @@ public class AktoPolicyNew {
         addClassifiedTag(apiInfo, "user-agent", UserAgentClassifier.classify(ua), ua);
 
         String referer = RuntimeUtil.getHeaderValue(reqHeaders, "referer");
-        String requestHost = RuntimeUtil.getHeaderValue(reqHeaders, "host");
-        addClassifiedTag(apiInfo, "referer", UserAgentClassifier.classifyReferer(referer, requestHost), referer);
+        addClassifiedTag(apiInfo, "referer", referer, referer);
 
     }
 
