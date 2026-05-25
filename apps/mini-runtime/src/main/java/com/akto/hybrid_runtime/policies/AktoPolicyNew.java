@@ -39,28 +39,6 @@ public class AktoPolicyNew {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoPolicyNew.class, LogDb.RUNTIME);
 
-    private static final List<String> BOT_KEYWORDS = Arrays.asList(
-        "bot", "crawler", "spider", "scraper", "slurp", "googlebot",
-        "bingbot", "yandex", "duckduckbot", "baiduspider", "semrush",
-        "ahrefsbot", "mj12bot", "facebookexternalhit", "twitterbot"
-    );
-
-    private static String classifyUserAgent(String ua) {
-        if (ua == null || ua.isEmpty()) return null;
-        String lower = ua.toLowerCase();
-        for (String keyword : BOT_KEYWORDS) {
-            if (lower.contains(keyword)) return "bot";
-        }
-        if (lower.contains("mobile") || lower.contains("android") || lower.contains("iphone") || lower.contains("ipad")) {
-            return "mobile";
-        }
-        if (lower.contains("mozilla") || lower.contains("chrome") || lower.contains("safari")
-                || lower.contains("firefox") || lower.contains("edge") || lower.contains("opera")) {
-            return "browser";
-        }
-        return "programmatic";
-    }
-
     public void fetchFilters() {
         this.filters = dataActor.fetchRuntimeFilters();
         loggerMaker.infoAndAddToDb("Fetched " + filters.size() + " filters from db");
@@ -236,24 +214,31 @@ public class AktoPolicyNew {
 
         apiInfo.setParentMcpToolNames(httpResponseParams.getParentMcpToolNames());
 
-        String ua = RuntimeUtil.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "user-agent");
-        String uaCategory = classifyUserAgent(ua);
-        if (uaCategory != null) {
-            CollectionTags uaTag = new CollectionTags(Context.now(), "user-agent-category", uaCategory, CollectionTags.TagSource.KUBERNETES);
-            List<CollectionTags> existingTags = apiInfo.getTagsList();
-            if (existingTags == null) {
-                existingTags = new ArrayList<>();
-                apiInfo.setTagsList(existingTags);
-            }
-            boolean alreadyPresent = existingTags.stream().anyMatch(t ->
-                Objects.equals(t.getKeyName(), uaTag.getKeyName()) &&
-                Objects.equals(t.getValue(), uaTag.getValue())
-            );
-            if (!alreadyPresent) {
-                existingTags.add(uaTag);
+        Map<String, List<String>> reqHeaders = httpResponseParams.getRequestParams().getHeaders();
+        String ua = RuntimeUtil.getHeaderValue(reqHeaders, "user-agent");
+        addClassifiedTag(apiInfo, "user-agent", UserAgentClassifier.classify(ua), ua);
+
+        String referer = RuntimeUtil.getHeaderValue(reqHeaders, "referer");
+        String requestHost = RuntimeUtil.getHeaderValue(reqHeaders, "host");
+        addClassifiedTag(apiInfo, "referer", UserAgentClassifier.classifyReferer(referer, requestHost), referer);
+
+    }
+
+    private static void addClassifiedTag(ApiInfo apiInfo, String headerKey, String category, String rawValue) {
+        if (category == null || rawValue == null || rawValue.isEmpty()) return;
+        List<CollectionTags> existingTags = apiInfo.getTagsList();
+        if (existingTags == null) {
+            existingTags = new ArrayList<>();
+            apiInfo.setTagsList(existingTags);
+        }
+        for (CollectionTags tag : existingTags) {
+            if (Objects.equals(tag.getKeyName(), headerKey)) {
+                tag.setValue(category);
+                tag.setLastUpdatedTs(Context.now());
+                return;
             }
         }
-
+        existingTags.add(new CollectionTags(Context.now(), headerKey, category, CollectionTags.TagSource.KUBERNETES));
     }
 
     public PolicyCatalog getApiInfoFromMap(ApiInfo.ApiInfoKey apiInfoKey) {
