@@ -265,7 +265,7 @@ public class ModuleInfoAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        AgentUsersDao.instance.upsertTag(username, userEmail, team, userRole);
+        AgentUsersDao.instance.upsertTag(username, userEmail, team, userRole, getSUser().getLogin());
         return SUCCESS.toUpperCase();
     }
 

@@ -1,6 +1,7 @@
 package com.akto;
 
 import com.akto.dao.*;
+import com.akto.dao.agentic_sessions.UserAnalysisDataDao;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.jobs.AccountJobDao;
@@ -550,6 +551,7 @@ public class DaoInit {
         AgentConversationResultDao.instance.createIndexIfAbsent();
         IpReputationScoreDao.instance.createIndicesIfAbsent();
         ApiCollectionIconsDao.instance.createIndicesIfAbsent();
-
+        UserAnalysisDataDao.instance.createIndicesIfAbsent();
+        AgentUsersDao.instance.createIndicesIfAbsent();
     }
 }

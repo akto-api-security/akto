@@ -14,13 +14,12 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.Base64;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
  * Reads agentic query records from Elasticsearch via the REST scroll API.
- * Configured by env vars: ES_HOST, ES_USERNAME, ES_PASSWORD, ES_INDEX_AGENT_QUERY.
+ * Configured by env vars: ES_HOST, ES_API_KEY, ES_INDEX_AGENT_QUERY.
  * If unset, isConfigured() returns false and the cron silently no-ops.
  */
 public class ElasticSearchClient {
@@ -28,8 +27,7 @@ public class ElasticSearchClient {
     private static final LoggerMaker logger = new LoggerMaker(ElasticSearchClient.class, LogDb.DASHBOARD);
 
     private static final String ES_HOST = System.getenv("ES_HOST");
-    private static final String ES_USERNAME = System.getenv("ES_USERNAME");
-    private static final String ES_PASSWORD = System.getenv("ES_PASSWORD");
+    private static final String ES_API_KEY = System.getenv("ES_API_KEY");
     private static final String ES_INDEX = System.getenv("ES_INDEX_AGENT_QUERY");
 
     private static final String SCROLL_KEEP_ALIVE = "2m";
@@ -76,6 +74,7 @@ public class ElasticSearchClient {
             while (hits != null && hits.length() > 0 && delivered < maxRecords) {
                 for (int i = 0; i < hits.length() && delivered < maxRecords; i++) {
                     AgentQueryRecord rec = parseHit(hits.getJSONObject(i));
+                    logger.info("ElasticSearchClient: rec: " + rec);
                     if (rec != null) {
                         handler.accept(rec);
                         delivered++;
@@ -184,11 +183,8 @@ public class ElasticSearchClient {
     }
 
     private void addAuthHeader(Request.Builder rb) {
-        if (ES_USERNAME != null && !ES_USERNAME.isEmpty()) {
-            String token = Base64.getEncoder().encodeToString(
-                (ES_USERNAME + ":" + (ES_PASSWORD == null ? "" : ES_PASSWORD)).getBytes()
-            );
-            rb.addHeader("Authorization", "Basic " + token);
+        if (ES_API_KEY != null && !ES_API_KEY.isEmpty()) {
+            rb.addHeader("Authorization", "ApiKey " + ES_API_KEY);
         }
     }
 
