@@ -1,6 +1,7 @@
 package com.akto.dto;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.type.URLMethods;
 import com.akto.util.Util;
 
@@ -60,6 +61,9 @@ public class ApiInfo {
     
     public static final String RATE_LIMIT_CONFIDENCE = "rateLimitConfidence";
     private float rateLimitConfidence;
+
+    public static final String TAGS_STRING = "tagsList";
+    private List<CollectionTags> tagsList;
 
     public static final String PARENT_MCP_TOOL_NAMES = "parentMcpToolNames";
     private List<String> parentMcpToolNames;
@@ -351,6 +355,22 @@ public class ApiInfo {
         // Merge rateLimitConfidence - take the maximum confidence
         this.rateLimitConfidence = Math.max(this.rateLimitConfidence, that.rateLimitConfidence);
 
+        if (that.tagsList != null && !that.tagsList.isEmpty()) {
+            if (this.tagsList == null) {
+                this.tagsList = new ArrayList<>(that.tagsList);
+            } else {
+                for (CollectionTags tag : that.tagsList) {
+                    boolean alreadyPresent = this.tagsList.stream().anyMatch(t ->
+                        Objects.equals(t.getKeyName(), tag.getKeyName()) &&
+                        Objects.equals(t.getValue(), tag.getValue())
+                    );
+                    if (!alreadyPresent) {
+                        this.tagsList.add(tag);
+                    }
+                }
+            }
+        }
+
     }
 
     public void setViolations(Map<String, Integer> violations) {
@@ -548,6 +568,14 @@ public class ApiInfo {
 
     public void setParentMcpToolNames(List<String> parentMcpToolNames) {
         this.parentMcpToolNames = parentMcpToolNames;
+    }
+
+    public List<CollectionTags> getTagsList() {
+        return tagsList;
+    }
+
+    public void setTagsList(List<CollectionTags> tagsList) {
+        this.tagsList = tagsList;
     }
 
     public String getDetectedBasePrompt() {
