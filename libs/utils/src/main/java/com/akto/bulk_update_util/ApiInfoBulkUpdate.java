@@ -53,12 +53,12 @@ public class ApiInfoBulkUpdate {
             // last seen
             subUpdates.add(Updates.set(ApiInfo.LAST_SEEN, apiInfo.getLastSeen()));
 
-            // tagsList — user-agent categories accumulated across traffic
+            // tagsList — keyed by headerKey; $set replaces the whole array so updates to existing keyNames are applied
             List<CollectionTags> tagsList = apiInfo.getTagsList();
-            if (tagsList == null || tagsList.isEmpty()) {
-                subUpdates.add(Updates.setOnInsert(ApiInfo.TAGS_STRING, new ArrayList<>()));
+            if (tagsList != null && !tagsList.isEmpty()) {
+                subUpdates.add(Updates.set(ApiInfo.TAGS_STRING, tagsList));
             } else {
-                subUpdates.add(Updates.addEachToSet(ApiInfo.TAGS_STRING, new ArrayList<>(tagsList)));
+                subUpdates.add(Updates.setOnInsert(ApiInfo.TAGS_STRING, new ArrayList<>()));
             }
 
             subUpdates.add(Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfo.getId().getApiCollectionId())));
