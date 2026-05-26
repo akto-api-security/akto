@@ -22,7 +22,7 @@ public class UserAgentClassifier {
             this.category = category;
             List<Pattern> compiled = new ArrayList<>();
             for (String p : regexes) {
-                compiled.add(Pattern.compile(p, Pattern.CASE_INSENSITIVE));
+                compiled.add(Pattern.compile(p));
             }
             this.patterns = Collections.unmodifiableList(compiled);
         }
