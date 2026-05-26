@@ -13,7 +13,24 @@ import json
 import logging
 from typing import Any, Dict
 
+from js import Object
+from pyodide.ffi import to_js
+
 logger = logging.getLogger(__name__)
+
+
+def _js_init(method: str, headers: Dict[str, str], body: str):
+    """Build a JS RequestInit object from Python values.
+
+    binding.fetch on Python Workers does NOT marshal Python kwargs into a JS
+    RequestInit. Passing body= as a kwarg silently drops the body, which is
+    what makes FastAPI return 422. We have to construct the JS object
+    explicitly with `to_js` so headers and body actually travel.
+    """
+    return to_js(
+        {"method": method, "headers": headers, "body": body},
+        dict_converter=Object.fromEntries,
+    )
 
 
 async def scan_anonymize(text: str, config: Dict[str, Any], env) -> Dict[str, Any]:
@@ -33,19 +50,19 @@ async def scan_anonymize(text: str, config: Dict[str, Any], env) -> Dict[str, An
             "details": {"error": "binding_missing"},
         }
 
-    body = json.dumps({
-        "text": text,
-        "language": config.get("language", "en"),
-        "entities": config.get("entities"),
-    })
+    payload = {"text": text, "language": config.get("language", "en")}
+    if config.get("entities"):
+        payload["entities"] = config["entities"]
+    body = json.dumps(payload)
+
+    init = _js_init(
+        method="POST",
+        headers={"content-type": "application/json"},
+        body=body,
+    )
 
     try:
-        response = await binding.fetch(
-            "https://anonymizer/anonymize",
-            method="POST",
-            headers={"content-type": "application/json"},
-            body=body,
-        )
+        response = await binding.fetch("https://anonymizer/anonymize", init)
     except Exception as exc:
         # Fail-open: if the container is unreachable, return the original text
         # so the caller can still ship a (less-redacted) threat report.
