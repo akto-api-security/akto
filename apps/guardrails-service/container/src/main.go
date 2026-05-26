@@ -9,8 +9,10 @@ import (
 	"github.com/akto-api-security/akto-endpoint-shield/utils"
 	"github.com/akto-api-security/guardrails-service/handlers"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
+	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/kafka"
+	"github.com/akto-api-security/guardrails-service/pkg/logsink"
 	"github.com/akto-api-security/guardrails-service/pkg/mediaprovider"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/gin-gonic/gin"
@@ -20,7 +22,11 @@ import (
 
 func main() {
 	cfg := config.LoadConfig()
-	logger := initLogger(cfg.LogLevel)
+
+	logSink := logsink.NewAsyncSink(dbabstractor.NewLogClient())
+	defer logSink.Close()
+
+	logger := initLogger(cfg.LogLevel, logSink)
 	defer logger.Sync()
 
 	utils.SetLogger(logger)
@@ -126,7 +132,7 @@ func setupRouter(validationHandler *handlers.ValidationHandler, logger *zap.Logg
 	return router
 }
 
-func initLogger(logLevel string) *zap.Logger {
+func initLogger(logLevel string, logSink *logsink.AsyncSink) *zap.Logger {
 	level := zapcore.InfoLevel
 	switch logLevel {
 	case "debug":
@@ -139,15 +145,21 @@ func initLogger(logLevel string) *zap.Logger {
 
 	config := zap.NewDevelopmentConfig()
 	config.Level = zap.NewAtomicLevelAt(level)
-	config.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05")
+	config.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000")
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
-	logger, err := config.Build()
+	consoleLogger, err := config.Build()
 	if err != nil {
 		panic(fmt.Sprintf("Failed to initialize logger: %v", err))
 	}
 
-	return logger
+	if logSink == nil || !logSink.Enabled() {
+		return consoleLogger
+	}
+
+	consoleCore := consoleLogger.Core()
+	dbCore := logSink.NewCore(level)
+	return zap.New(zapcore.NewTee(consoleCore, dbCore))
 }
 
 func registerMediaProcessors(registry *fileprocessor.Registry, cfg *config.Config, logger *zap.Logger) {

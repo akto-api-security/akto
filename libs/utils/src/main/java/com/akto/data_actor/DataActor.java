@@ -109,6 +109,8 @@ public abstract class DataActor {
 
     public abstract void insertDataIngestionLog(Log log);
 
+    public abstract void insertGuardrailsServiceLog(Log log);
+
     public abstract List<ApiCollection> fetchAllApiCollections();
 
     public abstract List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName);
