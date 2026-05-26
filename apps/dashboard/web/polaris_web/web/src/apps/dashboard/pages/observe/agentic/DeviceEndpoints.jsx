@@ -591,7 +591,7 @@ const DEVICE_COL_DEFS = [
             return AGENT_RISK_DATA[key]?.riskScore ?? null;
         },
     },
-    { field: "username",    headerName: "Username",      flex: 1, minWidth: 120                                      },
+    { field: "username",    headerName: "Username",      flex: 1, minWidth: 120, rowGroup: true, hide: true         },
     { field: "group",       headerName: "Group",         flex: 1, minWidth: 120                                      },
     { field: "role",        headerName: "Role",          flex: 1.2, minWidth: 150                                    },
     {
@@ -735,16 +735,12 @@ function SearchBar({ value, onChange }) {
 }
 
 function TableSection() {
-    const [activeTab, setActiveTab] = useState("devices");
     const [deviceQuickFilter, setDeviceQuickFilter] = useState("");
-    const [userQuickFilter, setUserQuickFilter] = useState("");
     const [selectedCount, setSelectedCount] = useState(0);
     const [flyout, setFlyout] = useState(null);       // { agent, device } — SkillsFlyout
     const [deviceFlyout, setDeviceFlyout] = useState(null); // { device, agents }
     const [mcpFlyout, setMcpFlyout] = useState(null);       // { agent, device }
     const deviceGridRef = useRef(null);
-    const userGridRef = useRef(null);
-    const isDevices = activeTab === "devices";
 
     const closeAll = useCallback(() => {
         setFlyout(null);
@@ -828,56 +824,9 @@ function TableSection() {
 
     return (
         <div>
-            {/* Tab bar */}
-            <div style={{
-                display: "inline-flex",
-                background: "#F1F2F3",
-                borderRadius: 10,
-                padding: 3,
-                marginBottom: 14,
-                gap: 2,
-            }}>
-                {[
-                    { key: "devices", label: "Devices", count: 6403 },
-                    { key: "users",   label: "Users",   count: 4203 },
-                ].map(tab => (
-                    <button
-                        key={tab.key}
-                        onClick={() => { setActiveTab(tab.key); setSelectedCount(0); }}
-                        style={{
-                            display: "flex", alignItems: "center", gap: 6,
-                            padding: "5px 14px",
-                            borderRadius: 8,
-                            border: "none",
-                            background: activeTab === tab.key ? "white" : "transparent",
-                            boxShadow: activeTab === tab.key ? "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06)" : "none",
-                            cursor: "pointer",
-                            fontSize: 13,
-                            fontWeight: activeTab === tab.key ? 600 : 400,
-                            color: activeTab === tab.key ? "#202223" : "#6D7175",
-                            fontFamily: "Inter, sans-serif",
-                            outline: "none",
-                            transition: "background 0.15s, box-shadow 0.15s",
-                        }}
-                    >
-                        {tab.label}
-                        <span style={{
-                            fontSize: 11, fontWeight: 600,
-                            color: activeTab === tab.key ? "#6D7175" : "#9CA3AF",
-                        }}>
-                            {tab.count.toLocaleString()}
-                        </span>
-                    </button>
-                ))}
-            </div>
-
             <BulkActionBar
                 count={selectedCount}
-                onClear={() => {
-                    const ref = isDevices ? deviceGridRef : userGridRef;
-                    ref.current?.api?.deselectAll();
-                    setSelectedCount(0);
-                }}
+                onClear={() => { deviceGridRef.current?.api?.deselectAll(); setSelectedCount(0); }}
             />
 
             {/* Grid */}
@@ -888,64 +837,34 @@ function TableSection() {
                 display: "flex",
                 flexDirection: "column",
             }}>
-                {isDevices ? (
-                    <>
-                        <SearchBar value={deviceQuickFilter} onChange={setDeviceQuickFilter} />
-                        <div style={{ flex: 1, minHeight: 0, borderRadius: "0 0 8px 8px", overflow: "hidden" }}>
-                            <AgGridReact
-                                key="devices"
-                                ref={deviceGridRef}
-                                theme={myThemeInner}
-                                rowData={DEVICE_FLAT_DATA}
-                                onRowClicked={handleRowClick}
-                                onSelectionChanged={e => setSelectedCount(e.api.getSelectedRows().length)}
-                                columnDefs={DEVICE_COL_DEFS}
-                                autoGroupColumnDef={autoGroupColumnDef}
-                                defaultColDef={DEFAULT_COL_DEF}
-                                treeData
-                                getDataPath={getDataPath}
-                                groupDefaultExpanded={0}
-                                rowSelection="multiple"
-                                suppressRowClickSelection
-                                animateRows
-                                rowHeight={44}
-                                headerHeight={40}
-                                suppressCellFocus
-                                sideBar={{ toolPanels: ["columns", "filters"] }}
-                                pagination
-                                paginationPageSize={20}
-                                paginationPageSizeSelector={[20, 50, 100]}
-                                quickFilterText={deviceQuickFilter}
-                            />
-                        </div>
-                    </>
-                ) : (
-                    <>
-                        <SearchBar value={userQuickFilter} onChange={setUserQuickFilter} />
-                        <div style={{ flex: 1, minHeight: 0, borderRadius: "0 0 8px 8px", overflow: "hidden" }}>
-                            <AgGridReact
-                                key="users"
-                                ref={userGridRef}
-                                theme={myThemeInner}
-                                rowData={USER_FLAT_DATA}
-                                onSelectionChanged={e => setSelectedCount(e.api.getSelectedRows().length)}
-                                columnDefs={USER_COL_DEFS}
-                                defaultColDef={DEFAULT_COL_DEF}
-                                rowSelection="multiple"
-                                suppressRowClickSelection
-                                animateRows
-                                rowHeight={44}
-                                headerHeight={40}
-                                suppressCellFocus
-                                sideBar={{ toolPanels: ["columns", "filters"] }}
-                                quickFilterText={userQuickFilter}
-                                pagination
-                                paginationPageSize={20}
-                                paginationPageSizeSelector={[20, 50, 100]}
-                            />
-                        </div>
-                    </>
-                )}
+                <SearchBar value={deviceQuickFilter} onChange={setDeviceQuickFilter} />
+                <div style={{ flex: 1, minHeight: 0, borderRadius: "0 0 8px 8px", overflow: "hidden" }}>
+                    <AgGridReact
+                        key="devices"
+                        ref={deviceGridRef}
+                        theme={myThemeInner}
+                        rowData={DEVICE_FLAT_DATA}
+                        onRowClicked={handleRowClick}
+                        onSelectionChanged={e => setSelectedCount(e.api.getSelectedRows().length)}
+                        columnDefs={DEVICE_COL_DEFS}
+                        autoGroupColumnDef={autoGroupColumnDef}
+                        defaultColDef={DEFAULT_COL_DEF}
+                        treeData
+                        getDataPath={getDataPath}
+                        groupDefaultExpanded={0}
+                        rowSelection="multiple"
+                        suppressRowClickSelection
+                        animateRows
+                        rowHeight={44}
+                        headerHeight={40}
+                        suppressCellFocus
+                        sideBar={{ toolPanels: ["columns", "filters"] }}
+                        pagination
+                        paginationPageSize={20}
+                        paginationPageSizeSelector={[20, 50, 100]}
+                        quickFilterText={deviceQuickFilter}
+                    />
+                </div>
             </div>
 
             <SkillsFlyout

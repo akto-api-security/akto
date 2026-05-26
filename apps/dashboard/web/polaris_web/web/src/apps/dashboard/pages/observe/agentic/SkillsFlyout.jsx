@@ -628,6 +628,8 @@ export default function SkillsFlyout({ agent, device, show, onClose, onDeviceCli
     const lockScroll   = useCallback(() => { document.body.style.overflow = "hidden"; }, []);
     const unlockScroll = useCallback(() => { document.body.style.overflow = "";       }, []);
 
+    useEffect(() => { if (!show) document.body.style.overflow = ""; }, [show]);
+
     return (
         <div className={"flyLayout " + (show ? "show" : "")} style={{ width: 720 }}>
             <div

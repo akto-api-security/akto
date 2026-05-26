@@ -784,6 +784,8 @@ export default function McpFlyout({ agent, device, show, onClose, onDeviceClick 
     const lockScroll   = useCallback(() => { document.body.style.overflow = "hidden"; }, []);
     const unlockScroll = useCallback(() => { document.body.style.overflow = "";       }, []);
 
+    React.useEffect(() => { if (!show) document.body.style.overflow = ""; }, [show]);
+
     if (!agent) return null;
 
     return (

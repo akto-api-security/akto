@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { AgGridReact } from "ag-grid-react";
 import { themeQuartz } from "ag-grid-enterprise";
 import { Tabs, Icon, Avatar, Card, Box, VerticalStack, HorizontalStack, Text } from "@shopify/polaris";
@@ -714,6 +714,8 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
 
     const lockScroll   = useCallback(() => { document.body.style.overflow = "hidden"; }, []);
     const unlockScroll = useCallback(() => { document.body.style.overflow = "";       }, []);
+
+    useEffect(() => { if (!show) document.body.style.overflow = ""; }, [show]);
 
     const tabs = useMemo(() => {
         if (!device) return [];
