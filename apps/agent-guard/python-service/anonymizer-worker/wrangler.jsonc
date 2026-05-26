@@ -1,0 +1,38 @@
+{
+	// Thin JS Worker that owns the anonymizer-container binding. worker-py reaches
+	// this worker via service binding; we forward the request to the container and
+	// return the response unchanged.
+	//
+	// We can't put this binding directly on worker-py because Cloudflare's
+	// Containers SDK is JS-only today — owning a container requires defining a
+	// Durable Object class, which Cloudflare doesn't document for Python Workers.
+	"name": "akto-anonymizer-worker",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-06-23",
+	"workers_dev": true,
+	"observability": {
+		"enabled": true
+	},
+	"containers": [
+		{
+			"class_name": "AnonymizerContainer",
+			"image": "../anonymizer-container/Dockerfile",
+			"instance_type": "basic",
+			"max_instances": 5
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "ANONYMIZER",
+				"class_name": "AnonymizerContainer"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["AnonymizerContainer"]
+		}
+	]
+}

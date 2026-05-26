@@ -11,5 +11,11 @@
 	"workers_dev": true,
 	"observability": {
 		"enabled": true
-	}
+	},
+	"services": [
+		{
+			"binding": "ANONYMIZER_WORKER",
+			"service": "akto-anonymizer-worker"
+		}
+	]
 }

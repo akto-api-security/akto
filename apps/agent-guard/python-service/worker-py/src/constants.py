@@ -58,4 +58,8 @@ def get_default_config(raw_json: str = "") -> Dict[str, Any]:
 # Routing tables — the single source of truth for which backend handles a scan.
 CASCADE_SCANNERS = {"PromptInjection", "BanTopics", "Toxicity", "Gibberish"}
 LOCAL_SCANNERS = {"BanSubstrings", "TokenLimit", "Secrets"}
-SUPPORTED_SCANNERS = CASCADE_SCANNERS | LOCAL_SCANNERS
+# Scanners that proxy to a sibling Worker which in turn owns a Cloudflare
+# Container. Used for any scanner that needs a real Python runtime (spaCy,
+# torch, etc.) which Pyodide can't host.
+REMOTE_SCANNERS = {"Anonymize"}
+SUPPORTED_SCANNERS = CASCADE_SCANNERS | LOCAL_SCANNERS | REMOTE_SCANNERS
