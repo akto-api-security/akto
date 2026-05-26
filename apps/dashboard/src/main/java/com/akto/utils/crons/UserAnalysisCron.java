@@ -44,6 +44,7 @@ public class UserAnalysisCron {
                     @Override
                     public void accept(Account account) {
                         try {
+                            loggerMaker.infoAndAddToDb("Starting user analysis cron for account " + account.getId());
                             processAccount(account.getId());
                         } catch (Exception e) {
                             loggerMaker.error("UserAnalysisCron: failure for account "
@@ -71,7 +72,7 @@ public class UserAnalysisCron {
         flushAggregates(aggregates);
         AccountSettingsDao.instance.updateOne(
             Filters.eq(Constants.ID, accountId),
-            Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_USER_ANALYSIS_CRON, Context.now())
+            Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_USER_ANALYSIS_CRON, (endTs/1000))
         );
     }
 

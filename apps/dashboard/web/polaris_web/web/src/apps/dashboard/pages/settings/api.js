@@ -979,12 +979,11 @@ const settingRequests = {
             }
         })
     },
-    getUserAnalysis(agentId, deviceId) {
+    getUserAnalysis(deviceId) {
         return request({
             url: '/api/getUserAnalysis',
             method: 'post',
             data: {
-                agentId,
                 deviceId
             }
         })
