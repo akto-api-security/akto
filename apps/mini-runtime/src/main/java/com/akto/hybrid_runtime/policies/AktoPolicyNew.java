@@ -5,6 +5,8 @@ import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.traffic.CollectionTags;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.policies.*;
 import com.akto.runtime.utils.Utils;
 import com.akto.dto.type.APICatalog;
@@ -212,6 +214,31 @@ public class AktoPolicyNew {
 
         apiInfo.setParentMcpToolNames(httpResponseParams.getParentMcpToolNames());
 
+        Map<String, List<String>> reqHeaders = httpResponseParams.getRequestParams().getHeaders();
+        String ua = RuntimeUtil.getHeaderValue(reqHeaders, "user-agent");
+        addClassifiedTag(apiInfo, "user-agent", UserAgentClassifier.classify(ua).name(), ua);
+
+        String referer = RuntimeUtil.getHeaderValue(reqHeaders, "referer");
+        String refererHost = UserAgentClassifier.extractRefererHost(referer);
+        addClassifiedTag(apiInfo, "referer", refererHost, refererHost);
+
+    }
+
+    private static void addClassifiedTag(ApiInfo apiInfo, String headerKey, String category, String rawValue) {
+        if (category == null || rawValue == null || rawValue.isEmpty()) return;
+        List<CollectionTags> existingTags = apiInfo.getTagsList();
+        if (existingTags == null) {
+            existingTags = new ArrayList<>();
+            apiInfo.setTagsList(existingTags);
+        }
+        for (CollectionTags tag : existingTags) {
+            if (Objects.equals(tag.getKeyName(), headerKey)) {
+                tag.setValue(category);
+                tag.setLastUpdatedTs(Context.now());
+                return;
+            }
+        }
+        existingTags.add(new CollectionTags(Context.now(), headerKey, category, CollectionTags.TagSource.AKTO));
     }
 
     public PolicyCatalog getApiInfoFromMap(ApiInfo.ApiInfoKey apiInfoKey) {

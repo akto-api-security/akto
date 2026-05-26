@@ -37,7 +37,8 @@ public class CollectionTags {
 
     public enum TagSource {
         KUBERNETES, 
-        USER
+        USER,
+        AKTO
     }
 
     TagSource source;
