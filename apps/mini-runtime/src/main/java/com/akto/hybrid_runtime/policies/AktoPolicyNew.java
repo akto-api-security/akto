@@ -238,7 +238,7 @@ public class AktoPolicyNew {
                 return;
             }
         }
-        existingTags.add(new CollectionTags(Context.now(), headerKey, category, CollectionTags.TagSource.KUBERNETES));
+        existingTags.add(new CollectionTags(Context.now(), headerKey, category, CollectionTags.TagSource.USER));
     }
 
     public PolicyCatalog getApiInfoFromMap(ApiInfo.ApiInfoKey apiInfoKey) {
