@@ -28,6 +28,7 @@ import com.akto.utils.ThreatApiDistributionUtils;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.ScriptOutputType;
 import io.lettuce.core.StreamMessage;
+import io.lettuce.core.internal.ExceptionFactory;
 import io.lettuce.core.XGroupCreateArgs;
 import io.lettuce.core.XReadArgs;
 import io.lettuce.core.api.StatefulRedisConnection;
@@ -50,7 +51,7 @@ public class DistributionStreamConsumer implements Runnable {
     private static final FilterConfig IP_API_RATE_LIMIT_FILTER = Utils.getipApiRateLimitFilter();
 
     private final StatefulRedisConnection<String, String> connection;
-    private final String asyncThreatProcessSha;
+    private String asyncThreatProcessSha;
     private final String consumerId;
     private final String[] bucketRangeArgs;
     private final KafkaProtoProducer internalKafka;
@@ -91,8 +92,11 @@ public class DistributionStreamConsumer implements Runnable {
     @Override
     public void run() {
         while (!Thread.currentThread().isInterrupted()) {
+            List<StreamMessage<String, String>> messages = null;
+
+            // 1. Read from stream
             try {
-                List<StreamMessage<String, String>> messages = connection.sync().xreadgroup(
+                messages = connection.sync().xreadgroup(
                     io.lettuce.core.Consumer.from(GROUP_NAME, consumerId),
                     XReadArgs.Builder.count(BATCH_SIZE).block(Duration.ofSeconds(1)),
                     XReadArgs.StreamOffset.lastConsumed(RedisKeyInfo.THREAT_INPUT_STREAM)
@@ -101,27 +105,69 @@ public class DistributionStreamConsumer implements Runnable {
                 if (messages == null || messages.isEmpty()) {
                     continue;
                 }
+            } catch (Exception e) {
+                logger.errorAndAddToDb(e, "Error reading from threat stream (xreadgroup)");
+                handleConnectionError();
+                continue;
+            }
 
+            // 2. Process batch
+            try {
                 processBatch(messages);
+            } catch (Exception e) {
+                logger.errorAndAddToDb(e, "Error processing threat batch");
+                // Continue without acknowledging - we'll retry this batch
+                handleConnectionError();
+                continue;
+            }
 
+            // 3. Acknowledge messages
+            try {
                 String[] messageIds = messages.stream()
                     .map(StreamMessage::getId)
                     .toArray(String[]::new);
                 connection.sync().xack(RedisKeyInfo.THREAT_INPUT_STREAM, GROUP_NAME, messageIds);
-
-                trimStreamIfNeeded();
-
             } catch (Exception e) {
-                logger.errorAndAddToDb(e, "Error in threat stream consumer loop");
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
+                logger.errorAndAddToDb(e, "Error acknowledging messages (xack)");
+                handleConnectionError();
+                // Don't continue - messages weren't acked, will be reprocessed
+                continue;
+            }
+
+            // 4. Trim stream
+            try {
+                trimStreamIfNeeded();
+            } catch (Exception e) {
+                logger.errorAndAddToDb(e, "Error trimming stream");
+                // Non-critical, continue
             }
         }
         logger.infoAndAddToDb("DistributionStreamConsumer stopped: " + consumerId);
+    }
+
+    private void handleConnectionError() {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Attempts to reload the Lua script if it was flushed from Redis.
+     * Handles NOSCRIPT errors by re-loading the script.
+     */
+    private void reloadLuaScriptIfNeeded(Exception e) {
+        if (e != null && e.getMessage() != null && e.getMessage().contains("NOSCRIPT")) {
+            try {
+                logger.infoAndAddToDb("Reloading Lua script due to NOSCRIPT error");
+                this.asyncThreatProcessSha = connection.sync()
+                    .scriptLoad(loadLuaScript("lua/async_threat_process.lua"));
+                logger.infoAndAddToDb("Lua script reloaded successfully");
+            } catch (Exception reloadEx) {
+                logger.errorAndAddToDb(reloadEx, "Failed to reload Lua script");
+            }
+        }
     }
 
     /**
@@ -190,6 +236,8 @@ public class DistributionStreamConsumer implements Runnable {
             }
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error executing async_threat_process Lua script");
+            // Try to reload the script if it was flushed from Redis
+            reloadLuaScriptIfNeeded(e);
         }
     }
 
