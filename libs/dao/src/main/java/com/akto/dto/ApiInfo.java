@@ -93,7 +93,7 @@ public class ApiInfo {
     private boolean isSkillBlocked;
 
     public static final String TAGS_LIST = "tagsList";
-    private List<ApiInfoTag> tagsList;
+    // private List<ApiInfoTag> tagsList;
 
     @Getter
     @Setter
