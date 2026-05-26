@@ -779,6 +779,7 @@ public class Main {
                 Executor.clearRoleCache();
 
                 if(!maxRetriesReached){
+                    TestExecutor.initRunDeadline(testingRun);
                     if(Constants.IS_NEW_TESTING_ENABLED){
                         int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
                         testingProducer.initProducer(testingRun, summaryId, false, syncLimit);
