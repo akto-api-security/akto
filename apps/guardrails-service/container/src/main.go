@@ -133,18 +133,10 @@ func setupRouter(validationHandler *handlers.ValidationHandler, logger *zap.Logg
 }
 
 func initLogger(logLevel string, logSink *logsink.AsyncSink) *zap.Logger {
-	level := zapcore.InfoLevel
-	switch logLevel {
-	case "debug":
-		level = zapcore.DebugLevel
-	case "warn":
-		level = zapcore.WarnLevel
-	case "error":
-		level = zapcore.ErrorLevel
-	}
+	consoleLevel := parseLogLevel(logLevel)
 
 	config := zap.NewDevelopmentConfig()
-	config.Level = zap.NewAtomicLevelAt(level)
+	config.Level = zap.NewAtomicLevelAt(consoleLevel)
 	config.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000")
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
@@ -157,9 +149,23 @@ func initLogger(logLevel string, logSink *logsink.AsyncSink) *zap.Logger {
 		return consoleLogger
 	}
 
+	// Console respects LOG_LEVEL; DB receives all levels (debug and above).
 	consoleCore := consoleLogger.Core()
-	dbCore := logSink.NewCore(level)
+	dbCore := logSink.NewCore(zapcore.DebugLevel)
 	return zap.New(zapcore.NewTee(consoleCore, dbCore))
+}
+
+func parseLogLevel(logLevel string) zapcore.Level {
+	switch logLevel {
+	case "debug":
+		return zapcore.DebugLevel
+	case "warn":
+		return zapcore.WarnLevel
+	case "error":
+		return zapcore.ErrorLevel
+	default:
+		return zapcore.InfoLevel
+	}
 }
 
 func registerMediaProcessors(registry *fileprocessor.Registry, cfg *config.Config, logger *zap.Logger) {

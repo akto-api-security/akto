@@ -14,7 +14,7 @@ const (
 	defaultQueueSize = 4096
 	defaultWorkers   = 4
 	maxWorkers       = 16
-	maxLogsPerMinute = 1000
+	maxLogsPerMinute = 5000
 	oneMinuteSeconds = 60
 )
 
