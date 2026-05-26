@@ -562,6 +562,10 @@ public class DbActor extends DataActor {
         DbLayer.insertAwsApiGatewayLog(log);
     }
 
+    public void insertGuardrailsServiceLog(Log log) {
+        DbLayer.insertGuardrailsServiceLog(log);
+    }
+
     public void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
         DbLayer.bulkWriteDependencyNodes(dependencyNodeList);
     }
