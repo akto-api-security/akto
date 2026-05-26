@@ -17,12 +17,20 @@ import java.util.function.Consumer;
 public class Cron {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Cron.class, LoggerMaker.LogDb.CYBORG);
+    private static final int PRIORITY_ACCOUNT_ID = 1736798101;
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void cron(boolean isHybridSaas) {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 if (isHybridSaas) {
+                    // Run optimized account first to avoid being blocked by other accounts
+                    Context.accountId.set(PRIORITY_ACCOUNT_ID);
+                    try {
+                        triggerMerging(PRIORITY_ACCOUNT_ID);
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error in priority merging for account " + PRIORITY_ACCOUNT_ID + ": " + e.getMessage(), LoggerMaker.LogDb.CYBORG);
+                    }
                     AccountTask.instance.executeTaskHybridAccounts(new Consumer<Account>() {
                         @Override
                         public void accept(Account t) {

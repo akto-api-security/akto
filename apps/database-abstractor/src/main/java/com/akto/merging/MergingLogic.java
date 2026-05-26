@@ -290,7 +290,7 @@ public class MergingLogic {
         }
 
         int offset = 0;
-        int limit = (mergeUrlsBasic || optimized) ? 10_000 : 50_000;
+        int limit = optimized ? 50_000 : (mergeUrlsBasic ? 10_000 : 50_000);
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
         ApiMergerResult finalResult = new ApiMergerResult(new HashMap<>());
@@ -404,6 +404,7 @@ public class MergingLogic {
             }
 
             offset += limit;
+            if (isOptimizedMergingAccount() && isOptimizedCollection(apiCollectionId)) break;
         } while (!singleTypeInfos.isEmpty());
 
         loggerMaker.infoAndAddToDb("done with tryMergeUrlsInCollection for collection" + apiCollectionId, LogDb.DB_ABS);
