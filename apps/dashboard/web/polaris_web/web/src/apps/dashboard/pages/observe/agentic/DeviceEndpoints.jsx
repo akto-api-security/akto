@@ -11,6 +11,8 @@ import { LicenseManager, themeQuartz, AllEnterpriseModule } from "ag-grid-enterp
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import SkillsFlyout from "./SkillsFlyout";
+import DeviceFlyout, { AGENT_RISK_DATA } from "./DeviceFlyout";
+import McpFlyout from "./McpFlyout";
 
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
@@ -350,7 +352,7 @@ function SkillBadge({ count }) {
             border: "1px solid #E5E7EB",
             whiteSpace: "nowrap",
         }}>
-            {count} skills
+            {count} {count === 1 ? "skill" : "skills"}
         </span>
     );
 }
@@ -402,9 +404,9 @@ const SEVERITY_COLORS = {
     low:      { bg: "#E4E5E7", text: "#202223" },
 };
 
-function ViolationsCellRenderer({ data }) {
-    if (!data?.violations) return null;
-    const { critical, high, medium, low } = data.violations;
+function ViolationsCellRenderer({ value }) {
+    if (!value) return null;
+    const { critical, high, medium, low } = value;
     const parts = [
         { key: "critical", count: critical },
         { key: "high",     count: high     },
@@ -576,11 +578,35 @@ function UserEndpointsCellRenderer({ data }) {
 
 const DEVICE_COL_DEFS = [
     // endpoint column is handled by autoGroupColumnDef in tree mode
-    { field: "riskScore",   headerName: "Risk score",    width: 110,             cellRenderer: RiskScoreCellRenderer, sort: "desc" },
+    {
+        field: "riskScore",
+        headerName: "Risk score",
+        width: 110,
+        sort: "desc",
+        cellRenderer: RiskScoreCellRenderer,
+        valueGetter: (params) => {
+            if (!params.data) return null;
+            if (!params.data.path || params.data.path.length <= 1) return params.data.riskScore ?? null;
+            const key = params.data.path.join("/");
+            return AGENT_RISK_DATA[key]?.riskScore ?? null;
+        },
+    },
     { field: "username",    headerName: "Username",      flex: 1, minWidth: 120                                      },
     { field: "group",       headerName: "Group",         flex: 1, minWidth: 120                                      },
     { field: "role",        headerName: "Role",          flex: 1.2, minWidth: 150                                    },
-    { field: "violations",  headerName: "Violations",    width: 160, sortable: false, cellRenderer: ViolationsCellRenderer },
+    {
+        field: "violations",
+        headerName: "Violations",
+        width: 160,
+        sortable: false,
+        cellRenderer: ViolationsCellRenderer,
+        valueGetter: (params) => {
+            if (!params.data) return null;
+            if (!params.data.path || params.data.path.length <= 1) return params.data.violations ?? null;
+            const key = params.data.path.join("/");
+            return AGENT_RISK_DATA[key]?.violations ?? null;
+        },
+    },
     { field: "lastTraffic", headerName: "Last Traffic",  width: 130                                                  },
 ];
 
@@ -713,17 +739,74 @@ function TableSection() {
     const [deviceQuickFilter, setDeviceQuickFilter] = useState("");
     const [userQuickFilter, setUserQuickFilter] = useState("");
     const [selectedCount, setSelectedCount] = useState(0);
-    const [flyout, setFlyout] = useState(null); // { agent, device }
+    const [flyout, setFlyout] = useState(null);       // { agent, device } — SkillsFlyout
+    const [deviceFlyout, setDeviceFlyout] = useState(null); // { device, agents }
+    const [mcpFlyout, setMcpFlyout] = useState(null);       // { agent, device }
     const deviceGridRef = useRef(null);
     const userGridRef = useRef(null);
     const isDevices = activeTab === "devices";
 
+    const closeAll = useCallback(() => {
+        setFlyout(null);
+        setDeviceFlyout(null);
+        setMcpFlyout(null);
+    }, []);
+
+    // Called when an agent row in Agentic Assets tab is clicked — open SkillsFlyout or McpFlyout
+    const handleAgentClickFromDevice = useCallback((agent) => {
+        if (!agent) return;
+        const device = deviceFlyout?.device;
+        if (agent.type === "MCP Server") {
+            setMcpFlyout({ agent, device });
+            setDeviceFlyout(null);
+            setFlyout(null);
+        } else if (agent.type === "AI Agent" && agent.skillCount > 0) {
+            setFlyout({ agent, device });
+            setDeviceFlyout(null);
+            setMcpFlyout(null);
+        }
+    }, [deviceFlyout]);
+
+    // Called when any flyout breadcrumb's device name is clicked — jump to DeviceFlyout
+    const handleDeviceClickFromFlyout = useCallback((device) => {
+        const deviceId = device?.path?.[0];
+        if (!deviceId) return;
+        const agents = DEVICE_FLAT_DATA.filter(r => r.path.length === 2 && r.path[0] === deviceId);
+        setFlyout(null);
+        setMcpFlyout(null);
+        setDeviceFlyout({ device, agents });
+    }, []);
+
     const handleRowClick = useCallback((e) => {
         const { data, node } = e;
-        if (node.level > 0 && data?.skillCount) {
+        if (!data) return; // synthetic group row
+
+        if (node.level === 0) {
+            // Device row — open DeviceFlyout
             const deviceId = data.path[0];
-            const device = DEVICE_FLAT_DATA.find(r => r.path.length === 1 && r.path[0] === deviceId);
-            setFlyout({ agent: data, device });
+            const agents = DEVICE_FLAT_DATA.filter(r => r.path.length === 2 && r.path[0] === deviceId);
+            setDeviceFlyout({ device: data, agents });
+            setFlyout(null);
+            setMcpFlyout(null);
+            return;
+        }
+
+        if (node.level > 0) {
+            if (data.type === "MCP Server") {
+                const deviceId = data.path[0];
+                const device = DEVICE_FLAT_DATA.find(r => r.path.length === 1 && r.path[0] === deviceId);
+                setMcpFlyout({ agent: data, device });
+                setFlyout(null);
+                setDeviceFlyout(null);
+                return;
+            }
+            if (data.skillCount) {
+                const deviceId = data.path[0];
+                const device = DEVICE_FLAT_DATA.find(r => r.path.length === 1 && r.path[0] === deviceId);
+                setFlyout({ agent: data, device });
+                setDeviceFlyout(null);
+                setMcpFlyout(null);
+            }
         }
     }, []);
 
@@ -869,7 +952,22 @@ function TableSection() {
                 agent={flyout?.agent}
                 device={flyout?.device}
                 show={flyout !== null}
-                onClose={() => setFlyout(null)}
+                onClose={closeAll}
+                onDeviceClick={handleDeviceClickFromFlyout}
+            />
+            <DeviceFlyout
+                device={deviceFlyout?.device}
+                agents={deviceFlyout?.agents}
+                show={deviceFlyout !== null}
+                onClose={closeAll}
+                onAgentClick={handleAgentClickFromDevice}
+            />
+            <McpFlyout
+                agent={mcpFlyout?.agent}
+                device={mcpFlyout?.device}
+                show={mcpFlyout !== null}
+                onClose={closeAll}
+                onDeviceClick={handleDeviceClickFromFlyout}
             />
         </div>
     );

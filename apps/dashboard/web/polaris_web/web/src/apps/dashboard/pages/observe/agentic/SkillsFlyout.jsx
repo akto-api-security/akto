@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { AgGridReact } from "ag-grid-react";
 import { themeQuartz } from "ag-grid-enterprise";
-import { Tabs, Popover, ActionList, LegacyCard, Link, Icon, TextField } from "@shopify/polaris";
+import { Tabs, Popover, ActionList, LegacyCard, Link, Icon, TextField, Badge } from "@shopify/polaris";
 import { ChevronDownMinor } from "@shopify/polaris-icons";
 import AgenticSearchInput from "../../agentic/components/AgenticSearchInput";
 import SampleDataComponent from "../../../components/shared/SampleDataComponent";
+import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import "../../../components/layouts/style.css";
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
@@ -126,6 +127,90 @@ function ViolationCell({ data }) {
     );
 }
 
+// ─── Skill schema params ──────────────────────────────────────────────────────
+
+const SKILL_SCHEMA_PARAMS = [
+    { name: "prompt",     type: "string", required: true,  desc: "The instruction or prompt for the skill to execute" },
+    { name: "context",    type: "object", required: false, desc: "Optional session context to scope the skill execution" },
+    { name: "timeout_ms", type: "number", required: false, desc: "Maximum execution time in milliseconds" },
+];
+
+function ParamNameCell({ data }) {
+    if (!data) return null;
+    return (
+        <div style={{ display: "flex", alignItems: "center", height: "100%", gap: 6 }}>
+            <span style={{ fontSize: 13, fontWeight: 500, color: "#202223" }}>{data.name}</span>
+            {data.required
+                ? <Badge status="critical">required</Badge>
+                : <Badge>optional</Badge>
+            }
+        </div>
+    );
+}
+
+function ParamTypeCell({ data }) {
+    if (!data) return null;
+    return (
+        <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
+            <Badge status="info">{data.type}</Badge>
+        </div>
+    );
+}
+
+function ParamDescCell({ data }) {
+    if (!data) return null;
+    return (
+        <div style={{ display: "flex", alignItems: "center", height: "100%", overflow: "hidden" }}>
+            <span style={{ fontSize: 12, color: "#6D7175", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{data.desc}</span>
+        </div>
+    );
+}
+
+const SKILL_SCHEMA_COL_DEFS = [
+    { field: "name", headerName: "Name",        flex: 1,   minWidth: 140, cellRenderer: ParamNameCell, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "type", headerName: "Type",        width: 100, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ParamTypeCell, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "desc", headerName: "Description", flex: 2,   minWidth: 160, cellRenderer: ParamDescCell, cellStyle: { display: "flex", alignItems: "center" } },
+];
+
+// ─── Skill violation data ─────────────────────────────────────────────────────
+
+const SKILL_VIOLATION_ROWS = [
+    { id: 0, severity: "critical", title: "PII Sent to External LLM", desc: "Skill transmitted user PII in the prompt payload to a third-party LLM without redaction or consent.", time: "2m ago" },
+    { id: 1, severity: "high",     title: "Excessive Token Consumption", desc: "Skill consumed 52k tokens in a single invocation, exceeding the 10k policy limit.", time: "17m ago" },
+    { id: 2, severity: "medium",   title: "Unusual Invocation Rate", desc: "Skill invoked 47 times within 2 minutes, consistent with automated enumeration.", time: "1h ago" },
+];
+
+function SevBadgeCell({ data }) {
+    if (!data) return null;
+    const MAP = {
+        critical: { bg: "#DF2909", color: "#FFFBFB" },
+        high:     { bg: "#FED3D1", color: "#202223" },
+        medium:   { bg: "#FFD79D", color: "#202223" },
+        low:      { bg: "#E4E5E7", color: "#202223" },
+    };
+    const s = MAP[data.severity] || MAP.low;
+    return (
+        <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: s.bg, color: s.color, textTransform: "capitalize" }}>{data.severity}</span>
+        </div>
+    );
+}
+
+function ViolTitleCell({ data }) {
+    if (!data) return null;
+    return (
+        <div style={{ display: "flex", alignItems: "center", height: "100%", overflow: "hidden" }}>
+            <span style={{ fontSize: 13, color: "#202223", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{data.title}</span>
+        </div>
+    );
+}
+
+const SKILL_VIOLATION_COL_DEFS = [
+    { field: "severity", headerName: "Severity", width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: SevBadgeCell, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "title",    headerName: "Violation", flex: 1, minWidth: 200, cellRenderer: ViolTitleCell, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "time",     headerName: "Time",      width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" } },
+];
+
 const COL_DEFS = [
     {
         field: "name",
@@ -141,6 +226,8 @@ const COL_DEFS = [
         field: "violations",
         headerName: "Violations",
         width: 120,
+        suppressHeaderMenuButton: true,
+        suppressHeaderFilterButton: true,
         cellRenderer: ViolationCell,
         cellStyle: { display: "flex", alignItems: "center" },
     },
@@ -195,7 +282,7 @@ const DETAIL_TABS = [
     { id: "traces",     content: "Traces" },
 ];
 
-function SkillDetailView({ skill, device, agent, skills, onBack, onClose, onSkillChange }) {
+function SkillDetailView({ skill, device, agent, skills, onBack, onClose, onSkillChange, onDeviceClick }) {
     const [selectedTab, setSelectedTab] = useState(0);
     const [pickerOpen, setPickerOpen]   = useState(false);
     const [pickerSearch, setPickerSearch] = useState("");
@@ -228,74 +315,59 @@ function SkillDetailView({ skill, device, agent, skills, onBack, onClose, onSkil
     return (
         <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             {/* Breadcrumb header */}
-            <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "12px 16px",
-                borderBottom: "1px solid #E1E3E5",
-                flexShrink: 0,
-            }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 13 }}>
-                    <button style={{ ...BREADCRUMB_BTN, fontSize: 13 }} onClick={onBack}>{device?.endpoint}</button>
-                    <RiskBadge score={device?.riskScore} />
-                    <span style={{ color: "#8C9196" }}>/</span>
-                    <span style={{ fontSize: 13 }}>
-                        <Link url="#" onClick={e => { e.preventDefault(); onBack(); }}>Skills</Link>
-                    </span>
-                    <span style={{ color: "#8C9196" }}>/</span>
-                    <Popover
-                        active={pickerOpen}
-                        onClose={() => { setPickerOpen(false); setPickerSearch(""); }}
-                        preferredAlignment="left"
-                        activator={
-                            <button
-                                onClick={() => showChevron && setPickerOpen(s => !s)}
-                                style={{
-                                    background: "none", border: "none", padding: 0,
-                                    cursor: showChevron ? "pointer" : "default",
-                                    fontSize: 12, fontWeight: 600,
-                                    color: "#202223", fontFamily: "Inter, sans-serif",
-                                    display: "flex", alignItems: "center", gap: 2,
-                                }}
-                            >
-                                {skill.name}
-                                {showChevron && (
-                                    <span style={{ display: "flex", alignItems: "center", color: "#6D7175" }}>
-                                        <Icon source={ChevronDownMinor} />
-                                    </span>
-                                )}
-                            </button>
-                        }
-                    >
-                        {showSearch && (
-                            <Popover.Pane fixed>
-                                <Popover.Section>
-                                    <TextField
-                                        autoFocus
-                                        type="search"
-                                        placeholder="Search skills…"
-                                        value={pickerSearch}
-                                        onChange={setPickerSearch}
-                                        autoComplete="off"
-                                        clearButton
-                                        onClearButtonClick={() => setPickerSearch("")}
-                                    />
-                                </Popover.Section>
-                            </Popover.Pane>
-                        )}
-                        <Popover.Pane>
-                            <ActionList items={skillActions} />
+            <FlyoutBreadcrumb
+                items={[
+                    { label: device?.endpoint, badge: device?.riskScore, onClick: () => onDeviceClick ? onDeviceClick(device) : onBack() },
+                    { label: agent?.endpoint, onClick: onBack },
+                ]}
+                onClose={onClose}
+            >
+                <span style={{ color: "#8C9196" }}>/</span>
+                <Popover
+                    active={pickerOpen}
+                    onClose={() => { setPickerOpen(false); setPickerSearch(""); }}
+                    preferredAlignment="left"
+                    activator={
+                        <button
+                            onClick={() => showChevron && setPickerOpen(s => !s)}
+                            style={{
+                                background: "none", border: "none", padding: 0,
+                                cursor: showChevron ? "pointer" : "default",
+                                fontSize: 13, fontWeight: 600,
+                                color: "#202223", fontFamily: "Inter, sans-serif",
+                                display: "flex", alignItems: "center", gap: 2,
+                            }}
+                        >
+                            {skill.name}
+                            {showChevron && (
+                                <span style={{ display: "flex", alignItems: "center", color: "#6D7175" }}>
+                                    <Icon source={ChevronDownMinor} />
+                                </span>
+                            )}
+                        </button>
+                    }
+                >
+                    {showSearch && (
+                        <Popover.Pane fixed>
+                            <Popover.Section>
+                                <TextField
+                                    autoFocus
+                                    type="search"
+                                    placeholder="Search skills…"
+                                    value={pickerSearch}
+                                    onChange={setPickerSearch}
+                                    autoComplete="off"
+                                    clearButton
+                                    onClearButtonClick={() => setPickerSearch("")}
+                                />
+                            </Popover.Section>
                         </Popover.Pane>
-                    </Popover>
-                </div>
-                <button
-                    onClick={onClose}
-                    style={{
-                        background: "none", border: "none", cursor: "pointer",
-                        color: "#6D7175", fontSize: 18, lineHeight: 1,
-                        padding: "2px 4px", display: "flex", alignItems: "center",
-                    }}
-                >×</button>
-            </div>
+                    )}
+                    <Popover.Pane>
+                        <ActionList items={skillActions} />
+                    </Popover.Pane>
+                </Popover>
+            </FlyoutBreadcrumb>
 
             {/* Tabs bar */}
             <div style={{ borderBottom: "1px solid #E1E3E5", padding: "0 4px", flexShrink: 0 }}>
@@ -323,15 +395,37 @@ function SkillDetailView({ skill, device, agent, skills, onBack, onClose, onSkil
                     </div>
                 )}
                 {selectedTab === 1 && (
-                    <div style={{ color: "#6D7175", fontSize: 13 }}>Schema information not available for this skill.</div>
+                    <div style={{ position: "relative", height: 3 * 44 + 40 }}>
+                        <AgGridReact
+                            theme={gridTheme}
+                            rowData={SKILL_SCHEMA_PARAMS}
+                            columnDefs={SKILL_SCHEMA_COL_DEFS}
+                            defaultColDef={{ sortable: false, resizable: true }}
+                            rowHeight={44}
+                            headerHeight={40}
+                            suppressCellFocus
+                        />
+                    </div>
                 )}
                 {selectedTab === 2 && (
                     <div style={{ color: "#6D7175", fontSize: 13 }}>No traces recorded yet.</div>
                 )}
                 {selectedTab === 3 && (
-                    skill.violations > 0
-                        ? <div style={{ color: "#DF2909", fontSize: 13 }}>{skill.violations} violation(s) found.</div>
-                        : <div style={{ color: "#6D7175", fontSize: 13 }}>No violations found.</div>
+                    skill.violations > 0 ? (
+                        <div style={{ position: "relative", height: skill.violations * 44 + 40 }}>
+                            <AgGridReact
+                                theme={gridTheme}
+                                rowData={SKILL_VIOLATION_ROWS.slice(0, skill.violations)}
+                                columnDefs={SKILL_VIOLATION_COL_DEFS}
+                                defaultColDef={{ sortable: false, resizable: true }}
+                                rowHeight={44}
+                                headerHeight={40}
+                                suppressCellFocus
+                            />
+                        </div>
+                    ) : (
+                        <div style={{ color: "#6D7175", fontSize: 13 }}>No violations found.</div>
+                    )
                 )}
             </div>
         </div>
@@ -340,7 +434,7 @@ function SkillDetailView({ skill, device, agent, skills, onBack, onClose, onSkil
 
 // ─── Skills list view ─────────────────────────────────────────────────────────
 
-function SkillsListView({ agent, device, allSkills, onSkillClick, onClose }) {
+function SkillsListView({ agent, device, allSkills, onSkillClick, onClose, onDeviceClick }) {
     const [activeTab, setActiveTab]         = useState("all");
     const [showSearch, setShowSearch]       = useState(false);
     const [quickFilter, setQuickFilter]     = useState("");
@@ -355,29 +449,13 @@ function SkillsListView({ agent, device, allSkills, onSkillClick, onClose }) {
     return (
         <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             {/* Header */}
-            <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "12px 16px",
-                borderBottom: "1px solid #E1E3E5",
-                flexShrink: 0,
-            }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 12, color: "#6D7175" }}>{device?.endpoint}</span>
-                    <RiskBadge score={device?.riskScore} />
-                    <span style={{ fontSize: 12, color: "#8C9196" }}>/</span>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "#202223" }}>
-                        {agent?.endpoint} Skills
-                    </span>
-                </div>
-                <button
-                    onClick={onClose}
-                    style={{
-                        background: "none", border: "none", cursor: "pointer",
-                        color: "#6D7175", fontSize: 18, lineHeight: 1,
-                        padding: "2px 4px", display: "flex", alignItems: "center",
-                    }}
-                >×</button>
-            </div>
+            <FlyoutBreadcrumb
+                items={[
+                    { label: device?.endpoint, badge: device?.riskScore, onClick: onDeviceClick ? () => onDeviceClick(device) : undefined },
+                    { label: `${agent?.endpoint} Skills` },
+                ]}
+                onClose={onClose}
+            />
 
             {/* Tabs + actions */}
             <div style={{
@@ -533,7 +611,7 @@ function SkillsListView({ agent, device, allSkills, onSkillClick, onClose }) {
  *   show    — boolean
  *   onClose — () => void
  */
-export default function SkillsFlyout({ agent, device, show, onClose }) {
+export default function SkillsFlyout({ agent, device, show, onClose, onDeviceClick }) {
     const [selectedSkill, setSelectedSkill] = useState(null);
 
     const allSkills = useMemo(() => generateSkills(agent?.skillCount || 0), [agent?.skillCount]);
@@ -578,6 +656,7 @@ export default function SkillsFlyout({ agent, device, show, onClose }) {
                         onBack={() => setSelectedSkill(null)}
                         onClose={onClose}
                         onSkillChange={setSelectedSkill}
+                        onDeviceClick={onDeviceClick}
                     />
                 ) : (
                     <SkillsListView
@@ -586,6 +665,7 @@ export default function SkillsFlyout({ agent, device, show, onClose }) {
                         allSkills={allSkills}
                         onSkillClick={setSelectedSkill}
                         onClose={onClose}
+                        onDeviceClick={onDeviceClick}
                     />
                 )}
 
