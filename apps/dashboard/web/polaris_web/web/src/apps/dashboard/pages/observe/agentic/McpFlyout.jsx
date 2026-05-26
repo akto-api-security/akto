@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef } from "react";
 import { AgGridReact } from "ag-grid-react";
 import { themeQuartz } from "ag-grid-enterprise";
-import { Tabs, Popover, ActionList, LegacyCard, Link, Icon, TextField, DataTable, Badge } from "@shopify/polaris";
+import { Tabs, Popover, ActionList, LegacyCard, Link, Icon, TextField, Badge } from "@shopify/polaris";
 import { ChevronDownMinor } from "@shopify/polaris-icons";
 import AiChatSection from "./AiChatSection";
 import SampleDataComponent from "../../../components/shared/SampleDataComponent";
@@ -425,6 +425,42 @@ const PROMPTS_COL_DEFS = [
     { field: "description", headerName: "Prompt",   flex: 2,   minWidth: 200, cellRenderer: PromptDescCell, cellStyle: { display: "flex", alignItems: "center" } },
 ];
 
+// ─── Schema param cell renderers (shared with SkillsFlyout pattern) ──────────
+
+function ParamNameCell({ data }) {
+    if (!data) return null;
+    return (
+        <div style={{ display: "flex", alignItems: "center", height: "100%", gap: 6 }}>
+            <span style={{ fontSize: 13, fontWeight: 500, color: "#202223" }}>{data.name}</span>
+            {data.required ? <Badge status="critical">required</Badge> : <Badge>optional</Badge>}
+        </div>
+    );
+}
+
+function ParamTypeCell({ data }) {
+    if (!data) return null;
+    return (
+        <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
+            <Badge status="info">{data.type}</Badge>
+        </div>
+    );
+}
+
+function ParamDescCell({ data }) {
+    if (!data) return null;
+    return (
+        <div style={{ display: "flex", alignItems: "center", height: "100%", overflow: "hidden" }}>
+            <span style={{ fontSize: 12, color: "#6D7175", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{data.desc}</span>
+        </div>
+    );
+}
+
+const SCHEMA_COL_DEFS = [
+    { field: "name", headerName: "Name",        flex: 1,   minWidth: 140, cellRenderer: ParamNameCell, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "type", headerName: "Type",        width: 100, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ParamTypeCell, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "desc", headerName: "Description", flex: 2,   minWidth: 160, cellRenderer: ParamDescCell, cellStyle: { display: "flex", alignItems: "center" } },
+];
+
 const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 
 // ─── Tool detail view (mirrors SkillDetailView) ───────────────────────────────
@@ -530,9 +566,9 @@ function ToolDetailView({ tool, device, agent, allTools, onBack, onClose, onTool
             </div>
 
             {/* Tab content */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
+            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                 {selectedTab === 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 16 }}>
                         <LegacyCard>
                             <SampleDataComponent type="request" sampleData={sampleData} readOnly={true} />
                         </LegacyCard>
@@ -542,30 +578,26 @@ function ToolDetailView({ tool, device, agent, allTools, onBack, onClose, onTool
                     </div>
                 )}
                 {selectedTab === 1 && (
-                    <div>
-                        {tool.params && tool.params.length > 0 ? (
-                            <DataTable
-                                columnContentTypes={["text", "text", "text"]}
-                                headings={["Name", "Type", "Description"]}
-                                rows={tool.params.map(p => [
-                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                        <span style={{ fontWeight: 500 }}>{p.name}</span>
-                                        {p.required
-                                            ? <Badge status="critical">required</Badge>
-                                            : <Badge>optional</Badge>
-                                        }
-                                    </div>,
-                                    <Badge status="info">{p.type}</Badge>,
-                                    p.desc,
-                                ])}
-                            />
-                        ) : (
-                            <span style={{ fontSize: 13, color: "#6D7175" }}>No parameters.</span>
-                        )}
-                    </div>
+                    tool.params && tool.params.length > 0 ? (
+                        <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+                            <div style={{ position: "absolute", inset: 0 }}>
+                                <AgGridReact
+                                    theme={gridTheme}
+                                    rowData={tool.params}
+                                    columnDefs={SCHEMA_COL_DEFS}
+                                    defaultColDef={{ sortable: false, resizable: true }}
+                                    rowHeight={44}
+                                    headerHeight={40}
+                                    suppressCellFocus
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <div style={{ padding: 16, color: "#8C9196", fontSize: 13 }}>No parameters.</div>
+                    )
                 )}
-                {selectedTab === 2 && <div style={{ color: "#6D7175", fontSize: 13 }}>No traces recorded yet.</div>}
-                {selectedTab === 3 && <div style={{ color: "#6D7175", fontSize: 13 }}>No violations found.</div>}
+                {selectedTab === 2 && <div style={{ padding: 16, color: "#8C9196", fontSize: 13 }}>No traces recorded yet.</div>}
+                {selectedTab === 3 && <div style={{ padding: 16, color: "#8C9196", fontSize: 13 }}>No violations found.</div>}
             </div>
         </div>
     );

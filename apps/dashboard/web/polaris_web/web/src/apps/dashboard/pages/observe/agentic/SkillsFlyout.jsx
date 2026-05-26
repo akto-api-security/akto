@@ -182,16 +182,11 @@ const SKILL_VIOLATION_ROWS = [
 
 function SevBadgeCell({ data }) {
     if (!data) return null;
-    const MAP = {
-        critical: { bg: "#DF2909", color: "#FFFBFB" },
-        high:     { bg: "#FED3D1", color: "#202223" },
-        medium:   { bg: "#FFD79D", color: "#202223" },
-        low:      { bg: "#E4E5E7", color: "#202223" },
-    };
-    const s = MAP[data.severity] || MAP.low;
+    const STATUS_MAP = { critical: "critical", high: "warning", medium: "attention", low: undefined };
+    const label = data.severity.charAt(0).toUpperCase() + data.severity.slice(1);
     return (
         <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: s.bg, color: s.color, textTransform: "capitalize" }}>{data.severity}</span>
+            <Badge status={STATUS_MAP[data.severity]}>{label}</Badge>
         </div>
     );
 }
@@ -375,9 +370,9 @@ function SkillDetailView({ skill, device, agent, skills, onBack, onClose, onSkil
             </div>
 
             {/* Tab content */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
+            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                 {selectedTab === 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 16 }}>
                         <LegacyCard>
                             <SampleDataComponent
                                 type="request"
@@ -395,36 +390,40 @@ function SkillDetailView({ skill, device, agent, skills, onBack, onClose, onSkil
                     </div>
                 )}
                 {selectedTab === 1 && (
-                    <div style={{ position: "relative", height: 3 * 44 + 40 }}>
-                        <AgGridReact
-                            theme={gridTheme}
-                            rowData={SKILL_SCHEMA_PARAMS}
-                            columnDefs={SKILL_SCHEMA_COL_DEFS}
-                            defaultColDef={{ sortable: false, resizable: true }}
-                            rowHeight={44}
-                            headerHeight={40}
-                            suppressCellFocus
-                        />
-                    </div>
-                )}
-                {selectedTab === 2 && (
-                    <div style={{ color: "#6D7175", fontSize: 13 }}>No traces recorded yet.</div>
-                )}
-                {selectedTab === 3 && (
-                    skill.violations > 0 ? (
-                        <div style={{ position: "relative", height: skill.violations * 44 + 40 }}>
+                    <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+                        <div style={{ position: "absolute", inset: 0 }}>
                             <AgGridReact
                                 theme={gridTheme}
-                                rowData={SKILL_VIOLATION_ROWS.slice(0, skill.violations)}
-                                columnDefs={SKILL_VIOLATION_COL_DEFS}
+                                rowData={SKILL_SCHEMA_PARAMS}
+                                columnDefs={SKILL_SCHEMA_COL_DEFS}
                                 defaultColDef={{ sortable: false, resizable: true }}
                                 rowHeight={44}
                                 headerHeight={40}
                                 suppressCellFocus
                             />
                         </div>
+                    </div>
+                )}
+                {selectedTab === 2 && (
+                    <div style={{ padding: 16, color: "#8C9196", fontSize: 13 }}>No traces recorded yet.</div>
+                )}
+                {selectedTab === 3 && (
+                    skill.violations > 0 ? (
+                        <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+                            <div style={{ position: "absolute", inset: 0 }}>
+                                <AgGridReact
+                                    theme={gridTheme}
+                                    rowData={SKILL_VIOLATION_ROWS.slice(0, skill.violations)}
+                                    columnDefs={SKILL_VIOLATION_COL_DEFS}
+                                    defaultColDef={{ sortable: false, resizable: true }}
+                                    rowHeight={44}
+                                    headerHeight={40}
+                                    suppressCellFocus
+                                />
+                            </div>
+                        </div>
                     ) : (
-                        <div style={{ color: "#6D7175", fontSize: 13 }}>No violations found.</div>
+                        <div style={{ padding: 16, color: "#8C9196", fontSize: 13 }}>No violations found.</div>
                     )
                 )}
             </div>
