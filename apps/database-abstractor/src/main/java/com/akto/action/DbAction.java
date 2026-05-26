@@ -3816,6 +3816,17 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String insertGuardrailsServiceLog() {
+        try {
+            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            GuardrailsServiceLogsDao.instance.insertOne(dbLog);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertGuardrailsServiceLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
 
     private List<CrawlerRun> crawlerRuns;
     private List<CrawlerRunDTO> crawlerRunsData;

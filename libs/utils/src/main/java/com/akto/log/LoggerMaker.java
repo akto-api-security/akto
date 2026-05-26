@@ -95,7 +95,7 @@ public class LoggerMaker  {
     private LogDb db;
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, DB_ABS, THREAT_DETECTION, DATA_INGESTION, CYBORG, PUPPETEER, AGENTIC_TESTING
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, DB_ABS, THREAT_DETECTION, DATA_INGESTION, CYBORG, PUPPETEER, AGENTIC_TESTING, GUARDRAILS_SERVICE
     }
 
     private static AccountSettings accountSettings = null;
@@ -329,6 +329,9 @@ public class LoggerMaker  {
                     break;
                 case AGENTIC_TESTING:
                     dataActor.insertAgenticTestingLog(log);
+                    break;
+                case GUARDRAILS_SERVICE:
+                    dataActor.insertGuardrailsServiceLog(log);
                     break;
                 default:
                     break;

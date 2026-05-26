@@ -1304,6 +1304,10 @@ public class DbLayer {
         AwsApiGatewayLogsDao.instance.insertOne(log);
     }
 
+    public static void insertGuardrailsServiceLog(Log log) {
+        GuardrailsServiceLogsDao.instance.insertOne(log);
+    }
+
     public static void insertEndpointShieldLog(LogsEndpointShield log) {
         LogsEndpointShieldDao.instance.insertOne(log);
     }
