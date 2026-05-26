@@ -25,9 +25,11 @@ public class Cron {
             public void run() {
                 if (isHybridSaas) {
                     // Run optimized account first to avoid being blocked by other accounts
+                    loggerMaker.warnAndAddToDb("Priority merging: starting for account " + PRIORITY_ACCOUNT_ID, LoggerMaker.LogDb.CYBORG);
                     Context.accountId.set(PRIORITY_ACCOUNT_ID);
                     try {
                         triggerMerging(PRIORITY_ACCOUNT_ID);
+                        loggerMaker.warnAndAddToDb("Priority merging: completed for account " + PRIORITY_ACCOUNT_ID, LoggerMaker.LogDb.CYBORG);
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Error in priority merging for account " + PRIORITY_ACCOUNT_ID + ": " + e.getMessage(), LoggerMaker.LogDb.CYBORG);
                     }
