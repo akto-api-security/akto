@@ -216,10 +216,11 @@ public class AktoPolicyNew {
 
         Map<String, List<String>> reqHeaders = httpResponseParams.getRequestParams().getHeaders();
         String ua = RuntimeUtil.getHeaderValue(reqHeaders, "user-agent");
-        addClassifiedTag(apiInfo, "user-agent", UserAgentClassifier.classify(ua), ua);
+        addClassifiedTag(apiInfo, "user-agent", UserAgentClassifier.classify(ua).name(), ua);
 
         String referer = RuntimeUtil.getHeaderValue(reqHeaders, "referer");
-        addClassifiedTag(apiInfo, "referer", referer, referer);
+        String refererHost = UserAgentClassifier.extractRefererHost(referer);
+        addClassifiedTag(apiInfo, "referer", refererHost, refererHost);
 
     }
 
