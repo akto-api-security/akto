@@ -2567,9 +2567,6 @@ public class InitializerListener implements ServletContextListener {
                             runInitializerFunctions();
                         }
                     }, "context-initializer-secondary");
-                    logger.warn("Starting user analysis cron scheduler", LogDb.DASHBOARD);
-                    userAnalysisCron.setUpUserAnalysisCronScheduler();
-                    logger.warn("Ending user analysis cron scheduler", LogDb.DASHBOARD);
 
                     if (runJobFunctions == 1) {
                         logger.warn("Starting CATEGORY 1 job schedulers", LogDb.DASHBOARD);
@@ -2587,6 +2584,9 @@ public class InitializerListener implements ServletContextListener {
                         setUpTestEditorTemplatesScheduler();
                     }
                     if (runJobFunctions == 2) {
+                        logger.warn("Starting user analysis cron scheduler", LogDb.DASHBOARD);
+                        userAnalysisCron.setUpUserAnalysisCronScheduler();
+                        logger.warn("Ending user analysis cron scheduler", LogDb.DASHBOARD);
                         logger.warn("Starting CATEGORY 2 job schedulers", LogDb.DASHBOARD);
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                         syncCronInfo.setUpMcpMaliciousnessCronScheduler();
@@ -3731,8 +3731,8 @@ public class InitializerListener implements ServletContextListener {
             // AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             // dropSampleDataIfEarlierNotDroped(accountSettings);
 
-            // backFillDiscovered();
-            // backFillStatusCodeType();
+            backFillDiscovered();
+            backFillStatusCodeType();
         } catch (Exception e) {
             logger.errorAndAddToDb(e,"error while setting up dashboard: " + e.toString(), LogDb.DASHBOARD);
         }

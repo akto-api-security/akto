@@ -27,8 +27,8 @@ public class UserAnalysisCron {
 
     private static final int CRON_INTERVAL_MINUTES = 10;
     private static final int SLACK_SECONDS = 60;
-    private static final int PAGE_SIZE = 500;
-    private static final int MAX_DOCS_PER_ACCOUNT_PER_TICK = 200;
+    private static final int PAGE_SIZE = 10;
+    private static final int MAX_DOCS_PER_ACCOUNT_PER_TICK = 100;
     private static final int MIN_QUERY_LENGTH = 20;
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -55,6 +55,7 @@ public class UserAnalysisCron {
             }
         }, 0, CRON_INTERVAL_MINUTES, TimeUnit.MINUTES);
     }
+
     private void processAccount(int accountId) {
         Context.accountId.set(accountId);
         AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
@@ -62,17 +63,18 @@ public class UserAnalysisCron {
         long endTs = nowMs - SLACK_SECONDS * 1000L;
         long startTs = resolveStartTs(settings);
 
-        Map<AggregateKey, Aggregate> aggregates = new HashMap<>();
+        // Rolling summaries accumulated in memory across the tick; individual record
+        // data (tokens, topics, harmful) is flushed to DB immediately per record.
+        Map<AggregateKey, String> rollingSummaries = new HashMap<>();
         UserQueryTopicClassifier classifier = new UserQueryTopicClassifier();
 
         ElasticSearchClient.instance().scrollQueryData(accountId, startTs, endTs, PAGE_SIZE,
             MAX_DOCS_PER_ACCOUNT_PER_TICK,
-            rec -> processRecord(rec, accountId, aggregates, classifier));
+            rec -> processRecord(rec, accountId, rollingSummaries, classifier));
 
-        flushAggregates(aggregates);
         AccountSettingsDao.instance.updateOne(
             Filters.eq(Constants.ID, accountId),
-            Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_USER_ANALYSIS_CRON, (endTs/1000))
+            Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_USER_ANALYSIS_CRON, (endTs / 1000))
         );
     }
 
@@ -84,22 +86,19 @@ public class UserAnalysisCron {
     }
 
     private void processRecord(AgentQueryRecord rec, int accountId,
-                               Map<AggregateKey, Aggregate> aggregates,
+                               Map<AggregateKey, String> rollingSummaries,
                                UserQueryTopicClassifier classifier) {
         if (rec.getServiceId() == null || rec.getServiceId().isEmpty()) return;
         if (rec.getDeviceId() == null || rec.getDeviceId().isEmpty()) return;
         if (rec.getQueryPayload() == null || rec.getQueryPayload().length() < MIN_QUERY_LENGTH) return;
 
         AggregateKey key = new AggregateKey(rec.getServiceId(), rec.getDeviceId());
-        Aggregate agg = aggregates.computeIfAbsent(key, k -> new Aggregate(rec.getUserName()));
-        agg.addTokens(rec.getInputTokens(), rec.getOutputTokens());
-        if (rec.getUserName() != null && !rec.getUserName().isEmpty()) {
-            agg.userName = rec.getUserName();
-        }
+        String existingSummary = rollingSummaries.getOrDefault(key, "");
 
         BasicDBObject classifierInput = new BasicDBObject()
             .append(UserQueryTopicClassifier.QUERY_PAYLOAD, rec.getQueryPayload())
-            .append(UserQueryTopicClassifier.RESPONSE_PAYLOAD, rec.getResponsePayload() != null ? rec.getResponsePayload() : "");
+            .append(UserQueryTopicClassifier.RESPONSE_PAYLOAD, rec.getResponsePayload() != null ? rec.getResponsePayload() : "")
+            .append(UserQueryTopicClassifier.EXISTING_SUMMARY, existingSummary);
 
         BasicDBObject result;
         try {
@@ -110,56 +109,71 @@ public class UserAnalysisCron {
         }
         if (result == null) return;
 
-        applyTopics(result, agg);
-        applyHarmful(result, rec.getTimeStampMs(), agg);
+        Map<String, Integer> topicDeltas = new HashMap<>();
+        applyTopics(result, topicDeltas);
+
+        Map<String, Object> harmfulMerge = new HashMap<>();
+        applyHarmful(result, rec.getTimeStampMs(), harmfulMerge);
+
+        String newSummary = result.getString("summary", "");
+        if (newSummary != null && !newSummary.isEmpty()) {
+            rollingSummaries.put(key, newSummary);
+        }
+
+        // Use token counts from the ES record; fall back to payload-length heuristic (~4 chars/token).
+        long inputTokens = rec.getInputTokens();
+        long outputTokens = rec.getOutputTokens();
+        if (inputTokens == 0 && rec.getQueryPayload() != null) {
+            inputTokens = rec.getQueryPayload().length() / 4;
+        }
+        if (outputTokens == 0 && rec.getResponsePayload() != null) {
+            outputTokens = rec.getResponsePayload().length() / 4;
+        }
+
+        String userName = rec.getUserName() != null ? rec.getUserName() : "";
+        String summaryToWrite = rollingSummaries.get(key);
+
+        try {
+            UserAnalysisDataDao.instance.upsertAggregates(
+                key.serviceId, key.deviceId, userName,
+                topicDeltas, inputTokens, outputTokens,
+                harmfulMerge, summaryToWrite, System.currentTimeMillis()
+            );
+        } catch (Exception ex) {
+            loggerMaker.error("UserAnalysisCron: upsert failed for (" + key.serviceId + ", " + key.deviceId + "): " + ex.getMessage());
+        }
     }
 
-    private void applyTopics(BasicDBObject result, Aggregate agg) {
+    private void applyTopics(BasicDBObject result, Map<String, Integer> topicDeltas) {
         Object topicsObj = result.get("topics");
         if (!(topicsObj instanceof List)) return;
         for (Object t : (List<?>) topicsObj) {
             String topic = String.valueOf(t).trim();
             if (!topic.isEmpty()) {
-                agg.topicDeltas.merge(topic, 1, Integer::sum);
+                topicDeltas.merge(topic, 1, Integer::sum);
             }
         }
     }
 
-    private void applyHarmful(BasicDBObject result, long timestampMs, Aggregate agg) {
+    private void applyHarmful(BasicDBObject result, long timestampMs, Map<String, Object> harmfulMerge) {
         if (!result.getBoolean("harmful", false)) return;
         String category = result.getString("harmfulCategory", "general");
         if (category == null || category.isEmpty()) category = "general";
         String reason = result.getString("harmfulReason", "");
 
-        BasicDBObject entry = (BasicDBObject) agg.harmfulMerge.get(category);
+        BasicDBObject entry = (BasicDBObject) harmfulMerge.get(category);
         if (entry == null) {
             entry = new BasicDBObject()
                 .append("count", 0)
                 .append("lastSeenAt", timestampMs)
                 .append("lastReason", reason);
-            agg.harmfulMerge.put(category, entry);
+            harmfulMerge.put(category, entry);
         }
         entry.put("count", entry.getInt("count", 0) + 1);
         entry.put("lastSeenAt", timestampMs);
         if (reason != null && !reason.isEmpty()) entry.put("lastReason", reason);
     }
 
-    private void flushAggregates(Map<AggregateKey, Aggregate> aggregates) {
-        long flushTs = System.currentTimeMillis();
-        for (Map.Entry<AggregateKey, Aggregate> e : aggregates.entrySet()) {
-            AggregateKey key = e.getKey();
-            Aggregate agg = e.getValue();
-            try {
-                UserAnalysisDataDao.instance.upsertAggregates(
-                    key.serviceId, key.deviceId, agg.userName,
-                    agg.topicDeltas, agg.inputTokens, agg.outputTokens,
-                    agg.harmfulMerge, null, flushTs
-                );
-            } catch (Exception ex) {
-                loggerMaker.error("UserAnalysisCron: upsert failed for (" + key.serviceId + ", " + key.deviceId + "): " + ex.getMessage());
-            }
-        }
-    }
     private static final class AggregateKey {
         final String serviceId;
         final String deviceId;
@@ -180,23 +194,6 @@ public class UserAnalysisCron {
         @Override
         public int hashCode() {
             return Objects.hash(serviceId, deviceId);
-        }
-    }
-
-    private static final class Aggregate {
-        String userName;
-        long inputTokens;
-        long outputTokens;
-        final Map<String, Integer> topicDeltas = new HashMap<>();
-        final Map<String, Object> harmfulMerge = new HashMap<>();
-
-        Aggregate(String userName) {
-            this.userName = userName;
-        }
-
-        void addTokens(long input, long output) {
-            inputTokens += input;
-            outputTokens += output;
         }
     }
 }
