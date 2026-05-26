@@ -35,6 +35,10 @@ public class MergingLogic {
     public static final int STRING_MERGING_THRESHOLD = 10;
     private static final String AKTO_MCP_SERVER_TAG = "mcp-server";
     private static final LoggerMaker loggerMaker = new LoggerMaker(MergingLogic.class, LogDb.DB_ABS);
+    private static final int OPTIMIZED_MERGING_ACCOUNT_ID = 1736798101;
+    private static final Set<Integer> OPTIMIZED_MERGING_COLLECTION_IDS = parseCollectionIds(System.getenv("OPTIMIZED_MERGING_COLLECTION_IDS"));
+    private static final int MAX_WILDCARD_POSITIONS = 2;
+    private static final boolean shouldUseOptimizedMerging = "true".equalsIgnoreCase(System.getenv("USE_OPTIMIZED_MERGING"));
 
     private static Set<MergedUrls> mergedUrls = new HashSet<>();
 
@@ -262,13 +266,19 @@ public class MergingLogic {
             }
         }
 
+        boolean optimized = useOptimizedMerging(apiCollectionId);
+
         // Check once at collection level whether STRING merging is allowed
         boolean allowStringMerging = !mergeUrlsBasic && (!ApiCollectionsDao.shouldSkipMerging(apiCollection) || !(Context.accountId.get() == 1758525547));
 
-        loggerMaker.infoAndAddToDb("allowStringMerging value for collection " + apiCollectionId + " is " + allowStringMerging, LogDb.DB_ABS);
+        loggerMaker.infoAndAddToDb("allowStringMerging value for collection " + apiCollectionId + " is " + allowStringMerging
+                + " optimized=" + optimized, LogDb.DB_ABS);
 
         Bson filterQ = null;
-        if (apiCollection != null && apiCollection.getHostName() == null) {
+        if (optimized) {
+            // Optimized path: only fetch host header STIs for URL discovery
+            filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
+        } else if (apiCollection != null && apiCollection.getHostName() == null) {
             filterQ = Filters.eq("apiCollectionId", apiCollectionId);
         } else {
             Bson hostFilter = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
@@ -280,7 +290,7 @@ public class MergingLogic {
         }
 
         int offset = 0;
-        int limit = mergeUrlsBasic ? 10_000 : 50_000;
+        int limit = (mergeUrlsBasic || optimized) ? 10_000 : 50_000;
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
         ApiMergerResult finalResult = new ApiMergerResult(new HashMap<>());
@@ -309,80 +319,88 @@ public class MergingLogic {
                     continue;
                 }
 
-
-                Set<String> set = staticUrlToSti.get(key);
-                if (set == null) {
-                    set = new HashSet<>();
-                    staticUrlToSti.put(key, set);
+                if (!optimized) {
+                    Set<String> set = staticUrlToSti.get(key);
+                    if (set == null) {
+                        set = new HashSet<>();
+                        staticUrlToSti.put(key, set);
+                    }
+                    set.add(sti.getResponseCode() + " " + sti.getParam());
                 }
-
-                set.add(sti.getResponseCode() + " " + sti.getParam());
             }
 
             for (String s: templateUrlSet) {
                 templateUrls.add(s);
             }
 
-            Iterator<String> iterator = staticUrlToSti.keySet().iterator();
-            while (iterator.hasNext()) {
-                String staticURL = iterator.next();
-                if (staticURL == null || staticURL.isEmpty() || !staticURL.contains(" ")) {
-                    loggerMaker.warnAndAddToDb("Invalid staticURL: '" + staticURL + "'");
-                    iterator.remove();
-                    continue;
-                }
-                String[] staticParts = staticURL.split(" ", 2);
-                if (staticParts.length < 2) {
-                    loggerMaker.warnAndAddToDb("staticURL missing space: '" + staticURL + "'");
-                    iterator.remove();
-                    continue;
-                }
-                URLMethods.Method staticMethod = URLMethods.Method.fromString(staticParts[0]);
-                String staticEndpoint = staticParts[1];
-                if (staticEndpoint.contains("//") || staticEndpoint.isEmpty()) {
-                    loggerMaker.warnAndAddToDb("staticEndpoint has empty tokens: '" + staticEndpoint + "'");
-                    iterator.remove();
-                    continue;
-                }
-
-                for (String templateURL: templateUrls) {
-                    if (templateURL == null || templateURL.isEmpty() || !templateURL.contains(" ")) {
-                        loggerMaker.warnAndAddToDb("Invalid templateURL: '" + templateURL + "'");
+            if (optimized) {
+                // Optimized: indexed template-to-static matching, skip static-to-static
+                Set<String> matched = optimizedTemplateToStaticMatch(templateUrls, staticUrlToSti, apiCollectionId);
+                finalResult.deleteStaticUrls.addAll(matched);
+                loggerMaker.infoAndAddToDb("optimized merging matched " + matched.size() + " static urls for collection " + apiCollectionId, LogDb.DB_ABS);
+            } else {
+                // Original: brute force template-to-static + static-to-static
+                Iterator<String> iterator = staticUrlToSti.keySet().iterator();
+                while (iterator.hasNext()) {
+                    String staticURL = iterator.next();
+                    if (staticURL == null || staticURL.isEmpty() || !staticURL.contains(" ")) {
+                        loggerMaker.warnAndAddToDb("Invalid staticURL: '" + staticURL + "'");
+                        iterator.remove();
                         continue;
                     }
-                    String[] templateParts = templateURL.split(" ", 2);
-                    if (templateParts.length < 2) {
-                        loggerMaker.warnAndAddToDb("templateURL missing space: '" + templateURL + "'");
+                    String[] staticParts = staticURL.split(" ", 2);
+                    if (staticParts.length < 2) {
+                        loggerMaker.warnAndAddToDb("staticURL missing space: '" + staticURL + "'");
+                        iterator.remove();
                         continue;
                     }
-                    URLMethods.Method templateMethod = URLMethods.Method.fromString(templateParts[0]);
-                    String templateEndpoint = templateParts[1];
-                    if (templateEndpoint.contains("//") || templateEndpoint.isEmpty()) {
-                        loggerMaker.warnAndAddToDb("templateEndpoint has empty tokens: '" + templateEndpoint + "'");
+                    URLMethods.Method staticMethod = URLMethods.Method.fromString(staticParts[0]);
+                    String staticEndpoint = staticParts[1];
+                    if (staticEndpoint.contains("//") || staticEndpoint.isEmpty()) {
+                        loggerMaker.warnAndAddToDb("staticEndpoint has empty tokens: '" + staticEndpoint + "'");
+                        iterator.remove();
                         continue;
                     }
 
-                    URLTemplate urlTemplate = createUrlTemplate(templateEndpoint, templateMethod);
-                    if (urlTemplate.match(staticEndpoint, staticMethod)) {
-                        // Don't delete static URLs if the matching template was previously demerged
-                        if (!isDemergedUrl(urlTemplate, apiCollectionId)) {
-                            finalResult.deleteStaticUrls.add(staticURL);
-                            iterator.remove();
+                    for (String templateURL: templateUrls) {
+                        if (templateURL == null || templateURL.isEmpty() || !templateURL.contains(" ")) {
+                            loggerMaker.warnAndAddToDb("Invalid templateURL: '" + templateURL + "'");
+                            continue;
                         }
-                        break;
+                        String[] templateParts = templateURL.split(" ", 2);
+                        if (templateParts.length < 2) {
+                            loggerMaker.warnAndAddToDb("templateURL missing space: '" + templateURL + "'");
+                            continue;
+                        }
+                        URLMethods.Method templateMethod = URLMethods.Method.fromString(templateParts[0]);
+                        String templateEndpoint = templateParts[1];
+                        if (templateEndpoint.contains("//") || templateEndpoint.isEmpty()) {
+                            loggerMaker.warnAndAddToDb("templateEndpoint has empty tokens: '" + templateEndpoint + "'");
+                            continue;
+                        }
+
+                        URLTemplate urlTemplate = createUrlTemplate(templateEndpoint, templateMethod);
+                        if (urlTemplate.match(staticEndpoint, staticMethod)) {
+                            // Don't delete static URLs if the matching template was previously demerged
+                            if (!isDemergedUrl(urlTemplate, apiCollectionId)) {
+                                finalResult.deleteStaticUrls.add(staticURL);
+                                iterator.remove();
+                            }
+                            break;
+                        }
                     }
                 }
-            }
 
-            Map<Integer, Map<String, Set<String>>> sizeToUrlToSti = groupByTokenSize(staticUrlToSti);
+                Map<Integer, Map<String, Set<String>>> sizeToUrlToSti = groupByTokenSize(staticUrlToSti);
 
-            sizeToUrlToSti.remove(1);
-            sizeToUrlToSti.remove(0);
+                sizeToUrlToSti.remove(1);
+                sizeToUrlToSti.remove(0);
 
 
-            for(int size: sizeToUrlToSti.keySet()) {
-                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), !mergeUrlsBasic, allowMergingOnVersions, allowStringMerging, apiCollectionId);
-                finalResult.templateToStaticURLs.putAll(result.templateToStaticURLs);
+                for(int size: sizeToUrlToSti.keySet()) {
+                    ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), !mergeUrlsBasic, allowMergingOnVersions, allowStringMerging, apiCollectionId);
+                    finalResult.templateToStaticURLs.putAll(result.templateToStaticURLs);
+                }
             }
 
             offset += limit;
@@ -712,6 +730,157 @@ public class MergingLogic {
 
     public static String[] trimAndSplit(String url) {
         return trim(url).split("/");
+    }
+
+    // --- Optimized template-to-static matching ---
+
+    private static Set<Integer> parseCollectionIds(String env) {
+        Set<Integer> ids = new HashSet<>();
+        if (env == null || env.isEmpty()) return ids;
+        for (String s : env.split(",")) {
+            try {
+                ids.add(Integer.parseInt(s.trim()));
+            } catch (NumberFormatException ignored) {}
+        }
+        return ids;
+    }
+
+    public static boolean isOptimizedMergingAccount() {
+        return shouldUseOptimizedMerging
+                && Context.accountId.get() == OPTIMIZED_MERGING_ACCOUNT_ID;
+    }
+
+    public static boolean isOptimizedCollection(int apiCollectionId) {
+        return OPTIMIZED_MERGING_COLLECTION_IDS.contains(apiCollectionId);
+    }
+
+    private static boolean useOptimizedMerging(int apiCollectionId) {
+        return isOptimizedMergingAccount() && isOptimizedCollection(apiCollectionId);
+    }
+
+    /**
+     * Build a lookup key directly from method, tokenCount, and tokens array,
+     * skipping positions in the skipSet. Positions are iterated in order so no sorting needed.
+     */
+    static String buildKeyDirect(String method, int tokenCount, String[] tokens, int skip1, int skip2) {
+        StringBuilder sb = new StringBuilder(method.length() + tokenCount * 10);
+        sb.append(method).append('|').append(tokenCount);
+        for (int i = 0; i < tokenCount; i++) {
+            if (i == skip1 || i == skip2) continue;
+            sb.append('|').append(i).append(':').append(tokens[i]);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Index templates by their fixed token positions for O(1) lookup.
+     */
+    static Map<String, List<URLTemplate>> buildTemplateIndex(List<String> templateUrls) {
+        Map<String, List<URLTemplate>> index = new HashMap<>();
+
+        for (String templateURL : templateUrls) {
+            if (templateURL == null || templateURL.isEmpty() || !templateURL.contains(" ")) continue;
+            String[] parts = templateURL.split(" ", 2);
+            if (parts.length < 2) continue;
+            URLMethods.Method method = URLMethods.Method.fromString(parts[0]);
+            String endpoint = parts[1];
+            if (endpoint.contains("//") || endpoint.isEmpty()) continue;
+
+            URLTemplate urlTemplate = createUrlTemplate(endpoint, method);
+            String[] tokens = urlTemplate.getTokens();
+
+            // Build key using only fixed (non-null) token positions
+            StringBuilder sb = new StringBuilder(method.name().length() + tokens.length * 10);
+            sb.append(method.name()).append('|').append(tokens.length);
+            for (int i = 0; i < tokens.length; i++) {
+                if (tokens[i] != null) {
+                    sb.append('|').append(i).append(':').append(tokens[i]);
+                }
+            }
+
+            index.computeIfAbsent(sb.toString(), k -> new ArrayList<>()).add(urlTemplate);
+        }
+
+        return index;
+    }
+
+    /**
+     * Generate all candidate keys for a static URL by skipping up to maxWildcards positions.
+     * Uses direct StringBuilder — no HashMap or sorting overhead.
+     */
+    static List<String> generateCandidateKeys(String method, String[] tokens, int maxWildcards) {
+        int n = tokens.length;
+        // Pre-calculate capacity: 1 + n + C(n,2) for maxWildcards=2
+        int capacity = 1 + (maxWildcards >= 1 ? n : 0) + (maxWildcards >= 2 ? n * (n - 1) / 2 : 0);
+        List<String> keys = new ArrayList<>(capacity);
+
+        // 0 wildcards: skip nothing (-1 means no skip)
+        keys.add(buildKeyDirect(method, n, tokens, -1, -1));
+
+        // 1 wildcard: skip each position once
+        if (maxWildcards >= 1) {
+            for (int skip = 0; skip < n; skip++) {
+                keys.add(buildKeyDirect(method, n, tokens, skip, -1));
+            }
+        }
+
+        // 2 wildcards: skip each pair of positions
+        if (maxWildcards >= 2) {
+            for (int s1 = 0; s1 < n; s1++) {
+                for (int s2 = s1 + 1; s2 < n; s2++) {
+                    keys.add(buildKeyDirect(method, n, tokens, s1, s2));
+                }
+            }
+        }
+
+        return keys;
+    }
+
+    /**
+     * Optimized template-to-static matching using indexed lookup.
+     * Returns the set of static URLs that matched a template (to be deleted).
+     */
+    static Set<String> optimizedTemplateToStaticMatch(
+            List<String> templateUrls,
+            Map<String, Set<String>> staticUrlToSti,
+            int apiCollectionId) {
+
+        Map<String, List<URLTemplate>> index = buildTemplateIndex(templateUrls);
+        Set<String> matched = new HashSet<>();
+
+        for (String staticURL : staticUrlToSti.keySet()) {
+            if (staticURL == null || staticURL.isEmpty() || !staticURL.contains(" ")) continue;
+            String[] parts = staticURL.split(" ", 2);
+            if (parts.length < 2) continue;
+            String method = parts[0];
+            String endpoint = parts[1];
+            if (endpoint.contains("//") || endpoint.isEmpty()) continue;
+
+            // Normalize to match URLTemplate behavior
+            String normalized = endpoint;
+            if (normalized.startsWith("/")) normalized = normalized.substring(1);
+            if (normalized.endsWith("/")) normalized = normalized.substring(0, normalized.length() - 1);
+            String[] tokens = normalized.split("/");
+
+            List<String> candidateKeys = generateCandidateKeys(method, tokens, MAX_WILDCARD_POSITIONS);
+            boolean found = false;
+            for (String key : candidateKeys) {
+                List<URLTemplate> candidates = index.get(key);
+                if (candidates == null) continue;
+                for (URLTemplate tmpl : candidates) {
+                    if (tmpl.match(endpoint, URLMethods.Method.fromString(method))) {
+                        if (!isDemergedUrl(tmpl, apiCollectionId)) {
+                            matched.add(staticURL);
+                        }
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) break;
+            }
+        }
+
+        return matched;
     }
 
     static class ApiMergerResult {
