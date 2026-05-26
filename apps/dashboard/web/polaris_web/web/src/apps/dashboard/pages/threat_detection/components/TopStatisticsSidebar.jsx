@@ -16,23 +16,30 @@ function timeAgo(epochSeconds) {
 const sidebarStyles = `
 .sidebar-list-item:hover {
     background: var(--p-color-bg-hover, #F6F6F7);
-    border-radius: 4px;
-    margin-inline: -0.25rem;
-    padding-inline: 0.25rem;
+    border-radius: var(--p-border-radius-1, 4px);
+    margin-inline: calc(-1 * var(--p-space-1, 0.25rem));
+    padding-inline: var(--p-space-1, 0.25rem);
+}
+.sidebar-section-red {
+    border: 1px solid #E45858;
+    border-radius: var(--p-border-radius-2, 8px);
+    overflow: hidden;
 }
 `;
 
-function SidebarSection({ title, children, borderColor }) {
-    return (
-        <div style={borderColor ? { border: `1px solid ${borderColor}`, borderRadius: "var(--p-border-radius-2, 8px)", overflow: "hidden" } : undefined}>
-            <Card padding={4}>
-                <VerticalStack gap="3">
-                    <Text variant="headingSm">{title}</Text>
-                    {children}
-                </VerticalStack>
-            </Card>
-        </div>
+function SidebarSection({ title, children, variant }) {
+    const card = (
+        <Card padding={4}>
+            <VerticalStack gap="3">
+                <Text variant="headingSm">{title}</Text>
+                {children}
+            </VerticalStack>
+        </Card>
     );
+    if (variant === "alert") {
+        return <div className="sidebar-section-red">{card}</div>;
+    }
+    return card;
 }
 
 function SidebarListItem({ icon, label, count, onClick, isLast }) {
@@ -42,7 +49,7 @@ function SidebarListItem({ icon, label, count, onClick, isLast }) {
             className="sidebar-list-item"
             style={{
                 cursor: onClick ? "pointer" : "default",
-                paddingBlock: "0.5rem",
+                paddingBlock: "var(--p-space-2, 0.5rem)",
                 borderBottom: isLast ? "none" : "1px solid var(--p-color-border-subdued, #E1E3E5)",
             }}
         >
@@ -95,7 +102,7 @@ function TopStatisticsSidebar({ startTimestamp, endTimestamp }) {
         <VerticalStack gap="4">
             <style>{sidebarStyles}</style>
 
-            <SidebarSection title="Recent Activity" borderColor="#E45858">
+            <SidebarSection title="Recent Activity" variant="alert">
                 <VerticalStack gap="2">
                     {recentActivity.length === 0 ? (
                         <Text variant="bodySm" color="subdued">No data</Text>
@@ -107,7 +114,7 @@ function TopStatisticsSidebar({ startTimestamp, endTimestamp }) {
                                 className="sidebar-list-item"
                                 style={{
                                     cursor: "pointer",
-                                    paddingBlock: "0.5rem",
+                                    paddingBlock: "var(--p-space-2, 0.5rem)",
                                     borderBottom: idx === recentActivity.length - 1 ? "none" : "1px solid var(--p-color-border-subdued, #E1E3E5)",
                                 }}
                             >
@@ -183,7 +190,7 @@ function HostFavicon({ host }) {
         <img
             src={`https://www.google.com/s2/favicons?domain=${cleanHost}&sz=16`}
             alt=""
-            style={{ width: "1em", height: "1em", borderRadius: "2px" }}
+            style={{ width: "1em", height: "1em", borderRadius: "var(--p-border-radius-05, 2px)" }}
             onError={(e) => { e.target.style.display = "none"; }}
         />
     );

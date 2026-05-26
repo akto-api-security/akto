@@ -160,18 +160,18 @@ function ThreatDashboardPage() {
             titleToolTip="Distribution of threats by severity level"
             component={
                 <VerticalStack gap="3">
-                    <div style={{ display: "flex", justifyContent: "center" }}>
+                    <HorizontalStack align="center">
                         <DonutChart
                             data={severityDistribution}
                             navUrl="/dashboard/protection/threat-activity"
                             size={200}
                             pieInnerSize="50%"
                         />
-                    </div>
+                    </HorizontalStack>
                     <HorizontalStack gap="4" align="center" wrap>
                         {Object.entries(severityDistribution).map(([label, item]) => (
                             <HorizontalStack gap="1" blockAlign="center" key={label}>
-                                <span style={{ background: item.color, borderRadius: "50%", width: "0.5rem", height: "0.5rem", display: "inline-block" }} />
+                                <span style={{ background: item.color, borderRadius: "50%", width: "var(--p-space-2, 0.5rem)", height: "var(--p-space-2, 0.5rem)", display: "inline-block" }} />
                                 <Text variant="bodySm">{label}</Text>
                             </HorizontalStack>
                         ))}
@@ -206,11 +206,11 @@ function ThreatDashboardPage() {
     );
 
     const dashboardLayout = (
-        <div style={{ display: "flex", gap: "var(--p-space-5, 1.25rem)", flexWrap: "wrap" }}>
-            <div style={{ flex: "1 1 65%", minWidth: 0 }}>
+        <div style={{ display: "flex", gap: "var(--p-space-5, 1.25rem)", alignItems: "flex-start" }}>
+            <div style={{ flex: "1 1 0%", minWidth: 0 }}>
                 {mainContent}
             </div>
-            <div style={{ flex: "0 0 28%", minWidth: "18rem" }}>
+            <div style={{ flex: "0 0 30%", minWidth: "18rem" }}>
                 {sidebarContent}
             </div>
         </div>

@@ -149,18 +149,20 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
     const renderTotalThreatsTab = () => (
         <HorizontalGrid columns={2} gap="4">
             <VerticalStack gap="3">
-                <div style={{ display: "flex", justifyContent: "center" }}>
-                    <DonutChart
-                        data={threatStatusData}
-                        size={180}
-                        pieInnerSize="55%"
-                        onSegmentClick={handleDonutSegmentClick}
-                    />
-                </div>
+                <Box>
+                    <HorizontalStack align="center">
+                        <DonutChart
+                            data={threatStatusData}
+                            size={180}
+                            pieInnerSize="55%"
+                            onSegmentClick={handleDonutSegmentClick}
+                        />
+                    </HorizontalStack>
+                </Box>
                 <HorizontalStack gap="4" align="center">
                     {Object.entries(threatStatusData).map(([label, item]) => (
                         <HorizontalStack gap="1" blockAlign="center" key={label}>
-                            <span style={{ background: item.color, borderRadius: "50%", width: "0.5rem", height: "0.5rem", display: "inline-block" }} />
+                            <span style={{ background: item.color, borderRadius: "50%", width: "var(--p-space-2, 0.5rem)", height: "var(--p-space-2, 0.5rem)", display: "inline-block" }} />
                             <Text variant="bodySm">{label}</Text>
                         </HorizontalStack>
                     ))}
@@ -180,7 +182,7 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
                             onClick={() => handleThreatNameClick(item.rawName)}
                         >
                             <HorizontalStack gap="2" blockAlign="center">
-                                <span style={{ color: "#E45858", fontSize: "0.75rem", letterSpacing: "-1px" }}>|||</span>
+                                <span style={{ color: "#E45858", fontSize: "var(--p-font-size-75, 0.75rem)", letterSpacing: "-1px" }}>|||</span>
                                 <Text variant="bodyMd">{item.name}</Text>
                             </HorizontalStack>
                         </div>,
@@ -299,14 +301,14 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
                             key={tab.label}
                             onClick={() => handleTabChange(idx)}
                             style={{
-                                padding: "0.5rem 1rem",
+                                padding: "var(--p-space-2, 0.5rem) var(--p-space-4, 1rem)",
                                 background: "none",
                                 border: "none",
                                 borderBottom: selectedTab === idx ? "2px solid var(--p-color-bg-interactive, #5C6AC4)" : "2px solid transparent",
                                 cursor: "pointer",
                                 display: "flex",
                                 alignItems: "center",
-                                gap: "0.5rem",
+                                gap: "var(--p-space-2, 0.5rem)",
                             }}
                         >
                             <Text
