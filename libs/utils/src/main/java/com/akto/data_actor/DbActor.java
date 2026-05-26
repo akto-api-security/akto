@@ -256,6 +256,11 @@ public class DbActor extends DataActor {
         DbLayer.insertDataIngestionLog(log);
     }
 
+    @Override
+    public void insertGuardrailsServiceLog(Log log) {
+        DbLayer.insertGuardrailsServiceLog(log);
+    }
+
     public List<ApiCollection> fetchAllApiCollections() {
         return DbLayer.fetchAllApiCollections();
     }

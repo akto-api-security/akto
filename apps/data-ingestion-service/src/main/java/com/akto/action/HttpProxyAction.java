@@ -62,7 +62,9 @@ public class HttpProxyAction extends ActionSupport {
     public String httpProxy() {
         long start = System.currentTimeMillis();
         try {
-            loggerMaker.info("HTTP Proxy API called - path: " + path + ", method: " + method + ", account: " + akto_account_id);
+            loggerMaker.infoAndAddToDb(
+                "HTTP Proxy API called - path: {}, method: {}, account: {}, guardrails: {}, response_guardrails: {}, ingest_data: {}, contextSource: {}",
+                path, method, akto_account_id, guardrails, response_guardrails, ingest_data, contextSource);
 
             Map<String, Object> requestData = buildRequestData();
             applyMcpHostRewrite(requestData);
@@ -76,11 +78,11 @@ public class HttpProxyAction extends ActionSupport {
             if (!success) {
                 String errorMsg = "[http-proxy] API failed - path: " + path + ", method: " + method
                     + ", account: " + akto_account_id + ", latencyMs: " + latencyMs + ", error: " + message;
-                loggerMaker.errorAndAddToDb(errorMsg, LoggerMaker.LogDb.DATA_INGESTION);
+                loggerMaker.errorAndAddToDb(errorMsg);
                 sendSlackAlert(errorMsg);
             } else {
-                loggerMaker.info("[http-proxy] API completed - path: " + path + ", method: " + method
-                    + ", account: " + akto_account_id + ", latencyMs: " + latencyMs);
+                loggerMaker.infoAndAddToDb("[http-proxy] API completed - path: {}, method: {}, account: {}, latencyMs: {}",
+                    path, method, akto_account_id, latencyMs);
             }
 
             return success ? Action.SUCCESS.toUpperCase() : Action.ERROR.toUpperCase();
@@ -89,7 +91,7 @@ public class HttpProxyAction extends ActionSupport {
             long latencyMs = System.currentTimeMillis() - start;
             String errorMsg = "[http-proxy] Unexpected error - path: " + path + ", method: " + method
                 + ", account: " + akto_account_id + ", latencyMs: " + latencyMs + ", error: " + e.getMessage();
-            loggerMaker.errorAndAddToDb(errorMsg, LoggerMaker.LogDb.DATA_INGESTION);
+            loggerMaker.errorAndAddToDb(errorMsg);
             sendSlackAlert(errorMsg);
             success = false;
             message = "Unexpected error: " + e.getMessage();
@@ -145,13 +147,13 @@ public class HttpProxyAction extends ActionSupport {
         String tempCollectionName = host.toLowerCase().trim();
         String realCollectionName = McpCollectionResolver.getInstance().resolve(tempCollectionName);
         if (realCollectionName == null) {
-            loggerMaker.warn("MCP host cache miss for tempCollectionName=" + tempCollectionName);
+            loggerMaker.warnAndAddToDb("MCP host cache miss for tempCollectionName=" + tempCollectionName);
             return;
         }
 
         String rewritten = McpCollectionResolver.rewriteHostInHeaders(headersJson, realCollectionName);
         requestData.put("requestHeaders", rewritten);
-        loggerMaker.info("MCP host rewrite: " + tempCollectionName + " -> " + realCollectionName);
+        loggerMaker.infoAndAddToDb("MCP host rewrite: " + tempCollectionName + " -> " + realCollectionName);
     }
 
     private Map<String, Object> buildRequestData() {

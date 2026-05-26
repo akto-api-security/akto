@@ -653,6 +653,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String insertGuardrailsServiceLog() {
+        try {
+            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            DbLayer.insertGuardrailsServiceLog(dbLog);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String modifyHybridSaasSetting() {
         try {
             DbLayer.modifyHybridSaasSetting(isHybridSaas);

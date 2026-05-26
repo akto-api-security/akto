@@ -94,6 +94,10 @@ func (h *ValidationHandler) IngestData(c *gin.Context) {
 			zap.Bool("hasBlockedResponses", hasBlockedResponses))
 	}
 
+	h.logger.Info("IngestData - completed",
+		zap.Int("batchSize", len(req.BatchData)),
+		zap.String("contextSource", req.ContextSource))
+
 	// Return success response with validation results
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -210,11 +214,16 @@ func (h *ValidationHandler) ValidateRequestWithPolicy(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Error("ValidateRequestWithPolicy - invalid request format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid request format",
 		})
 		return
 	}
+
+	h.logger.Info("ValidateRequestWithPolicy - received request",
+		zap.String("contextSource", req.ContextSource),
+		zap.String("policyName", req.Policy.Name))
 
 	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, "")
 
@@ -234,12 +243,23 @@ func (h *ValidationHandler) ValidateRequestWithPolicy(c *gin.Context) {
 		req.Policy,
 	)
 	if err != nil {
-		h.logger.Error("Failed to validate request with policy", zap.Error(err))
+		h.logger.Error("ValidateRequestWithPolicy failed",
+			zap.String("contextSource", req.ContextSource),
+			zap.String("policyName", req.Policy.Name),
+			zap.String("sessionID", sessionID),
+			zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Validation failed",
 		})
 		return
 	}
+
+	h.logger.Info("ValidateRequestWithPolicy - completed",
+		zap.String("contextSource", req.ContextSource),
+		zap.String("policyName", req.Policy.Name),
+		zap.String("sessionID", sessionID),
+		zap.Bool("allowed", result.Allowed),
+		zap.Bool("modified", result.Modified))
 
 	c.JSON(http.StatusOK, result)
 }
