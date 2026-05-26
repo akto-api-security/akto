@@ -77,6 +77,17 @@ public class Producer {
         return null;
     }
 
+    public static void deleteTestResultsTopic() {
+        if (!Constants.IS_NEW_TESTING_ENABLED || Constants.LOCAL_KAFKA_BROKER_URL == null) {
+            return;
+        }
+        try {
+            deleteTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Failed to delete test results topic: " + e.getMessage());
+        }
+    }
+
     private static void deleteTopicWithRetries(String bootstrapServers, String topicName) {
         int retries = 0;
         int maxRetries = 5;
