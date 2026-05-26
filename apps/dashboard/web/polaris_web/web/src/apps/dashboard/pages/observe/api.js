@@ -929,6 +929,13 @@ export default {
             data: {envType, apiCollectionIds,resetEnvTypes}
         })
     },
+    async updateApiInfoTags(envType, apiInfoKeys, resetTags) {
+        return await request({
+            url: '/api/updateApiInfoTags',
+            method: 'post',
+            data: { envType, apiInfoKeys, resetTags }
+        })
+    },
     fetchEndpoint(apiInfoKey){
         return request({
             url: '/api/getSingleEndpoint',

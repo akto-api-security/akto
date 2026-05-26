@@ -25,7 +25,8 @@ public class CollectionTags {
     public enum TagSource {
         KUBERNETES,
         USER,
-        ARCADE_AGENT
+        ARCADE_AGENT,
+        AKTO
     }
 
     TagSource source;

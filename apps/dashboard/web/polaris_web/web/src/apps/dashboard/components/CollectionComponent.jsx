@@ -51,11 +51,13 @@ function CollectionComponent(props) {
     const initialRegexText = (condition && condition?.type === 'REGEX') ? (condition?.data?.regex || '') : ''
     const initialHostRegexText = (condition && condition?.type === 'HOST_REGEX') ? (condition?.data?.host_regex || '') : ''
     const initialTagsText = (condition && condition?.type === 'TAGS') ? (condition?.data?.query || '') : ''
+    const initialApiTagsText = (condition && condition?.type === 'API_TAGS') ? (condition?.data?.query || '') : ''
     const initialAuthTypes = (condition && condition?.type === 'AUTH_TYPE') ? (condition?.data?.authTypes || []) : []
     const initialApiAccessTypes = (condition && condition?.type === 'API_ACCESS_TYPES') ? (condition?.data?.apiAccessTypes || []) : []
     const [regexText, setRegexText] = useState(initialRegexText)
     const [hostRegexText, setHostRegexText] = useState(initialHostRegexText)
     const [tagsText, setTagsText] = useState(initialTagsText)
+    const [apiTagsText, setApiTagsText] = useState(initialApiTagsText)
     const [selectedAuthTypes, setSelectedAuthTypes] = useState(initialAuthTypes)
     const [selectedApiAccessTypes, setSelectedApiAccessTypes] = useState(initialApiAccessTypes)
     const dashboardCategory = PersistStore(state => state.dashboardCategory)
@@ -185,6 +187,8 @@ function CollectionComponent(props) {
                 return {}
             case "TAGS":
                 return {}
+            case "API_TAGS":
+                return {}
             case "AUTH_TYPE":
                 return {authTypes:[]}
             case "API_ACCESS_TYPES":
@@ -214,8 +218,12 @@ function CollectionComponent(props) {
                 value: 'HOST_REGEX'
             },
             {
-                label: 'Tags',
+                label: 'Collection Tags',
                 value: 'TAGS'
+            },
+            {
+                label: 'API Tags',
+                value: 'API_TAGS'
             },
             {
                 label: 'Auth Type',
@@ -245,6 +253,11 @@ function CollectionComponent(props) {
 
     const handleTagsText = (val) => {
         setTagsText(val)
+        dispatch({ type: "overwrite", index: index, key: "data", obj: {"query":val } })
+    }
+
+    const handleApiTagsText = (val) => {
+        setApiTagsText(val)
         dispatch({ type: "overwrite", index: index, key: "data", obj: {"query":val } })
     }
 
@@ -285,6 +298,10 @@ function CollectionComponent(props) {
             case "TAGS":
                 return(
                     <TextField onChange={(val) => handleTagsText(val)} value={tagsText} />
+                )
+            case "API_TAGS":
+                return(
+                    <TextField onChange={(val) => handleApiTagsText(val)} value={apiTagsText} />
                 )
             case "AUTH_TYPE":
                 return(

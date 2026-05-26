@@ -281,6 +281,7 @@ public class DaoInit {
         ClassModel<RegexTestingEndpoints> regexTestingEndpointsClassModel = ClassModel.builder(RegexTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<HostRegexTestingEndpoints> hostRegexTestingEndpointsClassModel = ClassModel.builder(HostRegexTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<TagsTestingEndpoints> tagsTestingEndpointsClassModel = ClassModel.builder(TagsTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<ApiTagsTestingEndpoints> apiTagsTestingEndpointsClassModel = ClassModel.builder(ApiTagsTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<AuthTypeTestingEndpoints> authTypeTestingEndpointsClassModel = ClassModel.builder(AuthTypeTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<MultiCollectionTestingEndpoints> multiCollectionTestingEndpointsClassModel = ClassModel.builder(MultiCollectionTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<DependencyNode> dependencyNodeClassModel = ClassModel.builder(DependencyNode.class).enableDiscriminator(true).build();
@@ -380,6 +381,7 @@ public class DaoInit {
                 cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
                 methodConditionClassModel, regexTestingEndpointsClassModel, hostRegexTestingEndpointsClassModel,
                 tagsTestingEndpointsClassModel, authTypeTestingEndpointsClassModel, multiCollectionTestingEndpointsClassModel, allTestingEndpointsClassModel,
+                apiTagsTestingEndpointsClassModel,
                 UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel,
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel,
                 paramInfoClassModel,

@@ -22,6 +22,7 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.type.URLMethods;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dto.billing.FeatureAccess;
@@ -142,8 +143,8 @@ public class SkillsRiskScoreSyncCron {
 
                             loggerMaker.infoAndAddToDb("Skills malicious events count: " + apiInfoKeyToRiskScore.size());
 
-                            List<ApiInfo.ApiInfoTag> maliciousTags = Collections.singletonList(
-                                new ApiInfo.ApiInfoTag("malicious-skill", "true")
+                            List<CollectionTags> maliciousTags = Collections.singletonList(
+                                new CollectionTags(Context.now(), "malicious-skill", "true", CollectionTags.TagSource.AKTO)
                             );
 
                             List<WriteModel<ApiInfo>> updates = new ArrayList<>();
