@@ -14,22 +14,31 @@ public class GuardrailsServiceLogsDao extends LogsDao {
     public static final GuardrailsServiceLogsDao instance = new GuardrailsServiceLogsDao();
 
     public void createIndicesIfAbsent() {
-        boolean exists = false;
         String dbName = Context.accountId.get() + "";
+        if (clients == null || clients.length == 0 || clients[0] == null) {
+            return;
+        }
         MongoDatabase db = clients[0].getDatabase(dbName);
-
-        for (String col : db.listCollectionNames()) {
-            if (getCollName().equalsIgnoreCase(col)) {
-                exists = true;
-                break;
-            }
+        if (db == null) {
+            return;
         }
 
-        if (!exists) {
+        try {
             if (DbMode.allowCappedCollections()) {
-                db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(maxDocuments).sizeInBytes(sizeInBytes));
+                db.createCollection(
+                    getCollName(),
+                    new CreateCollectionOptions()
+                        .capped(true)
+                        .maxDocuments(maxDocuments)
+                        .sizeInBytes(sizeInBytes)
+                );
             } else {
                 db.createCollection(getCollName());
+            }
+        } catch (com.mongodb.MongoCommandException e) {
+            // NamespaceExists = collection already exists
+            if (e.getErrorCode() != 48) {
+                throw e;
             }
         }
 
