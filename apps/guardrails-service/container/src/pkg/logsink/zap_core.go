@@ -2,12 +2,13 @@ package logsink
 
 import (
 	"fmt"
+	"strings"
 
 	"go.uber.org/zap/zapcore"
 )
 
-// Millisecond precision in stored log text; API timestamp field stays epoch seconds.
-const logTimeLayout = "2006-01-02 15:04:05.000"
+// Nanosecond precision in stored log text; API timestamp field stays epoch seconds.
+const logTimeLayout = "2006-01-02 15:04:05.000000000"
 
 type dbCore struct {
 	level zapcore.Level
@@ -39,36 +40,47 @@ func (c *dbCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
 		return nil
 	}
 
-	line := ent.Message
+	var fieldMap map[string]interface{}
 	if len(fields) > 0 {
 		enc := zapcore.NewMapObjectEncoder()
 		for _, f := range fields {
 			f.AddTo(enc)
 		}
-		line = fmt.Sprintf("%s %v", ent.Message, enc.Fields)
+		fieldMap = enc.Fields
 	}
 
 	c.sink.Enqueue(Entry{
-		Message:   formatDBLogMessage(ent, line),
+		Message:   formatDBLogMessage(ent, ent.Message, fieldMap),
 		Key:       levelToKey(ent.Level),
 		Timestamp: int(ent.Time.Unix()),
 	})
 	return nil
 }
 
-func formatDBLogMessage(ent zapcore.Entry, line string) string {
+// formatDBLogMessage builds the stored log line: "<time> <message> [key=value ...]".
+// Level and logger name are omitted here; they are stored separately in the log key field.
+func formatDBLogMessage(ent zapcore.Entry, message string, fields map[string]interface{}) string {
 	timeStr := ent.Time.Format(logTimeLayout)
-	levelStr := ent.Level.CapitalString()
-
-	if ent.Caller.Defined {
-		return fmt.Sprintf("%s\t%s\t%s\t%s", timeStr, levelStr, ent.Caller.TrimmedPath(), line)
+	line := strings.TrimSpace(message)
+	if extra := formatLogFields(fields); extra != "" {
+		if line == "" {
+			line = extra
+		} else {
+			line = line + " " + extra
+		}
 	}
+	return timeStr + " " + line
+}
 
-	loggerName := ent.LoggerName
-	if loggerName == "" {
-		loggerName = "guardrails-service"
+func formatLogFields(fields map[string]interface{}) string {
+	if len(fields) == 0 {
+		return ""
 	}
-	return fmt.Sprintf("%s\t%s\t%s\t%s", timeStr, levelStr, loggerName, line)
+	parts := make([]string, 0, len(fields))
+	for key, val := range fields {
+		parts = append(parts, fmt.Sprintf("%s=%v", key, val))
+	}
+	return strings.Join(parts, " ")
 }
 
 func (c *dbCore) Sync() error {
