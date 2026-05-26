@@ -11,8 +11,9 @@ import { LicenseManager, themeQuartz, AllEnterpriseModule } from "ag-grid-enterp
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import SkillsFlyout from "./SkillsFlyout";
-import DeviceFlyout, { AGENT_RISK_DATA } from "./DeviceFlyout";
+import DeviceFlyout from "./DeviceFlyout";
 import McpFlyout from "./McpFlyout";
+import { AGENT_RISK_DATA, STAT_SPARKLINES, OS_TREND, VIOLATIONS_BY_SEVERITY, DEVICE_FLAT_DATA, USER_FLAT_DATA, devicesByUsername } from "./agenticDummyData";
 
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
@@ -52,146 +53,6 @@ const myThemeInner = myTheme.withParams({
 // ─── Chart data ─────────────────────────────────────────────────────────────
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
-const STAT_SPARKLINES = {
-    endpoints: [4200,4500,4800,5100,5300,5500,5700,5900,6000,6100,6350,6403],
-    users:     [2800,3000,3200,3400,3500,3700,3800,3900,4000,4050,4150,4203],
-    violations:[800, 850, 900, 950,1000,1050,1100,1150,1200,1280,1370,1400],
-};
-
-const OS_TREND = {
-    mac:     [2500,2700,2900,3100,3200,3300,3500,3600,3700,3800,3900,4000],
-    windows: [1200,1250,1300,1350,1400,1450,1500,1550,1600,1650,1700,1800],
-    linux:   [500, 550, 600, 650, 700, 750, 700, 750, 700, 650, 750, 603],
-};
-
-const VIOLATIONS_BY_SEVERITY = [
-    { name: "Critical", y: 450, color: "#DC2626" },
-    { name: "High",     y: 380, color: "#F97316" },
-    { name: "Medium",   y: 320, color: "#EAB308" },
-    { name: "Low",      y: 250, color: "#D1D5DB" },
-];
-
-// ─── Dummy data ──────────────────────────────────────────────────────────────
-
-const DEVICE_FLAT_DATA = [
-    { path: ["NYC-JDOE-MAC01"], endpoint: "NYC-JDOE-MAC01", os: "mac", userCount: 5, riskScore: 4.8, username: "John Doe", group: "Engineering", role: "Software Engineer", violations: { critical:2, high:0, medium:0, low:0 }, lastTraffic: "2h ago", hasPersonalAccount: true },
-    { path: ["NYC-JDOE-WIN11"], endpoint: "NYC-JDOE-WIN11", os: "windows", userCount: 2, riskScore: 3.2, username: "John Doe", group: "Engineering", role: "Software Engineer", violations: { critical:0, high:0, medium:1, low:0 }, lastTraffic: "1d ago" },
-    { path: ["NYC-JDOE-WIN11","copilot365-jdoe"], endpoint: "Microsoft Copilot 365", type: "AI Agent" },
-    { path: ["NYC-JDOE-WIN11","mcp-github-jdoe"], endpoint: "github-mcp",            type: "MCP Server" },
-    { path: ["NYC-JDOE-WIN11","gpt4-jdoe"],       endpoint: "GPT-4o",                type: "LLM" },
-    { path: ["NYC-JDOE-MAC01","cursor-cli"],     endpoint: "Cursor CLI",             type: "AI Agent",   skillCount: 1   },
-    { path: ["NYC-JDOE-MAC01","cursor-code"],    endpoint: "Cursor code",            type: "AI Agent",   skillCount: 407 },
-    { path: ["NYC-JDOE-MAC01","mcp-akto"],       endpoint: "mcp.akto.io",            type: "MCP Server"                  },
-    { path: ["NYC-JDOE-MAC01","chatgpt"],        endpoint: "ChatGPT",                type: "AI Agent"                    },
-    { path: ["NYC-JDOE-MAC01","razorpay-stdio"], endpoint: "razorpay-stdio",         type: "MCP Server"                  },
-    { path: ["NYC-JDOE-MAC01","gemini"],         endpoint: "gemini",                 type: "LLM"                         },
-
-    { path: ["BER-TSMITH-MAC02"], endpoint: "BER-TSMITH-MAC02", os: "mac", userCount: 23, riskScore: 4.7, username: "Traun Smith", group: "Engineering", role: "Frontend Developer", violations: { critical:1, high:1, medium:3, low:2 }, lastTraffic: "45m ago", hasPersonalAccount: true },
-    { path: ["BER-TSMITH-MAC02","vscode"],         endpoint: "VS Code",        type: "AI Agent",   skillCount: 12 },
-    { path: ["BER-TSMITH-MAC02","github-copilot"], endpoint: "GitHub Copilot", type: "AI Agent"                   },
-    { path: ["BER-TSMITH-MAC02","mcp-github"],     endpoint: "github-mcp",     type: "MCP Server"                 },
-
-    { path: ["SF-MWILSON-WIN10"], endpoint: "SF-MWILSON-WIN10", os: "windows", userCount: 23, riskScore: 4.5, username: "Mark Wilson", group: "Human Resources", role: "Lead HR", violations: { critical:2, high:4, medium:0, low:1 }, lastTraffic: "1d ago" },
-    { path: ["SF-MWILSON-MAC01"], endpoint: "SF-MWILSON-MAC01", os: "mac", userCount: 1, riskScore: 2.8, username: "Mark Wilson", group: "Human Resources", role: "Lead HR", violations: { critical:0, high:0, medium:0, low:1 }, lastTraffic: "3d ago" },
-    { path: ["SF-MWILSON-MAC01","claude-mwilson"], endpoint: "Claude Desktop", type: "AI Agent" },
-    { path: ["SF-MWILSON-MAC01","mcp-notion-mw"],  endpoint: "notion-mcp",     type: "MCP Server" },
-    { path: ["SF-MWILSON-WIN10","copilot365"],     endpoint: "Microsoft Copilot 365", type: "AI Agent"   },
-    { path: ["SF-MWILSON-WIN10","teams-bot"],      endpoint: "Teams AI Bot",          type: "AI Agent"   },
-    { path: ["SF-MWILSON-WIN10","mcp-sharepoint"], endpoint: "sharepoint-mcp",        type: "MCP Server" },
-    { path: ["SF-MWILSON-WIN10","gpt4"],           endpoint: "GPT-4o",                type: "LLM"        },
-
-    { path: ["BER-DWILSON-MAC02"], endpoint: "BER-DWILSON-MAC02", os: "mac", userCount: 10, riskScore: 4.5, username: "David Wilson", group: "Engineering", role: "Full Stack Developer", violations: { critical:0, high:1, medium:0, low:0 }, lastTraffic: "3h ago" },
-    { path: ["BER-DWILSON-MAC02","claude-desktop"], endpoint: "Claude Desktop",    type: "AI Agent",   skillCount: 23 },
-    { path: ["BER-DWILSON-MAC02","mcp-slack"],      endpoint: "slack-mcp",         type: "MCP Server"               },
-    { path: ["BER-DWILSON-MAC02","mcp-jira"],       endpoint: "jira-mcp",          type: "MCP Server"               },
-    { path: ["BER-DWILSON-MAC02","claude-3"],       endpoint: "claude-3.7-sonnet", type: "LLM"                      },
-
-    { path: ["SF-STAYLOR-MAC01"], endpoint: "SF-STAYLOR-MAC01", os: "mac", userCount: 30, riskScore: 4.5, username: "Sarah Taylor", group: "Engineering", role: "DevOps Engineer", violations: { critical:0, high:0, medium:0, low:5 }, lastTraffic: "6h ago" },
-    { path: ["SF-STAYLOR-MAC01","cursor-ai"], endpoint: "Cursor AI",      type: "AI Agent",   skillCount: 88 },
-    { path: ["SF-STAYLOR-MAC01","mcp-k8s"],   endpoint: "kubernetes-mcp", type: "MCP Server"               },
-    { path: ["SF-STAYLOR-MAC01","mcp-aws"],   endpoint: "aws-mcp",        type: "MCP Server"               },
-    { path: ["SF-STAYLOR-MAC01","gpt4-mini"], endpoint: "GPT-4o-mini",    type: "LLM"                      },
-
-    { path: ["SF-LTHOMAS-MAC02"], endpoint: "SF-LTHOMAS-MAC02", os: "mac", userCount: 20, riskScore: 4.3, username: "Linda Thomas", group: "Engineering", role: "QA Engineer", violations: { critical:1, high:2, medium:1, low:0 }, lastTraffic: "6h ago" },
-    { path: ["SF-LTHOMAS-MAC02","playwright-ai"], endpoint: "Playwright AI", type: "AI Agent", skillCount: 5 },
-    { path: ["SF-LTHOMAS-MAC02","gemini-pro"],    endpoint: "gemini-pro",    type: "LLM"                   },
-
-    { path: ["SF-RCLARK-MAC01"], endpoint: "SF-RCLARK-MAC01", os: "mac", userCount: 19, riskScore: 4.3, username: "Robert Clark", group: "Engineering", role: "Mobile App Developer", violations: { critical:0, high:1, medium:0, low:0 }, lastTraffic: "6h ago" },
-    { path: ["SF-RCLARK-MAC01","cursor-ai2"],   endpoint: "Cursor AI",   type: "AI Agent",   skillCount: 14 },
-    { path: ["SF-RCLARK-MAC01","mcp-xcode"],    endpoint: "xcode-mcp",   type: "MCP Server"               },
-    { path: ["SF-RCLARK-MAC01","claude-haiku"], endpoint: "claude-haiku",type: "LLM"                      },
-
-    { path: ["SF-JLEWIS-WIN10"], endpoint: "SF-JLEWIS-WIN10", os: "windows", userCount: 34, riskScore: 4.3, username: "Jennifer Lewis", group: "Engineering", role: "Data Engineer", violations: { critical:4, high:1, medium:0, low:0 }, lastTraffic: "6h ago", hasPersonalAccount: true },
-    { path: ["SF-JLEWIS-LIN01"], endpoint: "SF-JLEWIS-LIN01", os: "linux", userCount: 5, riskScore: 3.1, username: "Jennifer Lewis", group: "Engineering", role: "Data Engineer", violations: { critical:0, high:1, medium:0, low:0 }, lastTraffic: "2d ago" },
-    { path: ["SF-JLEWIS-LIN01","jupyter-jlewis"],  endpoint: "Jupyter AI",    type: "AI Agent",   skillCount: 4 },
-    { path: ["SF-JLEWIS-LIN01","ollama-jlewis"],   endpoint: "Ollama",        type: "LLM" },
-    { path: ["SF-JLEWIS-LIN01","mcp-pg-jlewis"],   endpoint: "postgres-mcp",  type: "MCP Server" },
-    { path: ["SF-JLEWIS-MAC01"], endpoint: "SF-JLEWIS-MAC01", os: "mac", userCount: 3, riskScore: 2.4, username: "Jennifer Lewis", group: "Engineering", role: "Data Engineer", violations: { critical:0, high:0, medium:1, low:0 }, lastTraffic: "5d ago" },
-    { path: ["SF-JLEWIS-MAC01","cursor-jlewis"],   endpoint: "Cursor AI",     type: "AI Agent",   skillCount: 6 },
-    { path: ["SF-JLEWIS-MAC01","claude-jlewis"],   endpoint: "claude-3.7-sonnet", type: "LLM" },
-    { path: ["SF-JLEWIS-WIN10","copilot-data"],   endpoint: "GitHub Copilot", type: "AI Agent"   },
-    { path: ["SF-JLEWIS-WIN10","mcp-databricks"], endpoint: "databricks-mcp", type: "MCP Server" },
-    { path: ["SF-JLEWIS-WIN10","gpt4-data"],      endpoint: "GPT-4o",         type: "LLM"        },
-
-    { path: ["SF-WHALL-WIN10"], endpoint: "SF-WHALL-WIN10", os: "windows", userCount: 19, riskScore: 4.1, username: "William Hall", group: "Engineering", role: "Product Manager", violations: { critical:0, high:0, medium:1, low:0 }, lastTraffic: "6h ago" },
-    { path: ["SF-WHALL-WIN10","copilot365-pm"], endpoint: "Microsoft Copilot 365", type: "AI Agent"   },
-    { path: ["SF-WHALL-WIN10","mcp-notion"],    endpoint: "notion-mcp",            type: "MCP Server" },
-
-    { path: ["SF-PYOUNG-WIN10"], endpoint: "SF-PYOUNG-WIN10", os: "windows", userCount: 3, riskScore: 4.1, username: "Patricia Young", group: "Finance", role: "Finance Manager", violations: { critical:0, high:0, medium:1, low:1 }, lastTraffic: "6h ago" },
-    { path: ["SF-PYOUNG-WIN10","copilot365-fin"], endpoint: "Microsoft Copilot 365", type: "AI Agent"   },
-    { path: ["SF-PYOUNG-WIN10","mcp-sap"],        endpoint: "sap-mcp",               type: "MCP Server" },
-
-    { path: ["SF-CKING-MAC01"], endpoint: "SF-CKING-MAC01", os: "mac", userCount: 1, riskScore: 4.1, username: "Charles King", group: "Finance", role: "Finance Manager", violations: { critical:0, high:0, medium:1, low:1 }, lastTraffic: "6h ago" },
-    { path: ["SF-CKING-MAC01","claude-fin"],      endpoint: "Claude Desktop", type: "AI Agent"   },
-    { path: ["SF-CKING-MAC01","mcp-quickbooks"],  endpoint: "quickbooks-mcp", type: "MCP Server" },
-
-    { path: ["NYC-JANDERSON-MAC01"], endpoint: "NYC-JANDERSON-MAC01", os: "mac", userCount: 4, riskScore: 3.8, username: "James Anderson", group: "Engineering", role: "VP of Engineering", violations: { critical:0, high:0, medium:2, low:0 }, lastTraffic: "5h ago" },
-    { path: ["NYC-JANDERSON-MAC01","cursor-vp"],  endpoint: "Cursor AI",  type: "AI Agent",   skillCount: 9 },
-    { path: ["NYC-JANDERSON-MAC01","mcp-linear"], endpoint: "linear-mcp", type: "MCP Server"              },
-    { path: ["NYC-JANDERSON-MAC01","gpt4-vp"],    endpoint: "GPT-4o",     type: "LLM"                     },
-
-    { path: ["LON-RJOHNSON-WIN11"], endpoint: "LON-RJOHNSON-WIN11", os: "windows", userCount: 15, riskScore: 3.8, username: "Robert Johnson", group: "Sales", role: "Sales Engineer", violations: { critical:0, high:1, medium:2, low:4 }, lastTraffic: "12h ago" },
-    { path: ["LON-RJOHNSON-WIN11","copilot-win"], endpoint: "Microsoft Copilot", type: "AI Agent"   },
-    { path: ["LON-RJOHNSON-WIN11","mcp-crm"],     endpoint: "salesforce-mcp",   type: "MCP Server" },
-
-    { path: ["TKY-AMATSUDA-LIN01"], endpoint: "TKY-AMATSUDA-LIN01", os: "linux", userCount: 8, riskScore: 2.1, username: "Akira Matsuda", group: "Data Science", role: "ML Engineer", violations: { critical:0, high:0, medium:1, low:1 }, lastTraffic: "2d ago" },
-    { path: ["TKY-AMATSUDA-LIN01","jupyter-ai"],  endpoint: "Jupyter AI",   type: "AI Agent",   skillCount: 3 },
-    { path: ["TKY-AMATSUDA-LIN01","ollama"],       endpoint: "Ollama",       type: "LLM"                     },
-    { path: ["TKY-AMATSUDA-LIN01","mcp-postgres"], endpoint: "postgres-mcp", type: "MCP Server"              },
-];
-
-// Build lookups: username → all device rows (array), device path → child count
-const devicesByUsername = {};
-const deviceChildCount = {};
-
-DEVICE_FLAT_DATA.forEach(row => {
-    if (row.path.length === 1 && row.username) {
-        if (!devicesByUsername[row.username]) devicesByUsername[row.username] = [];
-        devicesByUsername[row.username].push(row);
-    }
-    if (row.path.length === 2) {
-        const id = row.path[0];
-        deviceChildCount[id] = (deviceChildCount[id] || 0) + 1;
-    }
-});
-
-const USER_FLAT_DATA = [
-    { path: ["john-doe"],       username: "John Doe",       riskScore: 4.8, group: "Engineering",    role: "Software Engineer",   violations: { critical:2, high:0, medium:0, low:0 }, lastTraffic: "2h ago",  hasPersonalAccount: true },
-    { path: ["traun-smith"],    username: "Traun Smith",    riskScore: 4.7, group: "Engineering",    role: "Frontend Developer",  violations: { critical:1, high:1, medium:3, low:2 }, lastTraffic: "45m ago", hasPersonalAccount: true },
-    { path: ["mark-wilson"],    username: "Mark Wilson",    riskScore: 4.5, group: "Human Resources",role: "Lead HR",             violations: { critical:2, high:4, medium:0, low:1 }, lastTraffic: "1d ago"  },
-    { path: ["david-wilson"],   username: "David Wilson",   riskScore: 4.5, group: "Engineering",    role: "Full Stack Developer",violations: { critical:0, high:1, medium:0, low:0 }, lastTraffic: "3h ago"  },
-    { path: ["sarah-taylor"],   username: "Sarah Taylor",   riskScore: 4.5, group: "Engineering",    role: "DevOps Engineer",     violations: { critical:0, high:0, medium:0, low:5 }, lastTraffic: "6h ago"  },
-    { path: ["linda-thomas"],   username: "Linda Thomas",   riskScore: 4.3, group: "Engineering",    role: "QA Engineer",         violations: { critical:1, high:2, medium:1, low:0 }, lastTraffic: "6h ago"  },
-    { path: ["robert-clark"],   username: "Robert Clark",   riskScore: 4.3, group: "Engineering",    role: "Mobile App Developer",violations: { critical:0, high:1, medium:0, low:0 }, lastTraffic: "6h ago"  },
-    { path: ["jennifer-lewis"], username: "Jennifer Lewis", riskScore: 4.3, group: "Engineering",    role: "Data Engineer",       violations: { critical:4, high:1, medium:0, low:0 }, lastTraffic: "6h ago",  hasPersonalAccount: true },
-    { path: ["william-hall"],   username: "William Hall",   riskScore: 4.1, group: "Engineering",    role: "Product Manager",     violations: { critical:0, high:0, medium:1, low:0 }, lastTraffic: "6h ago"  },
-    { path: ["patricia-young"], username: "Patricia Young", riskScore: 4.1, group: "Finance",        role: "Finance Manager",     violations: { critical:0, high:0, medium:1, low:1 }, lastTraffic: "6h ago"  },
-    { path: ["charles-king"],   username: "Charles King",   riskScore: 4.1, group: "Finance",        role: "Finance Manager",     violations: { critical:0, high:0, medium:1, low:1 }, lastTraffic: "6h ago"  },
-    { path: ["james-anderson"], username: "James Anderson", riskScore: 3.8, group: "Engineering",    role: "VP of Engineering",   violations: { critical:0, high:0, medium:2, low:0 }, lastTraffic: "5h ago"  },
-    { path: ["robert-johnson"], username: "Robert Johnson", riskScore: 3.8, group: "Sales",          role: "Sales Engineer",      violations: { critical:0, high:1, medium:2, low:4 }, lastTraffic: "12h ago" },
-    { path: ["akira-matsuda"],  username: "Akira Matsuda",  riskScore: 2.1, group: "Data Science",   role: "ML Engineer",         violations: { critical:0, high:0, medium:1, low:1 }, lastTraffic: "2d ago"  },
-];
 
 // ─── Chart configs ───────────────────────────────────────────────────────────
 

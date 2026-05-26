@@ -6,6 +6,7 @@ import { CustomersMinor, AutomationMajor, MagicMajor } from "@shopify/polaris-ic
 import ReactFlow, { Handle, Position, Background } from "react-flow-renderer";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import AiChatSection from "./AiChatSection";
+import { AGENT_RISK_DATA, VIOLATION_TEMPLATES, REL_TIMES, generateViolations } from "./agenticDummyData";
 import "../../../components/layouts/style.css";
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
@@ -30,64 +31,6 @@ const gridTheme = themeQuartz.withParams({
     headerFontWeight: 500,
     checkboxBorderRadius: 4,
 });
-
-// ─── Per-agent risk lookup (exported for DeviceEndpoints valueGetters) ────────
-
-export const AGENT_RISK_DATA = {
-    "NYC-JDOE-MAC01/cursor-cli":          { riskScore: 1.2, violations: null },
-    "NYC-JDOE-MAC01/cursor-code":         { riskScore: 3.8, violations: { critical:0, high:1, medium:0, low:0 } },
-    "NYC-JDOE-MAC01/mcp-akto":            { riskScore: 4.1, violations: { critical:1, high:0, medium:0, low:0 } },
-    "NYC-JDOE-MAC01/chatgpt":             { riskScore: 2.5, violations: null },
-    "NYC-JDOE-MAC01/razorpay-stdio":      { riskScore: 4.5, violations: { critical:1, high:1, medium:0, low:0 } },
-    "NYC-JDOE-MAC01/gemini":              { riskScore: 1.8, violations: null },
-    "NYC-JDOE-WIN11/copilot365-jdoe":     { riskScore: 2.1, violations: null },
-    "NYC-JDOE-WIN11/mcp-github-jdoe":     { riskScore: 3.2, violations: null },
-    "NYC-JDOE-WIN11/gpt4-jdoe":           { riskScore: 1.9, violations: null },
-    "BER-TSMITH-MAC02/vscode":            { riskScore: 2.3, violations: { critical:0, high:1, medium:0, low:0 } },
-    "BER-TSMITH-MAC02/github-copilot":    { riskScore: 1.9, violations: null },
-    "BER-TSMITH-MAC02/mcp-github":        { riskScore: 3.2, violations: { critical:1, high:0, medium:1, low:0 } },
-    "SF-MWILSON-WIN10/copilot365":        { riskScore: 2.1, violations: null },
-    "SF-MWILSON-WIN10/teams-bot":         { riskScore: 1.8, violations: null },
-    "SF-MWILSON-WIN10/mcp-sharepoint":    { riskScore: 3.5, violations: { critical:2, high:2, medium:0, low:0 } },
-    "SF-MWILSON-WIN10/gpt4":              { riskScore: 2.0, violations: null },
-    "SF-MWILSON-MAC01/claude-mwilson":    { riskScore: 1.5, violations: null },
-    "SF-MWILSON-MAC01/mcp-notion-mw":     { riskScore: 2.1, violations: null },
-    "BER-DWILSON-MAC02/claude-desktop":   { riskScore: 2.8, violations: null },
-    "BER-DWILSON-MAC02/mcp-slack":        { riskScore: 2.4, violations: null },
-    "BER-DWILSON-MAC02/mcp-jira":         { riskScore: 2.0, violations: { critical:0, high:1, medium:0, low:0 } },
-    "BER-DWILSON-MAC02/claude-3":         { riskScore: 1.6, violations: null },
-    "SF-STAYLOR-MAC01/cursor-ai":         { riskScore: 3.1, violations: { critical:0, high:0, medium:0, low:3 } },
-    "SF-STAYLOR-MAC01/mcp-k8s":           { riskScore: 4.2, violations: { critical:0, high:0, medium:0, low:2 } },
-    "SF-STAYLOR-MAC01/mcp-aws":           { riskScore: 4.3, violations: null },
-    "SF-STAYLOR-MAC01/gpt4-mini":         { riskScore: 1.7, violations: null },
-    "SF-LTHOMAS-MAC02/playwright-ai":     { riskScore: 2.8, violations: { critical:1, high:2, medium:1, low:0 } },
-    "SF-LTHOMAS-MAC02/gemini-pro":        { riskScore: 1.6, violations: null },
-    "SF-RCLARK-MAC01/cursor-ai2":         { riskScore: 2.5, violations: { critical:0, high:1, medium:0, low:0 } },
-    "SF-RCLARK-MAC01/mcp-xcode":          { riskScore: 2.9, violations: null },
-    "SF-RCLARK-MAC01/claude-haiku":       { riskScore: 1.4, violations: null },
-    "SF-JLEWIS-WIN10/copilot-data":       { riskScore: 2.4, violations: null },
-    "SF-JLEWIS-WIN10/mcp-databricks":     { riskScore: 4.0, violations: { critical:4, high:1, medium:0, low:0 } },
-    "SF-JLEWIS-WIN10/gpt4-data":          { riskScore: 2.1, violations: null },
-    "SF-JLEWIS-LIN01/jupyter-jlewis":     { riskScore: 2.2, violations: null },
-    "SF-JLEWIS-LIN01/ollama-jlewis":      { riskScore: 1.3, violations: null },
-    "SF-JLEWIS-LIN01/mcp-pg-jlewis":      { riskScore: 3.4, violations: { critical:0, high:1, medium:0, low:0 } },
-    "SF-JLEWIS-MAC01/cursor-jlewis":      { riskScore: 1.9, violations: null },
-    "SF-JLEWIS-MAC01/claude-jlewis":      { riskScore: 1.4, violations: null },
-    "SF-WHALL-WIN10/copilot365-pm":       { riskScore: 2.0, violations: null },
-    "SF-WHALL-WIN10/mcp-notion":          { riskScore: 2.2, violations: { critical:0, high:0, medium:1, low:0 } },
-    "SF-PYOUNG-WIN10/copilot365-fin":     { riskScore: 2.3, violations: null },
-    "SF-PYOUNG-WIN10/mcp-sap":            { riskScore: 3.9, violations: { critical:0, high:0, medium:1, low:1 } },
-    "SF-CKING-MAC01/claude-fin":          { riskScore: 2.8, violations: null },
-    "SF-CKING-MAC01/mcp-quickbooks":      { riskScore: 4.1, violations: { critical:0, high:0, medium:1, low:1 } },
-    "NYC-JANDERSON-MAC01/cursor-vp":      { riskScore: 2.5, violations: null },
-    "NYC-JANDERSON-MAC01/mcp-linear":     { riskScore: 2.1, violations: { critical:0, high:0, medium:1, low:0 } },
-    "NYC-JANDERSON-MAC01/gpt4-vp":        { riskScore: 1.9, violations: null },
-    "LON-RJOHNSON-WIN11/copilot-win":     { riskScore: 2.2, violations: null },
-    "LON-RJOHNSON-WIN11/mcp-crm":         { riskScore: 3.0, violations: { critical:0, high:1, medium:2, low:4 } },
-    "TKY-AMATSUDA-LIN01/jupyter-ai":      { riskScore: 1.8, violations: null },
-    "TKY-AMATSUDA-LIN01/ollama":          { riskScore: 1.2, violations: null },
-    "TKY-AMATSUDA-LIN01/mcp-postgres":    { riskScore: 2.8, violations: { critical:0, high:0, medium:1, low:1 } },
-};
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -229,49 +172,6 @@ function computeRiskFactors(device, agents) {
         });
     }
     return factors;
-}
-
-// ─── Dummy violations generator ───────────────────────────────────────────────
-
-const VIOLATION_TEMPLATES = {
-    critical: [
-        { title: "Unauthorized API Key Exposure", description: "Agent transmitted a plaintext API key in request payload to an external service granting write access to production infrastructure." },
-        { title: "PII Sent to External LLM", description: "Customer PII (email, phone) was included in a prompt sent to a third-party LLM without redaction or consent." },
-        { title: "Financial Transaction Without Authorization", description: "Agent invoked payment API to initiate a transaction without explicit user confirmation." },
-        { title: "Credential Exfiltration Attempt", description: "Agent attempted to read system credential store and forward contents to an external endpoint." },
-    ],
-    high: [
-        { title: "Excessive Database Query Scope", description: "Agent executed a full-table scan on `users` (1.2M rows) without WHERE clause, violating least privilege." },
-        { title: "Shadow IT: Unauthorized SaaS Auth", description: "Personal account credentials used to authenticate an agent session. Corporate data may have been uploaded externally." },
-        { title: "Prompt Injection Detected", description: "A prompt injection payload was detected in tool call arguments. Agent may have been manipulated by adversarial content." },
-        { title: "Overprivileged Tool Invocation", description: "Agent invoked `admin_delete_user` outside its stated purpose. No business justification was logged." },
-    ],
-    medium: [
-        { title: "Unusual Invocation Pattern", description: "Agent invoked the same tool 47 times within 2 minutes, consistent with automated enumeration or data scraping." },
-        { title: "Missing Rate Limit Compliance", description: "Agent continued making API calls after receiving HTTP 429 responses, bypassing rate limiting." },
-    ],
-    low: [
-        { title: "Deprecated Tool Version Used", description: "Agent is calling a deprecated tool version. Upgrade for improved security controls." },
-        { title: "Verbose Logging of Sensitive Fields", description: "Debug logs include response payloads containing authentication tokens." },
-    ],
-};
-
-const REL_TIMES = ["2m ago","17m ago","1h ago","3h ago","6h ago","12h ago","1d ago","2d ago"];
-
-function generateViolations(device, agents) {
-    const rows = [];
-    let t = 0;
-    const add = (sev, idx) => {
-        const tpls = VIOLATION_TEMPLATES[sev] || VIOLATION_TEMPLATES.low;
-        const tpl = tpls[idx % tpls.length];
-        const ag = agents[(idx * 2) % Math.max(agents.length, 1)];
-        rows.push({ id: rows.length, severity: sev, title: tpl.title, description: tpl.description, agent: ag?.endpoint || "Unknown", agentType: ag?.type || "AI Agent", time: REL_TIMES[t++ % REL_TIMES.length] });
-    };
-    for (let i = 0; i < (device.violations?.critical || 0); i++) add("critical", i);
-    for (let i = 0; i < (device.violations?.high    || 0); i++) add("high",     i);
-    for (let i = 0; i < (device.violations?.medium  || 0); i++) add("medium",   i);
-    for (let i = 0; i < (device.violations?.low     || 0); i++) add("low",      i);
-    return rows;
 }
 
 // ─── Cell renderers for AG Grid ───────────────────────────────────────────────

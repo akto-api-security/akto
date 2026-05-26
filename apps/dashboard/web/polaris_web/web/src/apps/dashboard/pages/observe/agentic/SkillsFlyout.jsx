@@ -6,6 +6,7 @@ import { ChevronDownMinor } from "@shopify/polaris-icons";
 import AiChatSection from "./AiChatSection";
 import SampleDataComponent from "../../../components/shared/SampleDataComponent";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
+import { generateSkills, DUMMY_SKILL_SAMPLE, SKILL_SCHEMA_PARAMS, SKILL_VIOLATION_ROWS } from "./agenticDummyData";
 import "../../../components/layouts/style.css";
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
@@ -30,63 +31,6 @@ const gridTheme = themeQuartz.withParams({
     headerFontWeight: 500,
     checkboxBorderRadius: 4,
 });
-
-// ─── Dummy skill data ─────────────────────────────────────────────────────────
-
-const BASE_SKILL_NAMES = [
-    "Generate Snapshot", "Design a Framework", "Construct a Prototype",
-    "Craft a Snapshot", "Collect Insights", "Compile an Overview",
-    "Generate an Analysis Report", "Summarize Findings", "Draft a Proposal",
-    "Examine Data", "Prepare Documentation", "Master Testing Techniques",
-    "Run Diagnostic", "Deploy Service", "Query Database", "Execute Script",
-    "Fetch Credentials", "Parse Config", "Validate Schema", "Export Report",
-    "Sync Repository", "Trigger Pipeline", "Scan Endpoints", "Audit Logs",
-    "Monitor Resources", "Rotate Secrets", "Invoke Lambda", "List Buckets",
-];
-
-function generateSkills(total) {
-    return Array.from({ length: total }, (_, i) => ({
-        id: i,
-        name: BASE_SKILL_NAMES[i % BASE_SKILL_NAMES.length] +
-              (i >= BASE_SKILL_NAMES.length ? ` v${Math.floor(i / BASE_SKILL_NAMES.length) + 1}` : ""),
-        isNew: i < 6,
-        violations: i === 0 ? 1 : 0,
-        blocked: false,
-    }));
-}
-
-const DUMMY_SKILL_SAMPLE = {
-    message: JSON.stringify({
-        method: "POST",
-        path: "/mcp/tools/call",
-        requestHeaders: JSON.stringify({
-            "content-type": "application/json",
-            "authorization": "Bearer eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyXzAwMSJ9",
-            "x-mcp-session": "sess_8f2a91b4c3d1",
-        }),
-        requestPayload: JSON.stringify({
-            name: "generate_snapshot",
-            arguments: {
-                prompt: "Generate a complete state snapshot",
-                context: { sessionId: "sess_8f2a91b4c3d1", depth: 2 },
-            },
-        }),
-        statusCode: 200,
-        responseHeaders: JSON.stringify({
-            "content-type": "application/json",
-            "x-mcp-request-id": "req_7c3d12e9a4b5",
-        }),
-        responsePayload: JSON.stringify({
-            content: [{
-                type: "text",
-                text: JSON.stringify({
-                    snapshot: { id: "snap_20260522_001", timestamp: "2026-05-22T10:30:00Z", status: "complete" },
-                    usage: { promptTokens: 142, completionTokens: 89 },
-                }),
-            }],
-        }),
-    }),
-};
 
 // ─── Cell renderers ───────────────────────────────────────────────────────────
 
@@ -127,14 +71,6 @@ function ViolationCell({ data }) {
     );
 }
 
-// ─── Skill schema params ──────────────────────────────────────────────────────
-
-const SKILL_SCHEMA_PARAMS = [
-    { name: "prompt",     type: "string", required: true,  desc: "The instruction or prompt for the skill to execute" },
-    { name: "context",    type: "object", required: false, desc: "Optional session context to scope the skill execution" },
-    { name: "timeout_ms", type: "number", required: false, desc: "Maximum execution time in milliseconds" },
-];
-
 function ParamNameCell({ data }) {
     if (!data) return null;
     return (
@@ -170,14 +106,6 @@ const SKILL_SCHEMA_COL_DEFS = [
     { field: "name", headerName: "Name",        flex: 1,   minWidth: 140, cellRenderer: ParamNameCell, cellStyle: { display: "flex", alignItems: "center" } },
     { field: "type", headerName: "Type",        width: 100, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ParamTypeCell, cellStyle: { display: "flex", alignItems: "center" } },
     { field: "desc", headerName: "Description", flex: 2,   minWidth: 160, cellRenderer: ParamDescCell, cellStyle: { display: "flex", alignItems: "center" } },
-];
-
-// ─── Skill violation data ─────────────────────────────────────────────────────
-
-const SKILL_VIOLATION_ROWS = [
-    { id: 0, severity: "critical", title: "PII Sent to External LLM", desc: "Skill transmitted user PII in the prompt payload to a third-party LLM without redaction or consent.", time: "2m ago" },
-    { id: 1, severity: "high",     title: "Excessive Token Consumption", desc: "Skill consumed 52k tokens in a single invocation, exceeding the 10k policy limit.", time: "17m ago" },
-    { id: 2, severity: "medium",   title: "Unusual Invocation Rate", desc: "Skill invoked 47 times within 2 minutes, consistent with automated enumeration.", time: "1h ago" },
 ];
 
 function SevBadgeCell({ data }) {

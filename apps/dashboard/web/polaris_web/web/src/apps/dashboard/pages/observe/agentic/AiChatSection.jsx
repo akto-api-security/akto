@@ -2,9 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { HorizontalStack, Text, Button } from "@shopify/polaris";
 import { ChevronDownMinor } from "@shopify/polaris-icons";
 import AgenticSearchInput from "../../agentic/components/AgenticSearchInput";
-
-const MOCK_RESPONSE =
-    "I've analysed the request context. Based on the endpoint traffic and skill invocation patterns, I can see some anomalous behavior. The prompt appears to violate the configured security policy - this type of request would be flagged as a critical violation.";
+import { MOCK_RESPONSE } from "./agenticDummyData";
 
 export default function AiChatSection({ placeholder, resetKey }) {
     const [messages,      setMessages]     = useState([]);
