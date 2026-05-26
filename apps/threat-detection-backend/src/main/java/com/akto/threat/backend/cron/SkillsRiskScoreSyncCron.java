@@ -144,7 +144,7 @@ public class SkillsRiskScoreSyncCron {
                             loggerMaker.infoAndAddToDb("Skills malicious events count: " + apiInfoKeyToRiskScore.size());
 
                             List<CollectionTags> maliciousTags = Collections.singletonList(
-                                new CollectionTags(Context.now(), "malicious-skill", "true", CollectionTags.TagSource.USER)
+                                new CollectionTags(Context.now(), "malicious-skill", "true", CollectionTags.TagSource.AKTO)
                             );
 
                             List<WriteModel<ApiInfo>> updates = new ArrayList<>();
