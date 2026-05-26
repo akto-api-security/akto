@@ -1,38 +1,33 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { HorizontalStack, Text, Button } from "@shopify/polaris";
+import { ChevronDownMinor } from "@shopify/polaris-icons";
 import AgenticSearchInput from "../../agentic/components/AgenticSearchInput";
 
 const MOCK_RESPONSE =
-    "I've analysed the request context. Based on the endpoint traffic and skill invocation patterns, I can see some anomalous behavior. The prompt appears to violate the configured security policy — this type of request would be flagged as a critical violation.";
+    "I've analysed the request context. Based on the endpoint traffic and skill invocation patterns, I can see some anomalous behavior. The prompt appears to violate the configured security policy - this type of request would be flagged as a critical violation.";
 
-/**
- * AiChatSection — shared split-screen AI chat footer for all flyouts.
- *
- * Behaviour:
- *  • Collapsed (default): pinned at bottom, acts as a normal input bar.
- *  • Expanded: as soon as the user starts typing, the section grows to flex:1,
- *    splitting the flyout 50/50 — content above, AI chat below.
- *
- * Props:
- *   placeholder  – input placeholder text
- *   resetKey     – change to reset messages + input (e.g. pass agent?.endpoint)
- */
 export default function AiChatSection({ placeholder, resetKey }) {
-    const [messages,    setMessages]    = useState([]);
-    const [inputValue,  setInputValue]  = useState("");
+    const [messages,      setMessages]     = useState([]);
+    const [inputValue,    setInputValue]   = useState("");
+    const [userCollapsed, setUserCollapsed] = useState(false);
     const bottomRef = useRef(null);
 
-    const expanded = inputValue.length > 0 || messages.length > 0;
+    const hasContent = inputValue.length > 0 || messages.length > 0;
+    const expanded   = hasContent && !userCollapsed;
 
-    // Reset when the context changes (different device / agent / mcp)
     useEffect(() => {
         setMessages([]);
         setInputValue("");
+        setUserCollapsed(false);
     }, [resetKey]);
 
-    // Auto-scroll messages
     useEffect(() => {
         if (messages.length) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
+
+    useEffect(() => {
+        if (inputValue.length > 0) setUserCollapsed(false);
+    }, [inputValue]);
 
     const handleSubmit = useCallback((val) => {
         const text = (val ?? inputValue).trim();
@@ -43,6 +38,7 @@ export default function AiChatSection({ placeholder, resetKey }) {
             { role: "assistant", content: MOCK_RESPONSE },
         ]);
         setInputValue("");
+        setUserCollapsed(false);
     }, [inputValue]);
 
     return (
@@ -55,8 +51,22 @@ export default function AiChatSection({ placeholder, resetKey }) {
             flex:       expanded ? 1        : undefined,
             minHeight:  expanded ? 0        : undefined,
         }}>
-            {/* Message history — only rendered once there are messages */}
-            {messages.length > 0 && (
+            {/* Header bar with collapse button — only when expanded */}
+            {expanded && (
+                <div style={{ padding: "8px 12px", borderBottom: "1px solid #F1F2F3", flexShrink: 0 }}>
+                    <HorizontalStack align="space-between" blockAlign="center">
+                        <Text variant="headingXs">Ask Akto</Text>
+                        <Button
+                            icon={ChevronDownMinor}
+                            size="slim"
+                            onClick={() => setUserCollapsed(true)}
+                        />
+                    </HorizontalStack>
+                </div>
+            )}
+
+            {/* Message history */}
+            {expanded && messages.length > 0 && (
                 <div style={{
                     flex: 1,
                     minHeight: 0,
@@ -64,14 +74,14 @@ export default function AiChatSection({ placeholder, resetKey }) {
                     padding: "12px 16px",
                     display: "flex",
                     flexDirection: "column",
-                    gap: 10,
+                    gap: 4,
                 }}>
                     {messages.map((msg, i) =>
                         msg.role === "user" ? (
-                            <div key={i} style={{ display: "flex", justifyContent: "flex-end" }}>
+                            <div key={i} style={{ display: "flex", justifyContent: "flex-end", marginBottom: 2 }}>
                                 <div style={{
                                     maxWidth: "72%",
-                                    padding: "8px 12px",
+                                    padding: "7px 12px",
                                     borderRadius: "12px 12px 2px 12px",
                                     background: "#F1F2F3",
                                     fontSize: 13,
@@ -82,7 +92,12 @@ export default function AiChatSection({ placeholder, resetKey }) {
                                 </div>
                             </div>
                         ) : (
-                            <div key={i} style={{ fontSize: 13, color: "#202223", lineHeight: 1.65 }}>
+                            <div key={i} style={{
+                                fontSize: 13,
+                                color: "#202223",
+                                lineHeight: 1.6,
+                                marginBottom: 8,
+                            }}>
                                 {msg.content}
                             </div>
                         )
@@ -91,15 +106,15 @@ export default function AiChatSection({ placeholder, resetKey }) {
                 </div>
             )}
 
-            {/* Empty-state hint when expanded but no messages yet */}
+            {/* Hint when expanded but nothing sent yet */}
             {expanded && messages.length === 0 && (
                 <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <span style={{ fontSize: 12, color: "#C4C9D0" }}>Press Enter to ask…</span>
                 </div>
             )}
 
-            {/* Input bar */}
-            <div style={{ padding: "12px 16px", flexShrink: 0 }}>
+            {/* Input */}
+            <div style={{ padding: "10px 16px 12px", flexShrink: 0 }}>
                 <AgenticSearchInput
                     placeholder={placeholder || "Ask anything related to your endpoints..."}
                     isFixed={false}
