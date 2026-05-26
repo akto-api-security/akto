@@ -5,7 +5,7 @@ import { Tabs, Icon, Avatar, Card, Box, VerticalStack, HorizontalStack, Text } f
 import { CustomersMinor, AutomationMajor, MagicMajor } from "@shopify/polaris-icons";
 import ReactFlow, { Handle, Position, Background } from "react-flow-renderer";
 import MCPIcon from "@/assets/MCP_Icon.svg";
-import AgenticSearchInput from "../../agentic/components/AgenticSearchInput";
+import AiChatSection from "./AiChatSection";
 import "../../../components/layouts/style.css";
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
@@ -771,15 +771,11 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
                     {selectedTab === 2 && <ViolationsTab device={device} agents={agents || []} />}
                 </div>
 
-                {/* Ask Akto footer */}
-                <div style={{ borderTop: "1px solid #E1E3E5", padding: "12px 16px", flexShrink: 0, background: "white" }}>
-                    <AgenticSearchInput
-                        placeholder="Ask anything about this device..."
-                        isFixed={false}
-                        inputWidth="100%"
-                        containerStyle={{ display: "block" }}
-                    />
-                </div>
+                {/* Ask Akto — expands to half-screen as user types */}
+                <AiChatSection
+                    placeholder="Ask anything about this device..."
+                    resetKey={device?.endpoint}
+                />
             </div>
         </div>
     );

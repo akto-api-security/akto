@@ -591,7 +591,7 @@ const DEVICE_COL_DEFS = [
             return AGENT_RISK_DATA[key]?.riskScore ?? null;
         },
     },
-    { field: "username",    headerName: "Username",      flex: 1, minWidth: 120, rowGroup: true, hide: true         },
+    { field: "username",    headerName: "Username",      flex: 1, minWidth: 120, enableRowGroup: true               },
     { field: "group",       headerName: "Group",         flex: 1, minWidth: 120                                      },
     { field: "role",        headerName: "Role",          flex: 1.2, minWidth: 150                                    },
     {

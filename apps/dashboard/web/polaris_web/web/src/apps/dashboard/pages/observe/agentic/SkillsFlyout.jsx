@@ -3,7 +3,7 @@ import { AgGridReact } from "ag-grid-react";
 import { themeQuartz } from "ag-grid-enterprise";
 import { Tabs, Popover, ActionList, LegacyCard, Link, Icon, TextField, Badge } from "@shopify/polaris";
 import { ChevronDownMinor } from "@shopify/polaris-icons";
-import AgenticSearchInput from "../../agentic/components/AgenticSearchInput";
+import AiChatSection from "./AiChatSection";
 import SampleDataComponent from "../../../components/shared/SampleDataComponent";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import "../../../components/layouts/style.css";
@@ -600,6 +600,8 @@ function SkillsListView({ agent, device, allSkills, onSkillClick, onClose, onDev
     );
 }
 
+// ─── AI chat panel ────────────────────────────────────────────────────────────
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 /**
@@ -616,7 +618,6 @@ export default function SkillsFlyout({ agent, device, show, onClose, onDeviceCli
 
     const allSkills = useMemo(() => generateSkills(agent?.skillCount || 0), [agent?.skillCount]);
 
-    // Reset state when flyout closes or agent changes
     useEffect(() => {
         if (!show) setSelectedSkill(null);
     }, [show]);
@@ -648,43 +649,37 @@ export default function SkillsFlyout({ agent, device, show, onClose, onDeviceCli
                     fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                 }}
             >
-                {selectedSkill ? (
-                    <SkillDetailView
-                        key={selectedSkill.id}
-                        skill={selectedSkill}
-                        device={device}
-                        agent={agent}
-                        skills={allSkills}
-                        onBack={() => setSelectedSkill(null)}
-                        onClose={onClose}
-                        onSkillChange={setSelectedSkill}
-                        onDeviceClick={onDeviceClick}
-                    />
-                ) : (
-                    <SkillsListView
-                        agent={agent}
-                        device={device}
-                        allSkills={allSkills}
-                        onSkillClick={setSelectedSkill}
-                        onClose={onClose}
-                        onDeviceClick={onDeviceClick}
-                    />
-                )}
-
-                {/* Ask Akto — always pinned at bottom */}
-                <div style={{
-                    borderTop: "1px solid #E1E3E5",
-                    padding: "12px 16px",
-                    flexShrink: 0,
-                    background: "white",
-                }}>
-                    <AgenticSearchInput
-                        placeholder="Ask anything related to your endpoints..."
-                        isFixed={false}
-                        inputWidth="100%"
-                        containerStyle={{ display: "block" }}
-                    />
+                {/* Top half — skills panel */}
+                <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                    {selectedSkill ? (
+                        <SkillDetailView
+                            key={selectedSkill.id}
+                            skill={selectedSkill}
+                            device={device}
+                            agent={agent}
+                            skills={allSkills}
+                            onBack={() => setSelectedSkill(null)}
+                            onClose={onClose}
+                            onSkillChange={setSelectedSkill}
+                            onDeviceClick={onDeviceClick}
+                        />
+                    ) : (
+                        <SkillsListView
+                            agent={agent}
+                            device={device}
+                            allSkills={allSkills}
+                            onSkillClick={setSelectedSkill}
+                            onClose={onClose}
+                            onDeviceClick={onDeviceClick}
+                        />
+                    )}
                 </div>
+
+                {/* Bottom — AI chat (expands to flex:1 as user types) */}
+                <AiChatSection
+                    placeholder="Ask anything related to your skills..."
+                    resetKey={agent?.endpoint}
+                />
             </div>
         </div>
     );

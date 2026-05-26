@@ -3,7 +3,7 @@ import { AgGridReact } from "ag-grid-react";
 import { themeQuartz } from "ag-grid-enterprise";
 import { Tabs, Popover, ActionList, LegacyCard, Link, Icon, TextField, DataTable, Badge } from "@shopify/polaris";
 import { ChevronDownMinor } from "@shopify/polaris-icons";
-import AgenticSearchInput from "../../agentic/components/AgenticSearchInput";
+import AiChatSection from "./AiChatSection";
 import SampleDataComponent from "../../../components/shared/SampleDataComponent";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import "../../../components/layouts/style.css";
@@ -849,15 +849,11 @@ export default function McpFlyout({ agent, device, show, onClose, onDeviceClick 
                     />
                 )}
 
-                {/* Ask Akto footer */}
-                <div style={{ borderTop: "1px solid #E1E3E5", padding: "12px 16px", flexShrink: 0, background: "white" }}>
-                    <AgenticSearchInput
-                        placeholder="Ask about this MCP server's tools and risks..."
-                        isFixed={false}
-                        inputWidth="100%"
-                        containerStyle={{ display: "block" }}
-                    />
-                </div>
+                {/* Ask Akto — expands to half-screen as user types */}
+                <AiChatSection
+                    placeholder="Ask about this MCP server's tools and risks..."
+                    resetKey={agent?.endpoint}
+                />
             </div>
         </div>
     );
