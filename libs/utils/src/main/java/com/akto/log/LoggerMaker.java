@@ -222,7 +222,13 @@ public class LoggerMaker  {
         try {
             if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
                 StackTraceElement stackTraceElement = e.getStackTrace()[0];
-                err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+                err = String.format("Err msg: %s\nException: %s\nException msg: %s\nClass: %s\nFile: %s\nLine: %d",
+                    err, e.getClass().getName(), e.getMessage(), stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+
+                // Also log root cause if present
+                if (e.getCause() != null) {
+                    err += String.format("\nCause: %s - %s", e.getCause().getClass().getName(), e.getCause().getMessage());
+                }
             } else {
                 err = String.format("Err msg: %s\nStackTrace not available", err);
                 e.printStackTrace();
