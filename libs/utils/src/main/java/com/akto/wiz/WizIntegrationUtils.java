@@ -64,6 +64,7 @@ public class WizIntegrationUtils {
 
     private static final ConcurrentHashMap<Integer, Object> tokenLocks = new ConcurrentHashMap<>();
     
+    public static final String USER_AGENT = "WIN-Akto/1.0";
     public static final String AUTH_ENDPOINT = "https://auth.app.wiz.io/oauth/token";
     private static final int TESTING_RUN_RESULT_BATCH_SIZE = 500;
     private static final int LARGE_TEXT_BATCH_SIZE = 50;
@@ -121,6 +122,7 @@ public class WizIntegrationUtils {
             .post(requestBody)
             .addHeader("Content-Type", "application/x-www-form-urlencoded")
             .addHeader("Accept", "application/json")
+            .addHeader("User-Agent", USER_AGENT)
             .build();
 
         String accessToken;
@@ -248,6 +250,7 @@ public class WizIntegrationUtils {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Content-Type", Collections.singletonList("application/json"));
         headers.put("Authorization", Collections.singletonList("Bearer " + accessToken));
+        headers.put("User-Agent", Collections.singletonList(USER_AGENT));
 
         // Make request
         OriginalHttpRequest request = new OriginalHttpRequest(apiUrl, "", "POST", graphqlQuery, headers, "");
@@ -773,6 +776,7 @@ public class WizIntegrationUtils {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Content-Type", Collections.singletonList("application/json"));
         headers.put("Authorization", Collections.singletonList("Bearer " + accessToken));
+        headers.put("User-Agent", Collections.singletonList(USER_AGENT));
 
         // Make request
         OriginalHttpRequest request = new OriginalHttpRequest(apiUrl, "", "POST", graphqlQuery, headers, "");
