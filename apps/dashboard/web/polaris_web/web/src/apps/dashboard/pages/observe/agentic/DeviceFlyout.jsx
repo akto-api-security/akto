@@ -146,14 +146,14 @@ function computeRiskFactors(device, agents) {
     if (totalSkills > 100) {
         factors.push({
             severity: "medium",
-            title: `Broad Tool Surface (${totalSkills.toLocaleString()} tools)`,
-            description: `${totalSkills.toLocaleString()} tools exposed across agents. Each tool is a potential attack vector.`,
+            title: `Broad Skill Surface (${totalSkills.toLocaleString()} skills)`,
+            description: `${totalSkills.toLocaleString()} skills exposed across agents. Each skill is a potential attack vector.`,
         });
     } else if (totalSkills > 20) {
         factors.push({
             severity: "low",
-            title: `Elevated Skill Count (${totalSkills} tools)`,
-            description: `${totalSkills} tools accessible. Monitor for anomalous invocation patterns.`,
+            title: `Elevated Skill Count (${totalSkills} skills)`,
+            description: `${totalSkills} skills accessible. Monitor for anomalous invocation patterns.`,
         });
     }
     const mcpCount = agents.filter(a => a.type === "MCP Server").length;
@@ -318,7 +318,7 @@ function getRiskNarrative(device, agents, factors) {
     if (mcpNames.some(n => n.includes("postgres") || n.includes("databricks") || n.includes("mysql")))
         parts.push("direct database access MCPs enable arbitrary query execution against production data");
     if (totalSkills > 100)
-        parts.push(`${totalSkills.toLocaleString()} exposed tool endpoints significantly expand the attack surface`);
+        parts.push(`${totalSkills.toLocaleString()} exposed skills significantly expand the attack surface`);
 
     if (parts.length === 0)
         return `${device.endpoint} shows a standard activity profile with no elevated signals. Score reflects baseline AI agent usage patterns.`;
@@ -477,59 +477,91 @@ function OverviewTab({ device, agents }) {
     const mcpCount = agents.filter(a => a.type === "MCP Server").length;
     const llmCount = agents.filter(a => a.type === "LLM").length;
     const totalV   = (device.violations?.critical || 0) + (device.violations?.high || 0) + (device.violations?.medium || 0) + (device.violations?.low || 0);
-
-    const osLabel = device.os === "mac" ? "macOS" : device.os === "windows" ? "Windows" : device.os === "linux" ? "Linux" : "Unknown OS";
+    const osLabel  = device.os === "mac" ? "macOS" : device.os === "windows" ? "Windows" : device.os === "linux" ? "Linux" : "Unknown OS";
 
     const factors   = computeRiskFactors(device, agents);
     const narrative = getRiskNarrative(device, agents, factors);
 
+    const deviceDetails = [
+        { label: "User",      value: device.username },
+        { label: "OS",        value: osLabel },
+        { label: "Group",     value: device.group },
+        { label: "Role",      value: device.role },
+        { label: "Last Seen", value: device.lastTraffic },
+        device.hasPersonalAccount
+            ? { label: "Account", value: "Personal account", isWarning: true }
+            : { label: "Account", value: "Corporate" },
+    ];
+
     return (
-        <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* Topology graph */}
-            <TopologyGraph device={device} agents={agents} />
+        <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 20 }}>
 
-            {/* Risk narrative */}
-            <p style={{ margin: 0, fontSize: 13, color: "#202223", lineHeight: 1.6 }}>{narrative}</p>
-
-            {/* Quick stats */}
-            <div style={{ display: "flex", borderBottom: "1px solid #E1E3E5", paddingBottom: 16 }}>
+            {/* 1. Numbers */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
                 {[
-                    { label: "AI Agents",   value: aiCount,  isViolation: false },
-                    { label: "MCP Servers", value: mcpCount, isViolation: false },
-                    { label: "LLMs",        value: llmCount, isViolation: false },
-                    { label: "Violations",  value: totalV,   isViolation: true  },
-                ].map((s, i) => (
-                    <div key={s.label} style={{ flex: 1, paddingLeft: i > 0 ? 16 : 0, borderLeft: i > 0 ? "1px solid #E1E3E5" : "none", marginLeft: i > 0 ? 16 : 0 }}>
-                        <div style={{ fontSize: 22, fontWeight: 700, color: s.isViolation && s.value > 0 ? "#DC2626" : "#202223", lineHeight: 1 }}>{s.value}</div>
-                        <div style={{ fontSize: 12, color: "#6D7175", marginTop: 4 }}>{s.label}</div>
+                    { label: aiCount  === 1 ? "AI Agent"   : "AI Agents",   value: aiCount  },
+                    { label: mcpCount === 1 ? "MCP Server" : "MCP Servers", value: mcpCount },
+                    { label: llmCount === 1 ? "LLM"        : "LLMs",        value: llmCount },
+                    { label: totalV   === 1 ? "Violation"  : "Violations",  value: totalV   },
+                ].map(s => (
+                    <div key={s.label}>
+                        <Text variant="heading2xl" as="p">{s.value}</Text>
+                        <div style={{ marginTop: 2 }}>
+                            <Text variant="bodySm" color="subdued">{s.label}</Text>
+                        </div>
                     </div>
                 ))}
             </div>
 
-            {/* Device context */}
+            {/* 2. Topology graph */}
+            <TopologyGraph device={device} agents={agents} />
+
+            {/* 3. Why this risk score */}
             <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#8C9196", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Device Context</div>
-                <div style={{ display: "grid", gridTemplateColumns: "90px 1fr", gap: "10px 0", alignItems: "start" }}>
-                    {[
-                        ["User",     device.username],
-                        ["OS",       osLabel],
-                        ["Group",    device.group],
-                        ["Role",     device.role],
-                        ["Last Seen",device.lastTraffic],
-                    ].map(([k, v]) => (
-                        <React.Fragment key={k}>
-                            <span style={{ fontSize: 12, color: "#8C9196", fontWeight: 500, paddingTop: 2 }}>{k}</span>
-                            <span style={{ fontSize: 12, color: "#202223", fontWeight: 500 }}>{v || "—"}</span>
-                        </React.Fragment>
+                <div style={{ marginBottom: 8 }}>
+                    <Text variant="headingXs" color="subdued">Risk Analysis</Text>
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                    <Text variant="bodySm" color="base">{narrative}</Text>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {factors.map((f, i) => {
+                        const s = SEV[f.severity] || SEV.low;
+                        return (
+                            <div key={i} style={{
+                                display: "flex", gap: 12,
+                                padding: "10px 14px",
+                                borderRadius: 6,
+                                border: "1px solid #E1E3E5",
+                                borderLeft: `3px solid ${s.dot}`,
+                                background: "#FAFBFB",
+                            }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                    <Text variant="bodySm" fontWeight="semibold">{f.title}</Text>
+                                    <Text variant="bodySm" color="subdued">{f.description}</Text>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* 4. Device details — minimal 3-col grid */}
+            <div>
+                <div style={{ marginBottom: 10 }}>
+                    <Text variant="headingXs" color="subdued">Device Details</Text>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px 24px" }}>
+                    {deviceDetails.map(d => (
+                        <div key={d.label}>
+                            <Text variant="bodySm" color="subdued">{d.label}</Text>
+                            <div style={{ marginTop: 2 }}>
+                                <Text variant="bodySm" fontWeight="semibold" color={d.isWarning ? "warning" : "base"}>
+                                    {d.value || "—"}
+                                </Text>
+                            </div>
+                        </div>
                     ))}
-                    {device.hasPersonalAccount && (
-                        <>
-                            <span style={{ fontSize: 12, color: "#8C9196", fontWeight: 500, paddingTop: 2 }}>Account</span>
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "#B45309", fontWeight: 500, background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 6, padding: "2px 8px", width: "fit-content" }}>
-                                Personal account detected
-                            </span>
-                        </>
-                    )}
                 </div>
             </div>
         </div>
