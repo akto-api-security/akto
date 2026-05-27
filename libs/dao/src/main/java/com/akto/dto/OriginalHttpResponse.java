@@ -47,11 +47,8 @@ public class OriginalHttpResponse {
                             isTextOrHtml = true;
                         }
                     }
-                    if(!isTextOrHtml){
-                        this.body = json.get("responsePayload").toString();
-                    }else{
-                        this.body = null;
-                    }
+                    Object responsePayload = json.get("responsePayload");
+                    this.body = responsePayload != null ? responsePayload.toString() : null;
                 }
                 Object obj = json.get("statusCode");
                 if(obj instanceof Double){
