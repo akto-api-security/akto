@@ -408,5 +408,4 @@ public abstract class DataActor {
 
     public abstract void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook);
 
-    public abstract void storeAgentQueryData(AgentQueryData agentQueryData);
 }

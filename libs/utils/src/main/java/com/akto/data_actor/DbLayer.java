@@ -3066,7 +3066,20 @@ public class DbLayer {
         }
     }
 
-    public static void storeAgentQueryData(AgentQueryData agentQueryData) {
-        AgentQueryDataDao.instance.insertOne(agentQueryData);
+    public static Map<String, String> fetchDeviceUserMap() {
+        List<ModuleInfo> modules = ModuleInfoDao.instance.findAll(
+            Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD.name()),
+            Projections.include(ModuleInfo.NAME, ModuleInfo.ADDITIONAL_DATA + ".username")
+        );
+        Map<String, String> result = new HashMap<>();
+        if (modules == null) return result;
+        for (ModuleInfo m : modules) {
+            if (m.getName() == null || m.getAdditionalData() == null) continue;
+            Object usernameObj = m.getAdditionalData().get("username");
+            if (usernameObj instanceof String && !((String) usernameObj).isEmpty()) {
+                result.put(m.getName(), (String) usernameObj);
+            }
+        }
+        return result;
     }
 }

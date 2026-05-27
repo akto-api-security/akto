@@ -753,9 +753,4 @@ public class DbActor extends DataActor {
     public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
         DbLayer.storeTestingRunWebhook(testingRunWebhook);
     }
-
-    @Override
-    public void storeAgentQueryData(AgentQueryData agentQueryData) {
-        DbLayer.storeAgentQueryData(agentQueryData);
-    }
 }
