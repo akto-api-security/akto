@@ -292,6 +292,7 @@ public class DaoInit {
         ClassModel<EndpointShieldSettings> endpointShieldSettingsClassModel = ClassModel.builder(EndpointShieldSettings.class).enableDiscriminator(true).build();
         ClassModel<PlatformShieldConfig> platformShieldConfigClassModel = ClassModel.builder(PlatformShieldConfig.class).enableDiscriminator(true).build();
         ClassModel<ModelConfig> modelConfigClassModel = ClassModel.builder(ModelConfig.class).enableDiscriminator(true).build();
+        ClassModel<BlockedToken> blockedTokenClassModel = ClassModel.builder(BlockedToken.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -324,7 +325,7 @@ public class DaoInit {
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
                 RuntimeMetricsClassModel, jobsParam, ModuleInfoClassModel,fileClassModel, tlsAuthClassModel, apiHitCountInfoClassModel, collectionTagsModel, hostRegexTestingEndpointsClassModel, tagsTestingEndpointsClassModel
                 , authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, logsEndpointShieldClassModel, proxyPatternInfoClassModel, apiSequencesClassModel, endpointMcpConfigClassModel, deviceDomainConfigClassModel
-                , newRelicIntegrationClassModel, endpointShieldSettingsClassModel, platformShieldConfigClassModel, modelConfigClassModel).automatic(true).build());
+                , newRelicIntegrationClassModel, endpointShieldSettingsClassModel, platformShieldConfigClassModel, modelConfigClassModel, blockedTokenClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),

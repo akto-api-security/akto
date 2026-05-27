@@ -2,6 +2,7 @@ package com.akto.filter;
 
 import com.akto.dao.context.Context;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
+import com.akto.utils.TokenBlocklistCron;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -28,6 +29,11 @@ public class AuthFilter implements Filter {
         HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
         String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
         String requestURI = httpServletRequest.getRequestURI();
+
+        if (TokenBlocklistCron.isTokenBlocked(accessTokenFromRequest)) {
+            httpServletResponse.sendError(401);
+            return;
+        }
 
         try {
             Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
