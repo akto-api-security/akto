@@ -85,7 +85,7 @@ function TopStatisticsSidebar({ startTimestamp, endTimestamp }) {
                     setCountries(
                         [...countryResp.actorsCountPerCountry]
                             .sort((a, b) => b.count - a.count)
-                            .slice(0, 5)
+                            .slice(0, 8)
                     );
                 }
                 if (recentResp?.maliciousEvents) {

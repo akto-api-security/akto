@@ -36,10 +36,7 @@ function ThreatDetectionOverTimeChart({ startTimestamp, endTimestamp }) {
 
                 if (!mounted) return;
 
-                const totalActive = dailyResp?.totalActiveStatus || 0;
-                const totalIgnored = dailyResp?.totalIgnoredStatus || 0;
-                const totalUnderReview = dailyResp?.totalUnderReviewStatus || 0;
-                const totalThreats = totalActive + totalIgnored + totalUnderReview;
+                const totalThreats = dailyResp?.totalAnalysed || 0;
                 const totalActors = dailyResp?.totalActiveStatus || 0;
                 const apisTotal = apisResp?.total || 0;
 

@@ -347,7 +347,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         put("start_ts", startTs);
         put("end_ts", endTs);
         put("latestAttack", latestAttack);
-        put("limit", 5);
+        put("limit", 8);
       }
     };
     String msg = objectMapper.valueToTree(body).toString();

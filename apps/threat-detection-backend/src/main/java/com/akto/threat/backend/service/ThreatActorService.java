@@ -832,14 +832,40 @@ public class ThreatActorService {
     attackMatch.append("successfulExploit", true);
     long totalAttacks = maliciousEventDao.getCollection(accountId).countDocuments(attackMatch);
 
+    // Status aggregation on malicious_events
+    List<Document> statusPipeline = new ArrayList<>();
+    if (!eventsMatch.isEmpty()) {
+        statusPipeline.add(new Document("$match", eventsMatch));
+    }
+    statusPipeline.add(new Document("$group",
+        new Document("_id", "$status").append("count", new Document("$sum", 1))));
+
+    int totalActive = 0;
+    int totalIgnored = 0;
+    int totalUnderReview = 0;
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, statusPipeline).cursor()) {
+        while (cursor.hasNext()) {
+            Document d = cursor.next();
+            String status = d.getString("_id");
+            int c = d.getInteger("count", 0);
+            if ("ACTIVE".equalsIgnoreCase(status)) {
+                totalActive = c;
+            } else if (ThreatDetectionConstants.IGNORED.equalsIgnoreCase(status)) {
+                totalIgnored = c;
+            } else if ("UNDER_REVIEW".equalsIgnoreCase(status)) {
+                totalUnderReview = c;
+            }
+        }
+    }
+
     return DailyActorsCountResponse.newBuilder()
         .addActorsCounts(actorsCount)  // Add single element to array
-        .setTotalActive((int) activeActorsCount)
+        .setTotalActive(totalActive)
         .setCriticalActorsCount((int) criticalActorsCount)
         .setTotalAnalysed((int) totalAnalysed)
         .setTotalAttacks((int) totalAttacks)
-        .setTotalIgnored(0)
-        .setTotalUnderReview(0)
+        .setTotalIgnored(totalIgnored)
+        .setTotalUnderReview(totalUnderReview)
         .build();
   }
 
@@ -1383,7 +1409,8 @@ public class ThreatActorService {
       match.putAll(contextFilter);
     }
 
-    // --- Top Actors pipeline ---
+    // --- Top Actors (use malicious_events for accurate time-range filtering) ---
+    List<FetchDashboardTopDataResponse.TopActorData> topActors = new ArrayList<>();
     List<Document> actorPipeline = new ArrayList<>();
     if (!match.isEmpty()) actorPipeline.add(new Document("$match", match));
     actorPipeline.add(new Document("$group",
@@ -1394,7 +1421,6 @@ public class ThreatActorService {
     actorPipeline.add(new Document("$sort", new Document("attackCount", -1)));
     actorPipeline.add(new Document("$limit", limit));
 
-    List<FetchDashboardTopDataResponse.TopActorData> topActors = new ArrayList<>();
     try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, actorPipeline).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
