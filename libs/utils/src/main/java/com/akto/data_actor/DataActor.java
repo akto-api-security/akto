@@ -1,7 +1,7 @@
 package com.akto.data_actor;
 
 import com.akto.dto.*;
-import com.akto.dto.agentic_sessions.AgentQueryData;
+import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
@@ -356,5 +356,6 @@ public abstract class DataActor {
     public abstract void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook);
 
     public abstract void writeApiSequences(List<ApiSequences> sequences);
-    public abstract void storeAgentQueryData(AgentQueryData agentQueryData);
+    public abstract void storeAgentQueryData(AgentQueryRecord agentQueryRecord);
+    public abstract Map<String, String> fetchDeviceUserMap();
 }

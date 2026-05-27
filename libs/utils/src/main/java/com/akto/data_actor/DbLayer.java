@@ -12,7 +12,6 @@ import java.util.Set;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
-import com.akto.dao.agentic_sessions.AgentQueryDataDao;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
@@ -56,7 +55,6 @@ import com.akto.dao.tracing.SpanDao;
 import com.akto.dao.tracing.TraceDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.agentic_sessions.AgentQueryData;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
@@ -1473,7 +1471,4 @@ public class DbLayer {
         }
     }
 
-    public static void storeAgentQueryData(AgentQueryData agentQueryData) {
-        AgentQueryDataDao.instance.insertOne(agentQueryData);
-    }
 }
