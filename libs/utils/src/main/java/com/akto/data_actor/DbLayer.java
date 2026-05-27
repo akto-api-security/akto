@@ -2163,7 +2163,7 @@ public class DbLayer {
         Bson filters = Filters.and(
             Filters.eq("apiCollectionId", apiCollectionId),
             Filters.regex("url", url),
-            Filters.eq("method", method)
+            Filters.eq("method", method.name())
         );
         return SingleTypeInfoDao.instance.findOne(filters);
     }
@@ -2180,7 +2180,7 @@ public class DbLayer {
     public static SampleData fetchSampleDataById(int apiCollectionId, String url, URLMethods.Method method) {
         Bson filterQSampleData = Filters.and(
             Filters.eq("_id.apiCollectionId", apiCollectionId),
-            Filters.eq("_id.method", method),
+            Filters.eq("_id.method", method.name()),
             Filters.eq("_id.url", url)
         );
         return SampleDataDao.instance.findOne(filterQSampleData);

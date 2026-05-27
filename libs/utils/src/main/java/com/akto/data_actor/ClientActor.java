@@ -2747,7 +2747,7 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("apiCollectionId", apiCollectionId);
         obj.put("url", urlVal);
-        obj.put("method", method);
+        obj.put("method", method.name());
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findSti", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
@@ -2839,7 +2839,7 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("apiCollectionId", apiCollectionId);
         obj.put("url", urlVal);
-        obj.put("method", method);
+        obj.put("method", method.name());
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchSampleDataById", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
