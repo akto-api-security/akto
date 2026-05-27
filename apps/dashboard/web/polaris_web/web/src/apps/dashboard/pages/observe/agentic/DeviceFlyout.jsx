@@ -1,81 +1,21 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { AgGridReact } from "ag-grid-react";
-import { themeQuartz } from "ag-grid-enterprise";
-import { Tabs, Icon, Avatar, Card, Box, VerticalStack, HorizontalStack, Text, Badge, Divider } from "@shopify/polaris";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { Tabs, Icon, Avatar, Card, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Badge, Divider } from "@shopify/polaris";
 import { CustomersMinor, AutomationMajor, MagicMajor, ChevronRightMinor } from "@shopify/polaris-icons";
 import ReactFlow, { Handle, Position, Background } from "react-flow-renderer";
 import MCPIcon from "@/assets/MCP_Icon.svg";
+import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
+import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AiChatSection from "./AiChatSection";
-import { AGENT_RISK_DATA, VIOLATION_TEMPLATES, REL_TIMES, generateViolations } from "./agenticDummyData";
+import { TYPE_STYLES, SEVERITY_COLORS, getRiskColor, getRiskLabel } from "./agenticStyles";
+import { AGENT_RISK_DATA, generateViolations } from "./agenticDummyData";
 import "../../../components/layouts/style.css";
 
-// ─── Theme ────────────────────────────────────────────────────────────────────
-
-const gridTheme = themeQuartz.withParams({
-    accentColor: "#9642FC",
-    borderColor: "#E1E3E5",
-    borderRadius: 4,
-    browserColorScheme: "light",
-    cellTextColor: "#202223",
-    columnBorder: false,
-    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    fontSize: 13,
-    foregroundColor: "#202223",
-    headerFontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    headerRowBorder: true,
-    headerTextColor: "#6D7175",
-    rowBorder: true,
-    spacing: 8,
-    wrapperBorder: false,
-    headerFontSize: 12,
-    headerFontWeight: 500,
-    checkboxBorderRadius: 4,
-});
-
 // ─── Shared helpers ───────────────────────────────────────────────────────────
-
-const SEV = {
-    critical: { dot: "#DC2626", bg: "#FEE2E2", color: "#DC2626", badgeBg: "#DF2909", badgeText: "#FFFBFB" },
-    high:     { dot: "#F97316", bg: "#FFEDD5", color: "#EA580C", badgeBg: "#FED3D1", badgeText: "#202223" },
-    medium:   { dot: "#EAB308", bg: "#FEF9C3", color: "#CA8A04", badgeBg: "#FFD79D", badgeText: "#202223" },
-    low:      { dot: "#9CA3AF", bg: "#F1F2F3", color: "#6D7175", badgeBg: "#E4E5E7", badgeText: "#202223" },
-};
-
-function getRiskColors(score) {
-    if (score >= 4.5) return { bg: "#FEE2E2", color: "#DC2626" };
-    if (score >= 4.0) return { bg: "#FFEDD5", color: "#EA580C" };
-    if (score >= 3.5) return { bg: "#FEF9C3", color: "#CA8A04" };
-    return { bg: "#F0FDF4", color: "#16A34A" };
-}
-function getRiskLabel(score) {
-    if (score >= 4.5) return "Critical Risk";
-    if (score >= 4.0) return "High Risk";
-    if (score >= 3.5) return "Medium Risk";
-    return "Low Risk";
-}
-
-function RiskBadge({ score }) {
-    if (score == null) return null;
-    const { bg, color } = getRiskColors(score);
-    return (
-        <span style={{
-            display: "inline-flex", alignItems: "center", justifyContent: "center",
-            padding: "2px 8px", borderRadius: 12,
-            fontSize: 12, fontWeight: 600,
-            background: bg, color, flexShrink: 0,
-        }}>{score.toFixed(1)}</span>
-    );
-}
-
-const TYPE_STYLES = {
-    "AI Agent":   { bg: "#EFF6FF", color: "#1D4ED8", border: "#BFDBFE" },
-    "MCP Server": { bg: "#FFFBEB", color: "#92400E", border: "#FDE68A" },
-    "LLM":        { bg: "#F0FDF4", color: "#166534", border: "#BBF7D0" },
-};
 
 function TypeBadge({ type }) {
     if (!type) return null;
     const s = TYPE_STYLES[type] || { bg: "#F3F4F6", color: "#374151", border: "#E5E7EB" };
+    // TYPE_STYLES colours are outside the Polaris Badge status set — custom span justified
     return (
         <span style={{
             display: "inline-flex", alignItems: "center",
@@ -160,9 +100,10 @@ function computeRiskFactors(device, agents) {
     return factors;
 }
 
-// ─── Cell renderers for AG Grid ───────────────────────────────────────────────
+// ─── Cell renderers ───────────────────────────────────────────────────────────
+// Exception: AG Grid cell renderers use inline styles (Polaris tokens don't reach into the grid sandbox)
 
-function AgentNameCell({ data }) {
+function AgentNameCellRenderer({ data }) {
     if (!data) return null;
     return (
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -172,9 +113,9 @@ function AgentNameCell({ data }) {
     );
 }
 
-function AgentRiskCell({ value }) {
+function AgentRiskCellRenderer({ value }) {
     if (value == null) return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ color: "#C4C7CB" }}>—</span></div>;
-    const { bg, color } = getRiskColors(value);
+    const { bg, color } = getRiskColor(value);
     return (
         <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
             <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, lineHeight: "16px", background: bg, color }}>
@@ -184,43 +125,39 @@ function AgentRiskCell({ value }) {
     );
 }
 
-function AgentViolationsCell({ value }) {
+function AgentViolationsCellRenderer({ value }) {
     if (!value) return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ color: "#C4C7CB" }}>—</span></div>;
-    const parts = [
-        { k: "critical", c: value.critical, bg: "#DF2909", txt: "#FFFBFB" },
-        { k: "high",     c: value.high,     bg: "#FED3D1", txt: "#202223" },
-        { k: "medium",   c: value.medium,   bg: "#FFD79D", txt: "#202223" },
-        { k: "low",      c: value.low,      bg: "#E4E5E7", txt: "#202223" },
-    ].filter(p => p.c > 0);
+    const parts = ["critical", "high", "medium", "low"]
+        .map(k => ({ k, c: value[k], ...SEVERITY_COLORS[k] }))
+        .filter(p => p.c > 0);
     if (!parts.length) return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ color: "#C4C7CB" }}>—</span></div>;
     return (
         <div style={{ display: "flex", alignItems: "center", height: "100%", gap: 3 }}>
             {parts.map(p => (
-                <span key={p.k} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 20, height: 20, padding: "0 5px", borderRadius: 10, fontSize: 10, fontWeight: 700, background: p.bg, color: p.txt }}>{p.c}</span>
+                <span key={p.k} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 20, height: 20, padding: "0 5px", borderRadius: 10, fontSize: 10, fontWeight: 700, background: p.bg, color: p.text }}>{p.c}</span>
             ))}
         </div>
     );
 }
 
-function AgentSkillsCell({ data }) {
+function AgentSkillsCellRenderer({ data }) {
     if (!data) return null;
     return data.skillCount
         ? <span style={{ fontSize: 12, color: "#202223", fontWeight: 500 }}>{data.skillCount}</span>
         : <span style={{ color: "#C4C7CB" }}>—</span>;
 }
 
-function ViolSeverityCell({ data }) {
+function ViolSeverityCellRenderer({ data }) {
     if (!data) return null;
-    const s = SEV[data.severity] || SEV.low;
+    const s = SEVERITY_COLORS[data.severity] || SEVERITY_COLORS.low;
     return (
         <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
             <span style={{
                 display: "inline-flex", alignItems: "center",
                 padding: "2px 8px", borderRadius: 20,
                 fontSize: 11, fontWeight: 600, lineHeight: "16px",
-                background: s.badgeBg, color: s.badgeText,
-                textTransform: "capitalize", flexShrink: 0,
-                whiteSpace: "nowrap",
+                background: s.bg, color: s.text,
+                textTransform: "capitalize", flexShrink: 0, whiteSpace: "nowrap",
             }}>
                 {data.severity}
             </span>
@@ -228,7 +165,7 @@ function ViolSeverityCell({ data }) {
     );
 }
 
-function ViolTitleCell({ data }) {
+function ViolTitleCellRenderer({ data }) {
     if (!data) return null;
     return (
         <div style={{ display: "flex", alignItems: "center", width: "100%", overflow: "hidden" }}>
@@ -237,7 +174,7 @@ function ViolTitleCell({ data }) {
     );
 }
 
-function ViolAgentCell({ data }) {
+function ViolAgentCellRenderer({ data }) {
     if (!data) return null;
     return (
         <div style={{ display: "flex", alignItems: "center", height: "100%", gap: 5, overflow: "hidden" }}>
@@ -247,13 +184,15 @@ function ViolAgentCell({ data }) {
     );
 }
 
+// ─── Column definitions ───────────────────────────────────────────────────────
+
 const AGENTS_COL_DEFS = [
-    { field: "endpoint", headerName: "Agentic Asset", flex: 1, minWidth: 160, cellRenderer: AgentNameCell, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "endpoint", headerName: "Agentic Asset", flex: 1, minWidth: 160, cellRenderer: AgentNameCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
     {
         field: "riskScore", headerName: "Risk", width: 80,
         sort: "desc",
         suppressHeaderMenuButton: true, suppressHeaderFilterButton: true,
-        cellRenderer: AgentRiskCell,
+        cellRenderer: AgentRiskCellRenderer,
         cellStyle: { display: "flex", alignItems: "center" },
         valueGetter: (p) => {
             if (!p.data) return null;
@@ -263,20 +202,20 @@ const AGENTS_COL_DEFS = [
     {
         field: "violations", headerName: "Violations", width: 130,
         suppressHeaderMenuButton: true, suppressHeaderFilterButton: true,
-        cellRenderer: AgentViolationsCell,
+        cellRenderer: AgentViolationsCellRenderer,
         cellStyle: { display: "flex", alignItems: "center" },
         valueGetter: (p) => {
             if (!p.data) return null;
             return AGENT_RISK_DATA[p.data.path?.join("/")]?.violations ?? null;
         },
     },
-    { field: "skillCount", headerName: "Skills", width: 80, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: AgentSkillsCell, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "skillCount", headerName: "Skills", width: 80, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: AgentSkillsCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
 ];
 
 const VIOLATIONS_COL_DEFS = [
-    { field: "severity", headerName: "Severity", width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCell, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "title",    headerName: "Violation", flex: 1, minWidth: 200, cellRenderer: ViolTitleCell, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "agent",    headerName: "Agent",     width: 200, cellRenderer: ViolAgentCell, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "severity", headerName: "Severity", width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "title",    headerName: "Violation", flex: 1, minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "agent",    headerName: "Agent",     width: 200, cellRenderer: ViolAgentCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
     { field: "time",     headerName: "Time",      width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center" } },
 ];
 
@@ -315,7 +254,6 @@ function getRiskNarrative(device, agents, factors) {
 }
 
 // ─── Topology graph ───────────────────────────────────────────────────────────
-// Reuses exact same AgentNode pattern as AgentDiscoveryGraphWithDummyData.jsx
 
 function topoColors(category) {
     switch (category) {
@@ -326,6 +264,7 @@ function topoColors(category) {
         default:         return { borderColor: "#6b7280", backgroundColor: "#f9fafb" };
     }
 }
+
 function topoIcon(category) {
     switch (category) {
         case "external": return CustomersMinor;
@@ -346,6 +285,7 @@ function TopoNode({ data }) {
         <>
             {!isDevice && <Handle type="target" position={Position.Left} />}
             <Card padding={0}>
+                {/* Dynamic border/background colours from data — Box doesn't support computed border-color */}
                 <div style={{ border: `1px solid ${colors.borderColor}`, borderRadius: "8px", backgroundColor: colors.backgroundColor }}>
                     <Box padding={3}>
                         <VerticalStack gap={1}>
@@ -417,11 +357,9 @@ function TopologyGraph({ device, agents }) {
 
         const es = [];
         if (hasAgents) {
-            // Device → each AI Agent
             aiAgents.forEach((_, ai) => {
                 es.push({ id: `e-d-a${ai}`, source: "device", target: `agent-${ai}`, type: "smoothstep", style: { stroke: "#9ca3af", strokeWidth: 1.5 } });
             });
-            // Only the center AI Agent connects to resources (avoids dense all-to-all crossing edges)
             const pivot = Math.floor(aiAgents.length / 2);
             mcpServers.forEach((_, mi) => es.push({ id: `e-pivot-m${mi}`, source: `agent-${pivot}`, target: `mcp-${mi}`, sourceHandle: "b", type: "smoothstep", style: { stroke: "#4cbebb", strokeWidth: 1.5 } }));
             llms.forEach((_, li) => es.push({ id: `e-pivot-l${li}`, source: `agent-${pivot}`, target: `llm-${li}`, sourceHandle: "b", type: "smoothstep", style: { stroke: "#ec4899", strokeWidth: 1.5 } }));
@@ -433,6 +371,7 @@ function TopologyGraph({ device, agents }) {
         return { nodes: ns, edges: es, graphHeight: Math.max(totalH + 40, 220) };
     }, [agents, device.endpoint]);
 
+    // ReactFlow requires an explicit height container with overflow:hidden — Box props insufficient
     return (
         <div style={{ height: graphHeight, borderRadius: 8, border: "1px solid #e1e5e9", overflow: "hidden", background: "#f8fafc" }}>
             <ReactFlow
@@ -461,17 +400,32 @@ function TopologyGraph({ device, agents }) {
 const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 
 function OverviewTab({ device, agents, onTabChange }) {
-    const aiCount  = agents.filter(a => a.type === "AI Agent").length;
-    const mcpCount = agents.filter(a => a.type === "MCP Server").length;
-    const llmCount = agents.filter(a => a.type === "LLM").length;
-    const totalV   = (device.violations?.critical || 0) + (device.violations?.high || 0) + (device.violations?.medium || 0) + (device.violations?.low || 0);
-    const osLabel  = device.os === "mac" ? "macOS" : device.os === "windows" ? "Windows" : device.os === "linux" ? "Linux" : "Unknown OS";
+    const { aiCount, mcpCount, llmCount, totalV } = useMemo(() => ({
+        aiCount:  agents.filter(a => a.type === "AI Agent").length,
+        mcpCount: agents.filter(a => a.type === "MCP Server").length,
+        llmCount: agents.filter(a => a.type === "LLM").length,
+        totalV:   (device.violations?.critical || 0) + (device.violations?.high || 0) + (device.violations?.medium || 0) + (device.violations?.low || 0),
+    }), [agents, device.violations]);
 
-    const rawFactors = computeRiskFactors(device, agents);
-    const factors    = [...rawFactors].sort((a, b) => (SEV_ORDER[a.severity] ?? 99) - (SEV_ORDER[b.severity] ?? 99));
-    const narrative  = getRiskNarrative(device, agents, rawFactors);
+    const osLabel = useMemo(() => {
+        if (device.os === "mac") return "macOS";
+        if (device.os === "windows") return "Windows";
+        if (device.os === "linux") return "Linux";
+        return "Unknown OS";
+    }, [device.os]);
 
-    const deviceDetails = [
+    const rawFactors = useMemo(() => computeRiskFactors(device, agents), [device, agents]);
+    const factors    = useMemo(() => [...rawFactors].sort((a, b) => (SEV_ORDER[a.severity] ?? 99) - (SEV_ORDER[b.severity] ?? 99)), [rawFactors]);
+    const narrative  = useMemo(() => getRiskNarrative(device, agents, rawFactors), [device, agents, rawFactors]);
+
+    const stats = useMemo(() => [
+        { label: aiCount  === 1 ? "AI Agent"   : "AI Agents",   value: aiCount  },
+        { label: mcpCount === 1 ? "MCP Server" : "MCP Servers", value: mcpCount },
+        { label: llmCount === 1 ? "LLM"        : "LLMs",        value: llmCount },
+        { label: totalV   === 1 ? "Violation"  : "Violations",  value: totalV   },
+    ], [aiCount, mcpCount, llmCount, totalV]);
+
+    const deviceDetails = useMemo(() => [
         { label: "User",      value: device.username },
         { label: "OS",        value: osLabel },
         { label: "Group",     value: device.group },
@@ -480,95 +434,69 @@ function OverviewTab({ device, agents, onTabChange }) {
         device.hasPersonalAccount
             ? { label: "Account", value: "Personal account", isWarning: true }
             : { label: "Account", value: "Corporate" },
-    ];
+    ], [device, osLabel]);
 
     return (
-        <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 20 }}>
-
-            {/* 1. Numbers */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-                {[
-                    { label: aiCount  === 1 ? "AI Agent"   : "AI Agents",   value: aiCount  },
-                    { label: mcpCount === 1 ? "MCP Server" : "MCP Servers", value: mcpCount },
-                    { label: llmCount === 1 ? "LLM"        : "LLMs",        value: llmCount },
-                    { label: totalV   === 1 ? "Violation"  : "Violations",  value: totalV   },
-                ].map(s => (
-                    <div key={s.label}>
-                        <Text variant="heading2xl" as="p">{s.value}</Text>
-                        <div style={{ marginTop: 2 }}>
+        <Box padding="4">
+            <VerticalStack gap="5">
+                <HorizontalGrid columns={4} gap="3">
+                    {stats.map(s => (
+                        <VerticalStack gap="1" key={s.label}>
+                            <Text variant="heading2xl" as="p">{s.value}</Text>
                             <Text variant="bodySm" color="subdued">{s.label}</Text>
-                        </div>
-                    </div>
-                ))}
-            </div>
+                        </VerticalStack>
+                    ))}
+                </HorizontalGrid>
 
-            {/* 2. Topology graph */}
-            <TopologyGraph device={device} agents={agents} />
+                <TopologyGraph device={device} agents={agents} />
 
-            {/* 3. Why this risk score */}
-            <div>
-                <div style={{ marginBottom: 8 }}>
+                <VerticalStack gap="3">
                     <Text variant="headingXs" color="subdued">Risk Analysis</Text>
-                </div>
-                <div style={{ marginBottom: 12 }}>
-                    <Text variant="bodySm" color="base">{narrative}</Text>
-                </div>
-                <VerticalStack gap="0">
-                    {factors.map((f, i) => {
-                        const badgeStatus = f.severity === "critical" ? "critical" : f.severity === "high" ? "warning" : f.severity === "medium" ? "attention" : "info";
-                        const targetTab   = (f.severity === "critical" || f.severity === "high") && f.title.toLowerCase().includes("violation") ? 2 : f.title.toLowerCase().includes("integration") || f.title.toLowerCase().includes("database") || f.title.toLowerCase().includes("cloud") ? 1 : 2;
-                        return (
-                            <div key={i}>
-                                {i > 0 && <div style={{ margin: "4px 0" }}><Divider /></div>}
-                                <div
-                                    onClick={() => onTabChange?.(targetTab)}
-                                    style={{
-                                        padding: "12px 8px",
-                                        display: "flex", alignItems: "center", gap: 12,
-                                        cursor: "pointer", borderRadius: 6,
-                                        transition: "background 0.15s",
-                                    }}
-                                    onMouseEnter={e => e.currentTarget.style.background = "#F6F6F7"}
-                                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                                >
-                                    <div style={{ width: 72, flexShrink: 0 }}>
-                                        <Badge status={badgeStatus}>{f.severity.charAt(0).toUpperCase() + f.severity.slice(1)}</Badge>
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <Text variant="bodySm" fontWeight="semibold">{f.title}</Text>
-                                        <div style={{ marginTop: 2 }}>
+                    <Text variant="bodySm">{narrative}</Text>
+                    <VerticalStack gap="0">
+                        {factors.map((f, i) => {
+                            const badgeStatus = f.severity === "critical" ? "critical" : f.severity === "high" ? "warning" : f.severity === "medium" ? "attention" : "info";
+                            const targetTab   = (f.severity === "critical" || f.severity === "high") && f.title.toLowerCase().includes("violation") ? 2 : f.title.toLowerCase().includes("integration") || f.title.toLowerCase().includes("database") || f.title.toLowerCase().includes("cloud") ? 1 : 2;
+                            return (
+                                <React.Fragment key={i}>
+                                    {i > 0 && <Divider />}
+                                    {/* clickable row — no Polaris equivalent for a full-width interactive area with hover state */}
+                                    <div
+                                        onClick={() => onTabChange?.(targetTab)}
+                                        style={{ padding: "12px 8px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", borderRadius: 6, transition: "background 0.15s" }}
+                                        onMouseEnter={e => e.currentTarget.style.background = "#F6F6F7"}
+                                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                                    >
+                                        <Box width="72px">
+                                            <Badge status={badgeStatus}>{f.severity.charAt(0).toUpperCase() + f.severity.slice(1)}</Badge>
+                                        </Box>
+                                        <VerticalStack gap="0">
+                                            <Text variant="bodySm" fontWeight="semibold">{f.title}</Text>
                                             <Text variant="bodySm" color="subdued">{f.description}</Text>
-                                        </div>
-                                    </div>
-                                    <div style={{ flexShrink: 0, color: "#8C9196" }}>
+                                        </VerticalStack>
                                         <Icon source={ChevronRightMinor} color="subdued" />
                                     </div>
-                                </div>
-                            </div>
-                        );
-                    })}
+                                </React.Fragment>
+                            );
+                        })}
+                    </VerticalStack>
                 </VerticalStack>
-            </div>
 
-            {/* 4. Device details — minimal 3-col grid */}
-            <div>
-                <div style={{ marginBottom: 10 }}>
+                <VerticalStack gap="3">
                     <Text variant="headingXs" color="subdued">Device Details</Text>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px 24px" }}>
-                    {deviceDetails.map(d => (
-                        <div key={d.label}>
-                            <Text variant="bodySm" color="subdued">{d.label}</Text>
-                            <div style={{ marginTop: 2 }}>
+                    <HorizontalGrid columns={3} gap="3">
+                        {deviceDetails.map(d => (
+                            <VerticalStack gap="1" key={d.label}>
+                                <Text variant="bodySm" color="subdued">{d.label}</Text>
                                 <Text variant="bodySm" fontWeight="semibold" color={d.isWarning ? "warning" : "base"}>
                                     {d.value || "—"}
                                 </Text>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
+                            </VerticalStack>
+                        ))}
+                    </HorizontalGrid>
+                </VerticalStack>
+            </VerticalStack>
+        </Box>
     );
 }
 
@@ -580,7 +508,6 @@ function isAgentNavigable(data) {
 }
 
 function AgenticsTab({ agents, onAgentClick }) {
-    const gridRef = useRef(null);
     const enriched = useMemo(() =>
         agents.map(a => ({ ...a, _riskData: AGENT_RISK_DATA[a.path?.join("/")] })),
         [agents]
@@ -592,21 +519,18 @@ function AgenticsTab({ agents, onAgentClick }) {
     }, [onAgentClick]);
 
     return (
-        <div style={{ position: "relative", flex: 1, minHeight: 0, height: "100%" }}>
-            <AgGridReact
-                ref={gridRef}
-                theme={gridTheme}
-                rowData={enriched}
-                columnDefs={AGENTS_COL_DEFS}
-                defaultColDef={GRID_DEFAULT_COL}
-                rowHeight={44}
-                headerHeight={40}
-                suppressCellFocus
-                animateRows
-                onRowClicked={handleRowClick}
-                getRowStyle={({ data }) => isAgentNavigable(data) ? { cursor: "pointer" } : { cursor: "default" }}
-            />
-        </div>
+        <AgGridTable
+            rowData={enriched}
+            columnDefs={AGENTS_COL_DEFS}
+            defaultColDef={GRID_DEFAULT_COL}
+            onRowClicked={handleRowClick}
+            getRowStyle={({ data }) => isAgentNavigable(data) ? { cursor: "pointer" } : { cursor: "default" }}
+            fillHeight
+            noOuterBorder
+            searchPlaceholder="Search assets..."
+            pagination={false}
+            sideBar={false}
+        />
     );
 }
 
@@ -614,32 +538,29 @@ function AgenticsTab({ agents, onAgentClick }) {
 
 function ViolationsTab({ device, agents }) {
     const violations = useMemo(() => generateViolations(device, agents), [device, agents]);
-    const gridRef = useRef(null);
 
     if (violations.length === 0) {
         return (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, paddingTop: 48 }}>
-                <span style={{ fontSize: 32 }}>✓</span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: "#16A34A" }}>No violations</span>
-                <span style={{ fontSize: 12, color: "#6D7175" }}>This device is operating within policy.</span>
-            </div>
+            <Box paddingBlockStart="12">
+                <VerticalStack gap="2" align="center">
+                    <Text variant="heading2xl" as="p">✓</Text>
+                    <Text variant="bodySm" fontWeight="semibold">No violations</Text>
+                    <Text variant="bodySm" color="subdued">This device is operating within policy.</Text>
+                </VerticalStack>
+            </Box>
         );
     }
 
     return (
-        <div style={{ position: "relative", flex: 1, minHeight: 0, height: "100%" }}>
-            <AgGridReact
-                ref={gridRef}
-                theme={gridTheme}
-                rowData={violations}
-                columnDefs={VIOLATIONS_COL_DEFS}
-                defaultColDef={GRID_DEFAULT_COL}
-                rowHeight={44}
-                headerHeight={40}
-                suppressCellFocus
-                animateRows
-            />
-        </div>
+        <AgGridTable
+            rowData={violations}
+            columnDefs={VIOLATIONS_COL_DEFS}
+            defaultColDef={GRID_DEFAULT_COL}
+            fillHeight
+            noOuterBorder
+            pagination={false}
+            sideBar={false}
+        />
     );
 }
 
@@ -665,10 +586,9 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
 
     if (!device) return null;
 
-    const { bg: riskBg, color: riskColor } = getRiskColors(device.riskScore);
-
     return (
         <div className={"flyLayout " + (show ? "show" : "")} style={{ width: 720 }}>
+            {/* onMouseEnter/onMouseLeave not available on Box; flyout positioning requires flex+height CSS not supported by Box */}
             <div
                 className="innerFlyLayout"
                 onMouseEnter={lockScroll}
@@ -683,31 +603,23 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
                     fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                 }}
             >
-                {/* Breadcrumb header */}
-                <div style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "12px 16px", borderBottom: "1px solid #E1E3E5", flexShrink: 0,
-                }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: "#202223" }}>{device.endpoint}</span>
-                        <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 10, fontSize: 12, fontWeight: 600, background: riskBg, color: riskColor }}>{device.riskScore?.toFixed(1)}</span>
-                    </div>
-                    <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#6D7175", fontSize: 18, lineHeight: 1, padding: "2px 4px" }}>×</button>
-                </div>
+                <FlyoutBreadcrumb
+                    items={[{ label: device.endpoint, badge: device.riskScore }]}
+                    onClose={onClose}
+                />
 
-                {/* Tabs */}
-                <div style={{ borderBottom: "1px solid #E1E3E5", padding: "0 4px", flexShrink: 0 }}>
+                <Box paddingInlineStart="1" paddingInlineEnd="1">
                     <Tabs tabs={tabs} selected={selectedTab} onSelect={setSelectedTab} />
-                </div>
+                </Box>
+                <Divider />
 
-                {/* Content */}
+                {/* flex:1 + minHeight:0 required for AG Grid tabs to fill remaining space — Box props insufficient */}
                 <div style={{ flex: 1, minHeight: 0, overflowY: selectedTab === 0 ? "auto" : "hidden", display: "flex", flexDirection: "column" }}>
                     {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} onTabChange={setSelectedTab} />}
                     {selectedTab === 1 && <AgenticsTab agents={agents || []} onAgentClick={onAgentClick} />}
                     {selectedTab === 2 && <ViolationsTab device={device} agents={agents || []} />}
                 </div>
 
-                {/* Ask Akto — expands to half-screen as user types */}
                 <AiChatSection
                     placeholder="Ask anything about this device..."
                     resetKey={device?.endpoint}

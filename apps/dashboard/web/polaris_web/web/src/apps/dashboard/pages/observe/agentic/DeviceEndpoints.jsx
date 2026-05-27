@@ -1,18 +1,18 @@
 import React, { useState, useMemo, useCallback, useRef } from "react";
-import { createPortal } from "react-dom";
 import Highcharts from "highcharts";
 import { HighchartsReact } from "highcharts-react-official";
-import {
-    Card, HorizontalStack, Text,
-} from "@shopify/polaris";
-import { AgGridReact } from "ag-grid-react";
+import { Card, Box, HorizontalStack, VerticalStack, Text, Icon } from "@shopify/polaris";
+import { CustomersMajor, CustomersMinor } from "@shopify/polaris-icons";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
-import { LicenseManager, themeQuartz, AllEnterpriseModule } from "ag-grid-enterprise";
+import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
+import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
+import AgGridRow from "@/apps/dashboard/components/tables/rows/AgGridRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import SkillsFlyout from "./SkillsFlyout";
 import DeviceFlyout from "./DeviceFlyout";
 import McpFlyout from "./McpFlyout";
+import { TYPE_STYLES, SEVERITY_COLORS, getRiskColor } from "./agenticStyles";
 import { AGENT_RISK_DATA, STAT_SPARKLINES, OS_TREND, VIOLATIONS_BY_SEVERITY, DEVICE_FLAT_DATA, USER_FLAT_DATA, devicesByUsername } from "./agenticDummyData";
 
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
@@ -21,40 +21,11 @@ LicenseManager.setLicenseKey(
     "[TRIAL]_this_{AG_Charts_and_AG_Grid}_Enterprise_key_{AG-129492}_is_granted_for_evaluation_only___Use_in_production_is_not_permitted___Please_report_misuse_to_legal@ag-grid.com___For_help_with_purchasing_a_production_key_please_contact_info@ag-grid.com___You_are_granted_a_{Single_Application}_Developer_License_for_one_application_only___All_Front-End_JavaScript_developers_working_on_the_application_would_need_to_be_licensed___This_key_will_deactivate_on_{18 June 2026}____[v3]_[0102]_MTc4MTczNzIwMDAwMA==d27c8a4487e577f42d9980e95824f43c"
 );
 
-const myTheme = themeQuartz.withParams({
-    accentColor: "#9642FC",
-    borderColor: "#E1E3E5",
-    borderRadius: 4,
-    browserColorScheme: "light",
-    cellTextColor: "#202223",
-    columnBorder: false,
-    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    fontSize: 12,
-    foregroundColor: "#202223",
-    headerFontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    headerRowBorder: true,
-    headerTextColor: "#6D7175",
-    iconSize: 16,
-    rowBorder: true,
-    spacing: 8,
-    wrapperBorder: true,
-    wrapperBorderRadius: 8,
-    headerFontSize: 12,
-    headerFontWeight: 500,
-    checkboxBorderRadius: 4,
-});
-
-// Theme variant used when a search bar sits above the grid inside a shared container
-const myThemeInner = myTheme.withParams({
-    wrapperBorder: false,
-    wrapperBorderRadius: 0,
-});
-
-// ─── Chart data ─────────────────────────────────────────────────────────────
+// ─── Chart data ──────────────────────────────────────────────────────────────
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-// ─── Chart configs ───────────────────────────────────────────────────────────
+// ─── Chart config helpers ─────────────────────────────────────────────────────
 
 function makeSparklineConfig(data, color) {
     const min = Math.min(...data), max = Math.max(...data);
@@ -97,93 +68,88 @@ function makeViolationsDonutConfig() {
     };
 }
 
-// ─── Stat + chart cards ──────────────────────────────────────────────────────
+// Hoist static chart configs — these depend only on module-level data so they
+// can be computed once instead of on every render of TopSection.
+const OS_TREND_OPTS = makeOsTrendConfig();
+const VIOLATIONS_DONUT_OPTS = makeViolationsDonutConfig();
 
-function StatRow({ label, value, delta, sparklineData, color, hasBorder }) {
+// ─── Stat + chart cards ───────────────────────────────────────────────────────
+
+function StatRow({ label, value, delta, sparklineData, color }) {
     const opts = useMemo(() => makeSparklineConfig(sparklineData, color), [sparklineData, color]);
     return (
-        <div style={{ padding:"16px 20px", borderBottom:hasBorder?"1px solid #F1F2F3":"none", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, flex:1 }}>
-            <div>
-                <Text variant="headingSm" fontWeight="semibold">{label}</Text>
-                <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:6 }}>
-                    <Text variant="headingXl" fontWeight="bold">{value.toLocaleString()}</Text>
-                    <span style={{ fontSize:13, fontWeight:600, color:"#16A34A" }}>+{delta}</span>
-                </div>
-            </div>
-            <div style={{ flexShrink:0, lineHeight:0 }}>
+        <Box
+            paddingInlineStart="5"
+            paddingInlineEnd="5"
+            paddingBlockStart="4"
+            paddingBlockEnd="4"
+        >
+            <HorizontalStack align="space-between" blockAlign="center" gap="3">
+                <VerticalStack gap="2">
+                    <Text variant="headingSm" fontWeight="semibold">{label}</Text>
+                    <HorizontalStack gap="2" blockAlign="center">
+                        <Text variant="headingXl" fontWeight="bold">{value.toLocaleString()}</Text>
+                        <Text variant="bodySm" fontWeight="semibold" color="success">+{delta}</Text>
+                    </HorizontalStack>
+                </VerticalStack>
                 <HighchartsReact highcharts={Highcharts} options={opts} immutable />
-            </div>
-        </div>
+            </HorizontalStack>
+        </Box>
     );
 }
 
-
 function ChartPanel({ title, children }) {
     return (
-        <div style={{ padding:"16px 20px", display:"flex", flexDirection:"column" }}>
-            <Text variant="headingMd" fontWeight="semibold">{title}</Text>
-            <div style={{ flex:1 }}>{children}</div>
-        </div>
+        <Box padding="4">
+            <VerticalStack gap="2">
+                <Text variant="headingMd" fontWeight="semibold">{title}</Text>
+                {children}
+            </VerticalStack>
+        </Box>
     );
 }
 
 function TopSection() {
     return (
-        <div style={{ display:"grid", gridTemplateColumns:"320px 1fr 298px", gap:16 }}>
-            <Card padding="0">
-                <div style={{ display:"flex", flexDirection:"column", justifyContent:"space-between", height:"100%" }}>
-                    <StatRow label="Total Endpoints"  value={6403} delta={21} sparklineData={STAT_SPARKLINES.endpoints}  color="#7C3AED" hasBorder />
-                    <StatRow label="Users"            value={4203} delta={20} sparklineData={STAT_SPARKLINES.users}      color="#2563EB" hasBorder />
-                    <StatRow label="Total Violations" value={1400} delta={24} sparklineData={STAT_SPARKLINES.violations} color="#DC2626" hasBorder={false} />
-                </div>
-            </Card>
-            <Card padding="0">
-                <ChartPanel title="Endpoints Over Time by OS Type">
-                    <HighchartsReact highcharts={Highcharts} options={makeOsTrendConfig()}/>
-                </ChartPanel>
-            </Card>
-            <Card padding="0">
-                <ChartPanel title="Violations by Severity">
-                    <HighchartsReact highcharts={Highcharts} options={makeViolationsDonutConfig()}/>
-                </ChartPanel>
-            </Card>
-        </div>
+        <HorizontalStack gap="4" align="start" wrap={false}>
+            <Box width="320px">
+                <Card padding="0">
+                    <VerticalStack>
+                        <StatRow label="Total Endpoints"  value={6403} delta={21} sparklineData={STAT_SPARKLINES.endpoints}  color="#7C3AED" />
+                        <StatRow label="Users"            value={4203} delta={20} sparklineData={STAT_SPARKLINES.users}      color="#2563EB" />
+                        <StatRow label="Total Violations" value={1400} delta={24} sparklineData={STAT_SPARKLINES.violations} color="#DC2626" />
+                    </VerticalStack>
+                </Card>
+            </Box>
+            {/* flex:1 + minWidth:0 needed for chart to expand — Box doesn't support flex child props */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+                <Card padding="0">
+                    <ChartPanel title="Endpoints Over Time by OS Type">
+                        <HighchartsReact highcharts={Highcharts} options={OS_TREND_OPTS} />
+                    </ChartPanel>
+                </Card>
+            </div>
+            <Box width="298px">
+                <Card padding="0">
+                    <ChartPanel title="Violations by Severity">
+                        <HighchartsReact highcharts={Highcharts} options={VIOLATIONS_DONUT_OPTS} />
+                    </ChartPanel>
+                </Card>
+            </Box>
+        </HorizontalStack>
     );
 }
 
-// ─── OS icons ────────────────────────────────────────────────────────────────
+// ─── OS icon helpers ──────────────────────────────────────────────────────────
+// SVGs live in public/ per CLAUDE.md — no inline SVG in component code.
 
-const MacIcon = () => (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="#202223" style={{ flexShrink: 0 }}>
-        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-    </svg>
-);
+function OsIcon({ os }) {
+    if (os === "mac")     return <img src="/public/os-mac.svg"     width={15} height={15} alt="macOS"   style={{ flexShrink: 0 }} />;
+    if (os === "windows") return <img src="/public/os-windows.svg" width={15} height={15} alt="Windows" style={{ flexShrink: 0 }} />;
+    return                       <img src="/public/os-linux.svg"   width={15} height={15} alt="Linux"   style={{ flexShrink: 0 }} />;
+}
 
-const WindowsIcon = () => (
-    <svg width="15" height="15" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
-        <path fill="#00A4EF" d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/>
-    </svg>
-);
-
-const LinuxIcon = () => (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="#F59E0B" style={{ flexShrink: 0 }}>
-        <path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.31-.269 1.083 0 1.73.267 2.31.269.24.482.68.83 1.21.946.75.2 1.69-.004 2.616-.47.865-.465 1.963-.4 2.775-.6.406-.133.766-.268.94-.602.174-.339.142-.804-.106-1.483-.076-.242-.019-.572.04-.97.028-.136.055-.337.055-.538.003-.207-.043-.411-.131-.6-.207-.411-.553-.545-.865-.682-.312-.133-.598-.2-.797-.4-.213-.239-.404-.572-.664-.839a.424.424 0 00-.11-.135c.122-.805-.009-1.657-.287-2.489-.589-1.771-1.831-3.47-2.716-4.521-.75-1.067-.974-1.928-1.05-3.02-.066-1.491 1.056-5.965-3.17-6.298-.165-.013-.324-.021-.48-.021z"/>
-    </svg>
-);
-
-const OsIcon = ({ os }) => {
-    if (os === "mac") return <MacIcon />;
-    if (os === "windows") return <WindowsIcon />;
-    return <LinuxIcon />;
-};
-
-// ─── Shared cell renderers ───────────────────────────────────────────────────
-
-const TYPE_STYLES = {
-    "AI Agent":   { bg: "#EFF6FF", color: "#1D4ED8", border: "#BFDBFE" },
-    "MCP Server": { bg: "#FFFBEB", color: "#92400E", border: "#FDE68A" },
-    "LLM":        { bg: "#F0FDF4", color: "#166534", border: "#BBF7D0" },
-};
+// ─── Cell renderers ───────────────────────────────────────────────────────────
 
 function TypeBadge({ type }) {
     if (!type) return null;
@@ -218,34 +184,11 @@ function SkillBadge({ count }) {
     );
 }
 
-function CountBadge({ count, style }) {
-    return (
-        <span style={{
-            display: "inline-flex", alignItems: "center", justifyContent: "center",
-            padding: "1px 7px", borderRadius: 12,
-            fontSize: 11, fontWeight: 600, lineHeight: "18px",
-            background: "#F1F2F3", color: "#6D7175",
-            border: "1px solid #E1E3E5",
-            whiteSpace: "nowrap",
-            ...style,
-        }}>
-            +{count}
-        </span>
-    );
-}
-
-function getRiskColor(score) {
-    if (score >= 4.5) return { bg: "#FEE2E2", color: "#DC2626" };
-    if (score >= 4.0) return { bg: "#FFEDD5", color: "#EA580C" };
-    if (score >= 3.5) return { bg: "#FEF9C3", color: "#CA8A04" };
-    return { bg: "#F0FDF4", color: "#16A34A" };
-}
-
 function RiskScoreCellRenderer({ value }) {
     if (value == null) return null;
     const { bg, color } = getRiskColor(value);
     return (
-        <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
+        <HorizontalStack blockAlign="center">
             <span style={{
                 display: "inline-flex", alignItems: "center", justifyContent: "center",
                 width: 44, height: 24, borderRadius: 12,
@@ -254,31 +197,21 @@ function RiskScoreCellRenderer({ value }) {
             }}>
                 {value.toFixed(1)}
             </span>
-        </div>
+        </HorizontalStack>
     );
 }
 
-const SEVERITY_COLORS = {
-    critical: { bg: "#DF2909", text: "#FFFBFB" },
-    high:     { bg: "#FED3D1", text: "#202223" },
-    medium:   { bg: "#FFD79D", text: "#202223" },
-    low:      { bg: "#E4E5E7", text: "#202223" },
-};
-
 function ViolationsCellRenderer({ value }) {
     if (!value) return null;
-    const { critical, high, medium, low } = value;
     const parts = [
-        { key: "critical", count: critical },
-        { key: "high",     count: high     },
-        { key: "medium",   count: medium   },
-        { key: "low",      count: low      },
+        { key: "critical", count: value.critical },
+        { key: "high",     count: value.high     },
+        { key: "medium",   count: value.medium   },
+        { key: "low",      count: value.low      },
     ].filter(p => p.count > 0);
-
     if (!parts.length) return null;
-
     return (
-        <div style={{ display: "flex", alignItems: "center", gap: 4, height: "100%" }}>
+        <HorizontalStack gap="1" blockAlign="center">
             {parts.map(p => (
                 <span key={p.key} style={{
                     display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -290,160 +223,82 @@ function ViolationsCellRenderer({ value }) {
                     {p.count}
                 </span>
             ))}
-        </div>
+        </HorizontalStack>
     );
 }
 
-// ─── Endpoint count badge with hover tooltip ─────────────────────────────────
-
-function EndpointCountBadge({ count, children }) {
-    const [show, setShow] = useState(false);
-    const ref = useRef(null);
-    const [pos, setPos] = useState({ top: 0, left: 0 });
-
-    const handleEnter = () => {
-        if (ref.current) {
-            const r = ref.current.getBoundingClientRect();
-            setPos({ top: r.bottom + 6, left: r.left });
-        }
-        setShow(true);
-    };
-
-    return (
-        <>
-            <span
-                ref={ref}
-                onMouseEnter={handleEnter}
-                onMouseLeave={() => setShow(false)}
-                style={{
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
-                    minWidth: 20, height: 20, padding: "0 6px", borderRadius: 10,
-                    fontSize: 11, fontWeight: 600,
-                    background: "#F1F2F3", color: "#6D7175",
-                    cursor: "default",
-                }}
-            >
-                +{count}
-            </span>
-            {show && createPortal(
-                <div style={{
-                    position: "fixed", top: pos.top, left: pos.left,
-                    background: "white",
-                    border: "1px solid #E1E3E5",
-                    borderRadius: 8,
-                    padding: "6px 0",
-                    boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
-                    zIndex: 99999,
-                    minWidth: 200,
-                    fontFamily: "Inter, sans-serif",
-                    pointerEvents: "none",
-                }}>
-                    {children}
-                </div>,
-                document.body
-            )}
-        </>
-    );
-}
-
-// ─── Devices: endpoint cell (used as innerRenderer in autoGroupColumnDef) ────
-
-const GroupUsersIcon = ({ color = "#8C9196" }) => (
-    <svg width="14" height="14" viewBox="0 0 20 20" fill={color} style={{ flexShrink: 0 }}>
-        <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
-    </svg>
-);
+// ─── Endpoint cell — uses AgGridRow as shared inner renderer ──────────────────
 
 function DeviceEndpointCellRenderer({ data, node }) {
     const isLeaf = node.level > 0;
-
     if (isLeaf) {
         return (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 13, color: "#202223" }}>{data.endpoint}</span>
-                <TypeBadge type={data.type} />
-                {data.skillCount && <SkillBadge count={data.skillCount} />}
-            </div>
+            <AgGridRow
+                label={data.endpoint}
+                typeBadge={data.type}
+                warning={data.skillCount ? <SkillBadge count={data.skillCount} /> : null}
+            />
         );
     }
-
     const childCount = node.childrenAfterGroup?.length ?? 0;
-
     return (
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <OsIcon os={data.os} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#202223" }}>{data.endpoint}</span>
-            {childCount > 0 && (
+        <AgGridRow
+            icon={<OsIcon os={data.os} />}
+            label={data.endpoint}
+            isBold
+            childCount={childCount}
+            warning={data.hasPersonalAccount
+                ? <Icon source={CustomersMajor} color="critical" />
+                : null
+            }
+        />
+    );
+}
+
+// ─── Username / endpoint cells ────────────────────────────────────────────────
+
+function UsernameCellRenderer({ data }) {
+    return (
+        <HorizontalStack gap="2" blockAlign="center">
+            <Text variant="bodySm" fontWeight="semibold">{data.username}</Text>
+            {data.hasPersonalAccount && <Icon source={CustomersMajor} color="critical" />}
+        </HorizontalStack>
+    );
+}
+
+function UserEndpointsCellRenderer({ data }) {
+    const devices = devicesByUsername[data.username];
+    if (!devices || devices.length === 0) return null;
+    const primary = devices[0];
+    const others  = devices.slice(1);
+    return (
+        <HorizontalStack gap="2" blockAlign="center">
+            <OsIcon os={primary.os} />
+            <Text variant="bodySm">{primary.endpoint}</Text>
+            {others.length > 0 && (
                 <span style={{
                     display: "inline-flex", alignItems: "center", justifyContent: "center",
                     minWidth: 20, height: 20, padding: "0 6px", borderRadius: 10,
                     fontSize: 11, fontWeight: 600,
                     background: "#F1F2F3", color: "#6D7175",
+                    cursor: "default",
                 }}>
-                    {childCount}
+                    +{others.length}
                 </span>
             )}
-            {data.hasPersonalAccount && <UserPersonIcon color="#FCA5A5" />}
-        </div>
+        </HorizontalStack>
     );
 }
 
-// ─── Users: username cell ────────────────────────────────────────────────────
-
-const UserPersonIcon = ({ color = "#8C9196" }) => (
-    <svg width="14" height="14" viewBox="0 0 20 20" fill={color} style={{ flexShrink: 0 }}>
-        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd"/>
-    </svg>
-);
-
-function UsernameCellRenderer({ data }) {
-    return (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, height: "100%" }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: "#202223" }}>{data.username}</span>
-            {data.hasPersonalAccount && <UserPersonIcon color="#FCA5A5" />}
-        </div>
-    );
-}
-
-// ─── Users: endpoints cell ────────────────────────────────────────────────────
-
-function UserEndpointsCellRenderer({ data }) {
-    const devices = devicesByUsername[data.username];
-    if (!devices || devices.length === 0) return null;
-
-    const primary = devices[0];
-    const others = devices.slice(1);
-
-    return (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, height: "100%" }}>
-            <OsIcon os={primary.os} />
-            <span style={{ fontSize: 13, color: "#202223" }}>{primary.endpoint}</span>
-            {others.length > 0 && (
-                <EndpointCountBadge count={others.length}>
-                    {others.map((d, i) => (
-                        <div key={i} style={{
-                            display: "flex", alignItems: "center", gap: 8,
-                            padding: "5px 12px",
-                        }}>
-                            <OsIcon os={d.os} />
-                            <span style={{ fontSize: 12, color: "#202223" }}>{d.endpoint}</span>
-                        </div>
-                    ))}
-                </EndpointCountBadge>
-            )}
-        </div>
-    );
-}
-
-// ─── Column definitions ──────────────────────────────────────────────────────
+// ─── Column definitions ───────────────────────────────────────────────────────
 
 const DEVICE_COL_DEFS = [
-    // endpoint column is handled by autoGroupColumnDef in tree mode
     {
         field: "riskScore",
         headerName: "Risk score",
         width: 110,
         sort: "desc",
+        filter: false,
         cellRenderer: RiskScoreCellRenderer,
         valueGetter: (params) => {
             if (!params.data) return null;
@@ -452,14 +307,15 @@ const DEVICE_COL_DEFS = [
             return AGENT_RISK_DATA[key]?.riskScore ?? null;
         },
     },
-    { field: "username",    headerName: "Username",      flex: 1, minWidth: 120, enableRowGroup: true               },
-    { field: "group",       headerName: "Group",         flex: 1, minWidth: 120                                      },
-    { field: "role",        headerName: "Role",          flex: 1.2, minWidth: 150                                    },
+    { field: "username",    headerName: "Username",     flex: 1,   minWidth: 120, enableRowGroup: true },
+    { field: "group",       headerName: "Group",        flex: 1,   minWidth: 120                       },
+    { field: "role",        headerName: "Role",         flex: 1.2, minWidth: 150                       },
     {
         field: "violations",
         headerName: "Violations",
         width: 160,
         sortable: false,
+        filter: false,
         cellRenderer: ViolationsCellRenderer,
         valueGetter: (params) => {
             if (!params.data) return null;
@@ -468,7 +324,7 @@ const DEVICE_COL_DEFS = [
             return AGENT_RISK_DATA[key]?.violations ?? null;
         },
     },
-    { field: "lastTraffic", headerName: "Last Traffic",  width: 130                                                  },
+    { field: "lastTraffic", headerName: "Last Traffic", width: 130 },
 ];
 
 const USER_COL_DEFS = [
@@ -482,18 +338,11 @@ const USER_COL_DEFS = [
         headerCheckboxSelection: true,
         cellRenderer: UsernameCellRenderer,
     },
-    { field: "riskScore",  headerName: "Risk score", width: 110, cellRenderer: RiskScoreCellRenderer },
-    {
-        field: "userEndpoints",
-        headerName: "Endpoints",
-        flex: 1.8,
-        minWidth: 200,
-        sortable: false,
-        cellRenderer: UserEndpointsCellRenderer,
-    },
-    { field: "violations", headerName: "Violations", width: 160, sortable: false, cellRenderer: ViolationsCellRenderer },
-    { field: "group",      headerName: "Group",      flex: 1, minWidth: 130 },
-    { field: "role",       headerName: "Role",       flex: 1.2, minWidth: 150 },
+    { field: "riskScore",     headerName: "Risk score", width: 110, filter: false, cellRenderer: RiskScoreCellRenderer },
+    { field: "userEndpoints", headerName: "Endpoints",  flex: 1.8, minWidth: 200, sortable: false, filter: false, cellRenderer: UserEndpointsCellRenderer },
+    { field: "violations",    headerName: "Violations", width: 160, sortable: false, filter: false, cellRenderer: ViolationsCellRenderer },
+    { field: "group",         headerName: "Group",      flex: 1,   minWidth: 130 },
+    { field: "role",          headerName: "Role",       flex: 1.2, minWidth: 150 },
 ];
 
 const DEFAULT_COL_DEF = {
@@ -503,105 +352,14 @@ const DEFAULT_COL_DEF = {
     cellStyle: { display: "flex", alignItems: "center" },
 };
 
-// ─── Table section ───────────────────────────────────────────────────────────
-
-function BulkActionBar({ count, onClear }) {
-    if (!count) return null;
-    return (
-        <div style={{
-            display: "flex", alignItems: "center", gap: 10,
-            padding: "8px 14px",
-            background: "#F5F0FF",
-            border: "1px solid #DDD3FA",
-            borderRadius: 8,
-            marginBottom: 10,
-        }}>
-            <span style={{
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                minWidth: 24, height: 24, padding: "0 7px", borderRadius: 12,
-                fontSize: 12, fontWeight: 700,
-                background: "#7C3AED", color: "white",
-            }}>
-                {count}
-            </span>
-            <span style={{ fontSize: 13, color: "#4B5563", fontWeight: 500 }}>
-                {count === 1 ? "row" : "rows"} selected
-            </span>
-            <div style={{ width: 1, height: 16, background: "#DDD3FA", margin: "0 2px" }} />
-            <div style={{ display: "flex", gap: 8 }}>
-                <button style={{
-                    padding: "5px 14px", borderRadius: 6, cursor: "pointer",
-                    fontSize: 13, fontWeight: 500,
-                    background: "white", color: "#202223",
-                    border: "1px solid #D1D5DB",
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
-                }}>
-                    Edit Team
-                </button>
-                <button style={{
-                    padding: "5px 14px", borderRadius: 6, cursor: "pointer",
-                    fontSize: 13, fontWeight: 500,
-                    background: "white", color: "#202223",
-                    border: "1px solid #D1D5DB",
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
-                }}>
-                    Edit Role
-                </button>
-            </div>
-            <button
-                onClick={onClear}
-                style={{
-                    marginLeft: "auto", background: "none", border: "none",
-                    cursor: "pointer", color: "#6D7175", fontSize: 18, lineHeight: 1,
-                    padding: "0 4px",
-                }}
-            >×</button>
-        </div>
-    );
-}
-
-function SearchBar({ value, onChange }) {
-    return (
-        <div style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "7px 12px",
-            borderBottom: "1px solid #E1E3E5",
-            borderRadius: "8px 8px 0 0",
-            background: "white",
-            flexShrink: 0,
-        }}>
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="#8C9196" style={{ flexShrink: 0 }}>
-                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
-            </svg>
-            <input
-                type="text"
-                placeholder="Search…"
-                value={value}
-                onChange={e => onChange(e.target.value)}
-                style={{
-                    flex: 1, border: "none", outline: "none",
-                    fontSize: 13, color: "#202223",
-                    background: "transparent",
-                    fontFamily: "Inter, sans-serif",
-                }}
-            />
-            {value && (
-                <button onClick={() => onChange("")} style={{
-                    background: "none", border: "none", cursor: "pointer",
-                    color: "#8C9196", fontSize: 16, lineHeight: 1, padding: 0,
-                }}>×</button>
-            )}
-        </div>
-    );
-}
+// ─── Table section ────────────────────────────────────────────────────────────
 
 function TableSection() {
-    const [deviceQuickFilter, setDeviceQuickFilter] = useState("");
     const [selectedCount, setSelectedCount] = useState(0);
-    const [flyout, setFlyout] = useState(null);       // { agent, device } — SkillsFlyout
-    const [deviceFlyout, setDeviceFlyout] = useState(null); // { device, agents }
-    const [mcpFlyout, setMcpFlyout] = useState(null);       // { agent, device }
-    const deviceGridRef = useRef(null);
+    const [flyout, setFlyout] = useState(null);
+    const [deviceFlyout, setDeviceFlyout] = useState(null);
+    const [mcpFlyout, setMcpFlyout] = useState(null);
+    const gridRef = useRef(null);
 
     const closeAll = useCallback(() => {
         setFlyout(null);
@@ -609,7 +367,6 @@ function TableSection() {
         setMcpFlyout(null);
     }, []);
 
-    // Called when an agent row in Agentic Assets tab is clicked — open SkillsFlyout or McpFlyout
     const handleAgentClickFromDevice = useCallback((agent) => {
         if (!agent) return;
         const device = deviceFlyout?.device;
@@ -624,7 +381,6 @@ function TableSection() {
         }
     }, [deviceFlyout]);
 
-    // Called when any flyout breadcrumb's device name is clicked — jump to DeviceFlyout
     const handleDeviceClickFromFlyout = useCallback((device) => {
         const deviceId = device?.path?.[0];
         if (!deviceId) return;
@@ -636,10 +392,8 @@ function TableSection() {
 
     const handleRowClick = useCallback((e) => {
         const { data, node } = e;
-        if (!data) return; // synthetic group row
-
+        if (!data) return;
         if (node.level === 0) {
-            // Device row — open DeviceFlyout
             const deviceId = data.path[0];
             const agents = DEVICE_FLAT_DATA.filter(r => r.path.length === 2 && r.path[0] === deviceId);
             setDeviceFlyout({ device: data, agents });
@@ -647,7 +401,6 @@ function TableSection() {
             setMcpFlyout(null);
             return;
         }
-
         if (node.level > 0) {
             if (data.type === "MCP Server") {
                 const deviceId = data.path[0];
@@ -676,6 +429,7 @@ function TableSection() {
         pinned: "left",
         checkboxSelection: true,
         headerCheckboxSelection: true,
+        filter: "agTextColumnFilter",
         cellRendererParams: {
             suppressCount: true,
             innerRenderer: DeviceEndpointCellRenderer,
@@ -683,50 +437,36 @@ function TableSection() {
         cellStyle: { display: "flex", alignItems: "center" },
     }), []);
 
-    return (
-        <div>
-            <BulkActionBar
-                count={selectedCount}
-                onClear={() => { deviceGridRef.current?.api?.deselectAll(); setSelectedCount(0); }}
-            />
+    const bulkActions = useMemo(() => [
+        { label: "Edit Team", onAction: () => {} },
+        { label: "Edit Role", onAction: () => {} },
+    ], []);
 
-            {/* Grid */}
-            <div style={{
-                height: selectedCount > 0 ? 754 : 800,
-                border: "1px solid #E1E3E5",
-                borderRadius: 8,
-                display: "flex",
-                flexDirection: "column",
-            }}>
-                <SearchBar value={deviceQuickFilter} onChange={setDeviceQuickFilter} />
-                <div style={{ flex: 1, minHeight: 0, borderRadius: "0 0 8px 8px", overflow: "hidden" }}>
-                    <AgGridReact
-                        key="devices"
-                        ref={deviceGridRef}
-                        theme={myThemeInner}
-                        rowData={DEVICE_FLAT_DATA}
-                        onRowClicked={handleRowClick}
-                        onSelectionChanged={e => setSelectedCount(e.api.getSelectedRows().length)}
-                        columnDefs={DEVICE_COL_DEFS}
-                        autoGroupColumnDef={autoGroupColumnDef}
-                        defaultColDef={DEFAULT_COL_DEF}
-                        treeData
-                        getDataPath={getDataPath}
-                        groupDefaultExpanded={0}
-                        rowSelection="multiple"
-                        suppressRowClickSelection
-                        animateRows
-                        rowHeight={44}
-                        headerHeight={40}
-                        suppressCellFocus
-                        sideBar={{ toolPanels: ["columns", "filters"] }}
-                        pagination
-                        paginationPageSize={20}
-                        paginationPageSizeSelector={[20, 50, 100]}
-                        quickFilterText={deviceQuickFilter}
-                    />
-                </div>
-            </div>
+    return (
+        <VerticalStack gap="0">
+            <AgGridTable
+                gridRef={gridRef}
+                rowData={DEVICE_FLAT_DATA}
+                columnDefs={DEVICE_COL_DEFS}
+                defaultColDef={DEFAULT_COL_DEF}
+                autoGroupColumnDef={autoGroupColumnDef}
+                treeData
+                getDataPath={getDataPath}
+                groupDefaultExpanded={0}
+                height={800}
+                searchPlaceholder="Search..."
+                bulkActionCount={selectedCount}
+                bulkActions={bulkActions}
+                onClearBulk={() => { gridRef.current?.api?.deselectAll(); setSelectedCount(0); }}
+                onRowClicked={handleRowClick}
+                onSelectionChanged={e => setSelectedCount(e.api.getSelectedRows().length)}
+                rowSelection="multiple"
+                suppressRowClickSelection
+                pagination
+                paginationPageSize={20}
+                paginationPageSizeSelector={[20, 50, 100]}
+                sideBar={{ toolPanels: ["columns", "filters"] }}
+            />
 
             <SkillsFlyout
                 agent={flyout?.agent}
@@ -749,11 +489,11 @@ function TableSection() {
                 onClose={closeAll}
                 onDeviceClick={handleDeviceClickFromFlyout}
             />
-        </div>
+        </VerticalStack>
     );
 }
 
-// ─── Main component ──────────────────────────────────────────────────────────
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function DeviceEndpoints() {
     return (
