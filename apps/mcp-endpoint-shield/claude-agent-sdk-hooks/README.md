@@ -9,7 +9,7 @@ These hooks provide the same four guardrails behaviours as `claude-cli-hooks/`, 
 | Hook | Event | Behaviour |
 |---|---|---|
 | `akto_user_prompt_submit` | `UserPromptSubmit` | Validates user prompt; denies on a hard `block` (warn/alert pass through) |
-| `akto_stop` | `Stop` | Validates the agent response and ingests the turn; denies on a hard `block` (warn/alert pass through) |
+| `akto_stop` | `Stop` | Validates the agent response and ingests the turn; **detect-only** — a hard `block` is recorded as a 403 but not prevented (see note below) |
 | `akto_pre_tool_use` | `PreToolUse` | Validates MCP/built-in tool calls; denies on a hard `block` (warn/alert pass through) |
 | `akto_post_tool_use` | `PostToolUse` | Ingests tool execution results for observability |
 
@@ -127,6 +127,12 @@ All three validating hooks resolve a guardrail verdict through `resolve_guardrai
 | `block` (or unset) | Deny |
 | `alert` | Allow; the violation is recorded server-side |
 | `warn` | Allow; treated as `alert` in the Agent SDK (see below) |
+
+For `UserPromptSubmit` and `PreToolUse`, "Deny" actually blocks (the prompt isn't sent / the tool isn't run). For `Stop` it does **not**.
+
+### `Stop` is detect-only
+
+By the time the `Stop` hook fires, the response has already been produced and shown, and the Agent SDK cannot retract it — returning `continue_` neither regenerates nor hides the response (`continue_: True` is a no-op; `continue_: False` only hard-halts the whole run). So a hard `block` on a response is **recorded as a 403** for alerting/dashboard but is *not* prevented. True response-level blocking would require an output-interception layer, not a `Stop` hook.
 
 ### Why `warn` is not a resubmit gate here
 

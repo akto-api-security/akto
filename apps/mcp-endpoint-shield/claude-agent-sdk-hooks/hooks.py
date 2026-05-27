@@ -101,11 +101,14 @@ def create_hooks(client_ip: str = ""):
         Stop hook — validates the agent response against Akto guardrails and ingests
         the completed conversation turn.
 
-        SYNC_MODE=true  : Denies the response on a hard guardrail block (re-entering the
-                          agent loop with a system message so it can regenerate safely);
-                          'warn'/'alert' behaviours are allowed through (recorded server-side).
-        SYNC_MODE=false : Allows all responses through; ingests with guardrails=true
-                          for observational tracking.
+        Response guardrails are DETECT-ONLY in the Agent SDK: the response has already
+        been produced and shown by the time the Stop hook fires, and the SDK cannot
+        retract it (returning continue_ does not regenerate or hide the response). So a
+        hard block is recorded as a 403 for alerting/dashboard, but not actually prevented.
+
+        SYNC_MODE=true  : Validates the response; a hard block is ingested as a 403,
+                          while allowed / 'warn' / 'alert' responses ingest normally.
+        SYNC_MODE=false : Allows all responses through; ingests for observational tracking.
         Fail-open: any error allows the response through.
         """
         transcript_path = input_data.get("transcript_path")
@@ -130,13 +133,14 @@ def create_hooks(client_ip: str = ""):
         allowed, _ = resolve_guardrail_decision(gr_allowed, gr_reason, behaviour)
 
         if not allowed:
-            block_reason = f"Response blocked by Akto Guardrails: {gr_reason}"
-
-            logger.warning(f"BLOCKING response — reason: {gr_reason}")
+            # Detect-only: the response has already been produced and shown by the time the
+            # Stop hook fires, and the Agent SDK cannot retract it. Record the violation as a
+            # 403 for alerting/dashboard, but do not pretend to block.
+            logger.warning(f"Response FLAGGED by Akto Guardrails (detect-only) — reason: {gr_reason}")
             asyncio.create_task(
                 ingest_blocked_response_async(user_prompt, response_text, gr_reason, _ip)
             )
-            return {"continue_": True, "systemMessage": block_reason}
+            return {}
 
         asyncio.create_task(send_stop_ingestion_async(user_prompt, response_text, _ip))
         return {}
