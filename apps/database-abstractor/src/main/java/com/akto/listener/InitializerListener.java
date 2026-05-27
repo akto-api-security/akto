@@ -18,6 +18,7 @@ import com.akto.metrics.AllMetrics;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.TagMismatchCron;
+import com.akto.utils.TokenBlocklistCron;
 import com.mongodb.ConnectionString;
 
 
@@ -56,6 +57,9 @@ public class InitializerListener implements ServletContextListener {
                             TagMismatchCron tagsMismatchCron = new TagMismatchCron();
                             logger.info("triggering tags mismatch cron for db abstractor " + Context.now());
                             tagsMismatchCron.runCron();
+                            TokenBlocklistCron tokenBlocklistCron = new TokenBlocklistCron();
+                            logger.info("triggering token blocklist cron for db abstractor " + Context.now());
+                            tokenBlocklistCron.runCron();
                         }
                         AllMetrics.instance.ingestTcMetrics();
                     } catch (Exception e) {
