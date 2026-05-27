@@ -206,14 +206,14 @@ function ThreatDashboardPage() {
     );
 
     const dashboardLayout = (
-        <div style={{ display: "flex", gap: "var(--p-space-5, 1.25rem)", alignItems: "flex-start" }}>
-            <div style={{ flex: "1 1 0%", minWidth: 0 }}>
+        <Box style={{ display: "flex", gap: "var(--p-space-5, 1.25rem)", alignItems: "flex-start" }}>
+            <Box style={{ flex: "1 1 0%", minWidth: 0 }}>
                 {mainContent}
-            </div>
-            <div style={{ flex: "0 0 30%", minWidth: "18rem" }}>
+            </Box>
+            <Box style={{ flex: "0 0 30%", minWidth: "18rem" }}>
                 {sidebarContent}
-            </div>
-        </div>
+            </Box>
+        </Box>
     );
 
     return (

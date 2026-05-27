@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import { Box, Card, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import api from "../api";
 import observeFunc from "../../observe/transform";
 import { formatCategoryName, getFlagSrc, countryCodeToName, openThreatActivityPage } from "../utils/threatDashboardUtils";
@@ -44,7 +44,7 @@ function SidebarSection({ title, children, variant }) {
 
 function SidebarListItem({ icon, label, count, onClick, isLast }) {
     return (
-        <div
+        <Box
             onClick={onClick}
             className="sidebar-list-item"
             style={{
@@ -60,7 +60,7 @@ function SidebarListItem({ icon, label, count, onClick, isLast }) {
                 </HorizontalStack>
                 <Text variant="bodySm">{observeFunc.formatNumberWithCommas(count)}</Text>
             </HorizontalStack>
-        </div>
+        </Box>
     );
 }
 
