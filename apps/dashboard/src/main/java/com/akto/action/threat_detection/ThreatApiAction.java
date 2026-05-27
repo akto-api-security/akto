@@ -54,6 +54,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   @Getter int totalActiveStatus;
   @Getter int totalIgnoredStatus;
   @Getter int totalUnderReviewStatus;
+  @Getter int activeActorsCount;
 
   @Getter List<TopApiData> topApis;
   @Getter List<TopHostData> topHosts;
@@ -229,6 +230,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
                 this.totalActiveStatus = m.getTotalActive();
                 this.totalIgnoredStatus = m.getTotalIgnored();
                 this.totalUnderReviewStatus = m.getTotalUnderReview();
+                this.activeActorsCount = m.getActiveActorsCount();
               });
     } catch (Exception e) {
       e.printStackTrace();

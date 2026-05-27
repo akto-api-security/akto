@@ -808,13 +808,6 @@ public class ThreatActorService {
         LoggerMaker.LogDb.THREAT_DETECTION
     );
 
-    // UI expects actorsCounts array - return single element with aggregated totals
-    DailyActorsCountResponse.ActorsCount actorsCount = DailyActorsCountResponse.ActorsCount.newBuilder()
-        .setTs((int) endTs)  // Use endTs as timestamp
-        .setTotalActors((int) activeActorsCount)
-        .setCriticalActors((int) criticalActorsCount)
-        .build();
-
     // Build base filter for malicious_events queries (time range + context)
     Document eventsMatch = new Document();
     if (tsFilter != null) {
@@ -822,6 +815,53 @@ public class ThreatActorService {
     }
     if (!contextFilter.isEmpty()) {
       eventsMatch.putAll(contextFilter);
+    }
+
+    // Daily actor counts from malicious_events (for chart daily breakdown)
+    List<DailyActorsCountResponse.ActorsCount> dailyActors = new ArrayList<>();
+    List<Document> dailyPipeline = new ArrayList<>();
+    if (!eventsMatch.isEmpty()) {
+      dailyPipeline.add(new Document("$match", eventsMatch));
+    }
+    dailyPipeline.add(new Document("$project",
+        new Document("actor", 1)
+            .append("severity", 1)
+            .append("severityPriority",
+                new Document("$switch",
+                    new Document("branches", Arrays.asList(
+                        new Document("case", new Document("$eq", Arrays.asList("$severity", "CRITICAL"))).append("then", 4),
+                        new Document("case", new Document("$eq", Arrays.asList("$severity", "HIGH"))).append("then", 3),
+                        new Document("case", new Document("$eq", Arrays.asList("$severity", "MEDIUM"))).append("then", 2),
+                        new Document("case", new Document("$eq", Arrays.asList("$severity", "LOW"))).append("then", 1)))
+                    .append("default", 0)))
+            .append("dayStart",
+                new Document("$dateTrunc",
+                    new Document("date", new Document("$toDate", new Document("$multiply", Arrays.asList("$detectedAt", 1000))))
+                        .append("unit", "day")))));
+    dailyPipeline.add(new Document("$group",
+        new Document("_id",
+            new Document("dayStart", "$dayStart").append("actor", "$actor"))
+            .append("severity", new Document("$max", "$severityPriority"))));
+    dailyPipeline.add(new Document("$group",
+        new Document("_id", "$_id.dayStart")
+            .append("totalActors", new Document("$sum", 1))
+            .append("severityActors",
+                new Document("$sum",
+                    new Document("$cond",
+                        Arrays.asList(
+                            new Document("$gte", Arrays.asList("$severity", 3)),
+                            1, 0))))));
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, dailyPipeline).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        long dayStartEpochSeconds = doc.getDate("_id").getTime() / 1000;
+        dailyActors.add(
+            DailyActorsCountResponse.ActorsCount.newBuilder()
+                .setTs((int) dayStartEpochSeconds)
+                .setTotalActors(doc.getInteger("totalActors"))
+                .setCriticalActors(doc.getInteger("severityActors"))
+                .build());
+      }
     }
 
     // Total analysed - all events in time range
@@ -859,13 +899,14 @@ public class ThreatActorService {
     }
 
     return DailyActorsCountResponse.newBuilder()
-        .addActorsCounts(actorsCount)  // Add single element to array
+        .addAllActorsCounts(dailyActors)
         .setTotalActive(totalActive)
         .setCriticalActorsCount((int) criticalActorsCount)
         .setTotalAnalysed((int) totalAnalysed)
         .setTotalAttacks((int) totalAttacks)
         .setTotalIgnored(totalIgnored)
         .setTotalUnderReview(totalUnderReview)
+        .setActiveActorsCount((int) activeActorsCount)
         .build();
   }
 

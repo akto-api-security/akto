@@ -28,16 +28,18 @@ function ThreatDetectionOverTimeChart({ startTimestamp, endTimestamp }) {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [dailyResp, timelineResp, apisResp] = await Promise.all([
+                const [dailyResp, timelineResp, apisResp, actorsResp] = await Promise.all([
                     api.getDailyThreatActorsCount(startTimestamp, endTimestamp, []),
                     api.getThreatActivityTimeline(startTimestamp, endTimestamp),
                     api.fetchThreatApis(0, {}, []),
+                    api.fetchThreatActors(0, {}, [], [], startTimestamp, endTimestamp, [], []),
                 ]);
 
                 if (!mounted) return;
 
                 const totalThreats = dailyResp?.totalAnalysed || 0;
-                const totalActors = dailyResp?.totalActiveStatus || 0;
+                const actorsCounts = dailyResp?.actorsCounts || [];
+                const totalActors = actorsResp?.total || (actorsResp?.actors || []).length;
                 const apisTotal = apisResp?.total || 0;
 
                 setSummaryMetrics({ totalThreats, apisUnderThreat: apisTotal, threatActors: totalActors });
@@ -55,7 +57,6 @@ function ThreatDetectionOverTimeChart({ startTimestamp, endTimestamp }) {
                     // keep default
                 }
 
-                const actorsCounts = dailyResp?.actorsCounts || [];
                 const timelines = timelineResp?.threatActivityTimelines || [];
 
                 const dailyThreatMap = new Map();

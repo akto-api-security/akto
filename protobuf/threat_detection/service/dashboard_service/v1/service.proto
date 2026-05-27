@@ -248,6 +248,7 @@ message DailyActorsCountResponse {
   uint32 total_active = 5;
   uint32 total_ignored = 6;
   uint32 total_under_review = 7;
+  uint32 active_actors_count = 8;
 }
 
 message ThreatActivityTimelineRequest {

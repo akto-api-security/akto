@@ -11599,7 +11599,7 @@
                     name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">^(actorsCounts|total).*</param>
+                <param name="includeProperties">^(actorsCounts|total|activeActorsCount).*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

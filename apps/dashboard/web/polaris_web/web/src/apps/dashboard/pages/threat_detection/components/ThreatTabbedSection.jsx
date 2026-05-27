@@ -55,7 +55,7 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
                 const totalActive = summaryResp?.totalActiveStatus || 0;
                 const totalIgnored = summaryResp?.totalIgnoredStatus || 0;
                 const totalUnderReview = summaryResp?.totalUnderReviewStatus || 0;
-                setTotalThreatsCount(totalActive + totalIgnored + totalUnderReview);
+                setTotalThreatsCount(summaryResp?.totalAnalysed || 0);
 
                 setThreatStatusData({
                     Active: {
