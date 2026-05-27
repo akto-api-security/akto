@@ -233,11 +233,11 @@ public class AktoPolicyNew {
         }
         for (CollectionTags tag : existingTags) {
             if (Objects.equals(tag.getKeyName(), headerKey) && Objects.equals(tag.getValue(), category)) {
-                tag.setLastUpdatedTs(Context.now());
                 return;
             }
         }
-        existingTags.add(new CollectionTags(Context.now(), headerKey, category, CollectionTags.TagSource.AKTO));
+        // lastUpdatedTs=0 so the object is stable across runs — MongoDB addEachToSet deduplicates by full equality
+        existingTags.add(new CollectionTags(0, headerKey, category, CollectionTags.TagSource.AKTO));
     }
 
     public PolicyCatalog getApiInfoFromMap(ApiInfo.ApiInfoKey apiInfoKey) {
