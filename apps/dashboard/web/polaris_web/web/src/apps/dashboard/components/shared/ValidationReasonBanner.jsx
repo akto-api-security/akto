@@ -66,7 +66,13 @@ function ReasonBlock({ body }) {
     )
 }
 
+const HIDE_VALIDATION_REASON_BANNER = true
+
 function ValidationReasonBanner({ validationReason }) {
+    if (HIDE_VALIDATION_REASON_BANNER) {
+        return null
+    }
+
     const parsed = parseValidationReason(validationReason)
     if (!parsed) {
         return null
