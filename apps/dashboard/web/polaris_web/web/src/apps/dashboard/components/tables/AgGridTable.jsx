@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import { themeQuartz } from "ag-grid-enterprise";
 import { Box, HorizontalStack, VerticalStack, Text, Button } from "@shopify/polaris";
+import { MobileCancelMajor } from "@shopify/polaris-icons";
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 // Defined once here — all AG Grid consumers import agTableTheme / agTableThemeInner.
@@ -76,39 +77,47 @@ function SearchBar({ value, onChange, placeholder }) {
 
 // ─── BulkActionBar ───────────────────────────────────────────────────────────
 
-function BulkActionBar({ count, bulkActions = [], onClear }) {
+function BulkActionBar({ count, bulkActions = [], onClear, noRadius = false }) {
     if (!count) return null;
     return (
-        <Box paddingBlockEnd="2">
+        <Box paddingBlockEnd={noRadius ? "0" : "2"}>
             {/* Brand purple background/border (#F5F0FF, #DDD3FA) are outside the Polaris token set */}
             <div style={{
                 padding: "8px 14px",
                 background: "#F5F0FF",
                 border: "1px solid #DDD3FA",
-                borderRadius: 8,
+                borderRadius: noRadius ? 0 : 8,
+                borderLeft: noRadius ? "none" : undefined,
+                borderRight: noRadius ? "none" : undefined,
             }}>
-                <HorizontalStack align="space-between" blockAlign="center">
-                    <HorizontalStack gap="2" blockAlign="center">
-                        {/* Brand purple #7C3AED badge — no matching Polaris token */}
-                        <span style={{
-                            display: "inline-flex", alignItems: "center", justifyContent: "center",
-                            minWidth: 24, height: 24, padding: "0 7px", borderRadius: 12,
-                            fontSize: 12, fontWeight: 700,
-                            background: "#7C3AED", color: "white",
-                        }}>
-                            {count}
-                        </span>
-                        <Text variant="bodySm" color="subdued">
-                            {count === 1 ? "row" : "rows"} selected
-                        </Text>
-                        {bulkActions.map(action => (
-                            <Button key={action.label} size="slim" onClick={action.onAction}>
-                                {action.label}
-                            </Button>
-                        ))}
+                <VerticalStack gap="2">
+                    <HorizontalStack align="space-between" blockAlign="center">
+                        <HorizontalStack gap="2" blockAlign="center">
+                            {/* Brand purple #7C3AED badge — no matching Polaris token */}
+                            <span style={{
+                                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                minWidth: 24, height: 24, padding: "0 7px", borderRadius: 12,
+                                fontSize: 12, fontWeight: 700,
+                                background: "#7C3AED", color: "white",
+                            }}>
+                                {count}
+                            </span>
+                            <Text variant="bodySm" color="subdued">
+                                {count === 1 ? "row" : "rows"} selected
+                            </Text>
+                        </HorizontalStack>
+                        <Button plain icon={MobileCancelMajor} onClick={onClear} accessibilityLabel="Clear selection" />
                     </HorizontalStack>
-                    <Button plain onClick={onClear}>×</Button>
-                </HorizontalStack>
+                    {bulkActions.length > 0 && (
+                        <HorizontalStack gap="2">
+                            {bulkActions.map(action => (
+                                <Button key={action.label} size="slim" onClick={action.onAction}>
+                                    {action.label}
+                                </Button>
+                            ))}
+                        </HorizontalStack>
+                    )}
+                </VerticalStack>
             </div>
         </Box>
     );
@@ -203,7 +212,7 @@ export default function AgGridTable({
     if (fillHeight) {
         return (
             <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} />
+                <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} noRadius />
                 {hasSearch && <SearchBar value={quickFilter} onChange={handleQuickFilterChange} placeholder={searchPlaceholder} />}
                 <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
                     {gridNode}

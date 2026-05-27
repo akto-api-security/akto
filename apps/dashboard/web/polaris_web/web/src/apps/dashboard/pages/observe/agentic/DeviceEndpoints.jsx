@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef } from "react";
 import Highcharts from "highcharts";
 import { HighchartsReact } from "highcharts-react-official";
-import { Card, Box, HorizontalStack, VerticalStack, Text, Icon } from "@shopify/polaris";
+import { Card, Box, HorizontalStack, VerticalStack, Text, Icon, Divider } from "@shopify/polaris";
 import { CustomersMajor, CustomersMinor } from "@shopify/polaris-icons";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
@@ -42,11 +42,11 @@ function makeSparklineConfig(data, color) {
 
 function makeOsTrendConfig() {
     return {
-        chart:{type:"line",height:260,backgroundColor:"transparent",style:{fontFamily:"Inter, -apple-system, sans-serif"},margin:[24,20,64,52]},
+        chart:{type:"line",height:200,backgroundColor:"transparent",style:{fontFamily:"Inter, -apple-system, sans-serif"},margin:[8,8,64,44]},
         title:null, credits:{enabled:false}, exporting:{enabled:false},
         xAxis:{categories:MONTHS,labels:{style:{fontSize:"11px",color:"#8C9196"}},lineColor:"#DFE3E8",tickColor:"transparent"},
         yAxis:{title:null,labels:{style:{fontSize:"11px",color:"#8C9196"}},gridLineColor:"#F1F2F3"},
-        legend:{align:"left",verticalAlign:"bottom",itemStyle:{fontSize:"12px",fontWeight:"400",color:"#6D7175"},symbolRadius:4,margin:12},
+        legend:{align:"left",verticalAlign:"bottom",layout:"horizontal",itemStyle:{fontSize:"12px",fontWeight:"400",color:"#6D7175"},symbolRadius:4,margin:12},
         tooltip:{shared:true,backgroundColor:"white",borderColor:"#DFE3E8",borderRadius:8,style:{fontSize:"12px"}},
         plotOptions:{line:{marker:{enabled:false},lineWidth:2}},
         series:[
@@ -59,7 +59,7 @@ function makeOsTrendConfig() {
 
 function makeViolationsDonutConfig() {
     return {
-        chart:{type:"pie",height:240,backgroundColor:"transparent",style:{fontFamily:"Inter, -apple-system, sans-serif"},margin:[8,0,48,0]},
+        chart:{type:"pie",height:200,backgroundColor:"transparent",style:{fontFamily:"Inter, -apple-system, sans-serif"},margin:[4,0,48,0]},
         title:null, credits:{enabled:false}, exporting:{enabled:false},
         tooltip:{pointFormat:"<b>{point.y}</b> ({point.percentage:.0f}%)",backgroundColor:"white",borderColor:"#DFE3E8",borderRadius:8,style:{fontSize:"12px"}},
         plotOptions:{pie:{innerSize:"55%",size:"85%",center:["50%","45%"],borderWidth:2,borderColor:"white",dataLabels:{enabled:false},showInLegend:true}},
@@ -111,16 +111,19 @@ function ChartPanel({ title, children }) {
 
 function TopSection() {
     return (
-        <HorizontalStack gap="4" align="start" wrap={false}>
-            <Box width="320px">
+        <HorizontalStack gap="4" align="start" blockAlign="stretch" wrap={false}>
+            {/* width + flexShrink prevent the stat card from growing; height:100% makes Card fill the stretched column */}
+            <div style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column" }}>
                 <Card padding="0">
                     <VerticalStack>
                         <StatRow label="Total Endpoints"  value={6403} delta={21} sparklineData={STAT_SPARKLINES.endpoints}  color="#7C3AED" />
+                        <Divider />
                         <StatRow label="Users"            value={4203} delta={20} sparklineData={STAT_SPARKLINES.users}      color="#2563EB" />
+                        <Divider />
                         <StatRow label="Total Violations" value={1400} delta={24} sparklineData={STAT_SPARKLINES.violations} color="#DC2626" />
                     </VerticalStack>
                 </Card>
-            </Box>
+            </div>
             {/* flex:1 + minWidth:0 needed for chart to expand — Box doesn't support flex child props */}
             <div style={{ flex: 1, minWidth: 0 }}>
                 <Card padding="0">
@@ -129,13 +132,13 @@ function TopSection() {
                     </ChartPanel>
                 </Card>
             </div>
-            <Box width="298px">
+            <div style={{ width: 298, flexShrink: 0 }}>
                 <Card padding="0">
                     <ChartPanel title="Violations by Severity">
                         <HighchartsReact highcharts={Highcharts} options={VIOLATIONS_DONUT_OPTS} />
                     </ChartPanel>
                 </Card>
-            </Box>
+            </div>
         </HorizontalStack>
     );
 }
