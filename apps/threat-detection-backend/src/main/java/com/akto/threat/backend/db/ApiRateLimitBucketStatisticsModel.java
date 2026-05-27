@@ -6,16 +6,20 @@ import lombok.NoArgsConstructor;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ApiDistributionDataRequestPayload;
 import com.akto.threat.backend.cron.PercentilesCron;
 import com.akto.threat.backend.dao.ApiRateLimitBucketStatisticsDao;
 import com.akto.utils.ThreatApiDistributionUtils;
 import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.BulkWriteOptions;
+import com.mongodb.client.model.ReplaceOneModel;
 import com.mongodb.client.model.ReplaceOptions;
+import com.mongodb.client.model.WriteModel;
 import com.mongodb.client.model.Filters;
 
 @Data
@@ -84,27 +88,44 @@ public class ApiRateLimitBucketStatisticsModel {
 
         MongoCollection<ApiRateLimitBucketStatisticsModel> coll = dao.getCollection(accountId);
 
+        List<String> docIds = new ArrayList<>(frequencyBuckets.keySet());
+
+        // Single query to fetch all existing docs
+        Map<String, ApiRateLimitBucketStatisticsModel> existingDocs = new HashMap<>();
+        try (MongoCursor<ApiRateLimitBucketStatisticsModel> cursor =
+                coll.find(Filters.in(ID, docIds)).iterator()) {
+            while (cursor.hasNext()) {
+                ApiRateLimitBucketStatisticsModel doc = cursor.next();
+                existingDocs.put(doc.getId(), doc);
+            }
+        }
+
+        List<WriteModel<ApiRateLimitBucketStatisticsModel>> bulkOps = new ArrayList<>();
+
         for (Map.Entry<String, List<ApiDistributionDataRequestPayload.DistributionData>> entry : frequencyBuckets.entrySet()) {
             String docId = entry.getKey();
             List<ApiDistributionDataRequestPayload.DistributionData> updates = entry.getValue();
             if (updates == null || updates.isEmpty()) continue;
 
-            ApiRateLimitBucketStatisticsModel doc = Optional.ofNullable(coll.find(Filters.eq(ID, docId)).first())
-                .orElseGet(() -> {
-                    ApiRateLimitBucketStatisticsModel m = new ApiRateLimitBucketStatisticsModel();
-                    m.id = docId;
-                    m.buckets = new ArrayList<>();
-                    m.rateLimitConfidence = 0.0f;
-                    // Initialize all standard buckets
-                    for (ThreatApiDistributionUtils.Range range : ThreatApiDistributionUtils.getBucketRanges()) {
-                        m.buckets.add(new Bucket(range.label, new ArrayList<>(), new Stats(0,0,0,0,0)));
-                    }
-                    return m;
-                });
+            ApiRateLimitBucketStatisticsModel doc = existingDocs.get(docId);
+            if (doc == null) {
+                doc = new ApiRateLimitBucketStatisticsModel();
+                doc.setId(docId);
+                doc.setBuckets(new ArrayList<>());
+                doc.setRateLimitConfidence(0.0f);
+                for (ThreatApiDistributionUtils.Range range : ThreatApiDistributionUtils.getBucketRanges()) {
+                    doc.getBuckets().add(new Bucket(range.label, new ArrayList<>(), new Stats(0,0,0,0,0)));
+                }
+            }
 
             doc = applyUpdates(doc, updates);
 
-            coll.replaceOne(Filters.eq(ID, docId), doc, new ReplaceOptions().upsert(true));
+            bulkOps.add(new ReplaceOneModel<>(
+                Filters.eq(ID, docId), doc, new ReplaceOptions().upsert(true)));
+        }
+
+        if (!bulkOps.isEmpty()) {
+            coll.bulkWrite(bulkOps, new BulkWriteOptions().ordered(false));
         }
     }
 
