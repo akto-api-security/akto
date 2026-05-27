@@ -70,7 +70,10 @@ CONTEXT_SOURCE = "AGENTIC"
 
 DEFAULT_CLIENT_IP = "0.0.0.0"
 
-WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_prompt_warn_pending.json")
+# Warn-pending fingerprints are namespaced per hook so prompt and tool-call
+# resubmits never collide on a shared state file.
+PROMPT_WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_prompt_warn_pending.json")
+PRETOOL_WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_pretool_warn_pending.json")
 
 logger.info(
     f"Akto Agent SDK hooks initialised | mode={MODE} sync={AKTO_SYNC_MODE} "
@@ -367,13 +370,13 @@ async def call_guardrails_response_async(
 
 async def call_guardrails_mcp_async(
     tool_name: str, tool_input: Any, mcp_server_name: str, client_ip: str
-) -> Tuple[bool, str]:
-    """Validate an MCP tool call. Returns (allowed, reason)."""
+) -> Tuple[bool, str, str]:
+    """Validate an MCP / built-in tool call. Returns (allowed, reason, behaviour)."""
     if not tool_input:
-        return True, ""
+        return True, "", ""
     if not _data_ingestion_url():
         logger.warning("AKTO_DATA_INGESTION_URL not set, allowing MCP request (fail-open)")
-        return True, ""
+        return True, "", ""
 
     logger.info(f"Validating MCP request for tool: {tool_name} (server: {mcp_server_name})")
     try:
@@ -381,18 +384,15 @@ async def call_guardrails_mcp_async(
         result = await post_payload_json_async(
             build_http_proxy_url(guardrails=True, ingest_data=False), payload
         )
-        data = result.get("data", {}) if isinstance(result, dict) else {}
-        gr = data.get("guardrailsResult", {}) or {}
-        allowed = gr.get("Allowed", True)
-        reason = gr.get("Reason", "")
+        allowed, reason, behaviour = _parse_guardrails_result(result)
         if allowed:
             logger.info(f"MCP request ALLOWED for {tool_name}")
         else:
             logger.warning(f"MCP request DENIED for {tool_name}: {reason}")
-        return allowed, reason
+        return allowed, reason, behaviour
     except Exception as e:
         logger.error(f"Guardrails MCP validation error (fail-open): {e}")
-        return True, ""
+        return True, "", ""
 
 # ---------------------------------------------------------------------------
 # Ingestion senders
@@ -529,27 +529,32 @@ def prompt_fingerprint(prompt: str) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def load_warn_pending() -> Set[str]:
-    if not os.path.exists(WARN_STATE_PATH):
+def pretool_fingerprint(tool_name: str, tool_input: Any) -> str:
+    canonical = json.dumps({"t": tool_name, "i": tool_input}, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def load_warn_pending(state_path: str = PROMPT_WARN_STATE_PATH) -> Set[str]:
+    if not os.path.exists(state_path):
         return set()
     try:
-        with open(WARN_STATE_PATH, encoding="utf-8") as f:
+        with open(state_path, encoding="utf-8") as f:
             data = json.load(f)
         return set(data.get("warn_pending", []))
     except (json.JSONDecodeError, OSError) as e:
-        logger.warning(f"Could not read warn-pending map: {e}")
+        logger.warning(f"Could not read warn-pending map ({state_path}): {e}")
         return set()
 
 
-def save_warn_pending(hashes: Set[str]) -> None:
-    tmp_path = WARN_STATE_PATH + ".tmp"
+def save_warn_pending(hashes: Set[str], state_path: str = PROMPT_WARN_STATE_PATH) -> None:
+    tmp_path = state_path + ".tmp"
     try:
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump({"warn_pending": sorted(hashes)}, f, indent=0)
             f.write("\n")
-        os.replace(tmp_path, WARN_STATE_PATH)
+        os.replace(tmp_path, state_path)
     except OSError as e:
-        logger.error(f"Could not persist warn-pending map: {e}")
+        logger.error(f"Could not persist warn-pending map ({state_path}): {e}")
         if os.path.exists(tmp_path):
             try:
                 os.remove(tmp_path)
@@ -558,27 +563,42 @@ def save_warn_pending(hashes: Set[str]) -> None:
 
 
 def apply_warn_resubmit_flow(
-    gr_allowed: bool, reason: str, behaviour: str, fingerprint: str
+    gr_allowed: bool,
+    reason: str,
+    behaviour: str,
+    fingerprint: str,
+    state_path: str = PROMPT_WARN_STATE_PATH,
 ) -> Tuple[bool, str]:
+    """
+    Resolve a guardrails verdict into an allow/deny decision, honouring behaviours:
+
+    - allowed           -> allow
+    - alert behaviour   -> allow (violation recorded server-side only)
+    - warn behaviour    -> deny on first sight of this fingerprint, allow on identical resubmit
+    - anything else      -> deny (hard block)
+
+    `state_path` namespaces the warn-pending fingerprints; prompts and tool calls
+    pass different files so their resubmit state never collides.
+    """
     if gr_allowed:
         return True, ""
 
     if _is_alert_behaviour(behaviour):
-        logger.info("Alert behaviour: allowing prompt despite violation (server-side alert only)")
+        logger.info("Alert behaviour: allowing despite violation (server-side alert only)")
         return True, ""
 
     if not _is_warn_behaviour(behaviour):
         return False, reason
 
-    pending = load_warn_pending()
+    pending = load_warn_pending(state_path)
     if fingerprint in pending:
         pending.discard(fingerprint)
-        save_warn_pending(pending)
+        save_warn_pending(pending, state_path)
         logger.info("Warn flow: allowing resubmit; removed fingerprint from map")
         return True, ""
 
     pending.add(fingerprint)
-    save_warn_pending(pending)
+    save_warn_pending(pending, state_path)
     return False, reason
 
 # ---------------------------------------------------------------------------

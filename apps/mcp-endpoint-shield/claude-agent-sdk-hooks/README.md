@@ -8,9 +8,9 @@ These hooks provide the same four guardrails behaviours as `claude-cli-hooks/`, 
 
 | Hook | Event | Behaviour |
 |---|---|---|
-| `akto_user_prompt_submit` | `UserPromptSubmit` | Validates user prompt; blocks if denied by guardrails |
+| `akto_user_prompt_submit` | `UserPromptSubmit` | Validates user prompt; block / warn / alert per guardrail behaviour |
 | `akto_stop` | `Stop` | Ingests completed conversation turn for observability |
-| `akto_pre_tool_use` | `PreToolUse` | Validates MCP/built-in tool calls; blocks if denied |
+| `akto_pre_tool_use` | `PreToolUse` | Validates MCP/built-in tool calls; block / warn / alert per guardrail behaviour |
 | `akto_post_tool_use` | `PostToolUse` | Ingests tool execution results for observability |
 
 ## Installation
@@ -92,14 +92,28 @@ $LOG_DIR/akto-agent-sdk.log
 ## Sync vs Async Mode
 
 **`AKTO_SYNC_MODE=true` (default):**
-- `UserPromptSubmit`: validates before the model is called; blocks denied prompts
-- `PreToolUse`: validates before tool execution; blocks denied tool calls
+- `UserPromptSubmit`: validates before the model is called; resolves the verdict through the block / warn / alert flow
+- `PreToolUse`: validates before tool execution; resolves the verdict through the block / warn / alert flow
 - `Stop` / `PostToolUse`: always ingest (fire-and-forget, non-blocking)
 
 **`AKTO_SYNC_MODE=false`:**
 - All hooks are observational only — nothing is blocked
 - `Stop` and `PostToolUse` ingest with combined guardrails+ingest call
 
-## Warn Flow (UserPromptSubmit)
+## Guardrail Behaviours (UserPromptSubmit & PreToolUse)
 
-When a guardrail returns `behaviour=warn`, the prompt is blocked on first submission with a warning message. If the user submits the identical prompt a second time, it is allowed through. The pending fingerprint is stored in `$LOG_DIR/akto_prompt_warn_pending.json`.
+Both blocking hooks resolve a guardrail verdict through `apply_warn_resubmit_flow`, honouring the `behaviour` field returned by the guardrail:
+
+| Behaviour | Effect |
+|---|---|
+| *(allowed)* | Pass through |
+| `block` (or unset) | Deny |
+| `alert` | Allow, but the violation is recorded server-side |
+| `warn` | Deny on first sight, then allow on an **identical** resubmit/retry |
+
+The `warn` flow stores the pending fingerprint between calls. Prompts and tool calls use **separate** state files so their resubmit state never collides:
+
+- `UserPromptSubmit` → `$LOG_DIR/akto_prompt_warn_pending.json` (fingerprint of the prompt)
+- `PreToolUse` → `$LOG_DIR/akto_pretool_warn_pending.json` (fingerprint of `tool_name` + `tool_input`)
+
+A warned tool call is bypassed only when the agent retries it with **identical arguments**.

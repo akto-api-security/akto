@@ -36,6 +36,8 @@ import os
 from akto_guardrails_core import (
     AKTO_SYNC_MODE,
     DEFAULT_CLIENT_IP,
+    PROMPT_WARN_STATE_PATH,
+    PRETOOL_WARN_STATE_PATH,
     apply_warn_resubmit_flow,
     call_guardrails_mcp_async,
     call_guardrails_prompt_async,
@@ -47,6 +49,7 @@ from akto_guardrails_core import (
     ingest_blocked_response_async,
     _is_warn_behaviour,
     prompt_fingerprint,
+    pretool_fingerprint,
     send_mcp_response_ingestion_async,
     send_stop_ingestion_async,
 )
@@ -89,7 +92,9 @@ def create_hooks(client_ip: str = ""):
 
         gr_allowed, gr_reason, behaviour = await call_guardrails_prompt_async(prompt, _ip)
         fingerprint = prompt_fingerprint(prompt)
-        allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint)
+        allowed, _ = apply_warn_resubmit_flow(
+            gr_allowed, gr_reason, behaviour, fingerprint, PROMPT_WARN_STATE_PATH
+        )
 
         if not allowed:
             if _is_warn_behaviour(behaviour):
@@ -153,7 +158,10 @@ def create_hooks(client_ip: str = ""):
         """
         PreToolUse hook — validates MCP / built-in tool calls against Akto guardrails.
 
-        SYNC_MODE=true  : Blocks the tool call if guardrails deny it.
+        SYNC_MODE=true  : Resolves the guardrails verdict through the warn/alert flow:
+                          - block -> deny the tool call
+                          - warn  -> deny on first attempt, allow on an identical retry
+                          - alert -> allow (violation recorded server-side only)
         SYNC_MODE=false : Allows all tool calls through.
         Fail-open: any error allows the tool call through.
         """
@@ -166,19 +174,32 @@ def create_hooks(client_ip: str = ""):
         if not AKTO_SYNC_MODE:
             return {}
 
-        allowed, reason = await call_guardrails_mcp_async(tool_name, tool_input, mcp_server_name, _ip)
+        gr_allowed, gr_reason, behaviour = await call_guardrails_mcp_async(
+            tool_name, tool_input, mcp_server_name, _ip
+        )
+        fingerprint = pretool_fingerprint(tool_name, tool_input)
+        allowed, _ = apply_warn_resubmit_flow(
+            gr_allowed, gr_reason, behaviour, fingerprint, PRETOOL_WARN_STATE_PATH
+        )
 
         if not allowed:
-            block_reason = reason or "Policy violation"
-            logger.warning(f"BLOCKING tool call — tool={tool_name} reason={block_reason}")
+            if _is_warn_behaviour(behaviour):
+                deny_reason = (
+                    "Warning: tool call blocked, please review it. Call the tool again to bypass. "
+                    f"Reason: {gr_reason}"
+                )
+            else:
+                deny_reason = f"Blocked by Akto Guardrails: {gr_reason or 'Policy violation'}"
+
+            logger.warning(f"BLOCKING tool call — tool={tool_name} reason={gr_reason}")
             asyncio.create_task(
-                ingest_blocked_mcp_async(tool_name, tool_input, mcp_server_name, block_reason, _ip)
+                ingest_blocked_mcp_async(tool_name, tool_input, mcp_server_name, gr_reason, _ip)
             )
             return {
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
                     "permissionDecision": "deny",
-                    "permissionDecisionReason": f"Blocked by Akto Guardrails: {block_reason}",
+                    "permissionDecisionReason": deny_reason,
                 }
             }
 
