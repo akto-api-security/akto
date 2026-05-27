@@ -39,7 +39,6 @@ from akto_guardrails_core import (
     call_guardrails_mcp_async,
     call_guardrails_prompt_async,
     call_guardrails_response_async,
-    extract_mcp_server_name,
     get_last_user_prompt,
     ingest_blocked_mcp_async,
     ingest_blocked_prompt_async,
@@ -153,15 +152,14 @@ def create_hooks(client_ip: str = ""):
         """
         tool_name = str(input_data.get("tool_name") or "")
         tool_input = input_data.get("tool_input") or {}
-        mcp_server_name = extract_mcp_server_name(tool_name)
 
-        logger.info(f"PreToolUse hook: tool={tool_name} server={mcp_server_name}")
+        logger.info(f"PreToolUse hook: tool={tool_name}")
 
         if not AKTO_SYNC_MODE:
             return {}
 
         gr_allowed, gr_reason, behaviour = await call_guardrails_mcp_async(
-            tool_name, tool_input, mcp_server_name, _ip
+            tool_name, tool_input, _ip
         )
         allowed, _ = resolve_guardrail_decision(gr_allowed, gr_reason, behaviour)
 
@@ -169,7 +167,7 @@ def create_hooks(client_ip: str = ""):
             deny_reason = f"Blocked by Akto Guardrails: {gr_reason or 'Policy violation'}"
             logger.warning(f"BLOCKING tool call — tool={tool_name} reason={gr_reason}")
             asyncio.create_task(
-                ingest_blocked_mcp_async(tool_name, tool_input, mcp_server_name, gr_reason, _ip)
+                ingest_blocked_mcp_async(tool_name, tool_input, gr_reason, _ip)
             )
             return {
                 "hookSpecificOutput": {
@@ -190,12 +188,11 @@ def create_hooks(client_ip: str = ""):
         tool_name = str(input_data.get("tool_name") or "")
         tool_input = input_data.get("tool_input") or {}
         tool_response = input_data.get("tool_response") or {}
-        mcp_server_name = extract_mcp_server_name(tool_name)
 
-        logger.info(f"PostToolUse hook: tool={tool_name} server={mcp_server_name}")
+        logger.info(f"PostToolUse hook: tool={tool_name}")
 
         asyncio.create_task(
-            send_mcp_response_ingestion_async(tool_name, tool_input, tool_response, mcp_server_name, _ip)
+            send_mcp_response_ingestion_async(tool_name, tool_input, tool_response, _ip)
         )
 
         return {}

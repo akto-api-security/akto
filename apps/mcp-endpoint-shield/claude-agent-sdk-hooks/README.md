@@ -60,6 +60,9 @@ Set environment variables before starting your agent (see below), then pass `opt
 | `AKTO_TIMEOUT` | `5` | HTTP request timeout in seconds |
 | `MODE` | `argus` | `argus` (default) or `atlas` |
 | `AKTO_CONNECTOR` | `claude_agent_sdk` | Source label shown in Akto dashboard |
+| `AKTO_CONNECTOR_VALUE` | `claude_agent_sdk` | Client label used in tool tags (`mcp-client` for MCP, `ai-agent` for built-in tools) |
+| `MCP_INGEST_PATH` | `/mcp` | Mirrored path for MCP tool calls (must match Akto's MCP path detection) |
+| `NON_MCP_TOOL_PATH_PREFIX` | `/tool` | Path prefix for built-in / non-MCP tool calls (`/tool/<tool-name>`) |
 | `LOG_DIR` | `~/.claude/akto/logs` | Directory for log files |
 | `LOG_LEVEL` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `LOG_PAYLOADS` | `false` | Set to `true` to log full request/response bodies |
@@ -80,6 +83,20 @@ Set environment variables before starting your agent (see below), then pass `opt
 | Host in headers | Derived from `CLAUDE_API_URL` | `AKTO_HOST` env var |
 | `contextSource` | `ENDPOINT` | `AGENTIC` (hardcoded) |
 | `source` tag | set to `CONTEXT_SOURCE` value | omitted |
+
+## MCP traffic classification
+
+Tool calls are shaped so Akto's runtime classifies them correctly (`McpRequestResponseUtils.isMcpRequest` / `JsonRpcUtils.isMcpPath`):
+
+| | MCP tool (`mcp__<server>__<tool>`) | Built-in / non-MCP tool |
+|---|---|---|
+| Path | `/mcp` | `/tool/<normalized-tool-name>` |
+| Request body | JSON-RPC `tools/call` (`{"jsonrpc":"2.0","method":"tools/call","params":{"name","arguments"},"id"}`) | `{"body": <input>, "toolName": <name>}` |
+| Response body (PostToolUse) | JSON-RPC result (`{"jsonrpc":"2.0","id","result"}`) | `{"body":{"result": <output>}}` |
+| Tags | `{mcp-server, mcp-client}` | `{gen-ai, ai-agent}` |
+| Header | adds `x-mcp-server: <server>` | — |
+
+`parse_claude_tool()` splits `mcp__<server>__<tool>`; anything else is treated as a built-in tool. The `Stop`/PostToolUse hooks remain observational — PostToolUse never blocks (the Agent SDK cannot un-run an already-executed tool).
 
 ## Logging
 

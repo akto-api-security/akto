@@ -28,9 +28,11 @@ import asyncio
 import json
 import logging
 import os
+import re
 import ssl
 import time
 import urllib.request
+from urllib.parse import quote
 from typing import Any, Dict, Tuple, Union
 
 # ---------------------------------------------------------------------------
@@ -55,7 +57,13 @@ MODE = os.getenv("MODE", "argus").lower()
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_agent_sdk")
+AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "claude_agent_sdk")
 AKTO_HOST = os.getenv("AKTO_HOST", "api.anthropic.com")
+
+# MCP tool calls are mirrored on MCP_INGEST_PATH as JSON-RPC so Akto's runtime classifies
+# them as MCP; built-in / non-MCP tools are mirrored under NON_MCP_TOOL_PATH_PREFIX/<tool-name>.
+MCP_INGEST_PATH = os.getenv("MCP_INGEST_PATH", "/mcp")
+NON_MCP_TOOL_PATH_PREFIX = os.getenv("NON_MCP_TOOL_PATH_PREFIX", "/tool")
 
 # Read at call time so values set after import (e.g. via load_dotenv) are picked up
 def _data_ingestion_url() -> str:
@@ -190,16 +198,76 @@ def _base_payload(
     }
 
 # ---------------------------------------------------------------------------
-# MCP server name extraction
+# MCP tool classification
 # ---------------------------------------------------------------------------
+# Akto's runtime classifies traffic as MCP when the mirrored request is JSON-RPC with an
+# MCP method on an MCP path (McpRequestResponseUtils.isMcpRequest / JsonRpcUtils.isMcpPath).
+# Built-in / non-MCP tools must omit the JSON-RPC envelope and are mirrored as gen-ai HTTP.
 
-def extract_mcp_server_name(tool_name: str) -> str:
+def parse_claude_tool(tool_name: str) -> Tuple[bool, str, str]:
+    """
+    Parse a Claude tool name into (is_mcp, server_name, mcp_tool_name).
+    MCP tools follow mcp__<server>__<tool> (the tool segment may contain underscores).
+    """
     if not tool_name.startswith("mcp__"):
-        return "claude-built-in"
+        return False, "", ""
     parts = tool_name.split("__")
-    if len(parts) >= 3 and parts[1]:
-        return parts[1]
-    return "claude-built-in"
+    if len(parts) < 3:
+        return False, "", ""
+    server = parts[1]
+    mcp_tool = "__".join(parts[2:])
+    if not server or not mcp_tool:
+        return False, "", ""
+    return True, server, mcp_tool
+
+
+def normalize_tool_name_for_url_path(tool_name: str) -> str:
+    """RFC 3986 path segment: unreserved + hyphen; collapse repeats."""
+    s = (tool_name or "unknown").strip()
+    s = re.sub(r"[^a-zA-Z0-9._~-]+", "-", s)
+    s = re.sub(r"-+", "-", s).strip("-")
+    if not s:
+        s = "unknown"
+    return quote(s, safe=".-_~")
+
+
+def non_mcp_ingest_path(tool_name: str) -> str:
+    """Mirrored path for a built-in / non-MCP tool: NON_MCP_TOOL_PATH_PREFIX + normalized name."""
+    prefix = (NON_MCP_TOOL_PATH_PREFIX or "/tool").strip()
+    if not prefix.startswith("/"):
+        prefix = "/" + prefix
+    prefix = prefix.rstrip("/") or "/tool"
+    return f"{prefix}/{normalize_tool_name_for_url_path(tool_name)}"
+
+
+def _tool_arguments_for_jsonrpc(tool_input: Any) -> Dict[str, Any]:
+    if isinstance(tool_input, dict):
+        return tool_input
+    if tool_input is None:
+        return {}
+    return {"input": tool_input}
+
+
+def build_tools_call_jsonrpc(mcp_tool_name: str, tool_input: Any, request_id: int = 1) -> str:
+    """JSON-RPC body aligned with the MCP tools/call method."""
+    return json.dumps({
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "params": {"name": mcp_tool_name, "arguments": _tool_arguments_for_jsonrpc(tool_input)},
+        "id": request_id,
+    })
+
+
+def build_tools_call_result_jsonrpc(tool_response: Any, request_id: int = 1) -> str:
+    """JSON-RPC success body for the mirrored tool result (avoids MCP error-path handling)."""
+    result_body = tool_response if isinstance(tool_response, dict) else {"output": tool_response}
+    return json.dumps({"jsonrpc": "2.0", "id": request_id, "result": result_body})
+
+
+def build_tool_hook_tags(is_mcp: bool) -> Dict[str, str]:
+    if is_mcp:
+        return {"mcp-server": "MCP Server", "mcp-client": AKTO_CONNECTOR_VALUE}
+    return {"gen-ai": "Gen AI", "ai-agent": AKTO_CONNECTOR_VALUE}
 
 # ---------------------------------------------------------------------------
 # Payload builders
@@ -227,24 +295,30 @@ def build_prompt_validation_payload(query: str, client_ip: str) -> Dict[str, Any
     )
 
 
-def build_mcp_request_payload(
-    tool_name: str, tool_input: Any, mcp_server_name: str, client_ip: str
-) -> Dict[str, Any]:
-    tags = {"gen-ai": "Gen AI", "agent-name": "claude-agent"}
-    request_headers = json.dumps({
+def build_mcp_request_payload(tool_name: str, tool_input: Any, client_ip: str) -> Dict[str, Any]:
+    is_mcp, mcp_server_name, mcp_tool_name = parse_claude_tool(tool_name)
+    tags = build_tool_hook_tags(is_mcp)
+    request_headers = {
         "host": AKTO_HOST,
         "x-claude-hook": "PreToolUse",
         "content-type": "application/json",
-    })
-    response_headers = json.dumps({"x-claude-hook": "PreToolUse"})
-    request_payload = json.dumps({"body": tool_input, "toolName": tool_name})
-    response_payload = json.dumps({})
+    }
+    if is_mcp and mcp_server_name:
+        request_headers["x-mcp-server"] = mcp_server_name
+
+    if is_mcp:
+        request_payload = build_tools_call_jsonrpc(mcp_tool_name, tool_input)
+        path = MCP_INGEST_PATH
+    else:
+        request_payload = json.dumps({"body": tool_input, "toolName": tool_name})
+        path = non_mcp_ingest_path(tool_name)
+
     return _base_payload(
-        "/v1/messages",
-        request_headers,
-        response_headers,
+        path,
+        json.dumps(request_headers),
+        json.dumps({"x-claude-hook": "PreToolUse"}),
         request_payload,
-        response_payload,
+        json.dumps({}),
         "200",
         tags,
         client_ip,
@@ -252,28 +326,32 @@ def build_mcp_request_payload(
 
 
 def build_mcp_response_payload(
-    tool_name: str, tool_input: Any, tool_response: Any, mcp_server_name: str, client_ip: str
+    tool_name: str, tool_input: Any, tool_response: Any, client_ip: str
 ) -> Dict[str, Any]:
-    tags = {
-        "gen-ai": "Gen AI",
-        "tool-use": "Tool Execution",
-        "agent-name": "claude-agent",
-    }
-    request_headers = json.dumps({
+    is_mcp, mcp_server_name, mcp_tool_name = parse_claude_tool(tool_name)
+    tags = build_tool_hook_tags(is_mcp)
+    request_headers = {
         "host": AKTO_HOST,
         "x-claude-hook": "PostToolUse",
         "content-type": "application/json",
-    })
-    response_headers = json.dumps({
-        "x-claude-hook": "PostToolUse",
-        "content-type": "application/json",
-    })
-    request_payload = json.dumps({"body": {"toolName": tool_name, "toolArgs": tool_input}})
-    response_payload = json.dumps({"body": {"result": tool_response}})
+    }
+    if is_mcp and mcp_server_name:
+        request_headers["x-mcp-server"] = mcp_server_name
+    response_headers = {"x-claude-hook": "PostToolUse", "content-type": "application/json"}
+
+    if is_mcp:
+        request_payload = build_tools_call_jsonrpc(mcp_tool_name, tool_input)
+        response_payload = build_tools_call_result_jsonrpc(tool_response)
+        path = MCP_INGEST_PATH
+    else:
+        request_payload = json.dumps({"body": {"toolName": tool_name, "toolArgs": tool_input}})
+        response_payload = json.dumps({"body": {"result": tool_response}})
+        path = non_mcp_ingest_path(tool_name)
+
     return _base_payload(
-        "/v1/messages",
-        request_headers,
-        response_headers,
+        path,
+        json.dumps(request_headers),
+        json.dumps(response_headers),
         request_payload,
         response_payload,
         "200",
@@ -363,7 +441,7 @@ async def call_guardrails_response_async(
 
 
 async def call_guardrails_mcp_async(
-    tool_name: str, tool_input: Any, mcp_server_name: str, client_ip: str
+    tool_name: str, tool_input: Any, client_ip: str
 ) -> Tuple[bool, str, str]:
     """Validate an MCP / built-in tool call. Returns (allowed, reason, behaviour)."""
     if not tool_input:
@@ -372,9 +450,9 @@ async def call_guardrails_mcp_async(
         logger.warning("AKTO_DATA_INGESTION_URL not set, allowing MCP request (fail-open)")
         return True, "", ""
 
-    logger.info(f"Validating MCP request for tool: {tool_name} (server: {mcp_server_name})")
+    logger.info(f"Validating tool call: {tool_name}")
     try:
-        payload = build_mcp_request_payload(tool_name, tool_input, mcp_server_name, client_ip)
+        payload = build_mcp_request_payload(tool_name, tool_input, client_ip)
         result = await post_payload_json_async(
             build_http_proxy_url(guardrails=True, ingest_data=False), payload
         )
@@ -416,12 +494,12 @@ async def ingest_blocked_prompt_async(user_prompt: str, reason: str, client_ip: 
 
 
 async def ingest_blocked_mcp_async(
-    tool_name: str, tool_input: Any, mcp_server_name: str, reason: str, client_ip: str
+    tool_name: str, tool_input: Any, reason: str, client_ip: str
 ) -> None:
     if not _data_ingestion_url() or not AKTO_SYNC_MODE:
         return
     try:
-        payload = build_mcp_request_payload(tool_name, tool_input, mcp_server_name, client_ip)
+        payload = build_mcp_request_payload(tool_name, tool_input, client_ip)
         payload["responseHeaders"] = json.dumps({
             "x-claude-hook": "PreToolUse",
             "x-blocked-by": "Akto Proxy",
@@ -466,15 +544,15 @@ async def ingest_blocked_response_async(
 
 
 async def send_mcp_response_ingestion_async(
-    tool_name: str, tool_input: Any, tool_response: Any, mcp_server_name: str, client_ip: str
+    tool_name: str, tool_input: Any, tool_response: Any, client_ip: str
 ) -> None:
     if not _data_ingestion_url():
         return
     if not tool_input or not tool_response:
         return
-    logger.info(f"Ingesting MCP response for tool: {tool_name} (server: {mcp_server_name})")
+    logger.info(f"Ingesting tool response: {tool_name}")
     try:
-        payload = build_mcp_response_payload(tool_name, tool_input, tool_response, mcp_server_name, client_ip)
+        payload = build_mcp_response_payload(tool_name, tool_input, tool_response, client_ip)
         await post_payload_json_async(
             build_http_proxy_url(guardrails=not AKTO_SYNC_MODE, ingest_data=True), payload
         )
