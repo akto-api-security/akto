@@ -22,6 +22,7 @@ import com.akto.data_actor.DataActorFactory;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import java.util.*;
+import java.util.Arrays;
 
 import static com.akto.hybrid_runtime.APICatalogSync.createUrlTemplate;
 
@@ -216,29 +217,27 @@ public class AktoPolicyNew {
 
         Map<String, List<String>> reqHeaders = httpResponseParams.getRequestParams().getHeaders();
         String ua = RuntimeUtil.getHeaderValue(reqHeaders, "user-agent");
-        addClassifiedTag(apiInfo, "user-agent", UserAgentClassifier.classify(ua).name(), ua);
+        addClassifiedTag(apiInfo, "user-agent", UserAgentClassifier.classify(ua).name());
 
         String referer = RuntimeUtil.getHeaderValue(reqHeaders, "referer");
-        String refererHost = UserAgentClassifier.extractRefererHost(referer);
-        addClassifiedTag(apiInfo, "referer", refererHost, refererHost);
+        addClassifiedTag(apiInfo, "referer", UserAgentClassifier.extractRefererHost(referer));
 
     }
 
-    private static void addClassifiedTag(ApiInfo apiInfo, String headerKey, String category, String rawValue) {
-        if (category == null || rawValue == null || rawValue.isEmpty()) return;
+    private static void addClassifiedTag(ApiInfo apiInfo, String headerKey, String category) {
+        if (category == null || category.isEmpty()) return;
         List<CollectionTags> existingTags = apiInfo.getTagsList();
         if (existingTags == null) {
             existingTags = new ArrayList<>();
             apiInfo.setTagsList(existingTags);
         }
         for (CollectionTags tag : existingTags) {
-            if (Objects.equals(tag.getKeyName(), headerKey)) {
-                tag.setValue(category);
-                tag.setLastUpdatedTs(Context.now());
+            if (Objects.equals(tag.getKeyName(), headerKey) && Objects.equals(tag.getValue(), category)) {
                 return;
             }
         }
-        existingTags.add(new CollectionTags(Context.now(), headerKey, category, CollectionTags.TagSource.AKTO));
+        // lastUpdatedTs=0 so the object is stable across runs — MongoDB addEachToSet deduplicates by full equality
+        existingTags.add(new CollectionTags(0, headerKey, category, CollectionTags.TagSource.AKTO));
     }
 
     public PolicyCatalog getApiInfoFromMap(ApiInfo.ApiInfoKey apiInfoKey) {

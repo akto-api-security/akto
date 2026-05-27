@@ -53,10 +53,10 @@ public class ApiInfoBulkUpdate {
             // last seen
             subUpdates.add(Updates.set(ApiInfo.LAST_SEEN, apiInfo.getLastSeen()));
 
-            // tagsList — keyed by headerKey; $set replaces the whole array so updates to existing keyNames are applied
+            // tagsList — addEachToSet so USER/KUBERNETES tags are preserved; AKTO tags deduplicated by keyName+value+source
             List<CollectionTags> tagsList = apiInfo.getTagsList();
             if (tagsList != null && !tagsList.isEmpty()) {
-                subUpdates.add(Updates.set(ApiInfo.TAGS_STRING, tagsList));
+                subUpdates.add(Updates.addEachToSet(ApiInfo.TAGS_STRING, tagsList));
             } else {
                 subUpdates.add(Updates.setOnInsert(ApiInfo.TAGS_STRING, new ArrayList<>()));
             }
