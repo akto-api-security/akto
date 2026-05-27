@@ -40,6 +40,14 @@ public class Cron {
                         }
                     }, "mergingCron");
                 } else {
+                    loggerMaker.warnAndAddToDb("Priority merging else block: starting for account " + PRIORITY_ACCOUNT_ID, LoggerMaker.LogDb.CYBORG);
+                    Context.accountId.set(PRIORITY_ACCOUNT_ID);
+                    try {
+                        triggerMerging(PRIORITY_ACCOUNT_ID);
+                        loggerMaker.warnAndAddToDb("Priority merging: completed for account " + PRIORITY_ACCOUNT_ID, LoggerMaker.LogDb.CYBORG);
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error in priority merging for account " + PRIORITY_ACCOUNT_ID + ": " + e.getMessage(), LoggerMaker.LogDb.CYBORG);
+                    }
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
                         public void accept(Account t) {

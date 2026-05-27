@@ -290,7 +290,7 @@ public class MergingLogic {
         }
 
         int offset = 0;
-        int limit = optimized ? 250_000 : (mergeUrlsBasic ? 10_000 : 50_000);
+        int limit = optimized ? 150_000 : (mergeUrlsBasic ? 10_000 : 50_000);
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
         ApiMergerResult finalResult = new ApiMergerResult(new HashMap<>());
