@@ -8,9 +8,9 @@ These hooks provide the same four guardrails behaviours as `claude-cli-hooks/`, 
 
 | Hook | Event | Behaviour |
 |---|---|---|
-| `akto_user_prompt_submit` | `UserPromptSubmit` | Validates user prompt; block / warn / alert per guardrail behaviour |
-| `akto_stop` | `Stop` | Ingests completed conversation turn for observability |
-| `akto_pre_tool_use` | `PreToolUse` | Validates MCP/built-in tool calls; block / warn / alert per guardrail behaviour |
+| `akto_user_prompt_submit` | `UserPromptSubmit` | Validates user prompt; denies on a hard `block` (warn/alert pass through) |
+| `akto_stop` | `Stop` | Validates the agent response and ingests the turn; denies on a hard `block` (warn/alert pass through) |
+| `akto_pre_tool_use` | `PreToolUse` | Validates MCP/built-in tool calls; denies on a hard `block` (warn/alert pass through) |
 | `akto_post_tool_use` | `PostToolUse` | Ingests tool execution results for observability |
 
 ## Installation
@@ -92,28 +92,30 @@ $LOG_DIR/akto-agent-sdk.log
 ## Sync vs Async Mode
 
 **`AKTO_SYNC_MODE=true` (default):**
-- `UserPromptSubmit`: validates before the model is called; resolves the verdict through the block / warn / alert flow
-- `PreToolUse`: validates before tool execution; resolves the verdict through the block / warn / alert flow
+- `UserPromptSubmit`: validates before the model is called; resolves the verdict via `resolve_guardrail_decision`
+- `PreToolUse`: validates before tool execution; resolves the verdict via `resolve_guardrail_decision`
 - `Stop` / `PostToolUse`: always ingest (fire-and-forget, non-blocking)
 
 **`AKTO_SYNC_MODE=false`:**
 - All hooks are observational only — nothing is blocked
 - `Stop` and `PostToolUse` ingest with combined guardrails+ingest call
 
-## Guardrail Behaviours (UserPromptSubmit & PreToolUse)
+## Guardrail Behaviours (UserPromptSubmit, PreToolUse & Stop)
 
-Both blocking hooks resolve a guardrail verdict through `apply_warn_resubmit_flow`, honouring the `behaviour` field returned by the guardrail:
+All three validating hooks resolve a guardrail verdict through `resolve_guardrail_decision`, honouring the `behaviour` field returned by the guardrail:
 
 | Behaviour | Effect |
 |---|---|
 | *(allowed)* | Pass through |
 | `block` (or unset) | Deny |
-| `alert` | Allow, but the violation is recorded server-side |
-| `warn` | Deny on first sight, then allow on an **identical** resubmit/retry |
+| `alert` | Allow; the violation is recorded server-side |
+| `warn` | Allow; treated as `alert` in the Agent SDK (see below) |
 
-The `warn` flow stores the pending fingerprint between calls. Prompts and tool calls use **separate** state files so their resubmit state never collides:
+### Why `warn` is not a resubmit gate here
 
-- `UserPromptSubmit` → `$LOG_DIR/akto_prompt_warn_pending.json` (fingerprint of the prompt)
-- `PreToolUse` → `$LOG_DIR/akto_pretool_warn_pending.json` (fingerprint of `tool_name` + `tool_input`)
+The CLI hooks implement `warn` as "deny on first sight, allow on an identical resubmit" — a human reads the warning and consciously resends. That model **does not apply to the Agent SDK**:
 
-A warned tool call is bypassed only when the agent retries it with **identical arguments**.
+- `UserPromptSubmit`: `continue_: False` ends the turn; there is no built-in resubmit (the calling app must issue a new query), and the message isn't surfaced unless `include_hook_events` is set.
+- `PreToolUse`: a `deny` reason is fed back to the *model*, which is designed to **avoid retrying** and try a different approach — so an identical retry effectively never happens, and any retry is the model self-approving, not a human review.
+
+Because there is no human-in-the-loop "review and resend" step, `warn` is treated as `alert`: allowed through, with the violation recorded server-side during guardrail evaluation. No client-side resubmit state is kept.

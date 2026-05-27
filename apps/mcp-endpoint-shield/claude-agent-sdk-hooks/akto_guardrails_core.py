@@ -25,14 +25,13 @@ Environment Variables:
 """
 
 import asyncio
-import hashlib
 import json
 import logging
 import os
 import ssl
 import time
 import urllib.request
-from typing import Any, Dict, Set, Tuple, Union
+from typing import Any, Dict, Tuple, Union
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -69,11 +68,6 @@ def _akto_token() -> str:
 CONTEXT_SOURCE = "AGENTIC"
 
 DEFAULT_CLIENT_IP = "0.0.0.0"
-
-# Warn-pending fingerprints are namespaced per hook so prompt and tool-call
-# resubmits never collide on a shared state file.
-PROMPT_WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_prompt_warn_pending.json")
-PRETOOL_WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_pretool_warn_pending.json")
 
 logger.info(
     f"Akto Agent SDK hooks initialised | mode={MODE} sync={AKTO_SYNC_MODE} "
@@ -509,7 +503,7 @@ async def send_stop_ingestion_async(user_prompt: str, response_text: str, client
         logger.error(f"Conversation ingestion error: {e}")
 
 # ---------------------------------------------------------------------------
-# Warn-flow helpers (UserPromptSubmit)
+# Guardrail behaviour resolution
 # ---------------------------------------------------------------------------
 
 def _guardrails_behaviour_value(behaviour: Any) -> str:
@@ -524,81 +518,31 @@ def _is_alert_behaviour(behaviour: Any) -> bool:
     return _guardrails_behaviour_value(behaviour) == "alert"
 
 
-def prompt_fingerprint(prompt: str) -> str:
-    canonical = json.dumps({"p": prompt, "a": []}, sort_keys=True, ensure_ascii=False)
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def pretool_fingerprint(tool_name: str, tool_input: Any) -> str:
-    canonical = json.dumps({"t": tool_name, "i": tool_input}, sort_keys=True, ensure_ascii=False)
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def load_warn_pending(state_path: str = PROMPT_WARN_STATE_PATH) -> Set[str]:
-    if not os.path.exists(state_path):
-        return set()
-    try:
-        with open(state_path, encoding="utf-8") as f:
-            data = json.load(f)
-        return set(data.get("warn_pending", []))
-    except (json.JSONDecodeError, OSError) as e:
-        logger.warning(f"Could not read warn-pending map ({state_path}): {e}")
-        return set()
-
-
-def save_warn_pending(hashes: Set[str], state_path: str = PROMPT_WARN_STATE_PATH) -> None:
-    tmp_path = state_path + ".tmp"
-    try:
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump({"warn_pending": sorted(hashes)}, f, indent=0)
-            f.write("\n")
-        os.replace(tmp_path, state_path)
-    except OSError as e:
-        logger.error(f"Could not persist warn-pending map ({state_path}): {e}")
-        if os.path.exists(tmp_path):
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
-
-
-def apply_warn_resubmit_flow(
-    gr_allowed: bool,
-    reason: str,
-    behaviour: str,
-    fingerprint: str,
-    state_path: str = PROMPT_WARN_STATE_PATH,
+def resolve_guardrail_decision(
+    gr_allowed: bool, reason: str, behaviour: str
 ) -> Tuple[bool, str]:
     """
-    Resolve a guardrails verdict into an allow/deny decision, honouring behaviours:
+    Resolve a guardrails verdict into an allow/deny decision.
 
-    - allowed           -> allow
-    - alert behaviour   -> allow (violation recorded server-side only)
-    - warn behaviour    -> deny on first sight of this fingerprint, allow on identical resubmit
-    - anything else      -> deny (hard block)
+    - allowed              -> allow
+    - 'alert' or 'warn'    -> allow; the violation is recorded server-side during evaluation
+    - anything else (block) -> deny
 
-    `state_path` namespaces the warn-pending fingerprints; prompts and tool calls
-    pass different files so their resubmit state never collides.
+    The CLI's "warn = deny then allow on identical resubmit" gate does not apply in the
+    Agent SDK: prompts are issued by the calling app and tool calls by the model, neither
+    of which resubmits-to-bypass, and there is no human in the loop. So 'warn' is treated
+    as 'alert' here — observational, not blocking.
     """
     if gr_allowed:
         return True, ""
 
-    if _is_alert_behaviour(behaviour):
-        logger.info("Alert behaviour: allowing despite violation (server-side alert only)")
+    if _is_alert_behaviour(behaviour) or _is_warn_behaviour(behaviour):
+        logger.info(
+            f"{_guardrails_behaviour_value(behaviour)} behaviour: allowing despite violation "
+            "(recorded server-side)"
+        )
         return True, ""
 
-    if not _is_warn_behaviour(behaviour):
-        return False, reason
-
-    pending = load_warn_pending(state_path)
-    if fingerprint in pending:
-        pending.discard(fingerprint)
-        save_warn_pending(pending, state_path)
-        logger.info("Warn flow: allowing resubmit; removed fingerprint from map")
-        return True, ""
-
-    pending.add(fingerprint)
-    save_warn_pending(pending, state_path)
     return False, reason
 
 # ---------------------------------------------------------------------------
