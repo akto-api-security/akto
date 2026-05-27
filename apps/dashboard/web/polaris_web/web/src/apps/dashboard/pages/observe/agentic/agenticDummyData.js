@@ -472,7 +472,7 @@ export const DEVICE_FLAT_DATA = [
     { path: ["NYC-JDOE-WIN11","mcp-github-jdoe"], endpoint: "github-mcp",            type: "MCP Server" },
     { path: ["NYC-JDOE-WIN11","gpt4-jdoe"],       endpoint: "GPT-4o",                type: "LLM" },
     { path: ["NYC-JDOE-MAC01","cursor-cli"],     endpoint: "Cursor CLI",             type: "AI Agent",   skillCount: 1   },
-    { path: ["NYC-JDOE-MAC01","cursor-code"],    endpoint: "Cursor code",            type: "AI Agent",   skillCount: 407 },
+    { path: ["NYC-JDOE-MAC01","cursor-code"],    endpoint: "Cursor code",            type: "AI Agent",   skillCount: 34  },
     { path: ["NYC-JDOE-MAC01","mcp-akto"],       endpoint: "mcp.akto.io",            type: "MCP Server"                  },
     { path: ["NYC-JDOE-MAC01","chatgpt"],        endpoint: "ChatGPT",                type: "AI Agent"                    },
     { path: ["NYC-JDOE-MAC01","razorpay-stdio"], endpoint: "razorpay-stdio",         type: "MCP Server"                  },
