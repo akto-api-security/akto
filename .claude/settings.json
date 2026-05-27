@@ -1,0 +1,8 @@
+{
+ "mcpServers": {
+    "akto-docs": {
+      "type": "url",
+      "url": "https://docs.akto.io/~gitbook/mcp"
+    }
+  }
+}
