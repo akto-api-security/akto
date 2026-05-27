@@ -125,6 +125,7 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.new_relic.NewRelicUtils;
+import com.akto.dao.AgentUsersDao;
 import com.akto.dao.billing.UningestedApiOverageDao;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.usage.UsageMetricCalculator;
@@ -238,11 +239,14 @@ public class DbLayer {
         updateList.add(Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()));
         updateList.addAll(buildAdditionalDataUpdates(moduleInfo.getAdditionalData()));
 
-        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(
+        ModuleInfo result = ModuleInfoDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
                 Updates.combine(updateList),
                 updateOptions);
 
+        syncAgentUserFromModuleInfo(moduleInfo);
+
+        return result;
     }
 
     private static List<Bson> buildAdditionalDataUpdates(Map<String, Object> additionalData) {
@@ -254,6 +258,25 @@ public class DbLayer {
             updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + "." + entry.getKey(), entry.getValue()));
         }
         return updates;
+    }
+
+    private static void syncAgentUserFromModuleInfo(ModuleInfo moduleInfo) {
+        if (moduleInfo == null) {
+            return;
+        }
+        Map<String, Object> additionalData = moduleInfo.getAdditionalData();
+        if (additionalData == null || !additionalData.containsKey("username")) {
+            return;
+        }
+        try {
+            String userName = String.valueOf(additionalData.get("username"));
+            String teamName = additionalData.containsKey("team") ? String.valueOf(additionalData.get("team")) : null;
+            String userRole = additionalData.containsKey("userRole") ? String.valueOf(additionalData.get("userRole")) : null;
+            String device = moduleInfo.getName();
+            AgentUsersDao.instance.upsertAgentUser(userName, teamName, userRole, device, Context.now());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error syncing agent user from module info: " + e.getMessage(), LogDb.DB_ABS);
+        }
     }
 
     public static void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList) {
@@ -285,6 +308,10 @@ public class DbLayer {
         }
 
         ModuleInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
+
+        for (ModuleInfo moduleInfo : moduleInfoList) {
+            syncAgentUserFromModuleInfo(moduleInfo);
+        }
 
         ModuleHeartbeatProfilingMetrics.recordGaugeUpdates(moduleInfoList);
     }
