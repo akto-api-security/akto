@@ -1,8 +1,17 @@
 package com.akto.runtime.parser;
+
 import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.serialization.StringSerializer;
 
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
+import com.mongodb.client.model.Filters;
+import org.bson.conversions.Bson;
+
+import com.akto.DaoInit;
+import com.akto.dao.SampleDataDao;
+import com.akto.dao.context.Context;
+import com.akto.dto.traffic.SampleData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Properties;
@@ -10,12 +19,46 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-
-
 public class KafkaProducerExample {
     // Kafka configuration
     private static final String BOOTSTRAP_SERVERS = "localhost:9092";
     private static final String TOPIC = "akto.api.logs";
+
+    enum RecordGeneratorMode {
+        DEMO,
+        FILE_READ,
+        SAMPLE_DATA
+    }
+
+    public static void main(String[] args) {
+        // Configure Kafka producer properties
+        Properties props = new Properties();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4");
+
+        RecordGeneratorMode mode = RecordGeneratorMode.SAMPLE_DATA;
+
+        List<ProducerRecord<String, String>> records;
+        switch (mode) {
+            case FILE_READ:
+                records = fileReadRecordGeneration("kafka.txt");
+                break;
+            case SAMPLE_DATA:
+                records = sampleDataRecordGenerator(1758787662);
+                break;
+            case DEMO:
+            default:
+                records = demoRecordGenerator();
+                break;
+        }
+
+        for (int i = 0; i < 1; i++) {
+            produceRecords(props, records);
+        }
+
+    }
 
     @lombok.Getter
     @lombok.Setter
@@ -41,9 +84,9 @@ public class KafkaProducerExample {
         String tag;
 
         public IngestDataBatch(String path, String requestHeaders, String responseHeaders, String method,
-                              String requestPayload, String responsePayload, String ip, String time,
-                              String statusCode, String type, String status, String akto_account_id,
-                              String akto_vxlan_id, String is_pending, String source) {
+                String requestPayload, String responsePayload, String ip, String time,
+                String statusCode, String type, String status, String akto_account_id,
+                String akto_vxlan_id, String is_pending, String source) {
             this.path = path;
             this.requestHeaders = requestHeaders;
             this.responseHeaders = responseHeaders;
@@ -81,8 +124,7 @@ public class KafkaProducerExample {
         obj.put("is_pending", payload.getIs_pending());
         obj.put("source", payload.getSource());
 
-        
-        if(payload.getTag() != null && !payload.getTag().isEmpty()) {
+        if (payload.getTag() != null && !payload.getTag().isEmpty()) {
             obj.put("tag", payload.getTag());
         }
         return obj.toString();
@@ -97,30 +139,58 @@ public class KafkaProducerExample {
         }
     }
 
+    public static List<ProducerRecord<String, String>> sampleDataRecordGenerator(int accountId) {
+        Context.accountId.set(accountId);
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
+        Bson filter = Filters.regex("_id.url", "typename");
+        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(filter);
+        List<ProducerRecord<String, String>> records = new ArrayList<>();
+
+        for (SampleData sampleDoc : sampleDataList) {
+            if(!sampleDoc.getId().getUrl().contains("typename")){
+                System.out.println("************invlaid url");
+                continue;
+            }
+            if (sampleDoc.getSamples() == null || sampleDoc.getSamples().isEmpty())
+                continue;
+            for (String sample : sampleDoc.getSamples()) {
+                records.add(new ProducerRecord<>(TOPIC, null, sample));
+            }
+        }
+
+        return records;
+    }
 
     public static List<ProducerRecord<String, String>> demoRecordGenerator() {
         List<String> hosts = new ArrayList<>();
         for (int i = 1; i <= 10; i++) {
             hosts.add("host-" + i + "-auth-type.enigma");
         }
-        List<String> paths = java.util.Arrays.asList("json-one", "/json-two", "/json/-three", "/json-four", "/json/5/test");
+        List<String> paths = java.util.Arrays.asList("json-one", "/json-two", "/json/-three", "/json-four",
+                "/json/5/test");
         // List<String> paths = java.util.Arrays.asList("json-one", "/json-two");
         Random random = new Random();
         List<ProducerRecord<String, String>> records = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
             String randomHost = hosts.get(random.nextInt(hosts.size()));
-            String randomPath = paths.get(random.nextInt(paths.size())) ;
+            String randomPath = paths.get(random.nextInt(paths.size()));
             String requestHeaders;
 
-            // Add API_KEY header for every 5th record, MTLS for every 10th record (mutually exclusive)
+            // Add API_KEY header for every 5th record, MTLS for every 10th record (mutually
+            // exclusive)
             // if (i % 2 == 0) {
-                // MTLS header for every 10th record
-                requestHeaders = "{\"host\":\"" + randomHost + "\",\"user-agent\":\"Mozilla/5.0\", \"location\":\"pagenotd\",\"x-forwarded-client-cert\":\"By=spiffe://cluster.local/ns/default/sa/frontend;Hash=abc123;Subject=CN=client.example.com\"}";
+            // MTLS header for every 10th record
+            requestHeaders = "{\"host\":\"" + randomHost
+                    + "\",\"user-agent\":\"Mozilla/5.0\", \"location\":\"pagenotd\",\"x-forwarded-client-cert\":\"By=spiffe://cluster.local/ns/default/sa/frontend;Hash=abc123;Subject=CN=client.example.com\"}";
             // } else if (i % 3 == 0) {
-            //     // API_KEY header for every 5th record (but not 10th)
-                // requestHeaders = "{\"host\":\"" + randomHost + "\",\"user-agent\":\"Mozilla/5.0\", \"location\":\"pagenotd\",\"x-api-key\":\"sk_live_2_" + random.nextInt(100000) + "\"}";
+            // // API_KEY header for every 5th record (but not 10th)
+            // requestHeaders = "{\"host\":\"" + randomHost +
+            // "\",\"user-agent\":\"Mozilla/5.0\",
+            // \"location\":\"pagenotd\",\"x-api-key\":\"sk_live_2_" +
+            // random.nextInt(100000) + "\"}";
             // } else {
-                // requestHeaders = "{\"host\":\"" + randomHost + "\",\"user-agent\":\"Mozilla/5.0\", \"location\":\"pagenotd\"}";
+            // requestHeaders = "{\"host\":\"" + randomHost +
+            // "\",\"user-agent\":\"Mozilla/5.0\", \"location\":\"pagenotd\"}";
             // }
 
             IngestDataBatch payload = new IngestDataBatch(
@@ -138,8 +208,7 @@ public class KafkaProducerExample {
                     "1000000",
                     "123",
                     "false",
-                    "MIRRORING"
-            );
+                    "MIRRORING");
             String record = insertData(payload);
             records.add(new ProducerRecord<>(TOPIC, null, record));
         }
@@ -162,31 +231,6 @@ public class KafkaProducerExample {
             throw new RuntimeException("Error reading kafka.txt from resources: " + e.getMessage(), e);
         }
         return records;
-    }
-
-    public static void main(String[] args) {
-        // Configure Kafka producer properties
-        Properties props = new Properties();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4");
-
-        // Set to true to use fileReadRecordGeneration, false for demoRecordGenerator
-        boolean fileReadMode = false; 
-
-        List<ProducerRecord<String, String>> records;
-        if (fileReadMode) {
-            records = fileReadRecordGeneration("kafka.txt");
-        } else {
-            records = demoRecordGenerator();
-        }
-
-
-        for (int i = 0; i < 1; i++){
-            produceRecords(props, records);
-        }
-
     }
 
     private static void produceRecords(Properties props, List<ProducerRecord<String, String>> records) {
