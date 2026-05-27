@@ -217,13 +217,6 @@ const threatDetectionRequests = {
             data: data
         })
     },
-    fetchDashboardTopData(startTs, endTs) {
-        return request({
-            url: '/api/fetchDashboardTopData',
-            method: 'post',
-            data: {startTs, endTs}
-        })
-    },
     fetchThreatTopNData(startTs, endTs, latestAttack, limit = 5) {
         return request({
             url: '/api/fetchThreatTopNData',
