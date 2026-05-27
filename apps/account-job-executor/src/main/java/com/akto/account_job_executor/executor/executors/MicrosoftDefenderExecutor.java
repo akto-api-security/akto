@@ -3,6 +3,7 @@ package com.akto.account_job_executor.executor.executors;
 import com.akto.account_job_executor.client.CyborgApiClient;
 import com.akto.account_job_executor.executor.AccountJobExecutor;
 import com.akto.dto.jobs.AccountJob;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.jobs.exception.RetryableJobException;
 import com.akto.log.LoggerMaker;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -736,10 +737,10 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
 
                     Map<String, Object> batch = new HashMap<>();
                     // Path uses /skills/<name> (plural) to match the shield endpoint format.
-                    batch.put("path", "https://" + syntheticHost + "/skills/" + skillName);
+                    batch.put("path", "/skills/" + skillName);
                     batch.put("requestHeaders", OBJECT_MAPPER.writeValueAsString(reqHeaders));
                     batch.put("responseHeaders", "{}");
-                    batch.put("method", "POST");
+                    batch.put("method", Method.POST.name());
                     batch.put("type", "HTTP/1.1");
                     batch.put("requestPayload", OBJECT_MAPPER.writeValueAsString(reqPayload));
                     batch.put("responsePayload", "{}");

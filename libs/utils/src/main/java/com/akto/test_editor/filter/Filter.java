@@ -205,7 +205,8 @@ public class Filter {
         FilterNode firstExtractNode = null;
         StringBuilder validationReason = new StringBuilder();
         try {
-            Map<FilterNode, String> childNodeVsValidationReason = new HashMap<>();
+            Map<FilterNode, String> passedChildVsValidationReason = new HashMap<>();
+            Map<FilterNode, String> failedChildVsValidationReason = new HashMap<>();
             for (int i = 0; i < childNodes.size(); i++) {
                 FilterNode childNode = childNodes.get(i);
                 boolean skipExecutingExtractNode = skipExtractExecution;
@@ -214,7 +215,9 @@ public class Filter {
                 }
                 dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId, skipExecutingExtractNode);
                 if (!dataOperandsFilterResponse.getResult()) {
-                    childNodeVsValidationReason.put(childNode, dataOperandsFilterResponse.getValidationReason());
+                    failedChildVsValidationReason.put(childNode, dataOperandsFilterResponse.getValidationReason());
+                } else if (!StringUtils.isEmpty(dataOperandsFilterResponse.getValidationReason())) {
+                    passedChildVsValidationReason.put(childNode, dataOperandsFilterResponse.getValidationReason());
                 }
 
                 if (firstExtractNode == null) {
@@ -231,23 +234,15 @@ public class Filter {
                     matchingKeySet = evaluateMatchingKeySet(matchingKeySet, dataOperandsFilterResponse.getMatchedEntities(), operator);
                 }
             }
-            if (!result && !childNodeVsValidationReason.isEmpty()) {//Validation failed by all conditions
+            if ("validator".equalsIgnoreCase(context)
+                    && (!passedChildVsValidationReason.isEmpty() || !failedChildVsValidationReason.isEmpty())) {
                 validationReason.append("\n").append(node.getOperand().toLowerCase()).append(":");
-                if (operator.equalsIgnoreCase("or")) {
-                    for (FilterNode failedValidation: childNodeVsValidationReason.keySet()) {
-                        String validationReasonStr = childNodeVsValidationReason.getOrDefault(failedValidation, null);
-                        if (!StringUtils.isEmpty(validationReasonStr)) {
-                            validationReasonStr = validationReasonStr.replaceAll("\n","\n\t");
-                            validationReason.append(validationReasonStr);
-                        }
-                    }
-                } else {
-                    String validationReasonStr = childNodeVsValidationReason.getOrDefault(childNodeVsValidationReason.keySet().iterator().next(), null);
-                    if (!StringUtils.isEmpty(validationReasonStr)) {
-                        validationReasonStr = validationReasonStr.replaceAll("\n","\n\t");
-                        validationReason.append(validationReasonStr);
-                    }
-                }
+                appendValidationReasonSection(validationReason, "\npassed: ", operator, passedChildVsValidationReason);
+                appendValidationReasonSection(validationReason, "\nfailed: ", operator, failedChildVsValidationReason);
+            }
+            if (!"validator".equalsIgnoreCase(context) && !result && !failedChildVsValidationReason.isEmpty()) {
+                validationReason.append("\n").append(node.getOperand().toLowerCase()).append(":");
+                appendChildValidationReasons(validationReason, operator, failedChildVsValidationReason);
             }
 
         } catch (Exception e) {
@@ -260,6 +255,36 @@ public class Filter {
 
         return new DataOperandsFilterResponse(result, matchingKeySet, contextEntities, firstExtractNode, validationReason.toString());
 
+    }
+
+    private void appendFormattedValidationReason(StringBuilder validationReason, String validationReasonStr) {
+        if (StringUtils.isEmpty(validationReasonStr)) {
+            return;
+        }
+        validationReason.append(validationReasonStr.replaceAll("\n", "\n\t"));
+    }
+
+    private void appendChildValidationReasons(StringBuilder validationReason, String operator,
+            Map<FilterNode, String> childReasons) {
+        if (childReasons == null || childReasons.isEmpty()) {
+            return;
+        }
+        if (operator.equalsIgnoreCase("or")) {
+            for (String reason : childReasons.values()) {
+                appendFormattedValidationReason(validationReason, reason);
+            }
+        } else {
+            appendFormattedValidationReason(validationReason, childReasons.values().iterator().next());
+        }
+    }
+
+    private void appendValidationReasonSection(StringBuilder validationReason, String sectionPrefix, String operator,
+            Map<FilterNode, String> childReasons) {
+        if (childReasons == null || childReasons.isEmpty()) {
+            return;
+        }
+        validationReason.append(sectionPrefix);
+        appendChildValidationReasons(validationReason, operator, childReasons);
     }
 
     public List<String> evaluateMatchingKeySet(List<String> oldSet, List<String> newMatches, String operand) {

@@ -147,7 +147,9 @@ func GetModifiedPayloadWithSummary(sessionMgr *SessionManager, logger *zap.Logge
 
 	modifiedPayload, err := InjectSessionSummary(payload, sessionSummary, logger)
 	if err != nil {
-		logger.Debug("Failed to inject session summary",
+		// Warn (not Debug): silent failures here mean the session summary is
+		// computed but never reaches the validator, defeating session guardrails.
+		logger.Warn("Failed to inject session summary",
 			zap.String("sessionID", sessionID),
 			zap.Error(err))
 		return payload
@@ -160,51 +162,110 @@ func GetModifiedPayloadWithSummary(sessionMgr *SessionManager, logger *zap.Logge
 	return modifiedPayload
 }
 
-// InjectSessionSummary injects session summary into request_body.prompt field
+// summaryInjector prepends a session summary into one specific user-visible
+// field of a parsed request body. Implementations return true only when they
+// recognized the shape AND mutated body in place.
+type summaryInjector interface {
+	Inject(body map[string]interface{}, summary string) bool
+}
+
+// promptStringInjector handles legacy text-completions: {"prompt": "<text>"}.
+type promptStringInjector struct{}
+
+func (promptStringInjector) Inject(body map[string]interface{}, summary string) bool {
+	originalPrompt, ok := body["prompt"].(string)
+	if !ok {
+		return false
+	}
+	body["prompt"] = summary + "\n\n" + originalPrompt
+	return true
+}
+
+// chatMessagesInjector handles chat-completions: {"messages": [{role, content}, ...]}.
+// Walks from the end so the summary attaches to the freshest user turn.
+type chatMessagesInjector struct{}
+
+func (chatMessagesInjector) Inject(body map[string]interface{}, summary string) bool {
+	rawMessages, ok := body["messages"].([]interface{})
+	if !ok {
+		return false
+	}
+	for i := len(rawMessages) - 1; i >= 0; i-- {
+		msg, ok := rawMessages[i].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if role, _ := msg["role"].(string); role != "user" {
+			continue
+		}
+		content, ok := msg["content"].(string)
+		if !ok {
+			// Non-string content (multi-modal arrays) — skip and keep searching.
+			continue
+		}
+		msg["content"] = summary + "\n\n" + content
+		return true
+	}
+	return false
+}
+
+// summaryInjectors is the ordered registry of body-shape strategies.
+var summaryInjectors = []summaryInjector{
+	promptStringInjector{},
+	chatMessagesInjector{},
+}
+
+// applySummaryInjectors tries each registered strategy and returns true on
+// the first that handles the body.
+func applySummaryInjectors(body map[string]interface{}, summary string) bool {
+	for _, inj := range summaryInjectors {
+		if inj.Inject(body, summary) {
+			return true
+		}
+	}
+	return false
+}
+
+// InjectSessionSummary prepends the session summary to the user-facing prompt
 func InjectSessionSummary(payload, sessionSummary string, logger *zap.Logger) (string, error) {
 	if sessionSummary == "" {
 		return payload, nil
 	}
 
-	// Parse outer payload
 	var payloadObj map[string]interface{}
 	if err := json.Unmarshal([]byte(payload), &payloadObj); err != nil {
 		return payload, fmt.Errorf("failed to parse outer payload: %w", err)
 	}
 
-	// Get request_body string
-	requestBodyStr, ok := payloadObj["request_body"].(string)
-	if !ok {
-		return payload, fmt.Errorf("request_body not found or not a string")
+	// Wrapped envelope: request_body is itself a JSON string. Unwrap, inject,
+	// re-wrap.
+	if requestBodyStr, ok := payloadObj["request_body"].(string); ok {
+		var requestBodyObj map[string]interface{}
+		if err := json.Unmarshal([]byte(requestBodyStr), &requestBodyObj); err != nil {
+			return payload, fmt.Errorf("failed to parse request_body JSON: %w", err)
+		}
+		if !applySummaryInjectors(requestBodyObj, sessionSummary) {
+			return payload, fmt.Errorf("request_body has neither prompt nor messages to inject into")
+		}
+		modifiedRequestBodyBytes, err := json.Marshal(requestBodyObj)
+		if err != nil {
+			return payload, fmt.Errorf("failed to re-encode request_body: %w", err)
+		}
+		payloadObj["request_body"] = string(modifiedRequestBodyBytes)
+		modifiedPayloadBytes, err := json.Marshal(payloadObj)
+		if err != nil {
+			return payload, fmt.Errorf("failed to re-encode outer payload: %w", err)
+		}
+		return string(modifiedPayloadBytes), nil
 	}
 
-	// Parse request_body JSON
-	var requestBodyObj map[string]interface{}
-	if err := json.Unmarshal([]byte(requestBodyStr), &requestBodyObj); err != nil {
-		return payload, fmt.Errorf("failed to parse request_body JSON: %w", err)
+	// Bare envelope: prompt or messages live at the top level.
+	if !applySummaryInjectors(payloadObj, sessionSummary) {
+		return payload, fmt.Errorf("payload has neither request_body, prompt, nor messages to inject into")
 	}
-
-	// Get prompt field
-	originalPrompt, ok := requestBodyObj["prompt"].(string)
-	if !ok {
-		return payload, fmt.Errorf("prompt field not found or not a string")
-	}
-
-	// Inject session summary at the beginning of the prompt
-	requestBodyObj["prompt"] = sessionSummary + "\n\n" + originalPrompt
-
-	// Re-encode request_body
-	modifiedRequestBodyBytes, err := json.Marshal(requestBodyObj)
-	if err != nil {
-		return payload, fmt.Errorf("failed to re-encode request_body: %w", err)
-	}
-	payloadObj["request_body"] = string(modifiedRequestBodyBytes)
-
-	// Re-encode outer payload
 	modifiedPayloadBytes, err := json.Marshal(payloadObj)
 	if err != nil {
-		return payload, fmt.Errorf("failed to re-encode outer payload: %w", err)
+		return payload, fmt.Errorf("failed to re-encode payload: %w", err)
 	}
-
 	return string(modifiedPayloadBytes), nil
 }

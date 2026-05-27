@@ -27,6 +27,7 @@ public class RbacEnums {
     public enum Feature {
         API_COLLECTIONS(AccessGroups.INVENTORY),
         SENSITIVE_DATA(AccessGroups.PII_DATA),
+        NHI_DATA(AccessGroups.PII_DATA),
         TRAFFIC_FILTERS(AccessGroups.INVENTORY),
         DEFAULT_PAYLOADS(AccessGroups.INVENTORY),
         SAMPLE_DATA(AccessGroups.PII_DATA),

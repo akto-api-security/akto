@@ -3,6 +3,7 @@ package com.akto.log;
 import com.akto.dao.AgenticTestingLogsDao;
 import com.akto.dao.AnalyserLogsDao;
 import com.akto.dao.AwsApiGatewayLogsDao;
+import com.akto.dao.GuardrailsServiceLogsDao;
 import com.akto.dao.BillingLogsDao;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.DashboardLogsDao;
@@ -105,7 +106,7 @@ public class LoggerMaker  {
     }
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION, ENDPOINT_SHIELD, AGENTIC_TESTING, AWS_API_GATEWAY
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION, ENDPOINT_SHIELD, AGENTIC_TESTING, AWS_API_GATEWAY, GUARDRAILS_SERVICE
     }
 
     private static AccountSettings accountSettings = null;
@@ -341,6 +342,9 @@ public class LoggerMaker  {
                 case AGENTIC_TESTING:
                     dataActor.insertAgenticTestingLog(log);
                     break;
+                case GUARDRAILS_SERVICE:
+                    dataActor.insertGuardrailsServiceLog(log);
+                    break;
                 default:
                     break;
             }
@@ -402,6 +406,9 @@ public class LoggerMaker  {
                 break;
             case AWS_API_GATEWAY:
                 logs = AwsApiGatewayLogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
+                break;
+            case GUARDRAILS_SERVICE:
+                logs = GuardrailsServiceLogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
                 break;
             default:
                 break;

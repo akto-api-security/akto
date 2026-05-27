@@ -22,13 +22,19 @@ public class MagicValidateFilter extends DataOperandsImpl {
         queryData.put(TestExecutorModifier._REQUEST, dataOperandFilterRequest.getData());
 
         boolean isVulnerable = false;
+        String reason = "";
         for (String key : (List<String>)dataOperandFilterRequest.getQueryset()) {
             queryData.put(TestExecutorModifier._OPERATION, key);
             BasicDBObject response = new MagicValidator().handle(queryData);
             if (response != null) {
                 isVulnerable = isVulnerable || response.getBoolean("vulnerable", false);
+                try {
+                    reason = response.getString("reason", "");
+                } catch (Exception e) {
+                    reason = "";
+                }
             }
         }
-        return new ValidationResult(isVulnerable, "");
+        return new ValidationResult(isVulnerable, reason);
     }
 }

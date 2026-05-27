@@ -3,6 +3,7 @@ package com.akto.dao.testing;
 import com.akto.dao.AccountsContextDaoWithRbac;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
@@ -279,6 +280,15 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         }
 
         return finalMap;
+    }
+
+    public Bson getSummaryIdFilterWithContextSource() {
+        return TestingRunIssuesDao.instance.getSummaryIdsFilterForDashboardContext(Context.contextSource.get(), TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID);
+    }
+
+    public List<TestingRunResult> findAllWithSummaryContext(Bson q, Bson projection) {
+        Bson finalFilter = modifyFilters(q, true, false);
+        return super.findAllNoRbacFilter(finalFilter, projection);
     }
 
     public void createIndicesIfAbsent() {

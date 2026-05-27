@@ -1,18 +1,112 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ActionList, Box, Button, HorizontalStack, Popover, Text, VerticalStack } from "@shopify/polaris";
 import { IndexFiltersMode } from "@shopify/polaris";
 import FlyLayout from "../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
-import { IdentityIcon, violationsTableData, violationsHeaders, violationsSortOptions } from "./nhiViolationsData";
+import { IdentityIcon, violationsHeaders, violationsSortOptions, SEV_ORD, sevBadge, AgentIcon, PolicyCell } from "./nhiViolationsData";
 import IdentityGraph from "./IdentityGraph";
+import observeRequests from "../observe/api";
+import { extractIdentityName, violationIncludesIdentity, getFirstIdentityName } from "./identityHelper";
 
 const NHI_VIOLATIONS_PATH = "/dashboard/nhi/violations";
 
+// Format timestamp to relative time (e.g., "2h ago")
+const formatTimestampRelative = (timestamp) => {
+    if (!timestamp) return "Unknown";
+    const now = Math.floor(Date.now() / 1000);
+    const diff = now - timestamp;
+    const minutes = Math.floor(diff / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    return "Now";
+};
+
+// Transform API violations to table format with components
+const transformViolationsForUI = (apiViolations) => {
+    return apiViolations
+        .sort((a, b) => SEV_ORD[b.severity] - SEV_ORD[a.severity])
+        .map((v, i) => {
+            // Transform policy array to object format
+            const policyObj = v.policy && Array.isArray(v.policy)
+                ? {
+                    primary: v.policy[0] || "N/A",
+                    extra: Math.max(0, v.policy.length - 1),
+                    extras: v.policy.slice(1) || [],
+                  }
+                : v.policy;
+
+            // Extract identity name from new format { id: ObjectId, identityName: "name" }
+            const firstIdentityName = getFirstIdentityName(v.identities);
+
+            return {
+                ...v,
+                id: i + 1,
+                violation: v.violationType,
+                identity: firstIdentityName,
+                identities: v.identities,
+                discovered: formatTimestampRelative(v.discoveredAt),
+                severityOrder: SEV_ORD[v.severity] || 0,
+                policy: policyObj,
+                violationComp: <Text variant="bodyMd" fontWeight="medium">{v.violationType}</Text>,
+                identityComp: (
+                    <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                        <IdentityIcon name={firstIdentityName} />
+                        <Text variant="bodyMd">{firstIdentityName}</Text>
+                    </HorizontalStack>
+                ),
+                agentComp: (
+                    <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                        <AgentIcon name={v.agentName} />
+                        <Text variant="bodyMd">{v.agentName}</Text>
+                    </HorizontalStack>
+                ),
+                severityComp: sevBadge(v.severity),
+                policyComp: <PolicyCell policy={policyObj} />,
+            };
+        });
+};
+
 export default function IdentityDetailsPanel({ row, show, setShow }) {
     const [actionActive, setActionActive] = useState(false);
+    const [allViolations, setAllViolations] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [disabling, setDisabling] = useState(false);
 
-    const identityViolations = violationsTableData.filter((r) => r.identity === row.identityName);
+    // Fetch all violations for filtering
+    useEffect(() => {
+        const fetchViolations = async () => {
+            try {
+                setLoading(true);
+                const response = await observeRequests.fetchAllNhiViolations();
+
+                if (Array.isArray(response)) {
+                    setAllViolations(response);
+                } else {
+                    setAllViolations([]);
+                }
+            } catch (err) {
+                console.error("Error fetching violations:", err);
+                setAllViolations([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (show) {
+            fetchViolations();
+        }
+    }, [show]);
+
+    // Transform violations and filter for this identity
+    const identityViolations = useMemo(() => {
+        const transformed = transformViolationsForUI(allViolations);
+        return transformed.filter((v) => violationIncludesIdentity(v.identities, row.identityName));
+    }, [allViolations, row.identityName]);
     const violCrit = identityViolations.filter((v) => v.severity === "Critical").length;
     const violHigh = identityViolations.filter((v) => v.severity === "High").length;
     const violMed  = identityViolations.filter((v) => v.severity === "Medium").length;
@@ -22,6 +116,25 @@ export default function IdentityDetailsPanel({ row, show, setShow }) {
         sessionStorage.setItem("nhi_pending_violation", JSON.stringify(violationRow));
         setShow(false);
         window.location.href = NHI_VIOLATIONS_PATH;
+    };
+
+    const handleDisableIdentity = async () => {
+        try {
+            setDisabling(true);
+
+            await observeRequests.disableNhiIdentity(row.hexId);
+
+            setDisabling(false);
+            setActionActive(false);
+            setShow(false);
+
+            // Refresh the identities list
+            window.location.reload();
+        } catch (err) {
+            console.error("Error disabling identity:", err);
+            setDisabling(false);
+            setActionActive(false);
+        }
     };
 
     // ── TitleComponent ────────────────────────────────────────────────────────
@@ -62,7 +175,7 @@ export default function IdentityDetailsPanel({ row, show, setShow }) {
                     }
                     onClose={() => setActionActive(false)}
                 >
-                    <ActionList items={[{ content: "Disable identity", destructive: true, onAction: () => setActionActive(false) }]} />
+                    <ActionList items={[{ content: "Disable identity", destructive: true, onAction: handleDisableIdentity }]} />
                 </Popover>
             </HorizontalStack>
         </Box>

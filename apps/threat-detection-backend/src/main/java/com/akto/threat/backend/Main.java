@@ -21,6 +21,9 @@ import com.akto.threat.backend.cron.ArchiveOldMaliciousEventsCron;
 import com.akto.threat.backend.cron.RiskScoreSyncCron;
 import com.akto.threat.backend.cron.SkillsRiskScoreSyncCron;
 import com.akto.threat.backend.cron.CloudflareWafSyncCron;
+import com.akto.dao.context.Context;
+import com.akto.dto.Account;
+import com.akto.util.AccountTask;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ReadPreference;
@@ -29,6 +32,7 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
+import java.util.function.Consumer;
 
 public class Main {
 
@@ -111,6 +115,24 @@ public class Main {
 
     CloudflareWafSyncCron cloudflareWafSyncCron = new CloudflareWafSyncCron();
     cloudflareWafSyncCron.setUpCloudflareWafSyncCronScheduler();
+
+    // Initialize threat detection for all accounts
+    AccountTask.instance.executeTask(new Consumer<Account>() {
+      @Override
+      public void accept(Account account) {
+        Context.accountId.set(account.getId());
+        try {
+          String accountId = String.valueOf(account.getId());
+          logger.infoAndAddToDb("Starting to create indices for account: " + accountId);
+          ThreatDetectionDaoInit.createIndices(accountId);
+          logger.infoAndAddToDb("Finished creating indices for account: " + accountId);
+        } catch (Exception e) {
+          logger.errorAndAddToDb("Error initializing threat detection for account " + account.getId() + ": " + e.getMessage());
+        } finally {
+          Context.resetContextThreadLocals();
+        }
+      }
+    }, "threat-detection-initializer");
 
   }
 

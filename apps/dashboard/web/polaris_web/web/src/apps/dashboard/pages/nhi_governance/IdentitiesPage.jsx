@@ -1,4 +1,4 @@
-import { useState, useMemo, useReducer } from "react";
+import { useState, useMemo, useReducer, useEffect } from "react";
 import { IndexFiltersMode } from "@shopify/polaris";
 import { Badge, HorizontalStack, Modal, Text } from "@shopify/polaris";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
@@ -13,12 +13,14 @@ import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import values from "@/util/values";
 import { isEndpointSecurityCategory } from "../../../main/labelHelper";
+import { formatRelativeTime } from "./nhiUtils";
 import IdentityDetailsPanel from "./IdentityDetailsPanel";
 import IdentityOverviewGraph from "./IdentityOverviewGraph";
-import { violationsTableData, IdentityIcon, AgentIcon, ViolationBubbles } from "./nhiViolationsData";
-import { CRITICAL_CURATED, NON_CRITICAL_CURATED, GENERATED } from "./nhiData";
+import { IdentityIcon, AgentIcon, ViolationBubbles } from "./nhiViolationsData";
+import observeRequests from "../observe/api";
+import SpinnerCentered from "../../components/progress/SpinnerCentered";
 
-const definedTableTabs = ["All", "Expired"];
+const definedTableTabs = ["All", "Expired", "Disabled"];
 const resourceName = { singular: "identity", plural: "identities" };
 
 // ── Expiry status renderer ─────────────────────────────────────────────────────
@@ -31,52 +33,79 @@ const expiryComp = (s) => {
     return <Text variant="bodyMd">{s}</Text>;
 };
 
-// ── Violation counts derived from violations data (single source of truth) ────
-const VIOL_INDEX = violationsTableData.reduce((acc, v) => {
-    if (!acc[v.identity]) acc[v.identity] = { violCrit: 0, violHigh: 0, violMed: 0 };
-    if (v.severity === "Critical")     acc[v.identity].violCrit++;
-    else if (v.severity === "High")    acc[v.identity].violHigh++;
-    else if (v.severity === "Medium")  acc[v.identity].violMed++;
-    return acc;
-}, {});
+const buildTableData = (rawRows, violationIndex = {}) =>
+    rawRows
+        .map((r) => {
+            const v = violationIndex[r.identityName] || { violCrit: 0, violHigh: 0, violMed: 0 };
+            return { ...r, violCrit: v.violCrit, violHigh: v.violHigh, violMed: v.violMed };
+        })
+        .sort((a, b) => {
+            if (b.violCrit !== a.violCrit) return b.violCrit - a.violCrit;
+            return (b.violCrit + b.violHigh + b.violMed) - (a.violCrit + a.violHigh + a.violMed);
+        })
+        .map((r, i) => ({
+            ...r,
+            id:             i + 1,
+            totalViolations: r.violCrit + r.violHigh + r.violMed,
+            priorityScore:  r.violCrit * 1000 + (r.violCrit + r.violHigh + r.violMed),
+            identityComp:  <HorizontalStack gap="2" blockAlign="center" wrap={false}><IdentityIcon name={r.identityName} /><Text variant="bodyMd" fontWeight="medium">{r.identityName}</Text></HorizontalStack>,
+            agentComp:     <HorizontalStack gap="2" blockAlign="center" wrap={false}><AgentIcon name={r.agent} /><Text variant="bodyMd">{r.agent}</Text></HorizontalStack>,
+            typeComp:      <Badge>{r.type}</Badge>,
+            violationsComp: <ViolationBubbles critical={r.violCrit} high={r.violHigh} medium={r.violMed} />,
+            expiryComp:    expiryComp(r.expiryStatus),
+        }));
 
-const ALL_RAW = [...CRITICAL_CURATED, ...NON_CRITICAL_CURATED, ...GENERATED]
-    .map((r) => {
-        const v = VIOL_INDEX[r.identityName] || { violCrit: 0, violHigh: 0, violMed: 0 };
-        return { ...r, violCrit: v.violCrit, violHigh: v.violHigh, violMed: v.violMed };
-    })
-    .sort((a, b) => {
-        if (b.violCrit !== a.violCrit) return b.violCrit - a.violCrit;
-        return (b.violCrit + b.violHigh + b.violMed) - (a.violCrit + a.violHigh + a.violMed);
-    });
 
-const tableData = ALL_RAW.map((r, i) => ({
-    ...r,
-    id:             i + 1,
-    totalViolations: r.violCrit + r.violHigh + r.violMed,
-    priorityScore:  r.violCrit * 1000 + (r.violCrit + r.violHigh + r.violMed),
-    identityComp:  <HorizontalStack gap="2" blockAlign="center" wrap={false}><IdentityIcon name={r.identityName} /><Text variant="bodyMd" fontWeight="medium">{r.identityName}</Text></HorizontalStack>,
-    agentComp:     <HorizontalStack gap="2" blockAlign="center" wrap={false}><AgentIcon name={r.agent} /><Text variant="bodyMd">{r.agent}</Text></HorizontalStack>,
-    typeComp:      <Badge>{r.type}</Badge>,
-    violationsComp: <ViolationBubbles critical={r.violCrit} high={r.violHigh} medium={r.violMed} />,
-    expiryComp:    expiryComp(r.expiryStatus),
-}));
+// Helper to format expiry status (expiryDate is epoch seconds)
+const formatExpiryStatus = (expiryDate) => {
+    if (!expiryDate) return "No expiry";
+    const now = Math.floor(Date.now() / 1000); // Convert to seconds
+    const diff = expiryDate - now; // Both in seconds
+    const secondsInDay = 60 * 60 * 24;
+
+    if (diff < 0) {
+        const days = Math.floor(Math.abs(diff) / secondsInDay);
+        return `Expired ${days}d ago`;
+    }
+
+    const days = Math.floor(diff / secondsInDay);
+    if (days === 0) return "Rotation due today";
+    if (days <= 2) return `Rotation Due in ${days}d`;
+    return `${days}d left`;
+};
+
+// Helper to transform API identity to UI format
+const transformIdentityForUI = (apiIdentity) => {
+    return {
+        hexId: apiIdentity.hexId,
+        identityName: apiIdentity.identityName,
+        agent: apiIdentity.agentName,
+        type: apiIdentity.identityType,
+        access: apiIdentity.accessLevel,
+        owner: apiIdentity.owner?.name || "N/A",
+        lastUsed: formatRelativeTime(apiIdentity.lastUsedAt),
+        expiryStatus: formatExpiryStatus(apiIdentity.expiryDate),
+        targetResource: apiIdentity.targetResource,
+        status: apiIdentity.status,
+    };
+};
 
 // ── Computed summary ───────────────────────────────────────────────────────────
-const TOTAL_I    = tableData.length;
-const EXPIRED_I  = tableData.filter((r) => r.expiryStatus && r.expiryStatus.startsWith("Expired")).length;
-const WITH_VIOL  = tableData.filter((r) => r.totalViolations > 0).length;
-
-const summaryItems = [
-    { title: "Total Identities",          data: TOTAL_I.toLocaleString()   },
-    { title: "Expired Identities",        data: EXPIRED_I.toLocaleString() },
-    { title: "Identities with Violations",data: WITH_VIOL.toLocaleString() },
-];
+const makeSummaryItems = (data) => {
+    const total   = data.length;
+    const expired = data.filter((r) => r.expiryStatus && r.expiryStatus.startsWith("Expired")).length;
+    const withV   = data.filter((r) => r.totalViolations > 0).length;
+    return [
+        { title: "Total Identities",          data: total.toLocaleString()   },
+        { title: "Expired Identities",        data: expired.toLocaleString() },
+        { title: "Identities with Violations",data: withV.toLocaleString()   },
+    ];
+};
 
 // ── Headers ────────────────────────────────────────────────────────────────────
 const headers = [
     { text: "Identity",      value: "identityComp",   title: "Identity"                           },
-    { text: "Agent",         value: "agentComp",      title: "Agent"                              },
+    { text: "Agentic Asset", value: "agentComp",      title: "Agentic Asset"                      },
     ...(isEndpointSecurityCategory() ? [{ text: "Owner", value: "owner", title: "Owner", type: CellType.TEXT }] : []),
     { text: "Type",          value: "typeComp",       title: "Type"                               },
     { text: "Access",        value: "access",         title: "Access",      type: CellType.TEXT   },
@@ -105,6 +134,13 @@ export default function IdentitiesPage() {
     const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
     const initialSelectedTab  = tableSelectedTab[window.location.pathname] || "all";
 
+    // API fetching state
+    const [rawIdentities, setRawIdentities] = useState([]);
+    const [rawViolations, setRawViolations] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    // UI state
     const [selectedTab, setSelectedTab]         = useState(initialSelectedTab);
     const [selected, setSelected]               = useState(
         func.getTableTabIndexById(0, definedTableTabs, initialSelectedTab)
@@ -117,10 +153,73 @@ export default function IdentitiesPage() {
         values.ranges[2]
     );
 
+    // Fetch identities and violations from API
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+
+                // Fetch identities from API
+                const identitiesResponse = await observeRequests.fetchNhiIdentities();
+                if (identitiesResponse && identitiesResponse.length > 0) {
+                    const transformed = identitiesResponse.map(transformIdentityForUI);
+                    setRawIdentities(transformed);
+                } else if (Array.isArray(identitiesResponse)) {
+                    setRawIdentities([]);
+                } else {
+                    setRawIdentities([]);
+                }
+
+                // Fetch slim violation projection for per-identity counts
+                try {
+                    const violationsResponse = await observeRequests.fetchViolationCountsByIdentity();
+                    if (Array.isArray(violationsResponse) && violationsResponse.length > 0) {
+                        setRawViolations(violationsResponse);
+                    } else {
+                        setRawViolations([]);
+                    }
+                } catch (violErr) {
+                    console.error("Error fetching violations for counts:", violErr);
+                    setRawViolations([]);
+                }
+            } catch (err) {
+                console.error("Error fetching identities:", err);
+                setError(err.message);
+                setRawIdentities([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    // Build violation index from API violations
+    const violationIndex = useMemo(() => {
+        return rawViolations.reduce((acc, v) => {
+            if (!v.identities || !Array.isArray(v.identities)) return acc;
+            v.identities.forEach((identity) => {
+                const identityName = identity.identityName;
+                if (!acc[identityName]) acc[identityName] = { violCrit: 0, violHigh: 0, violMed: 0 };
+                if (v.severity === "Critical")     acc[identityName].violCrit++;
+                else if (v.severity === "High")    acc[identityName].violHigh++;
+                else if (v.severity === "Medium")  acc[identityName].violMed++;
+            });
+            return acc;
+        }, {});
+    }, [rawViolations]);
+
+    // Build table data with violation counts
+    const tableData = useMemo(() => {
+        return buildTableData(rawIdentities, violationIndex);
+    }, [rawIdentities, violationIndex]);
+
     const dataByTab = useMemo(() => ({
-        "all":     tableData,
-        "expired": tableData.filter((r) => r.expiryStatus && r.expiryStatus.startsWith("Expired")),
-    }), []);
+        "all":      tableData,
+        "expired":  tableData.filter((r) => r.expiryStatus && r.expiryStatus.startsWith("Expired")),
+        "disabled": tableData.filter((r) => r.status === "INACTIVE"),
+    }), [tableData]);
 
     const tableCountObj = func.getTabsCount(definedTableTabs, dataByTab);
     const tableTabs = func.getTableTabsContent(
@@ -131,6 +230,12 @@ export default function IdentitiesPage() {
         },
         selectedTab, tabsInfo
     );
+
+    const summaryItems = makeSummaryItems(tableData);
+
+    if (loading) {
+        return <SpinnerCentered />;
+    }
 
     return (
         <>

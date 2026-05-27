@@ -216,8 +216,10 @@ func (s *Service) getMcpAllowedHostList() ([]types.McpAllowedList, error) {
 
 	s.mcpListCache.mu.RLock()
 	if !s.mcpListCache.lastFetched.IsZero() && time.Since(s.mcpListCache.lastFetched) < refreshInterval {
+		list := s.mcpListCache.mcpAllowedList
 		s.mcpListCache.mu.RUnlock()
-		return s.mcpListCache.mcpAllowedList, nil
+		s.logger.Debug("Using cached MCP allowlist", zap.Int("count", len(list)))
+		return list, nil
 	}
 	s.mcpListCache.mu.RUnlock()
 
@@ -226,6 +228,7 @@ func (s *Service) getMcpAllowedHostList() ([]types.McpAllowedList, error) {
 
 	rawResp, err := s.dbClient.FetchMcpAllowedHostList()
 	if err != nil {
+		s.logger.Error("Failed to fetch MCP allowlist from database-abstractor", zap.Error(err))
 		return nil, err
 	}
 
@@ -239,6 +242,7 @@ func (s *Service) getMcpAllowedHostList() ([]types.McpAllowedList, error) {
 
 	s.mcpListCache.mcpAllowedList = mcpHostAllowedList.McpAllowlist
 	s.mcpListCache.lastFetched = time.Now()
+	s.logger.Info("MCP allowlist cache refreshed", zap.Int("count", len(mcpHostAllowedList.McpAllowlist)))
 	return mcpHostAllowedList.McpAllowlist, nil
 }
 
@@ -723,7 +727,6 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.String("aktoVxlanId", params.AktoVxlanID),
 		zap.Bool("skipThreat", params.EffectiveSkipThreat()))
 
-	// Check if session is already malicious
 	if result, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, requestID, payload); isMalicious {
 		s.logger.Info("ValidateRequest - session already malicious, blocking request",
 			zap.String("path", params.Path),
@@ -743,7 +746,6 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.String("sessionID", sessionID))
 	}
 
-	// Refresh schema registry if stale
 	s.schemaFetcher.RefreshIfNeeded()
 
 	payloadToValidate = s.extractPayloadForValidation(payloadToValidate, params.Method, params.Path, true)
@@ -794,7 +796,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.String("sessionID", sessionID),
 			zap.String("accountType", accountType))
 		if accountType != "" && accountType != "enterprise" {
-			s.logger.Warn("ValidateRequest - blocking non-enterprise account",
+			s.logger.Warn("ValidateRequest - blocking non-enterprise account via block_personal_account policy",
 				zap.String("path", params.Path),
 				zap.String("method", params.Method),
 				zap.String("account", params.AktoAccountID),
@@ -827,9 +829,9 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 
 	// Use the default processor - skipThreat is passed via ValidationContext
 	processStart := time.Now()
-	processResult, err := s.processor.ProcessRequest(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
+	processResult, err := s.processor.ProcessRequestParallel(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
 	if err != nil {
-		s.logger.Error("ValidateRequest - ProcessRequest failed",
+		s.logger.Error("ValidateRequest - ProcessRequestParallel failed",
 			zap.String("path", params.Path),
 			zap.String("method", params.Method),
 			zap.String("account", params.AktoAccountID),
@@ -839,7 +841,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		return nil, fmt.Errorf("failed to process request: %w", err)
 	}
 
-	s.logger.Info("ValidateRequest - ProcessRequest result",
+	s.logger.Info("ValidateRequest - ProcessRequestParallel result",
 		zap.String("path", params.Path),
 		zap.String("method", params.Method),
 		zap.String("sessionID", sessionID),
@@ -908,7 +910,6 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("aktoVxlanId", params.AktoVxlanID),
 		zap.Bool("skipThreat", params.EffectiveSkipThreat()))
 
-	// Refresh schema registry if stale
 	s.schemaFetcher.RefreshIfNeeded()
 
 	// Get cached policies (refreshes if stale)
@@ -934,7 +935,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 
 	mcpAllowedHostList, err := s.getMcpAllowedHostList()
 	if err != nil {
-		s.logger.Error("ValidateRequest - failed to get MCP allowed host list",
+		s.logger.Error("ValidateResponse - failed to get MCP allowed host list",
 			zap.String("path", params.Path),
 			zap.String("method", params.Method),
 			zap.String("account", params.AktoAccountID),
@@ -961,7 +962,6 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
 		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
 
-	// Apply schema-based content extraction if configured for this endpoint
 	responseBodyForValidation := s.extractPayloadForValidation(responseBody, params.Method, params.Path, false)
 	s.logger.Info("ValidateResponse - payload prepared for validation",
 		zap.String("path", params.Path),
@@ -970,9 +970,9 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 
 	// Use processor's ProcessResponse method with external policies
 	processStart := time.Now()
-	processResult, err := s.processor.ProcessResponse(ctx, responseBodyForValidation, valCtx, policies)
+	processResult, err := s.processor.ProcessResponseParallel(ctx, responseBodyForValidation, valCtx, policies)
 	if err != nil {
-		s.logger.Error("ValidateResponse - ProcessResponse failed",
+		s.logger.Error("ValidateResponse - ProcessResponseParallel failed",
 			zap.String("path", params.Path),
 			zap.String("method", params.Method),
 			zap.String("account", params.AktoAccountID),
@@ -981,6 +981,13 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 			zap.Error(err))
 		return nil, fmt.Errorf("failed to process response: %w", err)
 	}
+
+	s.logger.Info("ValidateResponse - ProcessResponseParallel result",
+		zap.String("path", params.Path),
+		zap.String("method", params.Method),
+		zap.String("sessionID", sessionID),
+		zap.Bool("isBlocked", processResult.IsBlocked),
+		zap.Int64("latencyMs", time.Since(processStart).Milliseconds()))
 
 	// Track response and generate summary
 	isMalicious := processResult.IsBlocked
@@ -1027,8 +1034,10 @@ func (s *Service) ValidateRequestWithPolicy(
 		zap.String("requestID", requestID),
 		zap.String("policyName", providedPolicy.Name))
 
-	// Check if session is already malicious
 	if result, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, requestID, payload); isMalicious {
+		s.logger.Info("ValidateRequestWithPolicy - session already malicious, blocking request",
+			zap.String("sessionID", sessionID),
+			zap.String("requestID", requestID))
 		return result, nil
 	}
 
@@ -1155,14 +1164,18 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 		zap.String("contextSource", contextSource),
 		zap.Int("batchSize", len(batchData)))
 
-	s.logger.Info("Validating batch data", zap.Int("count", len(batchData)))
+	s.logger.Info("Validating batch data",
+		zap.Int("count", len(batchData)),
+		zap.String("contextSource", contextSource),
+		zap.Bool("skipThreat", skipThreat))
 
-	// Refresh schema registry if stale
 	s.schemaFetcher.RefreshIfNeeded()
 
-	// Get cached policies (refreshes if stale)
 	policies, auditPolicies, _, hasAuditRules, err := s.getCachedPolicies(string(contextSource))
 	if err != nil {
+		s.logger.Error("ValidateBatch - failed to load policies",
+			zap.String("contextSource", contextSource),
+			zap.Error(err))
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
 
@@ -1335,6 +1348,21 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				zap.String("path", data.Path))
 		}
 	}
+
+	blockedRequests, blockedResponses := 0, 0
+	for _, r := range results {
+		if !r.RequestAllowed {
+			blockedRequests++
+		}
+		if !r.ResponseAllowed {
+			blockedResponses++
+		}
+	}
+	s.logger.Info("ValidateBatch - completed",
+		zap.Int("batchSize", len(batchData)),
+		zap.String("contextSource", contextSource),
+		zap.Int("blockedRequests", blockedRequests),
+		zap.Int("blockedResponses", blockedResponses))
 
 	return results, nil
 }

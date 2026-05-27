@@ -464,6 +464,18 @@ const aiAgentGateway = {
     component : <AIAgentsGateway />
 }
 
+const sidecarEgressProxy = {
+    icon: '/public/aws_bedrock.svg',
+    label: "Sidecar Egress Proxy",
+    text: "A sidecar proxy deployed alongside your AI agent to intercept and secure all egress traffic, providing deep visibility and control over outbound AI requests.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/sidecar-egress-proxy',
+    key: "SIDECAR_EGRESS_PROXY",
+    component: <BannerComponent
+        content="A sidecar proxy deployed alongside your AI agent to intercept and secure all egress traffic, providing deep visibility and control over outbound AI requests."
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/sidecar-egress-proxy'
+    />
+}
+
 const azureAIFoundryObj = {
     icon: '/public/azure_ai.svg',
     label: "Azure AI Foundry",
@@ -2062,7 +2074,7 @@ const quickStartFunc = {
 
         if(isAgenticSecurityCategory()){
             connectors = {
-                "Agentic Proxies": agenticProxies,
+                "Agentic Proxies": [...agenticProxies, sidecarEgressProxy],
                 "AI Agent Platforms": aiAgentConnectors,
                 "AI Model Security": aiScanConnectors,
                 "MCP": mcpScan,

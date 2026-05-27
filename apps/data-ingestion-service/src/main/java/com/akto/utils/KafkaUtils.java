@@ -9,6 +9,13 @@ import com.mongodb.BasicDBObject;
 public class KafkaUtils {
 
     private static final LoggerMaker logger = new LoggerMaker(KafkaUtils.class, LoggerMaker.LogDb.DATA_INGESTION);
+    private static final String KAFKA_TOPIC_KEY = "AKTO_KAFKA_TOPIC";
+    private static final String DEFAULT_API_LOGS_TOPIC = "akto.api.logs";
+    private static final String API_LOGS_TOPIC;
+    static {
+        String env = System.getenv(KAFKA_TOPIC_KEY);
+        API_LOGS_TOPIC = (env != null && !env.isEmpty()) ? env : DEFAULT_API_LOGS_TOPIC;
+    }
     private static Kafka kafkaProducer;
     private static TrafficPublisher topicPublisher;
 
@@ -23,9 +30,8 @@ public class KafkaUtils {
     }
 
     public static void insertData(IngestDataBatch payload, boolean publishToGuardrails) {
-        String topicName = "akto.api.logs";
         BasicDBObject obj = buildMessageObject(payload);
-        topicPublisher.publish(obj.toString(), topicName, publishToGuardrails);
+        topicPublisher.publish(obj.toString(), API_LOGS_TOPIC, publishToGuardrails);
     }
 
     /**

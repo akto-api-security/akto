@@ -2,6 +2,9 @@ package com.akto;
 
 import com.akto.dao.*;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
+import com.akto.dao.nhi_governance.NhiIdentityDao;
+import com.akto.dao.nhi_governance.NhiPolicyDao;
+import com.akto.dao.nhi_governance.NhiViolationDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.jobs.AccountJobDao;
 import com.akto.dao.jobs.JobsDao;
@@ -96,6 +99,7 @@ import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.DependencyNode.ParamInfo;
+import com.akto.dto.GuardrailPolicies.ModelConfig;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.agents.Model;
 import com.akto.dto.agents.ModelType;
@@ -277,6 +281,7 @@ public class DaoInit {
         ClassModel<RegexTestingEndpoints> regexTestingEndpointsClassModel = ClassModel.builder(RegexTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<HostRegexTestingEndpoints> hostRegexTestingEndpointsClassModel = ClassModel.builder(HostRegexTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<TagsTestingEndpoints> tagsTestingEndpointsClassModel = ClassModel.builder(TagsTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<ApiTagsTestingEndpoints> apiTagsTestingEndpointsClassModel = ClassModel.builder(ApiTagsTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<AuthTypeTestingEndpoints> authTypeTestingEndpointsClassModel = ClassModel.builder(AuthTypeTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<MultiCollectionTestingEndpoints> multiCollectionTestingEndpointsClassModel = ClassModel.builder(MultiCollectionTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<DependencyNode> dependencyNodeClassModel = ClassModel.builder(DependencyNode.class).enableDiscriminator(true).build();
@@ -348,6 +353,7 @@ public class DaoInit {
         ClassModel<WizSyncJobParams> wizSyncJobParamsClassModel = ClassModel.builder(WizSyncJobParams.class).enableDiscriminator(true).build();
         ClassModel<EndpointMcpConfig> endpointMcpConfigClassModel = ClassModel.builder(EndpointMcpConfig.class).enableDiscriminator(true).build();
         ClassModel<NewRelicIntegration> newRelicIntegrationClassModel = ClassModel.builder(NewRelicIntegration.class).enableDiscriminator(true).build();
+        ClassModel<ModelConfig> modelConfigClassModel = ClassModel.builder(ModelConfig.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -375,6 +381,7 @@ public class DaoInit {
                 cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
                 methodConditionClassModel, regexTestingEndpointsClassModel, hostRegexTestingEndpointsClassModel,
                 tagsTestingEndpointsClassModel, authTypeTestingEndpointsClassModel, multiCollectionTestingEndpointsClassModel, allTestingEndpointsClassModel,
+                apiTagsTestingEndpointsClassModel,
                 UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel,
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel,
                 paramInfoClassModel,
@@ -392,7 +399,7 @@ public class DaoInit {
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
                 traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
                 wizIntegrationClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel,
-                mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel, newRelicIntegrationClassModel)
+                mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel, newRelicIntegrationClassModel, modelConfigClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -453,7 +460,8 @@ public class DaoInit {
                 new EnumCodec<>(JiraIntegration.JiraType.class),
                 new EnumCodec<>(GlobalEnums.DashboardCategory.class),
                 new EnumCodec<>(McpRegistryConfig.RegistryType.class),
-                new EnumCodec<>(McpAllowlist.Source.class)
+                new EnumCodec<>(McpAllowlist.Source.class),
+                new EnumCodec<>(GuardrailPolicies.ModelRole.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
@@ -505,6 +513,7 @@ public class DaoInit {
         DashboardLogsDao.instance.createIndicesIfAbsent();
         DataIngestionLogsDao.instance.createIndicesIfAbsent();
         AwsApiGatewayLogsDao.instance.createIndicesIfAbsent();
+        GuardrailsServiceLogsDao.instance.createIndicesIfAbsent();
         AnalyserLogsDao.instance.createIndicesIfAbsent();
         SampleDataDao.instance.createIndicesIfAbsent();
         LoadersDao.instance.createIndicesIfAbsent();
@@ -536,6 +545,9 @@ public class DaoInit {
         MetricDataDao.instance.createIndicesIfAbsent();
         SensitiveSampleDataDao.instance.createIndicesIfAbsent();
         McpAuditInfoDao.instance.createIndicesIfAbsent();
+        NhiIdentityDao.instance.createIndicesIfAbsent();
+        NhiPolicyDao.instance.createIndicesIfAbsent();
+        NhiViolationDao.instance.createIndicesIfAbsent();
         McpReconRequestDao.instance.createIndicesIfAbsent();
         GuardrailPoliciesDao.instance.createIndicesIfAbsent();
         McpAllowlistDao.instance.createIndicesIfAbsent();

@@ -526,6 +526,10 @@ public class DbLayer {
         DataIngestionLogsDao.instance.insertOne(log);
     }
 
+    public static void insertGuardrailsServiceLog(Log log) {
+        GuardrailsServiceLogsDao.instance.insertOne(log);
+    }
+
     public static void updateModuleInfo(ModuleInfo moduleInfo) {
         if (moduleInfo == null || moduleInfo.getId() == null) {
             return;

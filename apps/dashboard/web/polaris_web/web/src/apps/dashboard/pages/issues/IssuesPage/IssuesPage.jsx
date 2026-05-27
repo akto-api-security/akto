@@ -1118,10 +1118,6 @@ function IssuesPage() {
                 filterCollectionsId={pageScopeApiCollectionIds}
             />
 
-{
-    window.ACTIVE_ACCOUNT === 1727251348 && isAgenticSecurityCategory()
-    ? null
-    :
             <IssuesGraphsGroup heading="Issues summary">
                 {[
                     <HorizontalGrid gap={5} columns={2} key="critical-issues-graph-detail">
@@ -1135,7 +1131,6 @@ function IssuesPage() {
                     <AllUnsecuredAPIsOverTimeGraph key="unsecured-over-time" startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} apiCollectionIds={pageScopeApiCollectionIds} />
                 ]}
             </IssuesGraphsGroup>
-            }
 
             <GithubServerTable
                 key={`${key}-${selectedCollectionId ?? 'all'}`}
