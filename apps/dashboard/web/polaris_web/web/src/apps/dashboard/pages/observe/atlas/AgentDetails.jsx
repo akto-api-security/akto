@@ -80,6 +80,7 @@ function AgentDetails({
     const liveIntervalRef = useRef(null);
 
     const [loading, setLoading] = useState(false);
+    const [tabLoading, setTabLoading] = useState(false);
     const [mcpServers, setMcpServers] = useState([]);
     const [userAnalysis, setUserAnalysis] = useState(null);
     const [agentLogs, setAgentLogs] = useState([]);
@@ -216,25 +217,25 @@ function AgentDetails({
         if (!selectedAgent) return;
         switch (tab.id) {
             case 'mcp-servers':
-                setLoading(true);
+                setTabLoading(true);
                 try {
                     const res = await settingRequests.getMcpServersByAgent(selectedAgent.agentId, selectedAgent.hostname);
                     setMcpServers(res.mcpServers || []);
                 } catch {
                     setMcpServers([]);
                 } finally {
-                    setLoading(false);
+                    setTabLoading(false);
                 }
                 break;
             case 'user-analysis':
-                setLoading(true);
+                setTabLoading(true);
                 try {
-                    const res = await settingRequests.getUserAnalysis(selectedAgent.agentId, selectedAgent.hostname);
+                    const res = await settingRequests.getUserAnalysis(selectedAgent.hostname);
                     setUserAnalysis(res || null);
                 } catch {
                     setUserAnalysis(null);
                 } finally {
-                    setLoading(false);
+                    setTabLoading(false);
                 }
                 break;
             case 'agent-logs':
@@ -374,27 +375,21 @@ function AgentDetails({
         content: 'MCP Servers',
         component: (
             <Box paddingBlockStart={"4"}>
-                {mcpServersTableData.length === 0 ? (
-                    <Box padding="4" background="bg-surface">
-                        <Text variant="bodyMd" color="subdued" alignment="center">No servers found</Text>
-                    </Box>
-                ) : (
-                    <GithubSimpleTable
-                        key="mcp-servers-table"
-                        data={mcpServersTableData}
-                        resourceName={{ singular: "server", plural: "servers" }}
-                        headers={mcpServersHeaders}
-                        headings={mcpServersHeaders}
-                        useNewRow={true}
-                        condensedHeight={true}
-                        hideQueryField={true}
-                        loading={false}
-                        pageLimit={10}
-                        showFooter={false}
-                        onRowClick={handleServerClick}
-                        rowClickable={true}
-                    />
-                )}
+                <GithubSimpleTable
+                    key="mcp-servers-table"
+                    data={mcpServersTableData}
+                    resourceName={{ singular: "server", plural: "servers" }}
+                    headers={mcpServersHeaders}
+                    headings={mcpServersHeaders}
+                    useNewRow={true}
+                    condensedHeight={true}
+                    hideQueryField={true}
+                    loading={tabLoading}
+                    pageLimit={10}
+                    showFooter={false}
+                    onRowClick={handleServerClick}
+                    rowClickable={true}
+                />
             </Box>
         ),
         panelID: 'mcp-servers-panel',
@@ -445,20 +440,30 @@ function AgentDetails({
     const humanizeTopicKey = (key) =>
         key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 
-    const showComingSoon = true;
-
     const titleComp = <TitleWithInfo
                 titleText="Queries Flagged"
                 textProps={{ variant: "headingMd" }}
                 tooltipContent="Queries identified as potentially harmful or policy-violating."
             />
 
+    const dominantTopics = useMemo(() => {
+        if (!userAnalysis?.topicCounts) return [];
+        return Object.entries(userAnalysis.topicCounts)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 5)
+            .map(([topic]) => topic);
+    }, [userAnalysis]);
+
     const UserAnalysisTab = {
         id: 'user-analysis',
         content: 'User Analysis',
         component: (
             <Box paddingBlockStart={"4"}>
-                {!userAnalysis ? (
+                {tabLoading ? (
+                    <Box padding="4" background="bg-surface">
+                        <Text variant="bodyMd" color="subdued" alignment="center">Loading...</Text>
+                    </Box>
+                ) : !userAnalysis ? (
                     <Box padding="4" background="bg-surface">
                         <Text variant="bodyMd" color="subdued" alignment="center">No analysis data found</Text>
                     </Box>
@@ -500,7 +505,7 @@ function AgentDetails({
                                 </Box>
                             </VerticalStack>
                         </HorizontalStack>
-                        {userAnalysis.dominantTopics && userAnalysis.dominantTopics.length > 0 && (
+                        {dominantTopics.length > 0 && (
                             <VerticalStack gap="2">
                                 <TitleWithInfo
                                     titleText="Dominant Topics"
@@ -508,13 +513,13 @@ function AgentDetails({
                                     tooltipContent="The topics that the user mostly queries."
                                 />
                                 <List type="bullet" gap="extraTight">
-                                    {userAnalysis.dominantTopics.map((topic) => (
-                                        <List.Item key={topic}>{topic}</List.Item>
+                                    {dominantTopics.map((topic) => (
+                                        <List.Item key={topic}>{humanizeTopicKey(topic)}</List.Item>
                                     ))}
                                 </List>
                             </VerticalStack>
                         )}
-                        {userAnalysis.harmfulTopics && Object.keys(userAnalysis.harmfulTopics).length > 0 && !showComingSoon && (
+                        {userAnalysis.harmfulTopics && Object.keys(userAnalysis.harmfulTopics).length > 0 ? (
                             <VerticalStack gap="2">
                                 {titleComp}
                                 <List type="bullet" gap="extraTight">
@@ -525,19 +530,22 @@ function AgentDetails({
                                                     <Text variant="bodyMd" fontWeight="bold" color="critical">
                                                         {humanizeTopicKey(topic)}
                                                     </Text>
-                                                    {data.timestamp && (
+                                                    {data.lastSeenAt && (
                                                         <Text variant="bodySm" color="subdued">
                                                             {func.prettifyEpoch(
-                                                                typeof data.timestamp === "object" && data.timestamp.$numberLong
-                                                                    ? parseInt(data.timestamp.$numberLong)
-                                                                    : data.timestamp
+                                                                typeof data.lastSeenAt === "object" && data.lastSeenAt.$numberLong
+                                                                    ? Math.floor(parseInt(data.lastSeenAt.$numberLong) / 1000)
+                                                                    : Math.floor(data.lastSeenAt / 1000)
                                                             )}
                                                         </Text>
                                                     )}
+                                                    {data.count != null && (
+                                                        <Badge size="small" tone="critical">{`${data.count}x`}</Badge>
+                                                    )}
                                                 </HorizontalStack>
-                                                {data.prompt && (
+                                                {data.lastReason && (
                                                     <Text variant="bodySm" fontWeight="regular" color="subdued" as="p">
-                                                        {data.prompt}
+                                                        {data.lastReason}
                                                     </Text>
                                                 )}
                                             </VerticalStack>
@@ -545,12 +553,10 @@ function AgentDetails({
                                     ))}
                                 </List>
                             </VerticalStack>
-                        )}
-                        {showComingSoon && (
-                            <HorizontalStack gap="2">
-                                {titleComp}
-                                <Badge status="info">Coming soon</Badge>
-                            </HorizontalStack>
+                        ) : (
+                            <Box padding="4" background="bg-surface">
+                                <Text variant="bodyMd" color="subdued" alignment="center">No harmful topics found</Text>
+                            </Box>
                         )}
                     </VerticalStack>
                 )}
@@ -622,7 +628,7 @@ function AgentDetails({
                 </HorizontalStack>,
                 <LayoutWithTabs
                     key="tabs"
-                    tabs={func.isDemoAccount() ? [McpServersTab, UserAnalysisTab, AgentLogsTab, ConfigureTab] : [McpServersTab, AgentLogsTab, ConfigureTab]}
+                    tabs={[McpServersTab, UserAnalysisTab, AgentLogsTab, ConfigureTab]}
                     currTab={handleTabChange}
                 />
             ]}

@@ -85,37 +85,21 @@ const fetchEndpointShieldUsernameMap = async () => {
 };
 
 const fetchEndpointShieldUserMetadata = async () => {
-    const usernameMap = {};
-    const userMetadataMap = {};
-
     try {
-        const response = await settingRequests.fetchModuleInfo({ moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD });
-        const moduleInfos = response?.moduleInfos || [];
+        const [usernameMap, agenticUsersResp] = await Promise.all([
+            fetchEndpointShieldUsernameMap(),
+            settingRequests.fetchAgenticUsers().catch(() => ({ agenticUsers: [] })),
+        ]);
 
-        moduleInfos.forEach((module) => {
-            const username = resolveModuleUsername(module);
-            if (!username) return;
-
-            const ad = module.additionalData || {};
-            registerDeviceKeys(usernameMap, username, [
-                module.name,
-                ad.deviceId,
-                ad.endpointId,
-            ]);
-
-            const mcpServers = ad.mcpServers || {};
-            Object.values(mcpServers).forEach((server) => {
-                if (server.collectionName) {
-                    usernameMap[server.collectionName.toLowerCase()] = username;
-                }
-            });
-
-            if (!userMetadataMap[username]) {
-                userMetadataMap[username] = {
-                    team: ad.team || '',
-                    userRole: ad.userRole || '',
-                };
-            }
+        const userMetadataMap = {};
+        const agenticUsers = agenticUsersResp?.agenticUsers || [];
+        agenticUsers.forEach((u) => {
+            if (!u?.userName) return;
+            userMetadataMap[u.userName] = {
+                team: u.teamName || '',
+                userRole: u.userRole || '',
+                userEmail: u.userEmail || '',
+            };
         });
 
         return { usernameMap, userMetadataMap };
