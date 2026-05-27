@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { AgGridReact } from "ag-grid-react";
 import { themeQuartz } from "ag-grid-enterprise";
-import { Tabs, Icon, Avatar, Card, Box, VerticalStack, HorizontalStack, Text } from "@shopify/polaris";
-import { CustomersMinor, AutomationMajor, MagicMajor } from "@shopify/polaris-icons";
+import { Tabs, Icon, Avatar, Card, Box, VerticalStack, HorizontalStack, Text, Badge, Divider } from "@shopify/polaris";
+import { CustomersMinor, AutomationMajor, MagicMajor, ChevronRightMinor } from "@shopify/polaris-icons";
 import ReactFlow, { Handle, Position, Background } from "react-flow-renderer";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import AiChatSection from "./AiChatSection";
@@ -140,20 +140,6 @@ function computeRiskFactors(device, agents) {
             severity: "high",
             title: "Direct Database Access",
             description: `${dbMcps.map(a => a.endpoint).join(", ")} enables agents to run arbitrary queries against production databases.`,
-        });
-    }
-    const totalSkills = agents.reduce((s, a) => s + (a.skillCount || 0), 0);
-    if (totalSkills > 100) {
-        factors.push({
-            severity: "medium",
-            title: `Broad Skill Surface (${totalSkills.toLocaleString()} skills)`,
-            description: `${totalSkills.toLocaleString()} skills exposed across agents. Each skill is a potential attack vector.`,
-        });
-    } else if (totalSkills > 20) {
-        factors.push({
-            severity: "low",
-            title: `Elevated Skill Count (${totalSkills} skills)`,
-            description: `${totalSkills} skills accessible. Monitor for anomalous invocation patterns.`,
         });
     }
     const mcpCount = agents.filter(a => a.type === "MCP Server").length;
@@ -472,15 +458,18 @@ function TopologyGraph({ device, agents }) {
 
 // ─── Overview tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ device, agents }) {
+const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
+
+function OverviewTab({ device, agents, onTabChange }) {
     const aiCount  = agents.filter(a => a.type === "AI Agent").length;
     const mcpCount = agents.filter(a => a.type === "MCP Server").length;
     const llmCount = agents.filter(a => a.type === "LLM").length;
     const totalV   = (device.violations?.critical || 0) + (device.violations?.high || 0) + (device.violations?.medium || 0) + (device.violations?.low || 0);
     const osLabel  = device.os === "mac" ? "macOS" : device.os === "windows" ? "Windows" : device.os === "linux" ? "Linux" : "Unknown OS";
 
-    const factors   = computeRiskFactors(device, agents);
-    const narrative = getRiskNarrative(device, agents, factors);
+    const rawFactors = computeRiskFactors(device, agents);
+    const factors    = [...rawFactors].sort((a, b) => (SEV_ORDER[a.severity] ?? 99) - (SEV_ORDER[b.severity] ?? 99));
+    const narrative  = getRiskNarrative(device, agents, rawFactors);
 
     const deviceDetails = [
         { label: "User",      value: device.username },
@@ -524,26 +513,41 @@ function OverviewTab({ device, agents }) {
                 <div style={{ marginBottom: 12 }}>
                     <Text variant="bodySm" color="base">{narrative}</Text>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <VerticalStack gap="0">
                     {factors.map((f, i) => {
-                        const s = SEV[f.severity] || SEV.low;
+                        const badgeStatus = f.severity === "critical" ? "critical" : f.severity === "high" ? "warning" : f.severity === "medium" ? "attention" : "info";
+                        const targetTab   = (f.severity === "critical" || f.severity === "high") && f.title.toLowerCase().includes("violation") ? 2 : f.title.toLowerCase().includes("integration") || f.title.toLowerCase().includes("database") || f.title.toLowerCase().includes("cloud") ? 1 : 2;
                         return (
-                            <div key={i} style={{
-                                display: "flex", gap: 12,
-                                padding: "10px 14px",
-                                borderRadius: 6,
-                                border: "1px solid #E1E3E5",
-                                borderLeft: `3px solid ${s.dot}`,
-                                background: "#FAFBFB",
-                            }}>
-                                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                                    <Text variant="bodySm" fontWeight="semibold">{f.title}</Text>
-                                    <Text variant="bodySm" color="subdued">{f.description}</Text>
+                            <div key={i}>
+                                {i > 0 && <div style={{ margin: "4px 0" }}><Divider /></div>}
+                                <div
+                                    onClick={() => onTabChange?.(targetTab)}
+                                    style={{
+                                        padding: "12px 8px",
+                                        display: "flex", alignItems: "center", gap: 12,
+                                        cursor: "pointer", borderRadius: 6,
+                                        transition: "background 0.15s",
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.background = "#F6F6F7"}
+                                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                                >
+                                    <div style={{ width: 72, flexShrink: 0 }}>
+                                        <Badge status={badgeStatus}>{f.severity.charAt(0).toUpperCase() + f.severity.slice(1)}</Badge>
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <Text variant="bodySm" fontWeight="semibold">{f.title}</Text>
+                                        <div style={{ marginTop: 2 }}>
+                                            <Text variant="bodySm" color="subdued">{f.description}</Text>
+                                        </div>
+                                    </div>
+                                    <div style={{ flexShrink: 0, color: "#8C9196" }}>
+                                        <Icon source={ChevronRightMinor} color="subdued" />
+                                    </div>
                                 </div>
                             </div>
                         );
                     })}
-                </div>
+                </VerticalStack>
             </div>
 
             {/* 4. Device details — minimal 3-col grid */}
@@ -698,7 +702,7 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
 
                 {/* Content */}
                 <div style={{ flex: 1, minHeight: 0, overflowY: selectedTab === 0 ? "auto" : "hidden", display: "flex", flexDirection: "column" }}>
-                    {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} />}
+                    {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} onTabChange={setSelectedTab} />}
                     {selectedTab === 1 && <AgenticsTab agents={agents || []} onAgentClick={onAgentClick} />}
                     {selectedTab === 2 && <ViolationsTab device={device} agents={agents || []} />}
                 </div>
