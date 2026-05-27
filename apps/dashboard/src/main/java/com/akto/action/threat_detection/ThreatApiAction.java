@@ -2,7 +2,9 @@ package com.akto.action.threat_detection;
 
 import com.akto.ProtoMessageUtils;
 import com.akto.dao.context.Context;
+import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.Info;
@@ -15,6 +17,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse.ActorsCount;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchDashboardTopDataResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.List;
@@ -54,6 +57,11 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
 
   @Getter List<TopApiData> topApis;
   @Getter List<TopHostData> topHosts;
+
+  @Getter List<DashboardTopActorData> dashboardTopActors;
+  @Getter List<DashboardTopApiData> dashboardTopApis;
+  @Getter int recentMaliciousCount;
+  @Getter long totalKafkaRecords;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -339,7 +347,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         put("start_ts", startTs);
         put("end_ts", endTs);
         put("latestAttack", latestAttack);
-        put("limit", 5);
+        put("limit", 8);
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -444,6 +452,64 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   public void setLatestAttack(List<String> latestAttack) {
     this.latestAttack = latestAttack;
   }
-  
+
+  public String fetchDashboardTopData() {
+    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_dashboard_top_data", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
+
+    int limit = 5;
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTs);
+        put("end_ts", endTs);
+        put("limit", limit);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+
+      ProtoMessageUtils.<FetchDashboardTopDataResponse>toProtoMessage(
+          FetchDashboardTopDataResponse.class, responseBody)
+          .ifPresent(m -> {
+            this.dashboardTopActors = m.getTopActorsList().stream()
+                .map(a -> new DashboardTopActorData(
+                    a.getActor(), a.getAttackCount(), a.getCountry(), a.getLatestAttack()))
+                .collect(Collectors.toList());
+            this.dashboardTopApis = m.getTopApisList().stream()
+                .map(a -> new DashboardTopApiData(
+                    a.getEndpoint(), a.getMethod(), a.getHost(), a.getRequestsCount(), a.getActorsCount()))
+                .collect(Collectors.toList());
+            this.recentMaliciousCount = m.getRecentMaliciousCount();
+          });
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+
+    // Query metrics_data for TD_KAFKA_RECORD_COUNT in last 5 mins (dashboard mongo)
+    try {
+      int now = Context.now();
+      int fiveMinAgo = now - 300;
+      List<MetricData> metrics = MetricDataDao.instance.getMetricsForModule(
+          fiveMinAgo, now, "THREAT_DETECTION");
+      this.totalKafkaRecords = 0;
+      for (MetricData md : metrics) {
+        if ("TD_KAFKA_RECORD_COUNT".equals(md.getMetricId())) {
+          this.totalKafkaRecords += (long) md.getValue();
+        }
+      }
+    } catch (Exception e) {
+      // keep default 0
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
 }
 

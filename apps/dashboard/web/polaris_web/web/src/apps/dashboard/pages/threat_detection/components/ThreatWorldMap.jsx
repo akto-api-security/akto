@@ -13,13 +13,13 @@ Exporting(Highcharts);
 ExportData(Highcharts);
 FullScreen(Highcharts);
 
-function ThreatWorldMap({ startTimestamp, endTimestamp,  style}) {
+function ThreatWorldMap({ startTimestamp, endTimestamp, style, hideTitle, containerId }) {
 
+  const mapContainerId = containerId || "threat-world-map-container";
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(false);
 
     const fetchActorsPerCountry = async () => {
-      // setLoading(true);
       const res = await api.getActorsCountPerCounty(startTimestamp, endTimestamp);
       if (res?.actorsCountPerCountry) {
         setData(
@@ -40,7 +40,7 @@ function ThreatWorldMap({ startTimestamp, endTimestamp,  style}) {
         "https://code.highcharts.com/mapdata/custom/world.topo.json"
       ).then((response) => response.json());
 
-      Highcharts.mapChart("threat-world-map-container", {
+      Highcharts.mapChart(mapContainerId, {
         chart: {
           map: topology,
           backgroundColor: "#fff",
@@ -143,11 +143,17 @@ function ThreatWorldMap({ startTimestamp, endTimestamp,  style}) {
     return <Spinner />;
   }
 
+  const mapElement = <div id={mapContainerId} style={style}></div>;
+
+  if (hideTitle) {
+    return mapElement;
+  }
+
   return (
     <InfoCard
       title={`${mapLabel("Threat", getDashboardCategory())} Actor Map`}
       titleToolTip={`${mapLabel("Threat", getDashboardCategory())} Actor Map`}
-      component={<div id="threat-world-map-container" style={style}></div>}
+      component={mapElement}
     />
   );
 }
