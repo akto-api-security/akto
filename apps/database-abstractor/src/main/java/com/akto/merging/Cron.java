@@ -71,11 +71,6 @@ public class Cron {
         Boolean doBodyMatch = accountSettings != null && accountSettings.getBodyMatchEnabled();
         try {
             for (int apiCollectionId : apiCollectionIds) {
-                if (MergingLogic.isOptimizedMergingAccount() && !MergingLogic.isOptimizedCollection(apiCollectionId)) {
-                    loggerMaker.infoAndAddToDb("Skipping merging for non-flagged collection " + apiCollectionId +
-                            " accountId " + accountId + " (optimized merging enabled)", LoggerMaker.LogDb.DB_ABS);
-                    continue;
-                }
                 int start = Context.now();
                 loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollectionId +
                         " accountId " + accountId);
