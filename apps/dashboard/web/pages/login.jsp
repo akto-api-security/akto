@@ -12,16 +12,14 @@
                 <title>Akto</title>
                 <link rel="shortcut icon" href="/public/favicon.svg" type="image/svg" />
                 <link rel="manifest" href="/public/manifest.json" />
-                <link href="https://cdn.jsdelivr.net/npm/vscode-codicons@0.0.16/dist/codicon.min.css" rel="stylesheet">
+                <link href="/public/vendor/codicons/codicon.min.css" rel="stylesheet">
             </head>
 
             <body>
                 <noscript>To run this application, JavaScript is required to be enabled.</noscript>
-                <script src="//ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js">
-                </script>
-                <script src="https://apis.google.com/js/client:platform.js?onload=start" async defer>
-                </script>
-                <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+                <script src="/public/vendor/jquery/jquery-3.6.3.min.js"></script>
+                <script src="/public/vendor/google/client-platform.js?onload=start" async defer></script>
+                <script src="/public/vendor/tailwind/tailwind.browser.js"></script>
                 <script type="text/javascript">
                     (function (f, b) {
                         if (!b.__SV) {
@@ -32,7 +30,6 @@
                                 MIXPANEL_CUSTOM_LIB_URL : "file:" === f.location.protocol && "//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js".match(/^\/\//) ? "https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js" : "//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js"; g = f.getElementsByTagName("script")[0]; g.parentNode.insertBefore(e, g)
                         }
                     })(document, window.mixpanel || []);
-
                 </script>
 
                 <div id="app"></div>
@@ -151,6 +148,7 @@
                         })
 
                         mixpanel.track('login');
+
                         (function () { var w = window; var ic = w.Intercom; if (typeof ic === "function") { ic('reattach_activator'); ic('update', w.intercomSettings); } else { var d = document; var i = function () { i.c(arguments); }; i.q = []; i.c = function (args) { i.q.push(args); }; w.Intercom = i; var l = function () { var s = d.createElement('script'); s.type = 'text/javascript'; s.async = true; s.src = 'https://widget.intercom.io/widget/e9w9wkdk'; var x = d.getElementsByTagName('script')[0]; x.parentNode.insertBefore(s, x); }; if (document.readyState === 'complete') { l(); } else if (w.attachEvent) { w.attachEvent('onload', l); } else { w.addEventListener('load', l, false); } } })();
                         window.intercomSettings = {
                             api_base: "https://api-iam.intercom.io",
@@ -194,13 +192,20 @@
                         lazy: true
                     };
                 </script>
-                <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>                
+                <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>
                 <script>
+                    var airgapped = '${requestScope.airgapped}' === 'true';
+                    var useLocalBundle = airgapped
+                        || window.RELEASE_VERSION_GLOBAL == ''
+                        || window.RELEASE_VERSION_GLOBAL == 'akto-release-version';
+                    if (airgapped) {
+                        window.__webpack_public_path__ = '/polaris_web/web/dist/';
+                    }
                     var script = document.createElement('script');
                     script.type = "text/javascript"
                     if ('${requestScope.nodeEnv}' === 'development') {
                         script.src = "http://localhost:3000/dist/main.js";
-                    } else if (window.RELEASE_VERSION_GLOBAL == '' || window.RELEASE_VERSION_GLOBAL == 'akto-release-version') {
+                    } else if (useLocalBundle) {
                         script.src = "/polaris_web/web/dist/main.js";
                     } else if (window.RELEASE_VERSION == '' || window.RELEASE_VERSION == 'akto-release-version') {
                         script.src = "https://d1hvi6xs55woen.cloudfront.net/polaris_web/" + window.RELEASE_VERSION_GLOBAL + "/dist/main.js";

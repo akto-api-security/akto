@@ -5,7 +5,6 @@ import ExportData from "highcharts/modules/export-data";
 import FullScreen from "highcharts/modules/full-screen";
 import { Card, VerticalStack, Box } from "@shopify/polaris";
 import ComponentHeader from "../new_components/ComponentHeader";
-
 // Initialize modules
 Exporting(Highcharts);
 ExportData(Highcharts);
@@ -73,9 +72,7 @@ function AttackWorldMap({ attackRequests, style, itemId, onRemoveComponent }) {
 
     const fetchMapData = useCallback(async () => {
         try {
-            const topology = await fetch(
-                "https://code.highcharts.com/mapdata/custom/world.topo.json"
-            ).then((response) => response.json());
+            const topology = await fetch("/public/maps/world.topo.json").then((response) => response.json());
 
             // Extract coordinates from topology for each attack flow
             const flowsWithCoords = attackRequests.map(attack => {
