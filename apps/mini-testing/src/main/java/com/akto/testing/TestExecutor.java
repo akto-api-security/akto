@@ -195,6 +195,7 @@ public class TestExecutor {
                 future.cancel(true);
             }
             loggerMaker.insertImportantTestingLog("Legacy mode execution completed. All tests processed.");
+            threadPool.shutdownNow();
             
         } catch (Exception e) {
             loggerMaker.insertImportantTestingLog("Error during legacy mode execution: " + e.getMessage());
@@ -525,9 +526,10 @@ public class TestExecutor {
                     }
     
                     for (Future<Void> future : testingRecords) {
-                        future.cancel(!Constants.IS_NEW_TESTING_ENABLED);
+                        future.cancel(true);
                     }
                     loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.");
+                    threadPool.shutdownNow();
                 }else{
                     // This else block only executes when IS_NEW_TESTING_ENABLED is true AND kafkaFallbackMode is false
                     // So we can directly proceed with Kafka completion logic
