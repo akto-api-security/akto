@@ -29,6 +29,18 @@ public class OriginalHttpRequest {
     @Setter
     private TLSAuthParam tlsAuthParam;
 
+    // Digest auth credentials — set by DigestAuthParam, consumed by ApiExecutor at send time.
+    // Kept outside the headers map so they don't affect request equality checks in the executor.
+    @org.bson.codecs.pojo.annotations.BsonIgnore
+    @Getter
+    @Setter
+    private String digestAuthUsername;
+
+    @org.bson.codecs.pojo.annotations.BsonIgnore
+    @Getter
+    @Setter
+    private String digestAuthPassword;
+
     public OriginalHttpRequest() { }
 
     // before adding any fields make sure to add them to copy function as well
@@ -53,9 +65,12 @@ public class OriginalHttpRequest {
             headerValues.addAll(headerKV.getValue());
             headersCopy.put(headerKV.getKey(), headerValues);
         }
-        return new OriginalHttpRequest(
+        OriginalHttpRequest copy = new OriginalHttpRequest(
                 this.url, this.queryParams, this.method, this.body, headersCopy, this.type, this.tlsAuthParam
         );
+        copy.digestAuthUsername = this.digestAuthUsername;
+        copy.digestAuthPassword = this.digestAuthPassword;
+        return copy;
     }
 
     public void buildFromSampleMessage(String message) {
