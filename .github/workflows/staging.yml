@@ -66,6 +66,12 @@ jobs:
       - name: Download dashboard static assets
         run: bash apps/dashboard/scripts/download-dashboard-vendor-assets.sh
 
+      - name: Build Dashboard polaris UI
+        working-directory: ./apps/dashboard/web/polaris_web
+        run: |
+          npm install
+          RELEASE_VERSION=${{ steps.docker_tag.outputs.IMAGE_TAG }} npm run build
+
       - run: mvn package -Dakto-image-tag=${{ steps.docker_tag.outputs.IMAGE_TAG }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
 
       - name: DockerHub login
@@ -121,12 +127,6 @@ jobs:
           ) &
           PID_DATA_INGESTION=$!
 
-          # Dashboard-only UI prep and deploy.
-          (
-            cd apps/dashboard/web/polaris_web
-            npm install
-            RELEASE_VERSION=$IMAGE_TAG npm run build
-          )
           aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/$IMAGE_TAG/dist --delete
           (
             cd apps/dashboard
