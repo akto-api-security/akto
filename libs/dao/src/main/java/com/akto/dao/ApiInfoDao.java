@@ -19,7 +19,6 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UnwindOptions;
 import com.mongodb.client.model.Updates;
 
@@ -166,27 +165,25 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         Map<Integer,Integer> result = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
 
+        List<Integer> collectionIds = null;
         try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
-            }
+            collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
         } catch(Exception e){
         }
 
-        UnwindOptions unwindOptions = new UnwindOptions();
-        unwindOptions.preserveNullAndEmptyArrays(false);  
-        pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
+        pipeline.add(Aggregates.group(groupedId, Accumulators.max(ApiInfo.LAST_SEEN, "$lastSeen")));
 
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$collectionIds");
-        pipeline.add(Aggregates.sort(Sorts.orderBy(Sorts.descending(ApiInfo.ID_API_COLLECTION_ID), Sorts.descending(ApiInfo.LAST_SEEN))));
-        pipeline.add(Aggregates.group(groupedId, Accumulators.first(ApiInfo.LAST_SEEN, "$lastSeen")));
-        
+        Set<Integer> allowedIds = collectionIds != null ? new HashSet<>(collectionIds) : null;
         MongoCursor<ApiInfo> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, ApiInfo.class).cursor();
         while(cursor.hasNext()){
             try {
                ApiInfo apiInfo = cursor.next();
-               result.put(apiInfo.getId().getApiCollectionId(), apiInfo.getLastSeen());
+               int apiCollectionId = apiInfo.getId().getApiCollectionId();
+               if (allowedIds != null && !allowedIds.contains(apiCollectionId)) {
+                   continue;
+               }
+               result.put(apiCollectionId, apiInfo.getLastSeen());
             } catch (Exception e) {
                 e.printStackTrace();
             }
