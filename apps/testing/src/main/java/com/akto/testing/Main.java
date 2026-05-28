@@ -1034,7 +1034,7 @@ public class Main {
         if(testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE)) {
             CollectionWiseTestingEndpoints collectionWiseTestingEndpoints = (CollectionWiseTestingEndpoints) testingEndpoints;
             int apiCollectionId = collectionWiseTestingEndpoints.getApiCollectionId();
-            ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+            ApiCollection apiCollection = ApiCollectionsDao.instance.fetchMeta(apiCollectionId);
             collection = apiCollection.getName();
         } else if(testingEndpoints.getType().equals(TestingEndpoints.Type.MULTI_COLLECTION)) {
             MultiCollectionTestingEndpoints multiCollectionTestingEndpoints = (MultiCollectionTestingEndpoints) testingEndpoints;
@@ -1042,7 +1042,7 @@ public class Main {
             List<String> collectionNames = new ArrayList<>();
             if (collectionIds != null) {
                 for (Integer colId : collectionIds) {
-                    ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(colId);
+                    ApiCollection apiCollection = ApiCollectionsDao.instance.fetchMeta(colId);
                     if (apiCollection != null) {
                         collectionNames.add(apiCollection.getName());
                     }

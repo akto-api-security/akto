@@ -98,7 +98,7 @@ public class HostRegexTestingEndpoints extends TestingEndpoints {
 
     private void createIdToHostMap() {
         idToHost = new HashMap<>();
-        for(ApiCollection apiCollection: ApiCollectionsDao.instance.getMetaAll()) {
+        for(ApiCollection apiCollection: ApiCollectionsDao.instance.fetchMetaAll()) {
             idToHost.put(apiCollection.getId(), apiCollection.getHostName());
         }
     }

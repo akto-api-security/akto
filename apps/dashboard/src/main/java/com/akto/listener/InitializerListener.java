@@ -227,7 +227,7 @@ public class InitializerListener implements ServletContextListener {
 
                             List<String> deactivatedHosts = new ArrayList<>();
                             if (deactivatedCollections != null && !deactivatedCollections.isEmpty()) {
-                                List<ApiCollection> metaForIds = ApiCollectionsDao.instance.getMetaForIds(new ArrayList<>(deactivatedCollections));
+                                List<ApiCollection> metaForIds = ApiCollectionsDao.instance.fetchMetaForIds(new ArrayList<>(deactivatedCollections));
                                 for (ApiCollection apiCollection: metaForIds) {
                                     String host = apiCollection.getHostName();
                                     if (host != null) deactivatedHosts.add(host);
@@ -847,7 +847,7 @@ public class InitializerListener implements ServletContextListener {
                             return;
                         }
 
-                        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.getMetaAll();
+                        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.fetchMetaAll();
                         Map<Integer, ApiCollection> apiCollectionMap = apiCollections.stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
 
                         for(Map.Entry<String, DefaultPayload> entry: defaultPayloadMap.entrySet()) {

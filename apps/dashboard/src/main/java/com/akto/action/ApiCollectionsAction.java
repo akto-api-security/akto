@@ -1302,7 +1302,7 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        ApiCollection apiCollection = ApiCollectionsDao.instance.fetchMeta(apiCollectionId);
         if (apiCollection == null) {
             String errorMessage = "API collection not found";
             addActionError(errorMessage);

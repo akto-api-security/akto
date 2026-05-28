@@ -348,7 +348,7 @@ public class InventoryAction extends UserAction {
 
     private void attachCodeAnalysisInResponse(BasicDBObject response){
         BasicDBObject codeAnalysisCollectionInfo = new BasicDBObject();
-        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        ApiCollection apiCollection = ApiCollectionsDao.instance.fetchMeta(apiCollectionId);
         CodeAnalysisCollection codeAnalysisCollection = null;
         if (apiCollection != null) {
             codeAnalysisCollection = CodeAnalysisCollectionDao.instance.findOne(

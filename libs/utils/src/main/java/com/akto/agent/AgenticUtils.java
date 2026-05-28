@@ -38,7 +38,7 @@ public class AgenticUtils {
     public static void checkAndInitializeAgent(String conversationId, RawApi rawApi, int apiCollectionId) {
         if (agentClient.performHealthCheck()) {
 
-            ApiCollection apiCollection = ApiCollectionsDao.instance.getMetaForId(apiCollectionId);
+            ApiCollection apiCollection = ApiCollectionsDao.instance.fetchMetaForId(apiCollectionId);
             boolean isMcpCollection = apiCollection.isMcpCollection();
 
             if (rawApi != null && !isMcpCollection) {

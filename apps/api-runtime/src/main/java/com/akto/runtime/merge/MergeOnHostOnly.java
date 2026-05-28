@@ -242,7 +242,7 @@ public class MergeOnHostOnly {
     }
 
     public void mergeHosts() {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.getMetaAll();
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.fetchMetaAll();
 
         Map<String, List<Integer>> hostToApiCollectionId = new HashMap<>();
 

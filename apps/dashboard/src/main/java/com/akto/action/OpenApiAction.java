@@ -184,7 +184,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
         InsertOneResult insertOneResult = FileUploadsDao.instance.insertOne(fileUpload);
         String fileUploadId = insertOneResult.getInsertedId().asObjectId().getValue().toString();
         this.uploadId = fileUploadId;
-        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        ApiCollection apiCollection = ApiCollectionsDao.instance.fetchMeta(apiCollectionId);
         if (apiCollection != null && apiCollection.getHostName() != null) {
             source = HttpResponseParams.Source.MIRRORING;
         }

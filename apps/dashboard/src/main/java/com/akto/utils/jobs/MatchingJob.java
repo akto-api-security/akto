@@ -166,7 +166,7 @@ public class MatchingJob {
     }
 
     private static void fillDbState(int apiCollectionId, Map<Integer, APICatalog> dbState) {
-        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        ApiCollection apiCollection = ApiCollectionsDao.instance.fetchMeta(apiCollectionId);
         Bson filterQ = null;
         if (apiCollection != null && apiCollection.getHostName() == null) {
             filterQ = Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId);

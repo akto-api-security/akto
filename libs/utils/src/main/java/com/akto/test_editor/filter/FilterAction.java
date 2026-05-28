@@ -355,7 +355,7 @@ public final class FilterAction {
             return new DataOperandsFilterResponse(false, null, null, null);
         }
         int apiCollectionId = filterActionRequest.getApiInfoKey().getApiCollectionId();
-        ApiCollection apiCollection = ApiCollectionsDao.instance.getMetaForId(apiCollectionId);
+        ApiCollection apiCollection = ApiCollectionsDao.instance.fetchMetaForId(apiCollectionId);
         if (apiCollection == null) {
             return new DataOperandsFilterResponse(false, null, null, null, "API collection not found");
         }

@@ -293,7 +293,7 @@ public class APICatalogSync {
     }
 
     public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb, boolean ignoreCaseInsensitiveApis, boolean mergeUrlsOnVersions, boolean skipMergingOnKnownStaticURLsForVersionedApis) {
-        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        ApiCollection apiCollection = ApiCollectionsDao.instance.fetchMeta(apiCollectionId);
 
         if (apiCollection != null && apiCollection.isMcpCollection()) {
             return new ApiMergerResult(new HashMap<>());
@@ -1592,7 +1592,7 @@ public class APICatalogSync {
                     }
 
                     try {
-                        List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
+                        List<ApiCollection> allCollections = ApiCollectionsDao.instance.fetchMetaAll();
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                         boolean makeApisCaseInsensitive = false;
                         boolean mergeUrlsOnVersions = false;

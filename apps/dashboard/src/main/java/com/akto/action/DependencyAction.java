@@ -187,7 +187,7 @@ public class DependencyAction extends UserAction {
 
     private List<ModifyHostDetail> modifyHostDetails = new ArrayList<>();
     public String fetchGlobalVars() {
-        List<ApiCollection> metaForIds = ApiCollectionsDao.instance.getMetaForIds(apiCollectionIds);
+        List<ApiCollection> metaForIds = ApiCollectionsDao.instance.fetchMetaForIds(apiCollectionIds);
         List<Integer> nonTrafficCollectionIds = new ArrayList<>();
 
         Set<String> hosts = new HashSet<>();

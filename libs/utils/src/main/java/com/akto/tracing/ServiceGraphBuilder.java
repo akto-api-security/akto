@@ -30,7 +30,7 @@ public class ServiceGraphBuilder {
 
         try {
             // Fetch current collection
-            ApiCollection collection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+            ApiCollection collection = ApiCollectionsDao.instance.fetchMeta(apiCollectionId);
             if (collection == null) {
                 logger.error("API Collection not found: {}", apiCollectionId);
                 return false;

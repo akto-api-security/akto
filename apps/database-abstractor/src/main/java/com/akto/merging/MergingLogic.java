@@ -187,7 +187,7 @@ public class MergingLogic {
     }
 
     public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, boolean mergeUrlsBasic, boolean skipMergingOnKnownStaticURLsForVersionedApis) {
-        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        ApiCollection apiCollection = ApiCollectionsDao.instance.fetchMeta(apiCollectionId);
 
         Bson filterQ = null;
         if (apiCollection != null && apiCollection.getHostName() == null) {

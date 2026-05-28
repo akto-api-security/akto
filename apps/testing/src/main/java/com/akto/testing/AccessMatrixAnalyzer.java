@@ -41,7 +41,7 @@ public class AccessMatrixAnalyzer {
 
         if (endpointLogicalGroup == null) return new ArrayList<>();
         List<ApiInfoKey> ret = new ArrayList<>();
-        for(ApiCollection apiCollection: ApiCollectionsDao.instance.getMetaAll()) {
+        for(ApiCollection apiCollection: ApiCollectionsDao.instance.fetchMetaAll()) {
             int lastBatchSize = 0;
             int skip = 0;
             boolean isAutomatedTrafficCollection = apiCollection != null && !StringUtils.isEmpty(apiCollection.getHostName());
