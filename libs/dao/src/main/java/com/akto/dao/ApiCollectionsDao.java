@@ -298,7 +298,7 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         } catch(Exception e){
             // If no user collections, proceed without filtering
         }
-        logger.info(LOG_PREFIX + "RBAC fetch took " + (System.currentTimeMillis() - stepStart) + "ms, userCollectionIds size=" + (userCollectionIds == null ? "null" : userCollectionIds.size()));
+        logger.warn(LOG_PREFIX + "RBAC fetch took " + (System.currentTimeMillis() - stepStart) + "ms, userCollectionIds size=" + (userCollectionIds == null ? "null" : userCollectionIds.size()));
         stepStart = System.currentTimeMillis();
 
         // Step 1: Query api_collections to separate group and non-group collections
@@ -315,7 +315,7 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                 nonGroupCollectionIds.add(collection.getId());
             }
         }
-        logger.info(LOG_PREFIX + "Segregation took " + (System.currentTimeMillis() - stepStart) + "ms, groupCollectionIds size=" + groupCollectionIds.size() + ", nonGroupCollectionIds size=" + nonGroupCollectionIds.size());
+        logger.warn(LOG_PREFIX + "Segregation took " + (System.currentTimeMillis() - stepStart) + "ms, groupCollectionIds size=" + groupCollectionIds.size() + ", nonGroupCollectionIds size=" + nonGroupCollectionIds.size());
         stepStart = System.currentTimeMillis();
 
         // Capture current context before async operations
@@ -371,7 +371,7 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                 Context.accountId.remove();
                 Context.userId.remove();
             }
-            logger.info(LOG_PREFIX + "Non-group aggregation took " + (System.currentTimeMillis() - nonGroupStart) + "ms, result size=" + nonGroupCountMap.size());
+            logger.warn(LOG_PREFIX + "Non-group aggregation took " + (System.currentTimeMillis() - nonGroupStart) + "ms, result size=" + nonGroupCountMap.size());
             return nonGroupCountMap;
         }, executor);
 
@@ -477,7 +477,7 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                 Context.userId.remove();
                 Context.contextSource.remove();
             }
-            logger.info(LOG_PREFIX + "Group aggregation took " + (System.currentTimeMillis() - groupStart) + "ms, result size=" + groupCountMap.size());
+            logger.warn(LOG_PREFIX + "Group aggregation took " + (System.currentTimeMillis() - groupStart) + "ms, result size=" + groupCountMap.size());
             return groupCountMap;
         }, executor);
         
@@ -501,7 +501,7 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
             // Shutdown executor
             executor.shutdown();
         }
-        logger.info(LOG_PREFIX + "Futures join + merge took " + (System.currentTimeMillis() - stepStart) + "ms, countMap size=" + countMap.size());
+        logger.warn(LOG_PREFIX + "Futures join + merge took " + (System.currentTimeMillis() - stepStart) + "ms, countMap size=" + countMap.size());
         stepStart = System.currentTimeMillis();
 
         // Step 3: Add code analysis counts (if any)
@@ -519,8 +519,8 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                 countMap.put(apiCollectionId, currentCount);
             }
         }
-        logger.info(LOG_PREFIX + "Code analysis counts took " + (System.currentTimeMillis() - stepStart) + "ms");
-        logger.info(LOG_PREFIX + "TOTAL took " + (System.currentTimeMillis() - totalStart) + "ms, final countMap size=" + countMap.size());
+        logger.warn(LOG_PREFIX + "Code analysis counts took " + (System.currentTimeMillis() - stepStart) + "ms");
+        logger.warn(LOG_PREFIX + "TOTAL took " + (System.currentTimeMillis() - totalStart) + "ms, final countMap size=" + countMap.size());
 
         return countMap;
     }
