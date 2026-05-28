@@ -14169,6 +14169,89 @@
             </result>
         </action>
 
+        <action name="api/fetchCrowdStrikeIntegration" class="com.akto.action.CrowdStrikeIntegrationAction" method="fetchCrowdStrikeIntegration">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack"/>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User fetched CrowdStrike integration</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json"><param name="statusCode">422</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="UNAUTHORIZED" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+        </action>
+
+        <action name="api/addCrowdStrikeIntegration" class="com.akto.action.CrowdStrikeIntegrationAction" method="addCrowdStrikeIntegration">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack"/>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User added CrowdStrike integration</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json"><param name="statusCode">422</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="UNAUTHORIZED" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+        </action>
+
+        <action name="api/removeCrowdStrikeIntegration" class="com.akto.action.CrowdStrikeIntegrationAction" method="removeCrowdStrikeIntegration">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack"/>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User removed CrowdStrike integration</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json"><param name="statusCode">422</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="UNAUTHORIZED" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+        </action>
+
+        <action name="api/fetchCrowdStrikeDevices" class="com.akto.action.CrowdStrikeIntegrationAction" method="fetchCrowdStrikeDevices">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack"/>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User fetched CrowdStrike devices</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json"><param name="statusCode">422</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="UNAUTHORIZED" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+        </action>
+
+        <action name="api/fetchCrowdStrikeGuardrailTypes" class="com.akto.action.CrowdStrikeIntegrationAction" method="fetchCrowdStrikeGuardrailTypes">
+            <interceptor-ref name="json"/><interceptor-ref name="defaultStack"/>
+            <interceptor-ref name="roleAccessInterceptor"><param name="featureLabel">INTEGRATIONS</param><param name="accessType">READ_WRITE</param><param name="actionDescription">User fetched CrowdStrike guardrail types</param></interceptor-ref>
+            <result name="FORBIDDEN" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json"><param name="statusCode">422</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="UNAUTHORIZED" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+        </action>
+
+        <action name="api/saveCrowdStrikeGuardrailsConfig" class="com.akto.action.CrowdStrikeIntegrationAction" method="saveCrowdStrikeGuardrailsConfig">
+            <interceptor-ref name="json"/><interceptor-ref name="defaultStack"/>
+            <interceptor-ref name="roleAccessInterceptor"><param name="featureLabel">INTEGRATIONS</param><param name="accessType">READ_WRITE</param><param name="actionDescription">User saved CrowdStrike guardrails config</param></interceptor-ref>
+            <result name="FORBIDDEN" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json"><param name="statusCode">422</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="UNAUTHORIZED" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+        </action>
+
+        <action name="api/executeCrowdStrikeGuardrails" class="com.akto.action.CrowdStrikeIntegrationAction" method="executeCrowdStrikeGuardrails">
+            <interceptor-ref name="json"/><interceptor-ref name="defaultStack"/>
+            <interceptor-ref name="roleAccessInterceptor"><param name="featureLabel">INTEGRATIONS</param><param name="accessType">READ_WRITE</param><param name="actionDescription">User executed CrowdStrike guardrails</param></interceptor-ref>
+            <result name="FORBIDDEN" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json"><param name="statusCode">422</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="UNAUTHORIZED" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+        </action>
+
         <action name="api/exportGuardrailActivityToAdx" class="com.akto.action.AdxIntegrationAction" method="exportGuardrailActivityToAdx" >
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

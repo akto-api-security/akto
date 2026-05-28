@@ -414,6 +414,62 @@ const api = {
         })
     },
 
+    fetchCrowdStrikeIntegration() {
+        return request({
+            url: '/api/fetchCrowdStrikeIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addCrowdStrikeIntegration(clientId, clientSecret, baseUrl, dataIngestionUrl, recurringIntervalSeconds) {
+        return request({
+            url: '/api/addCrowdStrikeIntegration',
+            method: 'post',
+            data: { clientId, clientSecret, baseUrl, dataIngestionUrl, recurringIntervalSeconds }
+        })
+    },
+
+    removeCrowdStrikeIntegration() {
+        return request({
+            url: '/api/removeCrowdStrikeIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchCrowdStrikeDevices() {
+        return request({
+            url: '/api/fetchCrowdStrikeDevices',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchCrowdStrikeGuardrailTypes() {
+        return request({
+            url: '/api/fetchCrowdStrikeGuardrailTypes',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    saveCrowdStrikeGuardrailsConfig(guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailDeviceIds) {
+        return request({
+            url: '/api/saveCrowdStrikeGuardrailsConfig',
+            method: 'post',
+            data: { guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailDeviceIds }
+        })
+    },
+
+    executeCrowdStrikeGuardrails(guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailDeviceIds) {
+        return request({
+            url: '/api/executeCrowdStrikeGuardrails',
+            method: 'post',
+            data: { guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailDeviceIds }
+        })
+    },
+
 }
 
 export default api

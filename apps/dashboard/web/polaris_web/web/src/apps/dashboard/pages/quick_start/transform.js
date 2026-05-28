@@ -86,6 +86,7 @@ import DataDogConnector from "./components/DataDogConnector"
 import MicrosoftDefenderConnector from "./components/MicrosoftDefenderConnector"
 import MicrosoftDefenderRunQueriesConnector from "./components/MicrosoftDefenderRunQueriesConnector"
 import SentinelOneConnector from "./components/SentinelOneConnector"
+import CrowdStrikeConnector from "./components/CrowdStrikeConnector"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -582,6 +583,15 @@ const microsoftDefenderObj = {
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-microsoft-defender',
     key: "MICROSOFT_DEFENDER",
     component: <MicrosoftDefenderConnector/>
+}
+
+const crowdStrikeObj = {
+    icon: '/public/crowdstrike.svg',
+    label: "CrowdStrike",
+    text: "Connect CrowdStrike to Akto to detect AI coding tools (Claude, Cursor, Copilot) running on managed endpoints.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-crowdstrike',
+    key: "CROWDSTRIKE",
+    component: <CrowdStrikeConnector/>
 }
 
 const microsoftDefenderRunQueriesObj = {
@@ -2061,7 +2071,7 @@ const quickStartFunc = {
 
         // Endpoint Management
         const endpointManagement = [
-            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj, crowdStrikeObj
         ]
 
        if(func.checkLocal() || func.isLimitedAccount()){
@@ -2140,7 +2150,7 @@ const quickStartFunc = {
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
             cloudflareWarpObj, zscalerObj, snowflakeObj,
-            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj, crowdStrikeObj
         ]
 
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
@@ -2149,7 +2159,7 @@ const quickStartFunc = {
                 awsBedrockObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
                 n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, anthropicImportObj, openaiImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj, neovimHookObj, openCodeHookObj,hermesHookObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj,
-                microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
+                microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj, crowdStrikeObj
             ])
         }
 
