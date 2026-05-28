@@ -610,7 +610,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         behavior: r.behavior.toLowerCase()
                     })) : [],
                 llmRule: {
-                    enabled: enableLlmPrompt,
+                    enabled: enableLlmPrompt && !!llmPrompt.trim(),
                     userPrompt: llmPrompt.trim(),
                     confidenceScore: llmConfidenceScore
                 },
