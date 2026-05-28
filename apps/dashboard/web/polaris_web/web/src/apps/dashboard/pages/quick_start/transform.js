@@ -440,7 +440,7 @@ const awsBedrockObj = {
     text: "Import your AWS Bedrock AI agents, seamlessly into AKTO.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-aws-bedrock',
     key: "AWS_BEDROCK",
-    component : <BannerComponent 
+    component : <BannerComponent
         content="Import your AWS Bedrock AI agents, seamlessly in AKTO."
         docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-aws-bedrock'
     />
@@ -993,6 +993,66 @@ const zscalerObj = {
     component: <AddOnComponenet/>,
     key: "ZSCALER",
 }
+
+const AI_SECURITY_DOCS_BASE_URL = "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/ai-endpoint-shield"
+
+const createEndpointManagementConnector = (label, key, docsPath, text, icon) => ({
+    icon,
+    label,
+    text,
+    docsUrl: `${AI_SECURITY_DOCS_BASE_URL}/${docsPath}`,
+    component: <BannerComponent title={`Setup using ${label}`} docsUrl={`${AI_SECURITY_DOCS_BASE_URL}/${docsPath}`} content="Use Akto Endpoint Shield deployment guides for this endpoint management platform." />,
+    key
+})
+
+const intuneEndpointObj = createEndpointManagementConnector(
+    "Intune",
+    "INTUNE_ENDPOINT_SHIELD",
+    "windows-mdm-deployment",
+    "Deploy Akto Endpoint Shield on Windows devices managed by Microsoft Intune.",
+    "/public/intune.svg"
+)
+
+const ninjaoneEndpointObj = createEndpointManagementConnector(
+    "NinjaOne",
+    "NINJAONE_ENDPOINT_SHIELD",
+    "ninjaone-windows-deployment",
+    "Deploy Akto Endpoint Shield on managed endpoints using NinjaOne automation.",
+    "/public/ninjaone.svg"
+)
+
+const automoxEndpointObj = createEndpointManagementConnector(
+    "Automox",
+    "AUTOMOX_ENDPOINT_SHIELD",
+    "automox-deployment",
+    "Deploy Akto Endpoint Shield using Automox Worklets for managed Windows devices.",
+    "/public/automox.svg"
+)
+
+const jamfEndpointObj = createEndpointManagementConnector(
+    "Jamf",
+    "JAMF_ENDPOINT_SHIELD",
+    "jamf-mdm-deployment",
+    "Deploy Akto Endpoint Shield on macOS using Jamf Pro.",
+    "/public/jamf.svg"
+)
+
+const kandjiEndpointObj = createEndpointManagementConnector(
+    "Kandji",
+    "KANDJI_ENDPOINT_SHIELD",
+    "mdm-deployment",
+    "Deploy Akto Endpoint Shield on Apple devices using Kandji MDM workflows.",
+    "/public/kandji.svg"
+)
+
+const customEndpointObj = createEndpointManagementConnector(
+    "Custom",
+    "CUSTOM_ENDPOINT_SHIELD",
+    "mdm-deployment",
+    "Use Akto's generic MDM deployment approach for custom endpoint management tools.",
+    "/public/endpoint_custom.svg"
+)
+
 const chromeExtensionObj = {
     icon: '/public/chrome.svg',
     label: "Chrome Extension",
@@ -2059,8 +2119,10 @@ const quickStartFunc = {
             sglangHookObj, vllmHookObj, dockerModelRunnerHookObj, ollamaHookObj,
         ]
 
-        // Endpoint Management
+        // Endpoint Management — MDM deployment + EDR integrations
         const endpointManagement = [
+            intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
+            jamfEndpointObj, kandjiEndpointObj, customEndpointObj,
             microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
         ]
 
@@ -2140,6 +2202,8 @@ const quickStartFunc = {
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
             cloudflareWarpObj, zscalerObj, snowflakeObj,
+            intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
+            jamfEndpointObj, kandjiEndpointObj, customEndpointObj,
             microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
         ]
 
@@ -2149,6 +2213,8 @@ const quickStartFunc = {
                 awsBedrockObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
                 n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, anthropicImportObj, openaiImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj, neovimHookObj, openCodeHookObj,hermesHookObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj,
+                intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
+                jamfEndpointObj, kandjiEndpointObj, customEndpointObj,
                 microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
             ])
         }
