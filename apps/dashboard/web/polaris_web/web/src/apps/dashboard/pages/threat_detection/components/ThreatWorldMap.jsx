@@ -7,7 +7,6 @@ import InfoCard from "../../dashboard/new_components/InfoCard";
 import { Spinner } from "@shopify/polaris";
 import api from "../api";
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
-
 // Initialize modules
 Exporting(Highcharts);
 ExportData(Highcharts);
@@ -36,9 +35,7 @@ function ThreatWorldMap({ startTimestamp, endTimestamp, style, hideTitle, contai
     };
 
     const fetchMapData = async () => {
-      const topology = await fetch(
-        "https://code.highcharts.com/mapdata/custom/world.topo.json"
-      ).then((response) => response.json());
+      const topology = await fetch("/public/maps/world.topo.json").then((response) => response.json());
 
       Highcharts.mapChart(mapContainerId, {
         chart: {

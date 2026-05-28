@@ -13,6 +13,10 @@ Run using
 Open 
 `http://localhost:8080/`
 
+### Dashboard static assets
+
+Maps and login vendor scripts under `web/public/` are refreshed in CI via `apps/dashboard/scripts/download-dashboard-vendor-assets.sh`. Other images (empty state, YouTube thumbnails) are committed static files only.
+
 How to setup git config locally
 `https://gist.github.com/Jonalogy/54091c98946cfe4f8cdab2bea79430f9`
 
