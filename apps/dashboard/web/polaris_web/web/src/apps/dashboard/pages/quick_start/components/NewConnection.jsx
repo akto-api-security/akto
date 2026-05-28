@@ -22,7 +22,7 @@ function NewConnection() {
     const [connectors, setConnectors] = useState(null)
     
     const dropdownList = quickStartFunc.convertListForMenu(connectorsList)
-    const thumbnailUrl = "https://img.youtube.com/vi/fRyusl8ppdY/sddefault.jpg"
+    const thumbnailUrl = "/public/images/youtube/fRyusl8ppdY-sddefault.jpg"
 
     const knowMoreLabel = (
         <HorizontalGrid gap="10" columns="2">

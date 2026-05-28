@@ -164,7 +164,7 @@ function ApiTraces(props) {
             <Box padding="6">
                 <EmptyState
                     heading="No traces found"
-                    image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                    image="/public/images/emptystate-files.png"
                 >
                     <p>There are no execution traces available for this API collection yet.</p>
                 </EmptyState>
@@ -282,7 +282,7 @@ function ApiTraces(props) {
                     <Box padding="6">
                         <EmptyState
                             heading="No spans available"
-                            image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                            image="/public/images/emptystate-files.png"
                         >
                             <p>No spans were found for this trace.</p>
                         </EmptyState>

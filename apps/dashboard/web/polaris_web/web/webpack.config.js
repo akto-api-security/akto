@@ -13,6 +13,12 @@ function hashGenerator() {
 
 process.env.HASH = hashGenerator()
 
+const localPublicPath = '/polaris_web/web/dist/'
+const version = process.env.VERSION || ''
+const publicPath = version === '' || version.includes('akto-release-version')
+  ? localPublicPath
+  : 'https://d1hvi6xs55woen.cloudfront.net/polaris_web/' + version + '/dist/'
+
 module.exports = {
   entry: {
     "babel-polyfill": "babel-polyfill",
@@ -22,7 +28,7 @@ module.exports = {
   },
   output: {
     path: path.resolve(__dirname, './dist'),
-    publicPath: process.env.VERSION ==='' || process.env.VERSION.includes("akto-release-version") ? '/polaris_web/web/dist/':  'https://d1hvi6xs55woen.cloudfront.net/polaris_web/' + process.env.VERSION +  '/dist/',
+    publicPath: publicPath,
     filename: '[name].js'
   },
   module: {
