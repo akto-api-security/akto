@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import Highcharts from "highcharts";
 import { HighchartsReact } from "highcharts-react-official";
 import { Card, Box, HorizontalStack, VerticalStack, Text, Icon, Divider } from "@shopify/polaris";
@@ -368,6 +368,18 @@ function TableSection() {
         setFlyout(null);
         setDeviceFlyout(null);
         setMcpFlyout(null);
+    }, []);
+
+    // Auto-open DeviceFlyout when arriving via ?device= URL param (e.g. from AgenticAssetFlyout Devices tab)
+    useEffect(() => {
+        const params   = new URLSearchParams(window.location.search);
+        const deviceId = params.get("device");
+        if (!deviceId) return;
+        const device = DEVICE_FLAT_DATA.find(r => r.path.length === 1 && r.path[0] === deviceId);
+        if (!device) return;
+        const agents = DEVICE_FLAT_DATA.filter(r => r.path.length === 2 && r.path[0] === deviceId);
+        setDeviceFlyout({ device, agents });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleAgentClickFromDevice = useCallback((agent) => {

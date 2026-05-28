@@ -129,6 +129,7 @@ import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
 import UsersAndDevices from "../dashboard/pages/observe/agentic/UsersAndDevices.jsx";
 import DeviceEndpoints from "../dashboard/pages/observe/agentic/DeviceEndpoints.jsx";
+import AgenticAssetsPage from "../dashboard/pages/observe/agentic/AgenticAssetsPage.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
 import IdentitiesPage from "../dashboard/pages/nhi_governance/IdentitiesPage.jsx";
@@ -220,6 +221,10 @@ const router = createBrowserRouter([
                             {
                                 path: "agentic-assets",
                                 element: <Endpoints/>
+                            },
+                            {
+                                path: "agentic-assets-v2",
+                                element: <AgenticAssetsPage/>
                             },
                             {
                                 path: "users-and-devices",

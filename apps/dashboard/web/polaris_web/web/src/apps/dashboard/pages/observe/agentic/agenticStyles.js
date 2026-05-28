@@ -5,6 +5,7 @@ export const TYPE_STYLES = {
     "AI Agent":   { bg: "#EFF6FF", color: "#1D4ED8", border: "#BFDBFE" },
     "MCP Server": { bg: "#FFFBEB", color: "#92400E", border: "#FDE68A" },
     "LLM":        { bg: "#F0FDF4", color: "#166534", border: "#BBF7D0" },
+    "Skill":      { bg: "#F3E8FF", color: "#7E22CE", border: "#DDD6FE" },
 };
 
 export const SEVERITY_COLORS = {

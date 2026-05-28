@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { Tabs, Icon, Avatar, Card, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Badge, Divider } from "@shopify/polaris";
 import { CustomersMinor, AutomationMajor, MagicMajor, ChevronRightMinor } from "@shopify/polaris-icons";
-import ReactFlow, { Handle, Position, Background } from "react-flow-renderer";
+import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-renderer";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
@@ -313,7 +313,7 @@ function TopoNode({ data }) {
 const TOPO_NODE_TYPES = { topoNode: TopoNode };
 
 function TopologyGraph({ device, agents }) {
-    const { nodes, edges, graphHeight } = useMemo(() => {
+    const { nodes, edges } = useMemo(() => {
         const aiAgents   = agents.filter(a => a.type === "AI Agent");
         const mcpServers = agents.filter(a => a.type === "MCP Server");
         const llms       = agents.filter(a => a.type === "LLM");
@@ -368,28 +368,31 @@ function TopologyGraph({ device, agents }) {
             llms.forEach((_, i) => es.push({ id: `e-d-l${i}`, source: "device", target: `llm-${i}`, type: "smoothstep", style: { stroke: "#9ca3af", strokeWidth: 1.5 } }));
         }
 
-        return { nodes: ns, edges: es, graphHeight: Math.max(totalH + 40, 220) };
+        return { nodes: ns, edges: es };
     }, [agents, device.endpoint]);
 
-    // ReactFlow requires an explicit height container with overflow:hidden — Box props insufficient
+    // Fixed-size container — ReactFlow's fitView + zoom handles overflow
     return (
-        <div style={{ height: graphHeight, borderRadius: 8, border: "1px solid #e1e5e9", overflow: "hidden", background: "#f8fafc" }}>
+        <div style={{ height: 280, borderRadius: 8, border: "1px solid #e1e5e9", overflow: "hidden", background: "#f8fafc" }}>
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
                 nodeTypes={TOPO_NODE_TYPES}
                 fitView
                 fitViewOptions={{ padding: 0.2 }}
+                onInit={api => api.fitView({ padding: 0.2 })}
+                minZoom={0.2}
+                maxZoom={2}
                 nodesDraggable={false}
                 nodesConnectable={false}
                 elementsSelectable={false}
-                zoomOnScroll={false}
-                zoomOnPinch={false}
-                panOnDrag={false}
-                panOnScroll={false}
+                zoomOnScroll
+                zoomOnPinch
+                panOnDrag
                 preventScrolling={false}
             >
                 <Background color="#e1e5e9" gap={16} />
+                <Controls showInteractive={false} />
             </ReactFlow>
         </div>
     );
@@ -463,18 +466,22 @@ function OverviewTab({ device, agents, onTabChange }) {
                                     {/* clickable row — no Polaris equivalent for a full-width interactive area with hover state */}
                                     <div
                                         onClick={() => onTabChange?.(targetTab)}
-                                        style={{ padding: "12px 8px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", borderRadius: 6, transition: "background 0.15s" }}
+                                        style={{ padding: "12px 8px", display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer", borderRadius: 6, transition: "background 0.15s" }}
                                         onMouseEnter={e => e.currentTarget.style.background = "#F6F6F7"}
                                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                                     >
-                                        <Box width="72px">
+                                        <div style={{ flexShrink: 0, paddingTop: 1, width: 72 }}>
                                             <Badge status={badgeStatus}>{f.severity.charAt(0).toUpperCase() + f.severity.slice(1)}</Badge>
-                                        </Box>
-                                        <VerticalStack gap="0">
-                                            <Text variant="bodySm" fontWeight="semibold">{f.title}</Text>
-                                            <Text variant="bodySm" color="subdued">{f.description}</Text>
-                                        </VerticalStack>
-                                        <Icon source={ChevronRightMinor} color="subdued" />
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <VerticalStack gap="0">
+                                                <Text variant="bodySm" fontWeight="semibold">{f.title}</Text>
+                                                <Text variant="bodySm" color="subdued">{f.description}</Text>
+                                            </VerticalStack>
+                                        </div>
+                                        <div style={{ flexShrink: 0, paddingTop: 2 }}>
+                                            <Icon source={ChevronRightMinor} color="subdued" />
+                                        </div>
                                     </div>
                                 </React.Fragment>
                             );
@@ -504,7 +511,7 @@ function OverviewTab({ device, agents, onTabChange }) {
 
 function isAgentNavigable(data) {
     if (!data) return false;
-    return data.type === "MCP Server" || (data.type === "AI Agent" && data.skillCount > 0);
+    return !!data.type; // all typed assets are navigable
 }
 
 function AgenticsTab({ agents, onAgentClick }) {
@@ -514,9 +521,11 @@ function AgenticsTab({ agents, onAgentClick }) {
     );
 
     const handleRowClick = useCallback((e) => {
-        if (!e.data || !onAgentClick) return;
-        if (isAgentNavigable(e.data)) onAgentClick(e.data);
-    }, [onAgentClick]);
+        if (!e.data) return;
+        if (!isAgentNavigable(e.data)) return;
+        const params = new URLSearchParams({ asset: e.data.endpoint, type: e.data.type });
+        window.open(`/dashboard/observe/agentic-assets-v2?${params}`, "_blank");
+    }, []);
 
     return (
         <AgGridTable
@@ -541,9 +550,8 @@ function ViolationsTab({ device, agents }) {
 
     if (violations.length === 0) {
         return (
-            <Box paddingBlockStart="12">
-                <VerticalStack gap="2" align="center">
-                    <Text variant="heading2xl" as="p">✓</Text>
+            <Box padding="8">
+                <VerticalStack gap="1" inlineAlign="center">
                     <Text variant="bodySm" fontWeight="semibold">No violations</Text>
                     <Text variant="bodySm" color="subdued">This device is operating within policy.</Text>
                 </VerticalStack>

@@ -472,11 +472,11 @@ export const DEVICE_FLAT_DATA = [
     { path: ["NYC-JDOE-WIN11","mcp-github-jdoe"], endpoint: "github-mcp",            type: "MCP Server" },
     { path: ["NYC-JDOE-WIN11","gpt4-jdoe"],       endpoint: "GPT-4o",                type: "LLM" },
     { path: ["NYC-JDOE-MAC01","cursor-cli"],     endpoint: "Cursor CLI",             type: "AI Agent",   skillCount: 1   },
-    { path: ["NYC-JDOE-MAC01","cursor-code"],    endpoint: "Cursor code",            type: "AI Agent",   skillCount: 34  },
+    { path: ["NYC-JDOE-MAC01","cursor-code"],    endpoint: "Cursor AI",              type: "AI Agent",   skillCount: 34  },
     { path: ["NYC-JDOE-MAC01","mcp-akto"],       endpoint: "mcp.akto.io",            type: "MCP Server"                  },
     { path: ["NYC-JDOE-MAC01","chatgpt"],        endpoint: "ChatGPT",                type: "AI Agent"                    },
     { path: ["NYC-JDOE-MAC01","razorpay-stdio"], endpoint: "razorpay-stdio",         type: "MCP Server"                  },
-    { path: ["NYC-JDOE-MAC01","gemini"],         endpoint: "gemini",                 type: "LLM"                         },
+    { path: ["NYC-JDOE-MAC01","gemini"],         endpoint: "gemini-pro",             type: "LLM"                         },
 
     { path: ["BER-TSMITH-MAC02"], endpoint: "BER-TSMITH-MAC02", os: "mac", userCount: 23, riskScore: 4.7, username: "Traun Smith", group: "Engineering", role: "Frontend Developer", violations: { critical:1, high:1, medium:3, low:2 }, lastTraffic: "45m ago", hasPersonalAccount: true },
     { path: ["BER-TSMITH-MAC02","vscode"],         endpoint: "VS Code",        type: "AI Agent",   skillCount: 12 },
@@ -543,7 +543,7 @@ export const DEVICE_FLAT_DATA = [
     { path: ["NYC-JANDERSON-MAC01","gpt4-vp"],    endpoint: "GPT-4o",     type: "LLM"                     },
 
     { path: ["LON-RJOHNSON-WIN11"], endpoint: "LON-RJOHNSON-WIN11", os: "windows", userCount: 15, riskScore: 3.8, username: "Robert Johnson", group: "Sales", role: "Sales Engineer", violations: { critical:0, high:1, medium:2, low:4 }, lastTraffic: "12h ago" },
-    { path: ["LON-RJOHNSON-WIN11","copilot-win"], endpoint: "Microsoft Copilot", type: "AI Agent"   },
+    { path: ["LON-RJOHNSON-WIN11","copilot-win"], endpoint: "Microsoft Copilot 365", type: "AI Agent"   },
     { path: ["LON-RJOHNSON-WIN11","mcp-crm"],     endpoint: "salesforce-mcp",   type: "MCP Server" },
 
     { path: ["TKY-AMATSUDA-LIN01"], endpoint: "TKY-AMATSUDA-LIN01", os: "linux", userCount: 8, riskScore: 2.1, username: "Akira Matsuda", group: "Data Science", role: "ML Engineer", violations: { critical:0, high:0, medium:1, low:1 }, lastTraffic: "2d ago" },
@@ -583,3 +583,286 @@ DEVICE_FLAT_DATA.forEach(row => {
         deviceChildCount[id] = (deviceChildCount[id] || 0) + 1;
     }
 });
+
+// ─── Agentic Assets page data ─────────────────────────────────────────────────
+
+// Rule: sum(groups[i].count) === endpointCount for every parent row.
+export const AGENTIC_TREE_DATA = [
+    // ── AI Agents ─────────────────────────────────────────────────────────────────
+    { path: ["cursor-ai"],                      name: "Cursor AI",             type: "AI Agent",   assetTagValue: "cursor",     riskScore: 4.2, violations: { critical:1, high:2, medium:0, low:3 }, endpointCount: 88,  aiInteractions: 1200000, groups: [{ name: "Engineering", count: 65 }, { name: "DevOps", count: 23 }],                                           deviceCount: 4, lastSeen: "2m ago" },
+    { path: ["cursor-ai","kubernetes-mcp"],     name: "kubernetes-mcp",        type: "MCP Server", endpoint: "kubernetes-mcp",                   riskScore: 4.2, violations: { critical:0, high:0, medium:0, low:2 } },
+    { path: ["cursor-ai","aws-mcp"],            name: "aws-mcp",               type: "MCP Server", endpoint: "aws-mcp",                           riskScore: 4.3, violations: null },
+
+    { path: ["vscode"],                         name: "VS Code",               type: "AI Agent",   assetTagValue: "vscode",     riskScore: 3.6, violations: { critical:0, high:1, medium:1, low:0 }, endpointCount: 12,  aiInteractions: 340000,  groups: [{ name: "Engineering", count: 12 }],                                                                         deviceCount: 1, lastSeen: "45m ago", skillCount: 12 },
+    { path: ["vscode","github-mcp"],            name: "github-mcp",            type: "MCP Server", endpoint: "github-mcp",                        riskScore: 3.2, violations: { critical:1, high:0, medium:1, low:0 } },
+
+    { path: ["github-copilot"],                 name: "GitHub Copilot",        type: "AI Agent",   assetTagValue: "github",     riskScore: 2.1, violations: { critical:0, high:0, medium:0, low:0 }, endpointCount: 2,   aiInteractions: 550000,  groups: [{ name: "Engineering", count: 2 }],                                                                          deviceCount: 2, lastSeen: "6h ago" },
+    { path: ["github-copilot","databricks-mcp"],name: "databricks-mcp",        type: "MCP Server", endpoint: "databricks-mcp",                    riskScore: 4.0, violations: { critical:4, high:1, medium:0, low:0 } },
+
+    { path: ["claude-desktop"],                 name: "Claude Desktop",        type: "AI Agent",   assetTagValue: "claude1",    riskScore: 3.2, violations: { critical:0, high:1, medium:0, low:1 }, endpointCount: 23,  aiInteractions: 680000,  groups: [{ name: "Engineering", count: 12 }, { name: "Finance", count: 7 }, { name: "HR", count: 4 }],               deviceCount: 3, lastSeen: "1h ago",  skillCount: 23 },
+    { path: ["claude-desktop","slack-mcp"],     name: "slack-mcp",             type: "MCP Server", endpoint: "slack-mcp",                         riskScore: 2.4, violations: null },
+    { path: ["claude-desktop","jira-mcp"],      name: "jira-mcp",              type: "MCP Server", endpoint: "jira-mcp",                           riskScore: 2.0, violations: { critical:0, high:1, medium:0, low:0 } },
+    { path: ["claude-desktop","quickbooks-mcp"],name: "quickbooks-mcp",        type: "MCP Server", endpoint: "quickbooks-mcp",                     riskScore: 4.1, violations: { critical:0, high:0, medium:1, low:1 } },
+
+    { path: ["copilot365"],                     name: "Microsoft Copilot 365", type: "AI Agent",   assetTagValue: "copilot",    riskScore: 2.8, violations: { critical:2, high:4, medium:1, low:1 }, endpointCount: 4,   aiInteractions: 990000,  groups: [{ name: "HR", count: 2 }, { name: "Finance", count: 1 }, { name: "Engineering", count: 1 }],               deviceCount: 4, lastSeen: "1d ago" },
+    { path: ["copilot365","sharepoint-mcp"],    name: "sharepoint-mcp",        type: "MCP Server", endpoint: "sharepoint-mcp",                     riskScore: 3.5, violations: { critical:2, high:2, medium:0, low:0 } },
+    { path: ["copilot365","notion-mcp"],        name: "notion-mcp",            type: "MCP Server", endpoint: "notion-mcp",                         riskScore: 2.1, violations: null },
+
+    { path: ["chatgpt"],                        name: "ChatGPT",               type: "AI Agent",   assetTagValue: "chatgpt",    riskScore: 2.5, violations: { critical:0, high:0, medium:0, low:0 }, endpointCount: 1,   aiInteractions: 450000,  groups: [{ name: "Engineering", count: 1 }],                                                                          deviceCount: 1, lastSeen: "45m ago" },
+    { path: ["chatgpt","razorpay-stdio"],       name: "razorpay-stdio",        type: "MCP Server", endpoint: "razorpay-stdio",                     riskScore: 4.5, violations: { critical:1, high:1, medium:0, low:0 } },
+
+    { path: ["playwright-ai"],                  name: "Playwright AI",         type: "AI Agent",   assetTagValue: "playwright", riskScore: 4.3, violations: { critical:1, high:2, medium:1, low:0 }, endpointCount: 5,   aiInteractions: 120000,  groups: [{ name: "QA", count: 5 }],                                                                                   deviceCount: 1, lastSeen: "6h ago",  skillCount: 5 },
+
+    { path: ["jupyter-ai"],                     name: "Jupyter AI",            type: "AI Agent",   assetTagValue: "jupyter",    riskScore: 2.0, violations: { critical:0, high:0, medium:1, low:1 }, endpointCount: 4,   aiInteractions: 85000,   groups: [{ name: "Data Science", count: 4 }],                                                                         deviceCount: 2, lastSeen: "2d ago",  skillCount: 4 },
+    { path: ["jupyter-ai","postgres-mcp"],      name: "postgres-mcp",          type: "MCP Server", endpoint: "postgres-mcp",                       riskScore: 3.4, violations: { critical:0, high:1, medium:0, low:0 } },
+
+    // ── Standalone MCP Servers ────────────────────────────────────────────────────
+    { path: ["mcp-akto"],                       name: "mcp.akto.io",           type: "MCP Server", endpoint: "mcp.akto.io",     riskScore: 4.1, violations: { critical:1, high:0, medium:0, low:0 }, endpointCount: 5,   aiInteractions: 340000,  groups: [{ name: "Security", count: 5 }],                                                                              deviceCount: 1, lastSeen: "2h ago" },
+    { path: ["linear-mcp"],                     name: "linear-mcp",            type: "MCP Server", endpoint: "linear-mcp",      riskScore: 2.1, violations: { critical:0, high:0, medium:1, low:0 }, endpointCount: 3,   aiInteractions: 95000,   groups: [{ name: "Engineering", count: 3 }],                                                                          deviceCount: 1, lastSeen: "5h ago" },
+    { path: ["salesforce-mcp"],                 name: "salesforce-mcp",        type: "MCP Server", endpoint: "salesforce-mcp",  riskScore: 3.0, violations: { critical:0, high:1, medium:2, low:4 }, endpointCount: 3,   aiInteractions: 180000,  groups: [{ name: "Sales", count: 2 }, { name: "Marketing", count: 1 }],                                             deviceCount: 1, lastSeen: "12h ago" },
+    { path: ["xcode-mcp"],                      name: "xcode-mcp",             type: "MCP Server", endpoint: "xcode-mcp",       riskScore: 2.9, violations: null,                                     endpointCount: 4,   aiInteractions: 62000,   groups: [{ name: "Mobile", count: 4 }],                                                                                deviceCount: 1, lastSeen: "6h ago" },
+    { path: ["sap-mcp"],                        name: "sap-mcp",               type: "MCP Server", endpoint: "sap-mcp",         riskScore: 3.9, violations: { critical:0, high:0, medium:1, low:1 }, endpointCount: 4,   aiInteractions: 115000,  groups: [{ name: "Finance", count: 3 }, { name: "Operations", count: 1 }],                                          deviceCount: 1, lastSeen: "6h ago" },
+
+    // ── LLMs — endpointCount = number of active model sessions (1 per device) ─────
+    { path: ["gpt4o"],                          name: "GPT-4o",                type: "LLM",        assetTagValue: "chatgpt",    riskScore: 2.0, violations: null,                                     endpointCount: 3,   aiInteractions: 500000,  groups: [{ name: "Engineering", count: 2 }, { name: "HR", count: 1 }],             deviceCount: 3, lastSeen: "1d ago" },
+    { path: ["gpt4o-mini"],                     name: "GPT-4o-mini",           type: "LLM",        assetTagValue: "chatgpt",    riskScore: 1.5, violations: null,                                     endpointCount: 1,   aiInteractions: 220000,  groups: [{ name: "Engineering", count: 1 }],                                        deviceCount: 1, lastSeen: "6h ago" },
+    { path: ["claude-3-7"],                     name: "claude-3.7-sonnet",     type: "LLM",        assetTagValue: "claude",     riskScore: 1.6, violations: null,                                     endpointCount: 2,   aiInteractions: 320000,  groups: [{ name: "Engineering", count: 2 }],                                        deviceCount: 2, lastSeen: "3h ago" },
+    { path: ["claude-haiku"],                   name: "claude-haiku",          type: "LLM",        assetTagValue: "claude",     riskScore: 1.4, violations: null,                                     endpointCount: 1,   aiInteractions: 140000,  groups: [{ name: "Mobile", count: 1 }],                                             deviceCount: 1, lastSeen: "6h ago" },
+    { path: ["gemini-pro"],                     name: "gemini-pro",            type: "LLM",        assetTagValue: "gemini",     riskScore: 1.6, violations: null,                                     endpointCount: 2,   aiInteractions: 180000,  groups: [{ name: "QA", count: 1 }, { name: "Engineering", count: 1 }],             deviceCount: 2, lastSeen: "6h ago" },
+    { path: ["ollama"],                         name: "Ollama",                type: "LLM",        riskScore: 1.3,              violations: null,                                                     endpointCount: 2,   aiInteractions: 95000,   groups: [{ name: "Data Science", count: 2 }],                                       deviceCount: 2, lastSeen: "2d ago" },
+
+    // ── Additional AI Agents from Endpoints page ───────────────────────────────────
+    { path: ["cursor-cli"],                     name: "Cursor CLI",            type: "AI Agent",   assetTagValue: "cursor",     riskScore: 2.5, violations: null,                                     endpointCount: 1,   aiInteractions: 42000,   groups: [{ name: "Engineering", count: 1 }],                                        deviceCount: 1, lastSeen: "2h ago",  skillCount: 1 },
+    { path: ["teams-ai-bot"],                   name: "Teams AI Bot",          type: "AI Agent",   assetTagValue: "copilot",    riskScore: 1.8, violations: null,                                     endpointCount: 1,   aiInteractions: 310000,  groups: [{ name: "HR", count: 1 }],                                                 deviceCount: 1, lastSeen: "1d ago" },
+
+    // ── Standalone child MCPs (also connected to parent agents) ───────────────────
+    { path: ["notion-mcp"],                     name: "notion-mcp",            type: "MCP Server", endpoint: "notion-mcp",      riskScore: 2.1, violations: null,                                     endpointCount: 2,   aiInteractions: 78000,   groups: [{ name: "HR", count: 1 }, { name: "Engineering", count: 1 }],             deviceCount: 2, lastSeen: "1h ago" },
+    { path: ["sharepoint-mcp"],                 name: "sharepoint-mcp",        type: "MCP Server", endpoint: "sharepoint-mcp",  riskScore: 3.5, violations: { critical:2, high:2, medium:0, low:0 }, endpointCount: 3,   aiInteractions: 190000,  groups: [{ name: "HR", count: 3 }],                                                 deviceCount: 1, lastSeen: "1d ago" },
+    { path: ["quickbooks-mcp"],                 name: "quickbooks-mcp",        type: "MCP Server", endpoint: "quickbooks-mcp",  riskScore: 4.1, violations: { critical:0, high:0, medium:1, low:1 }, endpointCount: 4,   aiInteractions: 115000,  groups: [{ name: "Finance", count: 4 }],                                            deviceCount: 1, lastSeen: "6h ago" },
+    { path: ["jira-mcp"],                       name: "jira-mcp",              type: "MCP Server", endpoint: "jira-mcp",        riskScore: 2.0, violations: { critical:0, high:1, medium:0, low:0 }, endpointCount: 4,   aiInteractions: 88000,   groups: [{ name: "Engineering", count: 4 }],                                        deviceCount: 1, lastSeen: "3h ago" },
+
+    // ── Skills ────────────────────────────────────────────────────────────────────
+    { path: ["skill-fetch-credentials"],        name: "Fetch Credentials",     type: "Skill",      riskScore: 4.5, violations: { critical:3, high:2, medium:0, low:0 }, endpointCount: 6,  aiInteractions: 12000,  groups: [{ name: "Engineering", count: 4 }, { name: "Security", count: 2 }],                                       deviceCount: 6, lastSeen: "2h ago" },
+    { path: ["skill-run-api-scan"],             name: "Run API Scan",          type: "Skill",      riskScore: 4.0, violations: { critical:2, high:1, medium:0, low:0 }, endpointCount: 3,  aiInteractions: 28000,  groups: [{ name: "Security", count: 3 }],                                                                              deviceCount: 2, lastSeen: "30m ago" },
+    { path: ["skill-query-database"],           name: "Query Database",        type: "Skill",      riskScore: 3.8, violations: { critical:0, high:2, medium:1, low:0 }, endpointCount: 9,  aiInteractions: 67000,  groups: [{ name: "Data Science", count: 5 }, { name: "Engineering", count: 4 }],                                   deviceCount: 3, lastSeen: "45m ago" },
+    { path: ["skill-generate-snapshot"],        name: "Generate Snapshot",     type: "Skill",      riskScore: 3.1, violations: { critical:1, high:0, medium:0, low:0 }, endpointCount: 8,  aiInteractions: 45000,  groups: [{ name: "Engineering", count: 8 }],                                                                          deviceCount: 3, lastSeen: "1h ago" },
+    { path: ["skill-deploy-service"],           name: "Deploy Service",        type: "Skill",      riskScore: 2.8, violations: { critical:0, high:1, medium:0, low:1 }, endpointCount: 5,  aiInteractions: 33000,  groups: [{ name: "Engineering", count: 5 }],                                                                          deviceCount: 2, lastSeen: "3h ago" },
+    { path: ["skill-export-report"],            name: "Export Report",         type: "Skill",      riskScore: 1.8, violations: null,                                    endpointCount: 4,  aiInteractions: 18000,  groups: [{ name: "Finance", count: 2 }, { name: "Sales", count: 2 }],                                              deviceCount: 2, lastSeen: "6h ago" },
+];
+
+export const AGENTIC_FLAT_DATA = [
+    // AI Agents
+    { id: "cursor-ai",      name: "Cursor AI",             type: "AI Agent",   riskScore: 4.2, violations: { critical:1, high:2, medium:0, low:3 }, skillCount: 88, toolCount: 0, deviceCount: 4, lastSeen: "2m ago",   mcpServers: ["kubernetes-mcp","aws-mcp"] },
+    { id: "vscode",         name: "VS Code",               type: "AI Agent",   riskScore: 3.6, violations: { critical:0, high:1, medium:1, low:0 }, skillCount: 12, toolCount: 0, deviceCount: 1, lastSeen: "45m ago",  mcpServers: ["github-mcp"] },
+    { id: "github-copilot", name: "GitHub Copilot",        type: "AI Agent",   riskScore: 2.1, violations: { critical:0, high:0, medium:0, low:0 }, skillCount: 0,  toolCount: 0, deviceCount: 2, lastSeen: "6h ago",   mcpServers: [] },
+    { id: "claude-desktop", name: "Claude Desktop",        type: "AI Agent",   riskScore: 3.2, violations: { critical:0, high:1, medium:0, low:1 }, skillCount: 23, toolCount: 0, deviceCount: 3, lastSeen: "1h ago",   mcpServers: ["slack-mcp","jira-mcp","quickbooks-mcp"] },
+    { id: "copilot365",     name: "Microsoft Copilot 365", type: "AI Agent",   riskScore: 2.8, violations: { critical:2, high:4, medium:1, low:1 }, skillCount: 0,  toolCount: 0, deviceCount: 4, lastSeen: "1d ago",   mcpServers: ["sharepoint-mcp"] },
+    { id: "chatgpt",        name: "ChatGPT",               type: "AI Agent",   riskScore: 2.5, violations: { critical:0, high:0, medium:0, low:0 }, skillCount: 0,  toolCount: 0, deviceCount: 1, lastSeen: "45m ago",  mcpServers: ["razorpay-stdio"] },
+    { id: "playwright-ai",  name: "Playwright AI",         type: "AI Agent",   riskScore: 4.3, violations: { critical:1, high:2, medium:1, low:0 }, skillCount: 5,  toolCount: 0, deviceCount: 1, lastSeen: "6h ago",   mcpServers: [] },
+    { id: "jupyter-ai",     name: "Jupyter AI",            type: "AI Agent",   riskScore: 2.0, violations: { critical:0, high:0, medium:1, low:1 }, skillCount: 4,  toolCount: 0, deviceCount: 2, lastSeen: "2d ago",   mcpServers: ["postgres-mcp"] },
+    // MCP Servers
+    { id: "mcp-akto",       name: "mcp.akto.io",           type: "MCP Server", riskScore: 4.1, violations: { critical:1, high:0, medium:0, low:0 }, skillCount: 0,  toolCount: 5, deviceCount: 1, lastSeen: "2h ago" },
+    { id: "razorpay-stdio", name: "razorpay-stdio",        type: "MCP Server", riskScore: 4.5, violations: { critical:1, high:1, medium:0, low:0 }, skillCount: 0,  toolCount: 6, deviceCount: 1, lastSeen: "2h ago" },
+    { id: "postgres-mcp",   name: "postgres-mcp",          type: "MCP Server", riskScore: 3.4, violations: { critical:0, high:1, medium:0, low:0 }, skillCount: 0,  toolCount: 4, deviceCount: 2, lastSeen: "2d ago" },
+    { id: "github-mcp",     name: "github-mcp",            type: "MCP Server", riskScore: 3.2, violations: { critical:1, high:0, medium:1, low:0 }, skillCount: 0,  toolCount: 4, deviceCount: 2, lastSeen: "45m ago" },
+    { id: "kubernetes-mcp", name: "kubernetes-mcp",        type: "MCP Server", riskScore: 4.2, violations: { critical:0, high:0, medium:0, low:2 }, skillCount: 0,  toolCount: 5, deviceCount: 1, lastSeen: "6h ago" },
+    { id: "databricks-mcp", name: "databricks-mcp",        type: "MCP Server", riskScore: 4.0, violations: { critical:4, high:1, medium:0, low:0 }, skillCount: 0,  toolCount: 4, deviceCount: 1, lastSeen: "6h ago" },
+    { id: "slack-mcp",      name: "slack-mcp",             type: "MCP Server", riskScore: 2.4, violations: { critical:0, high:0, medium:0, low:0 }, skillCount: 0,  toolCount: 4, deviceCount: 1, lastSeen: "3h ago" },
+    // LLMs
+    { id: "gpt4o",          name: "GPT-4o",                type: "LLM",        riskScore: 2.0, violations: { critical:0, high:0, medium:0, low:0 }, skillCount: 0,  toolCount: 0, deviceCount: 3, lastSeen: "1d ago" },
+    { id: "gpt4o-mini",     name: "GPT-4o-mini",           type: "LLM",        riskScore: 1.5, violations: null,                                     skillCount: 0,  toolCount: 0, deviceCount: 1, lastSeen: "6h ago" },
+    { id: "claude-3-7",     name: "claude-3.7-sonnet",     type: "LLM",        riskScore: 1.6, violations: { critical:0, high:0, medium:0, low:0 }, skillCount: 0,  toolCount: 0, deviceCount: 2, lastSeen: "3h ago" },
+    { id: "claude-haiku",   name: "claude-haiku",          type: "LLM",        riskScore: 1.4, violations: null,                                     skillCount: 0,  toolCount: 0, deviceCount: 1, lastSeen: "6h ago" },
+    { id: "gemini-pro",     name: "gemini-pro",            type: "LLM",        riskScore: 1.6, violations: { critical:0, high:0, medium:0, low:0 }, skillCount: 0,  toolCount: 0, deviceCount: 2, lastSeen: "6h ago" },
+    { id: "ollama",         name: "Ollama",                type: "LLM",        riskScore: 1.3, violations: { critical:0, high:0, medium:0, low:0 }, skillCount: 0,  toolCount: 0, deviceCount: 2, lastSeen: "2d ago" },
+    // Additional AI Agents on endpoints not yet in flat data
+    { id: "cursor-cli",     name: "Cursor CLI",            type: "AI Agent",   riskScore: 2.5, violations: null,                                     skillCount: 1,  toolCount: 0, deviceCount: 1, lastSeen: "2h ago",  mcpServers: ["mcp.akto.io"] },
+    { id: "teams-ai-bot",   name: "Teams AI Bot",          type: "AI Agent",   riskScore: 1.8, violations: null,                                     skillCount: 0,  toolCount: 0, deviceCount: 1, lastSeen: "1d ago",  mcpServers: [] },
+    // Child MCPs that need direct flyout access from DeviceFlyout
+    { id: "notion-mcp",     name: "notion-mcp",            type: "MCP Server", riskScore: 2.1, violations: null,                                     skillCount: 0,  toolCount: 4, deviceCount: 2, lastSeen: "1h ago" },
+    { id: "sharepoint-mcp", name: "sharepoint-mcp",        type: "MCP Server", riskScore: 3.5, violations: { critical:2, high:2, medium:0, low:0 }, skillCount: 0,  toolCount: 3, deviceCount: 1, lastSeen: "1d ago" },
+    { id: "quickbooks-mcp", name: "quickbooks-mcp",        type: "MCP Server", riskScore: 4.1, violations: { critical:0, high:0, medium:1, low:1 }, skillCount: 0,  toolCount: 4, deviceCount: 1, lastSeen: "6h ago" },
+    { id: "jira-mcp",       name: "jira-mcp",              type: "MCP Server", riskScore: 2.0, violations: { critical:0, high:1, medium:0, low:0 }, skillCount: 0,  toolCount: 4, deviceCount: 1, lastSeen: "3h ago" },
+];
+
+export const AGENTIC_ASSET_DEVICES = {
+    "cursor-ai": [
+        { deviceId: "SF-STAYLOR-MAC01",    endpoint: "SF-STAYLOR-MAC01",    username: "Sarah Taylor",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.5 },
+        { deviceId: "SF-RCLARK-MAC01",     endpoint: "SF-RCLARK-MAC01",     username: "Robert Clark",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.3 },
+        { deviceId: "SF-JLEWIS-MAC01",     endpoint: "SF-JLEWIS-MAC01",     username: "Jennifer Lewis", os: "mac",     lastSeen: "5d ago",  riskScore: 2.4 },
+        { deviceId: "NYC-JANDERSON-MAC01", endpoint: "NYC-JANDERSON-MAC01", username: "James Anderson", os: "mac",     lastSeen: "5h ago",  riskScore: 3.8 },
+    ],
+    "vscode": [
+        { deviceId: "BER-TSMITH-MAC02",    endpoint: "BER-TSMITH-MAC02",    username: "Traun Smith",    os: "mac",     lastSeen: "45m ago", riskScore: 4.7 },
+    ],
+    "github-copilot": [
+        { deviceId: "BER-TSMITH-MAC02",    endpoint: "BER-TSMITH-MAC02",    username: "Traun Smith",    os: "mac",     lastSeen: "45m ago", riskScore: 4.7 },
+        { deviceId: "SF-JLEWIS-WIN10",     endpoint: "SF-JLEWIS-WIN10",     username: "Jennifer Lewis", os: "windows", lastSeen: "6h ago",  riskScore: 4.3 },
+    ],
+    "claude-desktop": [
+        { deviceId: "SF-MWILSON-MAC01",    endpoint: "SF-MWILSON-MAC01",    username: "Mark Wilson",    os: "mac",     lastSeen: "3d ago",  riskScore: 2.8 },
+        { deviceId: "BER-DWILSON-MAC02",   endpoint: "BER-DWILSON-MAC02",   username: "David Wilson",   os: "mac",     lastSeen: "3h ago",  riskScore: 4.5 },
+        { deviceId: "SF-CKING-MAC01",      endpoint: "SF-CKING-MAC01",      username: "Charles King",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.1 },
+    ],
+    "copilot365": [
+        { deviceId: "NYC-JDOE-WIN11",      endpoint: "NYC-JDOE-WIN11",      username: "John Doe",       os: "windows", lastSeen: "1d ago",  riskScore: 3.2 },
+        { deviceId: "SF-MWILSON-WIN10",    endpoint: "SF-MWILSON-WIN10",    username: "Mark Wilson",    os: "windows", lastSeen: "1d ago",  riskScore: 4.5 },
+        { deviceId: "SF-WHALL-WIN10",      endpoint: "SF-WHALL-WIN10",      username: "William Hall",   os: "windows", lastSeen: "6h ago",  riskScore: 4.1 },
+        { deviceId: "SF-PYOUNG-WIN10",     endpoint: "SF-PYOUNG-WIN10",     username: "Patricia Young", os: "windows", lastSeen: "6h ago",  riskScore: 4.1 },
+    ],
+    "chatgpt": [
+        { deviceId: "NYC-JDOE-MAC01",      endpoint: "NYC-JDOE-MAC01",      username: "John Doe",       os: "mac",     lastSeen: "2h ago",  riskScore: 4.8 },
+    ],
+    "playwright-ai": [
+        { deviceId: "SF-LTHOMAS-MAC02",    endpoint: "SF-LTHOMAS-MAC02",    username: "Linda Thomas",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.3 },
+    ],
+    "jupyter-ai": [
+        { deviceId: "TKY-AMATSUDA-LIN01",  endpoint: "TKY-AMATSUDA-LIN01",  username: "Akira Matsuda",  os: "linux",   lastSeen: "2d ago",  riskScore: 2.1 },
+        { deviceId: "SF-JLEWIS-LIN01",     endpoint: "SF-JLEWIS-LIN01",     username: "Jennifer Lewis", os: "linux",   lastSeen: "2d ago",  riskScore: 3.1 },
+    ],
+    "mcp-akto": [
+        { deviceId: "NYC-JDOE-MAC01",      endpoint: "NYC-JDOE-MAC01",      username: "John Doe",       os: "mac",     lastSeen: "2h ago",  riskScore: 4.8 },
+    ],
+    "razorpay-stdio": [
+        { deviceId: "NYC-JDOE-MAC01",      endpoint: "NYC-JDOE-MAC01",      username: "John Doe",       os: "mac",     lastSeen: "2h ago",  riskScore: 4.8 },
+    ],
+    "postgres-mcp": [
+        { deviceId: "SF-JLEWIS-LIN01",     endpoint: "SF-JLEWIS-LIN01",     username: "Jennifer Lewis", os: "linux",   lastSeen: "2d ago",  riskScore: 3.1 },
+        { deviceId: "TKY-AMATSUDA-LIN01",  endpoint: "TKY-AMATSUDA-LIN01",  username: "Akira Matsuda",  os: "linux",   lastSeen: "2d ago",  riskScore: 2.1 },
+    ],
+    "github-mcp": [
+        { deviceId: "BER-TSMITH-MAC02",    endpoint: "BER-TSMITH-MAC02",    username: "Traun Smith",    os: "mac",     lastSeen: "45m ago", riskScore: 4.7 },
+        { deviceId: "NYC-JDOE-WIN11",      endpoint: "NYC-JDOE-WIN11",      username: "John Doe",       os: "windows", lastSeen: "1d ago",  riskScore: 3.2 },
+    ],
+    "kubernetes-mcp": [
+        { deviceId: "SF-STAYLOR-MAC01",    endpoint: "SF-STAYLOR-MAC01",    username: "Sarah Taylor",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.5 },
+    ],
+    "databricks-mcp": [
+        { deviceId: "SF-JLEWIS-WIN10",     endpoint: "SF-JLEWIS-WIN10",     username: "Jennifer Lewis", os: "windows", lastSeen: "6h ago",  riskScore: 4.3 },
+    ],
+    "slack-mcp": [
+        { deviceId: "BER-DWILSON-MAC02",   endpoint: "BER-DWILSON-MAC02",   username: "David Wilson",   os: "mac",     lastSeen: "3h ago",  riskScore: 4.5 },
+    ],
+    "gpt4o": [
+        { deviceId: "NYC-JDOE-WIN11",      endpoint: "NYC-JDOE-WIN11",      username: "John Doe",       os: "windows", lastSeen: "1d ago",  riskScore: 3.2 },
+        { deviceId: "SF-MWILSON-WIN10",    endpoint: "SF-MWILSON-WIN10",    username: "Mark Wilson",    os: "windows", lastSeen: "1d ago",  riskScore: 4.5 },
+        { deviceId: "NYC-JANDERSON-MAC01", endpoint: "NYC-JANDERSON-MAC01", username: "James Anderson", os: "mac",     lastSeen: "5h ago",  riskScore: 3.8 },
+    ],
+    "claude-3-7": [
+        { deviceId: "BER-DWILSON-MAC02",   endpoint: "BER-DWILSON-MAC02",   username: "David Wilson",   os: "mac",     lastSeen: "3h ago",  riskScore: 4.5 },
+        { deviceId: "SF-JLEWIS-MAC01",     endpoint: "SF-JLEWIS-MAC01",     username: "Jennifer Lewis", os: "mac",     lastSeen: "5d ago",  riskScore: 2.4 },
+    ],
+    "gemini-pro": [
+        { deviceId: "SF-LTHOMAS-MAC02",    endpoint: "SF-LTHOMAS-MAC02",    username: "Linda Thomas",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.3 },
+        { deviceId: "NYC-JDOE-MAC01",      endpoint: "NYC-JDOE-MAC01",      username: "John Doe",       os: "mac",     lastSeen: "2h ago",  riskScore: 4.8 },
+    ],
+    "ollama": [
+        { deviceId: "TKY-AMATSUDA-LIN01",  endpoint: "TKY-AMATSUDA-LIN01",  username: "Akira Matsuda",  os: "linux",   lastSeen: "2d ago",  riskScore: 2.1 },
+        { deviceId: "SF-JLEWIS-LIN01",     endpoint: "SF-JLEWIS-LIN01",     username: "Jennifer Lewis", os: "linux",   lastSeen: "2d ago",  riskScore: 3.1 },
+    ],
+    "skill-fetch-credentials": [
+        { deviceId: "NYC-JDOE-MAC01",      endpoint: "NYC-JDOE-MAC01",      username: "John Doe",       os: "mac",     lastSeen: "2h ago",  riskScore: 4.8 },
+        { deviceId: "BER-TSMITH-MAC02",    endpoint: "BER-TSMITH-MAC02",    username: "Traun Smith",    os: "mac",     lastSeen: "45m ago", riskScore: 4.7 },
+        { deviceId: "BER-DWILSON-MAC02",   endpoint: "BER-DWILSON-MAC02",   username: "David Wilson",   os: "mac",     lastSeen: "3h ago",  riskScore: 4.5 },
+        { deviceId: "NYC-JANDERSON-MAC01", endpoint: "NYC-JANDERSON-MAC01", username: "James Anderson", os: "mac",     lastSeen: "5h ago",  riskScore: 3.8 },
+        { deviceId: "SF-STAYLOR-MAC01",    endpoint: "SF-STAYLOR-MAC01",    username: "Sarah Taylor",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.5 },
+        { deviceId: "SF-RCLARK-MAC01",     endpoint: "SF-RCLARK-MAC01",     username: "Robert Clark",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.3 },
+    ],
+    "skill-run-api-scan": [
+        { deviceId: "NYC-JDOE-MAC01",      endpoint: "NYC-JDOE-MAC01",      username: "John Doe",       os: "mac",     lastSeen: "2h ago",  riskScore: 4.8 },
+        { deviceId: "SF-STAYLOR-MAC01",    endpoint: "SF-STAYLOR-MAC01",    username: "Sarah Taylor",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.5 },
+    ],
+    "skill-query-database": [
+        { deviceId: "SF-JLEWIS-LIN01",     endpoint: "SF-JLEWIS-LIN01",     username: "Jennifer Lewis", os: "linux",   lastSeen: "2d ago",  riskScore: 3.1 },
+        { deviceId: "TKY-AMATSUDA-LIN01",  endpoint: "TKY-AMATSUDA-LIN01",  username: "Akira Matsuda",  os: "linux",   lastSeen: "2d ago",  riskScore: 2.1 },
+        { deviceId: "SF-STAYLOR-MAC01",    endpoint: "SF-STAYLOR-MAC01",    username: "Sarah Taylor",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.5 },
+    ],
+    "skill-generate-snapshot": [
+        { deviceId: "NYC-JDOE-MAC01",      endpoint: "NYC-JDOE-MAC01",      username: "John Doe",       os: "mac",     lastSeen: "2h ago",  riskScore: 4.8 },
+        { deviceId: "BER-TSMITH-MAC02",    endpoint: "BER-TSMITH-MAC02",    username: "Traun Smith",    os: "mac",     lastSeen: "45m ago", riskScore: 4.7 },
+        { deviceId: "NYC-JANDERSON-MAC01", endpoint: "NYC-JANDERSON-MAC01", username: "James Anderson", os: "mac",     lastSeen: "5h ago",  riskScore: 3.8 },
+    ],
+    "skill-deploy-service": [
+        { deviceId: "SF-STAYLOR-MAC01",    endpoint: "SF-STAYLOR-MAC01",    username: "Sarah Taylor",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.5 },
+        { deviceId: "SF-RCLARK-MAC01",     endpoint: "SF-RCLARK-MAC01",     username: "Robert Clark",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.3 },
+    ],
+    "skill-export-report": [
+        { deviceId: "SF-CKING-MAC01",      endpoint: "SF-CKING-MAC01",      username: "Charles King",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.1 },
+        { deviceId: "SF-PYOUNG-WIN10",     endpoint: "SF-PYOUNG-WIN10",     username: "Patricia Young", os: "windows", lastSeen: "6h ago",  riskScore: 4.1 },
+    ],
+    // Standalone MCP Servers
+    "linear-mcp": [
+        { deviceId: "NYC-JANDERSON-MAC01", endpoint: "NYC-JANDERSON-MAC01", username: "James Anderson", os: "mac",     lastSeen: "5h ago",  riskScore: 3.8 },
+    ],
+    "salesforce-mcp": [
+        { deviceId: "LON-RJOHNSON-WIN11",  endpoint: "LON-RJOHNSON-WIN11",  username: "Robert Johnson", os: "windows", lastSeen: "12h ago", riskScore: 3.8 },
+    ],
+    "xcode-mcp": [
+        { deviceId: "SF-RCLARK-MAC01",     endpoint: "SF-RCLARK-MAC01",     username: "Robert Clark",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.3 },
+    ],
+    "sap-mcp": [
+        { deviceId: "SF-PYOUNG-WIN10",     endpoint: "SF-PYOUNG-WIN10",     username: "Patricia Young", os: "windows", lastSeen: "6h ago",  riskScore: 4.1 },
+    ],
+    "cursor-cli": [
+        { deviceId: "NYC-JDOE-MAC01",      endpoint: "NYC-JDOE-MAC01",      username: "John Doe",       os: "mac",     lastSeen: "2h ago",  riskScore: 4.8 },
+    ],
+    "gpt4o-mini": [
+        { deviceId: "SF-STAYLOR-MAC01",    endpoint: "SF-STAYLOR-MAC01",    username: "Sarah Taylor",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.5 },
+    ],
+    "claude-haiku": [
+        { deviceId: "SF-RCLARK-MAC01",     endpoint: "SF-RCLARK-MAC01",     username: "Robert Clark",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.3 },
+    ],
+    "teams-ai-bot": [
+        { deviceId: "SF-MWILSON-WIN10",    endpoint: "SF-MWILSON-WIN10",    username: "Mark Wilson",    os: "windows", lastSeen: "1d ago",  riskScore: 4.5 },
+    ],
+    "notion-mcp": [
+        { deviceId: "SF-MWILSON-MAC01",    endpoint: "SF-MWILSON-MAC01",    username: "Mark Wilson",    os: "mac",     lastSeen: "3d ago",  riskScore: 2.8 },
+        { deviceId: "SF-WHALL-WIN10",      endpoint: "SF-WHALL-WIN10",      username: "William Hall",   os: "windows", lastSeen: "6h ago",  riskScore: 4.1 },
+    ],
+    "sharepoint-mcp": [
+        { deviceId: "SF-MWILSON-WIN10",    endpoint: "SF-MWILSON-WIN10",    username: "Mark Wilson",    os: "windows", lastSeen: "1d ago",  riskScore: 4.5 },
+    ],
+    "quickbooks-mcp": [
+        { deviceId: "SF-CKING-MAC01",      endpoint: "SF-CKING-MAC01",      username: "Charles King",   os: "mac",     lastSeen: "6h ago",  riskScore: 4.1 },
+    ],
+    "jira-mcp": [
+        { deviceId: "BER-DWILSON-MAC02",   endpoint: "BER-DWILSON-MAC02",   username: "David Wilson",   os: "mac",     lastSeen: "3h ago",  riskScore: 4.5 },
+    ],
+};
+
+export const AGENTIC_ASSET_SPARKLINES = {
+    "cursor-ai":      [18,20,22,24,23,26,28,27,30,33,36,38],
+    "vscode":         [8,9,10,11,12,11,13,14,12,15,16,17],
+    "github-copilot": [12,13,14,13,15,14,16,15,17,18,17,19],
+    "claude-desktop": [10,12,15,16,18,17,20,22,21,24,25,28],
+    "copilot365":     [40,42,45,44,48,50,49,52,55,54,58,60],
+    "chatgpt":        [22,24,25,27,26,28,30,29,32,34,33,35],
+    "playwright-ai":  [6,7,8,9,8,10,11,10,12,13,14,15],
+    "jupyter-ai":     [5,5,6,7,6,8,7,9,8,10,9,11],
+    "mcp-akto":       [15,17,18,20,22,21,24,25,23,27,28,30],
+    "razorpay-stdio": [30,32,35,38,37,40,42,45,44,48,50,52],
+    "postgres-mcp":   [10,11,12,11,13,12,14,13,15,14,16,15],
+    "github-mcp":     [18,19,21,20,22,23,22,24,25,24,26,27],
+    "kubernetes-mcp": [25,27,28,30,29,32,34,33,36,38,37,40],
+    "databricks-mcp": [20,22,24,26,25,28,30,29,32,35,38,40],
+    "slack-mcp":      [8,9,10,11,10,12,11,13,12,14,13,15],
+    "gpt4o":          [35,37,38,40,39,42,44,43,46,48,47,50],
+    "claude-3-7":     [12,13,15,14,16,15,17,16,18,19,18,20],
+    "gemini-pro":     [10,11,12,13,12,14,13,15,14,16,15,17],
+    "ollama":         [4,5,5,6,5,7,6,8,7,9,8,10],
+};
+
+export function generateAssetViolations(asset) {
+    const rows = [];
+    let t = 0;
+    const add = (sev, idx) => {
+        const tpls = VIOLATION_TEMPLATES[sev] || VIOLATION_TEMPLATES.low;
+        const tpl = tpls[idx % tpls.length];
+        rows.push({ id: rows.length, severity: sev, title: tpl.title, description: tpl.description, agent: asset.name, agentType: asset.type, time: REL_TIMES[t++ % REL_TIMES.length] });
+    };
+    for (let i = 0; i < (asset.violations?.critical || 0); i++) add("critical", i);
+    for (let i = 0; i < (asset.violations?.high    || 0); i++) add("high",     i);
+    for (let i = 0; i < (asset.violations?.medium  || 0); i++) add("medium",   i);
+    for (let i = 0; i < (asset.violations?.low     || 0); i++) add("low",      i);
+    return rows;
+}
