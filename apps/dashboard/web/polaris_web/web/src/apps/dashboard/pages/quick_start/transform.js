@@ -1018,7 +1018,7 @@ const ninjaoneEndpointObj = createEndpointManagementConnector(
     "NINJAONE_ENDPOINT_SHIELD",
     "ninjaone-windows-deployment",
     "Deploy Akto Endpoint Shield on managed endpoints using NinjaOne automation.",
-    "/public/ninjaone.svg"
+    "/public/ninjaone.png"
 )
 
 const automoxEndpointObj = createEndpointManagementConnector(
@@ -2119,11 +2119,13 @@ const quickStartFunc = {
             sglangHookObj, vllmHookObj, dockerModelRunnerHookObj, ollamaHookObj,
         ]
 
-        // Endpoint Management — MDM deployment + EDR integrations
         const endpointManagement = [
-            intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
-            jamfEndpointObj, kandjiEndpointObj, customEndpointObj,
             microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
+        ]
+
+        const mdmTools = [
+            intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
+            jamfEndpointObj, kandjiEndpointObj, customEndpointObj
         ]
 
        if(func.checkLocal() || func.isLimitedAccount()){
@@ -2154,6 +2156,7 @@ const quickStartFunc = {
             connectors = {
                 "Endpoint Agents": endpointAgents,
                 "Endpoint Management": endpointManagement,
+                "MDM Tools": mdmTools,
                 "Agentic Proxies": agenticProxies,
                 "Platform connectors": [anthropicImportObj, openaiImportObj],
                 "Browser Extension": browserExtensions,
