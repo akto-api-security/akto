@@ -93,6 +93,11 @@ public class ApiExecutor {
             client = CustomHTTPClientHandler.instance.getClient(authParam, isHttps, followRedirects, requestProtocol);
         }
 
+        Authenticator digestAuth = request.tag(Authenticator.class);
+        if (digestAuth != null) {
+            client = client.newBuilder().authenticator(digestAuth).build();
+        }
+
         Call call = client.newCall(request);
         Response response = null;
         String body = null;
@@ -374,6 +379,18 @@ public class ApiExecutor {
 
         builder = builder.url(request.getFullUrlWithParams());
 
+        DigestOkHttpAuthenticator digestAuthenticator = null;
+        if (testingRunConfig != null) {
+            String digestUser = request.getDigestAuthUsername();
+            String digestPass = request.getDigestAuthPassword();
+            if (digestUser != null && digestPass != null) {
+                digestAuthenticator = new DigestOkHttpAuthenticator(digestUser, digestPass);
+                builder.tag(Authenticator.class, digestAuthenticator);
+                request.setDigestAuthUsername(null);
+                request.setDigestAuthPassword(null);
+            }
+        }
+
         boolean nonTestingContext = false;
         if (testingRunConfig == null) {
             nonTestingContext = true;
@@ -397,7 +414,12 @@ public class ApiExecutor {
             case OTHER:
                 throw new Exception("Invalid method name");
         }
-        //loggerMaker.infoAndAddToDb("Received response from: " + url, LogDb.TESTING);
+        if (digestAuthenticator != null) {
+            String computedAuth = digestAuthenticator.getLastAuthorizationHeader();
+            if (computedAuth != null && request.getHeaders() != null) {
+                request.getHeaders().put("authorization", Collections.singletonList(computedAuth));
+            }
+        }
 
         if (url.contains("login_submit")) {
             loggerMaker.infoAndAddToDb("Response Payload " + response.getBody(), LogDb.TESTING);

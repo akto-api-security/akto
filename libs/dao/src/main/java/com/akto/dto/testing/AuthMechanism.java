@@ -54,12 +54,7 @@ public class AuthMechanism {
         boolean modifiedAtLeastOne = false;
 
         for (AuthParam authParam1: authParamsToUse) {
-            // Special handling for DIGEST_AUTH: always compute credentials dynamically
-            if (authParam1 instanceof DigestAuthParam) {
-                authParam1.addAuthTokens(request);
-                messageKeysPresent += authParam1.getKey()+", ";
-                modifiedAtLeastOne = true;
-            } else if(authParam1.authTokenPresent(request)){
+            if(authParam1.authTokenPresent(request)){
                 authParam1.addAuthTokens(request);
                 messageKeysPresent += authParam1.getKey()+", ";
                 modifiedAtLeastOne = true;
