@@ -26,6 +26,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.info.SingleTestPayload;
@@ -130,7 +131,14 @@ public class ConsumerUtil {
         BasicDBObject currentTestInfo = readJsonContentFromFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, BasicDBObject.class);
         final String summaryIdForTest = currentTestInfo.getString("summaryId");
         final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
-        final int startTime = Context.now();
+        int startTime = Context.now();
+        int effectiveMaxRunTime = maxRunTimeInSeconds;
+        if (currentTestInfo.containsField(TestingRun.PICKED_UP_TIMESTAMP)) {
+            startTime = currentTestInfo.getInt(TestingRun.PICKED_UP_TIMESTAMP, startTime);
+        }
+        if (currentTestInfo.containsField("testRunMaxTimeSeconds")) {
+            effectiveMaxRunTime = currentTestInfo.getInt("testRunMaxTimeSeconds", maxRunTimeInSeconds);
+        }
         AtomicBoolean firstRecordRead = new AtomicBoolean(false);
 
         boolean isConsumerRunning = false;
@@ -202,12 +210,12 @@ public class ConsumerUtil {
                     executor.shutdownNow();
                     break;
                 }
-                else if ((Context.now() - startTime > maxRunTimeInSeconds)) {
+                else if ((Context.now() - startTime >= effectiveMaxRunTime)) {
                     loggerMaker.infoAndAddToDb("Max run time reached. Stopping consumer.");
                     executor.shutdownNow();
                     break;
                 }else if(firstRecordRead.get() && parallelConsumer.workRemaining() == 0){
-                    int remainingTime = Math.min( Math.max(0,maxRunTimeInSeconds - (Context.now() - startTime)), maxRunTimeForTests);
+                    int remainingTime = Math.min( Math.max(0,effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
                     loggerMaker.infoAndAddToDb("Records are empty now, thus executing final tests");
                     executor.shutdown();
                     executor.awaitTermination(remainingTime, TimeUnit.SECONDS);
@@ -228,6 +236,7 @@ public class ConsumerUtil {
             }
             parallelConsumer = null;
             consumer.close();
+            Producer.deleteTestResultsTopic();
             writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, null);
         }
     }

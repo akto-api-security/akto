@@ -90,6 +90,8 @@ public class TestExecutor {
     
     // Current execution fallback flag - used when Kafka fails during current test run
     private volatile boolean currentExecutionFallback = false;
+    private static int runPickedUp;
+    private static int runMaxSec;
     
     /**
      * Resets the current execution fallback flag for a new test cycle.
@@ -99,6 +101,17 @@ public class TestExecutor {
         currentExecutionFallback = false;
     }
 
+    public static void initRunDeadline(TestingRun testingRun) {
+        runPickedUp = testingRun.getPickedUpTimestamp() > 0 ? testingRun.getPickedUpTimestamp() : Context.now();
+        runMaxSec = testingRun.getTestRunTime() <= 0 ? 30 * 60 : testingRun.getTestRunTime();
+    }
+
+    public static boolean shouldContinueTestExecution(ObjectId summaryId) {
+        if (!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)) {
+            return false;
+        }
+        return Context.now() - runPickedUp < runMaxSec;
+    }
 
     /**
      * Executes all tests using legacy (non-Kafka) approach when Kafka fails.
@@ -117,7 +130,6 @@ public class TestExecutor {
         List<Future<Void>> testingRecords = new ArrayList<>();
         ExecutorService threadPool = Executors.newFixedThreadPool(maxThreads);
         CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
-        int tempRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
         
         // Process all API endpoints for legacy testing
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
@@ -159,11 +171,9 @@ public class TestExecutor {
         
         try {
             // Wait for all tests to complete with timeout handling
-            int waitTs = Context.now();
             int prevCalcTime = Context.now();
             int lastCheckedCount = 0;
-            while(latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
-                && (Context.now() - waitTs < tempRunTime)) {
+            while(latch.getCount() > 0 && shouldContinueTestExecution(summaryId)) {
                     loggerMaker.infoAndAddToDb("waiting for tests to finish, count left: " + totalTestsCount.get());
 
                     if(lastCheckedCount != totalTestsCount.get()){
@@ -185,6 +195,7 @@ public class TestExecutor {
                 future.cancel(true);
             }
             loggerMaker.insertImportantTestingLog("Legacy mode execution completed. All tests processed.");
+            threadPool.shutdownNow();
             
         } catch (Exception e) {
             loggerMaker.insertImportantTestingLog("Error during legacy mode execution: " + e.getMessage());
@@ -431,10 +442,7 @@ public class TestExecutor {
 
             // create count down latch to know when inserting kafka records are completed.
             CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
-            int tempRunTime = 10 * 60;
-            if(!Constants.IS_NEW_TESTING_ENABLED){
-                tempRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
-            }else{
+            if(Constants.IS_NEW_TESTING_ENABLED){
                 try {
                     Producer.createTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
                 } catch (Exception e) {
@@ -443,10 +451,12 @@ public class TestExecutor {
                 }
             }
 
-            final int maxRunTime = tempRunTime;
             AtomicInteger totalRecords = new AtomicInteger(0);
             AtomicInteger throttleNumber = new AtomicInteger(0);
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
+                if (Constants.IS_NEW_TESTING_ENABLED && !shouldContinueTestExecution(summaryId)) {
+                    break;
+                }
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
                 if (messages == null || messages.isEmpty()) {
                     countDownLatch(latch);
@@ -474,6 +484,9 @@ public class TestExecutor {
                 }
                 if(Constants.IS_NEW_TESTING_ENABLED){
                     for (String testSubCategory: testingRunSubCategories) {
+                        if (!shouldContinueTestExecution(summaryId)) {
+                            break;
+                        }
                         if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
                             insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, new AtomicBoolean(false), totalRecords, throttleNumber);
                         }
@@ -493,11 +506,9 @@ public class TestExecutor {
             buildMcpToolDescriptions();
             try {
                 if(!Constants.IS_NEW_TESTING_ENABLED){
-                    int waitTs = Context.now();
                     int prevCalcTime = Context.now();
                     int lastCheckedCount = 0;
-                    while(latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
-                        && (Context.now() - waitTs < maxRunTime)) {
+                    while(latch.getCount() > 0 && shouldContinueTestExecution(summaryId)) {
                             loggerMaker.infoAndAddToDb("waiting for tests to finish, count left: " + totalTestsCount.get());
 
                             if(lastCheckedCount != totalTestsCount.get()){
@@ -515,9 +526,10 @@ public class TestExecutor {
                     }
     
                     for (Future<Void> future : testingRecords) {
-                        future.cancel(!Constants.IS_NEW_TESTING_ENABLED);
+                        future.cancel(true);
                     }
                     loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.");
+                    threadPool.shutdownNow();
                 }else{
                     // This else block only executes when IS_NEW_TESTING_ENABLED is true AND kafkaFallbackMode is false
                     // So we can directly proceed with Kafka completion logic
@@ -526,8 +538,11 @@ public class TestExecutor {
                     int unsentRecords = throttleNumber.get();
                     loggerMaker.insertImportantTestingLog("Finished inserting records in kafka, Total records: " + totalRecords.get() + " Unsent records: " + unsentRecords);
 
-                    // Add detailed logging for unsent records analysis
-                    if (unsentRecords == totalRecords.get()) {
+                    if (!shouldContinueTestExecution(summaryId)) {
+                        loggerMaker.infoAndAddToDb("Test run time expired during Kafka production; deleting topic and skipping consumer.");
+                        Producer.deleteTestResultsTopic();
+                        writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, null);
+                    } else if (unsentRecords == totalRecords.get()) {
                         // Check producer status
                         loggerMaker.infoAndAddToDb("Producer status: " + Producer.getProducerStatus());
                         loggerMaker.infoAndAddToDb("KAFKA FAILURE DETECTED: All " + totalRecords.get() + " records failed to send. Switching to legacy mode immediately to run all tests.");
@@ -545,6 +560,8 @@ public class TestExecutor {
                         // Normal Kafka completion - start consumer
                         dbObject.put("PRODUCER_RUNNING", false);
                         dbObject.put("CONSUMER_RUNNING", true);
+                        dbObject.put(TestingRun.PICKED_UP_TIMESTAMP, runPickedUp);
+                        dbObject.put("testRunMaxTimeSeconds", runMaxSec);
                         writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
                     }
                 }
@@ -879,10 +896,10 @@ public class TestExecutor {
         try {
             for (String testSubCategory: testingRunSubCategories) {
                 if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
-                    if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
+                    if(shouldContinueTestExecution(summaryId)){
                         insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, isApiInfoTested, new AtomicInteger(0), new AtomicInteger(0));
                     }else{
-                        loggerMaker.warnAndAddToDb("Test stopped for id: " + testingRun.getHexId());
+                        loggerMaker.warnAndAddToDb("Test stopped or run time expired for id: " + testingRun.getHexId());
                         break;
                     }
                 }
@@ -999,6 +1016,10 @@ public class TestExecutor {
             ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<String, TestConfig> testConfigMap,
             List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, AtomicBoolean isApiInfoTested, AtomicInteger totalRecords, AtomicInteger throttleNumber) {
         Context.accountId.set(accountId);
+        if (!shouldContinueTestExecution(summaryId)) {
+            totalTestsCount.decrementAndGet();
+            return null;
+        }
         TestConfig testConfig = testConfigMap.get(testSubCategory);
         if (testConfig == null) {
             totalTestsCount.decrementAndGet();
@@ -1068,7 +1089,7 @@ public class TestExecutor {
             List<String> messages, TestConfig testConfig, List<TestingRunResult.TestLog> testLogs, 
             AtomicBoolean isApiInfoTested) {
         
-        if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
+        if(shouldContinueTestExecution(summaryId)){
             TestingConfigurations instance = TestingConfigurations.getInstance();
             String sampleMessage = messages.get(messages.size() - 1);
             int currentAccountId = Context.accountId.get();
