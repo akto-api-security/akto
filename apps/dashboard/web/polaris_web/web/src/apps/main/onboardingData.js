@@ -1,13 +1,13 @@
 const HOMEDASHBOARD_VIDEO_URL = "https://www.youtube.com/watch?v=fRyusl8ppdY"
-const HOMEDASHBOARD_VIDEO_THUMBNAIL = "https://img.youtube.com/vi/fRyusl8ppdY/sddefault.jpg"
+const HOMEDASHBOARD_VIDEO_THUMBNAIL = "/public/images/youtube/fRyusl8ppdY-sddefault.jpg"
 const HOMEDASHBOARD_VIDEO_LENGTH = 195
 
 const COLLECTIONS_VIDEO_URL = "https://www.youtube.com/watch?v=fRyusl8ppdY"
-const COLLECTIONS_VIDEO_THUMBNAIL = "https://img.youtube.com/vi/fRyusl8ppdY/sddefault.jpg"
+const COLLECTIONS_VIDEO_THUMBNAIL = "/public/images/youtube/fRyusl8ppdY-sddefault.jpg"
 const COLLECTIONS_VIDEO_LENGTH = 195
 
 const TESTING_VIDEO_URL = "https://www.youtube.com/watch?v=fRyusl8ppdY"
-const TESTING_VIDEO_THUMBNAIL = "https://img.youtube.com/vi/fRyusl8ppdY/sddefault.jpg"
+const TESTING_VIDEO_THUMBNAIL = "/public/images/youtube/fRyusl8ppdY-sddefault.jpg"
 const TESTING_VIDEO_LENGTH = 195
 
 const ISSUES_PAGE_DOCS_URL = "https://docs.akto.io/readme"

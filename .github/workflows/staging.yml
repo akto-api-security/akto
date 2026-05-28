@@ -63,6 +63,9 @@ jobs:
           aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
           aws-region: ap-south-1
 
+      - name: Download dashboard static assets
+        run: bash apps/dashboard/scripts/download-dashboard-vendor-assets.sh
+
       - run: mvn package -Dakto-image-tag=${{ steps.docker_tag.outputs.IMAGE_TAG }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
 
       - name: DockerHub login
