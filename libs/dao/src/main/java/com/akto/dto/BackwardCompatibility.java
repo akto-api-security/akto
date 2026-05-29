@@ -120,6 +120,9 @@ public class BackwardCompatibility {
     public static final String CREATE_VIN_SUPPORT_DATA_TYPE = "createVinSupportDataType";
     private int createVinSupportDataType;
 
+    public static final String MOVE_USER_DATA_FROM_MODULE_INFO_TO_AGENTIC_USERS = "moveUserDataFromModuleInfoToAgenticUsers";
+    private int moveUserDataFromModuleInfoToAgenticUsers;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -130,7 +133,7 @@ public class BackwardCompatibility {
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
                                  int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType,
                                  int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs, int moveOktaOidcSSO, int markSummariesVulnerable,
-                                 int changeOperatorConditionInCDT, int cleanupRbacEntries, int fillLastTestedField, int fillQueryParams, int createVinSupportDataType) {
+                                 int changeOperatorConditionInCDT, int cleanupRbacEntries, int fillLastTestedField, int fillQueryParams, int createVinSupportDataType, int moveUserDataFromModuleInfoToAgenticUsers) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -169,6 +172,7 @@ public class BackwardCompatibility {
         this.fillLastTestedField = fillLastTestedField; 
         this.fillQueryParams = fillQueryParams;
         this.createVinSupportDataType = createVinSupportDataType;
+        this.moveUserDataFromModuleInfoToAgenticUsers = moveUserDataFromModuleInfoToAgenticUsers;
     }
 
     public BackwardCompatibility() {
@@ -508,5 +512,13 @@ public class BackwardCompatibility {
 
     public void setCreateVinSupportDataType(int createVinSupportDataType) {
         this.createVinSupportDataType = createVinSupportDataType;
+    }
+
+    public int getMoveUserDataFromModuleInfoToAgenticUsers() {
+        return moveUserDataFromModuleInfoToAgenticUsers;
+    }
+
+    public void setMoveUserDataFromModuleInfoToAgenticUsers(int moveUserDataFromModuleInfoToAgenticUsers) {
+        this.moveUserDataFromModuleInfoToAgenticUsers = moveUserDataFromModuleInfoToAgenticUsers;
     }
 }
