@@ -276,6 +276,19 @@ public class ApiCollectionsAction extends UserAction {
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] fillApiCollectionsUrlCount took " + (System.currentTimeMillis() - stepStart) + "ms");
         stepStart = System.currentTimeMillis();
 
+        // For account 1736798101, trim tags to only service tag to reduce response size
+        if (Context.accountId.get() == 1736798101) {
+            String serviceTagKey = "privatecloud.agoda.com/service";
+            for (ApiCollection c : this.apiCollections) {
+                List<CollectionTags> tags = c.getTagsList();
+                if (tags != null && !tags.isEmpty()) {
+                    tags.removeIf(tag -> !serviceTagKey.equals(tag.getKeyName()));
+                }
+            }
+        }
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] tags filtering took " + (System.currentTimeMillis() - stepStart) + "ms");
+        stepStart = System.currentTimeMillis();
+
         // Start background icon processing for all collections asynchronously
         // This runs in a separate thread to not block the main response
         com.akto.util.IconUtils.processIconsForCollections(this.apiCollections);

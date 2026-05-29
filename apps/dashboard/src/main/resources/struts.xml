@@ -2444,7 +2444,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS"  type="json">
-                <param name="excludeProperties">apiCollections\[\d+\]\.mcpCollection,apiCollections\[\d+\]\.dastCollection,apiCollections\[\d+\]\.genAICollection,apiCollections\[\d+\]\.guardRailCollection,apiCollections\[\d+\]\.endpointCollection</param>
+                <param name="excludeProperties">apiCollections\[\d+\]\.mcpCollection,apiCollections\[\d+\]\.dastCollection,apiCollections\[\d+\]\.genAICollection,apiCollections\[\d+\]\.guardRailCollection,apiCollections\[\d+\]\.endpointCollection,apiCollections\[\d+\]\.conditions,apiCollections\[\d+\]\.serviceGraphEdges,apiCollections\[\d+\]\.hostNames,apiCollections\[\d+\]\.serviceTag,apiCollections\[\d+\]\.sampleCollectionsDropped,apiCollections\[\d+\]\.redact,apiCollections\[\d+\]\.runDependencyAnalyser,apiCollections\[\d+\]\.matchDependencyWithOtherCollections,apiCollections\[\d+\]\.sseCallbackUrl,apiCollections\[\d+\]\.mcpTransportType,apiCollections\[\d+\]\.mcpMaliciousnessLastCheck,apiCollections\[\d+\]\.vxlanId,apiCollections\[\d+\]\.userSetEnvType,apiCollections\[\d+\]\.urls</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
