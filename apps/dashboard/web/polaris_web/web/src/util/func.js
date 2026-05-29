@@ -782,11 +782,145 @@ prettifyEpoch(epoch) {
       return message?.method + " " + pathString + func.convertQueryParamsToUrl(queryParams) + " " + message?.type
     }
   },
+  webSocketRequestFirstLine(message, queryParams) {
+    let pathString = ""
+    let type = message?.type || "WEBSOCKET"
+    if (message["request"]) {
+      pathString = (message["request"]["url"] || "").split("?")[0]
+      type = message["request"]["type"] || type
+    } else if (message.path != null && message.path !== undefined) {
+      pathString = message.path.split("?")[0]
+    }
+    const suffix = type ? " " + type : ""
+    return pathString + func.convertQueryParamsToUrl(queryParams) + suffix
+  },
   responseFirstLine(message) {
     if (message["response"]) {
       return message["response"]["statusCode"] + ""
     } else {
       return message.statusCode + " " + message.status
+    }
+  },
+  isWebSocketApiType(apiType) {
+    return apiType != null && String(apiType).toUpperCase() === "WEBSOCKET"
+  },
+  isWebSocketUrl(url) {
+    if (url == null) return false
+    const s = String(url).trim().toLowerCase()
+    return s.startsWith("ws://") || s.startsWith("wss://")
+  },
+  shouldHideHttpMethodForEndpoint({ apiType, url } = {}) {
+    return func.isWebSocketApiType(apiType) || func.isWebSocketUrl(url)
+  },
+  WEBSOCKET_METHOD_LABEL: "WS",
+  getEndpointMethodForDisplay({ method, url, apiType } = {}) {
+    if (func.shouldHideHttpMethodForEndpoint({ apiType, url })) {
+      return func.WEBSOCKET_METHOD_LABEL
+    }
+    return getMethod(url, method)
+  },
+  parseWebSocketSampleMessage(message) {
+    if (message == null) return null
+    if (typeof message === "object" && !Array.isArray(message)) return message
+    if (typeof message !== "string") return null
+    let current = message.trim()
+    for (let i = 0; i < 4; i++) {
+      if (typeof current !== "string") {
+        return typeof current === "object" && current !== null && !Array.isArray(current) ? current : null
+      }
+      try {
+        current = JSON.parse(current)
+      } catch {
+        break
+      }
+    }
+    if (typeof current === "object" && current !== null && !Array.isArray(current)) {
+      return current
+    }
+    return null
+  },
+  parseWebSocketEventsField(events) {
+    if (events == null) return null
+    if (typeof events === "string") {
+      try {
+        return JSON.parse(events)
+      } catch {
+        return events
+      }
+    }
+    return events
+  },
+  parseWebSocketHeaders(headersField) {
+    if (headersField == null) return {}
+    const raw = typeof headersField === "string" ? func.parseWebSocketSampleMessage(headersField) : headersField
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {}
+    try {
+      return func.convertKeysToLowercase(raw)
+    } catch {
+      return {}
+    }
+  },
+  formatWebSocketHeaderLines(headers, redactSet) {
+    return Object.keys(headers || {}).sort().map((key) => {
+      const value = redactSet.has(key.toLowerCase()) ? "******" : headers[key]
+      return `${key}: ${value}`
+    })
+  },
+  formatWebSocketEventsMessage(events) {
+    const parsed = func.parseWebSocketEventsField(events)
+    if (parsed == null) return "{}"
+    if (Array.isArray(parsed)) {
+      return parsed.map((e, i) => {
+        const body = JSON.stringify(e, null, 2)
+        return parsed.length > 1 ? `--- Event ${i + 1} ---\n${body}` : body
+      }).join("\n\n")
+    }
+    return JSON.stringify(parsed, null, 2)
+  },
+  isWebSocketUpgradeResponse(parsed) {
+    const code = parsed?.statusCode ?? parsed?.response?.statusCode
+    return code != null && String(code) === "101"
+  },
+  formatWebSocketSampleDisplay(message, redactHeaders = []) {
+    try {
+      const parsed = func.parseWebSocketSampleMessage(message)
+      if (!parsed) return typeof message === "string" ? message : ""
+      const redactSet = new Set(redactHeaders.map((h) => h.toLowerCase()))
+      let queryParamsString = ""
+      const path = parsed.path || ""
+      const urlSplit = typeof path === "string" ? path.split("?") : []
+      queryParamsString = urlSplit.length > 1 ? urlSplit[1] : ""
+      const queryParams = {}
+      if (queryParamsString) {
+        for (const [key, value] of new URLSearchParams(queryParamsString)) {
+          queryParams[key] = value
+        }
+      }
+      const parts = [func.webSocketRequestFirstLine(parsed, queryParams)]
+      const requestHeaders = func.parseWebSocketHeaders(parsed.requestHeaders || parsed.request?.headers)
+      const requestHeaderLines = func.formatWebSocketHeaderLines(requestHeaders, redactSet)
+      if (requestHeaderLines.length > 0) {
+        parts.push(requestHeaderLines.join("\n"))
+      }
+      const isUpgrade = func.isWebSocketUpgradeResponse(parsed)
+      const responseHeaders = func.parseWebSocketHeaders(parsed.responseHeaders || parsed.response?.headers)
+      const responseHeaderLines = func.formatWebSocketHeaderLines(responseHeaders, redactSet)
+      if (!isUpgrade && (parsed.statusCode != null || parsed.status)) {
+        parts.push("")
+        parts.push(func.responseFirstLine(parsed))
+      }
+      if (responseHeaderLines.length > 0) {
+        parts.push("")
+        parts.push(responseHeaderLines.join("\n"))
+      }
+      if (parsed.events != null && parsed.events !== "") {
+        parts.push("")
+        parts.push("Events:")
+        parts.push(func.formatWebSocketEventsMessage(parsed.events))
+      }
+      return parts.join("\n")
+    } catch (e) {
+      return typeof message === "string" ? message : ""
     }
   },
   mapCollectionIdToName(collections) {
@@ -1055,7 +1189,10 @@ isObject(obj) {
   return obj !== null && typeof obj === 'object';
 },
 
-toMethodUrlString({method,url, shouldParse =false}){
+toMethodUrlString({method, url, shouldParse = false, apiType}){
+  if (func.shouldHideHttpMethodForEndpoint({ apiType, url })) {
+    return shouldParse ? observeFunc.getTruncatedUrl(url) : url
+  }
   if(shouldParse){
     const finalMethod = getMethod(url, method);
     const finalUrl = observeFunc.getTruncatedUrl(url);
@@ -1074,12 +1211,18 @@ toMethodUrlApiCollectionIdString({ method, url, apiCollectionId, shouldParse = f
 },
 
 toMethodUrlObject(str){
-
   if(!str){
     return {method:"", url:""}  
   }
-
-  return {method:str.split(" ")[0], url:str.split(" ")[1]}
+  const trimmed = String(str).trim()
+  const parts = trimmed.split(" ")
+  if (parts.length >= 2 && func.isWebSocketUrl(parts[1])) {
+    return { method: "", url: parts.slice(1).join(" ") }
+  }
+  if (func.isWebSocketUrl(trimmed)) {
+    return { method: "", url: trimmed }
+  }
+  return {method: parts[0], url: parts[1]}
 },
 
 toMethodUrlApiCollectionIdObject(str){
@@ -1172,6 +1315,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
           }
           let description = apiInfoMap[key] ? apiInfoMap[key]['description'] : ""
           let lastSeenTs = Math.max(apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : (x.startTs > 0 ? x.startTs : 0), (x.startTs > 0 ? x.startTs : 0))
+          const apiType = apiInfoMap[key]?.apiType || "REST"
+          const hideMethod = func.shouldHideHttpMethodForEndpoint({ apiType, url: x.url })
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
               shadow: x.shadow ? x.shadow : false,
@@ -1179,7 +1324,9 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               sensitive: x.sensitive,
               tags: x.tags,
               endpoint: x.url,
-              parameterisedEndpoint: x.method + " " + this.parameterizeUrl(x.url),
+              parameterisedEndpoint: hideMethod
+                ? this.parameterizeUrl(x.url)
+                : x.method + " " + this.parameterizeUrl(x.url),
               open: apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].indexOf("UNAUTHENTICATED") !== -1 : false,
               access_type: access_type || "No access type",
               method: x.method,
@@ -1215,6 +1362,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               guardrailSchema: apiInfoMap[key] ? (apiInfoMap[key]["guardrailSchema"] || null) : null,
               isMalicious: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true") : false,
               tagsList: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []) : [],
+              apiType,
           }
 
       }

@@ -60,7 +60,7 @@ function SchemaValidationError({ sampleData}) {
 
 function SampleDataList(props) {
 
-    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = []} = props;
+    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp} = props;
 
     const [page, setPage] = useState(0);
 
@@ -69,6 +69,9 @@ function SampleDataList(props) {
     }, [sampleData])
   
     const currentSample = sampleData[Math.min(page, sampleData.length - 1)];
+    const parsedSample = func.parseWebSocketSampleMessage(currentSample?.message)
+    const isWebSocket = isWebSocketProp === true || func.isWebSocketApiType(parsedSample?.type)
+    const panelTypes = isWebSocket ? ['events'] : ['request', 'response'];
 
     return (
       <VerticalStack gap="3">
@@ -114,7 +117,7 @@ function SampleDataList(props) {
                 </LegacyCard>
               </Box>
               :
-            ["request","response"].map((type) => {
+            panelTypes.map((type) => {
               return (
                 <Box key={type}>
                   <LegacyCard>
@@ -127,6 +130,7 @@ function SampleDataList(props) {
                       metadata={metadata}
                       readOnly={true}
                       redactHeaders={redactHeaders}
+                      isWebSocket={isWebSocket}
                     />
                   </LegacyCard>
                 </Box>
