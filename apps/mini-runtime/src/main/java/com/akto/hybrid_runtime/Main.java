@@ -1037,35 +1037,7 @@ public class Main {
                         }
                     }
                 }
-
-                // Save raw agent traffic logs to MongoDB for future training (boolean feature flag)
-                try {
-                    if (UsageMetricUtils.isFeatureAccessGranted(Context.getActualAccountId(), "AGENT_TRAFFIC_LOGS")) {
-                        saveAgentTrafficLogs(accWiseResponse);
-                    }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error saving agent traffic logs: " + e.getMessage());
-                }
-
                 sendToCentralKafka(centralKafkaTopicName, accWiseResponse);
-
-                if (UsageMetricUtils.isFeatureAccessGranted(Context.getActualAccountId(), "AGENT_TRAFFIC_LOGS")) {
-                        List<HttpResponseParams> endpointSourceResponses = new ArrayList<>();
-                        for (HttpResponseParams hrp : accWiseResponse) {
-                            Map<String, String> tagsMap = HttpCallParser.parseTagsMap(hrp.getTags());
-                            if (tagsMap != null && Constants.AI_AGENT_SOURCE_ENDPOINT.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE))) {
-                                endpointSourceResponses.add(hrp);
-                            }
-                        }
-
-                        if (!endpointSourceResponses.isEmpty()) {
-                            try {
-                                saveAgentTrafficLogs(endpointSourceResponses);
-                            } catch (Exception e) {
-                                loggerMaker.errorAndAddToDb(e, "Error saving agent traffic logs: " + e.getMessage());
-                            }
-                        }
-                }
                 
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in handleResponseParams: " + e.toString());
