@@ -6,7 +6,6 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
-import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
@@ -41,6 +40,7 @@ import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.JSONUtils;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
 import com.akto.mcp.McpToolDescriptionsRegistry;
@@ -333,7 +333,7 @@ public class TestExecutor {
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates, commonTemplate);
 
-        testingRunSubCategories = filterSubCategoriesByCollectionType(apiInfoKeyList, testingRunSubCategories, testConfigMap);
+        testingRunSubCategories = filterSubCategoriesByCollectionType(testingRun, testingRunSubCategories, testConfigMap);
 
         List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
         TestingUtil testingUtil = new TestingUtil(sampleMessageStore, testRoles, testingRun.getUserEmail(), customAuthTypes);
@@ -1510,42 +1510,21 @@ public class TestExecutor {
         return name.toUpperCase().startsWith("AGENT");
     }
 
-    private List<String> filterSubCategoriesByCollectionType(List<ApiInfoKey> apiInfoKeyList, List<String> subCategories, Map<String, TestConfig> testConfigMap) {
+    private List<String> filterSubCategoriesByCollectionType(TestingRun testingRun, List<String> subCategories, Map<String, TestConfig> testConfigMap) {
         if (subCategories == null || subCategories.isEmpty()) {
             return subCategories;
         }
 
-        Set<Integer> uniqueCollectionIds = new HashSet<>();
-        for (ApiInfoKey key : apiInfoKeyList) {
-            uniqueCollectionIds.add(key.getApiCollectionId());
-        }
-
-        boolean hasMcpCollection = false;
-        boolean hasGenAiCollection = false;
-        boolean fetchFailed = false;
-
-        for (int collectionId : uniqueCollectionIds) {
-            // early exit — no point fetching more once both flags are set
-            if (hasMcpCollection && hasGenAiCollection) break;
-            try {
-                ApiCollection collection = dataActor.fetchApiCollectionMeta(collectionId);
-                if (collection != null) {
-                    if (collection.isMcpCollection()) hasMcpCollection = true;
-                    if (collection.isGenAICollection()) hasGenAiCollection = true;
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Failed to fetch collection meta for category filtering, collectionId: " + collectionId);
-                fetchFailed = true;
-            }
-        }
-
-        // If all fetches failed we cannot reliably filter — run all tests rather than silently dropping them
-        if (fetchFailed && !hasMcpCollection && !hasGenAiCollection) {
-            loggerMaker.infoAndAddToDb("Category filter skipped: could not determine collection type, running all " + subCategories.size() + " tests");
+        GlobalEnums.CONTEXT_SOURCE contextSource = testingRun.getContextSource();
+        if (contextSource == null) {
+            // contextSource not set — no filtering, run all tests
             return subCategories;
         }
 
-        loggerMaker.infoAndAddToDb("Category filter - MCP: " + hasMcpCollection + ", GenAI: " + hasGenAiCollection);
+        boolean isMcpRun = contextSource == GlobalEnums.CONTEXT_SOURCE.MCP;
+        boolean isGenAiRun = contextSource == GlobalEnums.CONTEXT_SOURCE.GEN_AI || contextSource == GlobalEnums.CONTEXT_SOURCE.AGENTIC;
+
+        loggerMaker.infoAndAddToDb("Category filter - contextSource: " + contextSource + ", MCP run: " + isMcpRun + ", GenAI run: " + isGenAiRun);
 
         List<String> filtered = new ArrayList<>();
         for (String subCat : subCategories) {
@@ -1553,8 +1532,8 @@ public class TestExecutor {
             if (config == null || config.getInfo() == null || config.getInfo().getCategory() == null) {
                 // no config loaded — fall back to test ID prefix
                 String upper = subCat.toUpperCase();
-                if (upper.startsWith("MCP") && !hasMcpCollection) continue;
-                if (upper.startsWith("AGENT") && !hasGenAiCollection) continue;
+                if (upper.startsWith("MCP") && !isMcpRun) continue;
+                if (upper.startsWith("AGENT") && !isGenAiRun) continue;
                 filtered.add(subCat);
                 continue;
             }
@@ -1565,18 +1544,18 @@ public class TestExecutor {
             boolean isMcpTest = isCategoryMcp(categoryName) || isCategoryMcp(shortName);
             boolean isAgenticTest = isCategoryAgentic(categoryName) || isCategoryAgentic(shortName);
 
-            if (isMcpTest && !hasMcpCollection) {
-                loggerMaker.debugInfoAddToDb("Skipping MCP test " + subCat + " (category: " + categoryName + "): no MCP collection in run");
+            if (isMcpTest && !isMcpRun) {
+                loggerMaker.debugInfoAddToDb("Skipping MCP test " + subCat + " (category: " + categoryName + "): contextSource is " + contextSource);
                 continue;
             }
-            if (isAgenticTest && !hasGenAiCollection) {
-                loggerMaker.debugInfoAddToDb("Skipping Agentic test " + subCat + " (category: " + categoryName + "): no GenAI collection in run");
+            if (isAgenticTest && !isGenAiRun) {
+                loggerMaker.debugInfoAddToDb("Skipping Agentic test " + subCat + " (category: " + categoryName + "): contextSource is " + contextSource);
                 continue;
             }
             filtered.add(subCat);
         }
 
-        loggerMaker.infoAndAddToDb("Category filter: " + subCategories.size() + " -> " + filtered.size() + " subcategories after collection type check");
+        loggerMaker.infoAndAddToDb("Category filter: " + subCategories.size() + " -> " + filtered.size() + " subcategories after contextSource check");
         return filtered;
     }
 
