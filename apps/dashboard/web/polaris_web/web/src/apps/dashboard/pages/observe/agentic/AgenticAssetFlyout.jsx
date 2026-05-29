@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-renderer";
-import { Tabs, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Card, LegacyCard, Icon, Avatar, Badge, Link } from "@shopify/polaris";
+import { Tabs, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Card, LegacyCard, Icon, Avatar, Badge, Link, Popover, ActionList, Button } from "@shopify/polaris";
 import { AutomationMajor, MagicMajor, CustomersMinor, ChevronRightMinor } from "@shopify/polaris-icons";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
@@ -566,6 +566,37 @@ function ResourcePromptDetailPanel({ item, type }) {
     return <SamplePair sampleData={sampleData} />;
 }
 
+// ── Component picker dropdown — shown in breadcrumb when drilling into a detail ─
+
+function McpPickerDropdown({ allRows, selected, onSelect }) {
+    const [open, setOpen] = useState(false);
+    if (!allRows || allRows.length <= 1) {
+        return <Text variant="bodySm" fontWeight="semibold">{selected?.name}</Text>;
+    }
+    return (
+        <Popover
+            active={open}
+            onClose={() => setOpen(false)}
+            preferredAlignment="left"
+            activator={
+                <Button plain disclosure onClick={() => setOpen(s => !s)}>
+                    {selected?.name}
+                </Button>
+            }
+        >
+            <Popover.Pane>
+                <ActionList
+                    items={allRows.map(r => ({
+                        content: r.name,
+                        active: r.name === selected?.name,
+                        onAction: () => { onSelect(r); setOpen(false); },
+                    }))}
+                />
+            </Popover.Pane>
+        </Popover>
+    );
+}
+
 // ── MCP Server: single combined table (Tools + Resources + Prompts) → detail ──
 
 function McpItemTypeCellRenderer({ value }) {
@@ -641,18 +672,23 @@ function McpComponentsView({ asset, onNavChange }) {
 
     const handleBack = useCallback(() => {
         setSelectedItem(null);
-        onNavChange?.(null);
+        onNavChange(null);
     }, [onNavChange]);
+
+    // selectItem sets state AND updates the breadcrumb with a picker dropdown
+    const selectItem = useCallback((row) => {
+        setSelectedItem({ item: row, type: row._type.toLowerCase() });
+        onNavChange(
+            [{ label: asset.name, onClick: () => { setSelectedItem(null); onNavChange(null); } }],
+            <McpPickerDropdown allRows={allRows} selected={row} onSelect={selectItem} />
+        );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [asset.name, onNavChange, allRows]);
 
     const handleRowClick = useCallback((e) => {
         if (!e.data) return;
-        const item = { item: e.data, type: e.data._type.toLowerCase() };
-        setSelectedItem(item);
-        onNavChange?.([
-            { label: asset.name, onClick: () => { setSelectedItem(null); onNavChange?.(null); } },
-            { label: e.data.name },
-        ]);
-    }, [asset.name, onNavChange]);
+        selectItem(e.data);
+    }, [selectItem]);
 
     if (selectedItem?.type === "tool") {
         return <ToolDetailPanel tool={selectedItem.item} onBack={handleBack} />;
@@ -961,18 +997,27 @@ function DevicesTab({ asset }) {
 
 export default function AgenticAssetFlyout({ asset, show, onClose, onNavigateToAsset }) {
     const [selectedTab, setSelectedTab] = useState(0);
-    // topNav: null = show tabs; array of {label, onClick?} = show drill breadcrumb instead of tabs
-    const [topNav, setTopNav] = useState(null);
+    // topNav: null = show tabs; array of {label, onClick?} = show drill breadcrumb
+    const [topNav, setTopNav]           = useState(null);
+    // topNavPicker: optional ReactNode rendered as FlyoutBreadcrumb children (dropdown on last crumb)
+    const [topNavPicker, setTopNavPicker] = useState(null);
 
     const lockScroll   = useCallback(() => { document.body.style.overflow = "hidden"; }, []);
     const unlockScroll = useCallback(() => { document.body.style.overflow = "";       }, []);
 
     useEffect(() => { if (!show) document.body.style.overflow = ""; }, [show]);
-    useEffect(() => { setSelectedTab(0); setTopNav(null); }, [asset?.id]);
+    useEffect(() => { setSelectedTab(0); setTopNav(null); setTopNavPicker(null); }, [asset?.id]);
 
     const handleTabSelect = useCallback((tab) => {
         setSelectedTab(tab);
         setTopNav(null);
+        setTopNavPicker(null);
+    }, []);
+
+    // onNavChange(items, picker?) — called by child components when drilling into detail
+    const handleNavChange = useCallback((items, picker = null) => {
+        setTopNav(items);
+        setTopNavPicker(picker || null);
     }, []);
 
     const tabs = useMemo(() => {
@@ -1013,14 +1058,21 @@ export default function AgenticAssetFlyout({ asset, show, onClose, onNavigateToA
                     fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                 }}
             >
-                {/* Merge drill path into the single header breadcrumb — no second row */}
+                {/* Merge drill path into the single header breadcrumb — picker as children for dropdown */}
                 <FlyoutBreadcrumb
                     items={topNav
                         ? [{ label: asset.name, badge: asset.riskScore, onClick: topNav[0]?.onClick }, ...topNav.slice(1)]
                         : [{ label: asset.name, badge: asset.riskScore }]
                     }
                     onClose={onClose}
-                />
+                >
+                    {topNavPicker && (
+                        <>
+                            <Text variant="bodySm" color="subdued">/</Text>
+                            {topNavPicker}
+                        </>
+                    )}
+                </FlyoutBreadcrumb>
 
                 {!topNav && (
                     <>
@@ -1034,7 +1086,7 @@ export default function AgenticAssetFlyout({ asset, show, onClose, onNavigateToA
                 {/* flex:1 + minHeight:0 required for AG Grid tabs to fill remaining space — Box props insufficient */}
                 <div style={{ flex: 1, minHeight: 0, overflowY: selectedTab === 0 ? "auto" : "hidden", display: "flex", flexDirection: "column" }}>
                     {selectedTab === 0 && <OverviewTab asset={asset} onTabChange={setSelectedTab} />}
-                    {selectedTab === 1 && <AgenticComponentsTab asset={asset} onNavChange={setTopNav} onNavigateToAsset={onNavigateToAsset} />}
+                    {selectedTab === 1 && <AgenticComponentsTab asset={asset} onNavChange={handleNavChange} onNavigateToAsset={onNavigateToAsset} />}
                     {selectedTab === 2 && <ViolationsTab asset={asset} />}
                     {selectedTab === 3 && <DevicesTab asset={asset} />}
                 </div>

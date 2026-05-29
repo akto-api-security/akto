@@ -382,19 +382,7 @@ function TableSection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleAgentClickFromDevice = useCallback((agent) => {
-        if (!agent) return;
-        const device = deviceFlyout?.device;
-        if (agent.type === "MCP Server") {
-            setMcpFlyout({ agent, device });
-            setDeviceFlyout(null);
-            setFlyout(null);
-        } else if (agent.type === "AI Agent" && agent.skillCount > 0) {
-            setFlyout({ agent, device });
-            setDeviceFlyout(null);
-            setMcpFlyout(null);
-        }
-    }, [deviceFlyout]);
+    // handleAgentClickFromDevice removed — agentic asset clicks now navigate to the Agentic Assets page
 
     const handleDeviceClickFromFlyout = useCallback((device) => {
         const deviceId = device?.path?.[0];
@@ -417,21 +405,12 @@ function TableSection() {
             return;
         }
         if (node.level > 0) {
-            if (data.type === "MCP Server") {
-                const deviceId = data.path[0];
-                const device = DEVICE_FLAT_DATA.find(r => r.path.length === 1 && r.path[0] === deviceId);
-                setMcpFlyout({ agent: data, device });
-                setFlyout(null);
-                setDeviceFlyout(null);
-                return;
-            }
-            if (data.skillCount) {
-                const deviceId = data.path[0];
-                const device = DEVICE_FLAT_DATA.find(r => r.path.length === 1 && r.path[0] === deviceId);
-                setFlyout({ agent: data, device });
-                setDeviceFlyout(null);
-                setMcpFlyout(null);
-            }
+            // Agentic asset child rows → navigate to the dedicated Agentic Assets page
+            const params = new URLSearchParams({ asset: data.endpoint, type: data.type });
+            window.open(`/dashboard/observe/agentic-assets?${params}`, "_blank");
+            // Previously opened McpFlyout / SkillsFlyout inline — now handled on the Agentic Assets page
+            // if (data.type === "MCP Server") { setMcpFlyout({ agent: data, device }); ... }
+            // if (data.skillCount) { setFlyout({ agent: data, device }); ... }
         }
     }, []);
 
@@ -483,27 +462,16 @@ function TableSection() {
                 sideBar={{ toolPanels: ["columns", "filters"] }}
             />
 
-            <SkillsFlyout
-                agent={flyout?.agent}
-                device={flyout?.device}
-                show={flyout !== null}
-                onClose={closeAll}
-                onDeviceClick={handleDeviceClickFromFlyout}
-            />
+            {/* SkillsFlyout removed — skills now open on the Agentic Assets page */}
+            {/* <SkillsFlyout agent={flyout?.agent} device={flyout?.device} show={flyout !== null} onClose={closeAll} onDeviceClick={handleDeviceClickFromFlyout} /> */}
             <DeviceFlyout
                 device={deviceFlyout?.device}
                 agents={deviceFlyout?.agents}
                 show={deviceFlyout !== null}
                 onClose={closeAll}
-                onAgentClick={handleAgentClickFromDevice}
             />
-            <McpFlyout
-                agent={mcpFlyout?.agent}
-                device={mcpFlyout?.device}
-                show={mcpFlyout !== null}
-                onClose={closeAll}
-                onDeviceClick={handleDeviceClickFromFlyout}
-            />
+            {/* McpFlyout removed — MCP Servers now open on the Agentic Assets page */}
+            {/* <McpFlyout agent={mcpFlyout?.agent} device={mcpFlyout?.device} show={mcpFlyout !== null} onClose={closeAll} onDeviceClick={handleDeviceClickFromFlyout} /> */}
         </VerticalStack>
     );
 }
