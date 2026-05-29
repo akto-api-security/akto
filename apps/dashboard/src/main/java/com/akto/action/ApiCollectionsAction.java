@@ -263,7 +263,12 @@ public class ApiCollectionsAction extends UserAction {
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] deleteContextCollections took " + (System.currentTimeMillis() - stepStart) + "ms");
         stepStart = System.currentTimeMillis();
 
-        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude("urls"));
+        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude(
+                "urls", "conditions", "serviceGraphEdges", "hostNames", "serviceTag",
+                "sampleCollectionsDropped", "redact", "runDependencyAnalyser",
+                "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
+                "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType"
+        ));
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] findAll took " + (System.currentTimeMillis() - stepStart) + "ms, size=" + this.apiCollections.size());
         stepStart = System.currentTimeMillis();
 
@@ -860,7 +865,13 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchLastSeenInfoInCollections(){
-        this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeen();
+        long start = System.currentTimeMillis();
+        if (Context.accountId.get() == 1736798101) {
+            this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeenNew();
+        } else {
+            this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeen();
+        }
+        loggerMaker.infoAndAddToDb("[fetchLastSeen] time=" + (System.currentTimeMillis() - start) + "ms, size=" + this.lastTrafficSeenMap.size());
         return Action.SUCCESS.toUpperCase();
     }
 
