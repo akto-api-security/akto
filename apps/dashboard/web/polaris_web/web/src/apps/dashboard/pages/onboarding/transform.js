@@ -73,6 +73,7 @@ const onFunc = {
             case "SERVER": return `var(--color-server)`;
             case "HOOK": return `var(--color-put)`;
             case "CONFIG": return `var(--color-tool)`;
+            case "WS": return `var(--color-ws)`;
             default:
                 return "";
         }

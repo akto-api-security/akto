@@ -184,6 +184,7 @@ if(!getDashboardCategory().includes("MCP")){
     headers.push({
         text: 'Method',
         filterKey: 'method',
+        value: 'methodComp',
         showFilter: true,
         textValue: 'method',
         sortActive: true

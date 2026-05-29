@@ -282,6 +282,47 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         return countMap;
     }
 
+    public Map<Integer, Integer> buildEndpointsCountToApiCollectionMapNew(Set<Integer> deactivatedIds) {
+        Map<Integer, Integer> countMap = new HashMap<>();
+        if (deactivatedIds == null || deactivatedIds.isEmpty()) {
+            return countMap;
+        }
+
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(Filters.and(
+                SingleTypeInfoDao.filterForHostHeader(0, false),
+                Filters.in(SingleTypeInfo._API_COLLECTION_ID, deactivatedIds)
+        )));
+        pipeline.add(Aggregates.group(
+                "$" + SingleTypeInfo._API_COLLECTION_ID,
+                Accumulators.sum("count", 1)
+        ));
+
+        // RBAC filter in Java instead of $in with 35K IDs
+        List<Integer> rbacCollectionIds = null;
+        try {
+            rbacCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        } catch (Exception e) {
+        }
+        Set<Integer> allowedIds = rbacCollectionIds != null ? new HashSet<>(rbacCollectionIds) : null;
+
+        MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).cursor();
+        while (cursor.hasNext()) {
+            try {
+                BasicDBObject doc = cursor.next();
+                int apiCollectionId = doc.getInt("_id");
+                if (allowedIds != null && !allowedIds.contains(apiCollectionId)) {
+                    continue;
+                }
+                countMap.put(apiCollectionId, doc.getInt("count"));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return countMap;
+    }
+
     public Map<Integer, Integer> buildEndpointsCountToApiCollectionMapOptimized(Bson filter, List<ApiCollection> apiCollections) {
         final String LOG_PREFIX = "[buildEndpointsCountOptimized] ";
         Map<Integer, Integer> countMap = new HashMap<>();
