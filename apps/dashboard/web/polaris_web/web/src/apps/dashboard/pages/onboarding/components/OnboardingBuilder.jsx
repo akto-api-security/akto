@@ -87,10 +87,15 @@ function OnboardingBuilder() {
 
     const skipOnboarding = async() => {
         setLoading(true)
-        await api.skipOnboarding().then((resp)=>{
+        try {
+            await api.skipOnboarding()
             setLoading(false)
             navigate("/dashboard/quick-start")
-        })
+        } catch (error) {
+            setLoading(false)
+            console.error("Error skipping onboarding:", error)
+            navigate("/dashboard/quick-start")
+        }
     }
 
 

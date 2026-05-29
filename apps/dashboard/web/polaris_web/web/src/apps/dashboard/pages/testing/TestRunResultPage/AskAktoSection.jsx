@@ -12,12 +12,6 @@ function AskAktoSection({ aiSummary, aiSummaryLoading, aiMessages, aiLoading, on
     const chatScrollRef = useRef(null);
 
     useEffect(() => {
-        if (onGenerateAiOverview && !aiSummary && !aiSummaryLoading) {
-            onGenerateAiOverview();
-        }
-    }, [aiSummary, aiSummaryLoading]);
-
-    useEffect(() => {
         const el = chatScrollRef.current;
         if (!el) return;
         const observer = new MutationObserver(() => {
@@ -39,6 +33,7 @@ function AskAktoSection({ aiSummary, aiSummaryLoading, aiMessages, aiLoading, on
             <AiAnalysisCard
                 summary={aiSummary}
                 isLoading={aiSummaryLoading}
+                onGetOverview={onGenerateAiOverview}
                 scrollRef={chatScrollRef}
                 footer={
                     <AgenticSearchInput

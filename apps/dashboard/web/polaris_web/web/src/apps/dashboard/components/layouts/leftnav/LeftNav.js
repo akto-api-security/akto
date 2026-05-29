@@ -8,16 +8,17 @@ import {
     FinancesMinor,
     LockMajor,
     AutomationFilledMajor,
-    MagicMinor
+    MagicMinor,
+    SocialAdMajor,
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
-
+import DropdownSearch from "../../shared/DropdownSearch";
 import "./LeftNav.css";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
 import Store from "../../../store";
 import api from "../../../../signup/api";
-import { useMemo, useState} from "react";
+import { useCallback, useMemo, useState} from "react";
 import func from "@/util/func";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
@@ -44,15 +45,28 @@ export default function LeftNav() {
         setLeftNavSelected(selectedId);
     };
 
-    const handleAccountChange = async (selected) => {
-        resetAll();
-        resetStore();
-        resetSession();
-        resetFields();
-        await api.goToAccount(selected);
-        func.setToast(true, false, `Switched to account ${accounts[selected]}`);
-        window.location.href = '/dashboard/observe/inventory';
-    };
+    const handleAccountChange = useCallback(async (selected) => {
+        const accountId = selected === undefined || selected === null || selected === ""
+            ? NaN
+            : Number(selected);
+        if (!Number.isFinite(accountId) || accountId <= 0) {
+            func.setToast(true, true, "Invalid account selection. Please try again.");
+            return;
+        }
+        try {
+            // Must run while access-token is still set. Clearing session first forces /api/* to 403
+            // without refresh-token fallback (UserDetailsFilter), then a flaky retry path.
+            await api.goToAccount(accountId);
+            resetAll();
+            resetStore();
+            resetSession();
+            resetFields();
+            func.setToast(true, false, `Switched to account ${accounts[accountId] ?? accounts[String(accountId)]}`);
+            window.location.replace(`/dashboard/observe/inventory?_=${Date.now()}`);
+        } catch {
+            func.setToast(true, true, "Could not switch account. Please try again.");
+        }
+    }, [accounts, resetAll, resetFields, resetSession, resetStore]);
 
     const accountOptions = Object.keys(accounts).map(accountId => ({
         label: accounts[accountId],
@@ -105,17 +119,33 @@ export default function LeftNav() {
     ];
     const isAllowedDashboardUser = window.USER_NAME && allowedDashboardUsers.includes(window.USER_NAME.toLowerCase());
 
+
+    // Allowed users to for NHI Data
+    const allowedNhiUsers = ["ankush@akto.io"];
+    const isAllowedNhiUser = window.USER_NAME && allowedNhiUsers.includes(window.USER_NAME.toLowerCase());
+
     const navItems = useMemo(() => {
         let items = [
             {
                 label: (!func.checkLocal()) ? (
                     <Box paddingBlockEnd={"2"}>
-                        <Dropdown
-                            id={`select-account`}
-                            menuItems={accountOptions}
-                            initial={() => accounts[activeAccount]}
-                            selected={(type) => handleAccountChange(type)}
-                        />
+                        {accountOptions.length > 5 ? (
+                            <DropdownSearch
+                                id={`select-account`}
+                                optionsList={accountOptions}
+                                value={accounts[activeAccount]}
+                                preSelected={[`${activeAccount}`]}
+                                setSelected={(type) => handleAccountChange(type)}
+                                searchDisable={false}
+                            />
+                        ) : (
+                            <Dropdown
+                                id={`select-account`}
+                                menuItems={accountOptions}
+                                initial={() => accounts[activeAccount]}
+                                selected={(type) => handleAccountChange(type)}
+                            />
+                        )}
                     </Box>
 
                 ) : null
@@ -151,17 +181,17 @@ export default function LeftNav() {
                 selected: leftNavSelected === "dashboard_endpoint_security_dashboard" || currPathString === "dashboard_endpoint_dashboard",
                 key: "1",
             }] : []),
-            // ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
-            //     label: "Endpoint Security Posture",
-            //     icon: ReportFilledMinor,
-            //     onClick: () => {
-            //         handleSelect("dashboard_endpoint_posture");
-            //         navigate("/dashboard/endpoint-dashboard");
-            //         setActive("normal");
-            //     },
-            //     selected: leftNavSelected === "dashboard_endpoint_posture",
-            //     key: "2a",
-            // }] : []),
+            ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY && window.USER_NAME.indexOf("@akto.io") !== -1 ? [{
+                label: "AI Security Posture",
+                icon: ReportFilledMinor,
+                onClick: () => {
+                    handleSelect("dashboard_endpoint_posture");
+                    navigate("/dashboard/endpoint-dashboard");
+                    setActive("normal");
+                },
+                selected: leftNavSelected === "dashboard_endpoint_posture",
+                key: "2a",
+            }] : []),
             ...(dashboardCategory !== "Endpoint Security" ? [{
                 label: mapLabel("API Security Posture", dashboardCategory),
                 icon: ReportFilledMinor,
@@ -212,6 +242,14 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_agentic_assets",
+                    }, {
+                        label: "Users and devices",
+                        onClick: () => {
+                            navigate("/dashboard/observe/users-and-devices");
+                            handleSelect("dashboard_observe_users_and_devices");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_observe_users_and_devices",
                     }] : [{
                         label: "Collections",
                         onClick: () => {
@@ -369,6 +407,51 @@ export default function LeftNav() {
                     },
                 ],
                 key: "5",
+            }] : []),
+            ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && func.isDemoAccount() && isAllowedNhiUser  ? [{
+                label: (
+                    <Text variant="bodyMd" fontWeight="medium">
+                        NHI Governance
+                    </Text>
+                ),
+                icon: SocialAdMajor,
+                onClick: () => {
+                    handleSelect("dashboard_nhi_identities");
+                    navigate("/dashboard/nhi/identities");
+                    setActive("normal");
+                },
+                selected: leftNavSelected.includes("_nhi"),
+                url: "#",
+                key: "nhi_governance",
+                subNavigationItems: [
+                    {
+                        label: "Identities",
+                        onClick: () => {
+                            navigate("/dashboard/nhi/identities");
+                            handleSelect("dashboard_nhi_identities");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_nhi_identities",
+                    },
+                    {
+                        label: "Violations",
+                        onClick: () => {
+                            navigate("/dashboard/nhi/violations");
+                            handleSelect("dashboard_nhi_violations");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_nhi_violations",
+                    },
+                    {
+                        label: "Policies",
+                        onClick: () => {
+                            navigate("/dashboard/nhi/policies");
+                            handleSelect("dashboard_nhi_policies");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_nhi_policies",
+                    },
+                ],
             }] : []),
             ...(dashboardCategory === "Agentic Security" && func.isDemoAccount() ? [{
                 label: (
@@ -645,7 +728,7 @@ export default function LeftNav() {
         }
 
         return items
-    }, [dashboardCategory, leftNavSelected, currPathString])
+    }, [activeAccount, accounts, dashboardCategory, handleAccountChange, isAllowedDashboardUser, leftNavSelected, currPathString])
 
     const navigationMarkup = (
         <div className={`${active} ${dashboardCategory === "Agentic Security" ? "agentic-security-nav" : ""}`}>

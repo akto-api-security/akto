@@ -1,8 +1,9 @@
 package com.akto.gateway;
 
+import com.akto.dao.context.Context;
+import com.akto.data_actor.ClientActor;
 import com.akto.dto.IngestDataBatch;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import com.akto.log.LoggerMaker;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -10,7 +11,7 @@ import java.util.Map;
 
 public class Gateway {
 
-    private static final Logger logger = LogManager.getLogger(Gateway.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Gateway.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static Gateway instance;
     private final GuardrailsClient guardrailsClient;
     private DataPublisher dataPublisher;
@@ -27,15 +28,19 @@ public class Gateway {
     }
 
     public Map<String, Object> processHttpProxy(Map<String, Object> requestData) {
-        logger.info("Processing HTTP proxy request - path: {}, method: {}, guardrails: {}, ingest_data: {}",
-            requestData.get("path"), requestData.get("method"),
-            requestData.get("guardrails"), requestData.get("ingest_data"));
+        loggerMaker.infoAndAddToDb(
+            "Processing HTTP proxy request - path: {}, method: {}, guardrails: {}, response_guardrails: {}, ingest_data: {}",
+            requestData.get("path"),
+            requestData.get("method"),
+            requestData.get("guardrails"),
+            requestData.get("response_guardrails"),
+            requestData.get("ingest_data"));
 
         long start = System.currentTimeMillis();
         try {
             String requestPayload = getStringField(requestData, "requestPayload");
             if (requestPayload == null || requestPayload.isEmpty()) {
-                logger.warn("Missing required field: requestPayload");
+                loggerMaker.warnAndAddToDb("Missing required field: requestPayload");
                 Map<String, Object> error = new HashMap<>();
                 error.put("success", false);
                 error.put("message", "Missing required field: requestPayload");
@@ -45,32 +50,48 @@ public class Gateway {
 
             Map<String, Object> result = new HashMap<>();
 
-            String guardrails = getStringField(requestData, "guardrails");
-            if ("true".equalsIgnoreCase(guardrails)) {
+            boolean runRequestGuardrails = "true".equalsIgnoreCase(getStringField(requestData, "guardrails"));
+            boolean runResponseGuardrails = "true".equalsIgnoreCase(getStringField(requestData, "response_guardrails"));
+
+            if (shouldForceGuardrailsForAccount(Context.accountId.get())
+                || shouldForceGuardrailsForAccount(ClientActor.getAbstractorAccountIdFromEnvOrNull())) {
+                runRequestGuardrails = true;
+                runResponseGuardrails = true;
+            }
+
+            if (runRequestGuardrails || runResponseGuardrails) {
                 long guardrailsStart = System.currentTimeMillis();
-                Map<String, Object> guardrailsResponse = callGuardrails(requestData);
-                logger.info("Guardrails call completed - path: {}, latencyMs: {}",
+                Map<String, Object> guardrailsResult = null;
+
+                if (runRequestGuardrails) {
+                    guardrailsResult = mergeGuardrailsResults(guardrailsResult, callGuardrails(requestData, false));
+                }
+                if (runResponseGuardrails) {
+                    guardrailsResult = mergeGuardrailsResults(guardrailsResult, callGuardrails(requestData, true));
+                }
+
+                loggerMaker.infoAndAddToDb("Guardrails call(s) completed - path: {}, latencyMs: {}",
                     requestData.get("path"), System.currentTimeMillis() - guardrailsStart);
-                result.put("guardrailsResult", guardrailsResponse);
+                result.put("guardrailsResult", guardrailsResult);
             }
 
             String ingestData = getStringField(requestData, "ingest_data");
             if ("true".equalsIgnoreCase(ingestData)) {
                 long kafkaStart = System.currentTimeMillis();
                 ingestData(requestData);
-                logger.info("Kafka ingestion completed - path: {}, latencyMs: {}",
+                loggerMaker.infoAndAddToDb("Kafka ingestion completed - path: {}, latencyMs: {}",
                     requestData.get("path"), System.currentTimeMillis() - kafkaStart);
             }
 
-            logger.info("processHttpProxy completed - path: {}, method: {}, totalLatencyMs: {}",
+            loggerMaker.infoAndAddToDb("processHttpProxy completed - path: {}, method: {}, totalLatencyMs: {}",
                 requestData.get("path"), requestData.get("method"), System.currentTimeMillis() - start);
             result.put("success", true);
             result.put("message", "Request processed successfully");
             return result;
 
         } catch (Exception e) {
-            logger.error("Error processing HTTP proxy request: {}, latencyMs: {}", e.getMessage(),
-                System.currentTimeMillis() - start, e);
+            loggerMaker.errorAndAddToDb(e, "Error processing HTTP proxy request: {}, latencyMs: {}",
+                e.getMessage(), System.currentTimeMillis() - start);
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("message", "Unexpected error: " + e.getMessage());
@@ -79,7 +100,31 @@ public class Gateway {
         }
     }
 
-    private Map<String, Object> callGuardrails(Map<String, Object> requestData) {
+    private static boolean shouldForceGuardrailsForAccount(Integer accountId) {
+        return accountId != null && (accountId == 1710118493 || accountId == 1000000);
+    }
+
+    private Map<String, Object> mergeGuardrailsResults(Map<String, Object> existing, Map<String, Object> incoming) {
+        if (existing == null) return incoming;
+        if (incoming == null) return existing;
+
+        Map<String, Object> merged = new HashMap<>(existing);
+        boolean allowed = isAllowed(existing) && isAllowed(incoming);
+        merged.put("Allowed", allowed);
+        merged.put("requestResult", existing);
+        merged.put("responseResult", incoming);
+        return merged;
+    }
+
+    private boolean isAllowed(Map<String, Object> result) {
+        if (result == null) return false;
+        Object val = result.get("Allowed");
+        if (val instanceof Boolean) return (Boolean) val;
+        if (val != null) return Boolean.parseBoolean(val.toString());
+        return false;
+    }
+
+    private Map<String, Object> callGuardrails(Map<String, Object> requestData, boolean isResponse) {
         Map<String, Object> validateRequest = new HashMap<>();
         validateRequest.put("requestPayload", requestData.get("requestPayload"));
         validateRequest.put("contextSource", requestData.get("contextSource"));
@@ -104,11 +149,14 @@ public class Gateway {
         putIfNotNull(validateRequest, requestData, "metadata");
 
         String contextSource = getStringField(requestData, "contextSource");
-        logger.info("Calling guardrails /validate/request, contextSource: {}", contextSource);
+        String endpoint = isResponse ? "/validate/response" : "/validate/request";
+        loggerMaker.infoAndAddToDb("Calling guardrails {}, contextSource: {}", endpoint, contextSource);
 
-        Map<String, Object> guardrailsResponse = guardrailsClient.callValidateRequest(validateRequest);
+        Map<String, Object> guardrailsResponse = isResponse
+            ? guardrailsClient.callValidateResponse(validateRequest)
+            : guardrailsClient.callValidateRequest(validateRequest);
 
-        logger.info("Guardrails response - allowed: {}",
+        loggerMaker.infoAndAddToDb("Guardrails response - allowed: {}",
             guardrailsResponse != null ? guardrailsResponse.get("Allowed") : "null");
 
         return guardrailsResponse;
@@ -142,14 +190,14 @@ public class Gateway {
         if (dataPublisher != null) {
             try {
                 dataPublisher.publish(batch);
-                logger.info("Data ingested to Kafka - path: {}, method: {}",
+                loggerMaker.infoAndAddToDb("Data ingested to Kafka - path: {}, method: {}",
                     requestData.get("path"), requestData.get("method"));
             } catch (Exception e) {
-                logger.error("Error publishing data to Kafka: {}", e.getMessage(), e);
+                loggerMaker.errorAndAddToDb(e, "Error publishing data to Kafka: {}", e.getMessage());
                 throw new RuntimeException("Failed to publish data: " + e.getMessage(), e);
             }
         } else {
-            logger.warn("DataPublisher not configured - data will not be published to Kafka");
+            loggerMaker.warnAndAddToDb("DataPublisher not configured - data will not be published to Kafka");
         }
     }
 

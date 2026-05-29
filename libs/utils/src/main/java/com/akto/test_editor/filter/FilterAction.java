@@ -13,6 +13,8 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
 
 import com.alibaba.fastjson2.JSONObject;
+
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.ApiCollectionsDao;
@@ -380,7 +382,7 @@ public final class FilterAction {
 
         // Strip BOM before processing for regex filters to avoid false positives with SOAP payloads
         if (filterActionRequest.getOperand() != null &&
-            filterActionRequest.getOperand().equals(TestEditorEnums.DataOperands.REGEX.toString())) {
+            filterActionRequest.getOperand().equals(TestEditorEnums.DataOperands.REGEX.toString()) && !StringUtils.isEmpty(reqBody)) {
             reqBody = Utils.stripBOM(reqBody);
         }
         
@@ -452,7 +454,11 @@ public final class FilterAction {
         if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
 
             // if concerned prop for_all, all keys should match else empty list
-            doAllSatisfy = getMatchingKeysForPayload(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeySet, doAllSatisfy);
+            if (StringUtils.isEmpty(payload)) {
+                doAllSatisfy = false;
+            }else{
+                doAllSatisfy = getMatchingKeysForPayload(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeySet, doAllSatisfy);
+            }
             for (String s: matchingKeySet) {
                 matchingKeys.add(s);
             }
@@ -488,7 +494,10 @@ public final class FilterAction {
             Object val = origPayload;
 
             if (filterActionRequest.getBodyOperand() != null && filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.LENGTH.toString())) {
-                val = origPayload.trim().length() - 2; // todo:
+                if(origPayload != null && !origPayload.isEmpty()){
+                    val = origPayload.trim().length() - 2; // todo:
+                }
+                
             } else if (filterActionRequest.getBodyOperand() != null && filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.PERCENTAGE_MATCH.toString())) {
                 RawApi sampleRawApi = filterActionRequest.getRawApi();
                 if (sampleRawApi == null) {

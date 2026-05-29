@@ -22,6 +22,10 @@ public class AgentModelDao extends AccountsContextDao<Model> {
         getMCollection().deleteOne(filterByName(name));
     }
 
+    public Model findFirstModel() {
+        return findOne(Filters.empty());
+    }
+
     @Override
     public String getCollName() {
         return "agent_models";

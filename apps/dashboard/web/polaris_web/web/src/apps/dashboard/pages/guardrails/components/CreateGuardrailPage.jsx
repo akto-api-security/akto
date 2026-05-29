@@ -15,7 +15,15 @@ import {
 import PersistStore from '../../../../main/PersistStore';
 import AgenticSearchInput from '../../agentic/components/AgenticSearchInput';
 import guardrailApi from '../api';
-import { transformPolicyForBackend } from '../utils';
+import {
+    transformPolicyForBackend,
+    SEVERITY,
+    GUARDRAIL_BEHAVIOUR,
+    normalizeBehaviourValue,
+    normalizePiiTypesFromPolicy,
+    resolveStoredPolicyBehaviour
+} from '../utils';
+import func from "@/util/func";
 import {
     PolicyDetailsStep,
     PolicyDetailsConfig,
@@ -33,6 +41,8 @@ import {
     UsageGuardrailsConfig,
     AnomalyDetectionStep,
     AnomalyDetectionConfig,
+    ToolsGuardrailsStep,
+    ToolsGuardrailsConfig,
     ServerSettingsStep,
     ServerSettingsConfig
 } from './steps';
@@ -53,11 +63,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [blockedMessage, setBlockedMessage] = useState("");
+    const [severity, setSeverity] = useState(SEVERITY.MEDIUM.value);
     const [applyToResponses, setApplyToResponses] = useState(false);
 
     // Step 2: Content & Policy Guardrails
     const [enablePromptAttacks, setEnablePromptAttacks] = useState(false);
     const [promptAttackLevel, setPromptAttackLevel] = useState("high");
+    const [enableContextPoisoning, setEnableContextPoisoning] = useState(false);
     const [enableDeniedTopics, setEnableDeniedTopics] = useState(false);
     const [deniedTopics, setDeniedTopics] = useState([]);
     const [enableHarmfulCategories, setEnableHarmfulCategories] = useState(false);
@@ -112,11 +124,18 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableTokenLimit, setEnableTokenLimit] = useState(false);
     const [tokenLimitConfidenceScore, setTokenLimitConfidenceScore] = useState(0.7);
 
-    // Step 8: Server settings
+    // Step 9: Tools Guardrails
+    const [enableToolMisuse, setEnableToolMisuse] = useState(true);
+    const [enableMaliciousTools, setEnableMaliciousTools] = useState(true);
+    const [enableToolNameDescriptionMismatch, setEnableToolNameDescriptionMismatch] = useState(true);
+
+    // Step 10: Server settings
+    const [applyToAllServers, setApplyToAllServers] = useState(true);
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
     const [applyOnRequest, setApplyOnRequest] = useState(false);
+    const [policyBehaviour, setPolicyBehaviour] = useState(GUARDRAIL_BEHAVIOUR.BLOCK);
 
     // Collections data
     const [mcpServers, setMcpServers] = useState([]);
@@ -135,6 +154,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         // Step 2
         enablePromptAttacks,
         promptAttackLevel,
+        enableContextPoisoning,
         enableDeniedTopics,
         deniedTopics,
         enableHarmfulCategories,
@@ -171,19 +191,26 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         // Step 7
         enableTokenLimit,
         tokenLimitConfidenceScore,
-        // Step 8
+        // Step 9
+        enableToolMisuse,
+        enableMaliciousTools,
+        enableToolNameDescriptionMismatch,
+        // Step 10
+        applyToAllServers,
         selectedMcpServers,
         selectedAgentServers,
         mcpServers,
         agentServers,
         applyOnRequest,
-        applyOnResponse
+        applyOnResponse,
+        policyBehaviour
     });
 
     const getStepsWithSummary = () => {
         const storedStateData = getStoredStateData();
+        const isDemo = func.isDemoAccount();
 
-        return [
+        const steps = [
             {
                 number: PolicyDetailsConfig.number,
                 title: PolicyDetailsConfig.title,
@@ -231,14 +258,26 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 title: AnomalyDetectionConfig.title,
                 summary: AnomalyDetectionConfig.getSummary(storedStateData),
                 ...AnomalyDetectionConfig.validate(storedStateData)
-            },
-            {
-                number: ServerSettingsConfig.number,
-                title: ServerSettingsConfig.title,
-                summary: ServerSettingsConfig.getSummary(storedStateData),
-                ...ServerSettingsConfig.validate(storedStateData)
             }
         ];
+
+        if (isDemo) {
+            steps.push({
+                number: ToolsGuardrailsConfig.number,
+                title: ToolsGuardrailsConfig.title,
+                summary: ToolsGuardrailsConfig.getSummary(storedStateData),
+                ...ToolsGuardrailsConfig.validate(storedStateData)
+            });
+        }
+
+        steps.push({
+            number: ServerSettingsConfig.number,
+            title: ServerSettingsConfig.title,
+            summary: ServerSettingsConfig.getSummary(storedStateData),
+            ...ServerSettingsConfig.validate(storedStateData)
+        });
+
+        return steps;
     };
 
     const steps = getStepsWithSummary();
@@ -274,14 +313,19 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
     }, [isEditMode, editingPolicy]);
 
+    const isVisibilityOnly = (collection) =>
+        collection.envType && collection.envType.some(tag =>
+            tag.keyName === 'visibilityOnly' && tag.value === 'true'
+        );
+
     const filterCollections = () => {
         setCollectionsLoading(true);
         try {
             const mcpServerCollections = allCollections.filter(collection => {
                 const hasMcpEnvType = collection.envType && collection.envType.some(envType =>
-                    envType.keyName === 'mcp-server' && envType.value === 'MCP Server'
+                    envType.keyName === 'mcp-server'
                 );
-                return hasMcpEnvType;
+                return hasMcpEnvType && !isVisibilityOnly(collection);
             })
             .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
             .map(collection => ({
@@ -292,9 +336,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
             const agentServerCollections = allCollections.filter(collection => {
                 const hasGenAiEnvType = collection.envType && collection.envType.some(envType =>
-                    envType.keyName === 'gen-ai' && envType.value === 'Gen AI'
+                    envType.keyName === 'gen-ai'
                 );
-                return hasGenAiEnvType;
+                return hasGenAiEnvType && !isVisibilityOnly(collection);
             })
             .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
             .map(collection => ({
@@ -316,10 +360,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setName("");
         setDescription("");
         setBlockedMessage("");
+        setSeverity(SEVERITY.MEDIUM.value);
         setApplyToResponses(false);
         setPlaygroundMessages([]);
         setEnablePromptAttacks(false);
         setPromptAttackLevel("high");
+        setEnableContextPoisoning(false);
         setEnableDeniedTopics(false);
         setDeniedTopics([]);
         setEnableHarmfulCategories(false);
@@ -363,17 +409,26 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setConfidenceScore(25);
         setEnableTokenLimit(false);
         setTokenLimitConfidenceScore(0.7);
+        setEnableToolMisuse(true);
+        setEnableMaliciousTools(true);
+        setEnableToolNameDescriptionMismatch(true);
+        setApplyToAllServers(true);
         setSelectedMcpServers([]);
         setSelectedAgentServers([]);
         setApplyOnResponse(false);
         setApplyOnRequest(false);
+        setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
     };
 
     const populateFormForEdit = (policy) => {
+        const resolvedPolicyBehaviour = resolveStoredPolicyBehaviour(policy);
         setName(policy.name || "");
         setDescription(policy.description || "");
         setBlockedMessage(policy.blockedMessage || "");
+        setSeverity(policy.severity ? policy.severity.toUpperCase() : SEVERITY.MEDIUM.value);
         setApplyToResponses(policy.applyToResponses || false);
+
+        setPolicyBehaviour(resolvedPolicyBehaviour);
 
         // Content filters
         if (policy.contentFiltering) {
@@ -418,7 +473,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         // PII filters
         const hasPiiTypes = policy.piiTypes && policy.piiTypes.length > 0;
         setEnablePiiTypes(hasPiiTypes);
-        setPiiTypes(policy.piiTypes || []);
+        setPiiTypes(normalizePiiTypesFromPolicy(policy));
 
         // Regex patterns
         let hasRegexPatterns = false;
@@ -438,7 +493,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableRegexPatterns(hasRegexPatterns);
 
         // LLM prompt
-        setEnableLlmPrompt(policy.llmRule?.enabled || !!policy.llmRule?.userPrompt);
+        setEnableLlmPrompt(policy.llmRule?.enabled && !!policy.llmRule?.userPrompt);
         setLlmPrompt(policy.llmRule?.userPrompt || "");
         setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
 
@@ -483,6 +538,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         );
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
+        setApplyToAllServers(policy.applyToAllServers ?? true);
     };
 
     const handleClose = () => {
@@ -491,14 +547,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     };
 
     const handleNext = () => {
-        if (currentStep < steps.length) {
-            setCurrentStep(currentStep + 1);
+        const idx = steps.findIndex(s => s.number === currentStep);
+        if (idx >= 0 && idx < steps.length - 1) {
+            setCurrentStep(steps[idx + 1].number);
         }
     };
 
     const handlePrevious = () => {
-        if (currentStep > 1) {
-            setCurrentStep(currentStep - 1);
+        const idx = steps.findIndex(s => s.number === currentStep);
+        if (idx > 0) {
+            setCurrentStep(steps[idx - 1].number);
         }
     };
 
@@ -526,11 +584,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     };
                 });
 
+            const b = normalizeBehaviourValue(policyBehaviour);
             const guardrailData = {
                 name,
                 description,
                 blockedMessage,
+                severity,
                 applyToResponses,
+                behaviour: b,
                 contentFilters: {
                     harmfulCategories: enableHarmfulCategories ? harmfulCategoriesSettings : null,
                     promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
@@ -538,29 +599,25 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 },
                 deniedTopics,
                 wordFilters,
-                piiFilters: piiTypes,
-                regexPatterns: regexPatterns
+                piiFilters: enablePiiTypes ? piiTypes : [],
+                regexPatterns: enableRegexPatterns ? regexPatterns
                     .filter(r => r && r.pattern)
-                    .map(r => r.pattern),
-                regexPatternsV2: regexPatterns
+                    .map(r => r.pattern) : [],
+                regexPatternsV2: enableRegexPatterns ? regexPatterns
                     .filter(r => r && r.pattern && r.behavior)
                     .map(r => ({
                         pattern: r.pattern,
                         behavior: r.behavior.toLowerCase()
-                    })),
-                ...(enableLlmPrompt && llmPrompt && llmPrompt.trim() ? {
-                    llmRule: {
-                        enabled: true,
-                        userPrompt: llmPrompt.trim(),
-                        confidenceScore: llmConfidenceScore
-                    }
-                } : {}),
-                ...(enableBasePromptRule ? {
-                    basePromptRule: {
-                        enabled: true,
-                        confidenceScore: basePromptConfidenceScore
-                    }
-                } : {}),
+                    })) : [],
+                llmRule: {
+                    enabled: enableLlmPrompt && !!llmPrompt.trim(),
+                    userPrompt: llmPrompt.trim(),
+                    confidenceScore: llmConfidenceScore
+                },
+                basePromptRule: {
+                    enabled: enableBasePromptRule,
+                    confidenceScore: basePromptConfidenceScore
+                },
                 gibberishDetection: {
                     enabled: enableGibberishDetection,
                     confidenceScore: gibberishConfidenceScore
@@ -587,6 +644,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 },
                 url: enableExternalModel ? (url || null) : null,
                 confidenceScore: enableExternalModel ? confidenceScore : null,
+                applyToAllServers,
                 selectedMcpServers: selectedMcpServers,
                 selectedAgentServers: selectedAgentServers,
                 selectedMcpServersV2: transformedMcpServers,
@@ -621,6 +679,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setDescription={setDescription}
                         blockedMessage={blockedMessage}
                         setBlockedMessage={setBlockedMessage}
+                        severity={severity}
+                        setSeverity={setSeverity}
                         applyToResponses={applyToResponses}
                         setApplyToResponses={setApplyToResponses}
                     />
@@ -632,6 +692,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnablePromptAttacks={setEnablePromptAttacks}
                         promptAttackLevel={promptAttackLevel}
                         setPromptAttackLevel={setPromptAttackLevel}
+                        enableContextPoisoning={enableContextPoisoning}
+                        setEnableContextPoisoning={setEnableContextPoisoning}
                         enableDeniedTopics={enableDeniedTopics}
                         setEnableDeniedTopics={setEnableDeniedTopics}
                         deniedTopics={deniedTopics}
@@ -731,7 +793,20 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 );
             case 9:
                 return (
+                    <ToolsGuardrailsStep
+                        enableToolMisuse={enableToolMisuse}
+                        setEnableToolMisuse={setEnableToolMisuse}
+                        enableMaliciousTools={enableMaliciousTools}
+                        setEnableMaliciousTools={setEnableMaliciousTools}
+                        enableToolNameDescriptionMismatch={enableToolNameDescriptionMismatch}
+                        setEnableToolNameDescriptionMismatch={setEnableToolNameDescriptionMismatch}
+                    />
+                );
+            case 10:
+                return (
                     <ServerSettingsStep
+                        applyToAllServers={applyToAllServers}
+                        setApplyToAllServers={setApplyToAllServers}
                         selectedMcpServers={selectedMcpServers}
                         setSelectedMcpServers={setSelectedMcpServers}
                         selectedAgentServers={selectedAgentServers}
@@ -743,6 +818,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         mcpServers={mcpServers}
                         agentServers={agentServers}
                         collectionsLoading={collectionsLoading}
+                        policyBehaviour={policyBehaviour}
+                        setPolicyBehaviour={setPolicyBehaviour}
                     />
                 );
             default:
@@ -758,6 +835,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     // Helper function to build policy data for playground testing
     const buildPlaygroundPolicyData = () => {
+        const b = normalizeBehaviourValue(policyBehaviour);
         const regexPatternsV2 = regexPatterns
             .filter(r => r && r.pattern && r.behavior)
             .map(r => ({
@@ -770,6 +848,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             description: description || "",
             blockedMessage: blockedMessage || "",
             applyToResponses: applyToResponses,
+            behaviour: b,
             contentFilters: {
                 harmfulCategories: enableHarmfulCategories ? harmfulCategoriesSettings : null,
                 promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
@@ -803,6 +882,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             tokenLimitDetection: buildDetectionConfig(enableTokenLimit, tokenLimitConfidenceScore),
             url: enableExternalModel ? (url || null) : null,
             confidenceScore: enableExternalModel ? confidenceScore : null,
+            applyToAllServers: applyToAllServers,
             selectedMcpServers: selectedMcpServers,
             selectedAgentServers: selectedAgentServers,
             applyOnResponse: applyOnResponse,
@@ -941,7 +1021,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 <HorizontalStack gap="3" align="center">
                     <Icon source={SettingsMajor} />
                     <Text variant="headingLg" as="h1">
-                        Create Guardrail Policy
+                        {isEditMode ? "Edit Guardrail Policy" : "Create Guardrail Policy"}
                     </Text>
                 </HorizontalStack>
                 <button className="Polaris-Modal-CloseButton" onClick={handleClose}>
@@ -1006,7 +1086,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                 Previous
                             </Button>
                             <HorizontalStack gap="2">
-                                <Button onClick={handleNext} disabled={currentStep === steps.length}>
+                                <Button onClick={handleNext} disabled={steps.findIndex(s => s.number === currentStep) >= steps.length - 1}>
                                     Next
                                 </Button>
                                 <Button
@@ -1015,7 +1095,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                     loading={loading}
                                     disabled={!allStepsValid}
                                 >
-                                    Create policy
+                                    {isEditMode ? "Update policy" : "Create policy"}
                                 </Button>
                             </HorizontalStack>
                         </HorizontalStack>

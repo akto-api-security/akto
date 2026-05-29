@@ -1,9 +1,13 @@
 package com.akto.dto;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.type.URLMethods;
 import com.akto.util.Util;
-
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import java.util.*;
@@ -64,6 +68,9 @@ public class ApiInfo {
     public static final String DESCRIPTION = "description";
     private String description;
 
+    public static final String TAGS_STRING = "tagsList";
+    private List<CollectionTags> tagsList;
+
     public static final String RATELIMITS = "rateLimits";
     private Map<String, Map<String, Integer>> rateLimits;
 
@@ -81,6 +88,69 @@ public class ApiInfo {
 
     public static final String AGENT_PROXY_GUARDRAIL_ENABLED = "agentProxyGuardrailEnabled";
     private boolean agentProxyGuardrailEnabled;
+
+    public static final String IS_SKILL_BLOCKED = "isSkillBlocked";
+    private boolean isSkillBlocked;
+
+    public static final String TAGS_LIST = "tagsList";
+    // private List<ApiInfoTag> tagsList;
+
+    @Getter
+    @Setter
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class ApiInfoTag {
+        public static final String KEY = "key";
+        public static final String VALUE = "value";
+
+        private String key;
+        private String value;
+    }
+
+    public static class MessageFieldEntry {
+        private String fieldPath;
+        private String description;
+
+        public MessageFieldEntry() {}
+
+        public MessageFieldEntry(String fieldPath, String description) {
+            this.fieldPath = fieldPath;
+            this.description = description;
+        }
+
+        public String getFieldPath() { return fieldPath; }
+        public void setFieldPath(String fieldPath) { this.fieldPath = fieldPath; }
+        public String getDescription() { return description; }
+        public void setDescription(String description) { this.description = description; }
+    }
+
+    public static class GuardrailSchema {
+        private List<MessageFieldEntry> requestMessageFields;
+        private List<MessageFieldEntry> responseMessageFields;
+        private Integer blockedResponseCode;
+        private String blockedResponseBody;
+        private String blockedResponseContentType;
+
+        public GuardrailSchema() {}
+
+        public List<MessageFieldEntry> getRequestMessageFields() { return requestMessageFields; }
+        public void setRequestMessageFields(List<MessageFieldEntry> requestMessageFields) { this.requestMessageFields = requestMessageFields; }
+
+        public List<MessageFieldEntry> getResponseMessageFields() { return responseMessageFields; }
+        public void setResponseMessageFields(List<MessageFieldEntry> responseMessageFields) { this.responseMessageFields = responseMessageFields; }
+
+        public Integer getBlockedResponseCode() { return blockedResponseCode; }
+        public void setBlockedResponseCode(Integer blockedResponseCode) { this.blockedResponseCode = blockedResponseCode; }
+
+        public String getBlockedResponseBody() { return blockedResponseBody; }
+        public void setBlockedResponseBody(String blockedResponseBody) { this.blockedResponseBody = blockedResponseBody; }
+
+        public String getBlockedResponseContentType() { return blockedResponseContentType; }
+        public void setBlockedResponseContentType(String blockedResponseContentType) { this.blockedResponseContentType = blockedResponseContentType; }
+    }
+
+    public static final String GUARDRAIL_SCHEMA = "guardrailSchema";
+    private GuardrailSchema guardrailSchema;
 
     public enum ApiType {
         REST, GRAPHQL, GRPC, SOAP
@@ -340,6 +410,23 @@ public class ApiInfo {
 
         // Merge rateLimitConfidence - take the maximum confidence
         this.rateLimitConfidence = Math.max(this.rateLimitConfidence, that.rateLimitConfidence);
+
+        // Merge tagsList — union; compare on keyName+value only (ignore timestamp/source)
+        if (that.tagsList != null && !that.tagsList.isEmpty()) {
+            if (this.tagsList == null) {
+                this.tagsList = new ArrayList<>(that.tagsList);
+            } else {
+                for (CollectionTags tag : that.tagsList) {
+                    boolean alreadyPresent = this.tagsList.stream().anyMatch(t ->
+                        java.util.Objects.equals(t.getKeyName(), tag.getKeyName()) &&
+                        java.util.Objects.equals(t.getValue(), tag.getValue())
+                    );
+                    if (!alreadyPresent) {
+                        this.tagsList.add(tag);
+                    }
+                }
+            }
+        }
 
     }
 
@@ -661,5 +748,19 @@ public class ApiInfo {
 
     public void setAgentProxyGuardrailEnabled(boolean agentProxyGuardrailEnabled) {
         this.agentProxyGuardrailEnabled = agentProxyGuardrailEnabled;
+    }
+
+    public boolean getIsSkillBlocked() { return isSkillBlocked; }
+    public void setIsSkillBlocked(boolean isSkillBlocked) { this.isSkillBlocked = isSkillBlocked; }
+
+    public GuardrailSchema getGuardrailSchema() { return guardrailSchema; }
+    public void setGuardrailSchema(GuardrailSchema guardrailSchema) { this.guardrailSchema = guardrailSchema; }
+
+    public List<CollectionTags> getTagsList() {
+        return tagsList;
+    }
+
+    public void setTagsList(List<CollectionTags> tagsList) {
+        this.tagsList = tagsList;
     }
 }

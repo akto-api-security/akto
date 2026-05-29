@@ -6,7 +6,13 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.UpdateOneModel;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.UpdateOptions;
 import org.bson.Document;
+import com.mongodb.client.model.Filters;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ActorInfoDao extends AccountBasedDao<ActorInfoModel> {
 
@@ -79,6 +85,13 @@ public class ActorInfoDao extends AccountBasedDao<ActorInfoModel> {
             Indexes.ascending("country")
         ));
 
+        // For CloudflareWafSyncCron - filtering blocked actors by context and status
+        required.put("idx_contextSource_actorId_status", Indexes.compoundIndex(
+            Indexes.ascending("contextSource"),
+            Indexes.ascending("actorId"),
+            Indexes.ascending("status")
+        ));
+
         for (java.util.Map.Entry<String, org.bson.conversions.Bson> e : required.entrySet()) {
             if (!existing.contains(e.getKey())) {
                 IndexOptions options = new IndexOptions().name(e.getKey());
@@ -88,6 +101,33 @@ public class ActorInfoDao extends AccountBasedDao<ActorInfoModel> {
                 }
                 coll.createIndex(e.getValue(), options);
             }
+        }
+    }
+
+    /**
+     * Bulk update actor status for multiple actors
+     */
+    public void bulkUpdateActorStatus(String accountId, List<String> actorIds, String status, long timestamp) {
+        if (actorIds == null || actorIds.isEmpty()) {
+            return;
+        }
+
+        MongoCollection<Document> collection = getCollection(accountId).withDocumentClass(Document.class);
+        List<UpdateOneModel<Document>> bulkOps = new ArrayList<>();
+
+        for (String actorId : actorIds) {
+            bulkOps.add(new UpdateOneModel<>(
+                Filters.eq("actorId", actorId),
+                Updates.combine(
+                    Updates.set("status", status),
+                    Updates.set("updatedAt", timestamp)
+                ),
+                new UpdateOptions().upsert(false)
+            ));
+        }
+
+        if (!bulkOps.isEmpty()) {
+            collection.bulkWrite(bulkOps);
         }
     }
 }

@@ -9,7 +9,9 @@ const MODEL_TYPES = {
   ANTHROPIC: "ANTHROPIC",
   OPENAI: "OPENAI",
   AZURE_OPENAI: "AZURE_OPENAI",
-  OLLAMA: "OLLAMA"
+  OLLAMA: "OLLAMA",
+  DATABRICKS: "DATABRICKS",
+  GITHUB_COPILOT: "GITHUB_COPILOT"
 }
 
 const OPENAI_MODELS = [
@@ -31,6 +33,38 @@ const OLLAMA_MODELS = [
   { label: "Qwen 3 latest-qwen3:latest", value: "qwen3:latest" }
 ]
 
+const DATABRICKS_MODELS = [
+  { label: "Databricks GPT 5.4", value: "databricks-gpt-5-4" },
+  { label: "Databricks GPT 5", value: "databricks-gpt-5" },
+  { label: "Databricks GPT 5 Nano", value: "databricks-gpt-5-nano" },
+  { label: "Databricks Claude Opus 4.6", value: "databricks-claude-opus-4-6" },
+  { label: "Databricks Claude Sonnet 4.6", value: "databricks-claude-sonnet-4-6" },
+  { label: "Databricks Gemini 2.5 Pro", value: "databricks-gemini-2-5-pro" },
+  { label: "Databricks Gemini 2.5 Flash", value: "databricks-gemini-2-5-flash" },
+  { label: "Databricks BGE Large EN", value: "databricks-bge-large-en" },
+  { label: "Databricks Meta Llama 3.1 8B Instruct", value: "databricks-meta-llama-3-1-8b-instruct" },
+  { label: "Databricks Gemma 3 12B", value: "databricks-gemma-3-12b" },
+  { label: "Databricks Qwen3 Next 80B A3B Instruct", value: "databricks-qwen3-next-80b-a3b-instruct" },
+]
+
+// GitHub Copilot Models - Famous models available through Copilot
+const GITHUB_COPILOT_MODELS = [
+  { label: "Claude Sonnet 4.5", value: "claude-sonnet-4.5" },
+  { label: "Claude Sonnet 4.6", value: "claude-sonnet-4.6" },
+  { label: "Claude Haiku 4.5", value: "claude-haiku-4.5" },
+  { label: "GPT-4.1", value: "gpt-4.1" },
+  { label: "GPT-4o", value: "gpt-4o" },
+  { label: "GPT-4o mini", value: "gpt-4o-mini" },
+  { label: "GPT-5 mini", value: "gpt-5-mini" },
+  { label: "GPT-5.2", value: "gpt-5-2" },
+  { label: "GPT-5.4", value: "gpt-5-4" },
+  { label: "Gemini 2.5 Pro", value: "gemini-2-5-pro" },
+  { label: "Gemini 3.1 Pro (Preview)", value: "gemini-3-1-pro-preview" },
+  { label: "Gemini 3 Flash (Preview)", value: "gemini-3-flash-preview" },
+  { label: "Grok Code Fast 1", value: "grok-code-fast-1" },
+  { label: "Raptor mini (Preview)", value: "raptor-mini-preview" },
+]
+
 function getModelSections(type, data, setData, isEdit=false) {
   let sections = []
 
@@ -39,19 +73,36 @@ function getModelSections(type, data, setData, isEdit=false) {
     type: "text",
     id: "name",
     placeholder: "Model name",
-  }, {
+  })
+
+  sections.push({
     title: type === MODEL_TYPES.OLLAMA ? "API Key (Optional)" : "API Key",
     type: "text",
     id: "apiKey",
     placeholder: type === MODEL_TYPES.OLLAMA ? "API Key for the model (optional)" : "API Key for the model",
-  },{
-    title: "Model",
-    type: "dropdown",
-    id: "model"
   })
+
+  const shouldShowModelDropdown = true
+  
+  if (shouldShowModelDropdown) {
+    sections.push({
+      title: "Model",
+      type: "dropdown",
+      id: "model",
+      loading: false
+    })
+  }
   switch (type) {
     case MODEL_TYPES.ANTHROPIC:
     case MODEL_TYPES.OPENAI:
+      break;
+    case MODEL_TYPES.DATABRICKS:
+      sections.push({
+        title: "Databricks Model Serving Endpoint or AI Gateway Endpoint",
+        type: "text",
+        id: "databricksEndpoint",
+        placeholder: "The URL for your Databricks model serving or AI Gateway endpoint",
+      })
       break;
     case MODEL_TYPES.AZURE_OPENAI:
       sections.push({
@@ -88,6 +139,31 @@ function getModelSections(type, data, setData, isEdit=false) {
           }}
         />
       )
+    } else if (section.type === "text_with_button") {
+      section.component = (
+        <VerticalStack gap="2">
+          <TextField
+            label={section?.title}
+            placeholder={section?.placeholder}
+            value={data[section?.id]}
+            onChange={(value) => {
+              setData({
+                ...data,
+                [section?.id]: value
+              })
+            }}
+            connectedRight={
+              <Button
+                onClick={() => section.buttonAction()}
+                loading={section.buttonLoading}
+                disabled={section.buttonDisabled}
+              >
+                {section.buttonText}
+              </Button>
+            }
+          />
+        </VerticalStack>
+      )
     } else if (section.type === "dropdown") {
       let items = []
       if (type === MODEL_TYPES.OPENAI || type === MODEL_TYPES.AZURE_OPENAI) {
@@ -96,17 +172,22 @@ function getModelSections(type, data, setData, isEdit=false) {
         items = ANTHROPIC_MODELS
       } else if (type === MODEL_TYPES.OLLAMA) {
         items = OLLAMA_MODELS
+      } else if (type === MODEL_TYPES.DATABRICKS) {
+        items = DATABRICKS_MODELS
+      } else if (type === MODEL_TYPES.GITHUB_COPILOT) {
+        items = GITHUB_COPILOT_MODELS
       }
       section.component = (
         <VerticalStack gap="1">
           <Text>
-            {section?.title}
+            {section?.title} {section?.loading && "(Loading...)"}
           </Text>
           <Dropdown
           id={section?.id}
           key={`${section?.id}-${type}`}
           menuItems={items}
           initial={data[section?.id]}
+          disabled={section?.loading}
           selected={(value) => {
             setData((x) => {
               return {
@@ -149,6 +230,7 @@ function AgentConfig() {
     func.setToast(true, false, "Successfully deleted model")
     await fetchModels()
   }
+
 
   function renderItem(item) {
     const { name, type } = item;
@@ -230,6 +312,14 @@ function AgentConfig() {
             {
               label: 'OLLAMA',
               value: MODEL_TYPES.OLLAMA
+            },
+            {
+              label: 'Databricks',
+              value: MODEL_TYPES.DATABRICKS
+            },
+            {
+              label: 'GitHub Copilot',
+              value: MODEL_TYPES.GITHUB_COPILOT
             }
             ]}
             initial={modelType}

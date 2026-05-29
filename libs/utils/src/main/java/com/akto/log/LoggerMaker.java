@@ -2,6 +2,8 @@ package com.akto.log;
 
 import com.akto.dao.AgenticTestingLogsDao;
 import com.akto.dao.AnalyserLogsDao;
+import com.akto.dao.AwsApiGatewayLogsDao;
+import com.akto.dao.GuardrailsServiceLogsDao;
 import com.akto.dao.BillingLogsDao;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.DashboardLogsDao;
@@ -22,18 +24,26 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 import com.slack.api.Slack;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.helpers.MessageFormatter;
 import org.slf4j.simple.SimpleLogger;
 
 public class LoggerMaker  {
+
+    /** Keys persisted by {@link #insert(String, String, LogDb)} for dashboard-style logs. */
+    public static final Set<String> STORED_LOG_KEYS = new HashSet<>(Arrays.asList("error", "info", "warn", "debug"));
 
     static {
         System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN"));
@@ -57,6 +67,8 @@ public class LoggerMaker  {
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     protected static final Logger internalLogger = LoggerFactory.getLogger(LoggerMaker.class);
+
+    private static final boolean shouldNotSendLogs = System.getenv("BLOCK_LOGS") != null && System.getenv("BLOCK_LOGS").equals("true");
 
     static {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -94,7 +106,7 @@ public class LoggerMaker  {
     }
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION, ENDPOINT_SHIELD, AGENTIC_TESTING
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION, ENDPOINT_SHIELD, AGENTIC_TESTING, AWS_API_GATEWAY, GUARDRAILS_SERVICE
     }
 
     private static AccountSettings accountSettings = null;
@@ -225,7 +237,7 @@ public class LoggerMaker  {
     public void warnAndAddToDb(String info, LogDb db) {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
         String infoMessage = "acc: " + accountId + ", " + info;
-        logger.info(infoMessage);
+        logger.warn(infoMessage);
         try{
             insert(infoMessage, "warn",db);
         } catch (Exception e){
@@ -245,6 +257,44 @@ public class LoggerMaker  {
         warnAndAddToDb(info, this.db);
     }
 
+    public void infoAndAddToDb(String template, Object... args) {
+        infoAndAddToDb(formatSlf4jTemplate(template, args));
+    }
+
+    public void warnAndAddToDb(String template, Object... args) {
+        warnAndAddToDb(formatSlf4jTemplate(template, args));
+    }
+
+    public void debugAndAddToDb(String template, Object... args) {
+        debugAndAddToDb(formatSlf4jTemplate(template, args));
+    }
+
+    public void errorAndAddToDb(String template, Object... args) {
+        errorAndAddToDb(formatSlf4jTemplate(template, args));
+    }
+
+    public void errorAndAddToDb(Throwable t, String template, Object arg1, Object... rest) {
+        String message = formatSlf4jTemplate(template, prependArgs(arg1, rest));
+        if (t instanceof Exception) {
+            errorAndAddToDb((Exception) t, message, this.db);
+        } else if (t != null) {
+            errorAndAddToDb(new Exception(t), message, this.db);
+        } else {
+            errorAndAddToDb(message);
+        }
+    }
+
+    private static Object[] prependArgs(Object first, Object[] rest) {
+        Object[] out = new Object[1 + rest.length];
+        out[0] = first;
+        System.arraycopy(rest, 0, out, 1, rest.length);
+        return out;
+    }
+
+    private static String formatSlf4jTemplate(String template, Object... args) {
+        return MessageFormatter.arrayFormat(template, args).getMessage();
+    }
+
     private Boolean checkUpdate(){
         if(logCount>=1000){
             if((logCountResetTimestamp + oneMinute) >= Context.now()){
@@ -258,6 +308,11 @@ public class LoggerMaker  {
     }
     
     private void insert(String info, String key, LogDb db) {
+        
+        if(shouldNotSendLogs || (accountSettings != null && accountSettings.isBlockLogs())) {
+            return;
+        }
+
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
         if(checkUpdate() && db!=null){
@@ -287,6 +342,9 @@ public class LoggerMaker  {
                 case AGENTIC_TESTING:
                     dataActor.insertAgenticTestingLog(log);
                     break;
+                case GUARDRAILS_SERVICE:
+                    dataActor.insertGuardrailsServiceLog(log);
+                    break;
                 default:
                     break;
             }
@@ -295,53 +353,99 @@ public class LoggerMaker  {
     }
 
     public List<Log> fetchLogRecords(int logFetchStartTime, int logFetchEndTime, LogDb db) {
+        return fetchLogRecords(logFetchStartTime, logFetchEndTime, db, null);
+    }
+
+    public List<Log> fetchLogRecords(int logFetchStartTime, int logFetchEndTime, LogDb db, List<String> logKeysFilter) {
 
         List<Log> logs = new ArrayList<>();
 
         if( logFetchStartTime > logFetchEndTime){
             return logs;
         }
-        
-        Bson filters = Filters.and(
-            Filters.gte(Log.TIMESTAMP, logFetchStartTime),
-            Filters.lt(Log.TIMESTAMP, logFetchEndTime)
-        );
+
+        Bson filters = buildTimeAndKeysFilter(logFetchStartTime, logFetchEndTime, logKeysFilter);
+        Bson sortAscending = Sorts.ascending(Log.TIMESTAMP);
+        Bson standardProjection = Projections.include("log", Log.TIMESTAMP, Log.KEY);
+
         switch(db){
-            case TESTING: 
-                logs = LogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+            case TESTING:
+                logs = LogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
                 break;
-            case RUNTIME: 
-                logs = RuntimeLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+            case RUNTIME:
+                logs = RuntimeLogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
                 break;
-            case DASHBOARD: 
-                logs = DashboardLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+            case DASHBOARD:
+                logs = DashboardLogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
                 break;
             case DATA_INGESTION:
-                logs = DataIngestionLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                logs = DataIngestionLogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
                 break;
             case ANALYSER:
-                logs = AnalyserLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                logs = AnalyserLogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
                 break;
             case BILLING:
-                logs = BillingLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                logs = BillingLogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
                 break;
             case PUPPETEER:
-                logs = PupeteerLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                logs = PupeteerLogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
                 break;
             case THREAT_DETECTION:
-                logs = ProtectionLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                logs = ProtectionLogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
                 break;
             case ENDPOINT_SHIELD:
-                List<EndpointShieldLog> endpointShieldLogs = EndpointShieldLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP, EndpointShieldLog.AGENT_ID, EndpointShieldLog.DEVICE_ID, EndpointShieldLog.LEVEL));
+                Bson shieldProjection = Projections.include(
+                    "log", Log.TIMESTAMP, Log.KEY,
+                    EndpointShieldLog.AGENT_ID, EndpointShieldLog.DEVICE_ID, EndpointShieldLog.LEVEL);
+                List<EndpointShieldLog> endpointShieldLogs = EndpointShieldLogsDao.instance.findAll(
+                    filters, 0, 1_000_000, sortAscending, shieldProjection);
                 logs = new ArrayList<>(endpointShieldLogs);
                 break;
             case AGENTIC_TESTING:
-                logs = AgenticTestingLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                logs = AgenticTestingLogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
+                break;
+            case AWS_API_GATEWAY:
+                logs = AwsApiGatewayLogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
+                break;
+            case GUARDRAILS_SERVICE:
+                logs = GuardrailsServiceLogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
                 break;
             default:
                 break;
         }
         return logs;
+    }
+
+    private static Bson buildTimeAndKeysFilter(int logFetchStartTime, int logFetchEndTime, List<String> logKeysFilter) {
+        Bson timeRange = Filters.and(
+            Filters.gte(Log.TIMESTAMP, logFetchStartTime),
+            Filters.lt(Log.TIMESTAMP, logFetchEndTime)
+        );
+        List<String> normalized = normalizeLogKeysFilter(logKeysFilter);
+        if (normalized == null || normalized.size() >= STORED_LOG_KEYS.size()) {
+            return timeRange;
+        }
+        return Filters.and(timeRange, Filters.in(Log.KEY, normalized));
+    }
+
+    /**
+     * @return null if no key filter should be applied (show all known keys / empty request).
+     */
+    private static List<String> normalizeLogKeysFilter(List<String> logKeysFilter) {
+        if (logKeysFilter == null || logKeysFilter.isEmpty()) {
+            return null;
+        }
+        List<String> out = new ArrayList<>();
+        for (String k : logKeysFilter) {
+            if (k == null) {
+                continue;
+            }
+            String t = k.trim().toLowerCase();
+            if (STORED_LOG_KEYS.contains(t) && !out.contains(t)) {
+                out.add(t);
+            }
+        }
+        return out.isEmpty() ? null : out;
     }
 
     public void info(String message, Object... vars) {

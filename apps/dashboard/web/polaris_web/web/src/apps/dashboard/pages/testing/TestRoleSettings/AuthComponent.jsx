@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Button,
@@ -22,7 +22,8 @@ import JsonRecording from '../user_config/JsonRecording';
 import Dropdown from '../../../components/layouts/Dropdown';
 import TlsAuth from '../user_config/TlsAuth';
 import SampleDataAuth from '../user_config/SampleDataAuth';
-import { HARDCODED, LOGIN_REQUEST, SAMPLE_DATA, TLS_AUTH } from "./TestRoleConstants"; 
+import DigestAuth from '../user_config/DigestAuth';
+import { HARDCODED, LOGIN_REQUEST, SAMPLE_DATA, TLS_AUTH, DIGEST_AUTH } from "./TestRoleConstants"; 
 
 
 
@@ -41,6 +42,11 @@ const AuthComponent = ({
   setOpenAuth,
   advancedHeaderSettingsOpen,
   setAdvancedHeaderSettingsOpen,
+  roleName,
+  hybridTestingEnabled = false,
+  miniTestingServiceNameOptions = [],
+  selectedMiniTestingServiceName = '',
+  setSelectedMiniTestingServiceName,
 }) => {
 
 
@@ -52,6 +58,7 @@ const AuthComponent = ({
   const [hardCodeAuthInfo, setHardCodeAuthInfo] = useState({ authParams: [] });
   const [sampleDataAuthInfo, setSampleDataAuthInfo] = useState({ authParams: [] });
   const [tlsAuthInfo, setTlsAuthInfo] = useState({authParams:[]})
+  const [digestAuthInfo, setDigestAuthInfo] = useState({ authParams: [] });
 
   useEffect(() => {
     if (showAuthComponent && editableDoc >= 0 && initialItems?.authWithCondList?.[editableDoc]) {
@@ -68,6 +75,15 @@ const AuthComponent = ({
     { label: "Login Step Builder", value: "LOGIN_STEP_BUILDER" },
     { label: "JSON Recording", value: "RECORDED_FLOW" },
   ];
+
+  const runLoginFlowOnMenuItems = useMemo(
+    () => [
+      { label: "Default (dashboard)", value: "" },
+      ...miniTestingServiceNameOptions,
+    ],
+    [miniTestingServiceNameOptions]
+  );
+
 
   const setTlsInfo = (obj) => {
     setTlsAuthInfo(prev => ({
@@ -102,6 +118,13 @@ const AuthComponent = ({
     }));
   };
 
+  const setDigestInfo = (obj) => {
+    setDigestAuthInfo((prev) => ({
+      ...prev,
+      authParams: obj.authParams,
+    }));
+  };
+
   const handleCancel = () => {
     setShowAuthComponent(false);
     setCurrentInfo({});
@@ -114,6 +137,7 @@ const AuthComponent = ({
     setHardcodedOpen(true);
     setEditableDocs(-1);
     setTlsAuthInfo({authParams:[]})
+    setDigestAuthInfo({authParams:[]})
     setOpenAuth(HARDCODED)
   };
 
@@ -217,7 +241,28 @@ const AuthComponent = ({
             null
           );
         }
-
+    } else if (openAuth === DIGEST_AUTH) {
+        const currentAutomationType = DIGEST_AUTH;
+        const authParamData = digestAuthInfo.authParams;
+        if (editableDoc > -1) {
+          resp = await api.updateAuthInRole(
+            initialItems.name,
+            apiCond,
+            urlRegexToSend,
+            editableDoc,
+            authParamData,
+            currentAutomationType
+          );
+        } else {
+          resp = await api.addAuthToRole(
+            initialItems.name,
+            apiCond,
+            urlRegexToSend,
+            authParamData,
+            currentAutomationType,
+            null
+          );
+        }
     }
     handleCancel();
     await saveAction(true, resp.selectedRole.authWithCondList);
@@ -301,6 +346,27 @@ const AuthComponent = ({
             transition={{ duration: "500ms", timingFunction: "ease-in-out" }}
             expandOnPrint
           >
+            {hybridTestingEnabled ? (
+              <>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "max-content max-content",
+                    gap: "10px",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text>Run login flow on:</Text>
+                  <Dropdown
+                    id="mini-testing-login-flow-target"
+                    selected={(v) => setSelectedMiniTestingServiceName(v ?? "")}
+                    menuItems={runLoginFlowOnMenuItems}
+                    initial={selectedMiniTestingServiceName ?? ""}
+                  />
+                </div>
+                <br />
+              </>
+            ) : null}
             <div
               style={{
                 display: "grid",
@@ -323,6 +389,7 @@ const AuthComponent = ({
                 extractInformation={true}
                 showOnlyApi={true}
                 setStoreData={handleLoginInfo}
+                miniTestingServiceName={selectedMiniTestingServiceName}
               />
             )}
             {automationType === "RECORDED_FLOW" && (
@@ -330,6 +397,8 @@ const AuthComponent = ({
                 extractInformation={true}
                 showOnlyApi={true}
                 setStoreData={handleLoginInfo}
+                roleName={roleName}
+                miniTestingServiceName={selectedMiniTestingServiceName}
               />
             )}
           </Collapsible>
@@ -351,6 +420,26 @@ const AuthComponent = ({
               expandOnPrint
           >
               <TlsAuth setInformation={setTlsInfo}/>
+          </Collapsible>
+      </LegacyStack>
+
+      <LegacyStack vertical>
+          <Button
+            id={"digest-auth-expand-button"}
+            onClick={() => setOpenAuth(DIGEST_AUTH)}
+            ariaExpanded={checkOpenAuth(DIGEST_AUTH)}
+            icon={checkOpenAuth(DIGEST_AUTH) ? ChevronDownMinor : ChevronRightMinor}
+            ariaControls="digest-auth"
+          >
+            Digest Authentication
+          </Button>
+          <Collapsible
+            open={checkOpenAuth(DIGEST_AUTH)}
+            id="digest-auth"
+            transition={{ duration: "500ms", timingFunction: "ease-in-out" }}
+            expandOnPrint
+          >
+            <DigestAuth setInformation={setDigestInfo}/>
           </Collapsible>
       </LegacyStack>
       </LegacyCard.Section>

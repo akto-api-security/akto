@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -7,8 +8,10 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.util.enums.GlobalEnums.GuardrailSource;
 
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -65,7 +68,6 @@ public class GuardrailPolicies {
     private SentimentDetection sentimentDetection;
     private TokenLimitDetection tokenLimitDetection;
 
-
     // Step 7: Server and application settings (old format - backward compatibility)
     private List<String> selectedMcpServers;
     private List<String> selectedAgentServers;
@@ -75,7 +77,11 @@ public class GuardrailPolicies {
     private List<SelectedServer> selectedAgentServersV2;
     private boolean applyOnResponse;
     private boolean applyOnRequest;
-    
+    private boolean applyToAllServers;
+
+    /** Policy-wide rule behaviour: {@code "block"}, {@code "warn"}, or {@code "alert"}. */
+    private String behaviour;
+
     // Step 7: URL and Confidence Score
     private String url;
     private double confidenceScore;
@@ -85,6 +91,15 @@ public class GuardrailPolicies {
 
     // Context source - to identify which dashboard created this guardrail
     private CONTEXT_SOURCE contextSource;
+
+    // Source of this policy (e.g. GITHUB_WORKFLOW for CI/CD-pushed policies)
+    private GuardrailSource source;
+
+    // Unique hash from the source system; used for idempotent upserts from GITHUB_WORKFLOW
+    private String sourceHash;
+
+    // Modal config
+    private ArrayList<ModelConfig> modelConfigs;
 
     public String getHexId() {
         if (this.id != null) {
@@ -192,11 +207,14 @@ public class GuardrailPolicies {
     @NoArgsConstructor
     public static class PiiType {
         private String type;
-        private String behavior; // "Block" or "Mask"
+        private String behavior; // "Block" or "Mask" or "Warn"
+        /** Minimum matches for this data type in the prompt (inclusive) to trigger; e.g. 20 means fire when 20+ of this type are present. */
+        private int minMatchCount = 1;
 
-        public PiiType(String type, String behavior) {
+        public PiiType(String type, String behavior, int minMatchCount) {
             this.type = type;
             this.behavior = behavior;
+            this.minMatchCount = minMatchCount >= 1 ? minMatchCount : 1;
         }
     }
 
@@ -205,7 +223,7 @@ public class GuardrailPolicies {
     @NoArgsConstructor
     public static class RegexPattern {
         private String pattern;
-        private String behavior; // "Block" or "Mask"
+        private String behavior; // "Block" or "Mask" or "Warn"
 
         public RegexPattern(String pattern, String behavior) {
             this.pattern = pattern;
@@ -332,4 +350,28 @@ public class GuardrailPolicies {
             this.confidenceScore = confidenceScore;
         }
     }
+
+    public enum ModelRole {
+        FAST_THREAT_FILTER,     
+        FAST_FALLBACK_SAFE_FILTER,  
+        FINAL_ARBITER    
+    }
+
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ModelConfig {
+        private String provider;
+        private String model;
+        private String baseUrl;
+        private int timeoutMs;
+        private boolean strictBlock;
+        private boolean strictAllow;
+        private ModelRole modelRole;
+        private String attackType;
+        private double safeDecisionThreshold;
+    }
+
 }

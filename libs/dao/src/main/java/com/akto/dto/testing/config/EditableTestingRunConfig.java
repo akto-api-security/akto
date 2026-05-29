@@ -1,4 +1,5 @@
 package com.akto.dto.testing.config;
+import java.util.List;
 import com.akto.dto.testing.TestingRunConfig;
 
 import lombok.Getter;
@@ -20,6 +21,15 @@ public class EditableTestingRunConfig extends TestingRunConfig {
     @Getter
     @Setter
     private String miniTestingServiceName;
+    
+    @Getter
+    @Setter
+    private List<String> allowedMiniTestingServiceNames;
+
+    @Getter
+    @Setter
+    private boolean doNotMarkIssuesAsFixed;
+
     public EditableTestingRunConfig() {
 
     }

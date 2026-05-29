@@ -1,16 +1,21 @@
 package com.akto.dao.testing;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
+import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.TestingRun;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.util.Constants;
@@ -36,6 +41,9 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
 
         fieldNames = new String[]{TestingRun.NAME};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
+
+        fieldNames = new String[]{TestingRun.DASHBOARD_CONTEXT};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
     }
     
@@ -79,6 +87,50 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
         return testingSummaryIds;
     }
 
+    /**
+     * Latest {@link TestingRunResultSummary} id per testing run in the schedule window (same filters as the test runs table),
+     * then {@link TestingRunResultSummariesDao#fetchLatestTestingRunResultSummaries}. Used to scope category-wise scores
+     * to current summary rows only.
+     */
+    public List<ObjectId> getSummaryIdsForCategoryWiseScores(int startTimestamp, int endTimestamp, List<Integer> apiCollectionIds) {
+        List<Bson> filters = new ArrayList<>();
+        filters.add(Filters.ne(TestingRun.TRIGGERED_BY, "test_editor"));
+        if (startTimestamp > 0 && endTimestamp > 0) {
+            filters.add(Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, endTimestamp));
+            filters.add(Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTimestamp));
+        }
+        if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
+            filters.add(Filters.or(
+                    Filters.in(TestingRun._API_COLLECTION_ID, apiCollectionIds),
+                    Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, apiCollectionIds),
+                    Filters.in(TestingRun._API_COLLECTION_IDS_MULTI, apiCollectionIds)
+            ));
+        }
+        Bson runFilter = filters.size() == 1 ? filters.get(0) : Filters.and(filters);
+        Bson finalFilter = addCollectionsFilterForDashboard(runFilter);
+        List<ObjectId> runIds = new ArrayList<>();
+        try (MongoCursor<TestingRun> cursor = instance.getMCollection().find(finalFilter)
+                .projection(Projections.include(Constants.ID))
+                .iterator()) {
+            while (cursor.hasNext()) {
+                runIds.add(cursor.next().getId());
+            }
+        }
+        if (runIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Map<ObjectId, TestingRunResultSummary> latestByRun = TestingRunResultSummariesDao.instance
+                .fetchLatestTestingRunResultSummaries(runIds);
+        if (latestByRun.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<ObjectId> summaryIds = new ArrayList<>(latestByRun.size());
+        for (TestingRunResultSummary summary : latestByRun.values()) {
+            summaryIds.add(summary.getId());
+        }
+        return summaryIds;
+    }
+
     public boolean isStoredInVulnerableCollection(ObjectId testingRunId){
         if(testingRunId == null){
             return false;
@@ -113,6 +165,77 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
     public long count(Bson q) {
         Bson finalFilter = Filters.and(q, addCollectionsFilterForIAM(q));
         return super.count(finalFilter);
+    }
+
+    /**
+     * Finds test runs with RBAC and context-based filtering for dashboard views.
+     * Applies collection access filtering and dashboardContext filtering for context-based dashboards.
+     */
+    public List<TestingRun> findAllWithRbacAndContext(Bson q, int skip, int limit, Bson sort) {
+        Bson finalFilter = addCollectionsFilterForDashboard(q);
+        return super.findAll(finalFilter, skip, limit, sort, null);
+    }
+
+    /**
+     * Counts test runs with RBAC and context-based filtering for dashboard views.
+     * Applies collection access filtering and dashboardContext filtering for context-based dashboards.
+     */
+    public long countWithRbacAndContext(Bson q) {
+        Bson finalFilter = addCollectionsFilterForDashboard(q);
+        return super.count(finalFilter);
+    }
+
+    /**
+     * Applies RBAC and context-based filtering for dashboard queries.
+     * - Admin users viewing user-based dashboard (contextSource=null): show all
+     * - RBAC disabled: filter by dashboardContext if contextSource is set
+     * - RBAC enabled: filter by accessible collections, and include matching dashboardContext for admins in context-based dashboards
+     */
+    private Bson addCollectionsFilterForDashboard(Bson q) {
+        
+        CONTEXT_SOURCE contextSource = Context.contextSource.get();
+        Integer userId = Context.userId.get();
+        Integer accountId = Context.accountId.get();
+        
+        // Handle test scenarios where userId/accountId might be null
+        if (userId == null || accountId == null) {
+            // In tests/background jobs: no filtering (show all)
+            return q;
+        }
+        
+        boolean isAdmin = RBACDao.getCurrentRoleForUser(userId, accountId) == Role.ADMIN;
+        
+        // Admin viewing user-based dashboard: show all
+        if (isAdmin && contextSource == null) {
+            return q;
+        }
+         
+        List<Integer> apiCollectionIds = UsersCollectionsList.getCollectionsIdForUser(userId, accountId);
+        if (apiCollectionIds == null || (apiCollectionIds.isEmpty() && isAdmin)) {
+            // RBAC disabled or admin with empty list: show all if no context, otherwise filter by dashboardContext
+            return contextSource == null ? q : Filters.and(q, Filters.eq(TestingRun.DASHBOARD_CONTEXT, contextSource));
+        }
+        
+        if (apiCollectionIds.isEmpty()) {
+            // Non-admin with empty list: no access
+            return Filters.and(q, Filters.empty());
+        }
+        
+        // Reuse collection filter builder
+        Bson collectionFilter = Filters.or(
+            Filters.in(TestingRun._API_COLLECTION_ID, apiCollectionIds),
+            Filters.in(TestingRun._API_COLLECTION_ID_WORK_FLOW, apiCollectionIds),
+            Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, apiCollectionIds),
+            Filters.in(TestingRun._API_COLLECTION_IDS_MULTI, apiCollectionIds)
+        );
+        
+        // Admin viewing context-based dashboard: also include matching dashboardContext (for deleted collections)
+        if (contextSource != null && isAdmin) {
+            Bson dashboardContextFilter = Filters.eq(TestingRun.DASHBOARD_CONTEXT, contextSource);      
+            collectionFilter = Filters.or(collectionFilter, dashboardContextFilter);
+        }
+        
+        return Filters.and(q, collectionFilter);
     }
 
     @Override

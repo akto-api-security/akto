@@ -1,7 +1,8 @@
 const TYPE_TAG_KEYS = { MCP_SERVER: 'mcp-server', GEN_AI: 'gen-ai', BROWSER_LLM: 'browser-llm' };
 const ASSET_TAG_KEYS = { MCP_CLIENT: 'mcp-client', AI_AGENT: 'ai-agent', BROWSER_LLM_AGENT: 'browser-llm-agent' };
-const CLIENT_TYPES = { LLM: 'LLM', AI_AGENT: 'AI Agent', MCP_SERVER: 'MCP Server' };
-const ROW_TYPES = { AGENT: 'agent', SERVICE: 'service' };
+const SKILL_TAG_KEY = 'skill';
+const CLIENT_TYPES = { LLM: 'LLM', AI_AGENT: 'AI Agent', MCP_SERVER: 'MCP Server', SKILL: 'Skill' };
+const ROW_TYPES = { AGENT: 'agent', SERVICE: 'service', SKILL: 'skill' };
 const TYPE_TAG_TO_DISPLAY = {
     [TYPE_TAG_KEYS.MCP_SERVER]: CLIENT_TYPES.MCP_SERVER,
     [TYPE_TAG_KEYS.GEN_AI]: CLIENT_TYPES.AI_AGENT,
@@ -12,8 +13,11 @@ const TYPE_TAG_TO_DISPLAY = {
 // agentType is used to infer the type for agent rows (not from tags)
 const KNOWN_CLIENTS = {
     claude: { displayName: 'Claude', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
+    claude1: { displayName: 'Claude Desktop', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
+    claude2: { displayName: 'Claude CLI', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
     chatgpt: { displayName: 'ChatGPT', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     openai: { displayName: 'OpenAI', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
+    codex: { displayName: 'Codex', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     gemini: { displayName: 'Gemini', domain: 'gemini.google.com', agentType: CLIENT_TYPES.LLM },
     copilot: { displayName: 'Copilot', domain: 'copilot.microsoft.com', agentType: CLIENT_TYPES.AI_AGENT },
     cursor: { displayName: 'Cursor', domain: 'cursor.com', agentType: CLIENT_TYPES.AI_AGENT },
@@ -30,7 +34,12 @@ const KNOWN_CLIENTS = {
     stripe: { displayName: 'Stripe', domain: 'stripe.com', agentType: CLIENT_TYPES.MCP_SERVER },
     aws: { displayName: 'AWS', domain: 'aws.amazon.com', agentType: CLIENT_TYPES.MCP_SERVER },
     azure: { displayName: 'Azure', domain: 'azure.microsoft.com', agentType: CLIENT_TYPES.MCP_SERVER },
+    playwright: { displayName: 'Playwright', domain: 'playwright.dev', agentType: CLIENT_TYPES.MCP_SERVER },
+    postgres: { displayName: 'Postgres', domain: 'postgresql.org', agentType: CLIENT_TYPES.MCP_SERVER },
+    atlassian: { displayName: 'Atlassian', domain: 'atlassian.net', agentType: CLIENT_TYPES.MCP_SERVER },
+    docker: { displayName: 'Docker', domain: 'docker.com', agentType: CLIENT_TYPES.MCP_SERVER },
     google: { displayName: 'Google', domain: 'google.com', agentType: CLIENT_TYPES.AI_AGENT },
+    vs: { displayName: 'VS Code', domain: 'code.visualstudio.com', agentType: CLIENT_TYPES.AI_AGENT }, // for VS Code
     antigravity: { displayName: 'Antigravity', domain: 'antigravity.google', agentType: CLIENT_TYPES.AI_AGENT },
     litellm: { displayName: 'LiteLLM', domain: 'litellm.ai', agentType: CLIENT_TYPES.AI_AGENT },
     filesystem: { displayName: 'Filesystem', domain: 'filesystem', agentType: CLIENT_TYPES.MCP_SERVER },
@@ -67,9 +76,45 @@ const formatDisplayName = (tagValue) => {
 
 const getDomainForFavicon = (tagValue) => findClientInfo(tagValue)?.domain || null;
 
+/** Display name for Common MCP Servers list: "Playwright MCP Server", "Slack MCP Server", etc. */
+const getMcpServerDisplayName = (domain) => {
+    if (!domain) return 'Unknown MCP Server';
+    const info = findClientInfo(domain);
+    if (info) return `${info.displayName} MCP Server`;
+    const parts = domain.split('.');
+    const brand = (parts[0] === 'api' && parts.length > 1) ? parts[1] : (parts[0] || domain);
+    return `${formatDisplayName(brand)} MCP Server`;
+};
+
+/** Friendly name for Common LLMs list: "ChatGPT", "Gemini", "Grok", etc. */
+const getFriendlyLlmName = (domain) => {
+    if (!domain) return 'Unknown';
+    const info = findClientInfo(domain);
+    if (info) return info.displayName;
+    const first = domain.split('.')[0];
+    return formatDisplayName(first || domain);
+};
+
+// Normalizes both raw tag objects ({keyName, value}) and formatted strings ('key=value') to objects.
+const normalizeEnvType = (envType) => {
+    if (!Array.isArray(envType) || envType.length === 0) return [];
+    if (typeof envType[0] === 'string') {
+        return envType.map(t => {
+            const eq = t.indexOf('=');
+            return eq >= 0 ? { keyName: t.slice(0, eq), value: t.slice(eq + 1) } : { keyName: t, value: '' };
+        });
+    }
+    return envType;
+};
+
 const getTypeFromTags = (envType) => {
-    if (!Array.isArray(envType)) return CLIENT_TYPES.MCP_SERVER;
-    for (const tag of envType) {
+    const tags = normalizeEnvType(envType);
+    if (tags.length === 0) return CLIENT_TYPES.MCP_SERVER;
+    const hasSkill = tags.some(tag => tag.keyName === SKILL_TAG_KEY);
+    const hasAiAgent = tags.some(tag => tag.keyName === ASSET_TAG_KEYS.AI_AGENT);
+    const hasMcpServer = tags.some(tag => tag.keyName === TYPE_TAG_KEYS.MCP_SERVER);
+    if (hasSkill && !hasAiAgent && !hasMcpServer) return CLIENT_TYPES.SKILL;
+    for (const tag of tags) {
         if (tag.keyName && TYPE_TAG_TO_DISPLAY[tag.keyName]) return TYPE_TAG_TO_DISPLAY[tag.keyName];
     }
     return CLIENT_TYPES.MCP_SERVER;
@@ -99,16 +144,59 @@ const getAgentTypeFromValue = (tagValue) => {
     return info?.agentType || CLIENT_TYPES.AI_AGENT;
 };
 
-export { 
-    formatDisplayName, 
-    getDomainForFavicon, 
-    getTypeFromTags, 
-    findAssetTag, 
+/**
+ * Agentic asset category for inventory tree rows (AI Agent / MCP Server / LLM / Skill).
+ * Uses raw envType when present, else formatted envType strings from table data.
+ */
+const getAgenticCategoryLabel = (collection) => {
+    const raw = collection?.envTypeOriginal;
+    if (Array.isArray(raw) && raw.length > 0) return getTypeFromTags(raw);
+    if (Array.isArray(collection?.skills) && collection.skills.length > 0) return CLIENT_TYPES.SKILL;
+    const envArr = collection?.envType;
+    if (Array.isArray(envArr) && envArr.length > 0) return getTypeFromTags(envArr);
+    return CLIENT_TYPES.MCP_SERVER;
+};
+
+const PERSONAL_ACCOUNT_TAG_KEYS = ['browser-llm-account-type', 'login-user-email-type'];
+
+const hasPersonalAccountTag = (envType) => {
+    if (!Array.isArray(envType)) return false;
+    return envType.some((tag) => {
+        if (typeof tag === 'string') {
+            return PERSONAL_ACCOUNT_TAG_KEYS.some((key) => tag === `${key}=personal`);
+        }
+        return PERSONAL_ACCOUNT_TAG_KEYS.includes(tag.keyName) && tag.value === 'personal';
+    });
+};
+
+const LOCAL_MCP_SERVER_TAG_KEY = 'local-mcp-server';
+
+const hasLocalMcpServerTag = (envType) => {
+    if (!Array.isArray(envType)) return false;
+    return envType.some((tag) => {
+        if (typeof tag === 'string') {
+            return tag === LOCAL_MCP_SERVER_TAG_KEY || tag.startsWith(`${LOCAL_MCP_SERVER_TAG_KEY}=`);
+        }
+        return tag.keyName === LOCAL_MCP_SERVER_TAG_KEY;
+    });
+};
+
+export {
+    formatDisplayName,
+    getDomainForFavicon,
+    getMcpServerDisplayName,
+    getFriendlyLlmName,
+    getTypeFromTags,
+    findAssetTag,
     findTypeTag,
     getAgentTypeFromValue,
-    CLIENT_TYPES, 
-    TYPE_TAG_KEYS, 
+    getAgenticCategoryLabel,
+    hasPersonalAccountTag,
+    hasLocalMcpServerTag,
+    CLIENT_TYPES,
+    TYPE_TAG_KEYS,
     ASSET_TAG_KEYS,
-    ROW_TYPES 
+    SKILL_TAG_KEY,
+    ROW_TYPES
 };
 export default formatDisplayName;

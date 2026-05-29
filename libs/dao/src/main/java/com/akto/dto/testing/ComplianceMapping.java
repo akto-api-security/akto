@@ -36,6 +36,11 @@ public class ComplianceMapping {
         return this.mapComplianceToListClauses;
     }
 
+    /** True when there is at least one compliance standard mapped to clauses (inline YAML or merged from common). */
+    public boolean hasMappedClauses() {
+        return mapComplianceToListClauses != null && !mapComplianceToListClauses.isEmpty();
+    }
+
     public void setMapComplianceToListClauses(Map<String,List<String>> mapComplianceToListClauses) {
         this.mapComplianceToListClauses = mapComplianceToListClauses;
     }

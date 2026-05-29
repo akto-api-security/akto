@@ -62,13 +62,17 @@ public class ArcadeWebhookAction extends ActionSupport {
         try {
             loggerMaker.info("Arcade webhook received");
 
-            String requestURI = ServletActionContext.getRequest().getRequestURI();
+            javax.servlet.http.HttpServletRequest request = ServletActionContext.getRequest();
+            String requestURI = request.getRequestURI();
             String hookType = detectHookTypeFromPath(requestURI);
             loggerMaker.info("Detected Arcade hook type from path: " + hookType + " (URI: " + requestURI + ")");
 
+            String ip = extractClientIp(request);
+            String userAgent = request.getHeader("User-Agent");
+
             parseJsonBody();
 
-            Map<String, Object> requestData = buildRequestData(hookType);
+            Map<String, Object> requestData = buildRequestData(hookType, ip, userAgent);
             Map<String, Object> gatewayResponse = gateway.processHttpProxy(requestData);
 
             if (gatewayResponse != null && gatewayResponse.containsKey("guardrailsResult")) {
@@ -78,8 +82,10 @@ public class ArcadeWebhookAction extends ActionSupport {
                     if (allowed != null && !Boolean.TRUE.equals(allowed) && !"true".equalsIgnoreCase(String.valueOf(allowed))) {
                         code = "CHECK_FAILED";
                         Object reasonObj = guardrailsResult.get("Reason");
-                        String reason = reasonObj != null ? reasonObj.toString() : "Request blocked by guardrails policy";
-                        error_message = "Blocked by Akto Guardrails " + reason;
+                        String reason = (reasonObj != null && !reasonObj.toString().trim().isEmpty())
+                                ? reasonObj.toString()
+                                : "Request blocked by guardrails policy";
+                        error_message = "Blocked by Akto Guardrails: " + reason;
                         loggerMaker.info("Arcade webhook blocked by guardrails - hookType: " + hookType + ", reason: " + reason);
 
                         ingestBlockedRequest(requestData);
@@ -87,6 +93,27 @@ public class ArcadeWebhookAction extends ActionSupport {
                         return Action.SUCCESS.toUpperCase();
                     }
                 }
+            }
+
+            if (gatewayResponse != null && gatewayResponse.containsKey("responseGuardrailsResult")) {
+                Map<String, Object> responseGuardrailsResult = (Map<String, Object>) gatewayResponse.get("responseGuardrailsResult");
+                if (responseGuardrailsResult != null) {
+                    Object allowed = responseGuardrailsResult.get("Allowed");
+                    if (allowed != null && !Boolean.TRUE.equals(allowed) && !"true".equalsIgnoreCase(String.valueOf(allowed))) {
+                        code = "CHECK_FAILED";
+                        Object reasonObj = responseGuardrailsResult.get("Reason");
+                        String reason = (reasonObj != null && !reasonObj.toString().trim().isEmpty())
+                                ? reasonObj.toString()
+                                : "Response blocked by guardrails policy";
+                        error_message = "Blocked by Akto Guardrails: " + reason;
+                        loggerMaker.info("Arcade webhook response blocked by guardrails - hookType: " + hookType + ", reason: " + reason);
+
+                        ingestBlockedRequest(requestData);
+
+                        return Action.SUCCESS.toUpperCase();
+                    }
+                }
+                ingestAllowedResponse(requestData);
             }
 
             code = "OK";
@@ -129,6 +156,19 @@ public class ArcadeWebhookAction extends ActionSupport {
         }
     }
 
+    private void ingestAllowedResponse(Map<String, Object> requestData) {
+        try {
+            Map<String, Object> ingestData = new HashMap<>(requestData);
+            ingestData.put("ingest_data", "true");
+            ingestData.put("response_guardrails", null);
+
+            gateway.processHttpProxy(ingestData);
+            loggerMaker.info("Allowed response ingested into Kafka");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error ingesting allowed response: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
+        }
+    }
+
     private void ingestBlockedRequest(Map<String, Object> requestData) {
         try {
             Map<String, Object> blockedData = new HashMap<>(requestData);
@@ -143,6 +183,7 @@ public class ArcadeWebhookAction extends ActionSupport {
 
             blockedData.put("ingest_data", "true");
             blockedData.put("guardrails", null);
+            blockedData.put("response_guardrails", null);
 
             gateway.processHttpProxy(blockedData);
             loggerMaker.info("Blocked request ingested into Kafka");
@@ -151,7 +192,7 @@ public class ArcadeWebhookAction extends ActionSupport {
         }
     }
 
-    private Map<String, Object> buildRequestData(String hookType) throws Exception {
+    private Map<String, Object> buildRequestData(String hookType, String ip, String userAgent) throws Exception {
         Map<String, Object> requestData = new HashMap<>();
 
         String toolName = extractToolName();
@@ -163,27 +204,31 @@ public class ArcadeWebhookAction extends ActionSupport {
         switch (hookType) {
             case HOOK_TYPE_ACCESS:
                 path = "/access";
-                headers = buildRequestHeaders(hookType, null);
+                headers = buildRequestHeaders(hookType, null, userAgent);
                 requestBody.put("user_id", user_id);
                 if (toolkits != null) requestBody.put("toolkits", toolkits);
                 break;
 
             case HOOK_TYPE_POST:
                 path = "/tools/" + toolName;
-                headers = buildRequestHeaders(hookType, toolName);
+                headers = buildRequestHeaders(hookType, toolName, userAgent);
                 if (tool != null) requestBody.put("tool", tool);
                 if (inputs != null) requestBody.put("inputs", inputs);
 
                 requestData.put("statusCode", String.valueOf(success != null && success ? 200 : 500));
                 requestData.put("status", success != null && success ? "SUCCESS" : "ERROR");
-                requestData.put("responsePayload", output != null ? objectMapper.writeValueAsString(output) : "{}");
+
+                String scannableText = extractScannableOutputText(output, success, execution_error);
+                Map<String, Object> responseBody = new HashMap<>();
+                responseBody.put("body", scannableText);
+                requestData.put("responsePayload", objectMapper.writeValueAsString(responseBody));
                 requestData.put("responseHeaders", "{}");
                 break;
 
             case HOOK_TYPE_PRE:
             default:
                 path = "/tools/" + toolName;
-                headers = buildRequestHeaders(hookType, toolName);
+                headers = buildRequestHeaders(hookType, toolName, userAgent);
                 if (tool != null) requestBody.put("tool", tool);
                 if (inputs != null) requestBody.put("inputs", inputs);
                 break;
@@ -196,10 +241,11 @@ public class ArcadeWebhookAction extends ActionSupport {
 
         Map<String, String> tag = new HashMap<>();
         tag.put("gen-ai", "Gen AI");
+        tag.put("source", "ARCADE_DEV");
         requestData.put("tag", objectMapper.writeValueAsString(tag));
 
         requestData.put("contextSource", "AGENTIC");
-        requestData.put("ip", DEFAULT_IP);
+        requestData.put("ip", ip != null && !ip.isEmpty() ? ip : DEFAULT_IP);
         requestData.put("time", String.valueOf(System.currentTimeMillis() / 1000));
         requestData.put("type", "HTTP/1.1");
         requestData.put("akto_account_id", DEFAULT_AKTO_ACCOUNT_ID);
@@ -211,16 +257,19 @@ public class ArcadeWebhookAction extends ActionSupport {
         if (HOOK_TYPE_PRE.equals(hookType)) {
             requestData.put("guardrails", "true");
         } else if (HOOK_TYPE_POST.equals(hookType)) {
-            requestData.put("ingest_data", "true");
+            requestData.put("response_guardrails", "true");
         }
 
         return requestData;
     }
 
-    private Map<String, Object> buildRequestHeaders(String hookType, String toolName) {
+    private Map<String, Object> buildRequestHeaders(String hookType, String toolName, String userAgent) {
         Map<String, Object> headers = new HashMap<>();
         headers.put("host", ARCADE_HOST);
         headers.put("content-type", "application/json");
+        if (userAgent != null && !userAgent.isEmpty()) {
+            headers.put("user-agent", userAgent);
+        }
         headers.put("x-arcade-event", hookType);
         if (execution_id != null) {
             headers.put("x-arcade-execution-id", execution_id);
@@ -260,6 +309,36 @@ public class ArcadeWebhookAction extends ActionSupport {
         return headers;
     }
 
+    private String extractClientIp(javax.servlet.http.HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip != null && !ip.isEmpty()) {
+            // X-Forwarded-For may contain a comma-separated list; the first is the client IP
+            int commaIdx = ip.indexOf(',');
+            ip = commaIdx >= 0 ? ip.substring(0, commaIdx).trim() : ip.trim();
+            return stripPort(ip);
+        }
+        ip = request.getHeader("X-Real-IP");
+        if (ip != null && !ip.isEmpty()) {
+            return stripPort(ip.trim());
+        }
+        return stripPort(request.getRemoteAddr());
+    }
+
+    private String stripPort(String ip) {
+        if (ip == null) return null;
+        // IPv6 addresses are wrapped in brackets: [::1]:8080
+        if (ip.startsWith("[")) {
+            int bracketEnd = ip.indexOf(']');
+            return bracketEnd >= 0 ? ip.substring(1, bracketEnd) : ip;
+        }
+        // IPv4 with port: 1.2.3.4:8080
+        int lastColon = ip.lastIndexOf(':');
+        if (lastColon >= 0 && ip.indexOf(':') == lastColon) {
+            return ip.substring(0, lastColon);
+        }
+        return ip;
+    }
+
     private String detectHookTypeFromPath(String requestURI) {
         if (requestURI == null) {
             return HOOK_TYPE_PRE;
@@ -272,6 +351,22 @@ public class ArcadeWebhookAction extends ActionSupport {
         }
 
         return HOOK_TYPE_PRE;
+    }
+
+    private String extractScannableOutputText(Object output, Boolean success, String executionError) throws Exception {
+        if (Boolean.FALSE.equals(success) && executionError != null && !executionError.isEmpty()) {
+            return executionError;
+        }
+        if (output == null) {
+            return "";
+        }
+        if (output instanceof String) {
+            return (String) output;
+        }
+        if (output instanceof Number || output instanceof Boolean) {
+            return String.valueOf(output);
+        }
+        return objectMapper.writeValueAsString(output);
     }
 
     private String extractToolName() {

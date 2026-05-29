@@ -51,6 +51,10 @@ public class InventoryAction extends UserAction {
 
     int apiCollectionId = -1;
 
+    @Getter
+    @Setter
+    private List<Integer> apiCollectionIds;
+
     BasicDBObject response;
 
     // public String fetchAPICollection() {
@@ -379,7 +383,7 @@ public class InventoryAction extends UserAction {
     public String fetchApiInfosFromSTIs(){
         ApiCollection collection = ApiCollectionsDao.instance.findOne(
                 Filters.in(Constants.ID, apiCollectionId),
-                Projections.include(ApiCollection.HOST_NAME)
+                Projections.include(ApiCollection.HOST_NAME, ApiCollection._TYPE)
         );
         if(collection == null){
             addActionError("No such collection exists");
@@ -389,7 +393,8 @@ public class InventoryAction extends UserAction {
         if((collection.getHostName() == null || collection.getHostName().isEmpty()) && collection.getId() != AllAPIsGroup.ALL_APIS_GROUP_ID){
             Bson filter = Filters.and(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
                             Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
-            if (collection.getType() != null && !collection.getType().equals(ApiCollection.Type.API_GROUP)) {
+            // the previous logic was of this was redundant as only 1 type of ApiCollection.Type exists
+            if (collection.getType() != null && collection.getType().equals(ApiCollection.Type.API_GROUP) && Context.accountId.get() == 1729478227) {
                 filter = Filters.and(SingleTypeInfoDao.filterForHostHeader(0, false), filter);
             }
             list = ApiCollectionsDao.fetchEndpointsInCollection(filter, 0, -1, Utils.DELTA_PERIOD_VALUE);
@@ -1287,12 +1292,10 @@ public class InventoryAction extends UserAction {
         response = new BasicDBObject();
          try {
             List<Bson> pipeLine = new ArrayList<>();
-            pipeLine.add(Aggregates.sort(
-                Sorts.descending(ApiInfo.LAST_TESTED)
-            ));
-            pipeLine.add(
-                Aggregates.match(Filters.gt(ApiInfo.LAST_TESTED, 0))
-            );
+
+            if (this.apiCollectionIds != null && !this.apiCollectionIds.isEmpty()) {
+                pipeLine.add(Aggregates.match(Filters.in(ApiInfo.ID_API_COLLECTION_ID, this.apiCollectionIds)));
+            }
 
             try {
                 List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
@@ -1301,6 +1304,12 @@ public class InventoryAction extends UserAction {
                 }
             } catch(Exception e){
             }
+            pipeLine.add(
+                Aggregates.match(Filters.gt(ApiInfo.LAST_TESTED, 0))
+            );
+            pipeLine.add(Aggregates.sort(
+                Sorts.descending(ApiInfo.LAST_TESTED)
+            ));
 
             GroupByTimeRange.groupByWeek(pipeLine, ApiInfo.LAST_TESTED, "totalApisTested", new BasicDBObject());
             MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();

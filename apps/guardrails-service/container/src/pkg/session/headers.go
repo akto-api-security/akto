@@ -3,6 +3,7 @@ package session
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"os"
 	"strconv"
@@ -31,8 +32,8 @@ func ExtractSessionID(headers map[string]string) string {
 func ExtractRequestID(headers map[string]string) string {
 	candidates := []string{
 		"x-kong-request-id", "X-Kong-Request-Id", // Kong gateway
-		"x-request-id", "X-Request-Id",           // Standard
-		"request-id", "Request-Id",               // Alternative
+		"x-request-id", "X-Request-Id", // Standard
+		"request-id", "Request-Id", // Alternative
 	}
 
 	for _, key := range candidates {
@@ -74,10 +75,7 @@ func isSessionEnabled() bool {
 	return enabled
 }
 
-// ExtractSessionIDsFromRequest extracts session ID and request ID from HTTP request headers
-// Returns empty strings if SESSION_ENABLED environment variable is set to false
-func ExtractSessionIDsFromRequest(r *http.Request) (sessionID, requestID string) {
-	// Check if session functionality is enabled
+func ExtractSessionIDsFromRequest(r *http.Request, requestHeadersJSON string) (sessionID, requestID string) {
 	if !isSessionEnabled() {
 		return "", ""
 	}
@@ -91,5 +89,32 @@ func ExtractSessionIDsFromRequest(r *http.Request) (sessionID, requestID string)
 
 	sessionID = ExtractSessionID(headers)
 	requestID = ExtractRequestID(headers)
+
+	if sessionID != "" && requestID != "" {
+		return sessionID, requestID
+	}
+
+	bodySession, bodyRequest := extractSessionIDsFromHeadersJSON(requestHeadersJSON)
+	if sessionID == "" {
+		sessionID = bodySession
+	}
+	if requestID == "" {
+		requestID = bodyRequest
+	}
 	return sessionID, requestID
+}
+
+// extractSessionIDsFromHeadersJSON parses a JSON-encoded headers map (string→string,
+// matching how the rest of this service deserializes requestHeaders) and extracts
+// session and request IDs from it. Returns empty strings on empty or invalid input.
+func extractSessionIDsFromHeadersJSON(headersJSON string) (sessionID, requestID string) {
+	headersJSON = strings.TrimSpace(headersJSON)
+	if headersJSON == "" {
+		return "", ""
+	}
+	var headers map[string]string
+	if err := json.Unmarshal([]byte(headersJSON), &headers); err != nil {
+		return "", ""
+	}
+	return ExtractSessionID(headers), ExtractRequestID(headers)
 }

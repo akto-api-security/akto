@@ -1,10 +1,15 @@
 package com.akto.threat.detection;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.common.Metric;
+import org.apache.kafka.common.MetricName;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -26,13 +31,16 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.threat.detection.constants.KafkaTopic;
+import com.akto.threat.detection.hyperscan.HyperscanThreatMatcher;
 import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
 import com.akto.threat.detection.ip_api_counter.CmsCounterLayer;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
 import com.akto.threat.detection.ip_api_counter.DistributionDataForwardLayer;
+import com.akto.threat.detection.ip_api_counter.DistributionStreamConsumer;
 import com.akto.threat.detection.tasks.ConfigPoller;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
+import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.utils.Utils;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
@@ -43,6 +51,8 @@ import com.akto.dto.billing.Organization;
 public class Main {
 
   private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
+  private static final List<String> KAFKA_NUMERIC_METRICS = Arrays.asList(
+      "records-lag-max", "records-consumed-rate", "fetch-latency-avg", "bytes-consumed-rate");
   private static final LoggerMaker logger = new LoggerMaker(Main.class, LogDb.THREAT_DETECTION);
   private static boolean aggregationRulesEnabled = System.getenv().getOrDefault("AGGREGATION_RULES_ENABLED", "true").equals("true");
 
@@ -61,6 +71,19 @@ public class Main {
     logger.warnAndAddToDb("aggregation rules enabled " + aggregationRulesEnabled);
     ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
 
+    // Eagerly initialize Hyperscan so it's ready if Stigg flag switches to hyperscan mode at runtime
+    try {
+      HyperscanThreatMatcher matcher = HyperscanThreatMatcher.getInstance();
+      boolean hsReady = matcher.initializeFromClasspath("threat-patterns-example.txt");
+      if (hsReady) {
+        logger.infoAndAddToDb("Hyperscan initialized eagerly with " + matcher.getPatternCount() + " patterns");
+      } else {
+        logger.warnAndAddToDb("Hyperscan initialization failed - hyperscan mode will be unavailable");
+      }
+    } catch (Exception e) {
+      logger.warnAndAddToDb("Hyperscan initialization error (non-fatal): " + e.getMessage());
+    }
+
     int accountId = ClientActor.getAccountId();
     Context.accountId.set(accountId);
     String instanceId = ModuleInfoWorker.getModuleName(ModuleInfo.ModuleType.THREAT_DETECTION); 
@@ -73,23 +96,39 @@ public class Main {
         }
     }
 
-    KafkaConfig trafficKafka = createKafkaConfig("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER", 500, 100);
+    KafkaConfig trafficKafka = createKafkaConfig("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER", 500, 100, 100 * 1024 * 1024);
     KafkaConfig internalKafka = createKafkaConfig("AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER", 100, 100);
 
     startModuleConfigPoller();
 
     initCustomDataTypeScheduler();
+
     CmsCounterLayer.initialize(localRedis);
-    DistributionCalculator distributionCalculator = new DistributionCalculator();
-    DistributionDataForwardLayer distributionDataForwardLayer = new DistributionDataForwardLayer(localRedis, distributionCalculator);
+
+    DistributionCalculator distributionCalculator = localRedis != null
+        ? new DistributionCalculator(localRedis)
+        : null;
+    DistributionDataForwardLayer distributionDataForwardLayer = localRedis != null
+        ? new DistributionDataForwardLayer(localRedis)
+        : null;
 
     boolean apiDistributionEnabled = Utils.apiDistributionEnabled(localRedis != null, System.getenv().getOrDefault("API_DISTRIBUTION_ENABLED", "true").equals("true"));
 
     triggerDistributionDataForwardCron(apiDistributionEnabled, distributionDataForwardLayer);
 
+    KafkaProtoProducer internalKafkaProducer =
+        new KafkaProtoProducer(internalKafka);
+
+    // Start threat stream consumers (background threads)
+    if (localRedis != null && apiDistributionEnabled && distributionCalculator != null) {
+        startDistributionStreamConsumers(localRedis, internalKafkaProducer, instanceId);
+    }
+
     String currentTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yy-MM-dd HH:mm:ss"));
     logger.warnAndAddToDb("Initialization finished starting DetectorTask at " + currentTime);
-    new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, localRedis, distributionCalculator, apiDistributionEnabled, instanceId).run();
+    MaliciousTrafficDetectorTask detectorTask = new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, localRedis, distributionCalculator, apiDistributionEnabled, instanceId);
+    scheduleKafkaMetricsPoller(detectorTask);
+    detectorTask.run();
 
     new SendMaliciousEventsToBackend(internalKafka, KafkaTopic.ThreatDetection.ALERTS).run();
 
@@ -133,6 +172,14 @@ public class Main {
     }
   }
 
+  public static void startDistributionStreamConsumers(RedisClient redisClient,
+      KafkaProtoProducer internalKafkaProducer, String instanceId) {
+    java.util.concurrent.ExecutorService streamExecutor = Executors.newFixedThreadPool(1);
+    streamExecutor.submit(new DistributionStreamConsumer(
+        redisClient, instanceId, internalKafkaProducer));
+    logger.infoAndAddToDb("Started threat stream consumer: " + instanceId);
+  }
+
   public static RedisClient createLocalRedisClient() {
     RedisClient redisClient = RedisClient.create(System.getenv("AKTO_THREAT_DETECTION_LOCAL_REDIS_URI"));
     try {
@@ -163,6 +210,10 @@ public class Main {
   }
 
   private static KafkaConfig createKafkaConfig(String bootstrapServerEnvVar, int maxPollRecords, int pollDurationMilli) {
+    return createKafkaConfig(bootstrapServerEnvVar, maxPollRecords, pollDurationMilli, 0);
+  }
+
+  private static KafkaConfig createKafkaConfig(String bootstrapServerEnvVar, int maxPollRecords, int pollDurationMilli, int fetchMaxBytes) {
     return KafkaConfig.newBuilder()
         .setGroupId(CONSUMER_GROUP_ID)
         .setBootstrapServers(System.getenv(bootstrapServerEnvVar))
@@ -170,12 +221,49 @@ public class Main {
             KafkaConsumerConfig.newBuilder()
                 .setMaxPollRecords(maxPollRecords)
                 .setPollDurationMilli(pollDurationMilli)
+                .setFetchMaxBytes(fetchMaxBytes)
                 .build())
         .setProducerConfig(
-            KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
+            KafkaProducerConfig.newBuilder().setBatchSize(16384).setLingerMs(100).build())
         .setKeySerializer(Serializer.STRING)
         .setValueSerializer(Serializer.BYTE_ARRAY)
         .build();
+  }
+
+  private static void scheduleKafkaMetricsPoller(MaliciousTrafficDetectorTask detectorTask) {
+    scheduler.scheduleAtFixedRate(() -> {
+      try {
+        Consumer<String, byte[]> consumer = detectorTask.getKafkaConsumer();
+        if (consumer == null) return;
+
+        for (Map.Entry<MetricName, ? extends Metric> entry : consumer.metrics().entrySet()) {
+          MetricName key = entry.getKey();
+          Metric value = entry.getValue();
+
+          if (key.tags().containsKey("partition") || key.tags().containsKey("topic")) {
+            continue;
+          }
+
+          if (!KAFKA_NUMERIC_METRICS.contains(key.name())) {
+            continue;
+          }
+
+          double metricValue = Double.isNaN((double) value.metricValue()) ? 0d : (double) value.metricValue();
+
+          if (key.name().equals("records-lag-max")) {
+            AllMetrics.instance.setKafkaRecordsLagMax((float) metricValue);
+          } else if (key.name().equals("records-consumed-rate")) {
+            AllMetrics.instance.setKafkaRecordsConsumedRate((float) metricValue);
+          } else if (key.name().equals("fetch-latency-avg")) {
+            AllMetrics.instance.setKafkaFetchAvgLatency((float) metricValue);
+          } else if (key.name().equals("bytes-consumed-rate")) {
+            AllMetrics.instance.setKafkaBytesConsumedRate((float) metricValue);
+          }
+        }
+      } catch (Exception e) {
+        logger.errorAndAddToDb("Failed to collect Kafka consumer metrics: " + e.getMessage());
+      }
+    }, 0, 1, TimeUnit.MINUTES);
   }
 
   private static void validateAndInitializeDeployment(boolean isHybridDeployment) throws Exception {

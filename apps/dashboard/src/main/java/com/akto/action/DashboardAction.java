@@ -36,6 +36,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.opensymphony.xwork2.Action;
 
+import lombok.Getter;
 import lombok.Setter;
 
 import static com.akto.dto.test_run_findings.TestingRunIssues.KEY_SEVERITY;
@@ -44,6 +45,9 @@ public class DashboardAction extends UserAction {
 
     private int startTimeStamp;
     private int endTimeStamp;
+    @Getter
+    @Setter
+    private List<Integer> apiCollectionIds;
     private Map<Integer,List<IssueTrendType>> issuesTrendMap = new HashMap<>() ;
     private int skip;
     private List<Activity> recentActivities = new ArrayList<>();
@@ -67,24 +71,24 @@ public class DashboardAction extends UserAction {
         // Query 1: OPEN issues before endTimeStamp excluding deactivated
         // Optimized: (total OPEN with timestamp) - (deactivated OPEN with timestamp)
         long query1Start = System.currentTimeMillis();
-        totalIssuesCount = TestingRunIssuesDao.instance.count(
-            Filters.and(
-                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
-                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
-            )
+        Bson baseFilter1 = Filters.and(
+            Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
+            Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
         );
+        Bson dashboardFilter1 = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(baseFilter1);
+        totalIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(dashboardFilter1);
         long query1Time = System.currentTimeMillis() - query1Start;
         loggerMaker.warnAndAddToDb("Query1 (OPEN issues count): result=" + totalIssuesCount + ", time=" + query1Time + "ms, endTimeStamp=" + endTimeStamp, LogDb.DASHBOARD);
 
         if (!demoCollections.isEmpty()) {
             long query2Start = System.currentTimeMillis();
-            long excluded = TestingRunIssuesDao.instance.count(
-                Filters.and(
-                    Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
-                    Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
-                    Filters.in("_id.apiInfoKey.apiCollectionId", demoCollections)
-                )
+            Bson baseFilter2 = Filters.and(
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
+                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
+                Filters.in("_id.apiInfoKey.apiCollectionId", demoCollections)
             );
+            Bson dashboardFilter2 = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(baseFilter2);
+            long excluded = TestingRunIssuesDao.instance.getMCollection().countDocuments(dashboardFilter2);
             long query2Time = System.currentTimeMillis() - query2Start;
             loggerMaker.warnAndAddToDb("Query2 (OPEN deactivated count): result=" + excluded + ", time=" + query2Time + "ms, demoCollectionsSize=" + demoCollections.size(), LogDb.DASHBOARD);
             totalIssuesCount -= excluded;
@@ -93,26 +97,26 @@ public class DashboardAction extends UserAction {
         // Query 2: NOT IGNORED issues (OPEN + FIXED) before startTimeStamp excluding deactivated
         // Optimized: (total OPEN+FIXED with timestamp) - (deactivated OPEN+FIXED with timestamp)
         long query3Start = System.currentTimeMillis();
-        oldOpenCount = TestingRunIssuesDao.instance.count(
-                Filters.and(
-                        Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
-                            Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED)),
-                        Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp)
-                )
+        Bson baseFilter3 = Filters.and(
+            Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
+                Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED)),
+            Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp)
         );
+        Bson dashboardFilter3 = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(baseFilter3);
+        oldOpenCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(dashboardFilter3);
         long query3Time = System.currentTimeMillis() - query3Start;
         loggerMaker.warnAndAddToDb("Query3 (OPEN+FIXED issues count): result=" + oldOpenCount + ", time=" + query3Time + "ms, startTimeStamp=" + startTimeStamp, LogDb.DASHBOARD);
 
         if (!demoCollections.isEmpty()) {
             long query4Start = System.currentTimeMillis();
-            long excluded = TestingRunIssuesDao.instance.count(
-                Filters.and(
-                        Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
-                            Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED)),
-                        Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp),
-                        Filters.in("_id.apiInfoKey.apiCollectionId", demoCollections)
-                )
-        );
+            Bson baseFilter4 = Filters.and(
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
+                    Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED)),
+                Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp),
+                Filters.in("_id.apiInfoKey.apiCollectionId", demoCollections)
+            );
+            Bson dashboardFilter4 = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(baseFilter4);
+            long excluded = TestingRunIssuesDao.instance.getMCollection().countDocuments(dashboardFilter4);
             long query4Time = System.currentTimeMillis() - query4Start;
             loggerMaker.warnAndAddToDb("Query4 (OPEN+FIXED deactivated count): result=" + excluded + ", time=" + query4Time + "ms, demoCollectionsSize=" + demoCollections.size(), LogDb.DASHBOARD);
             oldOpenCount -= excluded;
@@ -160,24 +164,22 @@ public class DashboardAction extends UserAction {
 
 
         List<GlobalEnums.TestRunIssueStatus> allowedStatus = Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN);
-        Bson issuesFilter = Filters.and(
-                Filters.in(KEY_SEVERITY, severityToFetch),
-                Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
-                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
-                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allowedStatus),
-                Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, demoCollections)
-        );
+        List<Bson> issueMatchParts = new ArrayList<>();
+        issueMatchParts.add(Filters.in(KEY_SEVERITY, severityToFetch));
+        issueMatchParts.add(Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp));
+        issueMatchParts.add(Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp));
+        issueMatchParts.add(Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allowedStatus));
+        issueMatchParts.add(Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, demoCollections));
+        if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
+            issueMatchParts.add(Filters.in(TestingRunIssues.ID_API_COLLECTION_ID, apiCollectionIds));
+        }
+        Bson issuesFilter = Filters.and(issueMatchParts);
+
+        // Apply dashboard filtering (RBAC + dashboardContext)
+        Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(issuesFilter);
 
         List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.match(issuesFilter));
-
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
-            }
-        } catch(Exception e){
-        }
+        pipeline.add(Aggregates.match(dashboardFilter));
 
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
                                                     .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
@@ -252,21 +254,17 @@ public class DashboardAction extends UserAction {
                 }
             }
 
-            basePipeline.add(
-                Aggregates.match(Filters.and(
+            Bson filters = Filters.and(
                     Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
-                    filterQ
-                ))
-            );
+                    filterQ);
 
-            try {
-                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(
-                    Context.userId.get(), Context.accountId.get()
-                );
-                if (collectionIds != null) {
-                    basePipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
-                }
-            } catch (Exception e) {
+            // Apply dashboard filtering (RBAC + dashboardContext)
+            Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(filters);
+
+            basePipeline.add(Aggregates.match(dashboardFilter));
+
+            if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
+                basePipeline.add(Aggregates.match(Filters.in(TestingRunIssues.ID_API_COLLECTION_ID, apiCollectionIds)));
             }
 
             BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)

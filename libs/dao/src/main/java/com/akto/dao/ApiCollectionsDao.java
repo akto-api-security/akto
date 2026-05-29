@@ -15,8 +15,11 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -26,7 +29,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.apache.commons.collections.CollectionUtils;
+
 public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection> {
+
+    private static final Logger logger = LoggerFactory.getLogger(ApiCollectionsDao.class);
 
     public static final ApiCollectionsDao instance = new ApiCollectionsDao();
     private static Bson projectionForApis = Projections.include(Constants.TIMESTAMP, ApiInfoKey.API_COLLECTION_ID, ApiInfoKey.URL, ApiInfoKey.METHOD);
@@ -72,6 +79,30 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         List<ApiCollection> ret = ApiCollectionsDao.instance.findAll(Filters.eq("_id", apiCollectionId), Projections.exclude("urls"));
 
         return (ret != null && ret.size() > 0) ? ret.get(0) : null;
+    }
+
+    /**
+     * If the collection has no env tags in DB but hostname matches env rules, persist the derived
+     * env type to DB so that env type always comes from DB.
+     */
+    public void ensureEnvTypeFromHostname(ApiCollection apiCollection) {
+        if (apiCollection == null) {
+            return;
+        }
+        if (apiCollection.getHostName() == null || apiCollection.getHostName().isEmpty()) {
+            return;
+        }
+        List<CollectionTags> tagsList = apiCollection.getTagsList();
+        if (!CollectionUtils.isEmpty(tagsList)) {
+            return;
+        }
+        CollectionTags derived = apiCollection.computeEnvTypeFromHostname();
+        if (derived == null) {
+            return;
+        }
+        Bson filter = Filters.eq(ApiCollection.ID, apiCollection.getId());
+        instance.getMCollection().updateOne(filter, Updates.addToSet(ApiCollection.TAGS_STRING, derived));
+        apiCollection.setTagsList(new ArrayList<>(Collections.singletonList(derived)));
     }
 
     public void updateTransportType(ApiCollection apiCollection, String transportType) {
@@ -251,9 +282,52 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         return countMap;
     }
 
-    public Map<Integer, Integer> buildEndpointsCountToApiCollectionMapOptimized(Bson filter, List<ApiCollection> apiCollections) {
+    public Map<Integer, Integer> buildEndpointsCountToApiCollectionMapNew(Set<Integer> deactivatedIds) {
         Map<Integer, Integer> countMap = new HashMap<>();
-        int ts = Context.nowInMillis();
+        if (deactivatedIds == null || deactivatedIds.isEmpty()) {
+            return countMap;
+        }
+
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(Filters.and(
+                SingleTypeInfoDao.filterForHostHeader(0, false),
+                Filters.in(SingleTypeInfo._API_COLLECTION_ID, deactivatedIds)
+        )));
+        pipeline.add(Aggregates.group(
+                "$" + SingleTypeInfo._API_COLLECTION_ID,
+                Accumulators.sum("count", 1)
+        ));
+
+        // RBAC filter in Java instead of $in with 35K IDs
+        List<Integer> rbacCollectionIds = null;
+        try {
+            rbacCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        } catch (Exception e) {
+        }
+        Set<Integer> allowedIds = rbacCollectionIds != null ? new HashSet<>(rbacCollectionIds) : null;
+
+        MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).cursor();
+        while (cursor.hasNext()) {
+            try {
+                BasicDBObject doc = cursor.next();
+                int apiCollectionId = doc.getInt("_id");
+                if (allowedIds != null && !allowedIds.contains(apiCollectionId)) {
+                    continue;
+                }
+                countMap.put(apiCollectionId, doc.getInt("count"));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return countMap;
+    }
+
+    public Map<Integer, Integer> buildEndpointsCountToApiCollectionMapOptimized(Bson filter, List<ApiCollection> apiCollections) {
+        final String LOG_PREFIX = "[buildEndpointsCountOptimized] ";
+        Map<Integer, Integer> countMap = new HashMap<>();
+        long totalStart = System.currentTimeMillis();
+        long stepStart = totalStart;
         // Get user collection IDs for RBAC filtering
         List<Integer> userCollectionIds = null;
         Set<Integer> userCollectionIdsSet = new HashSet<>();
@@ -265,8 +339,9 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         } catch(Exception e){
             // If no user collections, proceed without filtering
         }
+        logger.warn(LOG_PREFIX + "RBAC fetch took " + (System.currentTimeMillis() - stepStart) + "ms, userCollectionIds size=" + (userCollectionIds == null ? "null" : userCollectionIds.size()));
+        stepStart = System.currentTimeMillis();
 
-        
         // Step 1: Query api_collections to separate group and non-group collections
         List<Integer> groupCollectionIds = new ArrayList<>();
         List<Integer> nonGroupCollectionIds = new ArrayList<>();
@@ -281,7 +356,9 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                 nonGroupCollectionIds.add(collection.getId());
             }
         }
-        
+        logger.warn(LOG_PREFIX + "Segregation took " + (System.currentTimeMillis() - stepStart) + "ms, groupCollectionIds size=" + groupCollectionIds.size() + ", nonGroupCollectionIds size=" + nonGroupCollectionIds.size());
+        stepStart = System.currentTimeMillis();
+
         // Capture current context before async operations
         final Integer currentAccountId = Context.accountId.get();
         final Integer currentUserId = Context.userId.get();
@@ -298,6 +375,7 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
             Context.contextSource.set(currentContextSource);
             
             Map<Integer, Integer> nonGroupCountMap = new HashMap<>();
+            long nonGroupStart = System.currentTimeMillis();
             try {
                 if(!nonGroupCollectionIds.isEmpty()) {
                     Bson hostHeaderFilter = SingleTypeInfoDao.filterForHostHeader(0, false);
@@ -334,6 +412,7 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                 Context.accountId.remove();
                 Context.userId.remove();
             }
+            logger.warn(LOG_PREFIX + "Non-group aggregation took " + (System.currentTimeMillis() - nonGroupStart) + "ms, result size=" + nonGroupCountMap.size());
             return nonGroupCountMap;
         }, executor);
 
@@ -344,6 +423,7 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
             Context.contextSource.set(currentContextSource);
             
             Map<Integer, Integer> groupCountMap = new HashMap<>();
+            long groupStart = System.currentTimeMillis();
             try {
                 if(!groupCollectionIds.isEmpty()) {
                     Bson hostHeaderFilter = SingleTypeInfoDao.filterForHostHeader(0, false);
@@ -438,6 +518,7 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                 Context.userId.remove();
                 Context.contextSource.remove();
             }
+            logger.warn(LOG_PREFIX + "Group aggregation took " + (System.currentTimeMillis() - groupStart) + "ms, result size=" + groupCountMap.size());
             return groupCountMap;
         }, executor);
         
@@ -461,7 +542,9 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
             // Shutdown executor
             executor.shutdown();
         }
-        
+        logger.warn(LOG_PREFIX + "Futures join + merge took " + (System.currentTimeMillis() - stepStart) + "ms, countMap size=" + countMap.size());
+        stepStart = System.currentTimeMillis();
+
         // Step 3: Add code analysis counts (if any)
         Map<String, Integer> codeAnalysisUrlsCountMap = CodeAnalysisApiInfoDao.instance.getUrlsCount();
         if (!codeAnalysisUrlsCountMap.isEmpty()) {
@@ -477,7 +560,9 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                 countMap.put(apiCollectionId, currentCount);
             }
         }
-        
+        logger.warn(LOG_PREFIX + "Code analysis counts took " + (System.currentTimeMillis() - stepStart) + "ms");
+        logger.warn(LOG_PREFIX + "TOTAL took " + (System.currentTimeMillis() - totalStart) + "ms, final countMap size=" + countMap.size());
+
         return countMap;
     }
 

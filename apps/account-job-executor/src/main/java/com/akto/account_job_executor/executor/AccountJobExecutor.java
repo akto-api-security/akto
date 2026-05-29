@@ -43,8 +43,15 @@ public abstract class AccountJobExecutor {
             // Run the job-specific logic
             runJob(job);
 
-            // Mark job as completed
-            executedJob = logSuccess(jobId);
+            if (job.getScheduleType() != ScheduleType.RECURRING) {
+                executedJob = logSuccess(jobId);
+            } else {
+                // Refresh from Cyborg so jobStatus is not stale in-memory (avoids skipping reschedule).
+                executedJob = CyborgApiClient.findById(jobId);
+                if (executedJob == null) {
+                    executedJob = job;
+                }
+            }
             logger.info("Finished executing job successfully: jobId={}", jobId);
 
         } catch (RetryableJobException rex) {
@@ -59,8 +66,11 @@ public abstract class AccountJobExecutor {
             logger.error("Non-retryable error occurred. Job marked as FAILED: jobId={}", jobId, e);
         }
 
-        // Handle recurring jobs
-        handleRecurringJob(executedJob);
+        // Handle recurring jobs only when job is not already rescheduled.
+        // Retry path sets status to SCHEDULED explicitly and should not be rescheduled again.
+        if (executedJob != null && executedJob.getJobStatus() != JobStatus.SCHEDULED) {
+            handleRecurringJob(executedJob);
+        }
     }
 
     /**

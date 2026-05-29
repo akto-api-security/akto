@@ -25,16 +25,26 @@ const rolesOptions = [
     {
         label: 'Guest',
         value: 'GUEST',
+    },
+    {
+        label: 'Threat Engineer',
+        value: 'THREAT_ENGINEER',
+    },
+    {
+        label: 'Threat Viewer',
+        value: 'THREAT_VIEWER',
     }]
 
-const getRoleDisplayName = (role) => {
-    for (let item of rolesOptions) {
+function getRoleDisplayName(role) {
+    for (const item of rolesOptions) {
         if (item.value === role) {
-            return item.label;
+            return item.label
         }
     }
-    return role;
+    return role
 }
+
+export { rolesOptions, getRoleDisplayName }
 
 const Roles = () => {
 
@@ -53,19 +63,26 @@ const Roles = () => {
     }
 
     const getRoleData = async () => {
-        setLoading(true);
-        const roleResponse = await settingRequests.getCustomRoles()
-        if (roleResponse.roles) {
-            setRoles(roleResponse.roles)
-            setTempRoles(roleResponse.roles)
+        try {
+            setLoading(true);
+            const roleResponse = await settingRequests.getCustomRoles()
+            if (roleResponse && roleResponse.roles) {
+                setRoles(roleResponse.roles)
+                setTempRoles(roleResponse.roles)
+            }
+            setLoading(false)
+        } catch (error) {
+            setLoading(false)
         }
-        setLoading(false)
     };
 
     const getAllAllowedFeatures = async () => {
-        const featuresResponse = await settingRequests.getAllowedFeaturesForRBAC()
-        if (featuresResponse) {
-            setAllowedFeatures(featuresResponse);
+        try {
+            const featuresResponse = await settingRequests.getAllowedFeaturesForRBAC()
+            if (featuresResponse) {
+                setAllowedFeatures(featuresResponse);
+            }
+        } catch (error) {
         }
     }
 

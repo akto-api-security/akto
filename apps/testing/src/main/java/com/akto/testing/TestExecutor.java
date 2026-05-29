@@ -32,7 +32,6 @@ import com.akto.dto.dependency_flow.KVPair;
 import com.akto.dto.dependency_flow.ReplaceDetail;
 import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ExecutorNode;
-import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.SeverityParserResult;
 import com.akto.dto.test_editor.TestConfig;
@@ -69,6 +68,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.github.GithubUtils;
+import com.akto.jsonrpc.McpToolDescriptionsRegistry;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.SampleMessageStore;
@@ -90,6 +90,7 @@ import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.LoginFlowEnums;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import com.alibaba.fastjson2.JSONArray;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -189,6 +190,40 @@ public class TestExecutor {
         );
     }
 
+    private void buildMcpToolDescriptions() {
+        Map<String, String> toolDescriptions = new HashMap<>();
+        for (Map.Entry<ApiInfo.ApiInfoKey, RawApi> entry : TestingConfigurations.getInstance().getRawApiMap().entrySet()) {
+            String url = entry.getKey().getUrl();
+            if (url == null || !url.contains("tools/list")) {
+                continue;
+            }
+            RawApi rawApi = entry.getValue();
+            if (rawApi.getResponse() == null) continue;
+            String body = rawApi.getResponse().getBody();
+            if (body == null || body.isEmpty()) continue;
+            try {
+                com.alibaba.fastjson2.JSONObject jsonRpc = JSON.parseObject(body);
+                com.alibaba.fastjson2.JSONObject result = jsonRpc.getJSONObject("result");
+                if (result == null) continue;
+                JSONArray tools = result.getJSONArray("tools");
+                if (tools == null) continue;
+                for (int i = 0; i < tools.size(); i++) {
+                    com.alibaba.fastjson2.JSONObject tool = tools.getJSONObject(i);
+                    String name = tool.getString("name");
+                    String description = tool.getString("description");
+                    if (name != null && description != null) {
+                        toolDescriptions.put(name, description);
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed to parse tools/list response for MCP tool descriptions");
+            }
+            break;
+        }
+        if (!toolDescriptions.isEmpty()) {
+            McpToolDescriptionsRegistry.set(toolDescriptions);
+        }
+    }    
     public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs, SyncLimit syncLimit, boolean shouldInitOnly) {
 
         // Clear authStatus hashmap for new test runs (different accounts)
@@ -330,7 +365,7 @@ public class TestExecutor {
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
 
-        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed());
+        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed(), testingRun.getMaxAgentTokens());
         TestingUtilsSingleton.init();
 
         // Pre-fetch auth token before inserting records in Kafka
@@ -466,6 +501,7 @@ public class TestExecutor {
                 }
             }
     
+            buildMcpToolDescriptions();
     
             try {
                 if(!Constants.IS_NEW_TESTING_ENABLED){
@@ -518,12 +554,17 @@ public class TestExecutor {
             for (String testSubCategory: testingRunSubCategories) {
                 if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
                     loggerMaker.debugAndAddToDb("Trying to run test for category: " + testSubCategory + " with summary state: " + GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId) );
-                    if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)){
+                    if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)
+                            && !TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
                         insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit,
                                 apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun,
                                 isApiInfoTested, new AtomicInteger(), new AtomicInteger(), new AtomicInteger());
                     }else{
-                        loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
+                        if(TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
+                            loggerMaker.infoAndAddToDb("Agent token limit reached, stopping further tests for run: " + testingRun.getHexId(), LogDb.TESTING);
+                        } else {
+                            loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
+                        }
                         break;
                     }
                 }
@@ -638,6 +679,14 @@ public class TestExecutor {
                         Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap),
                         Updates.set(TestingRunResultSummary.STATE, updatedState)),
                 options);
+
+        if (TestingConfigurations.getInstance().isAgentTokenLimitExceeded()) {
+            TestingRunResultSummariesDao.instance.updateOne(
+                    Filters.eq(Constants.ID, summaryId),
+                    Updates.set(TestingRunResultSummary.METADATA_STRING + ".tokenRateLimited",
+                            TestResult.TestError.TOKEN_RATE_LIMITED.getMessage())
+            );
+        }
 
         if (TestingConfigurations.getInstance().getRerunTestingRunResultSummary() != null) {
             TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummary.ID,
@@ -907,12 +956,32 @@ public class TestExecutor {
                     VulnerableTestingRunResultDao.instance.insertMany(vulTestResults);
                 }
 
+                // Calculate total external API tokens from all test results
+                int totalExternalApiTokens = 0;
+                for (TestingRunResult runResult : testingRunResults) {
+                    if (runResult != null && runResult.getTestResults() != null) {
+                        for (GenericTestResult testResult : runResult.getTestResults()) {
+                            if (testResult instanceof TestResult) {
+                                int tokens = ((TestResult) testResult).getExternalApiTokens();
+                                loggerMaker.infoAndAddToDb("📊 TestExecutor reading tokens from TestResult: " + tokens, LogDb.TESTING);
+                                totalExternalApiTokens += tokens;
+                            }
+                        }
+                    }
+                }
+                loggerMaker.infoAndAddToDb("TestExecutor TOTAL tokens to add to summary: " + totalExternalApiTokens, LogDb.TESTING);
+                TestingConfigurations.getInstance().addAgentTokens(totalExternalApiTokens);
+
+                // Update summary with test count and cumulative external API tokens
                 TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
                     Filters.eq(Constants.ID, testRunResultSummaryId),
-                    Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize)
+                    Updates.combine(
+                        Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize),
+                        Updates.inc(TestingRunResultSummary.TOTAL_EXTERNAL_API_TOKENS, totalExternalApiTokens)
+                    )
                 );
 
-                loggerMaker.debugAndAddToDb("Updated count in summary", LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Updated TestingRunResultSummary with " + totalExternalApiTokens + " tokens", LogDb.TESTING);
 
                 TestingIssuesHandler handler = new TestingIssuesHandler();
                 boolean triggeredByTestEditor = false;
@@ -1130,6 +1199,14 @@ public class TestExecutor {
         Map<String, Object> varMap = new HashMap<>();
         String severity = testConfig.getInfo().getSeverity();
 
+        // Add test context to varMap for SSRF UUID mapping (batch runs and test editor)
+        varMap.put("accountId", Context.accountId.get());
+        varMap.put("apiInfoKey", apiInfoKey.toString());
+        varMap.put("testSubType", testSubType);
+        if (testRunId != null && testRunResultSummaryId != null) {
+            varMap.put("testRunId", testRunId.toHexString());
+            varMap.put("testRunResultSummaryId", testRunResultSummaryId.toHexString());
+        }
         for (String key: wordListsMap.keySet()) {
             varMap.put("wordList_" + key, wordListsMap.get(key));
         }
@@ -1234,6 +1311,18 @@ public class TestExecutor {
             testRunId, apiInfoKey, testSuperType, testSubType ,testResults.getTestResults(),
             vulnerable,singleTypeInfos,confidencePercentage,startTime,
             endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs);  
+
+        // Attach any callback UUIDs captured during execution for editor polling
+        Object callbackUuidsObj = varMap.get("random_uuid");
+        if (callbackUuidsObj instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<String> callbackUuids = (List<String>) callbackUuidsObj;
+            ret.setCallbackUuids(callbackUuids);
+            // Validate block ran immediately; callback hit may arrive later. Mark result as pending so UI can poll.
+            if (!vulnerable && !callbackUuids.isEmpty()) {
+                ret.setCallbackCheckPending(true);
+            }
+        }
 
         if (testingRunConfig!=null && testingRunConfig.getCleanUp()) {
             try {
@@ -1454,7 +1543,18 @@ public class TestExecutor {
     private boolean prefetchAuthWithRetry(TestRoles testRole, RawApi rawApi, int maxAttempts) {
         AuthMechanism authMechanism = testRole.findMatchingAuthMechanism(rawApi);
         
-        if (authMechanism == null || !LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanism.getType())) {
+        if (authMechanism == null) {
+            return true; // No auth mechanism, no prefetch needed
+        }
+        
+        String authType = authMechanism.getType();
+        
+        // Handle digest authentication
+        if (LoginFlowEnums.AuthMechanismTypes.DIGEST_AUTH.toString().equalsIgnoreCase(authType)) {
+            return true; // Digest auth doesn't require prefetch - works directly via DigestAuthParam.addAuthTokens()
+        }
+        
+        if (!LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authType)) {
             return true; // Not a login request type, no prefetch needed
         }
         
@@ -1487,5 +1587,5 @@ public class TestExecutor {
         
         return false;
     }
-    
+
 }

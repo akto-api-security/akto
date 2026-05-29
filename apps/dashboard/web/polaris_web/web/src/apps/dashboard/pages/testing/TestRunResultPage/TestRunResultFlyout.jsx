@@ -5,8 +5,8 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, ActionList } from '@shopify/polaris'
-import { EditMinor } from '@shopify/polaris-icons'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, Tooltip, VerticalStack, Link, ActionList } from '@shopify/polaris'
+import { EditMinor, FileMinor } from '@shopify/polaris-icons'
 import CompulsoryDescriptionModal from "../../issues/components/CompulsoryDescriptionModal.jsx"
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
@@ -27,12 +27,19 @@ import ApiGroups from '../../../components/shared/ApiGroups'
 import ForbiddenRole from '../../../components/shared/ForbiddenRole'
 import LegendLabel from './LegendLabel.jsx'
 import TestRunResultChat from './TestRunResultChat.jsx'
+import AiExecutionJourney from './components/AiExecutionJourney'
 import AskAktoSection from './AskAktoSection.jsx'
+import PersistStore from '../../../../main/PersistStore'
+
+const SKIPPED_TEST_DOCS_URL = "https://docs.akto.io/api-security-testing/concepts/skipped-test-cases";
+const SKIP_ERROR_KEYWORDS = ["skipping execution"];
+
+function isSkippedTestError(errorText) {
+  return SKIP_ERROR_KEYWORDS.some(keyword => errorText?.includes(keyword));
+}
 
 function TestRunResultFlyout(props) {
-
-
-    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, validationFailed, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp } = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, wizFindingUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls, runAutomatedTests } = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -79,10 +86,28 @@ function TestRunResultFlyout(props) {
         acceptableFix: false
     })
 
+    const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
+
+    const normalizeRemediationText = (value) => {
+        if (value && typeof value === 'object' && typeof value.message === 'string') {
+            return value.message;
+        }
+        if (typeof value === 'string') {
+            try {
+                const parsed = JSON.parse(value);
+                if (parsed && typeof parsed === 'object' && typeof parsed.message === 'string') {
+                    return parsed.message;
+                }
+            } catch (_) {}
+            return value;
+        }
+        return '';
+    }
+
     const fetchRemediationInfo = useCallback(async (testId) => {
         if (testId && testId.length > 0) {
             await testingApi.fetchRemediationInfo(testId).then((resp) => {
-                setRemediationText(resp)
+                setRemediationText(normalizeRemediationText(resp))
             }).catch((err) => {
                 setRemediationText("Remediations not configured for this test.")
             })
@@ -113,7 +138,7 @@ function TestRunResultFlyout(props) {
                 })
             })
 
-            setRowItems(transform.getRowInfo(issueDetails.severity, apiInfoData, issueDetails.jiraIssueUrl, sensitiveParam, issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId, issueDetails.devrevWorkUrl))
+            setRowItems(transform.getRowInfo(issueDetails.severity, apiInfoData, issueDetails.jiraIssueUrl, sensitiveParam, issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId, issueDetails.devrevWorkUrl, issueDetails.wizFindingUrl))
         }
     }, [issueDetails])
 
@@ -175,10 +200,10 @@ function TestRunResultFlyout(props) {
     useEffect(() => {
         if (remediationSrc) {
             // Priority 1: Use remediation from backend/subCategoryMap
-            setRemediationText(remediationSrc)
+            setRemediationText(normalizeRemediationText(remediationSrc))
         } else if (conversationRemediationText) {
             // Priority 2: Use remediation text extracted from conversations
-            setRemediationText(conversationRemediationText)
+            setRemediationText(normalizeRemediationText(conversationRemediationText))
         } else {
             // Priority 3: Fall back to fetching from file
             fetchRemediationInfo("tests-library-master/remediation/" + selectedTestRunResult.testCategoryId + ".md")
@@ -381,6 +406,15 @@ function TestRunResultFlyout(props) {
         }
     }
 
+    const handleWizFindingCreation = async () => {
+        const items = [issueDetails?.id]
+        await issuesApi.createWizFindings(items).then((res) => {
+            func.setToast(true, false, "Wiz finding creation initiated.")
+        }).catch((err) => {
+            func.setToast(true, true, "Error creating wiz finding")
+        })
+    }
+
     const issues = [{
         content: 'False positive',
         onAction: () => { ignoreAction("False positive") }
@@ -409,10 +443,28 @@ function TestRunResultFlyout(props) {
         window.open(navUrl, "_blank")
     }
 
-    const categoryKey = selectedTestRunResult?.testCategory?.match(/\(([^)]+)\)/)?.[1] || selectedTestRunResult?.testCategory;
+    const openUrlInTestEditor = () => {
+        const apiInfoKey = issueDetails?.id?.apiInfoKey
+        if (!apiInfoKey) return
+        setSelectedSampleApi({
+            apiCollectionId: apiInfoKey.apiCollectionId,
+            url: apiInfoKey.url,
+            method: { "_name": apiInfoKey.method }
+        })
+        const navUrl = window.location.origin + "/dashboard/test-editor/" + selectedTestRunResult.testCategoryId
+        window.open(navUrl, "_blank")
+    }
+
+    const categoryKey =
+      selectedTestRunResult?.superCategoryName ||
+      selectedTestRunResult?.testCategory?.match(/\(([^)]+)\)/)?.[1] ||
+      selectedTestRunResult?.testCategory;
     const owaspData = func.categoryMapping[categoryKey] || {};
     const owaspMapping = owaspData.label || "";
     const owaspUrl = owaspData.url || "";
+    const owaspAgenticData = func.agenticCategoryMapping[categoryKey] || {};
+    const owaspAgenticMapping = owaspAgenticData.label || "";
+    const owaspAgenticUrl = owaspAgenticData.url || "";
 
     function ActionsComp() {
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
@@ -442,6 +494,7 @@ function TestRunResultFlyout(props) {
             </Popover>
         )
     }
+
     function TitleComponent() {
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : ""
         return (
@@ -508,6 +561,11 @@ function TestRunResultFlyout(props) {
                                         <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
                                     </Link>
                                 ) : null}
+                                {owaspAgenticMapping.length > 0 ? (
+                                    <Link onClick={() => owaspAgenticUrl && window.open(owaspAgenticUrl, '_blank')}>
+                                        <Badge size="small">{owaspAgenticMapping}</Badge>
+                                    </Link>
+                                ) : null}
                             </VerticalStack>
                         </div>
                         {
@@ -542,8 +600,22 @@ function TestRunResultFlyout(props) {
                     </HorizontalStack>
 
                     <ApiGroups collectionIds={apiInfo?.collectionIds} />
+                    {/* tools call format: {mcp/agent name} -> value: {tools for that mcp/agent} */}
+                    <VerticalStack gap={1}>
+                        {Object.keys(toolsCalls).map(agentName => (
+                            <HorizontalStack gap={1} key={agentName}>
+                                <Badge status='info'>{agentName}</Badge>
+                                <Text variant="bodySm">{toolsCalls[agentName].join(', ')}</Text>
+                            </HorizontalStack>
+                        ))}
+                    </VerticalStack>
                 </VerticalStack>
                 <HorizontalStack gap={2} wrap={false}>
+                    {issueDetails?.id?.apiInfoKey && (
+                        <Tooltip content="Open URL in test editor" dismissOnMouseOut>
+                            <Button monochrome onClick={openUrlInTestEditor} icon={FileMinor} />
+                        </Tooltip>
+                    )}
                     <ActionsComp />
 
                     {selectedTestRunResult && selectedTestRunResult.vulnerable &&
@@ -601,6 +673,13 @@ function TestRunResultFlyout(props) {
                                 issueId={issueDetails.id}
                                 isDevRevModal={true}
                             />
+                           
+                            { window?.WIZ_INTEGRATED === 'true' ? 
+                                <Button id={"create-wiz-finding-button"} primary onClick={handleWizFindingCreation} disabled={ wizFindingUrl?.length > 0 }>
+                                    Create Wiz Finding
+                                </Button> 
+                                : <></>
+                            }
                         </HorizontalStack>
                     }
                 </HorizontalStack>
@@ -624,8 +703,7 @@ function TestRunResultFlyout(props) {
     const [vulnerabilityHighlights, setVulnerabilityHighlights] = useState({});
 
     // Component that handles vulnerability analysis only when mounted
-    const ValuesTabContent = React.memo(() => {
-
+    const ValuesTabContent = React.memo(({ isAgentic = false, runAutomatedTests = false } = {}) => {
         useEffect(() => {
             // Check if vulnerability highlighting is enabled (use existing GPT feature flag)
             //const isVulnerabilityHighlightingEnabled = window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && 
@@ -644,7 +722,6 @@ function TestRunResultFlyout(props) {
                             try {
                                 messageObj = JSON.parse(messageObj);
                             } catch (e) {
-                                console.error('Failed to parse message string for idx', idx, e);
                                 return null;
                             }
                         }
@@ -707,7 +784,6 @@ function TestRunResultFlyout(props) {
                                 }
                                 return { idx, success: true };
                             } catch (error) {
-                                console.error('Failed to analyze vulnerability for result', idx, error);
                                 return { idx, success: false };
                             }
                         }
@@ -730,43 +806,65 @@ function TestRunResultFlyout(props) {
             return null;
         }
 
+        const firstError = selectedTestRunResult?.testResults?.find(result =>
+          result.errors && result.errors.length > 0
+        )?.errors?.join(", ");
 
         return (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
                 <VerticalStack gap="3">
+                    <AiExecutionJourney runAutomatedTests={runAutomatedTests} />
                     <Box padding="3" background="bg-surface-secondary" borderRadius="2">
                         <LegendLabel />
                     </Box>
-                    <SampleDataList
-                        key="Sample values"
-                        heading={"Attempt"}
-                        minHeight={"30vh"}
-                        vertical={true}
-                        sampleData={
-                            selectedTestRunResult?.testResults.map((result, idx) => {
-                                if (result.errors && result.errors.length > 0) {
-                                    let errorList = result.errors.join(", ");
-                                    return { errorList: errorList }
-                                }
-                                // Add vulnerability highlights only for response
-                                let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
-                                if (result.originalMessage || result.message) {
-                                    return {
-                                        originalMessage: result.originalMessage,
-                                        message: result.message,
-                                        vulnerabilitySegments
+                    <VerticalStack gap="0">
+                        <SampleDataList
+                            key="Sample values"
+                            heading={"Attempt"}
+                            minHeight={"30vh"}
+                            vertical={true}
+                            sampleData={
+                                selectedTestRunResult?.testResults.map((result, idx) => {
+                                    const validationReason = result.validationReason || "";
+                                    if (result.errors && result.errors.length > 0) {
+                                        let errorList = result.errors.join(", ");
+                                        return { errorList: errorList, validationReason }
                                     }
-                                }
-                                return { errorList: "No data found" }
-                            })}
-                        isNewDiff={true}
-                        vulnerable={selectedTestRunResult?.vulnerable}
-                        vulnerabilityAnalysisError={vulnerabilityAnalysisError}
-                    />
+                                    // Add vulnerability highlights only for response
+                                    let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
+                                    if (result.originalMessage || result.message) {
+                                        if(isAgentic){
+                                            return {
+                                                originalMessage: result.message,
+                                                message: result.message,
+                                                validationReason,
+                                            }
+                                        }
+                                        return {
+                                            originalMessage: result.originalMessage,
+                                            message: result.message,
+                                            vulnerabilitySegments,
+                                            validationReason,
+                                        }
+                                    }
+                                    return { errorList: "No data found", validationReason }
+                                })}
+                            isNewDiff={true}
+                            vulnerable={selectedTestRunResult?.vulnerable}
+                            vulnerabilityAnalysisError={vulnerabilityAnalysisError}
+                        />
+                        {firstError && isSkippedTestError(firstError) && (
+                            <Box paddingBlockStart="2" paddingInlineStart="2">
+                                <Link url={SKIPPED_TEST_DOCS_URL} external>Learn more about skipped tests</Link>
+                            </Box>
+                        )}
+                    </VerticalStack>
                 </VerticalStack>
             </Box>
         );
     });
+
+    const hasConversations = conversations?.length > 0
 
     const conversationTab = useMemo(() => {
         if (typeof selectedTestRunResult !== "object") return null;
@@ -778,7 +876,6 @@ function TestRunResultFlyout(props) {
         // TODO: Implement real message sending handler
         // Replace with actual API call when chat endpoint is available
         const handleSendMessage = (msg) => {
-            console.log("TODO: Send message to backend:", msg);
             // Future: Call testingApi.sendChatMessage(issueDetails.id, msg)
         };
 
@@ -790,20 +887,37 @@ function TestRunResultFlyout(props) {
                 conversations={conversations}
                 onSendMessage={handleSendMessage}
                 isStreaming={false}
+                testResults={selectedTestRunResult?.testResults || []}
+                runAutomatedTests={runAutomatedTests}
             />
         }
-    }, [selectedTestRunResult, conversations])
+    }, [selectedTestRunResult, conversations, runAutomatedTests])
+
+    const attemptTabForConversations = useMemo(() => {
+        if (!hasConversations) return null;
+        const hasTestResultsMessages = selectedTestRunResult?.testResults?.some(result => result.message);
+        if(!hasTestResultsMessages) return null;
+        return {
+            id: 'attempt',
+            content: "Attempt",
+            component: <ValuesTabContent isAgentic runAutomatedTests={runAutomatedTests} />
+        };
+    }, [hasConversations, selectedTestRunResult])
 
     const ValuesTab = useMemo(() => {
         if (typeof selectedTestRunResult !== "object") return null;
         return {
             id: 'values',
             content: "Evidence",
-            component: <ValuesTabContent />
+            component: <ValuesTabContent runAutomatedTests={runAutomatedTests} />
         }
-    }, [selectedTestRunResult, dataExpired, issueDetails, refreshFlag])
+    }, [selectedTestRunResult, dataExpired, issueDetails, refreshFlag, runAutomatedTests])
 
-    const finalResultTab = conversations?.length > 0 ? conversationTab : ValuesTab
+    const resultTabs = hasConversations
+        ? [conversationTab, attemptTabForConversations].filter(Boolean)
+        : [ValuesTab]
+
+    const finalResultTab = hasConversations ? conversationTab : ValuesTab
 
     function RowComp({ cardObj }) {
         const { title, value, tooltipContent } = cardObj
@@ -958,7 +1072,7 @@ function TestRunResultFlyout(props) {
     const tabsComponent = (
         <LayoutWithTabs
             key={issueDetails?.id}
-            tabs={issueDetails?.id ? [overviewTab, timelineTab, finalResultTab, remediationTab].filter(Boolean) : [attemptTab]}
+            tabs={issueDetails?.id ? [overviewTab, timelineTab, ...resultTabs, remediationTab].filter(Boolean) : (hasConversations ? [conversationTab, attemptTabForConversations].filter(Boolean) : [attemptTab])}
             currTab={() => { }}
         />
     )

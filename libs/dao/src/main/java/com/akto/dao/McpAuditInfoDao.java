@@ -49,6 +49,12 @@ public class McpAuditInfoDao extends AccountsContextDao<McpAuditInfo> {
         
         fieldNames = new String[]{"updatedTimestamp"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{McpAuditInfo.MCP_HOST, McpAuditInfo.TYPE, McpAuditInfo.RESOURCE_NAME};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{McpAuditInfo.CONTEXT_SOURCE};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
     public List<McpAuditInfo> findMarkedByEmptySortedByLastDetected(int pageNumber, int pageSize) {

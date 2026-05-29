@@ -56,6 +56,13 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public static final String REQUIRES_CONFIG = TEST_RESULTS + ".0." + TestResult.REQUIRES_CONFIG;
 
+    @BsonIgnore
+    private List<String> callbackUuids;
+
+    /** When true, validate block did not see a callback hit yet; result is not final until polling confirms or times out. */
+    @BsonIgnore
+    private boolean callbackCheckPending;
+
     public static final String WORKFLOW_TEST = "workflowTest";
     private WorkflowTest workflowTest;
 
@@ -354,6 +361,22 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public void setErrorsList(List<String> errorsList) {
         this.errorsList = errorsList;
+    }
+
+    public List<String> getCallbackUuids() {
+        return callbackUuids;
+    }
+
+    public void setCallbackUuids(List<String> callbackUuids) {
+        this.callbackUuids = callbackUuids;
+    }
+
+    public boolean isCallbackCheckPending() {
+        return callbackCheckPending;
+    }
+
+    public void setCallbackCheckPending(boolean callbackCheckPending) {
+        this.callbackCheckPending = callbackCheckPending;
     }
 
     public boolean isIgnoredResult() {

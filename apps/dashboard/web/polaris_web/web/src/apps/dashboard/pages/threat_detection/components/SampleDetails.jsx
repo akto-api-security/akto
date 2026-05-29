@@ -14,8 +14,11 @@ import settingFunctions from "../../settings/module";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal";
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
-import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN } from "../constants/guardrailDescriptions";
+import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN, CLAUDE_SETTINGS_RISK_MAP } from "../constants/guardrailDescriptions";
+import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
+import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import OwaspTag from "../../guardrails/components/OwaspTag";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
@@ -24,12 +27,22 @@ function SampleDetails(props) {
     // Determine if we should use hardcoded guardrail descriptions
     const useGuardrailDescription = isAgenticSecurityCategory() || isEndpointSecurityCategory();
 
+    // For guardrail events, look up the specific rule info based on ruleViolated / templateId
+    const guardrailRuleInfo = useGuardrailDescription
+        ? getGuardrailRuleInfo(moreInfoData?.ruleViolated, moreInfoData?.templateId)
+        : null;
+
+    // Build guardrail sections: use matched rule's overview if found, else fall back to all generic sections
+    const guardrailSectionsToShow = guardrailRuleInfo
+        ? [{ heading: guardrailRuleInfo.heading, description: null, subSections: guardrailRuleInfo.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
+        : GUARDRAIL_SECTIONS;
+
     // Get template object - either from hardcoded data or YAML templates
     let currentTemplateObj;
     if (useGuardrailDescription) {
         // For Argus/Atlas guardrails, use structured content
         currentTemplateObj = {
-            guardrailSections: GUARDRAIL_SECTIONS,
+            guardrailSections: guardrailSectionsToShow,
             testName: moreInfoData?.templateId || "Guardrail Policy",
             name: moreInfoData?.templateId || "Guardrail Policy"
         };
@@ -69,10 +82,19 @@ function SampleDetails(props) {
         }
         
     }
+    const owaspThreats = useGuardrailDescription
+        ? getOwaspThreatsForRule(moreInfoData?.ruleViolated)
+        : [];
+
     const overviewComp = useGuardrailDescription ? (
         // Structured view for Argus/Atlas guardrails - show all 7 sections with hierarchy
         <Box padding={"4"}>
             <VerticalStack gap={"5"}>
+                {owaspThreats.length > 0 && (
+                    <VerticalStack gap={"2"}>
+                        <OwaspTag threats={owaspThreats} />
+                    </VerticalStack>
+                )}
                 {currentTemplateObj?.guardrailSections?.map((section, sectionIdx) => (
                     <div key={sectionIdx}>
                         <VerticalStack gap={"3"}>
@@ -200,6 +222,35 @@ function SampleDetails(props) {
         component: <ActivityTracker latestActivity={latestActivity} />
     }
 
+    const isClaudeSettingsRisk = moreInfoData?.templateId === 'claude_settings_risk';
+
+    // Resolve the specific settings key from ruleViolated or URL path (e.g. "hooks.PreToolUse" from "/claude/settings/hooks.PreToolUse[0]")
+    // This is used to look up the per-field remediation text shown in the Remediation tab.
+    const getClaudeSettingsKey = () => {
+        const stripArrayIndices = (key) => key?.replace(/\[\d+\]/g, '');
+
+        if (moreInfoData?.ruleViolated && moreInfoData.ruleViolated !== '-') {
+            return stripArrayIndices(moreInfoData.ruleViolated);
+        }
+        const prefix = '/claude/settings/';
+        const idx = moreInfoData?.url?.indexOf(prefix) ?? -1;
+        return idx !== -1 ? stripArrayIndices(moreInfoData.url.slice(idx + prefix.length)) : null;
+    };
+
+    const resolveClaudeSettingsEntry = (key) => {
+        if (!key) return undefined;
+        if (CLAUDE_SETTINGS_RISK_MAP[key]) return CLAUDE_SETTINGS_RISK_MAP[key];
+        // Longest prefix match handles nested keys like "hooks.PreToolUse.hooks" -> "hooks"
+        const bestMatch = Object.keys(CLAUDE_SETTINGS_RISK_MAP)
+            .filter(k => key.startsWith(k))
+            .sort((a, b) => b.length - a.length)[0];
+        return bestMatch ? CLAUDE_SETTINGS_RISK_MAP[bestMatch] : undefined;
+    };
+
+    const claudeSettingsEntry = isClaudeSettingsRisk
+        ? resolveClaudeSettingsEntry(getClaudeSettingsKey())
+        : undefined;
+
     const ValuesTab = data.length > 0 && {
         id: 'values',
         content: "Values",
@@ -213,19 +264,33 @@ function SampleDetails(props) {
                     sampleData={data && Array.isArray(data) && data.length > 0 ? data.map((result) => {
                         return { message: result.orig, highlightPaths: [], metadata: result.metadata }
                     }) : []}
+                    redactHeaders={window.ACTIVE_ACCOUNT === 1758787662 ? ['authorization'] : []}
                 />
             </Box>)
     }
 
-    const remediationTab = useGuardrailDescription ? {
-        id: "remediation",
-        content: "Remediation",
-        component: (<MarkdownViewer markdown={GUARDRAIL_REMEDIATION_MARKDOWN}></MarkdownViewer>)
-    } : (remediationText.length > 0 && {
-        id: "remediation",
-        content: "Remediation",
-        component: (<MarkdownViewer markdown={remediationText}></MarkdownViewer>)
-    })
+    const remediationTab = (() => {
+        if (isClaudeSettingsRisk) {
+            return {
+                id: "remediation",
+                content: "Remediation",
+                component: (<MarkdownViewer markdown={claudeSettingsEntry ? claudeSettingsEntry.remediation : GUARDRAIL_REMEDIATION_MARKDOWN} />)
+            };
+        }
+        if (useGuardrailDescription) {
+            const remediationMarkdown = guardrailRuleInfo?.remediation || GUARDRAIL_REMEDIATION_MARKDOWN;
+            return {
+                id: "remediation",
+                content: "Remediation",
+                component: (<MarkdownViewer markdown={remediationMarkdown} />)
+            };
+        }
+        return remediationText.length > 0 && {
+            id: "remediation",
+            content: "Remediation",
+            component: (<MarkdownViewer markdown={remediationText} />)
+        };
+    })()
 
     // Session Context Tab - shows prompts involved in session-based detection
     const SessionContextComponent = () => {
@@ -277,7 +342,7 @@ function SampleDetails(props) {
                     let responseContent = conv.responsePayload;
 
                     try {
-                        if (typeof requestContent === 'string') {
+                        if (typeof requestContent === 'string' && requestContent !== '') {
                             const parsed = JSON.parse(requestContent);
                             requestContent = parsed.prompt || parsed.content || requestContent;
                         }
@@ -447,7 +512,7 @@ function SampleDetails(props) {
                                                                 }}
                                                             >
                                                                 <Text variant="bodyMd">
-                                                                    {prompt.content || prompt.snippet || prompt}
+                                                                    {prompt.content || prompt.snippet || (typeof prompt === 'string' ? prompt : "")}
                                                                 </Text>
                                                             </Box>
                                                         </VerticalStack>

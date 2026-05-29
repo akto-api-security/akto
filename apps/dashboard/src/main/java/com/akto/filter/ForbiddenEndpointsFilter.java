@@ -26,6 +26,7 @@ public class ForbiddenEndpointsFilter implements Filter {
             "api/sendGoogleAuthCodeToServer",
             "api/takeUpdate",
             "api/toggleNewMergingEnabled",
+            "api/toggleDoBodyMatch",
             "api/toggleRedactFeature",
             "api/updateGlobalRateLimit",
             "api/updateMergeAsyncOutside",

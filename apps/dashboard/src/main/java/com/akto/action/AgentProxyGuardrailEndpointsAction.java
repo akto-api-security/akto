@@ -32,6 +32,14 @@ public class AgentProxyGuardrailEndpointsAction extends UserAction {
     private List<String> apiInfoIds; // For bulk operations
 
     @Getter
+    @Setter
+    private ApiInfo.GuardrailSchema guardrailSchema;
+
+    @Getter
+    @Setter
+    private boolean clearGuardrailSchema;
+
+    @Getter
     private int updatedCount;
 
 
@@ -71,8 +79,17 @@ public class AgentProxyGuardrailEndpointsAction extends UserAction {
             int updatedCount = 0;
             if (!filters.isEmpty()) {
                 Bson queryFilter = Filters.or(filters);
-                Bson update = Updates.set(ApiInfo.AGENT_PROXY_GUARDRAIL_ENABLED, enabled);
-                
+
+                List<Bson> updateOps = new ArrayList<>();
+                updateOps.add(Updates.set(ApiInfo.AGENT_PROXY_GUARDRAIL_ENABLED, enabled));
+                if (clearGuardrailSchema) {
+                    updateOps.add(Updates.unset(ApiInfo.GUARDRAIL_SCHEMA));
+                } else if (guardrailSchema != null) {
+                    updateOps.add(Updates.set(ApiInfo.GUARDRAIL_SCHEMA, guardrailSchema));
+                }
+
+                Bson update = Updates.combine(updateOps);
+
                 UpdateResult result = ApiInfoDao.instance.getMCollection()
                     .updateMany(queryFilter, update);
                 

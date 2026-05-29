@@ -11,6 +11,7 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
@@ -20,6 +21,7 @@ import com.akto.testing.TemplateMapper;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
 import com.akto.utils.AktoCustomException;
@@ -637,8 +639,10 @@ public class CustomDataTypeAction extends UserAction{
          */
 
         int accountId = Context.accountId.get();
+        GlobalEnums.CONTEXT_SOURCE contextSource = Context.contextSource.get();
         service.submit(() -> {
             Context.accountId.set(accountId);
+            Context.contextSource.set(contextSource);
             loggerMaker.debugAndAddToDb("Triggered a job to recalculate data types");
             int skip = 0;
             final int LIMIT = 100;
@@ -741,6 +745,109 @@ public class CustomDataTypeAction extends UserAction{
                 info.getHttpCallParser().syncFunction(responses, true, false, accountSettings);
                 info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
                 loggerMaker.debugAndAddToDb("Processed responses to recalculate data types " + responses.size());
+            }
+            responses.clear();
+            loggerMaker.debugAndAddToDb("Starting to recalculate data types from sensitive sample data");
+            int ssdSkip = 0;
+            List<SensitiveSampleData> sensitiveSampleDataList = new ArrayList<>();
+            do {
+                sensitiveSampleDataList = SensitiveSampleDataDao.instance.findAll(Filters.empty(), ssdSkip, LIMIT, null);
+                ssdSkip += LIMIT;
+                for (SensitiveSampleData ssd : sensitiveSampleDataList) {
+                    List<String> ssdSamples = ssd.getSampleData();
+                    if (ssdSamples == null || ssdSamples.isEmpty()) continue;
+                    SingleTypeInfo.ParamId paramId = ssd.getId();
+                    Key ssdApiKey = new Key(paramId.getApiCollectionId(), paramId.getUrl(),
+                            URLMethods.Method.fromString(paramId.getMethod()), -1, 0, 0);
+                    Set<String> foundSet = new HashSet<>();
+                    for (String sample : ssdSamples) {
+                        try {
+                            HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                            boolean skip1 = false, skip2 = false, skip3 = false, skip4 = false, skip5 = false;
+                            try {
+                                skip1 = forHeaders(httpResponseParams.getHeaders(), customDataType, ssdApiKey, aktoDataType);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in recalculating data type for response headers for " + ssdApiKey.toString());
+                            }
+                            try {
+                                skip2 = forHeaders(httpResponseParams.requestParams.getHeaders(), customDataType, ssdApiKey, aktoDataType);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in recalculating data type for request headers for " + ssdApiKey.toString());
+                            }
+                            try {
+                                skip3 = forPayload(httpResponseParams.getPayload(), customDataType, ssdApiKey, aktoDataType);
+                            } catch (Exception e) {
+                                loggerMaker.debugAndAddToDb("Non-JSON response payload, skipping for " + ssdApiKey.toString());
+                            }
+                            try {
+                                skip4 = forPayload(httpResponseParams.requestParams.getPayload(), customDataType, ssdApiKey, aktoDataType);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in recalculating data type for request payload for " + ssdApiKey.toString());
+                            }
+                            try {
+                                skip5 = forQueryParams(httpResponseParams.requestParams.getURL(), customDataType, ssdApiKey, aktoDataType);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in recalculating data type for request query params for " + ssdApiKey.toString());
+                            }
+                            String matchKey = skip1 + " " + skip2 + " " + skip3 + " " + skip4 + " " + skip5 + " " + ssdApiKey.toString();
+                            if ((skip1 || skip2 || skip3 || skip4 || skip5) && !foundSet.contains(matchKey)) {
+                                foundSet.add(matchKey);
+                                httpResponseParams.setPayload(null); // bypass MCP error discard: isMcpErrorResponse returns false for null payload
+                                responses.add(httpResponseParams);
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+                if (sensitiveSampleDataList != null) {
+                    loggerMaker.debugAndAddToDb("Read sensitiveData to recalculate data types " + sensitiveSampleDataList.size());
+                }
+                if (!responses.isEmpty() && responses.size() >= BATCH_SIZE) {
+                    loggerMaker.debugAndAddToDb("Starting processing responses from ssd to recalculate data types " + responses.size());
+                    SingleTypeInfo.fetchCustomDataTypes(accountId);
+                    AccountHTTPCallParserAktoPolicyInfo ssdInfo = RuntimeListener.accountHTTPParserMap.get(accountId);
+                    if (ssdInfo == null) {
+                        ssdInfo = new AccountHTTPCallParserAktoPolicyInfo();
+                        HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+                        ssdInfo.setHttpCallParser(callParser);
+                        RuntimeListener.accountHTTPParserMap.put(accountId, ssdInfo);
+                    }
+                    AccountSettings ssdAccountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                    responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, ssdAccountSettings);
+                    ssdInfo.getHttpCallParser().syncFunction(responses, true, false, ssdAccountSettings);
+                    ssdInfo.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
+                    loggerMaker.debugAndAddToDb("Processed responses from ssd to recalculate data types " + responses.size());
+                    responses.clear();
+                }
+            } while (sensitiveSampleDataList != null && !sensitiveSampleDataList.isEmpty());
+
+            if (!responses.isEmpty()) {
+                loggerMaker.debugAndAddToDb("Starting processing final responses from ssd to recalculate data types " + responses.size());
+                SingleTypeInfo.fetchCustomDataTypes(accountId);
+                AccountHTTPCallParserAktoPolicyInfo ssdInfo = RuntimeListener.accountHTTPParserMap.get(accountId);
+                if (ssdInfo == null) {
+                    ssdInfo = new AccountHTTPCallParserAktoPolicyInfo();
+                    HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+                    ssdInfo.setHttpCallParser(callParser);
+                    RuntimeListener.accountHTTPParserMap.put(accountId, ssdInfo);
+                }
+                AccountSettings ssdAccountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, ssdAccountSettings);
+                ssdInfo.getHttpCallParser().syncFunction(responses, true, false, ssdAccountSettings);
+                ssdInfo.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
+                loggerMaker.debugAndAddToDb("Processed final responses from ssd to recalculate data types " + responses.size());
+            }
+            boolean isDataTypeRedacted = (customDataType != null && customDataType.isRedacted()) ||
+                    (aktoDataType != null && aktoDataType.isRedacted());
+            if (isDataTypeRedacted) {
+                SingleTypeInfo.SubType subType = customDataType != null
+                        ? customDataType.toSubType()
+                        : subTypeMap.get(name);
+                if (subType != null) {
+                    loggerMaker.debugAndAddToDb("Running redaction on both sample_data and sensitive_sample_data for " + subType.getName());
+                    handleRedactionForSubType(subType, true);
+                }
             }
             loggerMaker.debugAndAddToDb("Finished a job to recalculate data types");
         });
@@ -894,6 +1001,7 @@ public class CustomDataTypeAction extends UserAction{
     }
 
     public boolean forPayload(String payload, CustomDataType customDataType, Key apiKey, AktoDataType aktoDataType) throws IOException {
+        if (payload == null || payload.isEmpty()) return false;
         JsonParser jp = factory.createParser(payload);
         JsonNode node = mapper.readTree(jp);
 

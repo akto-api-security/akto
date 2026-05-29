@@ -1,6 +1,8 @@
 package com.akto.action.agents;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.akto.action.UserAction;
@@ -10,7 +12,9 @@ import com.akto.dto.agents.Model;
 import com.akto.dto.agents.ModelType;
 import com.akto.dto.audit_logs.Operation;
 import com.akto.dto.audit_logs.Resource;
+import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
+import org.bson.conversions.Bson;
 
 public class ModelAction extends UserAction {
 
@@ -19,6 +23,7 @@ public class ModelAction extends UserAction {
     String apiKey;
     String azureOpenAIEndpoint;
     String ollamaAIEndpoint;
+    String databricksEndpoint;
     ModelType type;
 
     public String saveAgentModel() {
@@ -67,6 +72,11 @@ public class ModelAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
+        if (type == ModelType.DATABRICKS && (databricksEndpoint == null || databricksEndpoint.isEmpty())) {
+            addActionError("Please add Databricks workspace endpoint");
+            return Action.ERROR.toUpperCase();
+        }
+
         Map<String, String> params = new HashMap<>();
         params.put(Model.PARAM_MODEL, this.model);
         params.put(Model.PARAM_API_KEY, this.apiKey);
@@ -75,6 +85,9 @@ public class ModelAction extends UserAction {
         }
         if (type == ModelType.OLLAMA) {
             params.put(Model.PARAM_OLLAMA_ENDPOINT, this.ollamaAIEndpoint);
+        }
+        if (type == ModelType.DATABRICKS) {
+            params.put(Model.PARAM_DATABRICKS_ENDPOINT, this.databricksEndpoint);
         }
 
         Model model = new Model(name, type, params);
@@ -143,6 +156,14 @@ public class ModelAction extends UserAction {
         this.ollamaAIEndpoint = ollamaAIEndpoint;
     }
 
+    public String getDatabricksEndpoint() {
+        return databricksEndpoint;
+    }
+
+    public void setDatabricksEndpoint(String databricksEndpoint) {
+        this.databricksEndpoint = databricksEndpoint;
+    }
+
     public ModelType getType() {
         return type;
     }
@@ -150,5 +171,32 @@ public class ModelAction extends UserAction {
     public void setType(ModelType type) {
         this.type = type;
     }
+
+    List<Model> githubCopilotConfigs;
+
+    public String fetchGithubCopilotConfigs() {
+        try {
+            Bson filter = Filters.eq("type", ModelType.GITHUB_COPILOT);
+            githubCopilotConfigs = AgentModelDao.instance.findAll(filter);
+            
+            if (githubCopilotConfigs == null) {
+                githubCopilotConfigs = new ArrayList<>();
+            }
+            
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error fetching GitHub Copilot configurations: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public List<Model> getGithubCopilotConfigs() {
+        return githubCopilotConfigs;
+    }
+
+    public void setGithubCopilotConfigs(List<Model> githubCopilotConfigs) {
+        this.githubCopilotConfigs = githubCopilotConfigs;
+    }
+
 
 }

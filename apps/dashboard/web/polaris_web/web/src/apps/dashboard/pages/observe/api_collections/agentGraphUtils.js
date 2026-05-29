@@ -17,6 +17,26 @@ export const getNodeCategoryFromType = (type) => {
     return { category: 'mcp', type: 'MCP Server', description: 'MCP Server' };
   }
 
+  if (typeLower.includes('agent')) {
+    return { category: 'agent', type: 'AI Agent', description: 'AI Agent' };
+  }
+
+  if (typeLower.includes('workflow')) {
+    return { category: 'workflow', type: 'Workflow', description: 'Agent Planner' };
+  }
+
+  if (typeLower.includes('database') || typeLower.includes('vector_db')) {
+    return { category: 'database', type: 'Database', description: 'Database Operation' };
+  }
+
+  if (typeLower.includes('rag')) {
+    return { category: 'rag', type: 'RAG', description: 'Retrieval Augmented Generation' };
+  }
+
+  if (typeLower.includes('api') || typeLower.includes('http')) {
+    return { category: 'api', type: 'API', description: 'API Call' };
+  }
+
   if (typeLower.includes('tool')) {
     return { category: 'ai-tool', type: 'AI Tool', description: 'AI Tool' };
   }
@@ -38,16 +58,37 @@ export const getComponentColors = (category) => {
       return { borderColor: '#3b82f6', backgroundColor: '#eff6ff' }; // Blue
     case 'agent':
       return { borderColor: '#f97316', backgroundColor: '#fff7ed' }; // Orange
+    case 'workflow':
+      return { borderColor: '#10b981', backgroundColor: '#f0fdf4' }; // Green
+    case 'database':
+      return { borderColor: '#f59e0b', backgroundColor: '#fffbeb' }; // Amber
+    case 'rag':
+      return { borderColor: '#06b6d4', backgroundColor: '#ecfeff' }; // Cyan
+    case 'api':
+      return { borderColor: '#8b5cf6', backgroundColor: '#f5f3ff' }; // Purple
     case 'ai-model':
       return { borderColor: '#ec4899', backgroundColor: '#fdf2f8' }; // Pink
     case 'mcp':
       return { borderColor: '#4cbebbff', backgroundColor: '#ecfdf5' }; // Yellow-Green
+    case 'violation':
+      return { borderColor: '#ef4444', backgroundColor: '#fef2f2' }; // Red - has violations
     case 'ai-tool':
       return { borderColor: '#8b5cf6', backgroundColor: '#f5f3ff' }; // Purple
     case 'webhook':
       return { borderColor: '#e91e63', backgroundColor: '#fce4ec' }; // Pink (webhook theme)
     case 'user':
       return { borderColor: '#10b981', backgroundColor: '#ecfdf5' }; // Green
+    case 'akto-hooks':
+      return { borderColor: '#0ea5e9', backgroundColor: '#f0f9ff' }; // Sky blue - Akto proxy
+    case 'arcade-mcp':
+      return { borderColor: '#4cbebbff', backgroundColor: '#ecfdf5' }; // Same as mcp - teal/green
+    case 'arcade-response':
+      return { borderColor: '#10b981', backgroundColor: '#f0fdf4' }; // Green - success/response
+    case 'arcade-tool-call':
+    case 'vscode-tool-call':
+      return { borderColor: '#8b5cf6', backgroundColor: '#f5f3ff' }; // Purple - tool call
+    case 'vscode-hub':
+      return { borderColor: '#3b82f6', backgroundColor: '#eff6ff' }; // Blue - VSCode hub
     default:
       return { borderColor: '#6b7280', backgroundColor: '#f9fafb' }; // Gray
   }
@@ -59,13 +100,28 @@ export const getComponentIcon = (category) => {
     case 'user':
       return CustomersMinor;
     case 'agent':
+    case 'workflow':
       return AutomationMajor;
+    case 'database':
+    case 'rag':
+      return CustomersMinor;
+    case 'api':
+      return CustomersMinor;
     case 'ai-model':
       return MagicMajor;
     case "mcp":
+    case 'arcade-mcp':
       return MCPIcon;
     case 'webhook':
       return WebhookIcon;
+    case 'akto-hooks':
+      return WebhookIcon;
+    case 'arcade-response':
+      return AutomationMajor;
+    case 'vscode-hub':
+      return AutomationMajor;
+    case 'vscode-tool-call':
+      return AutomationMajor;
     default:
       return CustomersMinor;
   }
@@ -99,14 +155,159 @@ export const getNodeXPosition = (category) => {
     return 400;
   } else if (category === 'mcp') {
     return 550;
-  } else if (['ai-tool', 'webhook', 'internal'].includes(category)) {
+  } else if (['workflow', 'database', 'rag', 'api', 'ai-tool', 'webhook', 'internal'].includes(category)) {
     return 700;
   }
   return 400;
 };
 
 
-export const CATEGORY_ORDER = ['ai-model', 'mcp', 'ai-tool', 'webhook', 'internal'];
+// Build the fixed 5-node linear arcade graph:
+// AI Agent → Akto Hooks (req) → MCP Server → Akto Hooks (resp) → Response
+// onNodeClick is passed in from the component so it stays framework-agnostic here.
+export const buildArcadeGraph = ({ agentName, mcpServers, onNodeClick }) => {
+  const centerY = 160;
+  const nodeSpacingX = 300;
+  const startX = 40;
+
+  const makeNode = (id, x, component) => ({
+    id,
+    type: 'agentNode',
+    position: { x, y: centerY },
+    draggable: false,
+    data: { component: { id, ...component }, onNodeClick },
+  });
+
+  const nodes = [
+    makeNode('arcade-agent', startX, {
+      label: agentName,
+      type: 'AI Agent',
+      category: 'agent',
+      description: `AI Agent: ${agentName}`,
+      status: 'active',
+    }),
+    makeNode('arcade-hooks-req', startX + nodeSpacingX, {
+      label: 'Akto Hooks',
+      type: 'Proxy (Request)',
+      category: 'akto-hooks',
+      description: 'Akto intercepts outgoing tool call requests, providing visibility and security before they reach MCP servers.',
+      status: 'active',
+    }),
+    makeNode('arcade-mcp', startX + nodeSpacingX * 2, {
+      label: 'ARCADE registry',
+      type: 'MCP Server',
+      category: 'arcade-mcp',
+      description: `MCP servers discovered via arcade.dev: ${mcpServers.join(', ') || 'None'}`,
+      status: 'connected',
+      mcpServers,
+      showBoundary: true,
+      boundaryColor: '#4cbebbff',
+      boundaryBg: 'rgba(76, 190, 187, 0.05)',
+    }),
+    makeNode('arcade-tool-call', startX + nodeSpacingX * 3, {
+      label: 'Tool Call',
+      type: 'Tool Call',
+      category: 'arcade-tool-call',
+      description: 'Final tool call response returned to the AI agent after passing through Akto proxy.',
+      status: 'connected',
+    }),
+    makeNode('arcade-hooks-resp', startX + nodeSpacingX * 4, {
+      label: 'Akto Evaluation response',
+      type: 'Proxy (Response)',
+      category: 'akto-hooks',
+      description: 'Akto intercepts incoming tool call responses, providing visibility and security before they reach the agent.',
+      status: 'active',
+    }),
+  ];
+
+  const edges = [
+    { id: 'ae-1', source: 'arcade-agent',     target: 'arcade-hooks-req',  type: 'agentEdge',  data: { edgeParam: 'tool call' } },
+    { id: 'ae-2', source: 'arcade-hooks-req',  target: 'arcade-mcp',        type: 'agentEdge',  data: { edgeParam: 'Evaluated call' } },
+    { id: 'ae-3', source: 'arcade-mcp',        target: 'arcade-tool-call',  type: 'agentEdge',  data: { edgeParam: 'Make call' } },
+    { id: 'ae-4', source: 'arcade-tool-call',  target: 'arcade-hooks-resp', type: 'agentEdge',  data: { edgeParam: 'Tool response' } }
+  ];
+
+  return { nodes, edges };
+};
+
+// Build hub-and-spoke VSCode graph: User → Agent (center) → LLM, Tool call (right) | Proxy/Hooks (below)
+// Center label from sourceService; guardrail node varies by tags: mcp-server→Proxy, browser-llm→Proxy, gen-ai/ai-agent→Hooks.
+export const buildVSCodeGraph = ({ onNodeClick, agentLabel = 'VSCode', hasMcpServer, hasBrowserLlm, hasGenAiOrAiAgent }) => {
+  const guardrailType = hasMcpServer ? 'Proxy (MCP)' : hasGenAiOrAiAgent ? 'Hooks' : hasBrowserLlm ? 'Proxy' : 'Hooks';
+  const leftX = 40;
+  const centerX = 280;
+  const rightX = 620;
+  const centerY = 140;
+  const guardrailY = centerY + 200;
+  const rightSpacing = 120;
+  const rightStartY = 80;
+
+  const makeNode = (id, x, y, component) => ({
+    id,
+    type: 'agentNode',
+    position: { x, y },
+    draggable: false,
+    data: { component: { id, ...component }, onNodeClick },
+  });
+
+  const nodes = [
+    makeNode('vscode-user', leftX, centerY, {
+      label: 'User',
+      type: '',
+      category: 'internal',
+      description: 'User initiates prompts and receives responses from the agent.',
+      status: 'active',
+    }),
+    makeNode('vscode-hub', centerX, centerY, {
+      label: agentLabel,
+      type: 'AI Agent',
+      category: 'vscode-hub',
+      description: 'VS Code with GitHub Copilot - orchestrates LLM calls, guardrail checks, and tool execution.',
+      status: 'active',
+      showBoundary: true,
+      boundaryColor: '#3b82f6',
+      boundaryBg: 'rgba(59, 130, 246, 0.05)',
+    }),
+    makeNode('vscode-guardrail', centerX, guardrailY, {
+      label: 'Guardrail service',
+      type: guardrailType,
+      category: 'akto-hooks',
+      description: hasMcpServer
+        ? 'Akto proxy validates MCP tool calls for security and policy compliance.'
+        : hasGenAiOrAiAgent
+          ? 'Akto hooks validate prompts and tool calls for gen-ai/ai-agent flows.'
+          : hasBrowserLlm
+            ? 'Akto proxy validates browser LLM traffic for security and policy compliance.'
+            : 'Akto guardrails validate prompts and tool calls for security and policy compliance.',
+      status: 'active',
+    }),
+    makeNode('vscode-llm', rightX, rightStartY, {
+      label: 'LLM',
+      type: 'LLM Call',
+      category: 'ai-model',
+      description: 'Large Language Model - processes prompts and generates responses.',
+      status: 'connected',
+    }),
+    makeNode('vscode-tool-call', rightX, rightStartY + rightSpacing, {
+      label: 'Tool call',
+      type: 'Tool Call',
+      category: 'vscode-tool-call',
+      description: 'External tool execution - terminal, file edits, and other agent tools.',
+      status: 'connected',
+    }),
+  ];
+
+  const edges = [
+    { id: 've-1', source: 'vscode-user', target: 'vscode-hub', type: 'agentEdge', data: { edgeParam: 'prompt' } },
+    { id: 've-2', source: 'vscode-hub', target: 'vscode-llm', type: 'agentEdge', data: { edgeParam: 'valid llm call' } },
+    { id: 've-3', source: 'vscode-hub', target: 'vscode-guardrail', type: 'agentEdge', data: { edgeParam: 'validate' }, sourceHandle: 'bottom', targetHandle: 'top' },
+    { id: 've-4', source: 'vscode-hub', target: 'vscode-tool-call', type: 'agentEdge', data: { edgeParam: 'valid tool call' } },
+  ];
+
+  return { nodes, edges };
+};
+
+export const CATEGORY_ORDER = ['agent', 'workflow', 'ai-model', 'mcp', 'rag', 'ai-tool', 'database', 'api', 'webhook', 'internal'];
 
 export const sortCategories = (categories) => {
   return categories.sort((a, b) => {

@@ -74,7 +74,7 @@ function TestSuite() {
     };
 
     const fetchData = async () => {
-        const subCategoryMap = await transform.getSubCategoryMap(LocalStore);
+        const { activeSubCategoryMap: subCategoryMap } = await transform.getSubCategoryMap(LocalStore);
         let all = [], by_akto = [], custom = [];
 
         // Get dashboard category using the existing helper function

@@ -4,6 +4,7 @@ package com.akto.testing.kafka_utils;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -12,6 +13,7 @@ import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.jsonrpc.McpToolDescriptionsRegistry;
 import com.akto.store.TestingUtil;
 
 public class TestingConfigurations {
@@ -27,6 +29,9 @@ public class TestingConfigurations {
     Map<String, TestConfig> testConfigMap;
     private  Map<ApiInfoKey, RawApi> rawApiMap = new HashMap<>();
     private boolean doNotMarkIssuesAsFixed;
+    private int maxAgentTokens = -1;
+    private final AtomicLong runningAgentTokenCount = new AtomicLong(0);
+    private Map<String, String> mcpToolDescriptions = new HashMap<>();
 
     private TestingConfigurations() {
     }
@@ -35,13 +40,24 @@ public class TestingConfigurations {
         return instance;
     }
 
-    public synchronized void init(TestingUtil testingUtil, TestingRunConfig testingRunConfig, boolean debug, Map<String, TestConfig> testConfigMap, int maxConcurrentRequests, boolean doNotMarkIssuesAsFixed) {
+    public synchronized void init(TestingUtil testingUtil, TestingRunConfig testingRunConfig, boolean debug, Map<String, TestConfig> testConfigMap, int maxConcurrentRequests, boolean doNotMarkIssuesAsFixed, int maxAgentTokens) {
         this.testingUtil = testingUtil;
         this.testingRunConfig = testingRunConfig;
         this.debug = debug;
         this.testConfigMap = testConfigMap;
         this.maxConcurrentRequest = maxConcurrentRequests == -1 ? 10 : maxConcurrentRequests;
         this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
+        this.maxAgentTokens = maxAgentTokens;
+        this.runningAgentTokenCount.set(0);
+        this.mcpToolDescriptions = new HashMap<>();
+    }
+
+    public void addAgentTokens(int tokens) {
+        runningAgentTokenCount.addAndGet(tokens);
+    }
+
+    public boolean isAgentTokenLimitExceeded() {
+        return maxAgentTokens != -1 && runningAgentTokenCount.get() >= maxAgentTokens;
     }
 
     public boolean isDebug() {
@@ -66,6 +82,14 @@ public class TestingConfigurations {
 
     public void setMaxConcurrentRequest(int maxConcurrentRequest) {
         this.maxConcurrentRequest = maxConcurrentRequest;
+    }
+
+    public Map<ApiInfoKey, RawApi> getRawApiMap() {
+        return rawApiMap;
+    }
+
+    public void setRawApiMap(Map<ApiInfoKey, RawApi> rawApiMap) {
+        this.rawApiMap = rawApiMap;
     }
 
     public List<TestingRunResult> getTestingRunResultList() {

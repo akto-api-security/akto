@@ -29,6 +29,8 @@ import java.util.UUID;
 public class McpAgentAction extends UserAction {
 
     private static final Logger logger = LoggerFactory.getLogger(McpAgentAction.class);
+    /** Guardrail: very large context breaks MCP /chat or gateway limits and yields 422 (ERROR). */
+    private static final int MAX_TEST_RESULT_CONTEXT_CHARS = 120_000;
     private String message;
     private String conversationId;
     private BasicDBObject response;
@@ -119,17 +121,26 @@ public class McpAgentAction extends UserAction {
                         sb.append("Vulnerable: ").append(dataMap.getOrDefault("vulnerable", false)).append("\n");
                         sb.append("Severity: ").append(dataMap.getOrDefault("severity", "")).append("\n");
                         sb.append("URL: ").append(dataMap.getOrDefault("url", "")).append("\n");
-                        Object sampleReq = dataMap.get("sampleRequest");
-                        if(sampleReq != null) {
-                            String reqStr = sampleReq.toString();
-                            sb.append("Sample Request: ").append(reqStr, 0, Math.min(reqStr.length(), 2000)).append("\n");
+                        Object originalMsg = dataMap.get("originalMessage");
+                        if(originalMsg != null) {
+                            sb.append("Original API Request+Response: ").append(originalMsg).append("\n");
                         }
-                        Object sampleResp = dataMap.get("sampleResponse");
-                        if(sampleResp != null) {
-                            String respStr = sampleResp.toString();
-                            sb.append("Sample Response: ").append(respStr, 0, Math.min(respStr.length(), 2000)).append("\n");
+                        Object attemptMsg = dataMap.get("attemptMessage");
+                        if(attemptMsg != null) {
+                            sb.append("Test Attempt Request+Response: ").append(attemptMsg).append("\n");
+                        }
+                        Object agenticCtx = dataMap.get("agenticConversationContext");
+                        if(agenticCtx != null) {
+                            String agenticStr = agenticCtx instanceof String ? (String) agenticCtx : String.valueOf(agenticCtx);
+                            if(StringUtils.isNotEmpty(agenticStr)) {
+                                sb.append("Agent / LLM Test Conversation:\n").append(agenticStr).append("\n");
+                            }
                         }
                         contextString = sb.toString();
+                        if(contextString.length() > MAX_TEST_RESULT_CONTEXT_CHARS) {
+                            contextString = contextString.substring(0, MAX_TEST_RESULT_CONTEXT_CHARS)
+                                + "\n\n[... truncated server-side ...]";
+                        }
                         tokensLimit = 40000;
                     }
                 }

@@ -62,6 +62,7 @@ public class GuardrailMetricsProcessor {
         Map<String, Long> policyCounts = new HashMap<>();
         Map<String, Long> categoryCounts = new HashMap<>();
         Map<String, List<Integer>> categoryTimestamps = new HashMap<>();
+        Map<String, String> categoryToFilterId = new HashMap<>();
         Map<String, Set<String>> complianceEndpoints = new HashMap<>();
         Set<String> totalGuardrailEndpoints = new HashSet<>();
         double totalScore = 0.0;
@@ -94,6 +95,7 @@ public class GuardrailMetricsProcessor {
 
                 categoryCounts.put(category, categoryCounts.getOrDefault(category, 0L) + 1);
                 categoryTimestamps.computeIfAbsent(category, k -> new ArrayList<>()).add((int) timestamp);
+                categoryToFilterId.putIfAbsent(category, filterId);
             }
 
             // 3. Calculate average threat score (all events)
@@ -171,7 +173,7 @@ public class GuardrailMetricsProcessor {
 
         // Process collected data
         metrics.topGuardrailPolicies = buildTopGuardrailPolicies(policyCounts);
-        metrics.dataProtectionTrends = buildDataProtectionTrends(categoryCounts, categoryTimestamps, daysBetween);
+        metrics.dataProtectionTrends = buildDataProtectionTrends(categoryCounts, categoryTimestamps, categoryToFilterId, daysBetween);
         metrics.avgThreatScore = scoreCount > 0 ? Math.round((totalScore / scoreCount) * 10.0) / 10.0 : 0.0;
         metrics.sensitiveCount = sensitiveEventCount;
         metrics.successfulExploits = successfulExploitCount;
@@ -233,6 +235,7 @@ public class GuardrailMetricsProcessor {
 
                 // Use displayName if available, otherwise fallback to filterId
                 doc.put("name", (displayName != null && !displayName.isEmpty()) ? displayName : filterId);
+                doc.put("filterId", filterId);
                 doc.put("count", entry.getValue());
                 result.add(doc);
             }
@@ -242,16 +245,28 @@ public class GuardrailMetricsProcessor {
         return result;
     }
 
+    private static final int SECONDS_PER_DAY = 86400;
+
     private static BasicDBObject buildDataProtectionTrends(
             Map<String, Long> categoryCounts,
             Map<String, List<Integer>> categoryTimestamps,
+            Map<String, String> categoryToFilterId,
             long daysBetween
     ) {
+
+        long bucketSizeInDays = TimePeriodUtils.getBucketSize(daysBetween);
+
+
         BasicDBObject result = new BasicDBObject();
         try {
-            // Sort categories by count and take top 3
-            List<String> topCategories = categoryCounts.entrySet().stream()
-                    .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+            // Sort categories by number of distinct days they appeared in (most days first), then take top 3
+            List<String> topCategories = categoryTimestamps.entrySet().stream()
+                    .filter(e -> e.getValue() != null && !e.getValue().isEmpty())
+                    .sorted((e1, e2) -> {
+                        long days1 = e1.getValue().stream().mapToLong(ts -> ts / SECONDS_PER_DAY).distinct().count();
+                        long days2 = e2.getValue().stream().mapToLong(ts -> ts / SECONDS_PER_DAY).distinct().count();
+                        return Long.compare(days2, days1);
+                    })
                     .limit(3)
                     .map(Map.Entry::getKey)
                     .collect(Collectors.toList());
@@ -260,9 +275,14 @@ public class GuardrailMetricsProcessor {
             for (String category : topCategories) {
                 List<Integer> timestamps = categoryTimestamps.get(category);
                 if (timestamps != null && !timestamps.isEmpty()) {
-                    Map<String, Long> timePeriodMap = TimePeriodUtils.groupByTimePeriod(timestamps, daysBetween);
-                    List<List<Object>> timeSeriesData = TimePeriodUtils.convertTimePeriodMapToTimeSeriesData(timePeriodMap, daysBetween);
-                    result.put(category, timeSeriesData);
+                    Map<String, Long> timePeriodMap = TimePeriodUtils.groupByTimePeriod(timestamps, bucketSizeInDays);
+                    List<List<Object>> timeSeriesData = TimePeriodUtils.convertTimePeriodMapToTimeSeriesData(timePeriodMap, bucketSizeInDays);
+                    BasicDBObject categoryData = new BasicDBObject("data", timeSeriesData);
+                    String filterId = categoryToFilterId != null ? categoryToFilterId.get(category) : null;
+                    if (filterId != null && !filterId.isEmpty()) {
+                        categoryData.put("filterId", filterId);
+                    }
+                    result.put(category, categoryData);
                 }
             }
         } catch (Exception e) {

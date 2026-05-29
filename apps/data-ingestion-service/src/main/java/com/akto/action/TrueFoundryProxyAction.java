@@ -113,9 +113,9 @@ public class TrueFoundryProxyAction extends ActionSupport {
             if (Boolean.TRUE.equals(result.get("success"))) {
                 Map<String, Object> guardrailsResult = (Map<String, Object>) result.get("guardrailsResult");
                 if (guardrailsResult != null) {
-                    Boolean allowed = (Boolean) guardrailsResult.get("allowed");
+                    Boolean allowed = (Boolean) guardrailsResult.get("Allowed");
                     if (allowed != null && !allowed) {
-                        String reason = (String) guardrailsResult.get("reason");
+                        String reason = (String) guardrailsResult.get("Reason");
                         loggerMaker.warn("TrueFoundry sync request blocked by guardrails: " + reason);
 
                         // Build flat blocked-response fields for async ingestion

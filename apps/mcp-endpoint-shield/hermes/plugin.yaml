@@ -1,0 +1,9 @@
+name: akto-guardrails
+version: "1.0.0"
+description: "Akto guardrails for Hermes Agent — validates prompts and tool calls in real-time, blocks risky requests, logs all activity for audit trail and compliance."
+author: Akto
+hooks:
+  - pre_llm_call
+  - post_llm_call
+  - pre_tool_call
+  - post_tool_call

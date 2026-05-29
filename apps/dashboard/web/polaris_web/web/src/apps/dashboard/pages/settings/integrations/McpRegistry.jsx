@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import IntegrationsLayout from './IntegrationsLayout'
-import { Box, Button, LegacyCard, TextField, Text, VerticalStack, HorizontalStack, Badge, Banner } from '@shopify/polaris'
+import { Box, Button, LegacyCard, TextField, Text, VerticalStack, HorizontalStack, Banner, DataTable, Scrollable, Link, Badge } from '@shopify/polaris'
 import { DeleteMinor } from '@shopify/polaris-icons'
 import "../settings.css"
 import func from "@/util/func"
@@ -10,52 +10,91 @@ function McpRegistry() {
 
     const defaultRegistryUrl = 'https://registry.modelcontextprotocol.io/v0/servers';
     const MAX_REGISTRIES = 10;
-    const MAX_NAME_LENGTH = 100;
     const MAX_URL_LENGTH = 500;
-    const TEST_CONNECTION_TIMEOUT = 10000; // 10 seconds
-    
-    const [registries, setRegistries] = useState([
-        { id: 'default', name: 'Official MCP Registry', url: defaultRegistryUrl, isDefault: true }
-    ]);
+    const MAX_HEADER_KEY_LENGTH = 100;
+    const MAX_HEADER_VALUE_LENGTH = 500;
+    const MAX_HEADERS = 20;
+
+    const [registries, setRegistries] = useState([]);
     const [originalRegistries, setOriginalRegistries] = useState([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [testingConnectionId, setTestingConnectionId] = useState(null);
-    const [connectionStatuses, setConnectionStatuses] = useState({});
-    
+    const [syncingId, setSyncingId] = useState(null);
+    const [syncStatuses, setSyncStatuses] = useState({});
+
     // New registry form state
-    const [newRegistryName, setNewRegistryName] = useState('');
     const [newRegistryUrl, setNewRegistryUrl] = useState('');
+    const [newRegistryHeaders, setNewRegistryHeaders] = useState([{ key: '', value: '' }]);
+    const [newRegistryType, setNewRegistryType] = useState('CSV_URL');
     const [showAddForm, setShowAddForm] = useState(false);
+    const [adding, setAdding] = useState(false);
+
+    // View endpoints state (per registry)
+    const [expandedEndpointsId, setExpandedEndpointsId] = useState(null);
+    const [endpointsByRegistryId, setEndpointsByRegistryId] = useState({});
+    const [endpointsLoadingId, setEndpointsLoadingId] = useState(null);
+
+    const headersArrayToObject = (arr) => {
+        const obj = {};
+        (arr || []).forEach(({ key, value }) => {
+            const k = (key || '').trim();
+            if (k) obj[k] = (value || '').trim();
+        });
+        return obj;
+    };
+
+    const updateHeader = (index, field, val) => {
+        setNewRegistryHeaders(prev => prev.map((h, i) => i === index ? { ...h, [field]: val } : h));
+    };
+
+    const addHeaderRow = () => {
+        if (newRegistryHeaders.length >= MAX_HEADERS) {
+            func.setToast(true, true, `Maximum ${MAX_HEADERS} headers allowed`);
+            return;
+        }
+        setNewRegistryHeaders(prev => [...prev, { key: '', value: '' }]);
+    };
+
+    const removeHeaderRow = (index) => {
+        setNewRegistryHeaders(prev => {
+            const next = prev.filter((_, i) => i !== index);
+            return next.length > 0 ? next : [{ key: '', value: '' }];
+        });
+    };
+
+    const buildEndpointRows = (registryId) => {
+        const list = endpointsByRegistryId[registryId] || [];
+        return list.map((entry) => [
+            entry.name || '-',
+            entry.url || '-',
+            entry.sourceDisplay || 'Registry',
+            entry.addedBy || '-',
+            entry.createdAt ? func.epochToDateTime(entry.createdAt) : '-',
+        ]);
+    };
 
     async function fetchRegistrySettings() {
         setLoading(true);
         try {
-            // Call the add API with null to fetch current state from DB without modifying it
-            const response = await api.addMcpRegistryIntegration(null);
-            
+            const response = await api.fetchMcpRegistries();
+
             let registriesList = [];
-            if (response && response.mcpRegistryConfig && response.mcpRegistryConfig.registries) {
+            if (response && Array.isArray(response.mcpRegistries)) {
+                registriesList = response.mcpRegistries;
+            } else if (response && response.mcpRegistryConfig && response.mcpRegistryConfig.registries) {
                 registriesList = response.mcpRegistryConfig.registries;
             } else {
-                // Default registry if none exists
-                registriesList = [
-                    { id: 'default', name: 'Official MCP Registry', url: defaultRegistryUrl, isDefault: true }
-                ];
+                registriesList = [];
             }
-            
+
             setRegistries(registriesList);
             setOriginalRegistries(JSON.parse(JSON.stringify(registriesList)));
         } catch (error) {
             console.error("Failed to load registry settings:", error);
             const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to load registry settings";
             func.setToast(true, true, errorMsg);
-            // Set default registry on error
-            const defaultList = [
-                { id: 'default', name: 'Official MCP Registry', url: defaultRegistryUrl, isDefault: true }
-            ];
-            setRegistries(defaultList);
-            setOriginalRegistries(JSON.parse(JSON.stringify(defaultList)));
+            setRegistries([]);
+            setOriginalRegistries([]);
         } finally {
             setLoading(false);
         }
@@ -65,56 +104,45 @@ function McpRegistry() {
         fetchRegistrySettings();
     }, []);
 
-    const testConnection = async (registryId, url) => {
-        setTestingConnectionId(registryId);
-        setConnectionStatuses(prev => ({ ...prev, [registryId]: null }));
-        
+    const syncRegistry = async (registryId) => {
+        setSyncingId(registryId);
+        setSyncStatuses(prev => ({ ...prev, [registryId]: null }));
         try {
-            // Create abort controller for timeout
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), TEST_CONNECTION_TIMEOUT);
-            
-            // Test the connection by attempting to fetch from the registry URL
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                },
-                signal: controller.signal,
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (response.ok) {
-                setConnectionStatuses(prev => ({ 
-                    ...prev, 
-                    [registryId]: { success: true, message: 'Connection successful!' } 
-                }));
-            } else {
-                setConnectionStatuses(prev => ({ 
-                    ...prev, 
-                    [registryId]: { success: false, message: `Failed with status: ${response.status}` } 
-                }));
-            }
+            const response = await api.syncMcpRegistry(registryId);
+            const message = (response && response.message) || 'Sync initiated successfully';
+            setSyncStatuses(prev => ({
+                ...prev,
+                [registryId]: { success: true, message }
+            }));
         } catch (error) {
-            let errorMessage = 'Failed to connect to registry';
-            if (error.name === 'AbortError') {
-                errorMessage = 'Connection timeout (10 seconds)';
-            } else if (error.message.includes('CORS')) {
-                errorMessage = 'CORS error - registry may not allow cross-origin requests';
-            } else if (error.message) {
-                errorMessage = error.message;
-            }
-            
-            setConnectionStatuses(prev => ({ 
-                ...prev, 
-                [registryId]: { 
-                    success: false, 
-                    message: errorMessage
-                } 
+            const errorMsg = error?.response?.data?.actionErrors?.[0] || error?.message || 'Failed to initiate sync';
+            setSyncStatuses(prev => ({
+                ...prev,
+                [registryId]: { success: false, message: errorMsg }
             }));
         } finally {
-            setTestingConnectionId(null);
+            setSyncingId(null);
+        }
+    };
+
+    const viewEndpoints = async (registryId) => {
+        if (expandedEndpointsId === registryId) {
+            setExpandedEndpointsId(null);
+            return;
+        }
+        setExpandedEndpointsId(registryId);
+
+        setEndpointsLoadingId(registryId);
+        try {
+            const response = await api.fetchMcpAllowlistEntries(registryId);
+            const list = (response && Array.isArray(response.mcpAllowlistEntries)) ? response.mcpAllowlistEntries : [];
+            setEndpointsByRegistryId(prev => ({ ...prev, [registryId]: list }));
+        } catch (error) {
+            const errorMsg = error?.response?.data?.actionErrors?.[0] || 'Failed to fetch endpoints';
+            func.setToast(true, true, errorMsg);
+            setEndpointsByRegistryId(prev => ({ ...prev, [registryId]: [] }));
+        } finally {
+            setEndpointsLoadingId(null);
         }
     };
 
@@ -123,89 +151,87 @@ function McpRegistry() {
         return urlPattern.test(url);
     };
 
-    const sanitizeName = (name) => {
-        // Remove potentially dangerous characters
-        return name.replace(/[<>"']/g, '');
-    };
-
-    const addRegistry = () => {
-        // Trim inputs
-        const trimmedName = newRegistryName.trim();
+    const addRegistry = async () => {
         const trimmedUrl = newRegistryUrl.trim();
-        
-        // Basic validation
-        if (!trimmedName || !trimmedUrl) {
-            func.setToast(true, true, "Please enter both registry name and URL");
+
+        if (!trimmedUrl) {
+            func.setToast(true, true, "Please enter a registry URL");
             return;
         }
-        
-        // Length validation
-        if (trimmedName.length > MAX_NAME_LENGTH) {
-            func.setToast(true, true, `Registry name too long (max ${MAX_NAME_LENGTH} characters)`);
-            return;
-        }
-        
+
         if (trimmedUrl.length > MAX_URL_LENGTH) {
             func.setToast(true, true, `Registry URL too long (max ${MAX_URL_LENGTH} characters)`);
             return;
         }
-        
-        // URL format validation
+
         if (!validateRegistryUrl(trimmedUrl)) {
             func.setToast(true, true, "Invalid URL format. Must be a valid http or https URL");
             return;
         }
-        
-        // Check max registries
+
         if (registries.length >= MAX_REGISTRIES) {
             func.setToast(true, true, `Maximum ${MAX_REGISTRIES} registries allowed`);
             return;
         }
-        
-        // Check for duplicate names (case-insensitive)
-        const nameLower = trimmedName.toLowerCase();
-        if (registries.some(r => r.name.toLowerCase() === nameLower)) {
-            func.setToast(true, true, "A registry with this name already exists");
-            return;
-        }
-        
-        // Check for duplicate URLs (case-insensitive)
+
         const urlLower = trimmedUrl.toLowerCase();
-        if (registries.some(r => r.url.toLowerCase() === urlLower)) {
+        if (registries.some(r => r.url && r.url.toLowerCase() === urlLower)) {
             func.setToast(true, true, "A registry with this URL already exists");
             return;
         }
 
-        // Sanitize name and create new registry
-        const newRegistry = {
-            id: `custom-${Date.now()}`,
-            name: sanitizeName(trimmedName),
-            url: trimmedUrl,
-            isDefault: false
-        };
+        for (const h of newRegistryHeaders) {
+            const k = (h.key || '').trim();
+            const v = (h.value || '').trim();
+            if (!k && !v) continue;
+            if (!k) {
+                func.setToast(true, true, "Header key cannot be empty");
+                return;
+            }
+            if (k.length > MAX_HEADER_KEY_LENGTH) {
+                func.setToast(true, true, `Header key too long (max ${MAX_HEADER_KEY_LENGTH} characters)`);
+                return;
+            }
+            if (v.length > MAX_HEADER_VALUE_LENGTH) {
+                func.setToast(true, true, `Header value too long (max ${MAX_HEADER_VALUE_LENGTH} characters)`);
+                return;
+            }
+        }
 
-        setRegistries([...registries, newRegistry]);
-        setNewRegistryName('');
-        setNewRegistryUrl('');
-        setShowAddForm(false);
-        func.setToast(true, false, "Registry added. Click 'Save Configuration' to apply changes.");
+        const headersObj = headersArrayToObject(newRegistryHeaders);
+        const registryType = newRegistryType || 'CSV_URL';
+
+        setAdding(true);
+        try {
+            await api.addMcpRegistry(trimmedUrl, headersObj, registryType);
+            func.setToast(true, false, "Registry added. Endpoints will be ingested on sync.");
+            setNewRegistryUrl('');
+            setNewRegistryHeaders([{ key: '', value: '' }]);
+            setNewRegistryType('CSV_URL');
+            setShowAddForm(false);
+            await fetchRegistrySettings();
+        } catch (error) {
+            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to add URL";
+            func.setToast(true, true, errorMsg);
+            window.location.reload();
+        } finally {
+            setAdding(false);
+        }
     };
 
-    const deleteRegistry = (registryId, registryName) => {
-        // Prevent deleting the default registry
-        const registry = registries.find(r => r.id === registryId);
-        if (registry && registry.isDefault) {
-            func.setToast(true, true, "Cannot delete the official registry");
+    const deleteRegistry = async (registryHexId, registryUrl) => {
+        if (!window.confirm(`Are you sure you want to remove the registry "${registryUrl}"?`)) {
             return;
         }
 
-        // Confirm deletion
-        if (!window.confirm(`Are you sure you want to delete the registry "${registryName}"?`)) {
-            return;
+        try {
+            await api.deleteMcpRegistry(registryHexId);
+            setRegistries(prev => prev.filter(r => r.hexId !== registryHexId));
+            func.setToast(true, false, "Registry removed successfully.");
+        } catch (error) {
+            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to delete registry";
+            func.setToast(true, true, errorMsg);
         }
-
-        setRegistries(registries.filter(r => r.id !== registryId));
-        func.setToast(true, false, "Registry removed. Click 'Save Configuration' to apply changes.");
     };
 
     const resetToDefault = () => {
@@ -215,28 +241,18 @@ function McpRegistry() {
         }
 
         // Reset to only the default registry (local state only)
-        const defaultRegistry = [
-            { id: 'default', name: 'Official MCP Registry', url: defaultRegistryUrl, isDefault: true }
-        ];
-        setRegistries(defaultRegistry);
+        setRegistries([]);
         func.setToast(true, false, "Reset to default. Click 'Save Configuration' to apply changes.");
     };
 
     const saveAction = async () => {
-        if (registries.length === 0) {
-            func.setToast(true, true, "You must have at least one registry");
-            return;
-        }
-
         if (saving) {
             return; // Prevent double-clicking
         }
 
         setSaving(true);
         try {
-            // If only default registry exists, send empty array to delete custom config
-            const dataToSend = (registries.length === 1 && registries[0].isDefault) ? [] : registries;
-            const response = await api.addMcpRegistryIntegration(dataToSend);
+            const response = await api.addMcpRegistryIntegration(registries);
             
             // Update original registries from the response
             if (response && response.mcpRegistryConfig && response.mcpRegistryConfig.registries) {
@@ -258,9 +274,9 @@ function McpRegistry() {
 
     const discardAction = () => {
         setRegistries(JSON.parse(JSON.stringify(originalRegistries)));
-        setConnectionStatuses({});
-        setNewRegistryName('');
+        setSyncStatuses({});
         setNewRegistryUrl('');
+        setNewRegistryHeaders([{ key: '', value: '' }]);
         setShowAddForm(false);
         func.setToast(true, true, "Changes Discarded");
     };
@@ -271,82 +287,116 @@ function McpRegistry() {
 
     const component = (
         <LegacyCard
-            title="MCP Registry Configuration"
-            secondaryFooterActions={[
-                { content: 'Discard Changes', destructive: true, onAction: discardAction, disabled: !hasChanges() || saving }
-            ]}
-            primaryFooterAction={{ 
-                content: 'Save Configuration', 
-                onAction: saveAction, 
-                disabled: !hasChanges() || saving,
-                loading: saving
-            }}
+            // secondaryFooterActions={[
+            //     { content: 'Discard Changes', destructive: true, onAction: discardAction, disabled: !hasChanges() || saving, }
+            // ]}
+            // primaryFooterAction={{ 
+            //     content: 'Save Configuration', 
+            //     onAction: saveAction, 
+            //     disabled: !hasChanges() || saving,
+            //     loading: saving
+            // }}
         >
             <LegacyCard.Section>
                 <VerticalStack gap="4">
+                    <HorizontalStack align="space-between" blockAlign="center">
+                        <Text variant="headingMd" as="h2">MCP Registry Configuration</Text>
+                        <HorizontalStack gap="2">
+                            {!registries.some(r => !r.isDefault) && (
+                                <Button
+                                    onClick={() => setShowAddForm(!showAddForm)}
+                                    disabled={saving}
+                                >
+                                    {showAddForm ? 'Cancel' : 'Add URL'}
+                                </Button>
+                            )}
+                            {/* <Button
+                                onClick={resetToDefault}
+                                disabled={saving}
+                            >
+                                Reset to Default
+                            </Button> */}
+                        </HorizontalStack>
+                    </HorizontalStack>
+
                     <Banner tone="info">
                         <Text variant="bodyMd">
                             Configure MCP (Model Context Protocol) Registries to discover and validate MCP servers.
-                            You can add multiple registries to expand your MCP server catalog.
                         </Text>
                     </Banner>
 
                     {/* Registered Registries List */}
                     <Box>
                         <VerticalStack gap="3">
-                            <HorizontalStack align="space-between">
-                                <Text variant="headingMd" as="h3">
-                                    Configured Registries ({registries.length}/{MAX_REGISTRIES})
-                                </Text>
-                                <HorizontalStack gap="2">
-                                    <Button 
-                                        onClick={() => setShowAddForm(!showAddForm)}
-                                        disabled={saving || registries.length >= MAX_REGISTRIES}
-                                    >
-                                        {showAddForm ? 'Cancel' : 'Add Registry'}
-                                    </Button>
-                                    <Button 
-                                        onClick={resetToDefault}
-                                        disabled={saving}
-                                        tone="critical"
-                                    >
-                                        Reset to Default
-                                    </Button>
-                                </HorizontalStack>
-                            </HorizontalStack>
 
-                            {/* Add Registry Form */}
                             {showAddForm && (
                                 <LegacyCard sectioned>
                                     <VerticalStack gap="3">
-                                        <Text variant="headingMd" as="h4">Add New Registry</Text>
+                                        <Text variant="headingMd" as="h4">Add URL</Text>
                                         <TextField
-                                            label="Registry Name"
-                                            value={newRegistryName}
-                                            onChange={setNewRegistryName}
-                                            placeholder="e.g., Internal MCP Registry"
-                                            autoComplete="off"
-                                            maxLength={MAX_NAME_LENGTH}
-                                            showCharacterCount
-                                        />
-                                    <TextField
                                             label="Registry URL"
                                             value={newRegistryUrl}
                                             onChange={setNewRegistryUrl}
-                                            placeholder="https://your-registry.com/v0/servers"
-                                            helpText="Enter the full URL of your MCP registry API endpoint"
-                                        autoComplete="off"
+                                            placeholder="https://example.com/path/to/mcp_servers.csv"
+                                            helpText="The file at this URL will be read to extract MCP endpoints."
+                                            autoComplete="off"
                                             maxLength={MAX_URL_LENGTH}
                                         />
+
+                                        <VerticalStack gap="2">
+                                            <Text variant="headingSm" as="h5">Request Headers (optional)</Text>
+                                            <Text variant="bodySm" color="subdued">
+                                                Add headers (e.g., Authorization) used when fetching the file.
+                                            </Text>
+                                            {newRegistryHeaders.map((header, idx) => (
+                                                <HorizontalStack key={idx} gap="2" blockAlign="end">
+                                                    <Box width="40%">
+                                                        <TextField
+                                                            label={idx === 0 ? "Header Key" : ""}
+                                                            labelHidden={idx !== 0}
+                                                            value={header.key}
+                                                            onChange={(v) => updateHeader(idx, 'key', v)}
+                                                            placeholder="Authorization"
+                                                            autoComplete="off"
+                                                            maxLength={MAX_HEADER_KEY_LENGTH}
+                                                        />
+                                                    </Box>
+                                                    <Box width="50%">
+                                                        <TextField
+                                                            label={idx === 0 ? "Header Value" : ""}
+                                                            labelHidden={idx !== 0}
+                                                            value={header.value}
+                                                            onChange={(v) => updateHeader(idx, 'value', v)}
+                                                            placeholder="Bearer token"
+                                                            autoComplete="off"
+                                                            maxLength={MAX_HEADER_VALUE_LENGTH}
+                                                        />
+                                                    </Box>
+                                                    <Button
+                                                        plain
+                                                        destructive
+                                                        icon={DeleteMinor}
+                                                        onClick={() => removeHeaderRow(idx)}
+                                                        accessibilityLabel="Remove header"
+                                                    />
+                                                </HorizontalStack>
+                                            ))}
+                                            <Box>
+                                                <Button onClick={addHeaderRow} disabled={newRegistryHeaders.length >= MAX_HEADERS}>
+                                                    Add Header
+                                                </Button>
+                                            </Box>
+                                        </VerticalStack>
+
                                         <HorizontalStack gap="2">
-                                            <Button primary onClick={addRegistry}>
+                                            <Button primary onClick={addRegistry} loading={adding} disabled={adding}>
                                                 Add Registry
                                             </Button>
                                             <Button onClick={() => {
                                                 setShowAddForm(false);
-                                                setNewRegistryName('');
                                                 setNewRegistryUrl('');
-                                            }}>
+                                                setNewRegistryHeaders([{ key: '', value: '' }]);
+                                            }} disabled={adding}>
                                                 Cancel
                                             </Button>
                                         </HorizontalStack>
@@ -359,22 +409,15 @@ function McpRegistry() {
                                 {registries.map((registry) => (
                                     <LegacyCard key={registry.id} sectioned>
                                         <VerticalStack gap="3">
-                                            <HorizontalStack align="space-between">
-                                                <Box>
-                                                    <HorizontalStack gap="2" align="center">
-                                                        <Text variant="headingMd" as="h4">
-                                                            {registry.name}
-                                                        </Text>
-                                                        {registry.isDefault && (
-                                                            <Badge tone="success">Official</Badge>
-                                                        )}
-                                                    </HorizontalStack>
-                                                </Box>
+                                            <HorizontalStack align="space-between" blockAlign="center">
+                                                <Text variant="bodyMd" color="subdued" breakWord>
+                                                    {registry.url}
+                                                </Text>
                                                 {!registry.isDefault && (
                                                     <Button
                                                         plain
                                                         destructive
-                                                        onClick={() => deleteRegistry(registry.id, registry.name)}
+                                                        onClick={() => deleteRegistry(registry.hexId, registry.url)}
                                                         icon={DeleteMinor}
                                                         disabled={saving}
                                                     >
@@ -383,37 +426,69 @@ function McpRegistry() {
                                                 )}
                                             </HorizontalStack>
 
-                                            <Box>
-                                                <Text variant="bodyMd" color="subdued" breakWord>
-                                                    {registry.url}
-                                                </Text>
-                                            </Box>
+                                            {!registry.isDefault && (
+                                                <HorizontalStack gap="2">
+                                                    <Button
+                                                        onClick={() => syncRegistry(registry.hexId)}
+                                                        loading={syncingId === registry.hexId}
+                                                        disabled={syncingId !== null || saving}
+                                                        size="slim"
+                                                        primary
+                                                    >
+                                                        Sync now
+                                                    </Button>
+                                                    <Button
+                                                        onClick={() => viewEndpoints(registry.hexId)}
+                                                        loading={endpointsLoadingId === registry.hexId}
+                                                        disabled={saving}
+                                                        size="slim"
+                                                    >
+                                                        {expandedEndpointsId === registry.hexId ? 'Hide endpoints' : 'View endpoints'}
+                                                    </Button>
+                                                </HorizontalStack>
+                                            )}
 
-                                            <HorizontalStack gap="2">
-                                                <Button
-                                                    onClick={() => testConnection(registry.id, registry.url)}
-                                                    loading={testingConnectionId === registry.id}
-                                                    disabled={testingConnectionId !== null || saving}
-                                                    size="slim"
-                                                >
-                                                    Test Connection
-                                                </Button>
-                                            </HorizontalStack>
-
-                                            {connectionStatuses[registry.id] && (
-                                <Banner
-                                                    tone={connectionStatuses[registry.id].success ? "success" : "critical"}
+                                            {syncStatuses[registry.hexId] && (
+                                                <Banner
+                                                    tone={syncStatuses[registry.hexId].success ? "success" : "critical"}
                                                     onDismiss={() => {
-                                                        const newStatuses = { ...connectionStatuses };
-                                                        delete newStatuses[registry.id];
-                                                        setConnectionStatuses(newStatuses);
+                                                        const newStatuses = { ...syncStatuses };
+                                                        delete newStatuses[registry.hexId];
+                                                        setSyncStatuses(newStatuses);
                                                     }}
                                                 >
                                                     <Text variant="bodyMd">
-                                                        {connectionStatuses[registry.id].message}
+                                                        {syncStatuses[registry.hexId].message}
                                                     </Text>
-                                </Banner>
-                            )}
+                                                </Banner>
+                                            )}
+
+                                            {expandedEndpointsId === registry.hexId && (
+                                                <Box>
+                                                    {endpointsLoadingId === registry.hexId ? (
+                                                        <Text variant="bodyMd" color="subdued">Loading endpoints...</Text>
+                                                    ) : (endpointsByRegistryId[registry.hexId] && endpointsByRegistryId[registry.hexId].length > 0) ? (
+                                                        <VerticalStack gap="2">
+                                                            <Text variant="bodySm" color="subdued">
+                                                                {endpointsByRegistryId[registry.hexId].length} endpoints
+                                                            </Text>
+                                                            <Scrollable style={{ maxHeight: '480px' }} shadow focusable>
+                                                                <DataTable
+                                                                    columnContentTypes={['text', 'text', 'text', 'text', 'text']}
+                                                                    headings={['Name', 'URL', 'Source', 'Added By', 'Created At']}
+                                                                    rows={buildEndpointRows(registry.hexId)}
+                                                                    increasedTableDensity
+                                                                    hoverable
+                                                                />
+                                                            </Scrollable>
+                                                        </VerticalStack>
+                                                    ) : (
+                                                        <Text variant="bodyMd" color="subdued">
+                                                            No endpoints found. Click "Sync now" to ingest endpoints from the registry.
+                                                        </Text>
+                                                    )}
+                                                </Box>
+                                            )}
                                         </VerticalStack>
                                     </LegacyCard>
                                 ))}
@@ -421,32 +496,48 @@ function McpRegistry() {
                         </VerticalStack>
                     </Box>
 
-                    <Banner tone="info">
-                        <VerticalStack gap="2">
-                            <Text variant="bodyMd" fontWeight="semibold">
-                                Important Notes:
-                            </Text>
-                            <Text variant="bodyMd">
-                                • All registries will be used for MCP server discovery and validation
-                            </Text>
-                            <Text variant="bodyMd">
-                                • Custom registries must follow the MCP Registry API specification
-                            </Text>
-                            <Text variant="bodyMd">
-                                • Ensure your custom registries are accessible from your Akto instance
-                            </Text>
+                    <LegacyCard sectioned>
+                        <VerticalStack gap="4">
+                            <Text variant="headingMd">How to add a URL</Text>
+                            <VerticalStack gap="2">
+                                <Text variant="bodyMd" fontWeight="semibold">1. Open the form</Text>
+                                <Text variant="bodyMd" color="subdued">Click <b>Add URL</b> to open the form.</Text>
+                                <Text variant="bodyMd" fontWeight="semibold">2. Enter the URL</Text>
+                                <Text variant="bodyMd" color="subdued">Enter the URL pointing to your CSV file (e.g. <code>https://example.com/path/to/mcp_servers.csv</code>).</Text>
+                                <Link url="https://raw.githubusercontent.com/akto-api-security/akto/master/apps/dashboard/src/main/resources/sample_mcp_registry.csv" target="_blank">Download sample CSV</Link>
+                                <Text variant="bodyMd" fontWeight="semibold">3. Add authentication (if required)</Text>
+                                <Text variant="bodyMd" color="subdued">If the file requires authentication, add a header — key: <code>Authorization</code>, value: <code>Bearer &lt;your_token&gt;</code>.</Text>
+                                <Text variant="bodyMd" fontWeight="semibold">4. Submit</Text>
+                                <Text variant="bodyMd" color="subdued">Click <b>Add Registry</b> — MCP server entries will be ingested automatically from the CSV.</Text>
+                            </VerticalStack>
                         </VerticalStack>
-                    </Banner>
+                    </LegacyCard>
+
+                    <LegacyCard sectioned>
+                        <VerticalStack gap="4">
+                            <Text variant="headingMd">Important Notes</Text>
+                            <VerticalStack gap="2">
+                                <Text variant="bodyMd" fontWeight="semibold">1. Only one registry URL is supported.</Text>
+                                <Text variant="bodyMd" fontWeight="semibold">2. CSV format</Text>
+                                <Text variant="bodyMd" color="subdued">Your CSV must have a header row with a <code>mcp_server_name</code> column. Each row is one MCP server name.</Text>
+                                <pre style={{ margin: 0, fontSize: '12px', fontFamily: 'monospace', lineHeight: '1.8', background: '#f6f6f7', border: '1px solid #e1e3e5', borderRadius: '6px', padding: '10px 14px' }}>{'mcp_server_name\napi.githubcopilot.com\nmcp.notion.com\nfilesystem-local\nmy-postgres'}</pre>
+                                <Text variant="bodyMd" color="subdued">For remote MCP servers, use the domain name (e.g. <code>api.example.com</code>). For local MCP servers, use the name your team has given it (e.g. <code>filesystem-local</code>, <code>my-postgres</code>).</Text>
+                                <Link url="https://raw.githubusercontent.com/akto-api-security/akto/master/apps/dashboard/src/main/resources/sample_mcp_registry.csv" target="_blank">Download sample CSV</Link>
+                                <Text variant="bodyMd" fontWeight="semibold">3. Syncing</Text>
+                                <Text variant="bodyMd" color="subdued">Updated your CSV? Wait 5 minutes for changes to propagate, then click <b>Sync now</b> to pull in the latest entries.</Text>
+                            </VerticalStack>
+                        </VerticalStack>
+                    </LegacyCard>
                 </VerticalStack>
             </LegacyCard.Section>
         </LegacyCard>
     );
 
-    const cardContent = "Configure and manage multiple MCP Registry endpoints for discovering and validating Model Context Protocol servers in your environment.";
+    const cardContent = "Configure and manage MCP servers from a remote registry URL for discovering and validating Model Context Protocol servers in your environment.";
 
     return (
         <IntegrationsLayout
-            title="MCP Registry"
+            title={<HorizontalStack gap="2" blockAlign="center"><span>MCP Registry</span><Badge status="info">Beta</Badge></HorizontalStack>}
             cardContent={cardContent}
             component={component}
             docsUrl="https://registry.modelcontextprotocol.io/docs"

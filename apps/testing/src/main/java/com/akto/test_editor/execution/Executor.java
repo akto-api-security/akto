@@ -2,6 +2,7 @@ package com.akto.test_editor.execution;
 
 import com.akto.agent.AgentClient;
 import com.akto.billing.UsageMetricUtils;
+
 import com.akto.dao.billing.OrganizationsDao;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,14 +29,19 @@ import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.type.KeyTypes;
 import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
+import com.akto.jsonrpc.McpToolDescriptionsRegistry;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpJsonRpcModel;
+import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.TestingUtilsSingleton;
 import com.akto.test_editor.Utils;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.util.Constants;
 import com.akto.util.CookieTransformer;
 import com.akto.util.HttpRequestResponseUtils;
+import com.akto.util.JSONUtils;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -121,7 +127,9 @@ public class Executor {
         ModifyExecutionOrderResp modifyExecutionOrderResp = executionListBuilder.modifyExecutionFlow(executorNodes, varMap);
 
         Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
-        varMap = VariableResolver.resolveDynamicWordList(varMap, apiInfoKey, newSampleDataMap);
+        Map<String, Object> resolved = VariableResolver.resolveDynamicWordList(varMap, apiInfoKey, newSampleDataMap);
+        varMap.clear();
+        varMap.putAll(resolved);
 
         if (modifyExecutionOrderResp.getError() != null) {
             error_messages.add(modifyExecutionOrderResp.getError());
@@ -241,13 +249,13 @@ public class Executor {
                 }
                 if (res != null) {
                     result.add(res);
+                    vulnerable = res.getVulnerable();
                 }
-                vulnerable = res.getVulnerable();
                 
             } catch(Exception e) {
                 testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
                 error_messages.add("Error executing test request: " + e.getMessage());
-                loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage());
             }
         }
         
@@ -435,9 +443,9 @@ public class Executor {
 
         String msg = convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
         RawApi testRawApi = new RawApi(attempt.getRequest(), attempt.getResponse(), msg);
-        boolean vulnerable = TestPlugin.validateValidator(validatorNode, rawApi, testRawApi , apiInfoKey, varMap, logId);
-        if (vulnerable) {
-            loggerMaker.debugAndAddToDb("found vulnerable " + logId, LogDb.TESTING);
+        ValidationResult vulnerable = TestPlugin.validateValidator(validatorNode, rawApi, testRawApi , apiInfoKey, varMap, logId);
+        if (vulnerable.getIsValid()) {
+            loggerMaker.debugAndAddToDb("found vulnerable " + logId);
         }
         double percentageMatch = 0;
         if (rawApi.getResponse() != null && testRawApi.getResponse() != null) {
@@ -446,8 +454,9 @@ public class Executor {
             );
         }
         TestResult testResult = new TestResult(
-                msg, rawApi.getOriginalMessage(), new ArrayList<>(), percentageMatch, vulnerable, TestResult.Confidence.HIGH, null
+                msg, rawApi.getOriginalMessage(), new ArrayList<>(), percentageMatch, vulnerable.getIsValid(), TestResult.Confidence.HIGH, null
         );
+        testResult.setValidationReason(vulnerable.getValidationReason());
 
         return testResult;
     }
@@ -493,6 +502,27 @@ public class Executor {
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             // FeatureAccess featureAccess = FeatureAccess.fullAccess;
             if (featureAccess.getIsGranted()) {
+
+                if (McpRequestResponseUtils.isMcpRequest(rawApi)) {
+                    McpJsonRpcModel mcpModel = JSONUtils.fromJson(rawApi.getRequest().getBody(), McpJsonRpcModel.class);
+                    if (mcpModel != null && mcpModel.getParams() != null) {
+                        String toolName = mcpModel.getParams().getName();
+                        if (toolName != null && !toolName.isEmpty()) {
+                            String toolDescription = McpToolDescriptionsRegistry.get(toolName);
+                            String operationTypeLower = operationType.toLowerCase();
+                            String operationContext = "Tool: " + toolName  + "\nParam under test: " + key + "\nTest intent: " + value;
+                            if (toolDescription != null && !toolDescription.isEmpty()) {
+                                operationContext += "\nDescription: " + toolDescription;
+                            }
+                            BasicDBObject queryData = new BasicDBObject();
+                            queryData.put(TestExecutorModifier._REQUEST, com.akto.test_editor.Utils.buildRequestIHttpFormat(rawApi));
+                            queryData.put(TestExecutorModifier._TOOL_CONTEXT, operationContext);
+                            queryData.put(TestExecutorModifier._OPERATION, operationTypeLower + ": " + value);
+                            BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
+                            generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
+                        }
+                    }
+                }
 
                 String request = Utils.buildRequestIHttpFormat(rawApi);
 
@@ -732,26 +762,86 @@ public class Executor {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    private static String resolveLegacyCallbackUrl(Map<String, Object> varMap, String url, String generatedUUID) {
+        List<String> urlList = (List<String>) varMap.get("wordList_url");
+        if (urlList != null && !urlList.isEmpty()) {
+            String base = urlList.get(0);
+            return (base != null && base.contains("{random_uuid}"))
+                ? base.replace("{random_uuid}", generatedUUID)
+                : (base != null ? base : "") + generatedUUID;
+        }
+        return (url != null ? url : "") + generatedUUID;
+    }
+
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, boolean isMcpRequest) {
         switch (operationType.toLowerCase()) {
             case "send_ssrf_req":
                 if (isMcpRequest) {
                     return new ExecutorSingleOperationResp(false, "SSRF is not supported for MCP requests");
                 }
-                String keyValue = key.toString().replaceAll("\\$\\{random_uuid\\}", "");
-                String url = Utils.extractValue(keyValue, "url=");
-                String redirectUrl = Utils.extractValue(keyValue, "redirect_url=");
-                List<String> uuidList = (List<String>) varMap.getOrDefault("random_uuid", new ArrayList<>());
-                String generatedUUID =  UUID.randomUUID().toString();
-                uuidList.add(generatedUUID);
-                varMap.put("random_uuid", uuidList);
+                String webhookBase = Utils.getSsrfWebhookServiceBase();
+                boolean useNewWebhookFlow = webhookBase != null && varMap.containsKey("wordList_url_webhook");
+                if (useNewWebhookFlow) {
+                    String uuid = Utils.createWebhookSiteToken(webhookBase);
+                    if (uuid == null) {
+                        return new ExecutorSingleOperationResp(false, "Could not create webhook token");
+                    }
+                    @SuppressWarnings("unchecked")
+                    List<String> urlTemplates = (List<String>) varMap.get("wordList_url_webhook");
+                    if (urlTemplates == null || urlTemplates.isEmpty()) {
+                        return new ExecutorSingleOperationResp(false, "Template must define wordLists.url with {random_uuid} placeholder");
+                    }
+                    List<String> callbackUrls = new ArrayList<>();
+                    for (String template : urlTemplates) {
+                        if (template != null && template.contains("{random_uuid}")) {
+                            String url = template.replace("{random_uuid}", uuid);
+                            if (url.endsWith("//")) {
+                                url = url.substring(0, url.length() - 1);
+                            }
+                            callbackUrls.add(url);
+                        } else {
+                            callbackUrls.add(template);
+                        }
+                    }
+                    if (callbackUrls.isEmpty()) {
+                        return new ExecutorSingleOperationResp(false, "Template wordLists.url must contain {random_uuid} placeholder");
+                    }
+                    List<String> uuidList = (List<String>) varMap.getOrDefault("random_uuid", new ArrayList<>());
+                    uuidList.add(uuid);
+                    Utils.storeSsrfWebhookMapping(uuid, varMap);
+                    varMap.put("random_uuid", uuidList);
+                    varMap.put("wordList_url_webhook", callbackUrls);
+                    String firstCallbackUrl = callbackUrls.get(0);
+                    varMap.put("url_webhook", firstCallbackUrl);
+                    return new ExecutorSingleOperationResp(true, "");
+                } else {
 
-                BasicDBObject response = OrganizationsDao.getBillingTokenForAuth();
-                if(response.getString("token") != null){
-                    String tokenVal = response.getString("token");
-                    return Utils.sendRequestToSsrfServer(url + generatedUUID, redirectUrl, tokenVal);
-                }else{
-                    return new ExecutorSingleOperationResp(false, response.getString("error"));
+                    String keyValue = key.toString().replaceAll("\\$\\{random_uuid\\}", "");
+                    String url = Utils.extractValue(keyValue, "url=");
+                    String redirectUrl = Utils.extractValue(keyValue, "redirect_url=");
+                    List<String> uuidList = (List<String>) varMap.getOrDefault("random_uuid", new ArrayList<>());
+                    String generatedUUID = java.util.UUID.randomUUID().toString();
+                    uuidList.add(generatedUUID);
+                    varMap.put("random_uuid", uuidList);
+
+                    String callbackUrl = (url != null && !url.isEmpty() && !url.contains("${"))
+                        ? url + generatedUUID
+                        : resolveLegacyCallbackUrl(varMap, url, generatedUUID);
+                    varMap.put("url_webhook", callbackUrl);
+                    varMap.put("url", callbackUrl);
+                    Utils.storeSsrfWebhookMapping(generatedUUID, varMap);
+
+                    BasicDBObject response = OrganizationsDao.getBillingTokenForAuth();
+                    if (response != null && response.getString("token") != null) {
+                        String tokenVal = response.getString("token");
+                        ExecutorSingleOperationResp postResp = Utils.sendRequestToWebhookService(callbackUrl, redirectUrl, tokenVal);
+                        if (!postResp.getSuccess()) {
+                            loggerMaker.debugAndAddToDb("Legacy SSRF server POST failed (test will continue): " + postResp.getErrMsg(), LogDb.TESTING);
+                        }
+                        return new ExecutorSingleOperationResp(true, "");
+                    }
+                    return new ExecutorSingleOperationResp(false, response != null ? response.getString("error") : "Billing token required for SSRF");
                 }
             case "conversations_list":
                 // conversations list will be the variable of wordlists, hence it will come in key after being resolved

@@ -8,13 +8,13 @@ import LineChart from '../../../components/charts/LineChart';
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 
-const ApisTestedOverTimeGraph = ({ showOnlyTable = false }) => {
+const ApisTestedOverTimeGraph = ({ showOnlyTable = false, apiCollectionIds }) => {
   const [chartData, setChartData] = useState([]);
   const [showTestingComponents, setShowTestingComponents] = useState(false);
 
   async function fetchChartData() {
     let tempChartData = [];
-    const res = await api.allApisTestedRanges();
+    const res = await api.allApisTestedRanges(apiCollectionIds);
     Object.keys(res).forEach((key) => {
       const timeInMillis = func.getEpochMillis(key, "weekOfYear");
       const count = res[key] || 0;
@@ -31,7 +31,7 @@ const ApisTestedOverTimeGraph = ({ showOnlyTable = false }) => {
 
   useEffect(() => {
     fetchChartData()
-  }, [showOnlyTable]);
+  }, [showOnlyTable, apiCollectionIds]);
 
   const emptyCardComponent = (
     <Text alignment='center' color='subdued'>

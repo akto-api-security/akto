@@ -69,7 +69,7 @@ public class HAR {
         String requestHeaders = mapper.writeValueAsString(requestHeaderMap);
         String responseHeaders = mapper.writeValueAsString(responseHeaderMap);
         String method = request.getMethod().toString();
-        String responsePayload = response.getContent().getText();;
+        String responsePayload = response.getContent().getText();
         String ip = "null"; // TODO:
         String time = Context.now() + "";
         String statusCode = response.getStatus() + "";

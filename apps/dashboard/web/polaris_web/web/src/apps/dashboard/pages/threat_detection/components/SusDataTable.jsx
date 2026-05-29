@@ -14,6 +14,7 @@ import { formatActorId, extractRuleViolated } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "../../observe/api_collections/endpointShieldHelper";
 import IpReputationScore from "./IpReputationScore";
 
 const resourceName = {
@@ -39,9 +40,9 @@ const getHeaders = () => {
       title: "Host",
     },
     {
-      text: "Threat Actor",
+      text: isEndpointSecurityCategory() ? "Username" : "Threat Actor",
       value: "actorComp",
-      title: "Actor",
+      title: isEndpointSecurityCategory() ? "Username" : "Actor",
       filterKey: 'actor'
     },
   ];
@@ -125,7 +126,7 @@ const sortOptions = [
 
 let filters = [];
 
-function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT }) {
+function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, initialTab }) {
   const location = useLocation();
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
@@ -136,10 +137,23 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const [loading, setLoading] = useState(true);
   const collectionsMap = PersistStore((state) => state.collectionsMap);
   const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
-  const [currentTab, setCurrentTab] = useState('active');
-  const [selected, setSelected] = useState(0)
+  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, training: 3 };
+  const resolvedInitialTab = initialTab || 'active';
+  const [currentTab, setCurrentTab] = useState(resolvedInitialTab);
+  const [selected, setSelected] = useState(tabIndexMap[resolvedInitialTab] || 0)
   const [currentFilters, setCurrentFilters] = useState({})
   const [totalFilteredCount, setTotalFilteredCount] = useState(0)
+  const [usernameMap, setUsernameMap] = useState({});
+  const [usernameMapLoaded, setUsernameMapLoaded] = useState(!isEndpointSecurityCategory());
+
+  useEffect(() => {
+    if (isEndpointSecurityCategory()) {
+      fetchEndpointShieldUsernameMap().then(map => {
+        setUsernameMap(map);
+        setUsernameMapLoaded(true);
+      });
+    }
+  }, []);
 
   const baseTabs = [
     {
@@ -542,7 +556,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
       let nextUrl = null;
       if (x.refId && x.eventType && x.actor && x.filterId) {
-        const params = new URLSearchParams();
+        const params = new URLSearchParams(location.search);
         params.set("refId", x.refId);
         params.set("eventType", x.eventType);
         params.set("actor", x.actor);
@@ -550,13 +564,15 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         if (x.status) {
           params.set("eventStatus", x.status.toUpperCase());
         }
-        nextUrl = `${location.pathname}?${params.toString()}`;
+        nextUrl = `${location.pathname}?${params.toString()}${location.hash}`;
       }
       
       const rowData = {
         ...x,
         id: x.id,
-        actorComp: formatActorId(x.actor),
+        actorComp: isEndpointSecurityCategory()
+          ? getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap)
+          : formatActorId(x.actor),
         host: x.host || "-",
         endpointComp: (
           <GetPrettifyEndpoint
@@ -621,7 +637,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   }
 
   async function fillFilters() {
-    const res = await api.fetchFiltersThreatTable();
+    const res = await api.fetchFiltersThreatTable(startTimestamp, endTimestamp);
     let urlChoices = res?.urls
       .map((x) => {
         const url = x || "/"
@@ -639,14 +655,19 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         .map(x => ({ label: x, value: x }));
     }
 
-    const attackTypeChoices = (isAgenticSecurityCategory() || isEndpointSecurityCategory())
-      ? (res?.subCategory || []).map(x => ({ label: x, value: x }))
-      : Object.keys(threatFiltersMap).length === 0 ? [] : Object.entries(threatFiltersMap).map(([key, value]) => {
-          return {
-            label: value?._id || key,
-            value: value?._id || key
-          }
-        })
+    // Policy triggered (latestAttack): merge subCategory from API (actual data) with threatFiltersMap (configured templates)
+    const subCategoryFromApi = (res?.subCategory || []).map(x => ({ label: x, value: x }));
+    const fromThreatFiltersMap = Object.entries(threatFiltersMap || {}).map(([key, value]) => ({
+      label: value?._id || key,
+      value: value?._id || key
+    }));
+    const uniqueByValue = new Map();
+    [...subCategoryFromApi, ...fromThreatFiltersMap].forEach(({ label, value }) => {
+      if (value && !uniqueByValue.has(value)) {
+        uniqueByValue.set(value, { label: label || value, value });
+      }
+    });
+    const attackTypeChoices = Array.from(uniqueByValue.values());
 
     filters = [
       {
@@ -698,18 +719,26 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   useEffect(() => {
     fillFilters();
-  }, [threatFiltersMap]);
+  }, [threatFiltersMap, startTimestamp, endTimestamp]);
 
   function disambiguateLabel(key, value) {
     switch (key) {
       case "apiCollectionId":
         return func.convertToDisambiguateLabelObj(value, collectionsMap, 2);
+      case "latestAttack":
+        const latestAttackLabelMap = Object.fromEntries(
+          Object.entries(threatFiltersMap || {}).map(([k, v]) => [
+            v?._id || k,
+            v?.category?.name || v?._id || k
+          ])
+        );
+        return func.convertToDisambiguateLabelObj(value, latestAttackLabelMap, 2);
       default:
         return func.convertToDisambiguateLabelObj(value, null, 2);
     }
   }
 
-  const key = startTimestamp + endTimestamp;
+  const key = startTimestamp + endTimestamp + (usernameMapLoaded ? '_u' : '');
   const headers = getHeaders();
 
   return (

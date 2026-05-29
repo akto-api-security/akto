@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Box, Text, VerticalStack, HorizontalStack, Button } from '@shopify/polaris';
 import { ChevronDownMinor, ChevronUpMinor } from '@shopify/polaris-icons';
@@ -17,10 +17,23 @@ const styles = {
     },
 };
 
-function AiAnalysisCard({ summary, isLoading, children, footer, scrollRef }) {
-    const [isExpanded, setIsExpanded] = useState(true);
+function AiAnalysisCard({ summary, isLoading, onGetOverview, children, footer, scrollRef }) {
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    useEffect(() => {
+        if (!summary && !isLoading) {
+            setIsExpanded(false);
+        }
+    }, [summary, isLoading]);
 
     const toggleExpanded = () => setIsExpanded(prev => !prev);
+
+    const handleGetOverview = () => {
+        if (onGetOverview) {
+            onGetOverview();
+            setIsExpanded(true);
+        }
+    };
 
     return (
         <Box
@@ -47,12 +60,21 @@ function AiAnalysisCard({ summary, isLoading, children, footer, scrollRef }) {
                         </Text>
                     </HorizontalStack>
 
-                    <Button
-                        plain
-                        icon={isExpanded ? ChevronUpMinor : ChevronDownMinor}
-                        onClick={toggleExpanded}
-                        accessibilityLabel={isExpanded ? "Collapse AI analysis" : "Expand AI analysis"}
-                    />
+                    {!summary && !isLoading && onGetOverview ? (
+                        <Button
+                            onClick={handleGetOverview}
+                            accessibilityLabel="Get AI Analysis"
+                        >
+                            Get AI Overview
+                        </Button>
+                    ) : (
+                        <Button
+                            plain
+                            icon={isExpanded ? ChevronUpMinor : ChevronDownMinor}
+                            onClick={toggleExpanded}
+                            accessibilityLabel={isExpanded ? "Collapse AI analysis" : "Expand AI analysis"}
+                        />
+                    )}
                 </HorizontalStack>
 
                 <Box style={{ display: isExpanded ? 'flex' : 'none', flexDirection: 'column', maxHeight: '40vh' }}>

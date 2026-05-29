@@ -51,6 +51,9 @@ public class AccountSettings {
 
     public static final String URL_REGEX_MATCHING_ENABLED = "urlRegexMatchingEnabled";
 
+    private boolean bodyMatchEnabled = true;
+    public static final String BODY_MATCH_ENABLED = "bodyMatchEnabled";
+
     private String initStackType;
 
     private boolean enableDebugLogs;
@@ -160,6 +163,74 @@ public class AccountSettings {
     private List<String> filterLogPolicy;
     public static final String FILTER_LOG_POLICY = "filterLogPolicy";
 
+    public static final String ENDPOINT_SHIELD_SETTINGS = "endpointShieldSettings";
+    @Getter @Setter private EndpointShieldSettings endpointShieldSettings;
+
+    public static final String MATCHING_PATTERNS_FOR_PROXY = "matchingPatternsForProxy";
+    private Map<String, ProxyPatternInfo> matchingPatternsForProxy;
+
+    public static final String ALLOWED_HOSTS_FOR_PAC = "allowedHostsForPac";
+    private Map<String, ProxyPatternInfo> allowedHostsForPac;
+
+    public Map<String, ProxyPatternInfo> getAllowedHostsForPac() {
+        return allowedHostsForPac;
+    }
+
+    public void setAllowedHostsForPac(Map<String, ProxyPatternInfo> allowedHostsForPac) {
+        this.allowedHostsForPac = allowedHostsForPac;
+    }
+
+    // Used by mini-runtime to send to threat topic.
+    public static final String THREAT_KAFKA_PARTITION_KEY = "threatKafkaPartitionKey";
+    private ThreatKafkaPartitionKey threatKafkaPartitionKey;
+
+    public enum ThreatKafkaPartitionKey {
+        IP
+    }
+
+    @Getter
+    @Setter
+    private boolean switchProxyMode;
+
+    public static final String CHATTY_DOMAINS = "chattyDomains";
+    @Getter
+    @Setter
+    private List<String> chattyDomains;
+
+    public static final String AI_DOMAINS = "aiDomains";
+    @Getter
+    @Setter
+    private List<String> aiDomains;
+
+    public static class ProxyPatternInfo {
+        private String pattern;
+        private String addedBy;
+        private int updatedTs;
+
+        public ProxyPatternInfo() {}
+
+        public ProxyPatternInfo(String pattern, String addedBy, int updatedTs) {
+            this.pattern = pattern;
+            this.addedBy = addedBy;
+            this.updatedTs = updatedTs;
+        }
+
+        public String getPattern() { return pattern; }
+        public void setPattern(String pattern) { this.pattern = pattern; }
+        public String getAddedBy() { return addedBy; }
+        public void setAddedBy(String addedBy) { this.addedBy = addedBy; }
+        public int getUpdatedTs() { return updatedTs; }
+        public void setUpdatedTs(int updatedTs) { this.updatedTs = updatedTs; }
+    }
+
+    public Map<String, ProxyPatternInfo> getMatchingPatternsForProxy() {
+        return matchingPatternsForProxy;
+    }
+
+    public void setMatchingPatternsForProxy(Map<String, ProxyPatternInfo> matchingPatternsForProxy) {
+        this.matchingPatternsForProxy = matchingPatternsForProxy;
+    }
+
     public AccountSettings() {
     }
 
@@ -196,6 +267,14 @@ public class AccountSettings {
 
     public enum SetupType {
         PROD, QA, STAGING, DEV
+    }
+
+    public ThreatKafkaPartitionKey getThreatKafkaPartitionKey() {
+        return threatKafkaPartitionKey;
+    }
+
+    public void setThreatKafkaPartitionKey(ThreatKafkaPartitionKey threatKafkaPartitionKey) {
+        this.threatKafkaPartitionKey = threatKafkaPartitionKey;
     }
 
     public Map<String, Map<Pattern, String>> convertApiCollectionNameMapperToRegex() {
@@ -326,6 +405,14 @@ public class AccountSettings {
 
     public void setShowOnboarding(boolean showOnboarding) {
         this.showOnboarding = showOnboarding;
+    }
+
+    public void setBodyMatchEnabled(boolean bodyMatchEnabled) {
+        this.bodyMatchEnabled = bodyMatchEnabled;
+    }
+
+    public boolean getBodyMatchEnabled() {
+        return bodyMatchEnabled;
     }
 
     public boolean getUrlRegexMatchingEnabled() {

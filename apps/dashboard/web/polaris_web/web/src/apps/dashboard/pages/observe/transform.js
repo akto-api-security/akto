@@ -705,16 +705,23 @@ const transform = {
         if(category.includes("MCP") || category.includes("Agentic") || category === CATEGORY_ENDPOINT_SECURITY){
             try {
                 const [path, tail = ""] = pathUrl.split(/(?=[?#])/); // keep ? or # in tail
-                const newPath = path
-                  .replace(/^.*?\/calls?(?:\/|$)/i, "/")       // keep only what's after /call or /calls
-                  .replace(/\/{2,}/g, "/");                  // collapse slashes
-                return (newPath.endsWith("/") && newPath !== "/")
-                  ? newPath.slice(0, -1) + tail
-                  : newPath + tail;
+                // if url has v1/hooks, keep everything after hooks
+                const hooksMatch = path.match(/\/v1\/hooks(\/.*)?$/i);
+                if (hooksMatch) {
+                    const afterHooks = hooksMatch[1] || "/";
+                    return afterHooks + tail;
+                } else {
+                    const newPath = path
+                      .replace(/^.*?\/calls?(?:\/|$)/i, "/")       // keep only what's after /call or /calls
+                      .replace(/\/{2,}/g, "/");                  // collapse slashes
+                    return (newPath.endsWith("/") && newPath !== "/")
+                      ? newPath.slice(0, -1) + tail
+                      : newPath + tail;
+                }
             } catch (error) {
                 return url;
             }
-            
+
         }
         return pathUrl;
     },
@@ -753,7 +760,7 @@ const transform = {
                 hostName: (hostNameMap[url.apiCollectionId] !== null ? hostNameMap[url.apiCollectionId] : this.getHostName(url.endpoint)),
                 access_type: url.access_type,
                 auth_type: url.auth_type,
-                endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} isNew={this.isNewEndpoint(url.lastSeenTs)} guardrailEnabled={guardrailEnabled} />,
+                endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} isNew={this.isNewEndpoint(url.lastSeenTs)} guardrailEnabled={guardrailEnabled} isMalicious={url.isMalicious || false} />,
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
                 riskScoreComp: <Badge status={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
                 isNew: this.isNewEndpoint(url.lastSeenTs),
@@ -956,7 +963,31 @@ const transform = {
             serviceName: parts.slice(2).join('.'),   // <3> (can contain dots)
             apiCollectionName: parts.slice(1).join('.') // <2>.<3> for backward compatibility
         };
-    }
+    },
+
+
+    extractMcpComponentNameFromPath(endpoint) {
+        const path = this.normalizeEndpointToPath(endpoint);
+        if (!path) return null;
+        const segments = path.split('/').filter(Boolean);
+        if (segments.length < 3) return null;
+        const mcpMethodSegments = [['tools', 'call'], ['resources', 'read'], ['prompts', 'get']];
+        for (const [first, second] of mcpMethodSegments) {
+            const i = segments.indexOf(first);
+            if (i === -1 || segments[i + 1] !== second) continue;
+            const component = segments[i + 2];
+            return component != null && component !== '' ? component : null;
+        }
+        return null;
+    },
+
+    normalizeEndpointToPath(endpoint) {
+        if (endpoint == null || typeof endpoint !== 'string') return '';
+        const s = endpoint.trim();
+        if (!s) return '';
+        const path = func.convertToRelativePath(s) || s;
+        return path.replace(/\?.*$/, '').replace(/\/+$/, '') || '/';
+    },
 }
 
 export default transform

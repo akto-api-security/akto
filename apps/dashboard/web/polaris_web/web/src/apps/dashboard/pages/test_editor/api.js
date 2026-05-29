@@ -29,6 +29,14 @@ const testEditorRequests = {
         })
     },
 
+    fetchCallbackStatusForTestEditor(callbackUuids) {
+        return request({
+            url: '/api/fetchCallbackStatusForTestEditor',
+            method: 'post',
+            data: { callbackUuids }
+        })
+    },
+
     addTestTemplate(content,originalTestId) {
         return request({
             url: '/api/saveTestEditorFile',

@@ -95,19 +95,40 @@ POST /api/validate/request
 Content-Type: application/json
 
 {
-  "payload": "{\"key\": \"value\"}"
+  "requestPayload": "{\"key\": \"value\"}"
 }
 ```
 
-**Validate Response:**
+**Validate Response:** uses the same traffic-envelope fields as validate request (`ValidateRequestParams`). Supply the body to check as **`responsePayload`**, or legacy **`payload`** (both names are accepted; `responsePayload` wins if both are set).
+
 ```bash
 POST /api/validate/response
 Content-Type: application/json
 
 {
-  "payload": "{\"key\": \"value\"}"
+  "responsePayload": "{\"key\": \"value\"}",
+  "path": "/optional/path",
+  "method": "POST",
+  "contextSource": "AGENTIC",
+  "skipThreat": false
 }
 ```
+
+**Validate File (upload .txt or .pdf):**
+```bash
+POST /api/validate/file
+Content-Type: multipart/form-data
+
+# Form fields:
+#   file (required): .txt or .pdf file
+#   contextSource (optional): e.g. AGENTIC
+
+curl -X POST http://localhost:8080/api/validate/file \
+  -F "file=@sample.txt" \
+  -F "contextSource=AGENTIC"
+```
+
+Response includes `allowed`, `reason`, `totalChunks`, `failedChunkIndex`, and optionally `chunkResults`. See `scripts/test-validate-file.sh` for a quick test script.
 
 ### Health Check
 ```bash
@@ -356,19 +377,22 @@ POST http://localhost:8080/api/validate/request
 Content-Type: application/json
 
 {
-  "payload": "your request payload here",
+  "requestPayload": "your request payload here",
   "contextSource": "AGENTIC",  // optional
   "skipThreat": true            // optional: skip threat reporting to TBS (default: false)
 }
 ```
 
-2. **Validate Single Response**:
+2. **Validate Single Response** (same schema as request; body to validate is `responsePayload` or legacy `payload`):
 ```bash
 POST http://localhost:8080/api/validate/response
 Content-Type: application/json
 
 {
-  "payload": "your response payload here",
+  "responsePayload": "your response payload here",
+  "requestPayload": "",
+  "path": "/api/example",
+  "method": "POST",
   "contextSource": "AGENTIC",  // optional
   "skipThreat": true            // optional: skip threat reporting to TBS (default: false)
 }
@@ -401,7 +425,7 @@ Content-Type: application/json
 curl -X POST http://localhost:8080/api/validate/request \
   -H "Content-Type: application/json" \
   -d '{
-    "payload": "test input",
+    "requestPayload": "test input",
     "contextSource": "AGENTIC"
   }'
 ```
@@ -411,7 +435,7 @@ curl -X POST http://localhost:8080/api/validate/request \
 curl -X POST http://localhost:8080/api/validate/request \
   -H "Content-Type: application/json" \
   -d '{
-    "payload": "test input",
+    "requestPayload": "test input",
     "contextSource": "AGENTIC",
     "skipThreat": true
   }'

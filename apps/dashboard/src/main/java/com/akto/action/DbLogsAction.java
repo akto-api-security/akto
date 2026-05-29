@@ -6,6 +6,9 @@ import com.akto.dto.Log;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
+import lombok.Getter;
+import lombok.Setter;
+
 public class DbLogsAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbLogsAction.class, LogDb.DASHBOARD);;
@@ -37,12 +40,17 @@ public class DbLogsAction extends UserAction {
         this.logDb = logDb;
     }
 
+    /** Optional. Omit or empty = no {@code key} filter. Otherwise subset of {@link com.akto.log.LoggerMaker#STORED_LOG_KEYS}. */
+    @Getter
+    @Setter
+    private List<String> logKeys;
+
     public String fetchLogsFromDb() {
         if(logDb==null){
             addActionError("Invalid log collection");
             return ERROR.toUpperCase();
         }
-        logs = loggerMaker.fetchLogRecords(startTime, endTime, logDb);
+        logs = loggerMaker.fetchLogRecords(startTime, endTime, logDb, logKeys);
 
         return SUCCESS.toUpperCase();
     }

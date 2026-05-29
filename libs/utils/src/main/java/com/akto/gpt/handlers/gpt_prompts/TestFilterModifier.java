@@ -20,6 +20,7 @@ public class TestFilterModifier extends TestExecutorModifier {
                 .append(operation)
                 .append("\n----------------------------------------\n\n")
                 .append("Strict rules:\n")
+                .append("- - Use the reasoning internally to validate your answer, no reasoning, no explanation, nothing else.\n")
                 .append("- If you're unable to do the operation, return only this word: " + _NOT_FOUND + "\n\n")
                 .append("Expected Output:\n")
                 .append("- A JSON object with operation and value data.\n")
@@ -30,7 +31,8 @@ public class TestFilterModifier extends TestExecutorModifier {
                 .append("- Example: { \"not_contains\": [\"param1\"] }\n")
                 .append("- Example: { \"regex\": \".*\" }\n")
                 .append("- Example: { \"gt\": 200 }\n")
-                .append("- Return ONLY the JSON or " + _NOT_FOUND + " — nothing else.");
+                .append(" Think through your reasoning silently before answering.")
+                .append("- Return ONLY the JSON or " + _NOT_FOUND + " — no explanations, no reasoning, no other text.");
         return promptBuilder.toString();
     }
 

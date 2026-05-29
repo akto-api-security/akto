@@ -21,6 +21,7 @@ message SchemaConformanceError {
     LOCATION_URL = 1;
     LOCATION_HEADER = 2;
     LOCATION_BODY = 3;
+    LOCATION_RESPONSE_BODY = 4;
   }
   
   string schema_path = 1;

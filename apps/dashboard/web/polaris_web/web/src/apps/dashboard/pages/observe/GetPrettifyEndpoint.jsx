@@ -9,12 +9,18 @@ export const getMethod = (url, method) => {
     if(isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()){
         if(url.includes("tool")){
             return "TOOL";
+        }else if(url.includes("skill")){
+            return "SKILL";
         }else if(url.includes("resource")){
             return "RESOURCE";
         }else if(url.includes("prompt")){
             return "PROMPT";
         }else if(url.includes("server")){
             return "SERVER";
+        }else if(url.includes("settings")){
+            return "CONFIG";
+        } else if (url.includes("v1/hooks")){
+          return "HOOK"
         }
     }
     return method;
@@ -22,6 +28,7 @@ export const getMethod = (url, method) => {
 
 export function MethodBox({method, methodBoxWidth, url}){
     const finalMethod = getMethod(url, method);
+    // Use TOOL color for CONFIG as well
     return (
       <Box width={methodBoxWidth || "64px"}>
         <HorizontalStack align="end">
@@ -40,7 +47,7 @@ export function MethodBox({method, methodBoxWidth, url}){
     )
 }
 
-function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth, guardrailEnabled}){
+function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth, guardrailEnabled, isMalicious}){
     const ref = useRef(null)
     const localUrl = url || "/"
     const [copyActive, setCopyActive] = useState(false)
@@ -71,6 +78,11 @@ function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth, guard
                   <div style={{ display: "inline-flex", alignItems: "center", cursor: "help" }}>
                     <img src="/public/mcp.svg" alt="Guardrails enabled" style={{ width: "24px", height: "24px" }} />
                   </div>
+                </Tooltip>
+              ) : null}
+              {isMalicious ? (
+                <Tooltip content="Malicious activity detected on this skill" dismissOnMouseOut>
+                  <Badge status="critical" size="small">Malicious</Badge>
                 </Tooltip>
               ) : null}
               {copyActive ? (

@@ -13,15 +13,21 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY src/requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY scanner_service.py .
-COPY intent_analyzer.py .
-COPY warmup.py .
+COPY src/scanner_service.py .
+COPY src/intent_analyzer.py .
+COPY src/llm_scanner.py .
+COPY src/model_map.py .
+COPY src/providers.py .
+COPY src/constants.py .
+COPY src/settings.py .
+COPY src/slack_alerter.py .
+COPY src/prompts/ ./prompts/
 
 # Create cache directory for HuggingFace models
 RUN mkdir -p /app/.cache/huggingface
@@ -32,9 +38,6 @@ ENV PORT=8092
 ENV HF_HOME=/app/.cache/huggingface
 ENV TRANSFORMERS_VERBOSITY=error
 ENV HF_HUB_VERBOSITY=error
-
-# Pre-download all models during build (makes container work offline and first request fast)
-RUN python warmup.py
 
 # Expose the service port
 EXPOSE 8092

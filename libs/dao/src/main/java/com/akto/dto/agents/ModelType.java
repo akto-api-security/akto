@@ -5,6 +5,8 @@ public enum ModelType {
     OPENAI,
     ANTHROPIC,
     AZURE_OPENAI,
-    OLLAMA
+    OLLAMA,
+    DATABRICKS,
+    GITHUB_COPILOT
 
 }

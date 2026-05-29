@@ -67,7 +67,9 @@ type ValidateRequestParams struct {
 	RequestHeaders  string `json:"requestHeaders,omitempty"`
 	ResponseHeaders string `json:"responseHeaders,omitempty"`
 	Method          string `json:"method,omitempty"`
-	RequestPayload  string `json:"requestPayload" binding:"required"`
+	RequestPayload  string `json:"requestPayload,omitempty"`
+	// LegacyPayload is the JSON field "payload" (e.g. legacy /api/validate/response clients).
+	LegacyPayload   string `json:"payload,omitempty"`
 	ResponsePayload string `json:"responsePayload,omitempty"`
 	IP              string `json:"ip,omitempty"`
 	DestIP          string `json:"destIp,omitempty"`
@@ -86,8 +88,17 @@ type ValidateRequestParams struct {
 	EnabledGraph    string `json:"enabled_graph,omitempty"`
 	Tag             string `json:"tag,omitempty"`
 	Metadata        string `json:"metadata,omitempty"`
-	ContextSource   string `json:"contextSource,omitempty"`
-	SkipThreat      bool   `json:"skipThreat,omitempty"`
+	ContextSource   string `json:"contextSource,omitempty"` // Optional context source for policy filtering
+	// SkipThreat is optional; nil/absent means false (same semantics as batch ingest).
+	SkipThreat *bool `json:"skipThreat,omitempty"` // Optional: skip threat reporting to TBS (default: false)
+}
+
+// EffectiveSkipThreat returns skip threat reporting bypass: false when nil or unset.
+func (p *ValidateRequestParams) EffectiveSkipThreat() bool {
+	if p == nil || p.SkipThreat == nil {
+		return false
+	}
+	return *p.SkipThreat
 }
 
 // ValidationRequest represents the request to validate payloads

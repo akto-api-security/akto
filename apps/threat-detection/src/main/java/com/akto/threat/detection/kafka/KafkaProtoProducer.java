@@ -19,6 +19,10 @@ public class KafkaProtoProducer {
             kafkaConfig.getProducerConfig().getBatchSize());
   }
 
+  private static void addAuthToProducerProperties(Properties kafkaProps) {
+    KafkaConfig.addAuthenticationFromEnv(kafkaProps);
+  }
+
   public void send(String topic, Message message) {
     byte[] messageBytes = message.toByteArray();
     this.producer.send(new ProducerRecord<>(topic, messageBytes));
@@ -44,7 +48,10 @@ public class KafkaProtoProducer {
     kafkaProps.put(ProducerConfig.RETRIES_CONFIG, 0);
     kafkaProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, requestTimeoutMs);
     kafkaProps.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, lingerMS + requestTimeoutMs);
-    kafkaProps.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "zstd");
+    kafkaProps.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4");
+
+    addAuthToProducerProperties(kafkaProps);
+
     return new KafkaProducer<>(kafkaProps);
   }
 }

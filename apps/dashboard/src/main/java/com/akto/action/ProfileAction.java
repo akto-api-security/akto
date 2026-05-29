@@ -18,6 +18,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.utils.Intercom;
 import com.akto.utils.AlertUtils;
 import com.akto.utils.billing.OrganizationUtils;
@@ -27,8 +28,10 @@ import com.akto.util.OrganizationInfo;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.UserBlockedNoPlanAlert;
 import com.akto.notifications.slack.SlackSender;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -36,10 +39,6 @@ import com.mongodb.client.model.Projections;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
 
 public class ProfileAction extends UserAction {
 
@@ -116,6 +115,7 @@ public class ProfileAction extends UserAction {
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
         RBAC.Role userRole = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
+        RBAC userRbac = RBACDao.getCurrentRBACForUser(user.getId(), Context.accountId.get());
 
         boolean jiraIntegrated = false;
         try {
@@ -154,6 +154,15 @@ public class ProfileAction extends UserAction {
         } catch (Exception e) {
         }
 
+        boolean wizIntegrated = false;
+        try {
+            long documentCount = WizIntegrationDao.instance.estimatedDocumentCount();
+            if (documentCount > 0) {
+                wizIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
         InitializerListener.insertStateInAccountSettings(accountSettings);
 
         Organization organization = OrganizationsDao.instance.findOne(
@@ -180,6 +189,13 @@ public class ProfileAction extends UserAction {
                 Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.CLOUDFLARE_WAF.name())
         ));
 
+        BasicDBObject scopeRoleMapping = new BasicDBObject();
+        if(userRbac.getScopeRoleMapping() != null){
+            for(String key : userRbac.getScopeRoleMapping().keySet()){
+                scopeRoleMapping.append(key, userRbac.getScopeRoleMapping().get(key));
+            }
+        }
+
         userDetails.append("accounts", accounts)
                 .append("username",username)
                 .append("userFullName", userActualName)
@@ -187,6 +203,7 @@ public class ProfileAction extends UserAction {
                 .append("activeAccount", sessionAccId)
                 .append("dashboardMode", DashboardMode.getDashboardMode())
                 .append("isSaas","true".equals(System.getenv("IS_SAAS")))
+                .append("airgapped", "true".equalsIgnoreCase(System.getenv("AIRGAPPED")))
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
                 .append("cloudType", Utils.getCloudType())
                 .append("accountName", accountName)
@@ -195,14 +212,36 @@ public class ProfileAction extends UserAction {
                 .append("azureBoardsIntegrated", azureBoardsIntegrated)
                 .append("servicenowIntegrated", servicenowIntegrated)
                 .append("devrevIntegrated", devrevIntegrated)
-                .append("userRole", userRole.toString().toUpperCase())
+                .append("wizIntegrated", wizIntegrated)
+                .append("userRole", userRole!=null ?userRole.toString().toUpperCase(): "")
                 .append("currentTimeZone", timeZone)
                 .append("organizationName", orgName)
                 .append("isAwsWafIntegrated", awsWafCount != 0)
-                .append("isCloudflareWafIntegrated", cloudflareWafCount != 0);
+                .append("isCloudflareWafIntegrated", cloudflareWafCount != 0)
+                .append("scopeRoleMapping", scopeRoleMapping);
+
+        boolean inviteDisabledForSSO = com.akto.utils.Utils.allowNewUserInviteViaDashboard(sessionAccId, user);
+        userDetails.append("inviteDisabledForSSO", inviteDisabledForSSO);
 
         if (DashboardMode.isOnPremDeployment()) {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));
+        }
+
+        List<String> validDashboardCategories = Arrays.stream(GlobalEnums.DashboardCategory.values())
+                .map(GlobalEnums.DashboardCategory::getDashboardCategory)
+                .collect(Collectors.toList());
+
+        // Derive dashboard category from scopeRoleMapping only if it's populated (for new users with scope-based access)
+        // For backward compatibility with old users who only have a single role, skip this derivation if scopeRoleMapping is empty
+        String dashboardCategory = null;
+
+        // Fallback to session attribute if not derived from scopeRoleMapping
+        if (dashboardCategory == null) {
+            try {
+                dashboardCategory = (String) request.getSession().getAttribute("dashboardCategory");
+            } catch (Exception e) {
+                // do nothing
+            }
         }
 
         // only external API calls have non-null "utility"
@@ -324,6 +363,13 @@ public class ProfileAction extends UserAction {
 
             }
         }
+
+        if (dashboardCategory == null || !validDashboardCategories.contains(dashboardCategory)) {
+            // Set default dashboard category if not set already
+            dashboardCategory = GlobalEnums.DashboardCategory.API_SECURITY.getDashboardCategory();
+            request.getSession().setAttribute("dashboardCategory", dashboardCategory);
+        }
+        userDetails.append("dashboardCategory", dashboardCategory);
 
         if (versions.length > 2) {
             if (versions[2].contains("akto-release-version")) {

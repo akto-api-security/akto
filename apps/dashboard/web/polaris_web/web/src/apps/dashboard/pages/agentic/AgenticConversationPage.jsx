@@ -243,7 +243,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                         </Button>
                     </HorizontalStack>
                         <Box style={{ flex: 1, overflow: 'hidden', display: 'flex', justifyContent: 'center', maxWidth: '100%' }}>
-                        <Box style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', maxWidth: '500px' }}>
+                        <Box style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', maxWidth: '800px' }}>
                             <Box style={{ flex: 1, overflowY: 'auto', paddingBottom: '120px' }}>
                                 <Box paddingBlockStart="16" paddingBlockEnd="19">
                                     <VerticalStack gap="4" align="start">
@@ -294,7 +294,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                     isStreaming={isStreaming}
                     isFixed={true}
                     centerAlign={true}
-                    inputWidth="600px"
+                    inputWidth="800px"
                 />
 
                 {/* History Modal */}

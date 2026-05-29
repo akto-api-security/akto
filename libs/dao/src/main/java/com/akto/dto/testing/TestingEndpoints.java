@@ -40,7 +40,7 @@ public abstract class TestingEndpoints {
 
     public enum Type {
         CUSTOM, COLLECTION_WISE, MULTI_COLLECTION, WORKFLOW, LOGICAL_GROUP, METHOD, ALL, REGEX, RISK_SCORE, SENSITIVE_DATA,
-        UNAUTHENTICATED, HOST_REGEX, TAGS, AUTH_TYPE, API_ACCESS_TYPES
+        UNAUTHENTICATED, HOST_REGEX, TAGS, AUTH_TYPE, API_ACCESS_TYPES, API_TAGS
     }
 
     public Type getType() {
@@ -87,6 +87,11 @@ public abstract class TestingEndpoints {
                 case TAGS:
                     String q = (data != null) ? data.getString("query") : null;
                     condition = new TagsTestingEndpoints(operator, q);
+                    break;
+                // The above TAGS refer to collection tags, while API_TAGS refer to tags on the api_info collection.
+                case API_TAGS:
+                    String apiTagsQuery = (data != null) ? data.getString("query") : null;
+                    condition = new ApiTagsTestingEndpoints(operator, apiTagsQuery);
                     break;
                 case AUTH_TYPE:
                     List<String> authTypes = (data != null && data.get("authTypes") != null) ? 

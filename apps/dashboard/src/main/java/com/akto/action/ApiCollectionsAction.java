@@ -26,9 +26,11 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.CollectionTags.TagSource;
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
@@ -63,6 +65,7 @@ import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
 
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.type.URLMethods;
+import com.akto.utils.scripts.AcesssTypeCollectionLevel;
 import com.akto.dao.ApiCollectionIconsDao;
 import com.akto.dto.ApiCollectionIcon;
 import com.mongodb.client.model.Projections;
@@ -137,10 +140,10 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
-        int tsRandom = Context.now();
-        loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
+        long fillStart = System.currentTimeMillis();
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMapOptimized(filter, apiCollections);
-        loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("[fillApiCollectionsUrlCount] buildEndpointsCount took " + (System.currentTimeMillis() - fillStart) + "ms");
+        long loopStart = System.currentTimeMillis();
 
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
@@ -173,6 +176,7 @@ public class ApiCollectionsAction extends UserAction {
             // Populate URLs for MCP collections using the service
             populateCollectionUrls(apiCollection);
         }
+        loggerMaker.infoAndAddToDb("[fillApiCollectionsUrlCount] loop + populateUrls took " + (System.currentTimeMillis() - loopStart) + "ms");
         return apiCollections;
     }
 
@@ -188,7 +192,7 @@ public class ApiCollectionsAction extends UserAction {
         }
         Bson filter = Filters.and(Filters.exists(ApiCollection.HOST_NAME), Filters.in(Constants.ID, deactivatedCollections));
         List<ApiCollection> hCollections = ApiCollectionsDao.instance.findAll(filter, Projections.include(Constants.ID));
-        List<Integer> deactivatedIds = new ArrayList<>();
+        Set<Integer> deactivatedIds = new HashSet<>();
         for(ApiCollection collection : hCollections){
             if(deactivatedCollections.contains(collection.getId())){
                 deactivatedIds.add(collection.getId());
@@ -199,9 +203,13 @@ public class ApiCollectionsAction extends UserAction {
             return SUCCESS.toUpperCase();
         }
 
-        this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(
-                Filters.in(SingleTypeInfo._COLLECTION_IDS, deactivatedIds)
-        );
+        if (Context.accountId.get() == 1736798101) {
+            this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMapNew(deactivatedIds);
+        } else {
+            this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(
+                    Filters.in(SingleTypeInfo._COLLECTION_IDS, deactivatedIds)
+            );
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -229,6 +237,9 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchAllCollections() {
         this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty());
+        for (ApiCollection c : this.apiCollections) {
+            ApiCollectionsDao.instance.ensureEnvTypeFromHostname(c);
+        }
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.empty());
         return Action.SUCCESS.toUpperCase();
     }
@@ -249,20 +260,55 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchAllCollectionsBasic() {
+        long start = System.currentTimeMillis();
+        long stepStart = start;
+
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
-        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude("urls"));
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] deleteContextCollections took " + (System.currentTimeMillis() - stepStart) + "ms");
+        stepStart = System.currentTimeMillis();
+
+        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude(
+                "urls", "conditions", "serviceGraphEdges", "hostNames", "serviceTag",
+                "sampleCollectionsDropped", "redact", "runDependencyAnalyser",
+                "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
+                "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType"
+        ));
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] findAll took " + (System.currentTimeMillis() - stepStart) + "ms, size=" + this.apiCollections.size());
+        stepStart = System.currentTimeMillis();
+
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] fillApiCollectionsUrlCount took " + (System.currentTimeMillis() - stepStart) + "ms");
+        stepStart = System.currentTimeMillis();
+
+        // For account 1736798101, trim tags to only service tag to reduce response size
+        if (Context.accountId.get() == 1736798101) {
+            String serviceTagKey = "privatecloud.agoda.com/service";
+            for (ApiCollection c : this.apiCollections) {
+                List<CollectionTags> tags = c.getTagsList();
+                if (tags != null && !tags.isEmpty()) {
+                    tags.removeIf(tag -> !serviceTagKey.equals(tag.getKeyName()));
+                }
+            }
+        }
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] tags filtering took " + (System.currentTimeMillis() - stepStart) + "ms");
+        stepStart = System.currentTimeMillis();
 
         // Start background icon processing for all collections asynchronously
         // This runs in a separate thread to not block the main response
         com.akto.util.IconUtils.processIconsForCollections(this.apiCollections);
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] processIcons took " + (System.currentTimeMillis() - stepStart) + "ms");
 
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] TOTAL took " + (System.currentTimeMillis() - start) + "ms");
         return Action.SUCCESS.toUpperCase();
     }
 
     public String fetchCollection() {
         this.apiCollections = new ArrayList<>();
-        this.apiCollections.add(ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId)));
+        ApiCollection c = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId));
+        if (c != null) {
+            ApiCollectionsDao.instance.ensureEnvTypeFromHostname(c);
+            this.apiCollections.add(c);
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -271,11 +317,13 @@ public class ApiCollectionsAction extends UserAction {
 
     private boolean isValidApiCollectionName(){
         if (this.collectionName == null || this.collectionName.length() == 0) {
+            loggerMaker.infoAndAddToDb("DAST createCollection: invalid - null or empty name");
             addActionError("Invalid collection name");
             return false;
         }
 
         if (this.collectionName.length() > maxCollectionNameLength) {
+            loggerMaker.infoAndAddToDb("DAST createCollection: invalid - name too long length=" + this.collectionName.length());
             addActionError("Custom collections max length: " + maxCollectionNameLength);
             return false;
         }
@@ -287,13 +335,18 @@ public class ApiCollectionsAction extends UserAction {
             boolean spaces = c == ' ';
 
             if (!(alphabets || numbers || specialChars || spaces)) {
+                loggerMaker.infoAndAddToDb("DAST createCollection: invalid - illegal character '" + c + "' (code=" + (int)c + ") in name='" + this.collectionName + "'");
                 addActionError("Collection names can only be alphanumeric and contain '-','.' and '_'");
                 return false;
             }
         }
 
         // unique names
+        int visibleCollectionCount = (int) ApiCollectionsDao.instance.count(new BasicDBObject());
+        loggerMaker.infoAndAddToDb("DAST createCollection: checking uniqueness for name='" + collectionName + "' visibleCollections=" + visibleCollectionCount);
         ApiCollection sameNameCollection = ApiCollectionsDao.instance.findByName(collectionName);
+        loggerMaker.infoAndAddToDb("DAST createCollection: findByName('" + collectionName + "') returned " +
+            (sameNameCollection == null ? "null (unique, proceeding)" : "id=" + sameNameCollection.getId() + " name=" + sameNameCollection.getName() + " hostName=" + sameNameCollection.getHostName() + " displayName=" + sameNameCollection.getDisplayName()));
         if (sameNameCollection != null){
             addActionError("Collection names must be unique");
             return false;
@@ -311,7 +364,9 @@ public class ApiCollectionsAction extends UserAction {
 
         // do not change hostName or vxlanId here
         ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName,Context.now(),new HashSet<>(), null, 0, false, true);
+        loggerMaker.infoAndAddToDb("DAST createCollection: inserting new collection id=" + apiCollection.getId() + " name=" + collectionName);
         ApiCollectionsDao.instance.insertOne(apiCollection);
+        loggerMaker.infoAndAddToDb("DAST createCollection: insert succeeded id=" + apiCollection.getId() + " name=" + collectionName);
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);
 
@@ -322,11 +377,18 @@ public class ApiCollectionsAction extends UserAction {
             /*
              * Since admin has all access, we don't update any collections for them.
              */
+            //Role
+            String currentScope = Context.contextSource.get().toString();
+            Bson adminFilter =  Filters.nor(
+                    Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN.getName()),
+                    Filters.eq(RBAC.SCOPE_ROLE_MAPPING + "." + currentScope, RBAC.Role.ADMIN.getName())
+                );
+
             RBACDao.instance.getMCollection().updateOne(
                     Filters.and(
                             Filters.eq(RBAC.USER_ID, userId),
                             Filters.eq(RBAC.ACCOUNT_ID, accountId),
-                            Filters.ne(RBAC.ROLE, RBAC.Role.ADMIN.getName())
+                            adminFilter
                     ),
                     Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
                     new UpdateOptions().upsert(false)
@@ -338,9 +400,55 @@ public class ApiCollectionsAction extends UserAction {
         } catch(Exception e){
         }
 
+        // Add context-specific tags based on the dashboard from which collection is created 
+        // Limitation : API-Security and ARGUS can have same collection name but the unique name check is applied within respective dashboards not across dashboards.
+        addContextSpecificTags(apiCollection.getId());
+
         ActivitiesDao.instance.insertActivity("Collection created", "new Collection " + this.collectionName + " created");
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private void addContextSpecificTags(int collectionId) {
+        try {
+            CONTEXT_SOURCE currentContextSource = Context.contextSource.get();
+            
+            if (currentContextSource == null) {
+                return; // No context source set, skip tagging
+            }
+            
+            CollectionTags tagToAdd = null;
+            
+            switch (currentContextSource) {
+                case AGENTIC:
+                    // Collections created from ARGUS (Agentic Security) should have gen-ai tag
+                    // This makes them show up in the ARGUS dashboard
+                    tagToAdd = new CollectionTags(
+                        Context.now(),
+                        Constants.AKTO_GEN_AI_TAG,
+                        "Gen AI",
+                        CollectionTags.TagSource.USER
+                    );
+                    break;
+                default:
+                    break;
+            }
+            
+            if (tagToAdd != null) {
+                // Add the tag to the collection
+                ApiCollectionsDao.instance.getMCollection().updateOne(
+                    Filters.eq(ApiCollection.ID, collectionId),
+                    Updates.addToSet(ApiCollection.TAGS_STRING, tagToAdd)
+                );
+                
+                loggerMaker.info("Added context-specific tag '" + tagToAdd.getKeyName() + "=" + tagToAdd.getValue() + 
+                               "' to collection ID: " + collectionId + " (context: " + currentContextSource.name() + ")",
+                               LogDb.DASHBOARD);
+            }
+        } catch (Exception e) {
+            loggerMaker.error("Error adding context-specific tags to collection " + collectionId + ": " + e.getMessage(),
+                            LogDb.DASHBOARD);
+        }
     }
 
     public String deleteCollection() {
@@ -408,6 +516,25 @@ public class ApiCollectionsAction extends UserAction {
         } catch (Exception e) {
         }
 
+        return SUCCESS.toUpperCase();
+    }
+
+    public String deleteUntrackedCollections() {
+        if (apiCollectionIds == null || apiCollectionIds.isEmpty()) {
+            loggerMaker.debugAndAddToDb("deleteUntrackedCollections: no apiCollectionIds provided", LogDb.DASHBOARD);
+            return SUCCESS.toUpperCase();
+        }
+        loggerMaker.debugAndAddToDb("deleteUntrackedCollections: requested " + apiCollectionIds.size() + " collection(s), ids=" + apiCollectionIds, LogDb.DASHBOARD);
+        List<Integer> accessibleCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if (accessibleCollectionIds != null) {
+            apiCollectionIds.removeIf(id -> !accessibleCollectionIds.contains(id));
+        }
+        if (apiCollectionIds.isEmpty()) {
+            loggerMaker.debugAndAddToDb("deleteUntrackedCollections: no accessible collections to delete", LogDb.DASHBOARD);
+            return SUCCESS.toUpperCase();
+        }
+        long deletedCount = UningestedApiOverageDao.instance.deleteByApiCollectionIds(apiCollectionIds);
+        loggerMaker.infoAndAddToDb("deleteUntrackedCollections: deleted " + deletedCount + " untracked API record(s) for " + apiCollectionIds.size() + " collection(s), ids=" + apiCollectionIds, LogDb.DASHBOARD);
         return SUCCESS.toUpperCase();
     }
 
@@ -740,7 +867,11 @@ public class ApiCollectionsAction extends UserAction {
 
     // required to measure the count of total tested endpoints per collection.
     public String fetchCoverageInfoInCollections(){
-        this.testedEndpointsMaps = ApiInfoDao.instance.getCoverageCount();
+        if (this.apiCollectionIds != null && !this.apiCollectionIds.isEmpty()) {
+            this.testedEndpointsMaps = ApiInfoDao.instance.getCoverageCount(this.apiCollectionIds);
+        } else {
+            this.testedEndpointsMaps = ApiInfoDao.instance.getCoverageCount();
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -751,7 +882,13 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchLastSeenInfoInCollections(){
-        this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeen();
+        long start = System.currentTimeMillis();
+        if (Context.accountId.get() == 1736798101) {
+            this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeenNew();
+        } else {
+            this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeen();
+        }
+        loggerMaker.infoAndAddToDb("[fetchLastSeen] time=" + (System.currentTimeMillis() - start) + "ms, size=" + this.lastTrafficSeenMap.size());
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -885,6 +1022,100 @@ public class ApiCollectionsAction extends UserAction {
     @Setter
     private boolean currentIsOutOfTestingScopeVal;
 
+    private boolean isSkillBlocked;
+
+    public void setIsSkillBlocked(boolean isSkillBlocked) {
+        this.isSkillBlocked = isSkillBlocked;
+    }
+
+    @Setter
+    private String skillName;
+
+    @Setter
+    private List<String> mcpHosts;
+
+    public String updateSkillBlockStatus() {
+        try {
+            if (this.apiCollectionIds == null || this.apiCollectionIds.isEmpty()) {
+                addActionError("No collections provided");
+                return ERROR.toUpperCase();
+            }
+            if (this.skillName == null || this.skillName.isEmpty()) {
+                addActionError("Skill name required");
+                return ERROR.toUpperCase();
+            }
+
+            // Dual-write: keep api_info in sync for legacy readers (ApiEndpoints.jsx etc.)
+            // and update mcp_audit_info (the new source of truth for the Skills tab).
+            String skillUrl = "/skills/" + this.skillName;
+            UpdateResult apiInfoResult = ApiInfoDao.instance.updateMany(
+                Filters.and(
+                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, this.apiCollectionIds),
+                    Filters.eq(ApiInfo.ID_URL, skillUrl)
+                ),
+                Updates.set(ApiInfo.IS_SKILL_BLOCKED, this.isSkillBlocked)
+            );
+            long apiInfoMatched = apiInfoResult.getMatchedCount();
+
+            // mcp_audit_info: reuse the existing remarks convention used for MCP-server
+            // approval flows (REMARKS_REJECTED = blocked, REMARKS_APPROVED = explicitly allowed).
+            int now = Context.now();
+            User user = getSUser();
+            String markedBy = (user != null && user.getLogin() != null) ? user.getLogin() : "system";
+            String remarksVal = this.isSkillBlocked ? McpAuditInfo.REMARKS_REJECTED : McpAuditInfo.REMARKS_APPROVED;
+
+            List<Bson> auditFilters = new ArrayList<>();
+            auditFilters.add(Filters.eq(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL));
+            auditFilters.add(Filters.eq(McpAuditInfo.RESOURCE_NAME, this.skillName));
+            if (this.mcpHosts != null && !this.mcpHosts.isEmpty()) {
+                auditFilters.add(Filters.in(McpAuditInfo.MCP_HOST, this.mcpHosts));
+            }
+
+            List<Bson> auditUpdates = new ArrayList<>();
+            auditUpdates.add(Updates.set(McpAuditInfo.REMARKS, remarksVal));
+            auditUpdates.add(Updates.set(McpAuditInfo.MARKED_BY, markedBy));
+            auditUpdates.add(Updates.set(McpAuditInfo.UPDATED_TIMESTAMP, now));
+            if (!this.isSkillBlocked) {
+                auditUpdates.add(Updates.set(McpAuditInfo.APPROVED_AT, now));
+            }
+
+            UpdateResult auditResult = McpAuditInfoDao.instance.updateMany(
+                Filters.and(auditFilters),
+                Updates.combine(auditUpdates)
+            );
+
+            if (apiInfoMatched == 0 && auditResult.getMatchedCount() == 0) {
+                addActionError("No matching skill records found");
+                return ERROR.toUpperCase();
+            }
+
+            response = new BasicDBObject();
+            response.put("success", true);
+            response.put("updatedCollections", apiInfoMatched);
+            response.put("updatedAuditRecords", auditResult.getMatchedCount());
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error updating skill block status: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchBlockedSkillCollections() {
+        try {
+            Set<Integer> blockedIds = ApiInfoDao.instance.findDistinctFields(
+                ApiInfo.ID_API_COLLECTION_ID,
+                Integer.class,
+                Filters.eq(ApiInfo.IS_SKILL_BLOCKED, true)
+            );
+            response = new BasicDBObject();
+            response.put("blockedCollectionIds", new ArrayList<>(blockedIds));
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error fetching blocked skill collections");
+            return ERROR.toUpperCase();
+        }
+    }
+
     public String toggleCollectionsOutOfTestScope(){
         try{
             if(this.apiCollectionIds ==null || this.apiCollectionIds.isEmpty()){
@@ -1016,34 +1247,14 @@ public class ApiCollectionsAction extends UserAction {
                         }
                     }
 
-                    boolean isAddingStaging = toAdd.stream().anyMatch(tag ->
-                            "envType".equalsIgnoreCase(tag.getKeyName()) &&
-                                    "staging".equalsIgnoreCase(tag.getValue())
+                    // When adding any envType tag, remove all existing envType tags (single env type per collection)
+                    boolean isAddingEnvType = toAdd.stream().anyMatch(tag ->
+                            "envType".equalsIgnoreCase(tag.getKeyName())
                     );
-
-                    boolean isAddingProduction = toAdd.stream().anyMatch(tag ->
-                            "envType".equalsIgnoreCase(tag.getKeyName()) &&
-                                    "production".equalsIgnoreCase(tag.getValue())
-                    );
-
-                    if (isAddingStaging) {
+                    if (isAddingEnvType) {
                         tagsList.stream()
-                                .filter(tag ->
-                                        "envType".equalsIgnoreCase(tag.getKeyName()) &&
-                                                "production".equalsIgnoreCase(tag.getValue())
-                                )
-                                .findFirst()
-                                .ifPresent(toPull::add);
-                    }
-
-                    if (isAddingProduction) {
-                        tagsList.stream()
-                                .filter(tag ->
-                                        "envType".equalsIgnoreCase(tag.getKeyName()) &&
-                                                "staging".equalsIgnoreCase(tag.getValue())
-                                )
-                                .findFirst()
-                                .ifPresent(toPull::add);
+                                .filter(tag -> "envType".equalsIgnoreCase(tag.getKeyName()))
+                                .forEach(toPull::add);
                     }
                 }
 
@@ -1082,7 +1293,20 @@ public class ApiCollectionsAction extends UserAction {
             RBAC rbac = RBACDao.instance.findOne(Filters.and(
                     Filters.eq(RBAC.USER_ID, userId),
                     Filters.eq(RBAC.ACCOUNT_ID, accountId)));
-            String role = rbac.getRole();
+
+            // Get scope-specific role if scopeRoleMapping exists, otherwise use primary role
+            String role = null;
+            if (rbac != null) {
+                RBAC.Role scopeAwareRole = rbac.getRoleForScope(
+                        Context.contextSource.get()
+                );
+                if (scopeAwareRole != null) {
+                    role = scopeAwareRole.name();
+                } else {
+                    role = rbac.getRole();
+                }
+            }
+
             CustomRole customRole = CustomRoleDao.instance.findRoleByName(role);
             /*
              * If the role is custom role, only update the user with the delta.
@@ -1872,5 +2096,35 @@ public class ApiCollectionsAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
     }
+
+    
+    public String resetCollectionAccessTypes() {
+        try {
+            int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb("Starting resetCollectionAccessTypes for account: " + accountId + " (background)", LogDb.DASHBOARD);
+
+            Runnable r = () -> {
+                Context.accountId.set(accountId);
+                try {
+                    AcesssTypeCollectionLevel.doResetCollectionAccessTypes();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error in resetCollectionAccessTypes (background)", LogDb.DASHBOARD);
+                }
+            };
+            new Thread(r).start();
+
+            if (this.response == null) {
+                this.response = new BasicDBObject();
+            }
+            this.response.put("started", true);
+            this.response.put("message", "Reset started in the background. This may take a few minutes. Refresh the inventory page to see updated access types.");
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error starting resetCollectionAccessTypes", LogDb.DASHBOARD);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
 
 }

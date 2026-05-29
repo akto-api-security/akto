@@ -5,6 +5,8 @@ import com.akto.data_actor.DataActor;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.type.URLTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -56,7 +58,6 @@ public class AccountConfigurationCache {
     public AccountConfig getConfig(DataActor dataActor) {
         long currentTime = System.currentTimeMillis();
         if(Context.accountId.get() == 1758787662){
-            logger.infoAndAddToDb("Returning default account config");
             return getDefaultConfig();
         }
 
@@ -87,7 +88,9 @@ public class AccountConfigurationCache {
     private AccountConfig getDefaultConfig() {
         return new AccountConfig(
             0,                          // accountId
-            false,                      // isRedacted = false (as requested)
+            false,                      // isRedacted = false
+            false,                      // isHyperscanEnabled = false (default to filter yaml)
+            false,                      // isBehavioralSequenceEnabled = false
             new ArrayList<>(),          // empty apiCollections
             new ArrayList<>(),          // empty apiInfos
             new HashMap<>(),            // empty apiCollectionUrlTemplates
@@ -113,6 +116,27 @@ public class AccountConfigurationCache {
 
             logger.infoAndAddToDb("AccountSettings ID: " + accountSettings.getId());
 
+            // Check Stigg feature flag for hyperscan mode
+            boolean isHyperscanEnabled = false;
+
+            // Check feature flag for behavioural
+            boolean isBehavioralSequenceEnabled = false;
+            try {
+                Organization organization = dataActor.fetchOrganization(accountSettings.getId());
+                if (organization != null && organization.getFeatureWiseAllowed() != null) {
+                    FeatureAccess hyperscanAccess = organization.getFeatureWiseAllowed()
+                            .getOrDefault("THREAT_DETECTION_HYPERSCAN", FeatureAccess.noAccess);
+                    isHyperscanEnabled = hyperscanAccess.getIsGranted();
+
+                    FeatureAccess sequenceAccess = organization.getFeatureWiseAllowed().getOrDefault("BEHAVIORAL_ANOMALLY_SEQUENCE", FeatureAccess.noAccess);
+                    isBehavioralSequenceEnabled = sequenceAccess.getIsGranted();
+                }
+            } catch (Exception e) {
+                logger.errorAndAddToDb(e, "Error fetching organization for hyperscan feature flag: " + e.getMessage());
+            }
+            logger.infoAndAddToDb("Hyperscan feature flag: " + isHyperscanEnabled);
+            logger.infoAndAddToDb("Behavioral sequence flag: " + isBehavioralSequenceEnabled);
+
             List <ApiCollection> apiCollections = new ArrayList<>();
             if (accountSettings.getId() != 1758179941) {
                 apiCollections = dataActor.fetchAllApiCollections();
@@ -135,6 +159,8 @@ public class AccountConfigurationCache {
             this.cachedConfig = new AccountConfig(
                 accountSettings.getId(),
                 accountSettings.isRedactPayload(),
+                isHyperscanEnabled,
+                isBehavioralSequenceEnabled,
                 apiCollections,
                 apiInfos,
                 apiCollectionUrlTemplates,
@@ -144,6 +170,7 @@ public class AccountConfigurationCache {
             logger.infoAndAddToDb("Account configuration cache refreshed successfully. AccountId: " +
                                   accountSettings.getId() + ", API Collections: " + apiCollections.size() +
                                   ", API Infos: " + (apiInfos != null ? apiInfos.size() : 0));
+
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error refreshing account configuration cache. Keeping old cache if available.");
             e.printStackTrace();

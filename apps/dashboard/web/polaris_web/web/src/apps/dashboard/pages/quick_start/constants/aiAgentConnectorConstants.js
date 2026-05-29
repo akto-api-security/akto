@@ -10,6 +10,9 @@ export const CONNECTOR_TYPE_COPILOT_STUDIO = 'COPILOT_STUDIO';
 export const CONNECTOR_TYPE_DATABRICKS = 'DATABRICKS';
 export const CONNECTOR_TYPE_SNOWFLAKE = 'SNOWFLAKE';
 export const CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'VERTEX_AI_CUSTOM_DEPLOYED_MODEL';
+export const CONNECTOR_TYPE_SALESFORCE = 'SALESFORCE';
+export const CONNECTOR_TYPE_ANTHROPIC = 'ANTHROPIC';
+export const CONNECTOR_TYPE_OPENAI = 'OPENAI';
 
 // Connector Names (Display)
 export const CONNECTOR_NAME_N8N = 'N8N';
@@ -18,6 +21,9 @@ export const CONNECTOR_NAME_COPILOT_STUDIO = 'Copilot Studio';
 export const CONNECTOR_NAME_DATABRICKS = 'Databricks';
 export const CONNECTOR_NAME_SNOWFLAKE = 'Snowflake';
 export const CONNECTOR_NAME_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'Vertex AI Custom Deployed Model';
+export const CONNECTOR_NAME_SALESFORCE = 'Salesforce';
+export const CONNECTOR_NAME_ANTHROPIC = 'Anthropic';
+export const CONNECTOR_NAME_OPENAI = 'OpenAI';
 
 // Documentation URLs
 export const DOCS_URL_N8N = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/n8n';
@@ -26,6 +32,9 @@ export const DOCS_URL_COPILOT_STUDIO = 'https://ai-security-docs.akto.io/akto-ar
 export const DOCS_URL_DATABRICKS = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/databrics';
 export const DOCS_URL_SNOWFLAKE = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/snowflake';
 export const DOCS_URL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/vertex-ai-custom-deployed-model';
+export const DOCS_URL_SALESFORCE = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/salesforce';
+export const DOCS_URL_ANTHROPIC = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security';
+export const DOCS_URL_OPENAI = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security';
 
 // Recurring Interval Seconds (in seconds)
 export const INTERVAL_N8N = 300; // 5 minutes
@@ -34,6 +43,9 @@ export const INTERVAL_COPILOT_STUDIO = 300; // 5 minutes
 export const INTERVAL_DATABRICKS = 300; // 5 minutes
 export const INTERVAL_SNOWFLAKE = 300; // 5 minutes
 export const INTERVAL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 300; // 5 minutes
+export const INTERVAL_SALESFORCE = 300; // 5 minutes
+export const INTERVAL_ANTHROPIC = 600; // 10 minutes
+export const INTERVAL_OPENAI = 300; // 5 minutes
 
 // Field Names
 export const FIELD_N8N_URL = 'n8nUrl';
@@ -52,6 +64,7 @@ export const FIELD_DATAVERSE_ENVIRONMENT_URL = 'dataverseEnvironmentUrl';
 export const FIELD_DATAVERSE_TENANT_ID = 'dataverseTenantId';
 export const FIELD_DATAVERSE_CLIENT_ID = 'dataverseClientId';
 export const FIELD_DATAVERSE_CLIENT_SECRET = 'dataverseClientSecret';
+export const FIELD_DATAVERSE_BOT_IDS = 'dataverseBotIds';
 export const FIELD_SNOWFLAKE_ACCOUNT_URL = 'snowflakeAccountUrl';
 export const FIELD_SNOWFLAKE_AUTH_TYPE = 'snowflakeAuthType';
 export const FIELD_SNOWFLAKE_USERNAME = 'snowflakeUsername';
@@ -62,7 +75,16 @@ export const FIELD_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE = 'snowflakePrivateKeyPassph
 export const FIELD_SNOWFLAKE_WAREHOUSE = 'snowflakeWarehouse';
 export const FIELD_SNOWFLAKE_DATABASE = 'snowflakeDatabase';
 export const FIELD_SNOWFLAKE_SCHEMA = 'snowflakeSchema';
+export const FIELD_SALESFORCE_URL = 'salesforceUrl';
+export const FIELD_SALESFORCE_CONSUMER_KEY = 'salesforceConsumerKey';
+export const FIELD_SALESFORCE_CONSUMER_SECRET = 'salesforceConsumerSecret';
+export const FIELD_INGESTION_API_KEY = 'ingestionApiKey';
 export const FIELD_DATA_INGESTION_URL = 'dataIngestionUrl';
+export const FIELD_ANTHROPIC_API_KEY = 'anthropicApiKey';
+export const FIELD_ANTHROPIC_API_BASE_URL = 'anthropicApiBaseUrl';
+export const FIELD_OPENAI_API_KEY = 'openaiApiKey';
+export const FIELD_OPENAI_ORG_ID = 'openaiOrgId';
+export const FIELD_OPENAI_API_BASE_URL = 'openaiApiBaseUrl';
 
 // Vertex AI Custom Deployed Model Fields
 export const FIELD_VERTEX_AI_PROJECT_ID = 'vertexAIProjectId';
@@ -89,6 +111,9 @@ export const DESCRIPTION_COPILOT_STUDIO = 'Use our Copilot Studio feature to cap
 export const DESCRIPTION_DATABRICKS = 'Import Databricks agents seamlessly into AKTO.';
 export const DESCRIPTION_SNOWFLAKE = 'Connect to your Snowflake account to discover agents using Cortex and automatically fetch data for all Snowflake agents.';
 export const DESCRIPTION_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'Connect to your GCP BigQuery to import Vertex AI Custom Deployed Model prediction logs into AKTO.';
+export const DESCRIPTION_SALESFORCE = 'Connect to your Salesforce instance to import agents and AI capabilities seamlessly into AKTO.';
+export const DESCRIPTION_ANTHROPIC = 'Use our Anthropic feature to capture traffic from Anthropic and instantly send it to your dashboard for real-time insights.';
+export const DESCRIPTION_OPENAI = 'Use our OpenAI feature to capture traffic from OpenAI and instantly send it to your dashboard for real-time insights.';
 
 // N8N Field Configuration
 export const N8N_FIELDS = [
@@ -283,6 +308,15 @@ export const COPILOT_STUDIO_FIELDS = [
         configKey: FIELD_DATAVERSE_CLIENT_SECRET
     },
     {
+        name: FIELD_DATAVERSE_BOT_IDS,
+        label: 'Bot IDs (Optional)',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'bot-guid-1,bot-guid-2',
+        configKey: FIELD_DATAVERSE_BOT_IDS,
+        helpText: 'Comma-separated Copilot Studio bot GUIDs. If set, only these bots are ingested; others are filtered out. Find the GUID in the agent URL after /bots/.',
+        required: false
+    },
+    {
         name: FIELD_DATA_INGESTION_URL,
         label: 'URL for Data Ingestion Service',
         type: FIELD_TYPE_URL,
@@ -393,3 +427,119 @@ export const VERTEX_AI_CUSTOM_DEPLOYED_MODEL_FIELDS = [
     }
 ];
 
+// Salesforce Field Configuration
+export const SALESFORCE_FIELDS = [
+    {
+        name: FIELD_SALESFORCE_URL,
+        label: 'Salesforce URL',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://your-domain.my.salesforce.com',
+        configKey: FIELD_SALESFORCE_URL,
+        helpText: 'Your Salesforce instance URL',
+        required: true
+    },
+    {
+        name: FIELD_SALESFORCE_CONSUMER_KEY,
+        label: 'Consumer Key',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'xxxxxxxxxxxxxxxxxxxxxxxx',
+        configKey: FIELD_SALESFORCE_CONSUMER_KEY,
+        helpText: 'OAuth 2.0 Consumer Key from your Salesforce connected app',
+        required: true
+    },
+    {
+        name: FIELD_SALESFORCE_CONSUMER_SECRET,
+        label: 'Consumer Secret',
+        type: FIELD_TYPE_PASSWORD,
+        placeholder: '*******',
+        configKey: FIELD_SALESFORCE_CONSUMER_SECRET,
+        helpText: 'OAuth 2.0 Consumer Secret from your Salesforce connected app',
+        required: true
+    },
+    {
+        name: FIELD_DATA_INGESTION_URL,
+        label: 'URL for Data Ingestion Service',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://ingestion.example.com',
+        helpText: 'URL of your Akto data ingestion service',
+        required: true
+    },
+    {
+        name: FIELD_INGESTION_API_KEY,
+        label: 'Ingestion API Key',
+        type: FIELD_TYPE_PASSWORD,
+        placeholder: '*******',
+        configKey: FIELD_INGESTION_API_KEY,
+        helpText: 'API key for authenticating with the data ingestion service (X-API-KEY header)',
+        required: true
+    }
+];
+
+// Anthropic — credentials map to shield binary env vars
+export const ANTHROPIC_FIELDS = [
+    {
+        name: FIELD_ANTHROPIC_API_KEY,
+        label: 'API key',
+        type: FIELD_TYPE_PASSWORD,
+        placeholder: 'sk-ant-api03-...',
+        configKey: FIELD_ANTHROPIC_API_KEY,
+        helpText: 'Anthropic API key with access to organization audit endpoints (x-api-key).',
+        required: true
+    },
+    {
+        name: FIELD_ANTHROPIC_API_BASE_URL,
+        label: 'API base URL (optional)',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://api.anthropic.com',
+        configKey: FIELD_ANTHROPIC_API_BASE_URL,
+        helpText: 'Override only if Anthropic provided a non-default base URL for your tenant.',
+        required: false
+    },
+    {
+        name: FIELD_DATA_INGESTION_URL,
+        label: 'URL for Data Ingestion Service',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://ingestion.example.com',
+        helpText: 'URL of your Akto data ingestion service',
+        required: true
+    }
+];
+
+// OpenAI — credentials map to shield binary env vars
+export const OPENAI_FIELDS = [
+    {
+        name: FIELD_OPENAI_API_KEY,
+        label: 'API key',
+        type: FIELD_TYPE_PASSWORD,
+        placeholder: 'sk-...',
+        configKey: FIELD_OPENAI_API_KEY,
+        helpText: 'OpenAI API key with access to organization audit endpoints (Bearer per your contract).',
+        required: true
+    },
+    {
+        name: FIELD_OPENAI_ORG_ID,
+        label: 'Organization ID',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'org-...',
+        configKey: FIELD_OPENAI_ORG_ID,
+        helpText: 'OpenAI organization ID for scoped API calls.',
+        required: true
+    },
+    {
+        name: FIELD_OPENAI_API_BASE_URL,
+        label: 'API base URL (optional)',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://api.openai.com',
+        configKey: FIELD_OPENAI_API_BASE_URL,
+        helpText: 'Override only if OpenAI provided a non-default base URL for your tenant.',
+        required: false
+    },
+    {
+        name: FIELD_DATA_INGESTION_URL,
+        label: 'URL for Data Ingestion Service',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://ingestion.example.com',
+        helpText: 'URL of your Akto data ingestion service',
+        required: true
+    }
+];

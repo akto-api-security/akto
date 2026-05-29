@@ -2,6 +2,9 @@ package com.akto.dto.testing;
 
 import com.akto.dto.testing.info.TestInfo;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -26,10 +29,14 @@ public class TestResult extends GenericTestResult {
 
     private boolean requiresConfig;
 
-    
     private String conversationId;
     private boolean resultTypeAgentic;
+    private int externalApiTokens;
 
+
+    @Getter
+    @Setter
+    private String validationReason = "";
     /*
      * This field is being used as severity.
      * Thus keeping this in sync with "enum severity".
@@ -61,7 +68,8 @@ public class TestResult extends GenericTestResult {
         DEACTIVATED_ENDPOINT("This is a deactivated endpoint", true),
         USAGE_EXCEEDED("You have exceeded the limit of this feature, skipping execution", true),
         ROLE_NOT_FOUND("config doesn't exist, skipping execution", false),
-        TEST_TIMED_OUT("Test took too long for execution, exited out", true);
+        TEST_TIMED_OUT("Test took too long for execution, exited out", true),
+        TOKEN_RATE_LIMITED("Token rate limit reached, some tests were skipped", true);
         private final String message;
         private final boolean skipTest;
 
@@ -172,6 +180,14 @@ public class TestResult extends GenericTestResult {
 
     public void setResultTypeAgentic(boolean resultTypeAgentic) {
         this.resultTypeAgentic = resultTypeAgentic;
+    }
+
+    public int getExternalApiTokens() {
+        return externalApiTokens;
+    }
+
+    public void setExternalApiTokens(int externalApiTokens) {
+        this.externalApiTokens = externalApiTokens;
     }
 
     @Override

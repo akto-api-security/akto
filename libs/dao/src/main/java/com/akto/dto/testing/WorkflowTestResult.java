@@ -2,6 +2,9 @@ package com.akto.dto.testing;
 
 import org.bson.types.ObjectId;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.*;
 
 public class WorkflowTestResult {
@@ -18,8 +21,16 @@ public class WorkflowTestResult {
         private String message;
         private boolean vulnerable;
         private List<String> errors;
+        @Getter
+        @Setter
+        private String validationReason = "";
 
         public NodeResult() { }
+
+        public NodeResult(String message, boolean vulnerable, List<String> errors, String validationReason) {
+            this(message, vulnerable, errors);
+            this.validationReason = validationReason;
+        }
 
         public NodeResult(String message, boolean vulnerable, List<String> errors) {
             this.message = message;

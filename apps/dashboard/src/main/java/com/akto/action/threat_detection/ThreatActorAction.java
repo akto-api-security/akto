@@ -6,6 +6,7 @@ import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dto.Config;
+import com.akto.threat_utils.CloudflareWafUtils;
 import com.akto.dto.Config.AwsWafConfig;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
@@ -90,7 +91,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     this.httpClient = HttpClients.createDefault();
   }
 
-  public String getActorsCountPerCounty() {
+  public String fetchActorsCountPerCounty() {
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_actors_count_per_country", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
@@ -284,6 +285,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchAggregateMaliciousRequests() {
+    long t0 = System.currentTimeMillis();
+    loggerMaker.infoAndAddToDb("fetchAggregateMaliciousRequests START ts=" + t0 + " refId=" + refId + " eventType=" + eventType, LogDb.DASHBOARD);
+
     HttpPost post =
         new HttpPost(String.format("%s/api/dashboard/fetchAggregateMaliciousRequests", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
@@ -303,8 +307,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
     post.setEntity(requestEntity);
 
+    loggerMaker.infoAndAddToDb("fetchAggregateMaliciousRequests BEFORE_HTTP_EXECUTE elapsed=" + (System.currentTimeMillis() - t0) + "ms", LogDb.DASHBOARD);
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      loggerMaker.infoAndAddToDb("fetchAggregateMaliciousRequests AFTER_HTTP_EXECUTE elapsed=" + (System.currentTimeMillis() - t0) + "ms", LogDb.DASHBOARD);
       String responseBody = EntityUtils.toString(resp.getEntity());
+      loggerMaker.infoAndAddToDb("fetchAggregateMaliciousRequests AFTER_RESPONSE_READ elapsed=" + (System.currentTimeMillis() - t0) + "ms", LogDb.DASHBOARD);
 
       ProtoMessageUtils.<FetchMaliciousEventsResponse>toProtoMessage(
         FetchMaliciousEventsResponse.class, responseBody)
@@ -325,6 +332,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
       return ERROR.toUpperCase();
     }
 
+    loggerMaker.infoAndAddToDb("fetchAggregateMaliciousRequests END totalElapsed=" + (System.currentTimeMillis() - t0) + "ms", LogDb.DASHBOARD);
     return SUCCESS.toUpperCase();
   }
 
@@ -352,7 +360,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     }
   }
 
-    public static Wafv2Client getAwsWafClient(String accessKey, String secretKey, String region) {
+    public static Wafv2Client fetchAwsWafClient(String accessKey, String secretKey, String region) {
       return Wafv2Client.builder()
           .region(Region.of(region))
           .credentialsProvider(StaticCredentialsProvider.create(
@@ -361,7 +369,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
           .build();
     }
 
-    public static GetIpSetResponse getIpSet(Wafv2Client wafv2Client, String ruleSetName, String ruleSetId) {
+    public static GetIpSetResponse fetchIpSet(Wafv2Client wafv2Client, String ruleSetName, String ruleSetId) {
         GetIpSetRequest getRequest = GetIpSetRequest.builder()
                     .name(ruleSetName)
                     .scope(SCOPE)
@@ -378,7 +386,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         return getResponse;
     }
 
-    private static Config.CloudflareWafConfig getCloudflareConfig() {
+    private static Config.CloudflareWafConfig fetchCloudflareConfig() {
         int accId = Context.accountId.get();
         Bson filters = Filters.and(
             Filters.eq(Constants.ID, accId + "_" + Config.ConfigType.CLOUDFLARE_WAF),
@@ -392,12 +400,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         return config != null && config.getListIds() != null && !config.getListIds().isEmpty();
     }
 
-    private static String getLastListId(Config.CloudflareWafConfig config) {
-        return config.getListIds().get(config.getListIds().size() - 1);
-    }
-
     public String modifyThreatActorStatusCloudflare() {
-        Config.CloudflareWafConfig cloudflareWafConfig = getCloudflareConfig();
+        Config.CloudflareWafConfig cloudflareWafConfig = fetchCloudflareConfig();
 
         if (!hasValidListConfig(cloudflareWafConfig)) {
             addActionError("Cloudflare WAF integration not configured properly.");
@@ -406,9 +410,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
         boolean result;
         if (status.equalsIgnoreCase("blocked")) {
-            result = addIPsToList(cloudflareWafConfig, Collections.singletonList(actorIp));
+            result = CloudflareWafUtils.blockActorIps(cloudflareWafConfig, Collections.singletonList(actorIp));
         } else {
-            result = removeIPsFromLists(cloudflareWafConfig, Collections.singletonList(actorIp));
+            result = CloudflareWafUtils.unblockActorIps(cloudflareWafConfig, Collections.singletonList(actorIp));
         }
 
         if (result) {
@@ -426,7 +430,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             return ERROR.toUpperCase();
         }
 
-        Config.CloudflareWafConfig cloudflareWafConfig = getCloudflareConfig();
+        Config.CloudflareWafConfig cloudflareWafConfig = fetchCloudflareConfig();
 
         if (!hasValidListConfig(cloudflareWafConfig)) {
             addActionError("Cloudflare WAF integration not configured properly.");
@@ -435,9 +439,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
         boolean result;
         if ("blocked".equalsIgnoreCase(status)) {
-            result = addIPsToList(cloudflareWafConfig, actorIps);
+            result = CloudflareWafUtils.blockActorIps(cloudflareWafConfig, actorIps);
         } else {
-            result = removeIPsFromLists(cloudflareWafConfig, actorIps);
+            result = CloudflareWafUtils.unblockActorIps(cloudflareWafConfig, actorIps);
         }
 
         if (!result) {
@@ -448,138 +452,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         return SUCCESS.toUpperCase();
     }
 
-    // ==================== Cloudflare List Operations ====================
-
-    /**
-     * Adds IPs to the last list. If list is full, creates overflow list and retries.
-     */
-    private boolean addIPsToList(Config.CloudflareWafConfig config, List<String> ips) {
-        try {
-            String currentListId = getLastListId(config);
-            Map<String, List<String>> headers = CloudflareWafAction.getAuthHeaders(config);
-
-            BasicDBList items = new BasicDBList();
-            for (String ip : ips) {
-                BasicDBObject ipItem = new BasicDBObject();
-                ipItem.put("ip", ip);
-                items.add(ipItem);
-            }
-
-            String url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
-                    + "/rules/lists/" + currentListId + "/items";
-            OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", items.toString(), headers, "");
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-
-            if (response.getStatusCode() > 201 || response.getBody() == null) {
-                String cfErr = CloudflareWafAction.extractCfError(response.getBody());
-
-                // Check if list is at capacity — create overflow list and retry
-                if (cfErr != null && cfErr.toLowerCase().contains("maximum")) {
-                    String newListId = CloudflareWafAction.createOverflowList(config);
-                    if (newListId == null) {
-                        addActionError("Failed to create overflow IP list.");
-                        return false;
-                    }
-                    // Retry with new list
-                    url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
-                            + "/rules/lists/" + newListId + "/items";
-                    request = new OriginalHttpRequest(url, "", "POST", items.toString(), headers, "");
-                    response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-                    if (response.getStatusCode() > 201 || response.getBody() == null) {
-                        addActionError(CloudflareWafAction.extractCfError(response.getBody()));
-                        return false;
-                    }
-                    return true;
-                }
-
-                addActionError(cfErr != null ? cfErr : "Unable to block IP(s).");
-                return false;
-            }
-            return true;
-        } catch (Exception e) {
-            addActionError("Unable to block IP(s). Try again later.");
-            loggerMaker.errorAndAddToDb("Error adding IPs to Cloudflare list: " + e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Removes IPs by searching across ALL lists and deleting from whichever contains them.
-     */
-    private boolean removeIPsFromLists(Config.CloudflareWafConfig config, List<String> ips) {
-        try {
-            Map<String, List<String>> headers = CloudflareWafAction.getAuthHeaders(config);
-
-            // Group items to delete by their list ID
-            Map<String, BasicDBList> deleteByList = new HashMap<>();
-            for (String ip : ips) {
-                String[] found = findItemAcrossLists(ip, config);
-                if (found != null) {
-                    String foundListId = found[0];
-                    String itemId = found[1];
-                    deleteByList.computeIfAbsent(foundListId, k -> new BasicDBList());
-                    BasicDBObject itemObj = new BasicDBObject();
-                    itemObj.put("id", itemId);
-                    deleteByList.get(foundListId).add(itemObj);
-                }
-            }
-
-            if (deleteByList.isEmpty()) {
-                addActionError("None of the IPs were found in the block list(s).");
-                return false;
-            }
-
-            // Delete from each list in one call per list
-            for (Map.Entry<String, BasicDBList> entry : deleteByList.entrySet()) {
-                String url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
-                        + "/rules/lists/" + entry.getKey() + "/items";
-                BasicDBObject deletePayload = new BasicDBObject();
-                deletePayload.put("items", entry.getValue());
-
-                OriginalHttpRequest request = new OriginalHttpRequest(url, "", "DELETE", deletePayload.toString(), headers, "");
-                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-
-                if (response.getStatusCode() > 201 || response.getBody() == null) {
-                    String cfErr = CloudflareWafAction.extractCfError(response.getBody());
-                    addActionError(cfErr != null ? cfErr : "Unable to unblock IP(s).");
-                    return false;
-                }
-            }
-            return true;
-        } catch (Exception e) {
-            addActionError("Unable to unblock IP(s). Try again later.");
-            loggerMaker.errorAndAddToDb("Error removing IPs from Cloudflare lists: " + e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Searches for an IP across all lists. Returns [listId, itemId] or null.
-     */
-    private static String[] findItemAcrossLists(String actorIp, Config.CloudflareWafConfig config) {
-        Map<String, List<String>> headers = CloudflareWafAction.getAuthHeaders(config);
-        for (String listId : config.getListIds()) {
-            try {
-                String url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
-                        + "/rules/lists/" + listId + "/items?search=" + actorIp;
-                OriginalHttpRequest request = new OriginalHttpRequest(url, "", "GET", "", headers, "");
-                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-
-                if (response.getStatusCode() > 201 || response.getBody() == null) continue;
-
-                BasicDBList result = (BasicDBList) BasicDBObject.parse(response.getBody()).get("result");
-                if (result != null && !result.isEmpty()) {
-                    String itemId = ((BasicDBObject) result.get(0)).getString("id");
-                    if (itemId != null) {
-                        return new String[]{listId, itemId};
-                    }
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error searching list " + listId + " for IP: " + e.getMessage());
-            }
-        }
-        return null;
-    }
 
     public List<String> getActorIps() {
         return actorIps;
@@ -604,7 +476,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         }
 
         try {
-            wafClient = getAwsWafClient(awsWafConfig.getAwsAccessKey(), awsWafConfig.getAwsSecretKey(), awsWafConfig.getRegion());
+            wafClient = fetchAwsWafClient(awsWafConfig.getAwsAccessKey(), awsWafConfig.getAwsSecretKey(), awsWafConfig.getRegion());
             //ListWebAcLsResponse webAclsResponse = wafClient.listWebACLs(ListWebAcLsRequest.builder().scope(SCOPE).build());
             loggerMaker.debugAndAddToDb("init aws client, for threat actor block");
         } catch (Exception e) {

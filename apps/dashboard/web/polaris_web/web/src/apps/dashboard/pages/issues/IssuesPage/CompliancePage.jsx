@@ -26,10 +26,11 @@ import values from "@/util/values";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered.jsx";
 import TableStore from "../../../components/tables/TableStore.js";
 import CriticalFindingsGraph from "./CriticalFindingsGraph.jsx";
+import ComplianceMenu from "./ComplianceMenu.jsx";
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
-import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, mapLabel, getDashboardCategory  } from "../../../../main/labelHelper";
+import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import testingApi from "../../testing/api.js"
 
 const sortOptions = [
@@ -42,14 +43,12 @@ const sortOptions = [
 ];
 
 const getCompliances = () => {
-    const isDemoAccount = func.isDemoAccount();
     const isMCP = isMCPSecurityCategory();
     const isGenAiSecurity = isGenAISecurityCategory();
     const isAgenticSecurity = isAgenticSecurityCategory();
 
-    if (isDemoAccount && (isMCP || isAgenticSecurity || isGenAiSecurity)) {
-        // Different compliances for demo account + MCP + Agentic Security
-        return ["OWASP Agentic", "OWASP LLM", "NIST AI Risk Management Framework","MITRE ATLAS","CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP"];
+    if (isMCP || isAgenticSecurity || isGenAiSecurity) {
+        return ["OWASP Agentic Top 10", "OWASP LLM", "EU AI Act", "NIST AI Risk Management Framework", "CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP", "MITRE ATLAS"];
     }
     
     // Default compliances
@@ -162,9 +161,9 @@ function CompliancePage() {
 
 
     function calcFilteredTestIds(complianceView) {
-        let ret = Object.entries(subCategoryMap).filter(([_, v]) => {return !!v.compliance?.mapComplianceToListClauses[complianceView]}).map(([k, _]) => k)
-        
-        return ret
+        return Object.entries(subCategoryMap)
+            .filter(([_, v]) => transform.subcategoryMatchesComplianceFramework(v.compliance, complianceView))
+            .map(([k]) => k);
     }
 
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
@@ -207,7 +206,29 @@ function CompliancePage() {
     })
 
 
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
+    const [searchParams, setSearchParams] = useSearchParams();
+    const getInitialDateRange = () => {
+        const rangeAlias = searchParams.get('range');
+        if (rangeAlias) {
+            const preset = values.ranges.find((r) => r.alias === rangeAlias);
+            if (preset) return preset;
+        }
+        const sinceParam = searchParams.get('since');
+        const untilParam = searchParams.get('until');
+        if (sinceParam != null && untilParam != null) {
+            const sinceTs = parseInt(sinceParam, 10);
+            const untilTs = parseInt(untilParam, 10);
+            if (!Number.isNaN(sinceTs) && !Number.isNaN(untilTs)) {
+                const sinceDate = new Date(sinceTs * 1000);
+                const untilDate = new Date(untilTs * 1000);
+                const title = sinceDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) + " - " + untilDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+                return { alias: "custom", title, period: { since: sinceDate, until: untilDate } };
+            }
+        }
+        return values.ranges[5];
+    };
+    const initialDateRange = getInitialDateRange();
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialDateRange)
 
     const getTimeEpoch = (key) => {
         return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
@@ -331,7 +352,6 @@ function CompliancePage() {
         })
     }
 
-    const [searchParams, setSearchParams] = useSearchParams();
     const resultId = searchParams.get("result")
 
     const filterParams = searchParams.get('filters')
@@ -350,6 +370,17 @@ function CompliancePage() {
             onRemove: () => {}
         }
     ]
+
+    useEffect(() => {
+        const complianceParam = searchParams.get('compliance');
+        if (complianceParam) {
+            const decoded = decodeURIComponent(complianceParam);
+            const match = allCompliances.find((c) => c.toLowerCase() === decoded.toLowerCase());
+            if (match) {
+                setComplianceView(match);
+            }
+        }
+    }, [])
 
     filtersOptions = func.getCollectionFilters(filtersOptions)
 
@@ -482,6 +513,16 @@ function CompliancePage() {
                 setBoardsModalActive(true)
             })
         }
+
+        async function createWizFindings() {
+            await api.createWizFindings(items).then((res) => {
+                setToast(true, false, `${items.length} Wiz finding${items.length === 1 ? "" : "s"} creation initiated.`)
+
+                resetResourcesSelected()
+            }).catch((err) => {
+                func.setToast(true, true, "Error initiating Wiz finding(s) creation")
+            })
+        }
         
         let issues = [{
             content: 'False positive',
@@ -516,7 +557,13 @@ function CompliancePage() {
             content: 'Create ServiceNow ticket',
             onAction: () => { createServiceNowTicketBulk(items) },
             disabled: (window.SERVICENOW_INTEGRATED === 'false')
-        }]
+        },
+        {
+            content: 'Create Wiz finding(s)',
+            onAction: () => { createWizFindings() },
+            disabled: (window.WIZ_INTEGRATED === 'false')
+        },
+    ]
         
         let reopen =  [{
             content: 'Reopen',
@@ -618,6 +665,18 @@ function CompliancePage() {
     }, [])
   
 
+    const handleVulnCategoryClick = (filterType, filterValue) => {
+        const pageKey = window.location.pathname + "/" + (window.location.hash || '');
+        const prev = PersistStore.getState().filtersMap;
+        const existing = (prev[pageKey]?.filters || []).filter(f => f.key !== filterType);
+        PersistStore.getState().setFiltersMap({
+            ...prev,
+            [pageKey]: { filters: [...existing, { key: filterType, value: [filterValue] }], sort: prev[pageKey]?.sort || [] }
+        });
+        func.setToast(true, false, `Table filtered by "${filterValue}" - scroll down to view results`);
+        setKey(k => !k);
+    };
+
     const onSelectCompliance = (compliance) => {
         setComplianceView(compliance)
         resetResourcesSelected()
@@ -632,8 +691,16 @@ function CompliancePage() {
         const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
         const apiCollectionId = filters.apiCollectionId || []
         let filterCollectionsId = apiCollectionId.concat(filters.collectionIds)
-        let filterSubCategory = calcFilteredTestIds(complianceView)
-        
+        let filterSubCategory
+        if (filters?.issueCategory?.length > 0) {
+            filterSubCategory = []
+            filters.issueCategory.forEach(cat => {
+                filterSubCategory = filterSubCategory.concat(categoryToSubCategories[cat] || [])
+            })
+        } else {
+            filterSubCategory = calcFilteredTestIds(complianceView)
+        }
+
         const collectionIdsArray = filterCollectionsId.map((x) => {return x.toString()})
 
         let obj = {
@@ -714,7 +781,7 @@ function CompliancePage() {
     const components = (
         <>
             <HorizontalGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
-                <CriticalFindingsGraph startTimestamp={getTimeEpoch("since")} endTimestamp={getTimeEpoch("until")} linkText={""} linkUrl={""}/>
+                <CriticalFindingsGraph startTimestamp={getTimeEpoch("since")} endTimestamp={getTimeEpoch("until")} linkText={""} linkUrl={""} onBarClick={handleVulnCategoryClick}/>
                 <CriticalFindingsGraph startTimestamp={getTimeEpoch("since")} endTimestamp={getTimeEpoch("until")} linkText={""} linkUrl={""} complianceMode={complianceView}/>
             </HorizontalGrid>
 
@@ -776,17 +843,10 @@ function CompliancePage() {
                     >
                         <Popover.Pane fixed>
                             <Popover.Section>
-                            <VerticalStack gap={"2"}>
-                                {allCompliances.map(compliance => {return <Button textAlign="left" plain onClick={() => {onSelectCompliance(compliance)}} removeUnderline>
-                                    <Box>
-                                        <HorizontalStack gap={2}>
-                                            <Avatar source={func.getComplianceIcon(compliance)} shape="square"  size="extraSmall"/> 
-                                            <Text>{compliance}</Text>
-                                        </HorizontalStack>
-                                    </Box>
-                                </Button>} )}
-                            </VerticalStack>
-                                
+                                <ComplianceMenu
+                                    items={allCompliances}
+                                    onSelect={onSelectCompliance}
+                                />
                             </Popover.Section>
                         </Popover.Pane>
                     </Popover>

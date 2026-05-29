@@ -49,11 +49,18 @@ const threatDetectionRequests = {
             }
         })
     },
-    fetchFiltersThreatTable() {
+    fetchFiltersThreatTable(startTimestamp, endTimestamp) {
+        const data = {};
+        if (startTimestamp !== undefined && startTimestamp !== null && startTimestamp > 0) {
+            data.startTimestamp = startTimestamp;
+        }
+        if (endTimestamp !== undefined && endTimestamp !== null && endTimestamp > 0) {
+            data.endTimestamp = endTimestamp;
+        }
         return request({
             url: '/api/fetchFiltersThreatTable',
             method: 'post',
-            data: {}
+            data: data
         })
     },
     fetchThreatActors(skip, sort, latestAttack, country, startTs, endTs, actorId, host, cursor) {
@@ -208,6 +215,13 @@ const threatDetectionRequests = {
             url: '/api/deleteMaliciousEvents',
             method: 'post',
             data: data
+        })
+    },
+    fetchDashboardTopData(startTs, endTs) {
+        return request({
+            url: '/api/fetchDashboardTopData',
+            method: 'post',
+            data: {startTs, endTs}
         })
     },
     fetchThreatTopNData(startTs, endTs, latestAttack, limit = 5) {

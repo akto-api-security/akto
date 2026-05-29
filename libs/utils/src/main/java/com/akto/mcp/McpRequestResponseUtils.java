@@ -22,7 +22,9 @@ import com.akto.utils.JsonUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 
+import java.net.URI;
 import java.util.*;
 
 import lombok.AccessLevel;
@@ -102,7 +104,7 @@ public final class McpRequestResponseUtils {
 
     private static boolean isMcpErrorResponse(HttpResponseParams responseParams) {
         String responsePayload = responseParams.getPayload();
-        if (responsePayload == null || responsePayload.isEmpty()) {
+        if (responsePayload == null || responsePayload.isEmpty() || responsePayload.trim().equals("{}")) {
             return false;
         }
 
@@ -190,6 +192,7 @@ public final class McpRequestResponseUtils {
         }
 
         String url = responseParams.getRequestParams().getURL();
+        String mcpHost = extractMcpHostFromResponseParams(responseParams);
 
         McpAuditInfo auditInfo = null;
 
@@ -202,7 +205,8 @@ public final class McpRequestResponseUtils {
                     auditInfo = new McpAuditInfo(
                             Context.now(), "", AKTO_MCP_TOOLS_TAG, 0,
                             params.getName(), "", null,
-                            responseParams.getRequestParams().getApiCollectionId()
+                            responseParams.getRequestParams().getApiCollectionId(),
+                            mcpHost
                     );
                 }
                 break;
@@ -215,7 +219,8 @@ public final class McpRequestResponseUtils {
                     auditInfo = new McpAuditInfo(
                             Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0,
                             params.getName(), "", null,
-                            responseParams.getRequestParams().getApiCollectionId()
+                            responseParams.getRequestParams().getApiCollectionId(),
+                            mcpHost
                     );
                 }
                 break;
@@ -228,7 +233,8 @@ public final class McpRequestResponseUtils {
                     auditInfo = new McpAuditInfo(
                             Context.now(), "", AKTO_MCP_PROMPTS_TAG, 0,
                             params.getName(), "", null,
-                            responseParams.getRequestParams().getApiCollectionId()
+                            responseParams.getRequestParams().getApiCollectionId(),
+                            mcpHost
                     );
                 }
                 break;
@@ -247,8 +253,9 @@ public final class McpRequestResponseUtils {
         try {
             // Check if record with same type, resourceName, and hostCollectionId already exists
             BasicDBObject findQuery = new BasicDBObject();
-            findQuery.put("type", auditInfo.getType());
-            findQuery.put("resourceName", auditInfo.getResourceName());
+            findQuery.put(McpAuditInfo.TYPE, auditInfo.getType());
+            findQuery.put(McpAuditInfo.RESOURCE_NAME, auditInfo.getResourceName());
+            findQuery.put(McpAuditInfo.MCP_HOST, auditInfo.getMcpHost());
            // findQuery.put("hostCollectionId", auditInfo.getHostCollectionId());  //removing this check for now to avoid auditing same mcp servers from different hosts
 
             McpAuditInfo existingRecord = McpAuditInfoDao.instance.findOne(findQuery);
@@ -262,7 +269,23 @@ public final class McpRequestResponseUtils {
                 logger.info("Updated existing MCP audit record for type: " + auditInfo.getType() +
                            ", resourceName: " + auditInfo.getResourceName());
             } else {
-                // Insert new record
+                // Before inserting, check if any mcp-server record for this mcpHost has
+                // blockAll=true — if so, auto-block the new record immediately.
+                if (StringUtils.isNotBlank(auditInfo.getMcpHost())) {
+                    McpAuditInfo blockAllSentinel = McpAuditInfoDao.instance.findOne(
+                        Filters.and(
+                            Filters.eq(McpAuditInfo.MCP_HOST, auditInfo.getMcpHost()),
+                            Filters.eq(McpAuditInfo.BLOCK_ALL, true)
+                        )
+                    );
+                    if (blockAllSentinel != null) {
+                        auditInfo.setRemarks("Rejected");
+                        auditInfo.setMarkedBy(blockAllSentinel.getMarkedBy());
+                        auditInfo.setUpdatedTimestamp(Context.now());
+                        logger.info("Auto-blocking new MCP audit record for mcpHost: " + auditInfo.getMcpHost()
+                            + " resourceName: " + auditInfo.getResourceName() + " due to blockAll flag");
+                    }
+                }
                 McpAuditInfoDao.instance.insertOne(auditInfo);
                 logger.info("Inserted new MCP audit record for type: " + auditInfo.getType() +
                            ", resourceName: " + auditInfo.getResourceName());
@@ -429,6 +452,48 @@ public final class McpRequestResponseUtils {
         }
 
         return new BasicDBObject().append("events", events).toJson();
+    }
+
+    public static String extractMcpHostFromResponseParams(HttpResponseParams responseParams) {
+        if (responseParams == null || responseParams.getRequestParams() == null) {
+            return null;
+        }
+        Map<String, List<String>> reqHeaders = responseParams.getRequestParams().getHeaders();
+
+        String hostRaw = null;
+        String url = responseParams.getRequestParams().getURL();
+        if (StringUtils.isNotBlank(url)) {
+            try {
+                URI uri = new URI(url.trim());
+                if (uri.getHost() != null) {
+                    hostRaw = uri.getHost();
+                }
+            } catch (Exception e) {
+                logger.debug("Failed to parse request URL for host: " + e.getMessage());
+            }
+        }
+        if (StringUtils.isBlank(hostRaw) && reqHeaders != null) {
+            hostRaw = HttpRequestResponseUtils.getHeaderValue(reqHeaders, HOST_HEADER);
+        }
+        if (hostRaw == null || StringUtils.isBlank(hostRaw)) {
+            return null;
+        }
+        return hostRaw.trim();
+    }
+
+    public static String extractServiceNameFromHost(String host) {
+        if (StringUtils.isBlank(host)) {
+            return null;
+        }
+        String[] parts = host.split("\\.");
+        if (parts.length < 3) {
+            return host;
+        }
+        StringBuilder sb = new StringBuilder(parts[2]);
+        for (int i = 3; i < parts.length; i++) {
+            sb.append(".").append(parts[i]);
+        }
+        return sb.toString();
     }
 
 }

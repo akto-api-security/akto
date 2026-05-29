@@ -2,7 +2,11 @@ import logging
 import time
 from typing import Dict, Any, List
 from fastapi import FastAPI, HTTPException
+import httpx
 from pydantic import BaseModel
+
+from settings import settings
+from slack_alerter import slack_alerter
 
 # Fix for optimum 2.0+ and transformers 4.57+ compatibility
 try:
@@ -27,6 +31,13 @@ except:
 
 from llm_guard import input_scanners, output_scanners
 from intent_analyzer import IntentAnalysisScanner
+from constants import DEFAULT_CONFIG
+from llm_scanner import (
+    LLM_SUPPORTED_SCANNERS,
+    init_llm_scanner,
+    is_truthy,
+    scan_with_model_map,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,6 +51,45 @@ logger.setLevel(logging.INFO)
 
 app = FastAPI(title="Agent Guard Scanner Service", version="1.0.0")
 scanner_cache = {}
+
+_DB_ABSTRACTOR_URL = settings.DATABASE_ABSTRACTOR_SERVICE_URL.rstrip("/")
+
+
+def store_model_results(
+    all_results: List[Dict[str, Any]],
+    scanner_name: str,
+) -> None:
+    """
+    Sync: POST all model outputs to DB abstractor. Called from a daemon thread
+    spawned inside scan_with_model_map — never blocks the /scan response. Never raises.
+    """
+    if not _DB_ABSTRACTOR_URL:
+        logger.debug("[ModelMap] DATABASE_ABSTRACTOR_SERVICE_URL not set; skipping DB store")
+        return
+    payload = {
+        "scannerName": scanner_name,
+        "modelResults": all_results,
+    }
+    try:
+        resp = httpx.post(
+            f"{_DB_ABSTRACTOR_URL}/api/storeGuardrailModelResults",
+            json=payload,
+            timeout=10.0,
+        )
+        if resp.status_code >= 400:
+            logger.warning(
+                f"[ModelMap] DB store returned status {resp.status_code} for scanner={scanner_name}"
+            )
+    except Exception as exc:
+        logger.warning(f"[ModelMap] DB store failed for scanner={scanner_name}: {exc}")
+
+
+# LLM scanner — initialized once from env vars. None if no provider configured.
+_llm_scanner = init_llm_scanner()
+_force_llm = settings.FORCE_LLM_MODE
+if _force_llm:
+    logger.info("[Service] FORCE_LLM_MODE=true — PromptInjection/BanTopics will use LLM path")
+
 
 class ScanRequest(BaseModel):
     scanner_type: str
@@ -106,10 +156,12 @@ def get_scanner(scanner_type: str, scanner_name: str, config: Dict[str, Any]):
         raise ValueError(f"Scanner {scanner_name} not found")
     
     try:
-        onnx_scanners = ["Toxicity", "PromptInjection", "Bias", "Relevance", 
+        onnx_scanners = ["Toxicity", "PromptInjection", "Bias", "Relevance",
                         "NoRefusal", "MaliciousURLs", "Sensitive"]
-        
+
         config = config or {}
+        # Strip transport-only flag before passing to scanner constructor
+        config.pop("use_llm", None)
         
         # Apply optimized configurations for best attack coverage
         if scanner_name == "PromptInjection":
@@ -153,6 +205,92 @@ async def scan_text(request: ScanRequest):
 
     try:
         logger.info(f"Starting scan: scanner={request.scanner_name}, type={request.scanner_type}, text_length={len(request.text)}")
+
+        if not request.config.get("modelConfigs"):
+            request.config = {**DEFAULT_CONFIG, **request.config, "modelConfigs": DEFAULT_CONFIG["modelConfigs"]}
+            logger.info("[Service] modelConfigs missing or empty; applied DEFAULT_CONFIG")
+
+        # ── modelMap dispatch (multi-model parallel) ──────────────────
+        if (
+            request.config.get("modelConfigs")
+            and request.scanner_name in LLM_SUPPORTED_SCANNERS
+        ):
+            try:
+                store_fn = store_model_results if request.config.get("storeAllResults") else None
+                result = scan_with_model_map(
+                    request.scanner_name,
+                    request.scanner_type,
+                    request.text,
+                    request.config,
+                    store_fn=store_fn,
+                )
+                slack_alerter.fire(request.scanner_name, request.scanner_type, request.text, result)
+                return ScanResponse(
+                    scanner_name=request.scanner_name,
+                    is_valid=result["is_valid"],
+                    risk_score=result["risk_score"],
+                    sanitized_text=request.text,
+                    details=result.get("details", {}),
+                )
+            except Exception as model_map_err:
+                total_duration = (time.time() - start_time) * 1000
+                logger.error(f"[ModelMap] scan_with_model_map failed: {model_map_err}")
+                return ScanResponse(
+                    scanner_name=request.scanner_name,
+                    is_valid=True,
+                    risk_score=0.0,
+                    sanitized_text=request.text,
+                    details={
+                        "error": f"modelMap execution failed: {model_map_err}",
+                        "execution_time_ms": round(total_duration, 2),
+                    },
+                )
+        # ── End modelMap dispatch ─────────────────────────────────────
+
+        # ── LLM dispatch ─────────────────────────────────────────────
+        use_llm_requested = is_truthy(str(request.config.get("use_llm", "")))
+        if ((_force_llm or use_llm_requested)
+                and request.scanner_name in LLM_SUPPORTED_SCANNERS):
+            if _llm_scanner is None:
+                # No provider configured — fail open
+                total_duration = (time.time() - start_time) * 1000
+                return ScanResponse(
+                    scanner_name=request.scanner_name,
+                    is_valid=True,
+                    risk_score=0.0,
+                    sanitized_text=request.text,
+                    details={
+                        "error": "LLM mode requested but SCANNER_LLM_PROVIDER is not configured on the server",
+                        "execution_time_ms": round(total_duration, 2),
+                    },
+                )
+            try:
+                result = _llm_scanner.scan(
+                    request.scanner_name, request.scanner_type,
+                    request.text, request.config,
+                )
+                return ScanResponse(
+                    scanner_name=request.scanner_name,
+                    is_valid=result["is_valid"],
+                    risk_score=result["risk_score"],
+                    sanitized_text=request.text,
+                    details=result.get("details", {}),
+                )
+            except Exception as llm_err:
+                # Provider failure — fail open
+                total_duration = (time.time() - start_time) * 1000
+                logger.error(f"[LLMScanner] Provider failed: {llm_err}")
+                return ScanResponse(
+                    scanner_name=request.scanner_name,
+                    is_valid=True,
+                    risk_score=0.0,
+                    sanitized_text=request.text,
+                    details={
+                        "error": f"LLM provider failed: {llm_err}",
+                        "execution_time_ms": round(total_duration, 2),
+                    },
+                )
+        # ── End LLM dispatch ─────────────────────────────────────────
 
         scanner = get_scanner(request.scanner_type, request.scanner_name, request.config)
 
@@ -209,6 +347,4 @@ async def scan_batch(requests: List[ScanRequest]):
 
 if __name__ == "__main__":
     import uvicorn
-    import os
-    port = int(os.getenv("PORT", 8092))
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+    uvicorn.run(app, host="0.0.0.0", port=settings.PORT, log_level="warning")

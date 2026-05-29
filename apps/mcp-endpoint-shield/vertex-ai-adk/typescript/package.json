@@ -1,0 +1,20 @@
+{
+  "name": "akto-vertex-ai-adk-callbacks",
+  "version": "1.0.0",
+  "description": "Akto Guardrails callbacks for Google Vertex AI ADK (TypeScript)",
+  "type": "module",
+  "main": "dist/callbacks.js",
+  "types": "dist/callbacks.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@google/adk": "^0.3.0",
+    "@google/genai": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}

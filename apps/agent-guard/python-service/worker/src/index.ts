@@ -9,14 +9,14 @@ import { Hono } from "hono";
  */
 
 type Environment = {
-  readonly AKTO_AGENT_GUARD_EXECUTOR_CONTAINER_DEV: DurableObjectNamespace<AktoAgentGuardExecutorContainerDev>;
+  readonly AKTO_AGENT_GUARD_EXECUTOR_CONTAINER: DurableObjectNamespace<AktoAgentGuardExecutorContainer>;
 }
 
 /**
  * Durable Object with Container binding
  * The container runs the Python service defined in the Dockerfile
  */
-export class AktoAgentGuardExecutorContainerDev extends Container {
+export class AktoAgentGuardExecutorContainer extends Container {
   defaultPort = 8092; // pass requests to port 8092 in the container
   sleepAfter = "2h"; // Keep container alive for 2 hours
 
@@ -24,7 +24,26 @@ export class AktoAgentGuardExecutorContainerDev extends Container {
   envVars = {
     PYTHONUNBUFFERED: "1",
     PORT: "8092",
-    HF_HOME: "/app/.cache/huggingface"
+    HF_HOME: "/app/.cache/huggingface",
+    // LLM guardrails — FORCE_LLM_MODE routes all PromptInjection/BanTopics
+    // through the LLM without clients needing to send use_llm.
+    SCANNER_LLM_PROVIDER: "",
+    ANTHROPIC_API_KEY: "", // TODO: set before deploy
+    FORCE_LLM_MODE: "",
+    
+    GEMMA_VERTEX_SA_KEY_JSON: "",
+    GEMMA_VERTEX_PROJECT: "",
+    GEMMA_VERTEX_LOCATION: "",
+    GEMMA_VERTEX_ENDPOINT_ID: "",
+    GEMMA_VERTEX_DEDICATED_DNS: "",
+
+    QWEN3GUARD_SA_KEY_JSON: "",
+    QWEN3GUARD_PROJECT: "",
+    QWEN3GUARD_LOCATION: "",
+    QWEN3GUARD_ENDPOINT_ID: "",
+    QWEN3GUARD_DEDICATED_DNS: "",
+    
+    SLACK_WEBHOOK_URL: ""
   };
 
   override onStart() {
@@ -88,7 +107,7 @@ export default {
 
       // Use scanner_name as the instance ID for consistent routing
       // This ensures requests for the same scanner go to the same container instance
-      const stub = getContainer(env.AKTO_AGENT_GUARD_EXECUTOR_CONTAINER_DEV, scannerName);
+      const stub = getContainer(env.AKTO_AGENT_GUARD_EXECUTOR_CONTAINER, scannerName);
       console.log(`[Execute Request] Got container stub for scanner: ${scannerName}`);
 
       // Start container and wait for it to be ready before forwarding requests
