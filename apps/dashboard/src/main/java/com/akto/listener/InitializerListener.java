@@ -228,6 +228,7 @@ import com.akto.utils.crons.Crons;
 import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
+import com.akto.utils.crons.UserAnalysisCron;
 import com.akto.utils.crons.AgentBasePromptDetectionCron;
 import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
@@ -291,6 +292,7 @@ public class InitializerListener implements ServletContextListener {
     TokenGeneratorCron tokenGeneratorCron = new TokenGeneratorCron();
     UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
     AgentBasePromptDetectionCron agentBasePromptDetectionCron = new AgentBasePromptDetectionCron();
+    UserAnalysisCron userAnalysisCron = new UserAnalysisCron();
 
     private static String domain = null;
     public static String subdomain = "https://app.akto.io";
@@ -2743,6 +2745,9 @@ public class InitializerListener implements ServletContextListener {
 
                     // API group jobs
                     setUpUpdateCustomCollections();
+                    logger.warn("Setting up user analysis cron scheduler");
+                    userAnalysisCron.setUpUserAnalysisCronScheduler();
+                    logger.warn("User analysis cron scheduler setup complete");
                     updateApiGroupsForAccounts();
 
                     syncCronInfo.setUpUpdateCronScheduler();

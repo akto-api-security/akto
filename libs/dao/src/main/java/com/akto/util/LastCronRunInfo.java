@@ -16,14 +16,18 @@ public class LastCronRunInfo {
     public static final String LAST_THREAT_SCORE_SYNC = "lastThreatScoreSync";
     private int lastThreatScoreSync;
 
+    public static final String LAST_USER_ANALYSIS_CRON = "lastUserAnalysisCron";
+    private int lastUserAnalysisCron;
+
     public LastCronRunInfo() {
     }
 
-    public LastCronRunInfo(int lastSyncedCron, int lastUpdatedSensitiveMap, int lastUpdatedSeverity, int lastInfoResetted) {
+    public LastCronRunInfo(int lastSyncedCron, int lastUpdatedSensitiveMap, int lastUpdatedSeverity, int lastInfoResetted, int lastUserAnalysisCron) {
         this.lastSyncedCron = lastSyncedCron;
         this.lastUpdatedSensitiveMap = lastUpdatedSensitiveMap;
         this.lastUpdatedSeverity = lastUpdatedSeverity;
         this.lastInfoResetted = lastInfoResetted;
+        this.lastUserAnalysisCron = lastUserAnalysisCron;
     }
 
     public int getLastSyncedCron() {
@@ -64,5 +68,13 @@ public class LastCronRunInfo {
 
     public void setLastThreatScoreSync(int lastThreatScoreSync) {
         this.lastThreatScoreSync = lastThreatScoreSync;
+    }
+
+    public int getLastUserAnalysisCron() {
+        return lastUserAnalysisCron;
+    }
+
+    public void setLastUserAnalysisCron(int lastUserAnalysisCron) {
+        this.lastUserAnalysisCron = lastUserAnalysisCron;
     }
 }
