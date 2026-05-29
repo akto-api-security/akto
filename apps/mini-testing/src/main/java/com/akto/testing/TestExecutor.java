@@ -6,6 +6,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
@@ -302,6 +303,7 @@ public class TestExecutor {
 
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size());
+
         boolean collectionWise = testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE);
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
@@ -330,6 +332,8 @@ public class TestExecutor {
         YamlTemplate commonTemplate = dataActor.fetchCommonWordList();
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates, commonTemplate);
+
+        testingRunSubCategories = filterSubCategoriesByCollectionType(apiInfoKeyList, testingRunSubCategories, testConfigMap);
 
         List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
         TestingUtil testingUtil = new TestingUtil(sampleMessageStore, testRoles, testingRun.getUserEmail(), customAuthTypes);
@@ -480,7 +484,8 @@ public class TestExecutor {
                     }
                 } else {
                     try {
-                        Future<Void> future = threadPool.submit(() -> startWithLatch(testingRunSubCategories, accountId,
+                        List<String> finalTestingRunSubCategories = testingRunSubCategories;
+                        Future<Void> future = threadPool.submit(() -> startWithLatch(finalTestingRunSubCategories, accountId,
                                 apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap,
                                 testConfigMap, testLogs, testingRun, latch, finalApiInfoKeySubcategoryMap));
                         testingRecords.add(future);
@@ -1492,6 +1497,87 @@ public class TestExecutor {
         }
         
         return false;
+    }
+
+    private static boolean isCategoryMcp(String name) {
+        if (name == null) return false;
+        return name.toUpperCase().startsWith("MCP");
+    }
+
+    private static boolean isCategoryAgentic(String name) {
+        if (name == null) return false;
+        // covers both AGENT_ (e.g. AGENT_GOAL_HIJACK) and AGENTIC_ (e.g. AGENTIC_SUPPLY_CHAIN)
+        return name.toUpperCase().startsWith("AGENT");
+    }
+
+    private List<String> filterSubCategoriesByCollectionType(List<ApiInfoKey> apiInfoKeyList, List<String> subCategories, Map<String, TestConfig> testConfigMap) {
+        if (subCategories == null || subCategories.isEmpty()) {
+            return subCategories;
+        }
+
+        Set<Integer> uniqueCollectionIds = new HashSet<>();
+        for (ApiInfoKey key : apiInfoKeyList) {
+            uniqueCollectionIds.add(key.getApiCollectionId());
+        }
+
+        boolean hasMcpCollection = false;
+        boolean hasGenAiCollection = false;
+        boolean fetchFailed = false;
+
+        for (int collectionId : uniqueCollectionIds) {
+            // early exit — no point fetching more once both flags are set
+            if (hasMcpCollection && hasGenAiCollection) break;
+            try {
+                ApiCollection collection = dataActor.fetchApiCollectionMeta(collectionId);
+                if (collection != null) {
+                    if (collection.isMcpCollection()) hasMcpCollection = true;
+                    if (collection.isGenAICollection()) hasGenAiCollection = true;
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed to fetch collection meta for category filtering, collectionId: " + collectionId);
+                fetchFailed = true;
+            }
+        }
+
+        // If all fetches failed we cannot reliably filter — run all tests rather than silently dropping them
+        if (fetchFailed && !hasMcpCollection && !hasGenAiCollection) {
+            loggerMaker.infoAndAddToDb("Category filter skipped: could not determine collection type, running all " + subCategories.size() + " tests");
+            return subCategories;
+        }
+
+        loggerMaker.infoAndAddToDb("Category filter - MCP: " + hasMcpCollection + ", GenAI: " + hasGenAiCollection);
+
+        List<String> filtered = new ArrayList<>();
+        for (String subCat : subCategories) {
+            TestConfig config = testConfigMap.get(subCat);
+            if (config == null || config.getInfo() == null || config.getInfo().getCategory() == null) {
+                // no config loaded — fall back to test ID prefix
+                String upper = subCat.toUpperCase();
+                if (upper.startsWith("MCP") && !hasMcpCollection) continue;
+                if (upper.startsWith("AGENT") && !hasGenAiCollection) continue;
+                filtered.add(subCat);
+                continue;
+            }
+
+            // check both name and shortName: category name can be AGENT_GOAL_HIJACK or AGENTIC_SUPPLY_CHAIN
+            String categoryName = config.getInfo().getCategory().getName();
+            String shortName = config.getInfo().getCategory().getShortName();
+            boolean isMcpTest = isCategoryMcp(categoryName) || isCategoryMcp(shortName);
+            boolean isAgenticTest = isCategoryAgentic(categoryName) || isCategoryAgentic(shortName);
+
+            if (isMcpTest && !hasMcpCollection) {
+                loggerMaker.debugInfoAddToDb("Skipping MCP test " + subCat + " (category: " + categoryName + "): no MCP collection in run");
+                continue;
+            }
+            if (isAgenticTest && !hasGenAiCollection) {
+                loggerMaker.debugInfoAddToDb("Skipping Agentic test " + subCat + " (category: " + categoryName + "): no GenAI collection in run");
+                continue;
+            }
+            filtered.add(subCat);
+        }
+
+        loggerMaker.infoAndAddToDb("Category filter: " + subCategories.size() + " -> " + filtered.size() + " subcategories after collection type check");
+        return filtered;
     }
 
     public boolean filterGraphQlPayload(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) throws Exception {
