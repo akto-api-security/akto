@@ -1506,6 +1506,7 @@ public class HttpCallParser {
                 AgentQueryRecord record = AgentQueryRecord.fromHttpResponseParams(
                         httpResponseParam, tagsMap, getDeviceUserMap());
                 if (record != null) {
+                    loggerMaker.infoAndAddToDb("Storing agent query data for account: " + Context.getActualAccountId());
                     dataActor.storeAgentQueryData(record);
                 }
             }

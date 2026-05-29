@@ -4723,11 +4723,13 @@ public class ClientActor extends DataActor {
 
     private static void flushAgentQueryRecords() {
         List<AgentQueryRecord> batch;
+        loggerMaker.infoAndAddToDb("Flushing agent query records", LoggerMaker.LogDb.RUNTIME);
         synchronized (agentQueryRecordBuffer) {
             if (agentQueryRecordBuffer.isEmpty()) return;
             batch = new ArrayList<>(agentQueryRecordBuffer);
             agentQueryRecordBuffer.clear();
         }
+        loggerMaker.infoAndAddToDb("Flushing agent query records: " + batch.size(), LoggerMaker.LogDb.RUNTIME);
         try {
             Map<String, List<String>> headers = buildHeaders();
             BasicDBObject obj = new BasicDBObject();
