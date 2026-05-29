@@ -22,12 +22,11 @@ public class LastCronRunInfo {
     public LastCronRunInfo() {
     }
 
-    public LastCronRunInfo(int lastSyncedCron, int lastUpdatedSensitiveMap, int lastUpdatedSeverity, int lastInfoResetted, int lastUserAnalysisCron) {
+    public LastCronRunInfo(int lastSyncedCron, int lastUpdatedSensitiveMap, int lastUpdatedSeverity, int lastInfoResetted) {
         this.lastSyncedCron = lastSyncedCron;
         this.lastUpdatedSensitiveMap = lastUpdatedSensitiveMap;
         this.lastUpdatedSeverity = lastUpdatedSeverity;
         this.lastInfoResetted = lastInfoResetted;
-        this.lastUserAnalysisCron = lastUserAnalysisCron;
     }
 
     public int getLastSyncedCron() {
