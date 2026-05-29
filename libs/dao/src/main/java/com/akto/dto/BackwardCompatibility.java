@@ -1,5 +1,12 @@
 package com.akto.dto;
 
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@NoArgsConstructor
+@Getter
+@Setter
 public class BackwardCompatibility {
     private int id;
 
@@ -117,6 +124,9 @@ public class BackwardCompatibility {
 
     public static final String FILL_LAST_TESTED_FIELD = "fillLastTestedField";
 
+    public static final String MOVE_USER_DATA_FROM_MODULE_INFO_TO_AGENTIC_USERS = "moveUserDataFromModuleInfoToAgenticUsers";
+    private int moveUserDataFromModuleInfoToAgenticUsers;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -127,7 +137,7 @@ public class BackwardCompatibility {
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
                                  int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType,
                                  int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs, int moveOktaOidcSSO, int markSummariesVulnerable,
-                                 int changeOperatorConditionInCDT, int cleanupRbacEntries, int fillLastTestedField, int fillQueryParams) {
+                                 int changeOperatorConditionInCDT, int cleanupRbacEntries, int fillLastTestedField, int fillQueryParams, int moveUserDataFromModuleInfoToAgenticUsers) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -165,336 +175,7 @@ public class BackwardCompatibility {
         this.cleanupRbacEntries = cleanupRbacEntries;
         this.fillLastTestedField = fillLastTestedField; 
         this.fillQueryParams = fillQueryParams;
+        this.moveUserDataFromModuleInfoToAgenticUsers = moveUserDataFromModuleInfoToAgenticUsers;
     }
 
-    public BackwardCompatibility() {
-    }
-
-    public int getId() {
-        return id;
-    }
-
-    public void setId(int id) {
-        this.id = id;
-    }
-
-    public int getDropFilterSampleData() {
-        return dropFilterSampleData;
-    }
-
-    public void setDropFilterSampleData(int dropFilterSampleData) {
-        this.dropFilterSampleData = dropFilterSampleData;
-    }
-
-    public int getResetSingleTypeInfoCount() {
-        return resetSingleTypeInfoCount;
-    }
-
-    public void setResetSingleTypeInfoCount(int resetSingleTypeInfoCount) {
-        this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
-    }
-
-    public int getDropWorkflowTestResult() {
-        return dropWorkflowTestResult;
-    }
-
-    public void setDropWorkflowTestResult(int dropWorkflowTestResult) {
-        this.dropWorkflowTestResult = dropWorkflowTestResult;
-    }
-
-    public int getReadyForNewTestingFramework() {
-        return this.readyForNewTestingFramework;
-    }
-
-    public void setReadyForNewTestingFramework(int readyForNewTestingFramework) {
-        this.readyForNewTestingFramework = readyForNewTestingFramework;
-    }
-
-    public int getAddAktoDataTypes() {
-        return addAktoDataTypes;
-    }
-
-    public void setAddAktoDataTypes(int addAktoDataTypes) {
-        this.addAktoDataTypes = addAktoDataTypes;
-    }
-    
-    public int getMergeOnHostInit() {
-        return this.mergeOnHostInit;
-    }
-
-    public void setMergeOnHostInit(int mergeOnHostInit) {
-        this.mergeOnHostInit = mergeOnHostInit;
-    }
-
-    public boolean isDeploymentStatusUpdated() {
-        return deploymentStatusUpdated;
-    }
-
-    public void setDeploymentStatusUpdated(boolean deploymentStatusUpdated) {
-        this.deploymentStatusUpdated = deploymentStatusUpdated;
-    }
-
-    public boolean isMirroringLambdaTriggered() {
-        return mirroringLambdaTriggered;
-    }
-
-    public void setMirroringLambdaTriggered(boolean mirroringLambdaTriggered) {
-        this.mirroringLambdaTriggered = mirroringLambdaTriggered;
-    }
-
-    public int getAuthMechanismData() {
-        return this.authMechanismData;
-    }
-
-    public void setAuthMechanismData(int authMechanismData) {
-        this.authMechanismData = authMechanismData;
-    }
-
-    public int getDeleteAccessListFromApiToken() {
-        return deleteAccessListFromApiToken;
-    }
-
-    public void setDeleteAccessListFromApiToken(int deleteAccessListFromApiToken) {
-        this.deleteAccessListFromApiToken = deleteAccessListFromApiToken;
-    }
-
-    public int getDeleteNullSubCategoryIssues() {
-        return deleteNullSubCategoryIssues;
-    }
-
-    public void setDeleteNullSubCategoryIssues(int deleteNullSubCategoryIssues) {
-        this.deleteNullSubCategoryIssues = deleteNullSubCategoryIssues;
-    }
-
-    public int getEnableNewMerging() {
-        return enableNewMerging;
-    }
-
-    public void setEnableNewMerging(int enableNewMerging) {
-        this.enableNewMerging = enableNewMerging;
-    }
-
-    public int getEnableMergeAsyncOutside() {
-        return enableMergeAsyncOutside;
-    }
-
-    public void setEnableMergeAsyncOutside(int enableMergeAsyncOutside) {
-        this.enableMergeAsyncOutside = enableMergeAsyncOutside;
-    }
-
-    public int getAktoDefaultNewUI() {
-        return aktoDefaultNewUI;
-    }
-
-    public void setAktoDefaultNewUI(int aktoDefaultNewUI) {
-        this.aktoDefaultNewUI = aktoDefaultNewUI;
-    }
-
-    public int getComputeIntegratedConnections() {
-        return computeIntegratedConnections;
-    }
-
-    public void setComputeIntegratedConnections(int computeIntegratedConnections) {
-        this.computeIntegratedConnections = computeIntegratedConnections;
-    }
-
-    public int getInitializeOrganizationAccountBelongsTo() {
-        return initializeOrganizationAccountBelongsTo;
-    }
-
-    public void setInitializeOrganizationAccountBelongsTo(int initializeOrganizationAccountBelongsTo) {
-        this.initializeOrganizationAccountBelongsTo = initializeOrganizationAccountBelongsTo;
-    }
-
-    public int getOrgsInBilling() {
-        return orgsInBilling;
-    }
-
-    public void setOrgsInBilling(int orgsInBilling) {
-        this.orgsInBilling = orgsInBilling;
-    }
-
-    public int getDeleteLastCronRunInfo() {
-        return deleteLastCronRunInfo;
-    }
-
-    public void setDeleteLastCronRunInfo(int deleteLastCronRunInfo) {
-        this.deleteLastCronRunInfo = deleteLastCronRunInfo;
-    }
-
-    public int getDefaultTelemetrySettings() {
-        return defaultTelemetrySettings;
-    }
-
-    public void setDefaultTelemetrySettings(int defaultTelemetrySettings) {
-        this.defaultTelemetrySettings = defaultTelemetrySettings;
-    }
-
-    public int getMoveAuthMechanismToRole() {
-        return this.moveAuthMechanismToRole;
-    }
-
-    public void setMoveAuthMechanismToRole(int moveAuthMechanismToRole) {
-        this.moveAuthMechanismToRole = moveAuthMechanismToRole;
-    }
-
-    public int getLoginSignupGroups() {
-        return loginSignupGroups;
-    }
-
-    public void setLoginSignupGroups(int loginSignupGroups) {
-        this.loginSignupGroups = loginSignupGroups;
-    }
-    
-    public int getVulnerableApiUpdationVersionV1() {
-        return vulnerableApiUpdationVersionV1;
-    }
-
-    public void setVulnerableApiUpdationVersionV1(int vulnerableApiUpdationVersionV1) {
-        this.vulnerableApiUpdationVersionV1 = vulnerableApiUpdationVersionV1;
-    }
-
-    public int getRiskScoreGroups() {
-        return riskScoreGroups;
-    }
-
-    public void setRiskScoreGroups(int riskScoreGroups) {
-        this.riskScoreGroups = riskScoreGroups;
-    }
-    
-    public int getDeactivateCollections() {
-        return deactivateCollections;
-    }
-
-    public void setDeactivateCollections(int deactivateCollections) {
-        this.deactivateCollections = deactivateCollections;
-    }
-
-    public int getDisableAwsSecretPii() {
-        return disableAwsSecretPii;
-    }
-
-    public void setDisableAwsSecretPii(int disableAwsSecretPii) {
-        this.disableAwsSecretPii = disableAwsSecretPii;
-    }
-
-    public int getApiCollectionAutomatedField() {
-        return apiCollectionAutomatedField;
-    }
-
-    public void setApiCollectionAutomatedField(int apiCollectionAutomatedField) {
-        this.apiCollectionAutomatedField = apiCollectionAutomatedField;
-    }
-
-    public int getAutomatedApiGroups() {
-        return automatedApiGroups;
-    }
-
-    public void setAutomatedApiGroups(int automatedApiGroups) {
-        this.automatedApiGroups = automatedApiGroups;
-    }
-
-    public int getDropApiDependencies() {
-        return dropApiDependencies;
-    }
-
-    public void setDropApiDependencies(int dropApiDependencies) {
-        this.dropApiDependencies = dropApiDependencies;
-    }
-
-    public int getAddAdminRoleIfAbsent() {
-        return addAdminRoleIfAbsent;
-    }
-
-    public void setAddAdminRoleIfAbsent(int addAdminRoleIfAbsent) {
-        this.addAdminRoleIfAbsent = addAdminRoleIfAbsent;
-    }
-
-    public int getDropSpecialCharacterApiCollections() {
-        return dropSpecialCharacterApiCollections;
-    }
-
-    public void setDropSpecialCharacterApiCollections(int dropSpecialCharacterApiCollections) {
-        this.dropSpecialCharacterApiCollections = dropSpecialCharacterApiCollections;
-    }
-
-    public int getFixApiAccessType() {
-        return fixApiAccessType;
-    }
-
-    public void setFixApiAccessType(int fixApiAccessType) {
-        this.fixApiAccessType = fixApiAccessType;
-    }
-
-    public int getAddDefaultFilters() {
-        return addDefaultFilters;
-    }
-
-    public void setAddDefaultFilters(int addDefaultFilters) {
-        this.addDefaultFilters = addDefaultFilters;
-    }
-
-    public int getMoveAzureSamlToNormalSaml() {
-        return moveAzureSamlToNormalSaml;
-    }
-
-    public void setMoveAzureSamlToNormalSaml(int moveAzureSamlToNormalSaml) {
-        this.moveAzureSamlToNormalSaml = moveAzureSamlToNormalSaml;
-    }
-
-    public int getDeleteOptionsAPIs() {
-        return deleteOptionsAPIs;
-    }
-
-    public void setDeleteOptionsAPIs(int deleteOptionsAPIs) {
-        this.deleteOptionsAPIs = deleteOptionsAPIs;
-    }
-
-    public int getMoveOktaOidcSSO() {
-        return moveOktaOidcSSO;
-    }
-
-    public void setMoveOktaOidcSSO(int moveOktaOidcSSO) {
-        this.moveOktaOidcSSO = moveOktaOidcSSO;
-    }
-
-    public int getMarkSummariesVulnerable() {
-        return markSummariesVulnerable;
-    }
-
-    public void setMarkSummariesVulnerable(int markSummariesVulnerable) {
-        this.markSummariesVulnerable = markSummariesVulnerable;
-    }
-
-    public int getChangeOperatorConditionInCDT() {
-        return changeOperatorConditionInCDT;
-    }
-
-    public void setChangeOperatorConditionInCDT(int changeOperatorConditionInCDT) {
-        this.changeOperatorConditionInCDT = changeOperatorConditionInCDT;
-    }
-
-    public int getCleanupRbacEntries() {
-        return cleanupRbacEntries;
-    }
-
-    public void setCleanupRbacEntries(int cleanupRbacEntries) {
-        this.cleanupRbacEntries = cleanupRbacEntries;
-    }
-
-    public int getFillLastTestedField() {
-        return fillLastTestedField;
-    }
-
-    public void setFillLastTestedField(int fillLastTestedField) {
-        this.fillLastTestedField = fillLastTestedField;
-    }
-
-    public int getFillQueryParams() {
-        return fillQueryParams;
-    }
-
-    public void setFillQueryParams(int fillQueryParams) {
-        this.fillQueryParams = fillQueryParams;
-    }
 }

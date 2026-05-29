@@ -193,6 +193,36 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         }
         return result;
     }
+
+    public Map<Integer,Integer> getLastTrafficSeenNew(){
+        Map<Integer,Integer> result = new HashMap<>();
+        List<Bson> pipeline = new ArrayList<>();
+
+        List<Integer> collectionIds = null;
+        try {
+            collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        } catch(Exception e){
+        }
+
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
+        pipeline.add(Aggregates.group(groupedId, Accumulators.max(ApiInfo.LAST_SEEN, "$lastSeen")));
+
+        Set<Integer> allowedIds = collectionIds != null ? new HashSet<>(collectionIds) : null;
+        MongoCursor<ApiInfo> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, ApiInfo.class).cursor();
+        while(cursor.hasNext()){
+            try {
+               ApiInfo apiInfo = cursor.next();
+               int apiCollectionId = apiInfo.getId().getApiCollectionId();
+               if (allowedIds != null && !allowedIds.contains(apiCollectionId)) {
+                   continue;
+               }
+               result.put(apiCollectionId, apiInfo.getLastSeen());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return result;
+    }
     
     public static Float getRiskScore(ApiInfo apiInfo, boolean isSensitive, float riskScoreFromSeverityScore){
         return getRiskScore(apiInfo, isSensitive, riskScoreFromSeverityScore, apiInfo.getThreatScore() > 0);
