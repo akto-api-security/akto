@@ -893,28 +893,75 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchRiskScoreInfo(){
+        long t0 = System.currentTimeMillis();
         Map<Integer, Double> riskScoreMap = new HashMap<>();
-        List<Bson> pipeline = new ArrayList<>();
 
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+        if (Context.accountId.get() == 1736798101) {
+            riskScoreMap = buildRiskScoreMapNew();
+            long t1 = System.currentTimeMillis();
+            loggerMaker.infoAndAddToDb("[fetchRiskScoreInfo] buildRiskScoreMapNew=" + (t1 - t0) + "ms, size=" + riskScoreMap.size());
+        } else {
+
+            List<Bson> pipeline = new ArrayList<>();
+
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if(collectionIds != null) {
+                    pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                }
+            } catch(Exception e){
             }
-        } catch(Exception e){
+            long t1 = System.currentTimeMillis();
+            loggerMaker.infoAndAddToDb("[fetchRiskScoreInfo] rbacFilter=" + (t1 - t0) + "ms");
+
+            /*
+            * Use Unwind to unwind the collectionIds field resulting in a document for each collectionId in the collectionIds array
+            */
+            UnwindOptions unwindOptions = new UnwindOptions();
+            unwindOptions.preserveNullAndEmptyArrays(false);
+            pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
+
+            BasicDBObject groupId = new BasicDBObject("apiCollectionId", "$collectionIds");
+            pipeline.add(Aggregates.sort(
+                    Sorts.descending(ApiInfo.RISK_SCORE)
+            ));
+            pipeline.add(Aggregates.group(groupId,
+                    Accumulators.max(ApiInfo.RISK_SCORE, "$riskScore")
+            ));
+
+            MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+            while(cursor.hasNext()){
+                try {
+                    BasicDBObject basicDBObject = cursor.next();
+                    BasicDBObject id = (BasicDBObject) basicDBObject.get("_id");
+                    double riskScore = 0;
+                    if(basicDBObject.get(ApiInfo.RISK_SCORE) != null){
+                        riskScore = basicDBObject.getDouble(ApiInfo.RISK_SCORE);
+                    }
+                    riskScoreMap.put(id.getInt("apiCollectionId"), riskScore);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e,"error in calculating risk score for collections " + e.toString(), LogDb.DASHBOARD);
+                    e.printStackTrace();
+                }
+            }
+            long t2 = System.currentTimeMillis();
+            loggerMaker.infoAndAddToDb("[fetchRiskScoreInfo] oldPipeline(unwind+sort+group)=" + (t2 - t1) + "ms, size=" + riskScoreMap.size());
         }
+        long t3 = System.currentTimeMillis();
+        this.criticalEndpointsCount = (int) ApiInfoDao.instance.count(Filters.gte(ApiInfo.RISK_SCORE, 4));
+        long t4 = System.currentTimeMillis();
+        loggerMaker.infoAndAddToDb("[fetchRiskScoreInfo] criticalCount=" + (t4 - t3) + "ms, count=" + this.criticalEndpointsCount);
+        loggerMaker.infoAndAddToDb("[fetchRiskScoreInfo] total=" + (t4 - t0) + "ms");
+        this.riskScoreOfCollectionsMap = riskScoreMap;
+        return Action.SUCCESS.toUpperCase();
+    }
 
-        /*
-         * Use Unwind to unwind the collectionIds field resulting in a document for each collectionId in the collectionIds array
-         */
-        UnwindOptions unwindOptions = new UnwindOptions();
-        unwindOptions.preserveNullAndEmptyArrays(false);
-        pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
+    public Map<Integer, Double> buildRiskScoreMapNew(){
+        long start = System.currentTimeMillis();
+        Map<Integer, Double> riskScoreMap = new HashMap<>();
 
-        BasicDBObject groupId = new BasicDBObject("apiCollectionId", "$collectionIds");
-        pipeline.add(Aggregates.sort(
-                Sorts.descending(ApiInfo.RISK_SCORE)
-        ));
+        List<Bson> pipeline = new ArrayList<>();
+        BasicDBObject groupId = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
         pipeline.add(Aggregates.group(groupId,
                 Accumulators.max(ApiInfo.RISK_SCORE, "$riskScore")
         ));
@@ -931,13 +978,17 @@ public class ApiCollectionsAction extends UserAction {
                 riskScoreMap.put(id.getInt("apiCollectionId"), riskScore);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e,"error in calculating risk score for collections " + e.toString(), LogDb.DASHBOARD);
-                e.printStackTrace();
             }
         }
 
-        this.criticalEndpointsCount = (int) ApiInfoDao.instance.count(Filters.gte(ApiInfo.RISK_SCORE, 4));
-        this.riskScoreOfCollectionsMap = riskScoreMap;
-        return Action.SUCCESS.toUpperCase();
+        try {
+            List<Integer> allowedCollections = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if (allowedCollections != null) {
+                riskScoreMap.keySet().retainAll(new HashSet<>(allowedCollections));
+            }
+        } catch (Exception e) {
+        }
+        return riskScoreMap;
     }
 
     public String fetchTimersInfo(){
