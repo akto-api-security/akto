@@ -1,6 +1,7 @@
 package com.akto;
 
 import com.akto.dao.*;
+import com.akto.dao.agentic_sessions.UserAnalysisDataDao;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.nhi_governance.NhiIdentityDao;
 import com.akto.dao.nhi_governance.NhiPolicyDao;
@@ -281,6 +282,7 @@ public class DaoInit {
         ClassModel<RegexTestingEndpoints> regexTestingEndpointsClassModel = ClassModel.builder(RegexTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<HostRegexTestingEndpoints> hostRegexTestingEndpointsClassModel = ClassModel.builder(HostRegexTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<TagsTestingEndpoints> tagsTestingEndpointsClassModel = ClassModel.builder(TagsTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<ApiTagsTestingEndpoints> apiTagsTestingEndpointsClassModel = ClassModel.builder(ApiTagsTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<AuthTypeTestingEndpoints> authTypeTestingEndpointsClassModel = ClassModel.builder(AuthTypeTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<MultiCollectionTestingEndpoints> multiCollectionTestingEndpointsClassModel = ClassModel.builder(MultiCollectionTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<DependencyNode> dependencyNodeClassModel = ClassModel.builder(DependencyNode.class).enableDiscriminator(true).build();
@@ -380,6 +382,7 @@ public class DaoInit {
                 cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
                 methodConditionClassModel, regexTestingEndpointsClassModel, hostRegexTestingEndpointsClassModel,
                 tagsTestingEndpointsClassModel, authTypeTestingEndpointsClassModel, multiCollectionTestingEndpointsClassModel, allTestingEndpointsClassModel,
+                apiTagsTestingEndpointsClassModel,
                 UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel,
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel,
                 paramInfoClassModel,
@@ -511,6 +514,7 @@ public class DaoInit {
         DashboardLogsDao.instance.createIndicesIfAbsent();
         DataIngestionLogsDao.instance.createIndicesIfAbsent();
         AwsApiGatewayLogsDao.instance.createIndicesIfAbsent();
+        GuardrailsServiceLogsDao.instance.createIndicesIfAbsent();
         AnalyserLogsDao.instance.createIndicesIfAbsent();
         SampleDataDao.instance.createIndicesIfAbsent();
         LoadersDao.instance.createIndicesIfAbsent();
@@ -556,6 +560,7 @@ public class DaoInit {
         AgentConversationResultDao.instance.createIndexIfAbsent();
         IpReputationScoreDao.instance.createIndicesIfAbsent();
         ApiCollectionIconsDao.instance.createIndicesIfAbsent();
-
+        UserAnalysisDataDao.instance.createIndicesIfAbsent();
+        AgentUsersDao.instance.createIndicesIfAbsent();
     }
 }

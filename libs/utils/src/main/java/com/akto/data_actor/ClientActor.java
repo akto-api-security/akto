@@ -1552,6 +1552,27 @@ public class ClientActor extends DataActor {
         }
     }
 
+    @Override
+    public void insertGuardrailsServiceLog(Log log) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertGuardrailsServiceLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                return;
+            }
+        } catch (Exception e) {
+            return;
+        }
+    }
+
     public List<ApiCollection> fetchAllApiCollections() {
         Map<String, List<String>> headers = buildHeaders();
         List<ApiCollection> apiCollections = new ArrayList<>();

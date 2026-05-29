@@ -82,7 +82,7 @@ function ApiDetails(props) {
     const [apiCallStats, setApiCallStats] = useState([]);
     const [apiCallDistribution, setApiCallDistribution] = useState([]);
     const endTs = func.timeNow();
-    const [startTime, setStartTime] = useState(endTs - statsOptions[6].value)
+    const [startTime, setStartTime] = useState(endTs - statsOptions[7].value)
     const [hasApiStats, setHasApiStats] = useState(false);
     const [hasApiDistribution, setHasApiDistribution] = useState(false);
     const apiStatsAvailableRef = useRef(false);

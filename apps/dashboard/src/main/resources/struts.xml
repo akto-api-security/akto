@@ -584,6 +584,29 @@
             </result>
         </action>
 
+        <action name="api/fetchAgenticUsers" class="com.akto.action.settings.ModuleInfoAction" method="fetchAgenticUsers">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ</param>
+                <param name="actionDescription">User fetched agentic users list</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/updateModuleEnvAndReboot" class="com.akto.action.settings.ModuleInfoAction" method="updateModuleEnvAndReboot">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2421,6 +2444,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS"  type="json">
+                <param name="excludeProperties">apiCollections\[\d+\]\.mcpCollection,apiCollections\[\d+\]\.dastCollection,apiCollections\[\d+\]\.genAICollection,apiCollections\[\d+\]\.guardRailCollection,apiCollections\[\d+\]\.endpointCollection,apiCollections\[\d+\]\.conditions,apiCollections\[\d+\]\.serviceGraphEdges,apiCollections\[\d+\]\.hostNames,apiCollections\[\d+\]\.serviceTag,apiCollections\[\d+\]\.sampleCollectionsDropped,apiCollections\[\d+\]\.redact,apiCollections\[\d+\]\.runDependencyAnalyser,apiCollections\[\d+\]\.matchDependencyWithOtherCollections,apiCollections\[\d+\]\.sseCallbackUrl,apiCollections\[\d+\]\.mcpTransportType,apiCollections\[\d+\]\.mcpMaliciousnessLastCheck,apiCollections\[\d+\]\.vxlanId,apiCollections\[\d+\]\.userSetEnvType,apiCollections\[\d+\]\.urls</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -4492,6 +4516,27 @@
             <result name="SUCCESS" type="json">
                 <param name="root">missingUrlsResults</param>
             </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/updateApiInfoTags" class="com.akto.action.ApiInfoAction" method="updateApiInfoTags">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated tags on API endpoint</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -11599,7 +11644,7 @@
                     name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">^(actorsCounts|total).*</param>
+                <param name="includeProperties">^(actorsCounts|total|activeActorsCount).*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -11633,6 +11678,38 @@
             </result>
             <result name="SUCCESS" type="json">
                 <param name="includeProperties">^(topApis|topHosts).*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchDashboardTopData"
+            class="com.akto.action.threat_detection.ThreatApiAction"
+            method="fetchDashboardTopData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">THREAT_DETECTION</param>
+            </interceptor-ref>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">THREAT_PROTECTION</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^(dashboardTopActors|dashboardTopApis|recentMaliciousCount|totalKafkaRecords).*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

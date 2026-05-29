@@ -2,14 +2,21 @@ package com.akto.action;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.MissingUrlResult;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.Updates;
+import com.opensymphony.xwork2.Action;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -20,6 +27,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import org.bson.Document;
@@ -29,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 public class ApiInfoAction extends UserAction {
     private static final Logger logger = LoggerFactory.getLogger(ApiInfoAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiInfoAction.class, LogDb.DASHBOARD);
 
     @Override
     public String execute() {
@@ -266,6 +275,88 @@ public class ApiInfoAction extends UserAction {
             return ERROR.toUpperCase();
         }
     }
+
+    // ---- tagsList fields (mirrors collection-level updateEnvType pattern) ----
+    private List<CollectionTags> envType;
+    private boolean resetTags;
+    @Getter @Setter
+    private List<ApiInfoKey> apiInfoKeys;
+
+    public String updateApiInfoTags() {
+        if (!resetTags && (envType == null || envType.isEmpty())) {
+            addActionError("Please provide valid tags.");
+            return Action.ERROR.toUpperCase();
+        }
+        try {
+            List<Bson> filters = new ArrayList<>();
+            if (apiInfoKeys != null && !apiInfoKeys.isEmpty()) {
+                for (ApiInfoKey key : apiInfoKeys) {
+                    filters.add(ApiInfoDao.getFilter(key.getUrl(), key.getMethod().name(), key.getApiCollectionId()));
+                }
+            } else {
+                filters.add(ApiInfoDao.getFilter(url, method, apiCollectionId));
+            }
+            Bson combinedFilter = filters.size() == 1 ? filters.get(0) : Filters.or(filters);
+
+            if (resetTags) {
+                ApiInfoDao.instance.getMCollection().updateMany(combinedFilter,
+                        Updates.unset(ApiInfo.TAGS_STRING));
+                return Action.SUCCESS.toUpperCase();
+            }
+
+            List<ApiInfo> matched = ApiInfoDao.instance.findAll(combinedFilter,
+                    Projections.include(ApiInfo.TAGS_STRING));
+
+            for (ApiInfo apiInfoItem : matched) {
+                Bson docFilter = ApiInfoDao.getFilter(
+                        apiInfoItem.getId().getUrl(),
+                        apiInfoItem.getId().getMethod().name(),
+                        apiInfoItem.getId().getApiCollectionId()
+                );
+                List<CollectionTags> existingTags = apiInfoItem.getTagsList();
+
+                List<CollectionTags> toPull = new ArrayList<>();
+                List<CollectionTags> toAdd = new ArrayList<>();
+
+                for (CollectionTags tag : envType) {
+                    boolean exists = existingTags != null && existingTags.stream().anyMatch(t ->
+                            Objects.equals(t.getKeyName(), tag.getKeyName()) &&
+                            Objects.equals(t.getValue(), tag.getValue())
+                    );
+                    if (exists) {
+                        existingTags.stream()
+                                .filter(t -> Objects.equals(t.getKeyName(), tag.getKeyName()) &&
+                                             Objects.equals(t.getValue(), tag.getValue()))
+                                .findFirst()
+                                .ifPresent(toPull::add);
+                    } else {
+                        tag.setSource(CollectionTags.TagSource.USER);
+                        tag.setLastUpdatedTs(Context.now());
+                        toAdd.add(tag);
+                    }
+                }
+
+                if (!toPull.isEmpty()) {
+                    ApiInfoDao.instance.getMCollection().updateOne(docFilter,
+                            Updates.pullAll(ApiInfo.TAGS_STRING, toPull));
+                }
+                if (!toAdd.isEmpty()) {
+                    ApiInfoDao.instance.getMCollection().updateOne(docFilter,
+                            Updates.addEachToSet(ApiInfo.TAGS_STRING, toAdd));
+                }
+            }
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error updating ApiInfo tags");
+            addActionError("Error updating tags");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public void setEnvType(List<CollectionTags> envType) { this.envType = envType; }
+    public void setResetTags(boolean resetTags) { this.resetTags = resetTags; }
+
+    // ---- existing getters/setters ----
 
     public List<ApiInfo> getApiInfoList() {
         return apiInfoList;

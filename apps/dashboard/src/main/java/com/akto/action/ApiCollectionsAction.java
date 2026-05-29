@@ -140,10 +140,10 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
-        int tsRandom = Context.now();
-        loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
+        long fillStart = System.currentTimeMillis();
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMapOptimized(filter, apiCollections);
-        loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("[fillApiCollectionsUrlCount] buildEndpointsCount took " + (System.currentTimeMillis() - fillStart) + "ms");
+        long loopStart = System.currentTimeMillis();
 
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
@@ -176,6 +176,7 @@ public class ApiCollectionsAction extends UserAction {
             // Populate URLs for MCP collections using the service
             populateCollectionUrls(apiCollection);
         }
+        loggerMaker.infoAndAddToDb("[fillApiCollectionsUrlCount] loop + populateUrls took " + (System.currentTimeMillis() - loopStart) + "ms");
         return apiCollections;
     }
 
@@ -191,7 +192,7 @@ public class ApiCollectionsAction extends UserAction {
         }
         Bson filter = Filters.and(Filters.exists(ApiCollection.HOST_NAME), Filters.in(Constants.ID, deactivatedCollections));
         List<ApiCollection> hCollections = ApiCollectionsDao.instance.findAll(filter, Projections.include(Constants.ID));
-        List<Integer> deactivatedIds = new ArrayList<>();
+        Set<Integer> deactivatedIds = new HashSet<>();
         for(ApiCollection collection : hCollections){
             if(deactivatedCollections.contains(collection.getId())){
                 deactivatedIds.add(collection.getId());
@@ -202,9 +203,13 @@ public class ApiCollectionsAction extends UserAction {
             return SUCCESS.toUpperCase();
         }
 
-        this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(
-                Filters.in(SingleTypeInfo._COLLECTION_IDS, deactivatedIds)
-        );
+        if (Context.accountId.get() == 1736798101) {
+            this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMapNew(deactivatedIds);
+        } else {
+            this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(
+                    Filters.in(SingleTypeInfo._COLLECTION_IDS, deactivatedIds)
+            );
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -255,14 +260,45 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchAllCollectionsBasic() {
+        long start = System.currentTimeMillis();
+        long stepStart = start;
+
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
-        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude("urls"));
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] deleteContextCollections took " + (System.currentTimeMillis() - stepStart) + "ms");
+        stepStart = System.currentTimeMillis();
+
+        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude(
+                "urls", "conditions", "serviceGraphEdges", "hostNames", "serviceTag",
+                "sampleCollectionsDropped", "redact", "runDependencyAnalyser",
+                "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
+                "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType"
+        ));
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] findAll took " + (System.currentTimeMillis() - stepStart) + "ms, size=" + this.apiCollections.size());
+        stepStart = System.currentTimeMillis();
+
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] fillApiCollectionsUrlCount took " + (System.currentTimeMillis() - stepStart) + "ms");
+        stepStart = System.currentTimeMillis();
+
+        // For account 1736798101, trim tags to only service tag to reduce response size
+        if (Context.accountId.get() == 1736798101) {
+            String serviceTagKey = "privatecloud.agoda.com/service";
+            for (ApiCollection c : this.apiCollections) {
+                List<CollectionTags> tags = c.getTagsList();
+                if (tags != null && !tags.isEmpty()) {
+                    tags.removeIf(tag -> !serviceTagKey.equals(tag.getKeyName()));
+                }
+            }
+        }
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] tags filtering took " + (System.currentTimeMillis() - stepStart) + "ms");
+        stepStart = System.currentTimeMillis();
 
         // Start background icon processing for all collections asynchronously
         // This runs in a separate thread to not block the main response
         com.akto.util.IconUtils.processIconsForCollections(this.apiCollections);
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] processIcons took " + (System.currentTimeMillis() - stepStart) + "ms");
 
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] TOTAL took " + (System.currentTimeMillis() - start) + "ms");
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -846,7 +882,13 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchLastSeenInfoInCollections(){
-        this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeen();
+        long start = System.currentTimeMillis();
+        if (Context.accountId.get() == 1736798101) {
+            this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeenNew();
+        } else {
+            this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeen();
+        }
+        loggerMaker.infoAndAddToDb("[fetchLastSeen] time=" + (System.currentTimeMillis() - start) + "ms, size=" + this.lastTrafficSeenMap.size());
         return Action.SUCCESS.toUpperCase();
     }
 

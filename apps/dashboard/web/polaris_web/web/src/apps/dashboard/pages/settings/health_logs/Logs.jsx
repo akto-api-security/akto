@@ -50,6 +50,7 @@ const Logs = () => {
         { label: "Threat", value: "THREAT_DETECTION" },
         { label: "Data Ingestion", value: "DATA_INGESTION" },
         { label: "AWS API Gateway", value: "AWS_API_GATEWAY" },
+        { label: "Guardrails Service", value: "GUARDRAILS_SERVICE" },
     ];
   
     const handleSelectLogGroup = (logGroup) => {

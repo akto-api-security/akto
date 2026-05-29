@@ -572,7 +572,7 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
             const skillName = splits?.[1];
             if (!skillName) return;
             skillScoreMap[skillName] = info.riskScore || 0;
-            const isMalicious = (info.tagsList || []).some(t => t.key === "malicious-skill" && t.value === "true");
+            const isMalicious = (info.tagsList || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true");
             if (isMalicious) maliciousSkills.add(skillName);
         });
     });

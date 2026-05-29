@@ -8,9 +8,9 @@ These hooks provide the same four guardrails behaviours as `claude-cli-hooks/`, 
 
 | Hook | Event | Behaviour |
 |---|---|---|
-| `akto_user_prompt_submit` | `UserPromptSubmit` | Validates user prompt; blocks if denied by guardrails |
-| `akto_stop` | `Stop` | Ingests completed conversation turn for observability |
-| `akto_pre_tool_use` | `PreToolUse` | Validates MCP/built-in tool calls; blocks if denied |
+| `akto_user_prompt_submit` | `UserPromptSubmit` | Validates user prompt; denies on a hard `block` (warn/alert pass through) |
+| `akto_stop` | `Stop` | Validates the agent response and ingests the turn; **detect-only** — a hard `block` is recorded as a 403 but not prevented (see note below) |
+| `akto_pre_tool_use` | `PreToolUse` | Validates MCP/built-in tool calls; denies on a hard `block` (warn/alert pass through) |
 | `akto_post_tool_use` | `PostToolUse` | Ingests tool execution results for observability |
 
 ## Installation
@@ -60,6 +60,9 @@ Set environment variables before starting your agent (see below), then pass `opt
 | `AKTO_TIMEOUT` | `5` | HTTP request timeout in seconds |
 | `MODE` | `argus` | `argus` (default) or `atlas` |
 | `AKTO_CONNECTOR` | `claude_agent_sdk` | Source label shown in Akto dashboard |
+| `AKTO_CONNECTOR_VALUE` | `claude_agent_sdk` | Client label used in tool tags (`mcp-client` for MCP, `ai-agent` for built-in tools) |
+| `MCP_INGEST_PATH` | `/mcp` | Mirrored path for MCP tool calls (must match Akto's MCP path detection) |
+| `NON_MCP_TOOL_PATH_PREFIX` | `/tool` | Path prefix for built-in / non-MCP tool calls (`/tool/<tool-name>`) |
 | `LOG_DIR` | `~/.claude/akto/logs` | Directory for log files |
 | `LOG_LEVEL` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `LOG_PAYLOADS` | `false` | Set to `true` to log full request/response bodies |
@@ -81,6 +84,20 @@ Set environment variables before starting your agent (see below), then pass `opt
 | `contextSource` | `ENDPOINT` | `AGENTIC` (hardcoded) |
 | `source` tag | set to `CONTEXT_SOURCE` value | omitted |
 
+## MCP traffic classification
+
+Tool calls are shaped so Akto's runtime classifies them correctly (`McpRequestResponseUtils.isMcpRequest` / `JsonRpcUtils.isMcpPath`):
+
+| | MCP tool (`mcp__<server>__<tool>`) | Built-in / non-MCP tool |
+|---|---|---|
+| Path | `/mcp` | `/tool/<normalized-tool-name>` |
+| Request body | JSON-RPC `tools/call` (`{"jsonrpc":"2.0","method":"tools/call","params":{"name","arguments"},"id"}`) | `{"body": <input>, "toolName": <name>}` |
+| Response body (PostToolUse) | JSON-RPC result (`{"jsonrpc":"2.0","id","result"}`) | `{"body":{"result": <output>}}` |
+| Tags | `{mcp-server, mcp-client}` | `{gen-ai, ai-agent}` |
+| Header | adds `x-mcp-server: <server>` | — |
+
+`parse_claude_tool()` splits `mcp__<server>__<tool>`; anything else is treated as a built-in tool. The `Stop`/PostToolUse hooks remain observational — PostToolUse never blocks (the Agent SDK cannot un-run an already-executed tool).
+
 ## Logging
 
 All hooks write to a single log file:
@@ -92,14 +109,36 @@ $LOG_DIR/akto-agent-sdk.log
 ## Sync vs Async Mode
 
 **`AKTO_SYNC_MODE=true` (default):**
-- `UserPromptSubmit`: validates before the model is called; blocks denied prompts
-- `PreToolUse`: validates before tool execution; blocks denied tool calls
+- `UserPromptSubmit`: validates before the model is called; resolves the verdict via `resolve_guardrail_decision`
+- `PreToolUse`: validates before tool execution; resolves the verdict via `resolve_guardrail_decision`
 - `Stop` / `PostToolUse`: always ingest (fire-and-forget, non-blocking)
 
 **`AKTO_SYNC_MODE=false`:**
 - All hooks are observational only — nothing is blocked
 - `Stop` and `PostToolUse` ingest with combined guardrails+ingest call
 
-## Warn Flow (UserPromptSubmit)
+## Guardrail Behaviours (UserPromptSubmit, PreToolUse & Stop)
 
-When a guardrail returns `behaviour=warn`, the prompt is blocked on first submission with a warning message. If the user submits the identical prompt a second time, it is allowed through. The pending fingerprint is stored in `$LOG_DIR/akto_prompt_warn_pending.json`.
+All three validating hooks resolve a guardrail verdict through `resolve_guardrail_decision`, honouring the `behaviour` field returned by the guardrail:
+
+| Behaviour | Effect |
+|---|---|
+| *(allowed)* | Pass through |
+| `block` (or unset) | Deny |
+| `alert` | Allow; the violation is recorded server-side |
+| `warn` | Allow; treated as `alert` in the Agent SDK (see below) |
+
+For `UserPromptSubmit` and `PreToolUse`, "Deny" actually blocks (the prompt isn't sent / the tool isn't run). For `Stop` it does **not**.
+
+### `Stop` is detect-only
+
+By the time the `Stop` hook fires, the response has already been produced and shown, and the Agent SDK cannot retract it — returning `continue_` neither regenerates nor hides the response (`continue_: True` is a no-op; `continue_: False` only hard-halts the whole run). So a hard `block` on a response is **recorded as a 403** for alerting/dashboard but is *not* prevented. True response-level blocking would require an output-interception layer, not a `Stop` hook.
+
+### Why `warn` is not a resubmit gate here
+
+The CLI hooks implement `warn` as "deny on first sight, allow on an identical resubmit" — a human reads the warning and consciously resends. That model **does not apply to the Agent SDK**:
+
+- `UserPromptSubmit`: `continue_: False` ends the turn; there is no built-in resubmit (the calling app must issue a new query), and the message isn't surfaced unless `include_hook_events` is set.
+- `PreToolUse`: a `deny` reason is fed back to the *model*, which is designed to **avoid retrying** and try a different approach — so an identical retry effectively never happens, and any retry is the model self-approving, not a human review.
+
+Because there is no human-in-the-loop "review and resend" step, `warn` is treated as `alert`: allowed through, with the violation recorded server-side during guardrail evaluation. No client-side resubmit state is kept.
