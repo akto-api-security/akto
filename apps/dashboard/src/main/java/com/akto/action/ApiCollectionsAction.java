@@ -192,7 +192,7 @@ public class ApiCollectionsAction extends UserAction {
         }
         Bson filter = Filters.and(Filters.exists(ApiCollection.HOST_NAME), Filters.in(Constants.ID, deactivatedCollections));
         List<ApiCollection> hCollections = ApiCollectionsDao.instance.findAll(filter, Projections.include(Constants.ID));
-        List<Integer> deactivatedIds = new ArrayList<>();
+        Set<Integer> deactivatedIds = new HashSet<>();
         for(ApiCollection collection : hCollections){
             if(deactivatedCollections.contains(collection.getId())){
                 deactivatedIds.add(collection.getId());
@@ -203,9 +203,13 @@ public class ApiCollectionsAction extends UserAction {
             return SUCCESS.toUpperCase();
         }
 
-        this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(
-                Filters.in(SingleTypeInfo._COLLECTION_IDS, deactivatedIds)
-        );
+        if (Context.accountId.get() == 1736798101) {
+            this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMapNew(deactivatedIds);
+        } else {
+            this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(
+                    Filters.in(SingleTypeInfo._COLLECTION_IDS, deactivatedIds)
+            );
+        }
         return SUCCESS.toUpperCase();
     }
 
