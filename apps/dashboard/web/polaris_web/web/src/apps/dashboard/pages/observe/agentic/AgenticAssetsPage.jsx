@@ -1,5 +1,8 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
+import Highcharts from "highcharts";
+import { HighchartsReact } from "highcharts-react-official";
+import { LegacyCard, Box, HorizontalStack, VerticalStack, Text, Divider } from "@shopify/polaris";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import MCPIcon from "@/assets/MCP_Icon.svg";
@@ -224,10 +227,226 @@ const DEFAULT_COL_DEF = {
     cellStyle: { display: "flex", alignItems: "center" },
 };
 
+// ─── Top section helpers ──────────────────────────────────────────────────────
+
+const ASSET_TREND     = [18,19,20,21,20,22,23,22,25,26,27,29];
+const VIOLATION_TREND = [900,920,950,980,1000,1020,1050,1090,1120,1150,1180,1203];
+
+// areaspline smooth curves; omit width for full-container auto-width, or pass explicit width
+function makeAreasplineConfig(data, color, height = 50, width = undefined, margin = [2, 0, 2, 0]) {
+    const min = Math.min(...data), max = Math.max(...data);
+    const pad = (max - min) * 0.2 || 1;
+    return {
+        chart: { type: "areaspline", height, ...(width ? { width } : {}), backgroundColor: "transparent", margin, spacing: [0,0,0,0], animation: false },
+        title: null, credits: { enabled: false }, exporting: { enabled: false },
+        xAxis: { visible: false }, yAxis: { visible: false, min: min - pad, max: max + pad },
+        legend: { enabled: false }, tooltip: { enabled: false },
+        plotOptions: { areaspline: {
+            fillColor: { linearGradient: { x1:0, y1:0, x2:0, y2:1 }, stops: [[0, Highcharts.color(color).setOpacity(0.25).get("rgba")], [1, Highcharts.color(color).setOpacity(0).get("rgba")]] },
+            lineWidth: 2, marker: { enabled: false }, states: { hover: { enabled: false } }, enableMouseTracking: false,
+        }},
+        series: [{ data, color }],
+    };
+}
+
+function TopSectionIcon({ row }) {
+    if (row.type === "MCP Server") return <img src={MCPIcon} width={18} height={18} alt="" style={{ flexShrink: 0, borderRadius: 3 }} />;
+    const domain = getDomainForFavicon(row.assetTagValue);
+    if (domain) return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={18} height={18} alt="" style={{ flexShrink: 0, borderRadius: 3 }} />;
+    return <img src={LaptopIcon} width={18} height={18} alt="" style={{ flexShrink: 0, borderRadius: 3, opacity: 0.7 }} />;
+}
+
+// ─── Top section ──────────────────────────────────────────────────────────────
+
+function TopSection({ onTypeFilter, activeTypeFilter, onAssetClick }) {
+    const aiCount    = FLAT_ROW_DATA.filter(r => r.type === "AI Agent").length;
+    const mcpCount   = FLAT_ROW_DATA.filter(r => r.type === "MCP Server").length;
+    const llmCount   = FLAT_ROW_DATA.filter(r => r.type === "LLM").length;
+    const skillCount = FLAT_ROW_DATA.filter(r => r.type === "Skill").length;
+    const total      = FLAT_ROW_DATA.length;
+
+    const critV  = FLAT_ROW_DATA.reduce((s, r) => s + (r.violations?.critical || 0), 0);
+    const highV  = FLAT_ROW_DATA.reduce((s, r) => s + (r.violations?.high    || 0), 0);
+    const medV   = FLAT_ROW_DATA.reduce((s, r) => s + (r.violations?.medium  || 0), 0);
+    const lowV   = FLAT_ROW_DATA.reduce((s, r) => s + (r.violations?.low     || 0), 0);
+    const totalV = critV + highV + medV + lowV;
+
+    const topApps = useMemo(() =>
+        [...FLAT_ROW_DATA].filter(r => r.aiInteractions > 0)
+            .sort((a, b) => b.aiInteractions - a.aiInteractions).slice(0, 5), []);
+
+    const topViolations = useMemo(() =>
+        [...FLAT_ROW_DATA]
+            .map(r => ({ ...r, totalV: (r.violations?.critical||0)+(r.violations?.high||0)+(r.violations?.medium||0)+(r.violations?.low||0) }))
+            .filter(r => r.totalV > 0).sort((a, b) => b.totalV - a.totalV).slice(0, 5), []);
+
+    // 1 — areaspline configs for the stat cards (full-width, height 80)
+    // stat charts: width=140, height=50 — to the right of the number, same as DeviceEndpoints StatRow
+    const assetChartOpts = useMemo(() => makeAreasplineConfig(ASSET_TREND,     "#9642FC", 50, 140), []);
+    const violChartOpts  = useMemo(() => makeAreasplineConfig(VIOLATION_TREND, "#DC2626", 50, 140), []);
+
+    // mini charts for list rows: explicit width=80, height=36
+    const topAppOpts  = useMemo(() => topApps.map((row) =>
+        makeAreasplineConfig(ASSET_TREND.map((v, j) => Math.round(v * (row.aiInteractions / 29) * (0.85 + j * 0.01))), "#9642FC", 36, 80)
+    ), [topApps]);
+
+    const topViolOpts = useMemo(() => topViolations.map((row) =>
+        makeAreasplineConfig(VIOLATION_TREND.map((v, j) => Math.round(v * (row.totalV / 1203) * (0.88 + j * 0.012))), "#EF4444", 36, 80)
+    ), [topViolations]);
+
+    const typeBreakdown = [
+        { label: "Agents",      count: aiCount,    color: "#9642FC", typeKey: "AI Agent"   },
+        { label: "MCP Servers", count: mcpCount,   color: "#4cbebb", typeKey: "MCP Server" },
+        { label: "LLMs",        count: llmCount,   color: "#EAB308", typeKey: "LLM"        },
+        { label: "Skills",      count: skillCount, color: "#D1D5DB", typeKey: "Skill"      },
+    ];
+    const violBreakdown = [
+        { label: "Critical", count: critV, color: "#DC2626" },
+        { label: "High",     count: highV, color: "#F97316" },
+        { label: "Medium",   count: medV,  color: "#EAB308" },
+        { label: "Low",      count: lowV,  color: "#D1D5DB" },
+    ];
+
+    // Stats card uses full-width vertical chart layout — section padding tuned so
+    // natural content height ≈ apps/violations cards (5 rows × ~60px each ≈ 370px)
+    return (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+
+            {/* ── Card 1: Stats — vertical chart layout, padding tuned for equal natural height ── */}
+            {/* Stats card — chart to the right of number, matching the reference design */}
+            <LegacyCard>
+                <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="5" paddingBlockEnd="4">
+                    <VerticalStack gap="3">
+                        <Text variant="headingSm" fontWeight="semibold">Agentic Assets</Text>
+                        <HorizontalStack align="space-between" blockAlign="center" gap="3">
+                            <HorizontalStack gap="2" blockAlign="center">
+                                <Text variant="heading2xl" as="p">{total}</Text>
+                                <Text variant="bodySm" fontWeight="semibold" color="success">+3</Text>
+                            </HorizontalStack>
+                            <HighchartsReact highcharts={Highcharts} options={assetChartOpts} immutable />
+                        </HorizontalStack>
+                        <VerticalStack gap="2">
+                            <div style={{ display: "flex", height: 5, borderRadius: 3, overflow: "hidden", gap: 1 }}>
+                                {typeBreakdown.map(b => total > 0 && <div key={b.label} style={{ flex: b.count, background: b.color, minWidth: b.count > 0 ? 2 : 0 }} />)}
+                            </div>
+                            {/* Clickable legend — filters the table below */}
+                            <HorizontalStack gap="3" wrap>
+                                {typeBreakdown.map(b => {
+                                    const active = activeTypeFilter === b.typeKey;
+                                    return (
+                                        <div
+                                            key={b.label}
+                                            onClick={() => onTypeFilter?.(active ? null : b.typeKey)}
+                                            style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 4, padding: "2px 6px", borderRadius: 12, background: active ? b.color + "22" : "transparent", border: active ? `1px solid ${b.color}` : "1px solid transparent", transition: "all 0.15s" }}
+                                        >
+                                            <div style={{ width: 7, height: 7, borderRadius: "50%", background: b.color, flexShrink: 0 }} />
+                                            <Text variant="bodySm" color="subdued">{b.label}</Text>
+                                        </div>
+                                    );
+                                })}
+                            </HorizontalStack>
+                        </VerticalStack>
+                    </VerticalStack>
+                </Box>
+                <Divider />
+                <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="4" paddingBlockEnd="5">
+                    <VerticalStack gap="3">
+                        <Text variant="headingSm" fontWeight="semibold">Violations</Text>
+                        <HorizontalStack align="space-between" blockAlign="center" gap="3">
+                            <HorizontalStack gap="2" blockAlign="center">
+                                <Text variant="heading2xl" as="p">{totalV}</Text>
+                                <Text variant="bodySm" fontWeight="semibold" color="critical">+{Math.round(totalV * 0.017)}</Text>
+                            </HorizontalStack>
+                            <HighchartsReact highcharts={Highcharts} options={violChartOpts} immutable />
+                        </HorizontalStack>
+                        <VerticalStack gap="2">
+                            <div style={{ display: "flex", height: 5, borderRadius: 3, overflow: "hidden", gap: 1 }}>
+                                {violBreakdown.map(b => totalV > 0 && <div key={b.label} style={{ flex: b.count, background: b.color, minWidth: b.count > 0 ? 2 : 0 }} />)}
+                            </div>
+                            <HorizontalStack gap="3" wrap>
+                                {violBreakdown.map(b => (
+                                    <HorizontalStack key={b.label} gap="1" blockAlign="center">
+                                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: b.color, flexShrink: 0 }} />
+                                        <Text variant="bodySm" color="subdued">{b.label}</Text>
+                                    </HorizontalStack>
+                                ))}
+                            </HorizontalStack>
+                        </VerticalStack>
+                    </VerticalStack>
+                </Box>
+            </LegacyCard>
+
+            {/* ── Card 2: Top Used Applications — each row opens the asset flyout ── */}
+            <LegacyCard>
+                <Box padding="4">
+                    <VerticalStack gap="0">
+                        <Box paddingBlockEnd="3">
+                            <Text variant="headingSm">Top Used Applications</Text>
+                        </Box>
+                        {topApps.map((row, i) => {
+                            const asset = AGENTIC_FLAT_DATA.find(a => a.name === row.name) || { ...row, id: row.path[0] };
+                            return (
+                                <React.Fragment key={row.path[0]}>
+                                    {i > 0 && <Divider />}
+                                    <Box paddingBlockStart="3" paddingBlockEnd="3">
+                                        <div onClick={() => onAssetClick?.(asset)} style={{ cursor: "pointer" }}>
+                                            <HorizontalStack blockAlign="center" gap="2" wrap={false}>
+                                                <TopSectionIcon row={row} />
+                                                <Text variant="bodySm" as="span" truncate>{row.name}</Text>
+                                                <div style={{ flex: 1 }} />
+                                                <Text variant="bodySm" color="subdued">{row.aiInteractions.toLocaleString("en-IN")}</Text>
+                                                <div style={{ width: 80, flexShrink: 0 }}>
+                                                    <HighchartsReact highcharts={Highcharts} options={topAppOpts[i]} />
+                                                </div>
+                                            </HorizontalStack>
+                                        </div>
+                                    </Box>
+                                </React.Fragment>
+                            );
+                        })}
+                    </VerticalStack>
+                </Box>
+            </LegacyCard>
+
+            {/* ── Card 3: Top Agentic Asset with Violations — each row opens the asset flyout ── */}
+            <LegacyCard>
+                <Box padding="4">
+                    <VerticalStack gap="0">
+                        <Box paddingBlockEnd="3">
+                            <Text variant="headingSm">Top Agentic Asset with Violations</Text>
+                        </Box>
+                        {topViolations.map((row, i) => {
+                            const asset = AGENTIC_FLAT_DATA.find(a => a.name === row.name) || { ...row, id: row.path[0] };
+                            return (
+                                <React.Fragment key={row.path[0]}>
+                                    {i > 0 && <Divider />}
+                                    <Box paddingBlockStart="3" paddingBlockEnd="3">
+                                        <div onClick={() => onAssetClick?.(asset)} style={{ cursor: "pointer" }}>
+                                            <HorizontalStack blockAlign="center" gap="2" wrap={false}>
+                                                <TopSectionIcon row={row} />
+                                                <Text variant="bodySm" as="span" truncate>{row.name}</Text>
+                                                <div style={{ flex: 1 }} />
+                                                <Text variant="bodySm" color="subdued">{row.totalV}</Text>
+                                                <div style={{ width: 80, flexShrink: 0 }}>
+                                                    <HighchartsReact highcharts={Highcharts} options={topViolOpts[i]} />
+                                                </div>
+                                            </HorizontalStack>
+                                        </div>
+                                    </Box>
+                                </React.Fragment>
+                            );
+                        })}
+                    </VerticalStack>
+                </Box>
+            </LegacyCard>
+
+        </div>
+    );
+}
+
 // ─── Table section ────────────────────────────────────────────────────────────
 
-function TableSection() {
-    const [flyout, setFlyout] = useState(null);
+function TableSection({ typeFilter, flyout, setFlyout }) {
     const gridRef = useRef(null);
 
     // Auto-open flyout when arriving from DeviceFlyout via ?asset= param
@@ -248,18 +467,23 @@ function TableSection() {
         if (!e.data) return;
         const flat = AGENTIC_FLAT_DATA.find(a => a.id === e.data.path?.[0]) || { ...e.data, id: e.data.path?.[0] };
         setFlyout(flat);
-    }, []);
+    }, [setFlyout]);
 
-    const handleClose             = useCallback(() => setFlyout(null), []);
-    // Fix 3: when a component inside the flyout navigates to another asset, update the active flyout
-    const handleNavigateToAsset   = useCallback((assetData) => setFlyout(assetData), []);
+    const handleClose           = useCallback(() => setFlyout(null), [setFlyout]);
+    const handleNavigateToAsset = useCallback((assetData) => setFlyout(assetData), [setFlyout]);
     const getRowStyle = useCallback(() => ({ cursor: "pointer" }), []);
+
+    // Filter table by type when a legend segment is clicked in TopSection
+    const rowData = useMemo(() =>
+        typeFilter ? FLAT_ROW_DATA.filter(r => r.type === typeFilter) : FLAT_ROW_DATA,
+        [typeFilter]
+    );
 
     return (
         <>
             <AgGridTable
                 gridRef={gridRef}
-                rowData={FLAT_ROW_DATA}
+                rowData={rowData}
                 columnDefs={COL_DEFS}
                 defaultColDef={DEFAULT_COL_DEF}
                 height={800}
@@ -291,6 +515,9 @@ function TableSection() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AgenticAssetsPage() {
+    const [typeFilter, setTypeFilter] = useState(null);
+    const [flyout,     setFlyout]     = useState(null);
+
     return (
         <PageWithMultipleCards
             title={
@@ -300,7 +527,20 @@ export default function AgenticAssetsPage() {
                 />
             }
             isFirstPage={true}
-            components={[<TableSection key="table" />]}
+            components={[
+                <TopSection
+                    key="top"
+                    onTypeFilter={t => setTypeFilter(prev => prev === t ? null : t)}
+                    activeTypeFilter={typeFilter}
+                    onAssetClick={setFlyout}
+                />,
+                <TableSection
+                    key="table"
+                    typeFilter={typeFilter}
+                    flyout={flyout}
+                    setFlyout={setFlyout}
+                />,
+            ]}
         />
     );
 }
