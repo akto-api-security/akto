@@ -493,7 +493,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableRegexPatterns(hasRegexPatterns);
 
         // LLM prompt
-        setEnableLlmPrompt(policy.llmRule?.enabled || !!policy.llmRule?.userPrompt);
+        setEnableLlmPrompt(policy.llmRule?.enabled && !!policy.llmRule?.userPrompt);
         setLlmPrompt(policy.llmRule?.userPrompt || "");
         setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
 
@@ -609,19 +609,15 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         pattern: r.pattern,
                         behavior: r.behavior.toLowerCase()
                     })) : [],
-                ...(enableLlmPrompt && llmPrompt && llmPrompt.trim() ? {
-                    llmRule: {
-                        enabled: true,
-                        userPrompt: llmPrompt.trim(),
-                        confidenceScore: llmConfidenceScore
-                    }
-                } : {}),
-                ...(enableBasePromptRule ? {
-                    basePromptRule: {
-                        enabled: true,
-                        confidenceScore: basePromptConfidenceScore
-                    }
-                } : {}),
+                llmRule: {
+                    enabled: enableLlmPrompt && !!llmPrompt.trim(),
+                    userPrompt: llmPrompt.trim(),
+                    confidenceScore: llmConfidenceScore
+                },
+                basePromptRule: {
+                    enabled: enableBasePromptRule,
+                    confidenceScore: basePromptConfidenceScore
+                },
                 gibberishDetection: {
                     enabled: enableGibberishDetection,
                     confidenceScore: gibberishConfidenceScore
