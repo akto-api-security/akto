@@ -56,7 +56,7 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
         try {
             String nodeEnv = System.getenv("NODE_ENV");
             servletRequest.setAttribute("nodeEnv", nodeEnv != null ? nodeEnv : "production");
-            servletRequest.setAttribute("airgapped", "true".equalsIgnoreCase(System.getenv("AIRGAPPED")));
+            servletRequest.setAttribute("airgapped", String.valueOf("true".equalsIgnoreCase(System.getenv("AIRGAPPED"))));
         } catch(Exception e){
         }
 
