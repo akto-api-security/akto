@@ -334,31 +334,53 @@ function ApiDetails(props) {
             let commonMessages = []
             try {
                 const res = await api.fetchSampleData(endpoint, apiCollectionId, method)
+                const firstSample = (res.sampleDataList || [])[0]?.samples?.[0]
+                const isWebSocket = func.isWebSocketApiType(apiDetail?.apiType)
+                    || func.isWebSocketApiType(func.parseWebSocketSampleMessage(firstSample)?.type)
                 try {
-                    const resp = await api.fetchSensitiveSampleData(endpoint, apiCollectionId, method)
-                    if (resp.sensitiveSampleData && Object.keys(resp.sensitiveSampleData).length > 0) {
-                        if (res.sampleDataList.length > 0) {
-                            commonMessages = transform.getCommonSamples(res.sampleDataList[0].samples, resp)
-                        } else {
-                            commonMessages = transform.prepareSampleData(resp, '')
+                    if (isWebSocket) {
+                        let samples = (res.sampleDataList || []).flatMap((x) => x.samples || [])
+                        samples = samples.reverse()
+                        if (samples.length === 0 && res?.events != null) {
+                            samples = [JSON.stringify({
+                                type: "WEBSOCKET",
+                                path: endpoint,
+                                events: res.events,
+                            })]
                         }
-                    } else {
-                        let sensitiveData = []
-                        try {
-                            const res3 = await api.loadSensitiveParameters(apiCollectionId, endpoint, method)
-                            sensitiveData = res3.data.endpoints;
-                        } catch (error) {
-                            if (isRBACError(error)) {
-                                setShowForbidden(true);
-                                setLoading(false);
-                                return;
+                        commonMessages = samples.map((s) => {
+                            const parsed = func.parseWebSocketSampleMessage(s)
+                            return {
+                                message: parsed ? JSON.stringify(parsed) : s,
+                                highlightPaths: [],
                             }
+                        })
+                    } else {
+                        const resp = await api.fetchSensitiveSampleData(endpoint, apiCollectionId, method)
+                        if (resp.sensitiveSampleData && Object.keys(resp.sensitiveSampleData).length > 0) {
+                            if (res.sampleDataList.length > 0) {
+                                commonMessages = transform.getCommonSamples(res.sampleDataList[0].samples, resp)
+                            } else {
+                                commonMessages = transform.prepareSampleData(resp, '')
+                            }
+                        } else {
+                            let sensitiveData = []
+                            try {
+                                const res3 = await api.loadSensitiveParameters(apiCollectionId, endpoint, method)
+                                sensitiveData = res3.data.endpoints;
+                            } catch (error) {
+                                if (isRBACError(error)) {
+                                    setShowForbidden(true);
+                                    setLoading(false);
+                                    return;
+                                }
+                            }
+                            let samples = res.sampleDataList.map(x => x.samples)
+                            samples = samples.reverse();
+                            samples = samples.flat()
+                            let newResp = transform.convertSampleDataToSensitiveSampleData(samples, sensitiveData)
+                            commonMessages = transform.prepareSampleData(newResp, '')
                         }
-                        let samples = res.sampleDataList.map(x => x.samples)
-                        samples = samples.reverse();
-                        samples = samples.flat()
-                        let newResp = transform.convertSampleDataToSensitiveSampleData(samples, sensitiveData)
-                        commonMessages = transform.prepareSampleData(newResp, '')
                     }
                     setSampleData(commonMessages)
                 } catch (error) {
@@ -395,7 +417,7 @@ function ApiDetails(props) {
             // }catch (e) {
             // }   
             fetchStats(apiCollectionId, endpoint, method)
-            fetchDistributionData(); // Fetch distribution data
+            fetchDistributionData()
         }
     }
 
@@ -498,6 +520,9 @@ function ApiDetails(props) {
         }
         return options;
     };
+
+    const isWebSocket = func.isWebSocketApiType(apiDetail?.apiType)
+        || func.isWebSocketApiType(func.parseWebSocketSampleMessage(sampleData?.[0]?.message)?.type)
 
     const distributionBoxplotOptions = {
         chart: {
@@ -621,6 +646,7 @@ function ApiDetails(props) {
                 minHeight={"35vh"}
                 vertical={true}
                 isAPISampleData={true}
+                isWebSocket={isWebSocket}
                 metadata={headersWithData.map(x => x.split(" ")[0])}
             />
         </Box>,

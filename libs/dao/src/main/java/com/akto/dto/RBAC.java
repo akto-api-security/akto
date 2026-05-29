@@ -13,9 +13,13 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
 public class RBAC {
@@ -144,19 +148,44 @@ public class RBAC {
         this.apiCollectionsId = apiCollectionsId;
     }
 
+    /** Accounts for which new signups default to MEMBER on ENDPOINT (Akto ATLAS). */
+    public static final Set<Integer> ATLAS_MEMBER_DEFAULT_ACCOUNT_IDS = Collections.unmodifiableSet(
+            new HashSet<>(Arrays.asList(1779059321, 1000000)));
+
+    /** Email substrings (case-insensitive) that trigger the same ATLAS default scope behavior. */
+    public static final Set<String> ATLAS_MEMBER_DEFAULT_EMAIL_KEYWORDS = Collections.unmodifiableSet(
+            new HashSet<>(Arrays.asList( "comscore")));
+
+    public static boolean shouldUseAtlasMemberDefaultScope(int accountId, String email) {
+        if (ATLAS_MEMBER_DEFAULT_ACCOUNT_IDS.contains(accountId)) {
+            return true;
+        }
+        if (email == null || email.isEmpty()) {
+            return false;
+        }
+        String lowerEmail = email.toLowerCase();
+        for (String keyword : ATLAS_MEMBER_DEFAULT_EMAIL_KEYWORDS) {
+            if (lowerEmail.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Initializes default scope-role mapping if empty.
-     * If scopeRoleMapping is null or empty, creates a new HashMap with API scope mapped to the provided default role.
-     * Otherwise, returns the existing scopeRoleMapping unchanged.
-     *
-     * @param scopeRoleMapping the current scope-role mapping (may be null/empty)
-     * @param defaultRole the default role to use for API scope if mapping is empty
-     * @return the initialized or existing scopeRoleMapping
+     * Atlas-configured accounts or matching emails get ENDPOINT (Akto ATLAS) → defaultRole; others get API → defaultRole.
+     * Otherwise returns the existing scopeRoleMapping unchanged.
      */
-    public static Map<String, String> initializeScopeRoleMapping(Map<String, String> scopeRoleMapping, String defaultRole) {
+    public static Map<String, String> initializeScopeRoleMapping(
+            Map<String, String> scopeRoleMapping, String defaultRole, int accountId, String email) {
         if (scopeRoleMapping == null || scopeRoleMapping.isEmpty()) {
             Map<String, String> initialized = new HashMap<>();
-            initialized.put("API", defaultRole);
+            if (shouldUseAtlasMemberDefaultScope(accountId, email)) {
+                initialized.put(CONTEXT_SOURCE.ENDPOINT.name(), defaultRole);
+            } else {
+                initialized.put("API", defaultRole);
+            }
             return initialized;
         }
         return scopeRoleMapping;
