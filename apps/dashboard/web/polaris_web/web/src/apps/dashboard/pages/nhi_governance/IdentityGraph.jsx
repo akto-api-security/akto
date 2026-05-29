@@ -3,33 +3,7 @@ import { Box } from "@shopify/polaris";
 import ReactFlow from "react-flow-renderer";
 import { AgentNode, AgentEdge } from "../observe/api_collections/AgentDiscoverGraph";
 import { isAgenticSecurityCategory } from "../../../main/labelHelper";
-
-// ── Per-identity resource mappings ────────────────────────────────────────────
-export const IDENTITY_RESOURCES = {
-    "aws-cursor-key":      [{ label: "Bedrock",     type: "LLM",           category: "ai-model"  }, { label: "S3",          type: "AWS Resource",  category: "ai-tool"   }, { label: "EC2",         type: "AWS Resource",  category: "ai-tool"   }],
-    "hr-slack-token":      [{ label: "Slack",       type: "Messaging",     category: "ai-tool"   }, { label: "HR System",   type: "Internal DB",   category: "internal"  }],
-    "aws-env-sa":          [{ label: "S3",          type: "AWS Resource",  category: "ai-tool"   }, { label: "RDS",         type: "AWS Resource",  category: "ai-tool"   }],
-    "github-oauth-456":    [{ label: "GitHub",      type: "Repository",    category: "internal"  }],
-    "jira-token":          [{ label: "Jira",        type: "Issue Tracker", category: "ai-tool"   }, { label: "Confluence",  type: "Project",       category: "internal"  }],
-    "internal-api-token":  [{ label: "Backend",     type: "Internal API",  category: "internal"  }],
-    "airbnb-api-key":      [{ label: "Airbnb",      type: "External API",  category: "ai-tool"   }],
-    "vscode-oauth":        [{ label: "GitHub",      type: "Repository",    category: "internal"  }, { label: "Azure",       type: "Cloud",         category: "ai-tool"   }],
-    "docker-registry-key": [{ label: "Docker Hub",  type: "Registry",      category: "ai-tool"   }, { label: "ECR",         type: "AWS Resource",  category: "internal"  }],
-    "github-actions-key":  [{ label: "GitHub",      type: "CI/CD",         category: "internal"  }, { label: "S3",          type: "AWS Resource",  category: "ai-tool"   }],
-    "playwright-token":    [{ label: "Playwright",  type: "Browser API",   category: "ai-model"  }],
-    "filesystem-token":    [{ label: "Local FS",    type: "Filesystem",    category: "internal"  }],
-    "notion-token":        [{ label: "Notion",      type: "Workspace",     category: "ai-tool"   }],
-    "huggingface-token":   [{ label: "HuggingFace", type: "LLM",           category: "ai-model"  }],
-    "github-copilot-key":  [{ label: "Copilot",     type: "AI Coding",     category: "ai-model"  }, { label: "GitHub",      type: "Repository",    category: "internal"  }],
-    "anthropic-api-key":   [{ label: "Claude",      type: "LLM",           category: "ai-model"  }],
-};
-
-export function getDefaultResources(identityName) {
-    if (identityName.includes("aws"))    return [{ label: "S3",     type: "AWS Resource", category: "ai-tool"  }];
-    if (identityName.includes("github")) return [{ label: "GitHub", type: "Repository",  category: "internal" }];
-    if (identityName.includes("slack"))  return [{ label: "Slack",  type: "Messaging",   category: "ai-tool"  }];
-    return [{ label: "API", type: "External API", category: "ai-tool" }];
-}
+import { getAgentType } from "./nhiViolationsData";
 
 const NODE_TYPES = { agentNode: AgentNode };
 const EDGE_TYPES = { agentEdge: AgentEdge };
@@ -37,7 +11,14 @@ const EDGE_TYPES = { agentEdge: AgentEdge };
 export default function IdentityGraph({ row }) {
     const { nodes, edges, height } = useMemo(() => {
         const isArgus = isAgenticSecurityCategory();
-        const resources = IDENTITY_RESOURCES[row.identityName] || getDefaultResources(row.identityName);
+
+        const resources = (row.targetResource || []).map((tr) => ({
+            label: tr.resourceName,
+            type: tr.resourceType,
+            accessLevel: tr.accessLevel,
+            category: tr.resourceType === "Agentic" ? "ai-model" : "ai-tool",
+        }));
+
         const n = resources.length;
         const SPACING = 82;
         const totalH = (n - 1) * SPACING;
@@ -70,7 +51,7 @@ export default function IdentityGraph({ row }) {
             ]),
             makeNode("agent", agentX, centerY, {
                 label: row.agent,
-                type:  "AI Agent",
+                type:  getAgentType(row.agent),
                 category: "agent",
                 description: `Agent using ${row.identityName}`,
                 status: "active",
@@ -101,12 +82,13 @@ export default function IdentityGraph({ row }) {
                 { id: "e-o-a", source: "owner", target: "agent", type: "agentEdge", data: {} },
             ]),
             { id: "e-a-i", source: "agent",    target: "identity", type: "agentEdge", data: {} },
-            ...resources.map((_, i) => ({
+            ...resources.map((resource, i) => ({
                 id: `e-i-r${i}`,
                 source: "identity",
                 target: `res-${i}`,
                 type: "agentEdge",
-                data: { edgeParam: i === 0 ? row.access : undefined },
+                // Use accessLevel from resource if available (from API), otherwise use row.access (fallback)
+                data: { edgeParam: resource.accessLevel || row.access },
             })),
         ];
 

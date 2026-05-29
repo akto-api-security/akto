@@ -32,22 +32,34 @@ export default {
             data: { startTimestamp, endTimestamp }
         })
     },
-    async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators, searchString) {
+    async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators, searchString, mergeMcpServers = false, aiAgentName = null, mcpServerName = null) {
+        const data = { sortKey, sortOrder, skip, limit, filters, filterOperators, searchString, mergeMcpServers };
+        if (typeof aiAgentName === 'string' && aiAgentName.length > 0) data.aiAgentName = aiAgentName;
+        if (typeof mcpServerName === 'string' && mcpServerName.length > 0) data.mcpServerName = mcpServerName;
         const resp = await request({
             url: '/api/fetchAuditData',
             method: 'post',
-            data: { sortKey, sortOrder, skip, limit, filters, filterOperators, searchString }
+            data
         });
         return resp;
     },
-    async updateAuditData(hexId, remarks, approvalData = null) {
+    async updateAuditData(hexId, remarks, approvalData = null, hexIds = null, cascadeHostCollectionIds = null, mcpServerForAllAgents = null) {
         const data = { hexId };
+        if (Array.isArray(hexIds) && hexIds.length > 0) {
+            data.hexIds = hexIds;
+        }
+        if (Array.isArray(cascadeHostCollectionIds) && cascadeHostCollectionIds.length > 0) {
+            data.cascadeHostCollectionIds = cascadeHostCollectionIds;
+        }
+        if (typeof mcpServerForAllAgents === 'string' && mcpServerForAllAgents.length > 0) {
+            data.mcpServerForAllAgents = mcpServerForAllAgents;
+        }
         if (approvalData) {
             data.approvalData = approvalData;
         } else {
             data.remarks = remarks;
         }
-        
+
         const resp = await request({
             url: '/api/updateAuditData',
             method: 'post',
@@ -55,7 +67,28 @@ export default {
         });
         return resp;
     },
+    async addMcpAllowlistUrls(mcpServerUrls) {
+        const list = Array.isArray(mcpServerUrls) ? mcpServerUrls : [mcpServerUrls];
+        const urls = [...new Set(list.map((u) => String(u ?? '').trim()).filter(Boolean))];
+        if (!urls.length) return null;
+        return request({
+            url: '/api/addMcpAllowlistEntry',
+            method: 'post',
+            data: { mcpServerUrls: urls },
+        });
+    },
 
+    // Paginated AGENT_SKILL audit rows from mcp_audit_info — same response shape as
+    // fetchAuditData ({ auditData: [...], total: N }). One row per (skill, mcpHost)
+    // detection. The Skills tab uses this both for table rows and for the badge count.
+    async fetchSkillsData(skip = 0, limit = 50, sortKey = 'lastDetected', sortOrder = -1, filters = {}, searchString = '') {
+        const resp = await request({
+            url: '/api/fetchSkillsData',
+            method: 'post',
+            data: { skip, limit, sortKey, sortOrder, filters, searchString }
+        });
+        return resp || { auditData: [], total: 0 };
+    },
     async fetchMcpAuditInfoByCollection(apiCollectionId) {
         const id = typeof apiCollectionId === 'string' ? parseInt(apiCollectionId, 10) : apiCollectionId;
         const resp = await request({
@@ -896,6 +929,13 @@ export default {
             data: {envType, apiCollectionIds,resetEnvTypes}
         })
     },
+    async updateApiInfoTags(envType, apiInfoKeys, resetTags) {
+        return await request({
+            url: '/api/updateApiInfoTags',
+            method: 'post',
+            data: { envType, apiInfoKeys, resetTags }
+        })
+    },
     fetchEndpoint(apiInfoKey){
         return request({
             url: '/api/getSingleEndpoint',
@@ -1069,6 +1109,78 @@ export default {
             method: 'post',
             data: { hostnames }
         })
+    },
+
+    async fetchNhiIdentities() {
+        const resp = await request({
+            url: '/api/fetchNhiIdentities',
+            method: 'post',
+            data: {}
+        })
+        return resp?.identities || []
+    },
+
+    async fetchAllNhiViolations() {
+        const resp = await request({
+            url: '/api/fetchAllNhiViolations',
+            method: 'post',
+            data: {}
+        })
+        return resp?.violations || []
+    },
+
+    async fetchViolationCountsByIdentity() {
+        const resp = await request({
+            url: '/api/fetchViolationCountsByIdentity',
+            method: 'post',
+            data: {}
+        })
+        return resp?.violations || []
+    },
+
+    async disableNhiIdentity(identityId) {
+        const resp = await request({
+            url: '/api/disableNhiIdentity',
+            method: 'post',
+            data: { identityId }
+        })
+        return resp?.success || false
+    },
+
+    async markViolationAsFixed(violationId) {
+        const resp = await request({
+            url: '/api/markViolationAsFixed',
+            method: 'post',
+            data: { violationId }
+        })
+        return resp?.success || false
+    },
+
+    async createJiraTicketFromViolation(violationId, aktoDashboardHost, projId, issueType, jiraMetaData) {
+        const resp = await request({
+            url: '/api/createJiraTicketFromViolation',
+            method: 'post',
+            data: { violationId, aktoDashboardHost, projId, issueType, jiraMetaData }
+        })
+        return resp
+    },
+
+    async fetchNhiPolicies() {
+        const resp = await request({
+            url: '/api/fetchNhiPolicies',
+            method: 'post',
+            data: {}
+        })
+        return resp?.policies || []
+    },
+
+    async saveNhiPolicy(policy, policyId) {
+        const resp = await request({
+            url: '/api/saveNhiPolicy',
+            method: 'post',
+            data: { policy, policyId }
+        })
+        return resp
     }
 
 }

@@ -1,12 +1,12 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubServerTable from "../../../components/tables/GithubServerTable"
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import api from "../api"
 import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { ActionList, Badge, Box, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover, TextField, Text } from "@shopify/polaris";
+import { ActionList, Box, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover } from "@shopify/polaris";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import { useCollectionPageScope } from "../../../hooks/useCollectionPageScope";
 import CompulsoryDescriptionModal from "../components/CompulsoryDescriptionModal.jsx";
@@ -38,7 +38,7 @@ import testingApi from "../../testing/api.js"
 import { saveAs } from 'file-saver'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import IssuesGraphsGroup from "./IssuesGraphsGroup.jsx";
-import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper.js";
+import { getDashboardCategory, isAgenticSecurityCategory, mapLabel } from "../../../../main/labelHelper.js";
 import MarkdownReportGenerator from "../../../components/shared/MarkdownReportGenerator";
 import SeveritySelector from "../components/SeveritySelector";
 
@@ -623,6 +623,17 @@ function IssuesPage() {
             })
         }
 
+        async function createWizFindings() {
+            await api.createWizFindings(items).then((res) => {
+                setToast(true, false, `${items.length} Wiz finding${items.length === 1 ? "" : "s"} creation initiated.`)
+
+                resetResourcesSelected()
+            }).catch((err) => {
+                func.setToast(true, true, "Error initiating Wiz finding(s) creation")
+            })
+        }
+
+
         let issues = [
             {
                 content: 'Update severity',
@@ -678,7 +689,12 @@ function IssuesPage() {
                 content: 'Create DevRev ticket',
                 onAction: () => { createDevRevTicketBulk() },
                 disabled: (window.DEVREV_INTEGRATED === 'false')
-            }
+            },
+            {
+                content: 'Create Wiz finding(s)',
+                onAction: () => { createWizFindings() },
+                disabled: (window.WIZ_INTEGRATED === 'false')
+            },
         ];
 
         let reopen = [{

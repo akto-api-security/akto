@@ -10,7 +10,8 @@ const MODEL_TYPES = {
   OPENAI: "OPENAI",
   AZURE_OPENAI: "AZURE_OPENAI",
   OLLAMA: "OLLAMA",
-  DATABRICKS: "DATABRICKS"
+  DATABRICKS: "DATABRICKS",
+  GITHUB_COPILOT: "GITHUB_COPILOT"
 }
 
 const OPENAI_MODELS = [
@@ -46,6 +47,24 @@ const DATABRICKS_MODELS = [
   { label: "Databricks Qwen3 Next 80B A3B Instruct", value: "databricks-qwen3-next-80b-a3b-instruct" },
 ]
 
+// GitHub Copilot Models - Famous models available through Copilot
+const GITHUB_COPILOT_MODELS = [
+  { label: "Claude Sonnet 4.5", value: "claude-sonnet-4.5" },
+  { label: "Claude Sonnet 4.6", value: "claude-sonnet-4.6" },
+  { label: "Claude Haiku 4.5", value: "claude-haiku-4.5" },
+  { label: "GPT-4.1", value: "gpt-4.1" },
+  { label: "GPT-4o", value: "gpt-4o" },
+  { label: "GPT-4o mini", value: "gpt-4o-mini" },
+  { label: "GPT-5 mini", value: "gpt-5-mini" },
+  { label: "GPT-5.2", value: "gpt-5-2" },
+  { label: "GPT-5.4", value: "gpt-5-4" },
+  { label: "Gemini 2.5 Pro", value: "gemini-2-5-pro" },
+  { label: "Gemini 3.1 Pro (Preview)", value: "gemini-3-1-pro-preview" },
+  { label: "Gemini 3 Flash (Preview)", value: "gemini-3-flash-preview" },
+  { label: "Grok Code Fast 1", value: "grok-code-fast-1" },
+  { label: "Raptor mini (Preview)", value: "raptor-mini-preview" },
+]
+
 function getModelSections(type, data, setData, isEdit=false) {
   let sections = []
 
@@ -54,16 +73,25 @@ function getModelSections(type, data, setData, isEdit=false) {
     type: "text",
     id: "name",
     placeholder: "Model name",
-  }, {
+  })
+
+  sections.push({
     title: type === MODEL_TYPES.OLLAMA ? "API Key (Optional)" : "API Key",
     type: "text",
     id: "apiKey",
     placeholder: type === MODEL_TYPES.OLLAMA ? "API Key for the model (optional)" : "API Key for the model",
-  },{
-    title: "Model",
-    type: "dropdown",
-    id: "model"
   })
+
+  const shouldShowModelDropdown = true
+  
+  if (shouldShowModelDropdown) {
+    sections.push({
+      title: "Model",
+      type: "dropdown",
+      id: "model",
+      loading: false
+    })
+  }
   switch (type) {
     case MODEL_TYPES.ANTHROPIC:
     case MODEL_TYPES.OPENAI:
@@ -111,6 +139,31 @@ function getModelSections(type, data, setData, isEdit=false) {
           }}
         />
       )
+    } else if (section.type === "text_with_button") {
+      section.component = (
+        <VerticalStack gap="2">
+          <TextField
+            label={section?.title}
+            placeholder={section?.placeholder}
+            value={data[section?.id]}
+            onChange={(value) => {
+              setData({
+                ...data,
+                [section?.id]: value
+              })
+            }}
+            connectedRight={
+              <Button
+                onClick={() => section.buttonAction()}
+                loading={section.buttonLoading}
+                disabled={section.buttonDisabled}
+              >
+                {section.buttonText}
+              </Button>
+            }
+          />
+        </VerticalStack>
+      )
     } else if (section.type === "dropdown") {
       let items = []
       if (type === MODEL_TYPES.OPENAI || type === MODEL_TYPES.AZURE_OPENAI) {
@@ -121,17 +174,20 @@ function getModelSections(type, data, setData, isEdit=false) {
         items = OLLAMA_MODELS
       } else if (type === MODEL_TYPES.DATABRICKS) {
         items = DATABRICKS_MODELS
+      } else if (type === MODEL_TYPES.GITHUB_COPILOT) {
+        items = GITHUB_COPILOT_MODELS
       }
       section.component = (
         <VerticalStack gap="1">
           <Text>
-            {section?.title}
+            {section?.title} {section?.loading && "(Loading...)"}
           </Text>
           <Dropdown
           id={section?.id}
           key={`${section?.id}-${type}`}
           menuItems={items}
           initial={data[section?.id]}
+          disabled={section?.loading}
           selected={(value) => {
             setData((x) => {
               return {
@@ -174,6 +230,7 @@ function AgentConfig() {
     func.setToast(true, false, "Successfully deleted model")
     await fetchModels()
   }
+
 
   function renderItem(item) {
     const { name, type } = item;
@@ -259,6 +316,10 @@ function AgentConfig() {
             {
               label: 'Databricks',
               value: MODEL_TYPES.DATABRICKS
+            },
+            {
+              label: 'GitHub Copilot',
+              value: MODEL_TYPES.GITHUB_COPILOT
             }
             ]}
             initial={modelType}

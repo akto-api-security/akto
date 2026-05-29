@@ -28,6 +28,7 @@ import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
 import GithubAppIntegration from "../dashboard/pages/settings/integrations/GithubAppIntegration";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import ModuleInfoPage from "../dashboard/pages/settings/module_info/ModuleInfoPage";
+import JobInfoPage from "../dashboard/pages/settings/job_info/JobInfoPage";
 import About from "../dashboard/pages/settings/about/About";
 import ThreatConfiguration from "../dashboard/pages/settings/threat_configuration/ThreatConfiguration";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
@@ -84,6 +85,7 @@ import {PollingProvider} from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
 import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
 import ProxyPatterns from "../dashboard/pages/settings/proxy_patterns/ProxyPatterns";
+import FileInspection from "../dashboard/pages/settings/file_inspection/FileInspection";
 import GoogleSamlSso from "../dashboard/pages/settings/integrations/sso/GoogleSamlSso";
 import SignUpWithSSO from "../signup/components/SignUpWithSSO";
 
@@ -106,6 +108,7 @@ import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
 import AzureDataExplorer from "../dashboard/pages/settings/integrations/AzureDataExplorer";
 import ServiceNow from "../dashboard/pages/settings/integrations/ServiceNow";
 import DevRev from "../dashboard/pages/settings/integrations/DevRev";
+import Wiz from "@/apps/dashboard/pages/settings/integrations/Wiz.jsx";
 import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
@@ -131,6 +134,8 @@ import IdentitiesPage from "../dashboard/pages/nhi_governance/IdentitiesPage.jsx
 import ViolationsPage from "../dashboard/pages/nhi_governance/ViolationsPage.jsx";
 import PoliciesPage from "../dashboard/pages/nhi_governance/PoliciesPage.jsx";
 import AllowedHostsForPac from "../dashboard/pages/settings/allowed_hosts/AllowedHostsForPac.jsx";
+import EndpointShieldSettings from "../dashboard/pages/settings/endpoint_shield/EndpointShieldSettings.jsx";
+import NewRelic from "../dashboard/pages/settings/integrations/NewRelic.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -483,6 +488,10 @@ const router = createBrowserRouter([
                         element: <DevRev/>,
                     },
                     {
+                        path: "integrations/wiz",
+                        element: <Wiz/>,
+                    },
+                    {
                         path: "integrations/akto_apis",
                         element: <ApiTokens/>,
                     },
@@ -555,12 +564,20 @@ const router = createBrowserRouter([
                         element: <GmailWebhookCore/>,
                     },
                     {
+                        path: "integrations/new_relic",
+                        element: <NewRelic/>,
+                    },
+                    {
                         path: "logs",
                         element: <HealthLogs/>,
                     },
                     {
                         path: "module-info",
                         element: <ModuleInfoPage/>,
+                    },
+                    {
+                        path: "job-info",
+                        element: <JobInfoPage/>,
                     },
                     {
                         path: "auth-types",
@@ -581,6 +598,14 @@ const router = createBrowserRouter([
                     {
                         path: 'allowed-hosts',
                         element: <AllowedHostsForPac/>
+                    },
+                    {
+                        path: 'endpoint-shield',
+                        element: <EndpointShieldSettings/>
+                    },
+                    {
+                        path: 'file-inspection',
+                        element: <FileInspection/>
                     },
                     {
                         path: "auth-types/details",

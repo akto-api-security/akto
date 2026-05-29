@@ -27,6 +27,7 @@ import ApiGroups from '../../../components/shared/ApiGroups'
 import ForbiddenRole from '../../../components/shared/ForbiddenRole'
 import LegendLabel from './LegendLabel.jsx'
 import TestRunResultChat from './TestRunResultChat.jsx'
+import AiExecutionJourney from './components/AiExecutionJourney'
 import AskAktoSection from './AskAktoSection.jsx'
 import PersistStore from '../../../../main/PersistStore'
 
@@ -38,7 +39,7 @@ function isSkippedTestError(errorText) {
 }
 
 function TestRunResultFlyout(props) {
-    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls } = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, wizFindingUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls, runAutomatedTests } = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -137,7 +138,7 @@ function TestRunResultFlyout(props) {
                 })
             })
 
-            setRowItems(transform.getRowInfo(issueDetails.severity, apiInfoData, issueDetails.jiraIssueUrl, sensitiveParam, issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId, issueDetails.devrevWorkUrl))
+            setRowItems(transform.getRowInfo(issueDetails.severity, apiInfoData, issueDetails.jiraIssueUrl, sensitiveParam, issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId, issueDetails.devrevWorkUrl, issueDetails.wizFindingUrl))
         }
     }, [issueDetails])
 
@@ -405,6 +406,15 @@ function TestRunResultFlyout(props) {
         }
     }
 
+    const handleWizFindingCreation = async () => {
+        const items = [issueDetails?.id]
+        await issuesApi.createWizFindings(items).then((res) => {
+            func.setToast(true, false, "Wiz finding creation initiated.")
+        }).catch((err) => {
+            func.setToast(true, true, "Error creating wiz finding")
+        })
+    }
+
     const issues = [{
         content: 'False positive',
         onAction: () => { ignoreAction("False positive") }
@@ -663,6 +673,13 @@ function TestRunResultFlyout(props) {
                                 issueId={issueDetails.id}
                                 isDevRevModal={true}
                             />
+                           
+                            { window?.WIZ_INTEGRATED === 'true' ? 
+                                <Button id={"create-wiz-finding-button"} primary onClick={handleWizFindingCreation} disabled={ wizFindingUrl?.length > 0 }>
+                                    Create Wiz Finding
+                                </Button> 
+                                : <></>
+                            }
                         </HorizontalStack>
                     }
                 </HorizontalStack>
@@ -686,8 +703,7 @@ function TestRunResultFlyout(props) {
     const [vulnerabilityHighlights, setVulnerabilityHighlights] = useState({});
 
     // Component that handles vulnerability analysis only when mounted
-    const ValuesTabContent = React.memo(({ isAgentic = false } = {}) => {
-
+    const ValuesTabContent = React.memo(({ isAgentic = false, runAutomatedTests = false } = {}) => {
         useEffect(() => {
             // Check if vulnerability highlighting is enabled (use existing GPT feature flag)
             //const isVulnerabilityHighlightingEnabled = window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && 
@@ -797,6 +813,7 @@ function TestRunResultFlyout(props) {
         return (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
                 <VerticalStack gap="3">
+                    <AiExecutionJourney runAutomatedTests={runAutomatedTests} />
                     <Box padding="3" background="bg-surface-secondary" borderRadius="2">
                         <LegendLabel />
                     </Box>
@@ -808,9 +825,10 @@ function TestRunResultFlyout(props) {
                             vertical={true}
                             sampleData={
                                 selectedTestRunResult?.testResults.map((result, idx) => {
+                                    const validationReason = result.validationReason || "";
                                     if (result.errors && result.errors.length > 0) {
                                         let errorList = result.errors.join(", ");
-                                        return { errorList: errorList }
+                                        return { errorList: errorList, validationReason }
                                     }
                                     // Add vulnerability highlights only for response
                                     let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
@@ -818,16 +836,18 @@ function TestRunResultFlyout(props) {
                                         if(isAgentic){
                                             return {
                                                 originalMessage: result.message,
-                                                message: result.message
+                                                message: result.message,
+                                                validationReason,
                                             }
                                         }
                                         return {
                                             originalMessage: result.originalMessage,
                                             message: result.message,
-                                            vulnerabilitySegments
+                                            vulnerabilitySegments,
+                                            validationReason,
                                         }
                                     }
-                                    return { errorList: "No data found" }
+                                    return { errorList: "No data found", validationReason }
                                 })}
                             isNewDiff={true}
                             vulnerable={selectedTestRunResult?.vulnerable}
@@ -868,9 +888,10 @@ function TestRunResultFlyout(props) {
                 onSendMessage={handleSendMessage}
                 isStreaming={false}
                 testResults={selectedTestRunResult?.testResults || []}
+                runAutomatedTests={runAutomatedTests}
             />
         }
-    }, [selectedTestRunResult, conversations])
+    }, [selectedTestRunResult, conversations, runAutomatedTests])
 
     const attemptTabForConversations = useMemo(() => {
         if (!hasConversations) return null;
@@ -879,7 +900,7 @@ function TestRunResultFlyout(props) {
         return {
             id: 'attempt',
             content: "Attempt",
-            component: <ValuesTabContent isAgentic />
+            component: <ValuesTabContent isAgentic runAutomatedTests={runAutomatedTests} />
         };
     }, [hasConversations, selectedTestRunResult])
 
@@ -888,9 +909,9 @@ function TestRunResultFlyout(props) {
         return {
             id: 'values',
             content: "Evidence",
-            component: <ValuesTabContent />
+            component: <ValuesTabContent runAutomatedTests={runAutomatedTests} />
         }
-    }, [selectedTestRunResult, dataExpired, issueDetails, refreshFlag])
+    }, [selectedTestRunResult, dataExpired, issueDetails, refreshFlag, runAutomatedTests])
 
     const resultTabs = hasConversations
         ? [conversationTab, attemptTabForConversations].filter(Boolean)

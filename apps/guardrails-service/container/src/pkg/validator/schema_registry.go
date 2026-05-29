@@ -321,6 +321,7 @@ func (sf *SchemaFetcher) FetchAndUpdate() error {
 
 	body, err := sf.dbClient.FetchGuardrailEndpoints()
 	if err != nil {
+		sf.logger.Error("SchemaFetcher: failed to fetch guardrail endpoints", zap.Error(err))
 		return fmt.Errorf("failed to fetch guardrail endpoints: %w", err)
 	}
 

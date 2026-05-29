@@ -248,6 +248,7 @@ message DailyActorsCountResponse {
   uint32 total_active = 5;
   uint32 total_ignored = 6;
   uint32 total_under_review = 7;
+  uint32 active_actors_count = 8;
 }
 
 message ThreatActivityTimelineRequest {
@@ -439,6 +440,33 @@ message FetchTopNDataResponse {
 
   repeated TopApiData top_apis = 1;
   repeated TopHostData top_hosts = 2;
+}
+
+message FetchDashboardTopDataRequest {
+  uint32 start_ts = 1;
+  uint32 end_ts = 2;
+  uint32 limit = 3;
+}
+
+message FetchDashboardTopDataResponse {
+  message TopActorData {
+    string actor = 1;
+    uint32 attack_count = 2;
+    string country = 3;
+    string latest_attack = 4;
+  }
+
+  message TopApiData {
+    string endpoint = 1;
+    string method = 2;
+    string host = 3;
+    uint32 requests_count = 4;
+    uint32 actors_count = 5;
+  }
+
+  repeated TopActorData top_actors = 1;
+  repeated TopApiData top_apis = 2;
+  uint32 recent_malicious_count = 3;
 }
 
 message FetchThreatsForActorRequest {

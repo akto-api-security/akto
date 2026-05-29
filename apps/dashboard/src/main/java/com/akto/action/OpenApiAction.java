@@ -254,7 +254,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
                 try {
                     ParseOptions options = new ParseOptions();
                     options.setResolve(true);
-                    options.setResolveFully(true);
+                    options.setResolveFully(false);
                     SwaggerParseResult result = new OpenAPIParser().readContents(openAPIString, null, options);
                     OpenAPI openAPI = result.getOpenAPI();
                     if(openAPI.getInfo()!=null && openAPI.getInfo().getTitle()!=null){

@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Badge, Modal, TextField, FormLayout } from "@shopify/polaris";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { IndexFiltersMode, Badge, HorizontalStack, Text, Modal, TextField, FormLayout } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -22,6 +22,7 @@ import {
     groupCollectionsByUser,
     groupCollectionsByDevice,
     buildAgenticInventoryFilterForRow,
+    fetchAndCacheSkillApiData,
 } from "./constants";
 
 const definedTableTabs = ["Users", "Devices"];
@@ -35,6 +36,7 @@ function UsersAndDevices() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState({ users: [], devices: [] });
+    const [userEnrichVersion, setUserEnrichVersion] = useState(0);
     const [summaryData, setSummaryData] = useState({ profileCount: 0, collectionCount: 0 });
     const [editTagModal, setEditTagModal] = useState({ active: false, usernames: [], team: '', userRole: '', saving: false });
 
@@ -48,6 +50,9 @@ function UsersAndDevices() {
     const filtersMap = PersistStore((state) => state.filtersMap);
     const setFiltersMap = PersistStore((state) => state.setFiltersMap);
 
+    const dataRef = useRef(data);
+    useEffect(() => { dataRef.current = data; }, [data]);
+
     const tableCountObj = func.getTabsCount(definedTableTabs, data);
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo);
 
@@ -55,17 +60,17 @@ function UsersAndDevices() {
         setSelected(selectedIndex);
     };
 
-    const headers = useMemo(
-        () =>
-            getHeaders({
-                primaryColumnTitle: selectedTab === "users" ? "User" : "Device",
-                primaryColumnText: selectedTab === "users" ? "User" : "Device",
-                includeIconColumn: false,
-                includeUserColumns: selectedTab === "users",
-                ...usersAndDevicesCountColumnOpts,
-            }),
-        [selectedTab],
-    );
+    const headers = useMemo(() => {
+        const h = getHeaders({
+            primaryColumnTitle: selectedTab === "users" ? "User" : "Device",
+            primaryColumnText: selectedTab === "users" ? "User" : "Device",
+            includeIconColumn: false,
+            includeUserColumns: selectedTab === "users",
+            ...usersAndDevicesCountColumnOpts,
+        });
+        h[0] = { ...h[0], value: "groupNameDisplay" };
+        return h;
+    }, [selectedTab]);
 
     const sortOptionsNoIcon = useMemo(
         () => getSortOptionsWithoutIconColumn(usersAndDevicesCountColumnOpts),
@@ -84,6 +89,7 @@ function UsersAndDevices() {
         (groups) => {
             return groups.map((group) => ({
                 ...group,
+                groupNameDisplay: group.groupName,
                 sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes || [], false),
                 riskScoreComp:
                     group.riskScore !== null ? (
@@ -97,6 +103,40 @@ function UsersAndDevices() {
         },
         [getRiskScoreStatus],
     );
+
+    const applyMaliciousBadgeToUsers = useCallback((maliciousSkillsSet, isMountedRef) => {
+        if (!isMountedRef.current) return;
+        setData((prev) => ({
+            ...prev,
+            users: prev.users.map((row) => {
+                const skillNames = row.uniqueSkillNames || new Set();
+                const hasMalicious = [...skillNames].some((s) => maliciousSkillsSet.has(s));
+                const groupNameDisplay = hasMalicious ? (
+                    <HorizontalStack gap="2" align="start" wrap={false}>
+                        <Text>{row.groupName}</Text>
+                        <Badge size="small" status="critical">Malicious Skills</Badge>
+                    </HorizontalStack>
+                ) : row.groupName;
+                return { ...row, hasMaliciousSkill: hasMalicious, groupNameDisplay };
+            }),
+        }));
+        setUserEnrichVersion((v) => v + 1);
+    }, []);
+
+    const enrichUsersWithMaliciousSkills = useCallback(async (userRows, isMountedRef = { current: true }) => {
+        const allCollectionIds = [];
+        userRows.forEach((row) => {
+            (row.collections || []).forEach((c) => {
+                if (!allCollectionIds.includes(c.id)) allCollectionIds.push(c.id);
+            });
+        });
+        if (!allCollectionIds.length) return;
+
+        const { maliciousSkills } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
+
+        if (!isMountedRef.current) return;
+        applyMaliciousBadgeToUsers(maliciousSkills, isMountedRef);
+    }, [applyMaliciousBadgeToUsers]);
 
     async function fetchData(isMountedRef = { current: true }) {
         try {
@@ -131,6 +171,8 @@ function UsersAndDevices() {
                 devices: deviceGroups,
             });
             setLoading(false);
+
+            enrichUsersWithMaliciousSkills(userGroups, isMountedRef);
         } catch {
             setLoading(false);
         }
@@ -150,7 +192,7 @@ function UsersAndDevices() {
         const rows = selectedTab === "users" ? data.users : data.devices;
         setSummaryData({
             profileCount: selectedTab === "users" ? userLen : deviceLen,
-            collectionCount: rows.reduce((sum, row) => sum + (row.hostNames?.length || 0), 0),
+            collectionCount: rows.reduce((sum, row) => sum + (row.endpointsCount ?? row.hostNames?.length ?? 0), 0),
         });
     }, [selectedTab, data.users, data.devices]);
 
@@ -207,6 +249,9 @@ function UsersAndDevices() {
             } else {
                 delete updatedFiltersMap[INVENTORY_FILTER_KEY];
             }
+            // The agent-tree subview keeps its own filter slot; clear it so the
+            // previous user's hostnames don't leak into this user's view.
+            delete updatedFiltersMap[`${INVENTORY_FILTER_KEY}agent-tree/`];
 
             setFiltersMap(updatedFiltersMap);
 
@@ -254,9 +299,10 @@ function UsersAndDevices() {
 
     const tableComponent = useMemo(() => {
         const commonTabProps = { tableTabs, onSelect: handleSelectedTab, selected };
+        const tableKey = selectedTab === "users" ? `table-users-${userEnrichVersion}` : "table";
         return (
             <GithubSimpleTable
-                key="table"
+                key={tableKey}
                 pageLimit={PAGE_LIMIT}
                 data={data[selectedTab]}
                 sortOptions={sortOptionsNoIcon}
@@ -264,7 +310,7 @@ function UsersAndDevices() {
                 filters={[]}
                 headers={headers}
                 selectable={selectedTab === 'users'}
-                mode={IndexFiltersMode.Default}
+                mode={IndexFiltersMode.Filtering}
                 headings={headers}
                 useNewRow={true}
                 condensedHeight={true}
@@ -275,7 +321,7 @@ function UsersAndDevices() {
                 {...commonTabProps}
             />
         );
-    }, [data, selectedTab, headers, disambiguateLabel, handleRowClick, promotedBulkActions, tableTabs, selected, resourceName]);
+    }, [data, selectedTab, userEnrichVersion, headers, disambiguateLabel, handleRowClick, promotedBulkActions, tableTabs, selected, resourceName]);
 
     const pageTitle = useMemo(
         () => (

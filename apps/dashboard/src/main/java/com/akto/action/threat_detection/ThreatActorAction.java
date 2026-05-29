@@ -91,7 +91,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     this.httpClient = HttpClients.createDefault();
   }
 
-  public String getActorsCountPerCounty() {
+  public String fetchActorsCountPerCounty() {
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_actors_count_per_country", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
@@ -285,6 +285,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchAggregateMaliciousRequests() {
+    long t0 = System.currentTimeMillis();
+    loggerMaker.infoAndAddToDb("fetchAggregateMaliciousRequests START ts=" + t0 + " refId=" + refId + " eventType=" + eventType, LogDb.DASHBOARD);
+
     HttpPost post =
         new HttpPost(String.format("%s/api/dashboard/fetchAggregateMaliciousRequests", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
@@ -304,8 +307,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
     post.setEntity(requestEntity);
 
+    loggerMaker.infoAndAddToDb("fetchAggregateMaliciousRequests BEFORE_HTTP_EXECUTE elapsed=" + (System.currentTimeMillis() - t0) + "ms", LogDb.DASHBOARD);
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      loggerMaker.infoAndAddToDb("fetchAggregateMaliciousRequests AFTER_HTTP_EXECUTE elapsed=" + (System.currentTimeMillis() - t0) + "ms", LogDb.DASHBOARD);
       String responseBody = EntityUtils.toString(resp.getEntity());
+      loggerMaker.infoAndAddToDb("fetchAggregateMaliciousRequests AFTER_RESPONSE_READ elapsed=" + (System.currentTimeMillis() - t0) + "ms", LogDb.DASHBOARD);
 
       ProtoMessageUtils.<FetchMaliciousEventsResponse>toProtoMessage(
         FetchMaliciousEventsResponse.class, responseBody)
@@ -326,6 +332,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
       return ERROR.toUpperCase();
     }
 
+    loggerMaker.infoAndAddToDb("fetchAggregateMaliciousRequests END totalElapsed=" + (System.currentTimeMillis() - t0) + "ms", LogDb.DASHBOARD);
     return SUCCESS.toUpperCase();
   }
 
@@ -353,7 +360,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     }
   }
 
-    public static Wafv2Client getAwsWafClient(String accessKey, String secretKey, String region) {
+    public static Wafv2Client fetchAwsWafClient(String accessKey, String secretKey, String region) {
       return Wafv2Client.builder()
           .region(Region.of(region))
           .credentialsProvider(StaticCredentialsProvider.create(
@@ -362,7 +369,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
           .build();
     }
 
-    public static GetIpSetResponse getIpSet(Wafv2Client wafv2Client, String ruleSetName, String ruleSetId) {
+    public static GetIpSetResponse fetchIpSet(Wafv2Client wafv2Client, String ruleSetName, String ruleSetId) {
         GetIpSetRequest getRequest = GetIpSetRequest.builder()
                     .name(ruleSetName)
                     .scope(SCOPE)
@@ -379,7 +386,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         return getResponse;
     }
 
-    private static Config.CloudflareWafConfig getCloudflareConfig() {
+    private static Config.CloudflareWafConfig fetchCloudflareConfig() {
         int accId = Context.accountId.get();
         Bson filters = Filters.and(
             Filters.eq(Constants.ID, accId + "_" + Config.ConfigType.CLOUDFLARE_WAF),
@@ -394,7 +401,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     }
 
     public String modifyThreatActorStatusCloudflare() {
-        Config.CloudflareWafConfig cloudflareWafConfig = getCloudflareConfig();
+        Config.CloudflareWafConfig cloudflareWafConfig = fetchCloudflareConfig();
 
         if (!hasValidListConfig(cloudflareWafConfig)) {
             addActionError("Cloudflare WAF integration not configured properly.");
@@ -423,7 +430,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             return ERROR.toUpperCase();
         }
 
-        Config.CloudflareWafConfig cloudflareWafConfig = getCloudflareConfig();
+        Config.CloudflareWafConfig cloudflareWafConfig = fetchCloudflareConfig();
 
         if (!hasValidListConfig(cloudflareWafConfig)) {
             addActionError("Cloudflare WAF integration not configured properly.");
@@ -469,7 +476,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         }
 
         try {
-            wafClient = getAwsWafClient(awsWafConfig.getAwsAccessKey(), awsWafConfig.getAwsSecretKey(), awsWafConfig.getRegion());
+            wafClient = fetchAwsWafClient(awsWafConfig.getAwsAccessKey(), awsWafConfig.getAwsSecretKey(), awsWafConfig.getRegion());
             //ListWebAcLsResponse webAclsResponse = wafClient.listWebACLs(ListWebAcLsRequest.builder().scope(SCOPE).build());
             loggerMaker.debugAndAddToDb("init aws client, for threat actor block");
         } catch (Exception e) {

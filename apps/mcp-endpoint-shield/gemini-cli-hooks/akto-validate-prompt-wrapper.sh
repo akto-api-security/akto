@@ -9,4 +9,4 @@ export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="gemini_cli"
 
 # Execute Python hook script
-exec python3 "$HOME/.gemini/hooks/akto-validate-response.py" "$@"
+exec python3 "$HOME/.gemini/hooks/akto-validate-prompt.py" "$@"

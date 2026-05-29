@@ -2,6 +2,9 @@ package com.akto.dto.testing;
 
 import com.akto.dto.testing.info.TestInfo;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -26,11 +29,14 @@ public class TestResult extends GenericTestResult {
 
     private boolean requiresConfig;
 
-
     private String conversationId;
     private boolean resultTypeAgentic;
     private int externalApiTokens;
 
+
+    @Getter
+    @Setter
+    private String validationReason = "";
     /*
      * This field is being used as severity.
      * Thus keeping this in sync with "enum severity".

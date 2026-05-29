@@ -36,17 +36,14 @@ import os
 from akto_guardrails_core import (
     AKTO_SYNC_MODE,
     DEFAULT_CLIENT_IP,
-    apply_warn_resubmit_flow,
     call_guardrails_mcp_async,
     call_guardrails_prompt_async,
     call_guardrails_response_async,
-    extract_mcp_server_name,
     get_last_user_prompt,
     ingest_blocked_mcp_async,
     ingest_blocked_prompt_async,
     ingest_blocked_response_async,
-    _is_warn_behaviour,
-    prompt_fingerprint,
+    resolve_guardrail_decision,
     send_mcp_response_ingestion_async,
     send_stop_ingestion_async,
 )
@@ -73,7 +70,8 @@ def create_hooks(client_ip: str = ""):
         """
         UserPromptSubmit hook — validates the user prompt against Akto guardrails.
 
-        SYNC_MODE=true  : Blocks the prompt if guardrails deny it.
+        SYNC_MODE=true  : Denies the prompt on a hard guardrail block; 'warn'/'alert'
+                          behaviours are allowed through (recorded server-side).
         SYNC_MODE=false : Allows all prompts through.
         Fail-open: any error allows the prompt through.
         """
@@ -88,18 +86,10 @@ def create_hooks(client_ip: str = ""):
             return {}
 
         gr_allowed, gr_reason, behaviour = await call_guardrails_prompt_async(prompt, _ip)
-        fingerprint = prompt_fingerprint(prompt)
-        allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint)
+        allowed, _ = resolve_guardrail_decision(gr_allowed, gr_reason, behaviour)
 
         if not allowed:
-            if _is_warn_behaviour(behaviour):
-                block_reason = (
-                    "Warning: prompt blocked, please review it. Send again to bypass. "
-                    f"Reason: {gr_reason}"
-                )
-            else:
-                block_reason = f"Blocked by Akto Guardrails: {gr_reason}"
-
+            block_reason = f"Blocked by Akto Guardrails: {gr_reason}"
             logger.warning(f"BLOCKING prompt — reason: {gr_reason}")
             asyncio.create_task(ingest_blocked_prompt_async(prompt, gr_reason, _ip))
             return {"continue_": False, "systemMessage": block_reason}
@@ -111,10 +101,14 @@ def create_hooks(client_ip: str = ""):
         Stop hook — validates the agent response against Akto guardrails and ingests
         the completed conversation turn.
 
-        SYNC_MODE=true  : Blocks the response if guardrails deny it, re-entering the
-                          agent loop with a system message so it can regenerate safely.
-        SYNC_MODE=false : Allows all responses through; ingests with guardrails=true
-                          for observational tracking.
+        Response guardrails are DETECT-ONLY in the Agent SDK: the response has already
+        been produced and shown by the time the Stop hook fires, and the SDK cannot
+        retract it (returning continue_ does not regenerate or hide the response). So a
+        hard block is recorded as a 403 for alerting/dashboard, but not actually prevented.
+
+        SYNC_MODE=true  : Validates the response; a hard block is ingested as a 403,
+                          while allowed / 'warn' / 'alert' responses ingest normally.
+        SYNC_MODE=false : Allows all responses through; ingests for observational tracking.
         Fail-open: any error allows the response through.
         """
         transcript_path = input_data.get("transcript_path")
@@ -133,18 +127,20 @@ def create_hooks(client_ip: str = ""):
             asyncio.create_task(send_stop_ingestion_async(user_prompt, response_text, _ip))
             return {}
 
-        gr_allowed, gr_reason, _ = await call_guardrails_response_async(
+        gr_allowed, gr_reason, behaviour = await call_guardrails_response_async(
             user_prompt, response_text, _ip
         )
+        allowed, _ = resolve_guardrail_decision(gr_allowed, gr_reason, behaviour)
 
-        if not gr_allowed:
-            block_reason = f"Response blocked by Akto Guardrails: {gr_reason}"
-
-            logger.warning(f"BLOCKING response — reason: {gr_reason}")
+        if not allowed:
+            # Detect-only: the response has already been produced and shown by the time the
+            # Stop hook fires, and the Agent SDK cannot retract it. Record the violation as a
+            # 403 for alerting/dashboard, but do not pretend to block.
+            logger.warning(f"Response FLAGGED by Akto Guardrails (detect-only) — reason: {gr_reason}")
             asyncio.create_task(
                 ingest_blocked_response_async(user_prompt, response_text, gr_reason, _ip)
             )
-            return {"continue_": True, "systemMessage": block_reason}
+            return {}
 
         asyncio.create_task(send_stop_ingestion_async(user_prompt, response_text, _ip))
         return {}
@@ -153,32 +149,35 @@ def create_hooks(client_ip: str = ""):
         """
         PreToolUse hook — validates MCP / built-in tool calls against Akto guardrails.
 
-        SYNC_MODE=true  : Blocks the tool call if guardrails deny it.
+        SYNC_MODE=true  : Denies the tool call on a hard guardrail block; 'warn'/'alert'
+                          behaviours are allowed through (recorded server-side).
         SYNC_MODE=false : Allows all tool calls through.
         Fail-open: any error allows the tool call through.
         """
         tool_name = str(input_data.get("tool_name") or "")
         tool_input = input_data.get("tool_input") or {}
-        mcp_server_name = extract_mcp_server_name(tool_name)
 
-        logger.info(f"PreToolUse hook: tool={tool_name} server={mcp_server_name}")
+        logger.info(f"PreToolUse hook: tool={tool_name}")
 
         if not AKTO_SYNC_MODE:
             return {}
 
-        allowed, reason = await call_guardrails_mcp_async(tool_name, tool_input, mcp_server_name, _ip)
+        gr_allowed, gr_reason, behaviour = await call_guardrails_mcp_async(
+            tool_name, tool_input, _ip
+        )
+        allowed, _ = resolve_guardrail_decision(gr_allowed, gr_reason, behaviour)
 
         if not allowed:
-            block_reason = reason or "Policy violation"
-            logger.warning(f"BLOCKING tool call — tool={tool_name} reason={block_reason}")
+            deny_reason = f"Blocked by Akto Guardrails: {gr_reason or 'Policy violation'}"
+            logger.warning(f"BLOCKING tool call — tool={tool_name} reason={gr_reason}")
             asyncio.create_task(
-                ingest_blocked_mcp_async(tool_name, tool_input, mcp_server_name, block_reason, _ip)
+                ingest_blocked_mcp_async(tool_name, tool_input, gr_reason, _ip)
             )
             return {
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
                     "permissionDecision": "deny",
-                    "permissionDecisionReason": f"Blocked by Akto Guardrails: {block_reason}",
+                    "permissionDecisionReason": deny_reason,
                 }
             }
 
@@ -193,12 +192,11 @@ def create_hooks(client_ip: str = ""):
         tool_name = str(input_data.get("tool_name") or "")
         tool_input = input_data.get("tool_input") or {}
         tool_response = input_data.get("tool_response") or {}
-        mcp_server_name = extract_mcp_server_name(tool_name)
 
-        logger.info(f"PostToolUse hook: tool={tool_name} server={mcp_server_name}")
+        logger.info(f"PostToolUse hook: tool={tool_name}")
 
         asyncio.create_task(
-            send_mcp_response_ingestion_async(tool_name, tool_input, tool_response, mcp_server_name, _ip)
+            send_mcp_response_ingestion_async(tool_name, tool_input, tool_response, _ip)
         )
 
         return {}

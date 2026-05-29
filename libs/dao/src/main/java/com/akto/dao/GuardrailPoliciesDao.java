@@ -51,6 +51,9 @@ public class GuardrailPoliciesDao extends AccountsContextDao<GuardrailPolicies> 
 
         fieldNames = new String[]{"contextSource", "updatedTimestamp"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{"name", "contextSource"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
     public List<GuardrailPolicies> findAllSortedByCreatedTimestamp(int skip, int limit) {

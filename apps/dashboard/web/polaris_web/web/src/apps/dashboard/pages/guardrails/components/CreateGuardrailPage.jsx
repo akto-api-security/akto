@@ -323,7 +323,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         try {
             const mcpServerCollections = allCollections.filter(collection => {
                 const hasMcpEnvType = collection.envType && collection.envType.some(envType =>
-                    envType.keyName === 'mcp-server' && envType.value === 'MCP Server'
+                    envType.keyName === 'mcp-server'
                 );
                 return hasMcpEnvType && !isVisibilityOnly(collection);
             })
@@ -336,7 +336,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
             const agentServerCollections = allCollections.filter(collection => {
                 const hasGenAiEnvType = collection.envType && collection.envType.some(envType =>
-                    envType.keyName === 'gen-ai' && envType.value === 'Gen AI'
+                    envType.keyName === 'gen-ai'
                 );
                 return hasGenAiEnvType && !isVisibilityOnly(collection);
             })
@@ -493,7 +493,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableRegexPatterns(hasRegexPatterns);
 
         // LLM prompt
-        setEnableLlmPrompt(policy.llmRule?.enabled || !!policy.llmRule?.userPrompt);
+        setEnableLlmPrompt(policy.llmRule?.enabled && !!policy.llmRule?.userPrompt);
         setLlmPrompt(policy.llmRule?.userPrompt || "");
         setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
 
@@ -616,19 +616,15 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                             behavior: r.behavior.toLowerCase()
                         }))
                     : [],
-                ...(enableLlmPrompt && llmPrompt && llmPrompt.trim() ? {
-                    llmRule: {
-                        enabled: true,
-                        userPrompt: llmPrompt.trim(),
-                        confidenceScore: llmConfidenceScore
-                    }
-                } : {}),
-                ...(enableBasePromptRule ? {
-                    basePromptRule: {
-                        enabled: true,
-                        confidenceScore: basePromptConfidenceScore
-                    }
-                } : {}),
+                llmRule: {
+                    enabled: enableLlmPrompt && !!llmPrompt.trim(),
+                    userPrompt: llmPrompt.trim(),
+                    confidenceScore: llmConfidenceScore
+                },
+                basePromptRule: {
+                    enabled: enableBasePromptRule,
+                    confidenceScore: basePromptConfidenceScore
+                },
                 gibberishDetection: {
                     enabled: enableGibberishDetection,
                     confidenceScore: gibberishConfidenceScore

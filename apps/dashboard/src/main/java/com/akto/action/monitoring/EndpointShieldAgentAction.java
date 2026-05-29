@@ -234,10 +234,6 @@ public class EndpointShieldAgentAction extends UserAction {
     }
 
     public String fetchUserAnalysis() {
-        if (agentId == null || agentId.trim().isEmpty()) {
-            addActionError("Agent ID is required");
-            return ERROR.toUpperCase();
-        }
         if (deviceId == null || deviceId.trim().isEmpty()) {
             addActionError("Device ID is required");
             return ERROR.toUpperCase();
@@ -245,11 +241,11 @@ public class EndpointShieldAgentAction extends UserAction {
 
         userAnalysis = UserAnalysisDataDao.instance.findOne(
             Filters.and(
-                Filters.eq(UserAnalysisData.ID_SERVICE_ID, agentId),
                 Filters.eq(UserAnalysisData.ID_DEVICE_ID, deviceId)
             )
         );
 
         return SUCCESS.toUpperCase();
     }
+
 }

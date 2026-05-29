@@ -14,7 +14,7 @@ import (
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
-	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -72,8 +72,6 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 		return
 	}
 
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
-
 	// Build request headers JSON from the hostname form field so that
 	// validationContextFromParams can extract McpServerName (Host header) and
 	// the threat dashboard shows the correct hostname — mirroring validate/request.
@@ -85,6 +83,15 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 			}
 		}
 	}
+
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, requestHeaders)
+
+	h.logger.Info("ValidateFile - received request",
+		zap.Int("fileCount", len(inputs)),
+		zap.String("contextSource", contextSource),
+		zap.String("path", strings.TrimSpace(c.PostForm("path"))),
+		zap.String("method", strings.TrimSpace(c.PostForm("method"))),
+		zap.String("sessionID", sessionID))
 
 	meta := &models.ValidateRequestParams{
 		ContextSource:  contextSource,
@@ -119,6 +126,16 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 		inputs[i].Reader.Close()
 	}
 
+	allowedCount := 0
+	for _, fr := range fileResults {
+		if fr.Allowed {
+			allowedCount++
+		}
+	}
+	h.logger.Info("ValidateFile - completed",
+		zap.Int("fileCount", len(inputs)),
+		zap.Int("allowedCount", allowedCount),
+		zap.String("sessionID", sessionID))
 	h.writeMultiFileResponse(c, fileResults, len(inputs))
 }
 

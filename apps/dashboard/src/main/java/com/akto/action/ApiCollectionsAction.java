@@ -140,10 +140,10 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
-        int tsRandom = Context.now();
-        loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
+        long fillStart = System.currentTimeMillis();
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMapOptimized(filter, apiCollections);
-        loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("[fillApiCollectionsUrlCount] buildEndpointsCount took " + (System.currentTimeMillis() - fillStart) + "ms");
+        long loopStart = System.currentTimeMillis();
 
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
@@ -176,6 +176,7 @@ public class ApiCollectionsAction extends UserAction {
             // Populate URLs for MCP collections using the service
             populateCollectionUrls(apiCollection);
         }
+        loggerMaker.infoAndAddToDb("[fillApiCollectionsUrlCount] loop + populateUrls took " + (System.currentTimeMillis() - loopStart) + "ms");
         return apiCollections;
     }
 
@@ -191,7 +192,7 @@ public class ApiCollectionsAction extends UserAction {
         }
         Bson filter = Filters.and(Filters.exists(ApiCollection.HOST_NAME), Filters.in(Constants.ID, deactivatedCollections));
         List<ApiCollection> hCollections = ApiCollectionsDao.instance.findAll(filter, Projections.include(Constants.ID));
-        List<Integer> deactivatedIds = new ArrayList<>();
+        Set<Integer> deactivatedIds = new HashSet<>();
         for(ApiCollection collection : hCollections){
             if(deactivatedCollections.contains(collection.getId())){
                 deactivatedIds.add(collection.getId());
@@ -202,9 +203,13 @@ public class ApiCollectionsAction extends UserAction {
             return SUCCESS.toUpperCase();
         }
 
-        this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(
-                Filters.in(SingleTypeInfo._COLLECTION_IDS, deactivatedIds)
-        );
+        if (Context.accountId.get() == 1736798101) {
+            this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMapNew(deactivatedIds);
+        } else {
+            this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(
+                    Filters.in(SingleTypeInfo._COLLECTION_IDS, deactivatedIds)
+            );
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -255,14 +260,45 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchAllCollectionsBasic() {
+        long start = System.currentTimeMillis();
+        long stepStart = start;
+
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
-        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude("urls"));
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] deleteContextCollections took " + (System.currentTimeMillis() - stepStart) + "ms");
+        stepStart = System.currentTimeMillis();
+
+        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude(
+                "urls", "conditions", "serviceGraphEdges", "hostNames", "serviceTag",
+                "sampleCollectionsDropped", "redact", "runDependencyAnalyser",
+                "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
+                "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType"
+        ));
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] findAll took " + (System.currentTimeMillis() - stepStart) + "ms, size=" + this.apiCollections.size());
+        stepStart = System.currentTimeMillis();
+
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] fillApiCollectionsUrlCount took " + (System.currentTimeMillis() - stepStart) + "ms");
+        stepStart = System.currentTimeMillis();
+
+        // For account 1736798101, trim tags to only service tag to reduce response size
+        if (Context.accountId.get() == 1736798101) {
+            String serviceTagKey = "privatecloud.agoda.com/service";
+            for (ApiCollection c : this.apiCollections) {
+                List<CollectionTags> tags = c.getTagsList();
+                if (tags != null && !tags.isEmpty()) {
+                    tags.removeIf(tag -> !serviceTagKey.equals(tag.getKeyName()));
+                }
+            }
+        }
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] tags filtering took " + (System.currentTimeMillis() - stepStart) + "ms");
+        stepStart = System.currentTimeMillis();
 
         // Start background icon processing for all collections asynchronously
         // This runs in a separate thread to not block the main response
         com.akto.util.IconUtils.processIconsForCollections(this.apiCollections);
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] processIcons took " + (System.currentTimeMillis() - stepStart) + "ms");
 
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] TOTAL took " + (System.currentTimeMillis() - start) + "ms");
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -281,11 +317,13 @@ public class ApiCollectionsAction extends UserAction {
 
     private boolean isValidApiCollectionName(){
         if (this.collectionName == null || this.collectionName.length() == 0) {
+            loggerMaker.infoAndAddToDb("DAST createCollection: invalid - null or empty name");
             addActionError("Invalid collection name");
             return false;
         }
 
         if (this.collectionName.length() > maxCollectionNameLength) {
+            loggerMaker.infoAndAddToDb("DAST createCollection: invalid - name too long length=" + this.collectionName.length());
             addActionError("Custom collections max length: " + maxCollectionNameLength);
             return false;
         }
@@ -297,13 +335,18 @@ public class ApiCollectionsAction extends UserAction {
             boolean spaces = c == ' ';
 
             if (!(alphabets || numbers || specialChars || spaces)) {
+                loggerMaker.infoAndAddToDb("DAST createCollection: invalid - illegal character '" + c + "' (code=" + (int)c + ") in name='" + this.collectionName + "'");
                 addActionError("Collection names can only be alphanumeric and contain '-','.' and '_'");
                 return false;
             }
         }
 
         // unique names
+        int visibleCollectionCount = (int) ApiCollectionsDao.instance.count(new BasicDBObject());
+        loggerMaker.infoAndAddToDb("DAST createCollection: checking uniqueness for name='" + collectionName + "' visibleCollections=" + visibleCollectionCount);
         ApiCollection sameNameCollection = ApiCollectionsDao.instance.findByName(collectionName);
+        loggerMaker.infoAndAddToDb("DAST createCollection: findByName('" + collectionName + "') returned " +
+            (sameNameCollection == null ? "null (unique, proceeding)" : "id=" + sameNameCollection.getId() + " name=" + sameNameCollection.getName() + " hostName=" + sameNameCollection.getHostName() + " displayName=" + sameNameCollection.getDisplayName()));
         if (sameNameCollection != null){
             addActionError("Collection names must be unique");
             return false;
@@ -321,7 +364,9 @@ public class ApiCollectionsAction extends UserAction {
 
         // do not change hostName or vxlanId here
         ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName,Context.now(),new HashSet<>(), null, 0, false, true);
+        loggerMaker.infoAndAddToDb("DAST createCollection: inserting new collection id=" + apiCollection.getId() + " name=" + collectionName);
         ApiCollectionsDao.instance.insertOne(apiCollection);
+        loggerMaker.infoAndAddToDb("DAST createCollection: insert succeeded id=" + apiCollection.getId() + " name=" + collectionName);
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);
 
@@ -837,7 +882,13 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchLastSeenInfoInCollections(){
-        this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeen();
+        long start = System.currentTimeMillis();
+        if (Context.accountId.get() == 1736798101) {
+            this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeenNew();
+        } else {
+            this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeen();
+        }
+        loggerMaker.infoAndAddToDb("[fetchLastSeen] time=" + (System.currentTimeMillis() - start) + "ms, size=" + this.lastTrafficSeenMap.size());
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -980,6 +1031,9 @@ public class ApiCollectionsAction extends UserAction {
     @Setter
     private String skillName;
 
+    @Setter
+    private List<String> mcpHosts;
+
     public String updateSkillBlockStatus() {
         try {
             if (this.apiCollectionIds == null || this.apiCollectionIds.isEmpty()) {
@@ -991,23 +1045,54 @@ public class ApiCollectionsAction extends UserAction {
                 return ERROR.toUpperCase();
             }
 
+            // Dual-write: keep api_info in sync for legacy readers (ApiEndpoints.jsx etc.)
+            // and update mcp_audit_info (the new source of truth for the Skills tab).
             String skillUrl = "/skills/" + this.skillName;
-            UpdateResult result = ApiInfoDao.instance.updateMany(
+            UpdateResult apiInfoResult = ApiInfoDao.instance.updateMany(
                 Filters.and(
                     Filters.in(ApiInfo.ID_API_COLLECTION_ID, this.apiCollectionIds),
                     Filters.eq(ApiInfo.ID_URL, skillUrl)
                 ),
                 Updates.set(ApiInfo.IS_SKILL_BLOCKED, this.isSkillBlocked)
             );
+            long apiInfoMatched = apiInfoResult.getMatchedCount();
 
-            if (result.getMatchedCount() == 0) {
-                addActionError("No valid skill collections found");
+            // mcp_audit_info: reuse the existing remarks convention used for MCP-server
+            // approval flows (REMARKS_REJECTED = blocked, REMARKS_APPROVED = explicitly allowed).
+            int now = Context.now();
+            User user = getSUser();
+            String markedBy = (user != null && user.getLogin() != null) ? user.getLogin() : "system";
+            String remarksVal = this.isSkillBlocked ? McpAuditInfo.REMARKS_REJECTED : McpAuditInfo.REMARKS_APPROVED;
+
+            List<Bson> auditFilters = new ArrayList<>();
+            auditFilters.add(Filters.eq(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL));
+            auditFilters.add(Filters.eq(McpAuditInfo.RESOURCE_NAME, this.skillName));
+            if (this.mcpHosts != null && !this.mcpHosts.isEmpty()) {
+                auditFilters.add(Filters.in(McpAuditInfo.MCP_HOST, this.mcpHosts));
+            }
+
+            List<Bson> auditUpdates = new ArrayList<>();
+            auditUpdates.add(Updates.set(McpAuditInfo.REMARKS, remarksVal));
+            auditUpdates.add(Updates.set(McpAuditInfo.MARKED_BY, markedBy));
+            auditUpdates.add(Updates.set(McpAuditInfo.UPDATED_TIMESTAMP, now));
+            if (!this.isSkillBlocked) {
+                auditUpdates.add(Updates.set(McpAuditInfo.APPROVED_AT, now));
+            }
+
+            UpdateResult auditResult = McpAuditInfoDao.instance.updateMany(
+                Filters.and(auditFilters),
+                Updates.combine(auditUpdates)
+            );
+
+            if (apiInfoMatched == 0 && auditResult.getMatchedCount() == 0) {
+                addActionError("No matching skill records found");
                 return ERROR.toUpperCase();
             }
 
             response = new BasicDBObject();
             response.put("success", true);
-            response.put("updatedCollections", result.getMatchedCount());
+            response.put("updatedCollections", apiInfoMatched);
+            response.put("updatedAuditRecords", auditResult.getMatchedCount());
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             addActionError("Error updating skill block status: " + e.getMessage());
@@ -1027,38 +1112,6 @@ public class ApiCollectionsAction extends UserAction {
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             addActionError("Error fetching blocked skill collections");
-            return ERROR.toUpperCase();
-        }
-    }
-
-    public String fetchBlockedSkillNames() {
-        try {
-            Set<Integer> blockedCollectionIds = ApiInfoDao.instance.findDistinctFields(
-                ApiInfo.ID_API_COLLECTION_ID,
-                Integer.class,
-                Filters.eq(ApiInfo.IS_SKILL_BLOCKED, true)
-            );
-            Set<String> blockedSkillNames = new HashSet<>();
-            if (!blockedCollectionIds.isEmpty()) {
-                List<String> skillUrls = ApiInfoDao.instance.findDistinctFields(
-                    ApiInfo.ID_URL,
-                    String.class,
-                    Filters.and(
-                        Filters.in(ApiInfo.ID_API_COLLECTION_ID, blockedCollectionIds),
-                        Filters.regex(ApiInfo.ID_URL, "^/skills/")
-                    )
-                ).stream().collect(Collectors.toList());
-                for (String url : skillUrls) {
-                    if (url.startsWith("/skills/")) {
-                        blockedSkillNames.add(url.substring("/skills/".length()));
-                    }
-                }
-            }
-            response = new BasicDBObject();
-            response.put("blockedSkillNames", new ArrayList<>(blockedSkillNames));
-            return SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            addActionError("Error fetching blocked skill names");
             return ERROR.toUpperCase();
         }
     }

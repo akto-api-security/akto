@@ -485,20 +485,26 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         }
 
         this.projectAndIssueMap = new HashMap<>();
-        try {
-            for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
+        List<String> failedProjects = new ArrayList<>();
+        for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
+            try {
                 List<BasicDBObject> issueTypes = getProjectMetadata(entry.getKey());
                 this.projectAndIssueMap.put(entry.getKey(), issueTypes);
+            } catch (Exception ex) {
+                loggerMaker.errorAndAddToDb(ex, "Error while fetching project metadata for project " + entry.getKey() + ", skipping");
+                failedProjects.add(entry.getKey());
             }
-        } catch (Exception ex) {
-            loggerMaker.error("Error while fetching project metadata", ex);
-            addActionError("Error while fetching project metadata");
-            return Action.ERROR.toUpperCase();
         }
+        failedProjects.forEach(projectMappings::remove);
+        this.failedProjectKeys = failedProjects;
 
         JiraIntegration existingIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
 
         if (existingIntegration == null) {
+            if (this.projectAndIssueMap.isEmpty()) {
+                addActionError("Error while fetching project metadata. Please check your credentials and project keys.");
+                return Action.ERROR.toUpperCase();
+            }
             String response = addIntegration();
             this.jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
             syncBidirectionalSettings(jiraIntegration);
@@ -513,7 +519,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
             ProjectMapping mapping = entry.getValue();
-            if (!mapping.getBiDirectionalSyncSettings().isEnabled()) {
+            BiDirectionalSyncSettings biDirSettings = mapping.getBiDirectionalSyncSettings();
+            if (biDirSettings == null || !biDirSettings.isEnabled()) {
                 mapping.setStatuses(null);
             }
         }
@@ -525,8 +532,15 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         Bson integrationUpdate = Updates.combine(
             Updates.set("updatedTs", Context.now()),
-            Updates.set("projectMappings", existingProjectMappings)
+            Updates.set("projectMappings", existingProjectMappings),
+            Updates.set("baseUrl", baseUrl),
+            Updates.set("userEmail", userEmail),
+            Updates.set("jiraType", jiraType)
         );
+
+        if (apiToken != null && !apiToken.contains("******")) {
+            integrationUpdate = Updates.combine(integrationUpdate, Updates.set("apiToken", apiToken));
+        }
 
         Map<String, List<BasicDBObject>> existingProjectIdMap = existingIntegration.getProjectIdsMap();
 
@@ -971,6 +985,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     String aktoDashboardHost;
     List<TestingIssuesId> issuesIds;
     private String errorMessage;
+    private List<String> failedProjectKeys;
 
     public String bulkCreateJiraTickets (){
         if(issuesIds == null || issuesIds.isEmpty()){
@@ -1411,6 +1426,10 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     public String getErrorMessage() {
         return errorMessage;
+    }
+
+    public List<String> getFailedProjectKeys() {
+        return failedProjectKeys;
     }
 
     public Map<String, ProjectMapping> getProjectMappings() {

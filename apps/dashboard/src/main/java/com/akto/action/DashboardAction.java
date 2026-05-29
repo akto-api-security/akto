@@ -175,16 +175,11 @@ public class DashboardAction extends UserAction {
         }
         Bson issuesFilter = Filters.and(issueMatchParts);
 
-        List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.match(issuesFilter));
+        // Apply dashboard filtering (RBAC + dashboardContext)
+        Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(issuesFilter);
 
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
-            }
-        } catch(Exception e){
-        }
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(dashboardFilter));
 
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
                                                     .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
@@ -259,22 +254,14 @@ public class DashboardAction extends UserAction {
                 }
             }
 
-            basePipeline.add(
-                Aggregates.match(Filters.and(
+            Bson filters = Filters.and(
                     Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
-                    filterQ
-                ))
-            );
+                    filterQ);
 
-            try {
-                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(
-                    Context.userId.get(), Context.accountId.get()
-                );
-                if (collectionIds != null) {
-                    basePipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
-                }
-            } catch (Exception e) {
-            }
+            // Apply dashboard filtering (RBAC + dashboardContext)
+            Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(filters);
+
+            basePipeline.add(Aggregates.match(dashboardFilter));
 
             if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
                 basePipeline.add(Aggregates.match(Filters.in(TestingRunIssues.ID_API_COLLECTION_ID, apiCollectionIds)));

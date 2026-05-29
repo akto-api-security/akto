@@ -1,14 +1,11 @@
 package com.akto.action;
 
-import java.util.Base64;
 import java.util.List;
 
+import com.akto.data_actor.ClientActor;
 import com.akto.dto.IngestDataBatch;
 import com.akto.log.LoggerMaker;
 import com.akto.utils.KafkaUtils;
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.interfaces.DecodedJWT;
-import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
@@ -89,18 +86,8 @@ public class IngestionAction extends ActionSupport {
     }
 
     public static int getAccountId() {
-        try {
-            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
-            DecodedJWT jwt = JWT.decode(token);
-            String payload = jwt.getPayload();
-            byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
-            String decodedPayload = new String(decodedBytes);
-            BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
-            return (int) basicDBObject.getInt("accountId");
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("checkaccount error" + e.getStackTrace());
-            return 0;
-        }
+        Integer id = ClientActor.getAbstractorAccountIdFromEnvOrNull();
+        return id != null ? id : 0;
     }
 
     public List<IngestDataBatch> getBatchData() {

@@ -7,8 +7,8 @@ import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
-import com.akto.util.Util;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.util.enums.GlobalEnums.GuardrailSource;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
@@ -24,6 +24,7 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -87,10 +88,34 @@ public class GuardrailPoliciesAction extends UserAction {
             User user = getSUser();
             int currentTime = Context.now();
 
-            // Get current context source for this guardrail, default to ENDPOINT if not set
+            boolean isGithubWorkflow = policy.getSource() == GuardrailSource.GITHUB_WORKFLOW
+                    && StringUtils.isNotBlank(policy.getSourceHash());
+
             CONTEXT_SOURCE contextSource = Context.contextSource.get();
             if (contextSource == null) {
                 contextSource = CONTEXT_SOURCE.AGENTIC;
+            }
+            String createdByValue = user.getLogin();
+
+            if (isGithubWorkflow) {
+                GuardrailPolicies existing = GuardrailPoliciesDao.instance.findOne(
+                    Filters.and(
+                        Filters.eq("name", policy.getName()),
+                        Filters.eq("contextSource", contextSource)
+                    )
+                );
+                if (existing != null && policy.getSourceHash().equals(existing.getSourceHash())) {
+                    loggerMaker.infoAndAddToDb("GITHUB_WORKFLOW: sourceHash unchanged, skipping update for: " + policy.getName());
+                    return SUCCESS.toUpperCase();
+                }
+                if (existing != null) {
+                    hexId = existing.getId().toHexString();
+                    loggerMaker.infoAndAddToDb("GITHUB_WORKFLOW: sourceHash changed, updating policy: " + policy.getName());
+                } else {
+                    hexId = null;
+                    loggerMaker.infoAndAddToDb("GITHUB_WORKFLOW: no existing policy, inserting: " + policy.getName());
+                }
+                createdByValue = GuardrailSource.GITHUB_WORKFLOW.getDisplayName();
             }
 
             loggerMaker.info("createGuardrailPolicy called with hexId: " + hexId);
@@ -120,49 +145,20 @@ public class GuardrailPoliciesAction extends UserAction {
                 ? Filters.eq(Constants.ID, new ObjectId(hexId))
                 : Filters.eq("name", policy.getName()); // or use another unique identifier
             
-            List<Bson> updates = new ArrayList<>();
-            updates.add(Updates.set("name", policy.getName()));
-            updates.add(Updates.set("description", policy.getDescription()));
-            updates.add(Updates.set("blockedMessage", policy.getBlockedMessage()));
-            updates.add(Updates.set("severity", policy.getSeverity()));
-            updates.add(Updates.set("selectedCollection", policy.getSelectedCollection()));
-            updates.add(Updates.set("selectedModel", policy.getSelectedModel()));
-            updates.add(Updates.set("deniedTopics", policy.getDeniedTopics()));
-            updates.add(Updates.set("piiTypes", policy.getPiiTypes()));
-            updates.add(Updates.set("regexPatterns", policy.getRegexPatterns()));
-            updates.add(Updates.set("regexPatternsV2", policy.getRegexPatternsV2()));
-            updates.add(Updates.set("contentFiltering", policy.getContentFiltering()));
-            updates.add(Updates.set("llmRule", policy.getLlmRule()));
-            updates.add(Updates.set("basePromptRule", policy.getBasePromptRule()));
-            updates.add(Updates.set("gibberishDetection", policy.getGibberishDetection()));
-            updates.add(Updates.set("anonymizeDetection", policy.getAnonymizeDetection()));
-            updates.add(Updates.set("banCodeDetection", policy.getBanCodeDetection()));
-            updates.add(Updates.set("secretsDetection", policy.getSecretsDetection()));
-            updates.add(Updates.set("sentimentDetection", policy.getSentimentDetection()));
-            updates.add(Updates.set("tokenLimitDetection", policy.getTokenLimitDetection()));
-            updates.add(Updates.set("selectedMcpServers", policy.getSelectedMcpServers()));
-            updates.add(Updates.set("selectedAgentServers", policy.getSelectedAgentServers()));
-            updates.add(Updates.set("selectedMcpServersV2", policy.getSelectedMcpServersV2()));
-            updates.add(Updates.set("selectedAgentServersV2", policy.getSelectedAgentServersV2()));
-            updates.add(Updates.set("applyOnResponse", policy.isApplyOnResponse()));
-            updates.add(Updates.set("applyOnRequest", policy.isApplyOnRequest()));
-            updates.add(Updates.set("applyToAllServers", policy.isApplyToAllServers()));
-            updates.add(Updates.set("behaviour", policy.getBehaviour()));
-            updates.add(Updates.set("url", policy.getUrl()));
-            updates.add(Updates.set("confidenceScore", policy.getConfidenceScore()));
-            updates.add(Updates.set("active", policy.isActive()));
-
-            // Set contextSource from current context
-            updates.add(Updates.set("contextSource", contextSource));
+            List<Bson> updates = buildPolicyUpdates(policy, contextSource);
 
             // Only set createdBy and createdTimestamp on insert
-            updates.add(Updates.setOnInsert("createdBy", user.getLogin()));
+            updates.add(Updates.setOnInsert("createdBy", createdByValue));
             updates.add(Updates.setOnInsert("createdTimestamp", currentTime));
             updates.add(Updates.set("updatedTimestamp", currentTime));
 
             // Only set updatedTimestamp and updatedBy on actual updates (when hexId exists)
             if (hexId != null && !hexId.isEmpty()) {
-                updates.add(Updates.set("updatedBy", user.getLogin()));
+                String updatedByValue = user.getLogin();
+                if (isGithubWorkflow) {
+                    updatedByValue = GuardrailSource.GITHUB_WORKFLOW.getDisplayName();
+                }
+                updates.add(Updates.set("updatedBy", updatedByValue));
             }
 
             // Perform upsert using updateOne with upsert option
@@ -180,6 +176,101 @@ public class GuardrailPoliciesAction extends UserAction {
             loggerMaker.errorAndAddToDb("Error creating guardrail policy: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
+    }
+
+    private List<Bson> buildPolicyUpdates(GuardrailPolicies p, CONTEXT_SOURCE contextSource) {
+        List<Bson> updates = new ArrayList<>();
+
+        updates.add(Updates.set("name", p.getName()));
+        updates.add(Updates.set("contextSource", contextSource));
+        updates.add(Updates.set("applyOnResponse", p.isApplyOnResponse()));
+        updates.add(Updates.set("applyOnRequest", p.isApplyOnRequest()));
+        updates.add(Updates.set("applyToAllServers", p.isApplyToAllServers()));
+        updates.add(Updates.set("active", p.isActive()));
+
+        if (StringUtils.isNotBlank(p.getDescription())) {
+            updates.add(Updates.set("description", p.getDescription()));
+        }
+        if (StringUtils.isNotBlank(p.getBlockedMessage())) {
+            updates.add(Updates.set("blockedMessage", p.getBlockedMessage()));
+        }
+        if (StringUtils.isNotBlank(p.getSeverity())) {
+            updates.add(Updates.set("severity", p.getSeverity()));
+        }
+        if (StringUtils.isNotBlank(p.getSelectedCollection())) {
+            updates.add(Updates.set("selectedCollection", p.getSelectedCollection()));
+        }
+        if (StringUtils.isNotBlank(p.getSelectedModel())) {
+            updates.add(Updates.set("selectedModel", p.getSelectedModel()));
+        }
+        if (p.getDeniedTopics() != null) {
+            updates.add(Updates.set("deniedTopics", p.getDeniedTopics()));
+        }
+        if (p.getPiiTypes() != null) {
+            updates.add(Updates.set("piiTypes", p.getPiiTypes()));
+        }
+        if (p.getRegexPatterns() != null) {
+            updates.add(Updates.set("regexPatterns", p.getRegexPatterns()));
+        }
+        if (p.getRegexPatternsV2() != null) {
+            updates.add(Updates.set("regexPatternsV2", p.getRegexPatternsV2()));
+        }
+        if (p.getContentFiltering() != null) {
+            updates.add(Updates.set("contentFiltering", p.getContentFiltering()));
+        }
+        if (p.getLlmRule() != null) {
+            updates.add(Updates.set("llmRule", p.getLlmRule()));
+        }
+        if (p.getBasePromptRule() != null) {
+            updates.add(Updates.set("basePromptRule", p.getBasePromptRule()));
+        }
+        if (p.getGibberishDetection() != null) {
+            updates.add(Updates.set("gibberishDetection", p.getGibberishDetection()));
+        }
+        if (p.getAnonymizeDetection() != null) {
+            updates.add(Updates.set("anonymizeDetection", p.getAnonymizeDetection()));
+        }
+        if (p.getBanCodeDetection() != null) {
+            updates.add(Updates.set("banCodeDetection", p.getBanCodeDetection()));
+        }
+        if (p.getSecretsDetection() != null) {
+            updates.add(Updates.set("secretsDetection", p.getSecretsDetection()));
+        }
+        if (p.getSentimentDetection() != null) {
+            updates.add(Updates.set("sentimentDetection", p.getSentimentDetection()));
+        }
+        if (p.getTokenLimitDetection() != null) {
+            updates.add(Updates.set("tokenLimitDetection", p.getTokenLimitDetection()));
+        }
+        if (p.getSelectedMcpServers() != null) {
+            updates.add(Updates.set("selectedMcpServers", p.getSelectedMcpServers()));
+        }
+        if (p.getSelectedAgentServers() != null) {
+            updates.add(Updates.set("selectedAgentServers", p.getSelectedAgentServers()));
+        }
+        if (p.getSelectedMcpServersV2() != null) {
+            updates.add(Updates.set("selectedMcpServersV2", p.getSelectedMcpServersV2()));
+        }
+        if (p.getSelectedAgentServersV2() != null) {
+            updates.add(Updates.set("selectedAgentServersV2", p.getSelectedAgentServersV2()));
+        }
+        if (StringUtils.isNotBlank(p.getBehaviour())) {
+            updates.add(Updates.set("behaviour", p.getBehaviour()));
+        }
+        if (StringUtils.isNotBlank(p.getUrl())) {
+            updates.add(Updates.set("url", p.getUrl()));
+        }
+        if (p.getConfidenceScore() > 0) {
+            updates.add(Updates.set("confidenceScore", p.getConfidenceScore()));
+        }
+        if (p.getSource() != null) {
+            updates.add(Updates.set("source", p.getSource()));
+        }
+        if (StringUtils.isNotBlank(p.getSourceHash())) {
+            updates.add(Updates.set("sourceHash", p.getSourceHash()));
+        }
+
+        return updates;
     }
 
     public String deleteGuardrailPolicies() {
@@ -217,8 +308,15 @@ public class GuardrailPoliciesAction extends UserAction {
             User user = getSUser();
             int currentTime = Context.now();
 
-            // Get guardrail service URL from environment variable or use default
-            String guardrailServiceUrl = Util.getEnvironmentVariable("GUARDRAIL_SERVICE_URL");
+            // Build per-account guardrail service URL.
+            // Default: https://<accountId>-guardrails.akto.io
+            // Exception: the US / demo account (1768362636) is hosted on a custom
+            // domain (https://ingest-demo.akto.io) instead of the standard
+            // <accountId>-guardrails.akto.io pattern, so it needs a hardcoded override.
+            int accountId = Context.accountId.get();
+            String guardrailServiceUrl = accountId == 1768362636
+                    ? "https://ingest-demo.akto.io"
+                    : "https://" + accountId + "-guardrails.akto.io";
             String validateUrl = guardrailServiceUrl + "/api/validate/requestWithPolicy";
 
             // Prepare request payload - wrap testInput in JSON with "prompt" key

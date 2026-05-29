@@ -9,13 +9,17 @@ import {
     getTypeFromTags,
     findAssetTag,
     findTypeTag,
-    getAgentTypeFromValue
+    getAgentTypeFromValue,
+    hasPersonalAccountTag,
+    hasLocalMcpServerTag,
 } from "./mcpClientHelper";
 import func from "@/util/func";
 import { getResolvedUsernameForCollection, DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
 
 // Table constants
 export const PAGE_LIMIT = 100;
+
+export const SKILL_RISK_CACHE_TTL_MS = 2 * 60 * 1000;
 
 // Route constants
 export const INVENTORY_PATH = '/dashboard/observe/inventory';
@@ -185,11 +189,15 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
                 sensitiveTypes: new Set(),
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
+                hasPersonalAccount: false,
+                hasLocalMcpServer: false,
             };
         }
-        
+
         agents[key].collections.push(c);
         if (!agents[key].firstCollection) agents[key].firstCollection = c;
+        if (hasPersonalAccountTag(c.envType)) agents[key].hasPersonalAccount = true;
+        if (hasLocalMcpServerTag(c.envType)) agents[key].hasLocalMcpServer = true;
         
         // Track unique endpoint IDs
         if (endpointId) {
@@ -261,15 +269,18 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
                 sensitiveTypes: new Set(),
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
+                hasPersonalAccount: false,
+                hasLocalMcpServer: false,
             };
         }
-        
+
         services[key].collections.push(c);
-        // Track all hostnames for this service for filtering
         if (!services[key].hostNames.includes(hostName)) {
             services[key].hostNames.push(hostName);
         }
         if (!services[key].firstCollection) services[key].firstCollection = c;
+        if (hasPersonalAccountTag(c.envType)) services[key].hasPersonalAccount = true;
+        if (hasLocalMcpServerTag(c.envType)) services[key].hasLocalMcpServer = true;
         
         // Track unique endpoint IDs
         if (endpointId) {
@@ -331,11 +342,13 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
                     sensitiveTypes: new Set(),
                     maxTrafficTimestamp: 0,
                     maxRiskScore: 0,
+                    hasPersonalAccount: false,
                 };
             }
 
             skills[skillValue].collections.push(c);
             if (!skills[skillValue].firstCollection) skills[skillValue].firstCollection = c;
+            if (hasPersonalAccountTag(c.envType)) skills[skillValue].hasPersonalAccount = true;
             if (hostName && !skills[skillValue].hostNames.includes(hostName)) {
                 skills[skillValue].hostNames.push(hostName);
             }
@@ -467,17 +480,37 @@ export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMa
                 sensitiveTypes: new Set(),
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
+                uniqueSkillNames: new Set(),
+                nonSkillCollectionsCount: 0,
                 team: meta.team || '',
                 userRole: meta.userRole || '',
             };
         }
         const g = users[username];
         g.collections.push(c);
-        g.clientTypes.add(getTypeFromTags(c.envType));
+        const category = getTypeFromTags(c.envType);
+        g.clientTypes.add(category);
+        if (category !== CLIENT_TYPES.SKILL) {
+            g.nonSkillCollectionsCount += 1;
+        }
+        // Skills bundled inside an AI Agent / MCP Server collection still make the user a Skill
+        // owner for the Type column, even when the user has no standalone Skill-type collection.
+        if (Array.isArray(c.skills) && c.skills.length > 0) {
+            g.clientTypes.add(CLIENT_TYPES.SKILL);
+            c.skills.forEach(s => { if (s) g.uniqueSkillNames.add(String(s).toLowerCase()); });
+        }
         accumulateHostGroupedCollection(g, c, trafficMap, sensitiveMap, riskScoreMap);
     });
 
-    return Object.values(users).map((g) => finalizeHostGroupedRow(g, "user"));
+    // Per-user "Agentic assets" count uses the same semantic as the Agentic assets totals page:
+    // non-Skill collections + unique skill names (from c.skills[] across all the user's collections).
+    // Counting hostNames alone hides skills bundled inside AI Agent / MCP Server collections.
+    return Object.values(users).map((g) => {
+        const row = finalizeHostGroupedRow(g, "user");
+        row.endpointsCount = g.nonSkillCollectionsCount + g.uniqueSkillNames.size;
+        row.uniqueSkillNames = g.uniqueSkillNames;
+        return row;
+    });
 };
 
 export const createEnvTypeFilter = (values, negated = false) => ({
@@ -506,3 +539,44 @@ export const buildAgenticInventoryFilterForRow = (row) => {
 };
 
 export { ROW_TYPES, SKILL_TAG_KEY } from "./mcpClientHelper";
+
+/**
+ * Fetch apiInfos for the given collection IDs, build and cache skillScoreMap + maliciousSkills,
+ * then return { skillScoreMap, maliciousSkills }. Uses PersistStore cache; skips fetch if warm.
+ */
+export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistStore }) {
+
+    const cached = PersistStore.getState().skillRiskScoreCache;
+    const cacheAge = Date.now() - (cached?.ts || 0);
+
+    if (cacheAge <= SKILL_RISK_CACHE_TTL_MS && cached?.ts > 0) {
+        return { skillScoreMap: cached.data || {}, maliciousSkills: new Set(cached.maliciousSkills || []) };
+    }
+
+    const results = await Promise.all(
+        collectionIds.map(async (id) => {
+            try {
+                const resp = await api.fetchApiInfosForCollection(id);
+                return resp?.apiInfoList || [];
+            } catch {
+                return [];
+            }
+        })
+    );
+
+    const skillScoreMap = {};
+    const maliciousSkills = new Set();
+    results.forEach((infos) => {
+        infos.forEach((info) => {
+            const splits = info?.id?.url?.split("skills/");
+            const skillName = splits?.[1];
+            if (!skillName) return;
+            skillScoreMap[skillName] = info.riskScore || 0;
+            const isMalicious = (info.tagsList || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true");
+            if (isMalicious) maliciousSkills.add(skillName);
+        });
+    });
+
+    PersistStore.getState().setSkillRiskScoreCache({ data: skillScoreMap, maliciousSkills: [...maliciousSkills], ts: Date.now() });
+    return { skillScoreMap, maliciousSkills };
+}

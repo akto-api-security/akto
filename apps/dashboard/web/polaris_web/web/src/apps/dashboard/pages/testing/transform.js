@@ -1087,7 +1087,7 @@ const transform = {
       let obj = testRunResultsObj[key]
       let prettifiedObj = {
         ...obj,
-        nameComp: <div data-testid={obj.name}><Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{ fontWeight: 'medium' }} /></Box></div>,
+        nameComp: <div data-testid={obj.name}><Box><TooltipText tooltip={obj.name} text={obj.name} textProps={{ fontWeight: 'medium' }} /></Box></div>,
         severityComp: obj?.vulnerable === true ? <div className={`badge-wrapper-${obj?.severity[0].toUpperCase()}`}>
           <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge>
         </div> : <Text>-</Text>,
@@ -1124,7 +1124,7 @@ const transform = {
     return finalMethod + " " + truncatedUrl
 
   },
-  getRowInfo(severity, apiInfo, jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl, serviceNowTicketUrl, servicenowTicketId, devrevWorkUrl) {
+  getRowInfo(severity, apiInfo, jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl, serviceNowTicketUrl, servicenowTicketId, devrevWorkUrl, wizFindingUrl) {
     if (apiInfo == null || apiInfo === undefined) {
       apiInfo = {
         allAuthTypesFound: [],
@@ -1217,6 +1217,21 @@ const transform = {
       </Box>
     ) : null
 
+    const wizComp = (wizFindingUrl?.length > 0 && wizFindingUrl !== "unavailable") ? (
+      <Box>
+        <Tag>
+          <HorizontalStack gap={1}>
+            <Avatar size="extraSmall" shape='round' source="/public/wiz_logo.svg" />
+            <Link target="_blank" url={wizFindingUrl}>
+              <Text>
+                View finding
+              </Text>
+            </Link>
+          </HorizontalStack>
+        </Tag>
+      </Box>
+    ) : null
+
     const rowItems = [
       {
         title: 'Severity',
@@ -1286,6 +1301,14 @@ const transform = {
         title: "DevRev ticket",
         value: devrevComp,
         tooltipContent: "DevRev ticket attached to the testing run issue"
+      })
+    }
+
+    if (wizComp != null) {
+      rowItems.push({
+        title: "Wiz finding",
+        value: wizComp,
+        tooltipContent: "Wiz finding attached to the testing run issue"
       })
     }
 
@@ -1480,6 +1503,7 @@ const transform = {
       testSuiteIds: testSuiteIds,
       autoTicketingDetails: autoTicketingDetails,
       selectedSlackChannelId: testRun?.slackChannel || 0,
+      doNotMarkIssuesAsFixed: Boolean(testRun.doNotMarkIssuesAsFixed),
     }
   },
   prepareTestingEndpointsApisList(apiEndpoints) {

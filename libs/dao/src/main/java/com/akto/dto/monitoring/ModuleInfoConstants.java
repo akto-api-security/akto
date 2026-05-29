@@ -28,7 +28,14 @@ public class ModuleInfoConstants {
             put("AKTO_THREAT_ENABLED", "Threat Enabled");
             put("AKTO_IGNORE_ENVOY_PROXY_CALLS", "Ignore Envoy Proxy Calls");
             put("AKTO_IGNORE_IP_TRAFFIC", "Ignore IP Traffic");
+            put("AKTO_SYSTEM_CPU_SOFT_CORES", "System CPU Soft Cores");
+            put("AKTO_SYSTEM_CPU_HARD_CORES", "System CPU Hard Cores");
+            put("AKTO_SYSTEM_CPU_SOFT_ADD_CORES", "System CPU Soft Additional Cores over system detected baseline");
+            put("AKTO_SYSTEM_CPU_HARD_ADD_CORES", "System CPU Hard Additional Cores over system detected baseline");
+            put("AKTO_SYSTEM_CPU_CHECK_INTERVAL_SEC", "System CPU Check Interval (Seconds)");
+            put("AKTO_PAUSE_INGESTION", "Pause Ingestion");
         }});
+   
 
         put(ModuleInfo.ModuleType.AKTO_AGENT_GATEWAY, new HashMap<String, String>() {{
             put("AKTO_API_BASE_URL", "URL for Akto data ingestion service");

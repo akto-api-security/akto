@@ -126,7 +126,7 @@ const sortOptions = [
 
 let filters = [];
 
-function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT }) {
+function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, initialTab }) {
   const location = useLocation();
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
@@ -137,8 +137,10 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const [loading, setLoading] = useState(true);
   const collectionsMap = PersistStore((state) => state.collectionsMap);
   const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
-  const [currentTab, setCurrentTab] = useState('active');
-  const [selected, setSelected] = useState(0)
+  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, training: 3 };
+  const resolvedInitialTab = initialTab || 'active';
+  const [currentTab, setCurrentTab] = useState(resolvedInitialTab);
+  const [selected, setSelected] = useState(tabIndexMap[resolvedInitialTab] || 0)
   const [currentFilters, setCurrentFilters] = useState({})
   const [totalFilteredCount, setTotalFilteredCount] = useState(0)
   const [usernameMap, setUsernameMap] = useState({});
@@ -554,7 +556,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
       let nextUrl = null;
       if (x.refId && x.eventType && x.actor && x.filterId) {
-        const params = new URLSearchParams();
+        const params = new URLSearchParams(location.search);
         params.set("refId", x.refId);
         params.set("eventType", x.eventType);
         params.set("actor", x.actor);
@@ -562,7 +564,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         if (x.status) {
           params.set("eventStatus", x.status.toUpperCase());
         }
-        nextUrl = `${location.pathname}?${params.toString()}`;
+        nextUrl = `${location.pathname}?${params.toString()}${location.hash}`;
       }
       
       const rowData = {

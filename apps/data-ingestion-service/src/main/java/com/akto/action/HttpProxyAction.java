@@ -3,6 +3,7 @@ package com.akto.action;
 import com.akto.gateway.Gateway;
 import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
+import com.akto.utils.McpCollectionResolver;
 import com.akto.utils.SlackUtils;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
@@ -27,6 +28,7 @@ public class HttpProxyAction extends ActionSupport {
     private String response_guardrails;
     private String akto_connector;
     private String ingest_data;
+    private String client_hook;
 
     private String path;
     private String requestHeaders;
@@ -60,9 +62,12 @@ public class HttpProxyAction extends ActionSupport {
     public String httpProxy() {
         long start = System.currentTimeMillis();
         try {
-            loggerMaker.info("HTTP Proxy API called - path: " + path + ", method: " + method + ", account: " + akto_account_id);
+            loggerMaker.infoAndAddToDb(
+                "HTTP Proxy API called - path: {}, method: {}, account: {}, guardrails: {}, response_guardrails: {}, ingest_data: {}, contextSource: {}",
+                path, method, akto_account_id, guardrails, response_guardrails, ingest_data, contextSource);
 
             Map<String, Object> requestData = buildRequestData();
+            applyMcpHostRewrite(requestData);
             Map<String, Object> result = gateway.processHttpProxy(requestData);
 
             success = Boolean.TRUE.equals(result.get("success"));
@@ -73,11 +78,11 @@ public class HttpProxyAction extends ActionSupport {
             if (!success) {
                 String errorMsg = "[http-proxy] API failed - path: " + path + ", method: " + method
                     + ", account: " + akto_account_id + ", latencyMs: " + latencyMs + ", error: " + message;
-                loggerMaker.errorAndAddToDb(errorMsg, LoggerMaker.LogDb.DATA_INGESTION);
+                loggerMaker.errorAndAddToDb(errorMsg);
                 sendSlackAlert(errorMsg);
             } else {
-                loggerMaker.info("[http-proxy] API completed - path: " + path + ", method: " + method
-                    + ", account: " + akto_account_id + ", latencyMs: " + latencyMs);
+                loggerMaker.infoAndAddToDb("[http-proxy] API completed - path: {}, method: {}, account: {}, latencyMs: {}",
+                    path, method, akto_account_id, latencyMs);
             }
 
             return success ? Action.SUCCESS.toUpperCase() : Action.ERROR.toUpperCase();
@@ -86,7 +91,7 @@ public class HttpProxyAction extends ActionSupport {
             long latencyMs = System.currentTimeMillis() - start;
             String errorMsg = "[http-proxy] Unexpected error - path: " + path + ", method: " + method
                 + ", account: " + akto_account_id + ", latencyMs: " + latencyMs + ", error: " + e.getMessage();
-            loggerMaker.errorAndAddToDb(errorMsg, LoggerMaker.LogDb.DATA_INGESTION);
+            loggerMaker.errorAndAddToDb(errorMsg);
             sendSlackAlert(errorMsg);
             success = false;
             message = "Unexpected error: " + e.getMessage();
@@ -125,6 +130,32 @@ public class HttpProxyAction extends ActionSupport {
         }
     }
 
+    private void applyMcpHostRewrite(Map<String, Object> requestData) {
+        Object tagObj = requestData.get("tag");
+        String tagJson = tagObj != null ? tagObj.toString() : null;
+        if (!McpCollectionResolver.isMcpTag(tagJson)) {
+            return;
+        }
+
+        Object headersObj = requestData.get("requestHeaders");
+        String headersJson = headersObj != null ? headersObj.toString() : null;
+        String host = McpCollectionResolver.extractHost(headersJson);
+        if (host == null || host.isEmpty()) {
+            return;
+        }
+
+        String tempCollectionName = host.toLowerCase().trim();
+        String realCollectionName = McpCollectionResolver.getInstance().resolve(tempCollectionName);
+        if (realCollectionName == null) {
+            loggerMaker.warnAndAddToDb("MCP host cache miss for tempCollectionName=" + tempCollectionName);
+            return;
+        }
+
+        String rewritten = McpCollectionResolver.rewriteHostInHeaders(headersJson, realCollectionName);
+        requestData.put("requestHeaders", rewritten);
+        loggerMaker.infoAndAddToDb("MCP host rewrite: " + tempCollectionName + " -> " + realCollectionName);
+    }
+
     private Map<String, Object> buildRequestData() {
         Map<String, Object> requestData = new HashMap<>();
 
@@ -157,6 +188,7 @@ public class HttpProxyAction extends ActionSupport {
         requestData.put("daemonset_id", daemonset_id);
         requestData.put("enabled_graph", enabled_graph);
         requestData.put("contextSource", contextSource);
+        requestData.put("client_hook", client_hook);
 
         return requestData;
     }

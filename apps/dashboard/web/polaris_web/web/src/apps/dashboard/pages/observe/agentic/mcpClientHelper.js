@@ -17,6 +17,7 @@ const KNOWN_CLIENTS = {
     claude2: { displayName: 'Claude CLI', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
     chatgpt: { displayName: 'ChatGPT', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     openai: { displayName: 'OpenAI', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
+    codex: { displayName: 'Codex', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     gemini: { displayName: 'Gemini', domain: 'gemini.google.com', agentType: CLIENT_TYPES.LLM },
     copilot: { displayName: 'Copilot', domain: 'copilot.microsoft.com', agentType: CLIENT_TYPES.AI_AGENT },
     cursor: { displayName: 'Cursor', domain: 'cursor.com', agentType: CLIENT_TYPES.AI_AGENT },
@@ -94,9 +95,26 @@ const getFriendlyLlmName = (domain) => {
     return formatDisplayName(first || domain);
 };
 
+// Normalizes both raw tag objects ({keyName, value}) and formatted strings ('key=value') to objects.
+const normalizeEnvType = (envType) => {
+    if (!Array.isArray(envType) || envType.length === 0) return [];
+    if (typeof envType[0] === 'string') {
+        return envType.map(t => {
+            const eq = t.indexOf('=');
+            return eq >= 0 ? { keyName: t.slice(0, eq), value: t.slice(eq + 1) } : { keyName: t, value: '' };
+        });
+    }
+    return envType;
+};
+
 const getTypeFromTags = (envType) => {
-    if (!Array.isArray(envType)) return CLIENT_TYPES.MCP_SERVER;
-    for (const tag of envType) {
+    const tags = normalizeEnvType(envType);
+    if (tags.length === 0) return CLIENT_TYPES.MCP_SERVER;
+    const hasSkill = tags.some(tag => tag.keyName === SKILL_TAG_KEY);
+    const hasAiAgent = tags.some(tag => tag.keyName === ASSET_TAG_KEYS.AI_AGENT);
+    const hasMcpServer = tags.some(tag => tag.keyName === TYPE_TAG_KEYS.MCP_SERVER);
+    if (hasSkill && !hasAiAgent && !hasMcpServer) return CLIENT_TYPES.SKILL;
+    for (const tag of tags) {
         if (tag.keyName && TYPE_TAG_TO_DISPLAY[tag.keyName]) return TYPE_TAG_TO_DISPLAY[tag.keyName];
     }
     return CLIENT_TYPES.MCP_SERVER;
@@ -132,27 +150,35 @@ const getAgentTypeFromValue = (tagValue) => {
  */
 const getAgenticCategoryLabel = (collection) => {
     const raw = collection?.envTypeOriginal;
-    if (Array.isArray(raw) && raw.length > 0) {
-        if (typeof raw[0] === 'object' && raw[0]?.keyName) {
-            return getTypeFromTags(raw);
-        }
-    }
-    if (Array.isArray(collection?.skills) && collection.skills.length > 0) {
-        return CLIENT_TYPES.SKILL;
-    }
+    if (Array.isArray(raw) && raw.length > 0) return getTypeFromTags(raw);
+    if (Array.isArray(collection?.skills) && collection.skills.length > 0) return CLIENT_TYPES.SKILL;
     const envArr = collection?.envType;
-    if (Array.isArray(envArr) && envArr.length > 0 && typeof envArr[0] === 'string') {
-        if (envArr.some((t) => typeof t === 'string' && t.startsWith('mcp-server='))) {
-            return TYPE_TAG_TO_DISPLAY[TYPE_TAG_KEYS.MCP_SERVER];
+    if (Array.isArray(envArr) && envArr.length > 0) return getTypeFromTags(envArr);
+    return CLIENT_TYPES.MCP_SERVER;
+};
+
+const PERSONAL_ACCOUNT_TAG_KEYS = ['browser-llm-account-type', 'login-user-email-type'];
+
+const hasPersonalAccountTag = (envType) => {
+    if (!Array.isArray(envType)) return false;
+    return envType.some((tag) => {
+        if (typeof tag === 'string') {
+            return PERSONAL_ACCOUNT_TAG_KEYS.some((key) => tag === `${key}=personal`);
         }
-        if (envArr.some((t) => typeof t === 'string' && t.startsWith('gen-ai='))) {
-            return TYPE_TAG_TO_DISPLAY[TYPE_TAG_KEYS.GEN_AI];
+        return PERSONAL_ACCOUNT_TAG_KEYS.includes(tag.keyName) && tag.value === 'personal';
+    });
+};
+
+const LOCAL_MCP_SERVER_TAG_KEY = 'local-mcp-server';
+
+const hasLocalMcpServerTag = (envType) => {
+    if (!Array.isArray(envType)) return false;
+    return envType.some((tag) => {
+        if (typeof tag === 'string') {
+            return tag === LOCAL_MCP_SERVER_TAG_KEY || tag.startsWith(`${LOCAL_MCP_SERVER_TAG_KEY}=`);
         }
-        if (envArr.some((t) => typeof t === 'string' && t.startsWith('browser-llm='))) {
-            return TYPE_TAG_TO_DISPLAY[TYPE_TAG_KEYS.BROWSER_LLM];
-        }
-    }
-    return getTypeFromTags(Array.isArray(raw) ? raw : []);
+        return tag.keyName === LOCAL_MCP_SERVER_TAG_KEY;
+    });
 };
 
 export {
@@ -165,6 +191,8 @@ export {
     findTypeTag,
     getAgentTypeFromValue,
     getAgenticCategoryLabel,
+    hasPersonalAccountTag,
+    hasLocalMcpServerTag,
     CLIENT_TYPES,
     TYPE_TAG_KEYS,
     ASSET_TAG_KEYS,

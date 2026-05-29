@@ -1509,6 +1509,11 @@ public class StartTestAction extends UserAction {
                                         editableTestingRunConfig.getSendMsTeamsAlert()));
                     }
 
+                    if (existingTestingRun.getDoNotMarkIssuesAsFixed() != editableTestingRunConfig.isDoNotMarkIssuesAsFixed()) {
+                        updates.add(Updates.set(TestingRun.DO_NOT_MARK_ISSUES_AS_FIXED,
+                                editableTestingRunConfig.isDoNotMarkIssuesAsFixed()));
+                    }
+
                     int periodInSeconds = getPeriodInSeconds(editableTestingRunConfig.getRecurringDaily(), editableTestingRunConfig.getRecurringWeekly(), editableTestingRunConfig.getRecurringMonthly());
                     if (editableTestingRunConfig.getContinuousTesting()) {
                         periodInSeconds = -1;
@@ -1768,7 +1773,8 @@ public class StartTestAction extends UserAction {
         this.conversationsList = AgentConversationResultDao.instance.findAll(
                 Filters.eq(GenericAgentConversation._CONVERSATION_ID, this.conversationId),
                 0, 100,
-                Sorts.ascending(GenericAgentConversation._LAST_UPDATED_AT));
+                // TODO: there's inconsistency in this DTO in all branches ??
+                Sorts.ascending(GenericAgentConversation._LAST_UPDATED_AT, GenericAgentConversation._TIMESTAMP));
         return SUCCESS.toUpperCase();
     }
 

@@ -17,7 +17,7 @@ import (
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
-	"github.com/akto-api-security/mcp-endpoint-shield/mcp/types"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/segmentio/kafka-go"
 	"github.com/segmentio/kafka-go/sasl/plain"
 	"go.uber.org/zap"

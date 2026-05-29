@@ -1,6 +1,5 @@
 package com.akto.test_editor.filter;
 
-import com.akto.gpt.handlers.gpt_prompts.TestValidatorModifier;
 import java.util.*;
 
 import com.akto.log.LoggerMaker;
@@ -49,7 +48,9 @@ public class Filter {
         try {
             int accountId = Context.accountId.get();
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
+            // FeatureAccess featureAccess = FeatureAccess.fullAccess;
             if (featureAccess.getIsGranted()) {
+
                 if (querySet instanceof String) {
                     String query = (String) querySet;
                     if (query.startsWith(Utils._MAGIC)) {
@@ -77,19 +78,30 @@ public class Filter {
                     BasicDBObject queryData = new BasicDBObject();
 
                     RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+                    
+                    if (filterActionRequest.isValidationContext()) {
+                        operation = operation + "\n\nIMPORTANT - Strict validation rules for this check:\n"
+                            + "The request payload may appear in the response, but echoing alone does NOT confirm the operation. "
+                            + "You must verify that the response demonstrates actual exploitation or behavioral evidence — "
+                            + "not merely that the input was reflected back.\n"
+                            + "Return not_found immediately if the response:\n"
+                            + "  - No actual retry/tool recall/loop trigger occurred in the response\n"
+                            + "  - The response is a normal benign response with no behavioral change from the request\n"
+                            + "  - The phrase appears ONLY because it was echoed/reflected from the request payload " 
+                            + "(e.g., the query string was included back in the response). Reflection alone is" 
+                            + "NOT evidence of the vulnerability being triggered."
+                            + " - The phrase appears in a standard \"no results found\" or \"adjust your search\" message that any clean request would also produce"
+                            + "- Contains error indicators such as: invalid parameter, resource not found, bad request, unknown field, unrecognized input, operation not" 
+                            + "permitted,not allowed, unsupported, missing parameter, malformed, rejected, forbidden, unauthorized, resource does not exist, no such,"
+                            + "no results found, Try adjusting your search, adjust search criteria, no items found, nothing matched" 
+                            + "— or any equivalent phrasing indicating the server returned an empty or rejected result.";
+                    }
+                    queryData.put(TestExecutorModifier._OPERATION, operation);
                     String ogRequest = Utils.buildRequestIHttpFormat(rawApi);
                     String response = Utils.buildResponseIHttpFormat(rawApi);
-
-                    queryData.put(TestExecutorModifier._OPERATION, operation);
-                    BasicDBObject generatedData;
-                    if (filterActionRequest.isValidationContext()) {
-                        queryData.put(TestExecutorModifier._REQUEST, response);
-                        generatedData = new TestValidatorModifier().handle(queryData);
-                    } else {
-                        String request = "Request payload: \n" + ogRequest + "\n\nResponse payload: \n" + response;
-                        queryData.put(TestExecutorModifier._REQUEST, request);
-                        generatedData = new TestFilterModifier().handle(queryData);
-                    }
+                    String request = "Request payload: \n" + ogRequest + "\n\nResponse payload: \n" + response;
+                    queryData.put(TestExecutorModifier._REQUEST, request);
+                    BasicDBObject  generatedData = new TestFilterModifier().handle(queryData);
 
                     if (generatedData.containsKey(operationTypeLower)) {
                         Object generatedQuerySet = generatedData.get(operationTypeLower);
@@ -193,7 +205,8 @@ public class Filter {
         FilterNode firstExtractNode = null;
         StringBuilder validationReason = new StringBuilder();
         try {
-            Map<FilterNode, String> childNodeVsValidationReason = new HashMap<>();
+            Map<FilterNode, String> passedChildVsValidationReason = new HashMap<>();
+            Map<FilterNode, String> failedChildVsValidationReason = new HashMap<>();
             for (int i = 0; i < childNodes.size(); i++) {
                 FilterNode childNode = childNodes.get(i);
                 boolean skipExecutingExtractNode = skipExtractExecution;
@@ -202,7 +215,9 @@ public class Filter {
                 }
                 dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId, skipExecutingExtractNode);
                 if (!dataOperandsFilterResponse.getResult()) {
-                    childNodeVsValidationReason.put(childNode, dataOperandsFilterResponse.getValidationReason());
+                    failedChildVsValidationReason.put(childNode, dataOperandsFilterResponse.getValidationReason());
+                } else if (!StringUtils.isEmpty(dataOperandsFilterResponse.getValidationReason())) {
+                    passedChildVsValidationReason.put(childNode, dataOperandsFilterResponse.getValidationReason());
                 }
 
                 if (firstExtractNode == null) {
@@ -219,23 +234,15 @@ public class Filter {
                     matchingKeySet = evaluateMatchingKeySet(matchingKeySet, dataOperandsFilterResponse.getMatchedEntities(), operator);
                 }
             }
-            if (!result && !childNodeVsValidationReason.isEmpty()) {//Validation failed by all conditions
+            if ("validator".equalsIgnoreCase(context)
+                    && (!passedChildVsValidationReason.isEmpty() || !failedChildVsValidationReason.isEmpty())) {
                 validationReason.append("\n").append(node.getOperand().toLowerCase()).append(":");
-                if (operator.equalsIgnoreCase("or")) {
-                    for (FilterNode failedValidation: childNodeVsValidationReason.keySet()) {
-                        String validationReasonStr = childNodeVsValidationReason.getOrDefault(failedValidation, null);
-                        if (!StringUtils.isEmpty(validationReasonStr)) {
-                            validationReasonStr = validationReasonStr.replaceAll("\n","\n\t");
-                            validationReason.append(validationReasonStr);
-                        }
-                    }
-                } else {
-                    String validationReasonStr = childNodeVsValidationReason.getOrDefault(childNodeVsValidationReason.keySet().iterator().next(), null);
-                    if (!StringUtils.isEmpty(validationReasonStr)) {
-                        validationReasonStr = validationReasonStr.replaceAll("\n","\n\t");
-                        validationReason.append(validationReasonStr);
-                    }
-                }
+                appendValidationReasonSection(validationReason, "\npassed: ", operator, passedChildVsValidationReason);
+                appendValidationReasonSection(validationReason, "\nfailed: ", operator, failedChildVsValidationReason);
+            }
+            if (!"validator".equalsIgnoreCase(context) && !result && !failedChildVsValidationReason.isEmpty()) {
+                validationReason.append("\n").append(node.getOperand().toLowerCase()).append(":");
+                appendChildValidationReasons(validationReason, operator, failedChildVsValidationReason);
             }
 
         } catch (Exception e) {
@@ -248,6 +255,36 @@ public class Filter {
 
         return new DataOperandsFilterResponse(result, matchingKeySet, contextEntities, firstExtractNode, validationReason.toString());
 
+    }
+
+    private void appendFormattedValidationReason(StringBuilder validationReason, String validationReasonStr) {
+        if (StringUtils.isEmpty(validationReasonStr)) {
+            return;
+        }
+        validationReason.append(validationReasonStr.replaceAll("\n", "\n\t"));
+    }
+
+    private void appendChildValidationReasons(StringBuilder validationReason, String operator,
+            Map<FilterNode, String> childReasons) {
+        if (childReasons == null || childReasons.isEmpty()) {
+            return;
+        }
+        if (operator.equalsIgnoreCase("or")) {
+            for (String reason : childReasons.values()) {
+                appendFormattedValidationReason(validationReason, reason);
+            }
+        } else {
+            appendFormattedValidationReason(validationReason, childReasons.values().iterator().next());
+        }
+    }
+
+    private void appendValidationReasonSection(StringBuilder validationReason, String sectionPrefix, String operator,
+            Map<FilterNode, String> childReasons) {
+        if (childReasons == null || childReasons.isEmpty()) {
+            return;
+        }
+        validationReason.append(sectionPrefix);
+        appendChildValidationReasons(validationReason, operator, childReasons);
     }
 
     public List<String> evaluateMatchingKeySet(List<String> oldSet, List<String> newMatches, String operand) {

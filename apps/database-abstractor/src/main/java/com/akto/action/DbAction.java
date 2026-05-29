@@ -45,6 +45,10 @@ public class DbAction extends ActionSupport {
     int vxlanId;
     String name;
     List<String> cidrList;
+    String deviceId;
+    String domainKey;
+    List<String> domainsToAdd;
+    List<String> domainsToRemove;
     List<BasicDBObject> apiInfoList;
     List<BulkUpdates> writesForFilterSampleData;
     List<BulkUpdates> writesForSti;
@@ -129,6 +133,7 @@ public class DbAction extends ActionSupport {
         }
         return Action.SUCCESS.toUpperCase();
     }
+
 
     public String fetchAccountSettings() {
         try {
@@ -648,6 +653,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String insertGuardrailsServiceLog() {
+        try {
+            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            DbLayer.insertGuardrailsServiceLog(dbLog);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String modifyHybridSaasSetting() {
         try {
             DbLayer.modifyHybridSaasSetting(isHybridSaas);
@@ -811,6 +826,18 @@ public class DbAction extends ActionSupport {
     public void setCidrList(List<String> cidrList) {
         this.cidrList = cidrList;
     }
+
+    public String getDeviceId() { return deviceId; }
+    public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
+
+    public String getDomainKey() { return domainKey; }
+    public void setDomainKey(String domainKey) { this.domainKey = domainKey; }
+
+    public List<String> getDomainsToAdd() { return domainsToAdd; }
+    public void setDomainsToAdd(List<String> domainsToAdd) { this.domainsToAdd = domainsToAdd; }
+
+    public List<String> getDomainsToRemove() { return domainsToRemove; }
+    public void setDomainsToRemove(List<String> domainsToRemove) { this.domainsToRemove = domainsToRemove; }
 
     public List<BasicDBObject> getApiInfoList() {
         return apiInfoList;

@@ -146,5 +146,12 @@ export default {
             method: 'post',
             data: {testingIssuesIdList, partId, workItemType, aktoDashboardHost}
         })
+    },
+    createWizFindings(testingIssuesIdList) {
+        return request({
+            url: 'api/createWizFindings',
+            method: 'post',
+            data: {testingIssuesIdList}
+        })
     }
 }

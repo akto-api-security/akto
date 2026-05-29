@@ -1,48 +1,32 @@
-import { Button, Text, TextField, VerticalStack, Card, Form } from '@shopify/polaris'
+import { Button, Modal, Text, TextField, VerticalStack, Form } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
 import func from '@/util/func'
 import { CellType } from '../../../components/tables/rows/GithubRow'
 
-const HEADERS = [
+const DEFAULT_HEADERS = [
     { text: 'Value', title: 'Value', value: 'patternValue', type: CellType.TEXT },
     { text: 'Created By', title: 'Created By', value: 'addedBy', type: CellType.TEXT },
     { text: 'Last Updated', title: 'Last Updated', value: 'updatedTsFormatted', type: CellType.TEXT },
 ]
 
-// patternKey: the field name on each info object that holds the display value (e.g. "pattern" or "host")
-export function buildPatternTableData(map, patternKey) {
+export function buildPatternTableData(map, patternKey, buildRow) {
     if (!map) return []
-    const data = Object.entries(map).map(([key, info]) => ({
-        id: key,
-        patternValue: info[patternKey] || key,
-        addedBy: info.addedBy || '-',
-        updatedTsFormatted: info.updatedTs ? func.prettifyEpoch(info.updatedTs) : '-',
-        updatedTs: info.updatedTs,
-    }))
+    const data = Object.entries(map).map(([key, info]) => {
+        const base = {
+            id: key,
+            patternValue: info[patternKey] || key,
+            addedBy: info.addedBy || '-',
+            updatedTsFormatted: info.updatedTs ? func.prettifyEpoch(info.updatedTs) : '-',
+            updatedTs: info.updatedTs,
+        }
+        return buildRow ? { ...base, ...buildRow(key, info) } : base
+    })
     data.sort((a, b) => b.updatedTs - a.updatedTs)
     return data
 }
 
-/**
- * Reusable page for "add a pattern to a list" settings screens.
- *
- * Props:
- *   title         - page title
- *   cardTitle     - heading inside the input card
- *   description   - subtext inside the input card
- *   extraContent  - optional ReactNode rendered in the card between description and the input (e.g. a toggle)
- *   inputLabel    - TextField label
- *   placeholder   - TextField placeholder
- *   inputDisabled - whether the input and button are disabled
- *   tableKey      - unique key for GithubSimpleTable
- *   resourceName  - { singular, plural } for the table
- *   onFetch       - async () => Map<string, info> — called on mount to load data
- *   onAdd         - async (value) => Map<string, info> — called when user submits
- *   onDelete      - optional async (patternValue) => Map<string, info> — called when user deletes a row
- *   patternKey    - field name on the info object holding the display value
- */
 function PatternSettingsPage({
     title,
     cardTitle,
@@ -57,18 +41,27 @@ function PatternSettingsPage({
     onAdd,
     onDelete,
     patternKey,
+    headers,
+    buildRow,
+    additionalCards = [],
+    onRowClick,
+    getRowActions,
+    secondaryActions,
+    initialValue
 }) {
+    const tableHeaders = headers || DEFAULT_HEADERS
     const [value, setValue] = useState('')
     const [inputError, setInputError] = useState('')
     const [loading, setLoading] = useState(false)
     const [tableData, setTableData] = useState([])
     const [fetchingData, setFetchingData] = useState(false)
+    const [addModalOpen, setAddModalOpen] = useState(false)
 
     async function fetchData() {
         setFetchingData(true)
         try {
             const map = await onFetch()
-            setTableData(buildPatternTableData(map, patternKey))
+            setTableData(buildPatternTableData(map, patternKey, buildRow))
         } catch (e) {
             func.setToast(true, true, `Failed to load ${resourceName.plural}`)
         } finally {
@@ -77,10 +70,22 @@ function PatternSettingsPage({
     }
 
     useEffect(() => { fetchData() }, [])
+    useEffect(() => {
+        if (initialValue?.value) {
+            setValue(initialValue.value)
+            setAddModalOpen(true)
+        }
+    }, [initialValue])
 
     function handleChange(v) {
         setValue(v)
         if (inputError) setInputError('')
+    }
+
+    function handleClose() {
+        setAddModalOpen(false)
+        setValue('')
+        setInputError('')
     }
 
     async function handleAdd() {
@@ -91,8 +96,8 @@ function PatternSettingsPage({
         setLoading(true)
         try {
             const map = await onAdd(value.trim())
-            setTableData(buildPatternTableData(map, patternKey))
-            setValue('')
+            setTableData(buildPatternTableData(map, patternKey, buildRow))
+            handleClose()
             func.setToast(true, false, `${resourceName.singular.charAt(0).toUpperCase() + resourceName.singular.slice(1)} added successfully`)
         } catch (e) {
             func.setToast(true, true, `Failed to add ${resourceName.singular}`)
@@ -117,7 +122,7 @@ function PatternSettingsPage({
                                 const item = tableData.find(r => r.id === id)
                                 if (item) map = await onDelete(item.patternValue)
                             }
-                            if (map !== undefined) setTableData(buildPatternTableData(map, patternKey))
+                            if (map !== undefined) setTableData(buildPatternTableData(map, patternKey, buildRow))
                             func.setToast(true, false, `${selectedResources.length} ${resourceName.singular}${selectedResources.length > 1 ? 's' : ''} deleted successfully`)
                         } catch (e) {
                             func.setToast(true, true, `Failed to delete ${resourceName.singular}`)
@@ -128,35 +133,32 @@ function PatternSettingsPage({
         }]
     }
 
-    const inputCard = (
-        <Card>
-            <VerticalStack gap="3">
-                <Text variant="headingSm" as="h3">{cardTitle}</Text>
-                <Text variant="bodyMd" color="subdued">{description}</Text>
-                {extraContent}
-                <Form onSubmit={handleAdd}>
-                    <TextField
-                        label={inputLabel}
-                        value={value}
-                        onChange={handleChange}
-                        placeholder={placeholder}
-                        error={inputError || undefined}
-                        autoComplete="off"
-                        disabled={inputDisabled}
-                        connectedRight={
-                            <Button
-                                primary
-                                onClick={handleAdd}
-                                loading={loading}
-                                disabled={inputDisabled || !value.trim()}
-                            >
-                                Add
-                            </Button>
-                        }
-                    />
-                </Form>
-            </VerticalStack>
-        </Card>
+    const addModal = (
+        <Modal
+            open={addModalOpen}
+            onClose={handleClose}
+            title={cardTitle}
+            primaryAction={{ content: 'Add', onAction: handleAdd, loading, disabled: inputDisabled || !value.trim() }}
+            secondaryActions={[{ content: 'Cancel', onAction: handleClose }]}
+        >
+            <Modal.Section>
+                <VerticalStack gap="4">
+                    {!!description && <Text variant="bodyMd" color="subdued">{description}</Text>}
+                    {extraContent}
+                    <Form onSubmit={handleAdd}>
+                        <TextField
+                            label={inputLabel}
+                            value={value}
+                            onChange={handleChange}
+                            placeholder={placeholder}
+                            error={inputError || undefined}
+                            autoComplete="off"
+                            disabled={inputDisabled}
+                        />
+                    </Form>
+                </VerticalStack>
+            </Modal.Section>
+        </Modal>
     )
 
     const tableCard = (
@@ -164,23 +166,32 @@ function PatternSettingsPage({
             key={tableKey}
             data={tableData}
             resourceName={resourceName}
-            headers={HEADERS}
+            headers={tableHeaders}
             loading={fetchingData}
             selectable={true}
             promotedBulkActions={promotedBulkActions}
             useNewRow={true}
             condensedHeight={true}
-            headings={HEADERS}
+            headings={tableHeaders}
             pageLimit={15}
+            onRowClick={onRowClick}
+            rowClickable={!!onRowClick}
+            getActions={getRowActions}
+            hasRowActions={!!getRowActions}
+            preventRowClickOnActions={true}
         />
     )
 
     return (
-        <PageWithMultipleCards
-            title={title}
-            isFirstPage={true}
-            components={[inputCard, tableCard]}
-        />
+        <>
+            <PageWithMultipleCards
+                title={title}
+                isFirstPage={true}
+                primaryAction={{ content: `Add ${resourceName.singular}`, onAction: () => setAddModalOpen(true) }}
+                secondaryActions={secondaryActions}
+                components={[addModal, tableCard, ...(additionalCards || [])]}
+            />
+        </>
     )
 }
 

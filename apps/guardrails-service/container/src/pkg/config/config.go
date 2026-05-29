@@ -28,6 +28,10 @@ type Config struct {
 
 	PolicyRefreshIntervalMin int
 
+	McpAllowedListRefreshIntervalMin int
+
+	CollectionRefreshIntervalMin int
+
 	// Supports comma-separated or "regex:" prefixed patterns.
 	FilterHost string
 	FilterPath string
@@ -83,11 +87,13 @@ func LoadConfig() *Config {
 		KafkaBatchSize:           getEnvAsInt("KAFKA_BATCH_SIZE", 100),
 		KafkaBatchLingerSec:      getEnvAsInt("KAFKA_BATCH_LINGER_SEC", 5),
 		KafkaMaxWaitSec:          getEnvAsInt("KAFKA_MAX_WAIT_SEC", 1),
-		PolicyRefreshIntervalMin: getEnvAsInt("POLICY_REFRESH_INTERVAL_MIN", 5),
+		PolicyRefreshIntervalMin: getEnvAsInt("POLICY_REFRESH_INTERVAL_MIN", 1),
 		FilterHost:               getEnv("FILTER_HOST", ""),
 		FilterPath:               getEnv("FILTER_PATH", ""),
 		SessionSyncIntervalMin:   getEnvAsInt("SESSION_SYNC_INTERVAL_MIN", 5),
 		SessionEnabled:           getEnvAsBool("SESSION_ENABLED", true),
+		McpAllowedListRefreshIntervalMin:  getEnvAsInt("MCP_ALLOWLIST_REFRESH_INTERVAL_MIN", 1),
+		CollectionRefreshIntervalMin:   getEnvAsInt("COLLECTION_REFRESH_INTERVAL_MIN", 5),
 		File: FileConfig{
 			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
 			MaxTextFileBytes: getEnvAsInt("FILE_VALIDATE_MAX_TEXT_FILE_BYTES", 5*1024*1024),

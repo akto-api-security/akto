@@ -15,6 +15,7 @@ import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreati
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
 import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN, CLAUDE_SETTINGS_RISK_MAP } from "../constants/guardrailDescriptions";
+import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import OwaspTag from "../../guardrails/components/OwaspTag";
@@ -26,12 +27,22 @@ function SampleDetails(props) {
     // Determine if we should use hardcoded guardrail descriptions
     const useGuardrailDescription = isAgenticSecurityCategory() || isEndpointSecurityCategory();
 
+    // For guardrail events, look up the specific rule info based on ruleViolated / templateId
+    const guardrailRuleInfo = useGuardrailDescription
+        ? getGuardrailRuleInfo(moreInfoData?.ruleViolated, moreInfoData?.templateId)
+        : null;
+
+    // Build guardrail sections: use matched rule's overview if found, else fall back to all generic sections
+    const guardrailSectionsToShow = guardrailRuleInfo
+        ? [{ heading: guardrailRuleInfo.heading, description: null, subSections: guardrailRuleInfo.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
+        : GUARDRAIL_SECTIONS;
+
     // Get template object - either from hardcoded data or YAML templates
     let currentTemplateObj;
     if (useGuardrailDescription) {
         // For Argus/Atlas guardrails, use structured content
         currentTemplateObj = {
-            guardrailSections: GUARDRAIL_SECTIONS,
+            guardrailSections: guardrailSectionsToShow,
             testName: moreInfoData?.templateId || "Guardrail Policy",
             name: moreInfoData?.templateId || "Guardrail Policy"
         };
@@ -267,10 +278,11 @@ function SampleDetails(props) {
             };
         }
         if (useGuardrailDescription) {
+            const remediationMarkdown = guardrailRuleInfo?.remediation || GUARDRAIL_REMEDIATION_MARKDOWN;
             return {
                 id: "remediation",
                 content: "Remediation",
-                component: (<MarkdownViewer markdown={GUARDRAIL_REMEDIATION_MARKDOWN} />)
+                component: (<MarkdownViewer markdown={remediationMarkdown} />)
             };
         }
         return remediationText.length > 0 && {
