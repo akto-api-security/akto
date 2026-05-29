@@ -2,6 +2,7 @@ package com.akto.dto.testing;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
+import java.util.List;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -50,7 +51,9 @@ public class TestingRun {
     private String name;
 
     public static final String MINI_TESTING_SERVICE_NAME = "miniTestingServiceName";
+    public static final String ALLOWED_MINI_TESTING_SERVICE_NAMES = "allowedMiniTestingServiceNames";
     private String miniTestingServiceName;
+    private List<String> allowedMiniTestingServiceNames;
 
     public enum TestingRunType{
         ONE_TIME, RECURRING, CI_CD, CONTINUOUS_TESTING
@@ -58,6 +61,9 @@ public class TestingRun {
 
     public static final String DO_NOT_MARK_ISSUES_AS_FIXED = "doNotMarkIssuesAsFixed";
     private boolean doNotMarkIssuesAsFixed = false;
+
+    public static final String RUN_AUTOMATED_TESTS = "runAutomatedTests";
+    private boolean runAutomatedTests = false;
 
     public TestingRun() { }
 
@@ -219,12 +225,28 @@ public class TestingRun {
         this.miniTestingServiceName = miniTestingServiceName;
     }
 
+    public List<String> getAllowedMiniTestingServiceNames() {
+        return allowedMiniTestingServiceNames;
+    }
+
+    public void setAllowedMiniTestingServiceNames(List<String> allowedMiniTestingServiceNames) {
+        this.allowedMiniTestingServiceNames = allowedMiniTestingServiceNames;
+    }
+
     public boolean getDoNotMarkIssuesAsFixed() {
         return doNotMarkIssuesAsFixed;
     }
 
     public void setDoNotMarkIssuesAsFixed(boolean doNotMarkIssuesAsFixed) {
         this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
+    }
+
+    public boolean getRunAutomatedTests() {
+        return runAutomatedTests;
+    }
+
+    public void setRunAutomatedTests(boolean runAutomatedTests) {
+        this.runAutomatedTests = runAutomatedTests;
     }
 
 

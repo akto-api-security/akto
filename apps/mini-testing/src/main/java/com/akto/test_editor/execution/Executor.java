@@ -1,6 +1,7 @@
 package com.akto.test_editor.execution;
 
 import com.akto.agent.AgentClient;
+import com.akto.agent.AutomatedAgenticTestExecutor;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
@@ -19,6 +20,8 @@ import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.AuthParam.Location;
 import com.akto.testing.*;
+import com.akto.testing.ApiExecutor;
+import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.test_editor.*;
@@ -30,8 +33,16 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.OrgUtils;
 import com.akto.test_editor.utils.Utils;
+import static com.akto.test_editor.Utils.createWebhookSiteToken;
+import static com.akto.test_editor.Utils.getSsrfWebhookServiceBase;
+import static com.akto.test_editor.Utils.sendRequestToWebhookService;
+import static com.akto.test_editor.utils.Utils.storeSsrfWebhookMapping;
 import com.akto.util.Constants;
+import com.akto.mcp.McpJsonRpcModel;
+import com.akto.mcp.McpRequestResponseUtils;
+import com.akto.mcp.McpToolDescriptionsRegistry;
 import com.akto.util.HttpRequestResponseUtils;
+import com.akto.util.JSONUtils;
 import com.akto.util.McpSseEndpointHelper;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -55,6 +66,7 @@ public class Executor {
     private final AgentClient agentClient = new AgentClient(
         Constants.AGENT_BASE_URL
     );
+    private static final AutomatedAgenticTestExecutor automatedAgenticTestExecutor = new AutomatedAgenticTestExecutor();
 
     public final String _HOST = "host";
 
@@ -86,7 +98,9 @@ public class Executor {
         ModifyExecutionOrderResp modifyExecutionOrderResp = executionListBuilder.modifyExecutionFlow(executorNodes, varMap);
 
         Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
-        varMap = VariableResolver.resolveDynamicWordList(varMap, apiInfoKey, newSampleDataMap);
+        Map<String, Object> resolvedWordList = VariableResolver.resolveDynamicWordList(varMap, apiInfoKey, newSampleDataMap);
+        varMap.clear();
+        varMap.putAll(resolvedWordList);
 
         if (modifyExecutionOrderResp.getError() != null) {
             error_messages.add(modifyExecutionOrderResp.getError());
@@ -134,10 +148,12 @@ public class Executor {
         origRawApi = sampleRawApi.copy();
 
         boolean requestSent = false;
+         // boolean templateAllowsAutomated = varMap.containsKey("agenticTestingAllowed") && Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
+         boolean runAutomatedPentest = TestingConfigurations.getInstance().isRunAutomatedTests();
 
         String executionType = node.getChildNodes().get(0).getValues().toString();
         boolean isParallelExecution = executionType.equalsIgnoreCase("parallel");
-        if (executionType.equals("multiple") || executionType.equals("graph") || isParallelExecution) {
+        if (!runAutomatedPentest && (executionType.equals("multiple") || executionType.equals("graph") || isParallelExecution)) {
             if (executionType.equals("graph")) {
                 List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
                 apiInfoKeys.add(apiInfoKey);
@@ -150,7 +166,7 @@ public class Executor {
             return yamlTestResult;
         }
 
-        if (executionType.equals("passive")) {
+        if (!runAutomatedPentest && executionType.equals("passive")) {
             ExecutionResult attempt = new ExecutionResult(true, "", rawApi.getRequest(), rawApi.getResponse());
             TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
             if (res != null) {
@@ -182,59 +198,83 @@ public class Executor {
         boolean allRequestsSkippedDueToMatch = false;
         int skippedCount = 0;
 
-        for (RawApi testReq: testRawApis) {
-            if (executorNodes.size() > 0 && testReq.equals(origRawApi)) {
-                skippedCount++;
-                continue;
-            }
-            if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
-                break;
-            }
-            try {
-                // follow redirects = true for now
-                TestResult res = null;
-                List<TestResult> agenticResults = null;
-                if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
-                    // execute agentic test here
-                    requestAttempted = true;
-                    agenticResults = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
-                    if (agenticResults != null && !agenticResults.isEmpty()) {
-                        result.addAll(agenticResults);
-                        // needed to check for vulnerable 
-                        res = agenticResults.get(agenticResults.size() - 1);
-                    }
-                }else{
-                    List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
-                    String contentTypeString = "";
-                    if(!contentType.isEmpty()){
-                        contentTypeString = contentType.get(0);
-                    }
-                    if(!contentTypeString.isEmpty() && (contentTypeString.contains(HttpRequestResponseUtils.SOAP) || contentTypeString.contains(HttpRequestResponseUtils.XML))){
-                        // since we are storing a map for original raw payload, we need original raw url and method to float to api executor
-                        // we are adding custom header here and when sending request we will remove them
-                        testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
-                        testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));   
-                    }
 
-                    // Add SSE endpoint header for MCP collections
-                    McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
+        if (runAutomatedPentest) {
+            String testSubType = varMap.containsKey("testSubType") ? varMap.get("testSubType").toString() : "unknown";
+            List<TestResult> automatedAgenticResults = automatedAgenticTestExecutor.executeAgenticTest(origRawApi, testSubType);
+            if (automatedAgenticResults != null && !automatedAgenticResults.isEmpty()) {
+                requestAttempted = true;
+                String originalMessage = origRawApi.getOriginalMessage();
+                for (TestResult tr : automatedAgenticResults) {
+                    tr.setOriginalMessage(originalMessage);
+                    vulnerable = vulnerable || tr.getVulnerable();
+                }
+                result.addAll(automatedAgenticResults);
+                TestResult last = automatedAgenticResults.get(automatedAgenticResults.size() - 1);
+                loggerMaker.infoAndAddToDb("AutomatedAgenticTest: vulnerable=" + vulnerable + ", confidence=" + last.getConfidence() + " for testSubType=" + testSubType);
+            } else {
+                loggerMaker.infoAndAddToDb("AutomatedAgenticTest: no results returned for testSubType=" + testSubType);
+            }
+        } else {
+            for (RawApi testReq: testRawApis) {
+                if (executorNodes.size() > 0 && testReq.equals(origRawApi)) {
+                    skippedCount++;
+                    continue;
+                }
+                if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
+                    break;
+                }
+                try {
+                    // follow redirects = true for now
+                    TestResult res = null;
+                    List<TestResult> agenticResults = null;
 
-                    requestAttempted = true;
-                    testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
-                    requestSent = true;
-                    ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
-                    res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                    if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
+                        // execute agentic test here
+                        requestAttempted = true;
+                        String testingRunResultSummaryIdHex = null;
+                        if (testingRunConfig != null && testingRunConfig.getTestRunResultSummaryId() != null) {
+                            testingRunResultSummaryIdHex = testingRunConfig.getTestRunResultSummaryId().toHexString();
+                        }
+                        agenticResults = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId(), testingRunResultSummaryIdHex);
+                        if (agenticResults != null && !agenticResults.isEmpty()) {
+                            result.addAll(agenticResults);
+                            // needed to check for vulnerable 
+                            res = agenticResults.get(agenticResults.size() - 1);
+                        }
+                    }else{
+                        List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
+                        String contentTypeString = "";
+                        if(!contentType.isEmpty()){
+                            contentTypeString = contentType.get(0);
+                        }
+                        if(!contentTypeString.isEmpty() && (contentTypeString.contains(HttpRequestResponseUtils.SOAP) || contentTypeString.contains(HttpRequestResponseUtils.XML))){
+                            // since we are storing a map for original raw payload, we need original raw url and method to float to api executor
+                            // we are adding custom header here and when sending request we will remove them
+                            testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
+                            testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));   
+                        }
+
+                        // Add SSE endpoint header for MCP collections
+                        McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
+
+                        requestAttempted = true;
+                        testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                        requestSent = true;
+                        ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
+                        res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                    }
+                    if (res != null && agenticResults == null) {
+                        result.add(res);
+                    }
+                    if (res != null) {
+                        vulnerable = res.getVulnerable();
+                    }
+                } catch(Exception e) {
+                    testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
+                    error_messages.add("Error executing test request: " + e.getMessage());
+                    loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
                 }
-                if (res != null && agenticResults == null) {
-                    result.add(res);
-                }
-                if (res != null) {
-                    vulnerable = res.getVulnerable();
-                }
-            } catch(Exception e) {
-                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
-                error_messages.add("Error executing test request: " + e.getMessage());
-                loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
             }
         }
 
@@ -466,40 +506,65 @@ public class Executor {
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             if (featureAccess.getIsGranted()) {
 
-                String request = com.akto.test_editor.Utils.buildRequestIHttpFormat(rawApi);
-
-                String operationPrompt = "";
-                boolean isMagicContext = false;
-                // for $magic_context - no request is passed as context.
-                if (key.equals(com.akto.test_editor.Utils.MAGIC_CONTEXT)) {
-                    operationPrompt = value.toString();
-                    isMagicContext = true;
-                } else if (key.toString().startsWith(com.akto.test_editor.Utils.MAGIC_CONTEXT)) {
-                    operationPrompt = key.toString().replace(com.akto.test_editor.Utils.MAGIC_CONTEXT, "").trim();
-                    isMagicContext = true;
+                // MCP request: always invoke TestExecutorModifier enriched with tool context
+                if (McpRequestResponseUtils.isMcpRequest(rawApi)) {
+                    McpJsonRpcModel mcpModel = JSONUtils.fromJson(rawApi.getRequest().getBody(), McpJsonRpcModel.class);
+                    if (mcpModel != null && mcpModel.getParams() != null) {
+                        String toolName = mcpModel.getParams().getName();
+                        if (toolName != null && !toolName.isEmpty()) {
+                            String toolDescription = McpToolDescriptionsRegistry.get(toolName);
+                            String operationTypeLower = operationType.toLowerCase();
+                            String operationContext = "Tool: " + toolName  + "\nParam under test: " + key + "\nTest intent: " + value;
+                            if (toolDescription != null && !toolDescription.isEmpty()) {
+                                operationContext += "\nDescription: " + toolDescription;
+                            }
+                            BasicDBObject queryData = new BasicDBObject();
+                            queryData.put(TestExecutorModifier._REQUEST, com.akto.test_editor.Utils.buildRequestIHttpFormat(rawApi));
+                            queryData.put(TestExecutorModifier._TOOL_CONTEXT, operationContext);
+                            queryData.put(TestExecutorModifier._OPERATION, operationTypeLower + ": " + value);
+                            BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
+                            generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
+                        }
+                    }
                 }
 
-                if (!isMagicContext) {
-                    if (key.equals(com.akto.test_editor.Utils._MAGIC)) {
+                // $magic detection — only runs when MCP path did not already fire
+                if (generatedOperationKeyValuePairs == null || generatedOperationKeyValuePairs.isEmpty()) {
+                    String request = com.akto.test_editor.Utils.buildRequestIHttpFormat(rawApi);
+
+                    String operationPrompt = "";
+                    boolean isMagicContext = false;
+                    // for $magic_context - no request is passed as context.
+                    if (key.equals(com.akto.test_editor.Utils.MAGIC_CONTEXT)) {
                         operationPrompt = value.toString();
-                    } else if (key.toString().startsWith(com.akto.test_editor.Utils._MAGIC)) {
-                        operationPrompt = key.toString().replace(com.akto.test_editor.Utils._MAGIC, "").trim();
+                        isMagicContext = true;
+                    } else if (key.toString().startsWith(com.akto.test_editor.Utils.MAGIC_CONTEXT)) {
+                        operationPrompt = key.toString().replace(com.akto.test_editor.Utils.MAGIC_CONTEXT, "").trim();
+                        isMagicContext = true;
                     }
-                }
 
-                if (!operationPrompt.isEmpty()) {
-                    String operationTypeLower = operationType.toLowerCase();
-                    String operation = operationTypeLower + ": " + operationPrompt;
-
-                    BasicDBObject queryData = new BasicDBObject();
                     if (!isMagicContext) {
-                        queryData.put(TestExecutorModifier._REQUEST, request);
+                        if (key.equals(com.akto.test_editor.Utils._MAGIC)) {
+                            operationPrompt = value.toString();
+                        } else if (key.toString().startsWith(com.akto.test_editor.Utils._MAGIC)) {
+                            operationPrompt = key.toString().replace(com.akto.test_editor.Utils._MAGIC, "").trim();
+                        }
                     }
-                    queryData.put(TestExecutorModifier._IS_EXTERNAL_CONTEXT_IN_OPERATION, isMagicContext);
-                    queryData.put(TestExecutorModifier._OPERATION, operation);
-                    BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
-                    generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
-                }
+
+                    if (!operationPrompt.isEmpty()) {
+                        String operationTypeLower = operationType.toLowerCase();
+                        String operation = operationTypeLower + ": " + operationPrompt;
+
+                        BasicDBObject queryData = new BasicDBObject();
+                        if (!isMagicContext) {
+                            queryData.put(TestExecutorModifier._REQUEST, request);
+                        }
+                        queryData.put(TestExecutorModifier._IS_EXTERNAL_CONTEXT_IN_OPERATION, isMagicContext);
+                        queryData.put(TestExecutorModifier._OPERATION, operation);
+                        BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
+                        generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
+                    }
+                } // end: skip $magic when MCP already fired
             }
 
         } catch (Exception e) {
@@ -695,6 +760,7 @@ public class Executor {
     }
 
     private static ConcurrentHashMap<String, TestRoles> roleCache = new ConcurrentHashMap<>();
+    private static final int ROLE_FETCH_THROTTLE_SECS = 1 * 60; // 1 minute
 
     public static TestRoles fetchOrFindAttackerRole() {
         return fetchOrFindTestRole("ATTACKER_TOKEN_ALL", false);
@@ -704,19 +770,24 @@ public class Executor {
         if (roleCache == null) {
             roleCache = new ConcurrentHashMap<>();
         }
-        if (roleCache.containsKey(name)) {
+        TestRoles cached = roleCache.get(name);
+        if (cached != null) {
+            int now = Context.now();
+            if (cached.getLastFetched() > 0 && (now - cached.getLastFetched()) < ROLE_FETCH_THROTTLE_SECS) {
+                return roleCache.get(name);
+            }
+        }
+        TestRoles fresh = isId ? dataActor.fetchTestRolesforId(name) : dataActor.fetchTestRole(name);
+        if (fresh == null) {
             return roleCache.get(name);
         }
-
-        if(!isId){
-            TestRoles testRole = dataActor.fetchTestRole(name);
-            roleCache.put(name, testRole);
-            return roleCache.get(name);
-        }else{
-            TestRoles testRole = dataActor.fetchTestRolesforId(name);
-            roleCache.put(name, testRole);
+        if (cached != null && fresh.getLastUpdatedTs() <= cached.getLastUpdatedTs()) {
+            cached.setLastFetched(Context.now());
             return roleCache.get(name);
         }
+        fresh.setLastFetched(Context.now());
+        roleCache.put(name, fresh);
+        return roleCache.get(name);
     }
 
     public static void clearRoleCache() {
@@ -743,23 +814,84 @@ public class Executor {
         return valueStr.replace("${self}", existingValues.get(0));
     }
 
+    @SuppressWarnings("unchecked")
+    private static String resolveLegacyCallbackUrl(Map<String, Object> varMap, String url, String generatedUUID) {
+        List<String> urlList = (List<String>) varMap.get("wordList_url");
+        if (urlList != null && !urlList.isEmpty()) {
+            String base = urlList.get(0);
+            return (base != null && base.contains("{random_uuid}"))
+                ? base.replace("{random_uuid}", generatedUUID)
+                : (base != null ? base : "") + generatedUUID;
+        }
+        return (url != null ? url : "") + generatedUUID;
+    }
+
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
         switch (operationType.toLowerCase()) {
             case "send_ssrf_req":
-                String keyValue = key.toString().replaceAll("\\$\\{random_uuid\\}", "");
-                String url = Utils.extractValue(keyValue, "url=");
-                String redirectUrl = Utils.extractValue(keyValue, "redirect_url=");
-                List<String> uuidList = (List<String>) varMap.getOrDefault("random_uuid", new ArrayList<>());
-                String generatedUUID =  UUID.randomUUID().toString();
-                uuidList.add(generatedUUID);
-                varMap.put("random_uuid", uuidList);
+                String webhookBase = getSsrfWebhookServiceBase();
+                boolean useNewWebhookFlow = webhookBase != null && varMap.containsKey("wordList_url_webhook");
+                if (useNewWebhookFlow) {
+                    String uuid = createWebhookSiteToken(webhookBase);
+                    if (uuid == null) {
+                        return new ExecutorSingleOperationResp(false, "Could not create webhook token");
+                    }
+                    @SuppressWarnings("unchecked")
+                    List<String> urlTemplates = (List<String>) varMap.get("wordList_url_webhook");
+                    if (urlTemplates == null || urlTemplates.isEmpty()) {
+                        return new ExecutorSingleOperationResp(false, "Template must define wordLists.url with {random_uuid} placeholder");
+                    }
+                    List<String> callbackUrls = new ArrayList<>();
+                    for (String template : urlTemplates) {
+                        if (template != null && template.contains("{random_uuid}")) {
+                            String url = template.replace("{random_uuid}", uuid);
+                            if (url.endsWith("//")) {
+                                url = url.substring(0, url.length() - 1);
+                            }
+                            callbackUrls.add(url);
+                        } else {
+                            callbackUrls.add(template);
+                        }
+                    }
+                    if (callbackUrls.isEmpty()) {
+                        return new ExecutorSingleOperationResp(false, "Template wordLists.url must contain {random_uuid} placeholder");
+                    }
+                    @SuppressWarnings("unchecked")
+                    List<String> uuidList = (List<String>) varMap.getOrDefault("random_uuid", new ArrayList<>());
+                    uuidList.add(uuid);
+                    storeSsrfWebhookMapping(uuid, varMap);
+                    varMap.put("random_uuid", uuidList);
+                    varMap.put("wordList_url_webhook", callbackUrls);
+                    String firstCallbackUrl = callbackUrls.get(0);
+                    varMap.put("url_webhook", firstCallbackUrl);
+                    return new ExecutorSingleOperationResp(true, "");
+                } else {
+                    String keyValue = key.toString().replaceAll("\\$\\{random_uuid\\}", "");
+                    String url = Utils.extractValue(keyValue, "url=");
+                    String redirectUrl = Utils.extractValue(keyValue, "redirect_url=");
+                    @SuppressWarnings("unchecked")
+                    List<String> uuidList = (List<String>) varMap.getOrDefault("random_uuid", new ArrayList<>());
+                    String generatedUUID = UUID.randomUUID().toString();
+                    uuidList.add(generatedUUID);
+                    varMap.put("random_uuid", uuidList);
 
-                BasicDBObject response = OrgUtils.getBillingTokenForAuth();
-                if(response.getString("token") != null){
-                    String tokenVal = response.getString("token");
-                    return Utils.sendRequestToSsrfServer(url + generatedUUID, redirectUrl, tokenVal);
-                }else{
-                    return new ExecutorSingleOperationResp(false, response.getString("error"));
+                    String callbackUrl = (url != null && !url.isEmpty() && !url.contains("${"))
+                        ? url + generatedUUID
+                        : resolveLegacyCallbackUrl(varMap, url, generatedUUID);
+                    varMap.put("url_webhook", callbackUrl);
+                    varMap.put("url", callbackUrl);
+                    storeSsrfWebhookMapping(generatedUUID, varMap);
+
+                    BasicDBObject response = OrgUtils.getBillingTokenForAuth();
+                    if (response != null && response.getString("token") != null) {
+                        String tokenVal = response.getString("token");
+                        ExecutorSingleOperationResp postResp = sendRequestToWebhookService(callbackUrl, redirectUrl, tokenVal);
+                        if (!postResp.getSuccess()) {
+                            loggerMaker.infoAndAddToDb("Legacy SSRF server POST failed (test will continue): " + postResp.getErrMsg(), LogDb.TESTING);
+                        }
+                        return new ExecutorSingleOperationResp(true, "");
+                    }
+                    return new ExecutorSingleOperationResp(false, response != null ? response.getString("error") : "Billing token required for SSRF");
                 }
             case "conversations_list":
                 List<String> conversationsList = (List<String>) value;

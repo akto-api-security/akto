@@ -78,7 +78,7 @@ public class APICatalogSync {
     public Map<String, FilterConfig> advancedFilterMap =  new HashMap<>();
 
     private static DataActor dataActor = DataActorFactory.fetchInstance();
-    public static Set<MergedUrls> mergedUrls;
+    public static Set<MergedUrls> mergedUrls = new HashSet<>();
     private static final ClientLayer clientLayer = new ClientLayer();
     private static RSAPublicKey publicKey = PayloadEncodeUtil.getPublicKey();
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
@@ -1438,7 +1438,7 @@ public class APICatalogSync {
         List<Object> writesForSensitiveParamInfo = new ArrayList<>();
         Map<Integer, Boolean> apiCollectionToRedactPayload = new HashMap<>();
         loggerMaker.debug("fetch all collections meta");
-        List<ApiCollection> all = dataActor.fetchAllApiCollectionsMeta();
+        List<ApiCollection> all = dataActor.fetchAllApiCollectionsMeta(false);
         Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
         for(ApiCollection apiCollection: all) {
             apiCollectionToRedactPayload.put(apiCollection.getId(), apiCollection.getRedact());

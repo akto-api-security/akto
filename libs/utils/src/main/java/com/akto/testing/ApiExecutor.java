@@ -33,6 +33,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.TESTING);
@@ -90,6 +91,11 @@ public class ApiExecutor {
 
         if (authParam != null) {
             client = CustomHTTPClientHandler.instance.getClient(authParam, isHttps, followRedirects, requestProtocol);
+        }
+
+        Authenticator digestAuth = request.tag(Authenticator.class);
+        if (digestAuth != null) {
+            client = client.newBuilder().authenticator(digestAuth).build();
         }
 
         Call call = client.newCall(request);
@@ -314,6 +320,7 @@ public class ApiExecutor {
         if(testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
             calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
         }
+        removeAktoInternalHeaders(request);
 
         boolean executeScript = testingRunConfig != null;
         String tempPayload = ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript, testingRunConfig);
@@ -350,7 +357,12 @@ public class ApiExecutor {
         List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
         Map<String, List<String>> headersMap = request.getHeaders();
         if (headersMap == null) headersMap = new HashMap<>();
-        headersMap.put(Constants.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
+
+        // Only add AKTO_IGNORE_FLAG if AKTO_COVERAGE_FLAG is not present
+        if (!headersMap.containsKey(Constants.AKTO_COVERAGE_FLAG)) {
+            headersMap.put(Constants.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
+        }
+
         for (String headerName: headersMap.keySet()) {
             if (forbiddenHeaders.contains(headerName)) continue;
             if (headerName.contains(" ")) continue;
@@ -366,6 +378,18 @@ public class ApiExecutor {
         URLMethods.Method method = URLMethods.Method.fromString(request.getMethod());
 
         builder = builder.url(request.getFullUrlWithParams());
+
+        DigestOkHttpAuthenticator digestAuthenticator = null;
+        if (testingRunConfig != null) {
+            String digestUser = request.getDigestAuthUsername();
+            String digestPass = request.getDigestAuthPassword();
+            if (digestUser != null && digestPass != null) {
+                digestAuthenticator = new DigestOkHttpAuthenticator(digestUser, digestPass);
+                builder.tag(Authenticator.class, digestAuthenticator);
+                request.setDigestAuthUsername(null);
+                request.setDigestAuthPassword(null);
+            }
+        }
 
         boolean nonTestingContext = false;
         if (testingRunConfig == null) {
@@ -390,10 +414,19 @@ public class ApiExecutor {
             case OTHER:
                 throw new Exception("Invalid method name");
         }
-        //loggerMaker.infoAndAddToDb("Received response from: " + url, LogDb.TESTING);
+        if (digestAuthenticator != null) {
+            String computedAuth = digestAuthenticator.getLastAuthorizationHeader();
+            if (computedAuth != null && request.getHeaders() != null) {
+                request.getHeaders().put("authorization", Collections.singletonList(computedAuth));
+            }
+        }
 
         if (url.contains("login_submit")) {
             loggerMaker.infoAndAddToDb("Response Payload " + response.getBody(), LogDb.TESTING);
+        }
+
+        if (executeScript) {
+            response = ApiExecutorUtil.runPostRequestScript(request, response, true, testingRunConfig);
         }
 
         request.setBody(tempPayload);
@@ -625,6 +658,22 @@ public class ApiExecutor {
         );
     }
 
+    private static void removeAktoInternalHeaders(OriginalHttpRequest request) {
+        Map<String, List<String>> headers = request.getHeaders();
+        if (headers == null || headers.isEmpty()) return;
+
+        Set<String> toRemove = headers.keySet().stream()
+            .filter(h -> h != null && h.startsWith("x-akto-")
+                      && !h.equals(Constants.AKTO_IGNORE_FLAG)
+                      && !h.equals(Constants.AKTO_ATTACH_FILE))  // consumed by sendWithRequestBody before the wire
+            .collect(Collectors.toSet());
+
+        if (!toRemove.isEmpty()) {
+            loggerMaker.info("Removing akto internal headers before sending test request: " + toRemove);
+            toRemove.forEach(headers::remove);
+        }
+    }
+
     private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
         if (headers == null) {
@@ -653,7 +702,6 @@ public class ApiExecutor {
                 fileUrl = attachHeaderVal.substring(sepIdx + 2);
             }
             RequestBody requestBody = getFileRequestBody(fileUrl);
-        
             builder.post(requestBody);
             builder.removeHeader(Constants.AKTO_ATTACH_FILE);
             Request updatedRequest = builder.build();
@@ -880,6 +928,13 @@ public class ApiExecutor {
         throw new Exception("Timeout waiting for SSE message with id=" + id);
     }
 
+    public static OriginalHttpResponse sendRequestSkipSse(OriginalHttpRequest request,
+            boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug,
+            List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+        return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs,
+                skipSSRFCheck, true);
+    }
+
     public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects,
         TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
         boolean skipSSRFCheck, boolean overrideMessageEndpoint) throws Exception {
@@ -900,6 +955,7 @@ public class ApiExecutor {
         }
 
         // Open SSE session with dynamic endpoint and request headers
+        removeAktoInternalHeaders(request);
         Headers headers = request.toOkHttpHeaders();
         SseSession session = openSseSession(host, sseEndpoint, headers, debug);
 

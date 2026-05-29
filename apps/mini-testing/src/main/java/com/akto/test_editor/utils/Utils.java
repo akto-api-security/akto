@@ -14,12 +14,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dto.TestingRunWebhook;
 import com.akto.dto.ApiInfo.ApiAccessType;
-import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.UrlModifierPayload;
-import com.akto.util.Constants;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.JSONUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -32,11 +35,14 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
+import org.bson.types.ObjectId;
+
 import static com.akto.rules.TestPlugin.extractAllValuesFromPayload;
 import okhttp3.*;
 
 public class Utils {
 
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.TESTING);
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final JsonFactory factory = mapper.getFactory();
     private static final Gson gson = new Gson();
@@ -775,63 +781,35 @@ public class Utils {
         return result;
     }
 
-    public static ExecutorSingleOperationResp sendRequestToSsrfServer(String requestUrl, String redirectUrl, String tokenVal){
-        RequestBody emptyBody = RequestBody.create(new byte[]{}, null);
-        
-        Request request = new Request.Builder()
-            .url(requestUrl)
-            .addHeader("x-akto-redirect-url", redirectUrl)
-            .addHeader(Constants.AKTO_TOKEN_KEY, tokenVal)
-            .post(emptyBody)
-            .build();
-        Response okResponse = null;
-    
+    /**
+     * Persist webhook UUID → test run context for dashboard correlation.
+     * Uses DataActor so the insert goes through the configured layer (e.g. HTTP to backend or local TestingRunWebhookDao).
+     */
+    public static void storeSsrfWebhookMapping(String uuid, Map<String, Object> varMap) {
         try {
-            okResponse = client.newCall(request).execute();
-            if (!okResponse.isSuccessful()) {
-                return new ExecutorSingleOperationResp(false,"Could not send request to the ssrf server.");
+            Integer accountId = (Integer) varMap.get("accountId");
+            String apiInfoKeyStr = (String) varMap.get("apiInfoKey");
+            String testSubType = (String) varMap.get("testSubType");
+            if (accountId == null || apiInfoKeyStr == null || testSubType == null) {
+                return;
             }
-            return new ExecutorSingleOperationResp(true, "");
-        }catch (Exception e){
-            return new ExecutorSingleOperationResp(false, e.getMessage());
-        }finally {
-            if (okResponse != null) {
-                okResponse.close(); // Manually close the response body
-            }
-        }
-    }
-
-    public static Boolean sendRequestToSsrfServer(String url){
-        String requestUrl = "";
-        if(!(url.startsWith("http"))){
-            String hostName ="https://test-services.akto.io/";
-            if(System.getenv("SSRF_SERVICE_NAME") != null && System.getenv("SSRF_SERVICE_NAME").length() > 0){
-                hostName = System.getenv("SSRF_SERVICE_NAME");
-            }
-            requestUrl = hostName + "validate/" + url;
-        }
-
-        Request request = new Request.Builder()
-            .url(requestUrl)
-            .get()
-            .build();
-            Response okResponse = null;
-        
-        try {
-            okResponse = client.newCall(request).execute();
-            if (!okResponse.isSuccessful()) {
-                return false;
-            }else{
-                ResponseBody responseBody = okResponse.body();
-                BasicDBObject bd = BasicDBObject.parse(responseBody.string());
-                return bd.getBoolean("url-hit");
-            }
-        }catch (Exception e){
-            return false;
-        } finally {
-            if (okResponse != null) {
-                okResponse.close(); // Manually close the response body
-            }
+            String testRunIdStr = (String) varMap.get("testRunId");
+            String testRunResultSummaryIdStr = (String) varMap.get("testRunResultSummaryId");
+            ObjectId runId = (testRunIdStr != null && !testRunIdStr.isEmpty() && ObjectId.isValid(testRunIdStr))
+                    ? new ObjectId(testRunIdStr) : null;
+            ObjectId summaryId = (testRunResultSummaryIdStr != null && !testRunResultSummaryIdStr.isEmpty() && ObjectId.isValid(testRunResultSummaryIdStr))
+                    ? new ObjectId(testRunResultSummaryIdStr) : null;
+            TestingRunWebhook mapping = new TestingRunWebhook(
+                    uuid,
+                    accountId,
+                    runId,
+                    summaryId,
+                    apiInfoKeyStr,
+                    testSubType,
+                    Context.now()
+            );
+            DataActorFactory.fetchInstance().storeTestingRunWebhook(mapping);
+        } catch (Exception ignored) {
         }
     }
 

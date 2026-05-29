@@ -5,6 +5,8 @@ import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.traffic.CollectionTags;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.policies.*;
 import com.akto.runtime.utils.Utils;
 import com.akto.dto.type.APICatalog;
@@ -20,6 +22,7 @@ import com.akto.data_actor.DataActorFactory;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import java.util.*;
+import java.util.Arrays;
 
 import static com.akto.hybrid_runtime.APICatalogSync.createUrlTemplate;
 
@@ -212,6 +215,29 @@ public class AktoPolicyNew {
 
         apiInfo.setParentMcpToolNames(httpResponseParams.getParentMcpToolNames());
 
+        Map<String, List<String>> reqHeaders = httpResponseParams.getRequestParams().getHeaders();
+        String ua = RuntimeUtil.getHeaderValue(reqHeaders, "user-agent");
+        addClassifiedTag(apiInfo, "user-agent", UserAgentClassifier.classify(ua).name());
+
+        String referer = RuntimeUtil.getHeaderValue(reqHeaders, "referer");
+        addClassifiedTag(apiInfo, "referer", UserAgentClassifier.extractRefererHost(referer));
+
+    }
+
+    private static void addClassifiedTag(ApiInfo apiInfo, String headerKey, String category) {
+        if (category == null || category.isEmpty()) return;
+        List<CollectionTags> existingTags = apiInfo.getTagsList();
+        if (existingTags == null) {
+            existingTags = new ArrayList<>();
+            apiInfo.setTagsList(existingTags);
+        }
+        for (CollectionTags tag : existingTags) {
+            if (Objects.equals(tag.getKeyName(), headerKey) && Objects.equals(tag.getValue(), category)) {
+                return;
+            }
+        }
+        // lastUpdatedTs=0 so the object is stable across runs — MongoDB addEachToSet deduplicates by full equality
+        existingTags.add(new CollectionTags(0, headerKey, category, CollectionTags.TagSource.AKTO));
     }
 
     public PolicyCatalog getApiInfoFromMap(ApiInfo.ApiInfoKey apiInfoKey) {
@@ -367,6 +393,10 @@ public class AktoPolicyNew {
 //        }
 
         return bulkUpdates;
+    }
+
+    public boolean isMergeUrlsOnVersions() {
+        return mergeUrlsOnVersions;
     }
 
     public List<RuntimeFilter> getFilters() {

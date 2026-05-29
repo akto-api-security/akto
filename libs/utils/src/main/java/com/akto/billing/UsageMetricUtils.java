@@ -271,6 +271,11 @@ public class UsageMetricUtils {
         return featureAccess;
     }
 
+    public static boolean isFeatureAccessGranted(int accountId, String featureLabel){
+        FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, featureLabel);
+        return featureAccess != null && featureAccess.getIsGranted();
+    }
+
     public static FeatureAccess getFeatureAccessSaas(int accountId, String featureLabel) {
         /*
          * No access in case of billing service down.

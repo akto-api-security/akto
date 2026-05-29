@@ -105,13 +105,18 @@ public class Kafka {
         // test if connection successful by sending a test message in a blocking way
         // calling .get() blocks the thread till we receive a message
         // if any error then close the connection
+        loggerMaker.infoAndAddToDb("Kafka init: attempting ping to broker: " + brokerIP);
         ProducerRecord<String, String> record = new ProducerRecord<>("akto.misc", "ping");
         try {
             producer.send(record).get();
             producerReady = true;
+            loggerMaker.infoAndAddToDb("Kafka init: ping successful, producer is ready. broker: " + brokerIP);
         } catch (Exception e) {
             close();
-            loggerMaker.errorAndAddToDb(e, "Kafka producer initialization failed with unexpected error: ");
+            loggerMaker.errorAndAddToDb(e, "Kafka init: ping failed, producerReady=false. broker: " + brokerIP
+                + " | errorType: " + e.getClass().getName()
+                + " | cause: " + (e.getCause() != null ? e.getCause().getClass().getName() + " - " + e.getCause().getMessage() : "none")
+                + " | message: " + e.getMessage());
         }
     }
 

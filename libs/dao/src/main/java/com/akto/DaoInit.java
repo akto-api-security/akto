@@ -252,13 +252,13 @@ public class DaoInit {
         ClassModel<OrganizationFlags> OrganizationFlagsClassModel = ClassModel.builder(OrganizationFlags.class).enableDiscriminator(true).build();
         ClassModel<JobParams> jobParams = ClassModel.builder(JobParams.class).enableDiscriminator(true).build();
         ClassModel<TLSAuthParam> tlsAuthClassModel = ClassModel.builder(TLSAuthParam.class).enableDiscriminator(true).build();
+        ClassModel<DigestAuthParam> digestAuthParamClassModel = ClassModel.builder(DigestAuthParam.class).enableDiscriminator(true).build();
         ClassModel<CollectionTags> collectionTagsModel = ClassModel.builder(CollectionTags.class).enableDiscriminator(true).build();
         ClassModel<McpReconResult> mcpReconResultClassModel = ClassModel.builder(McpReconResult.class).enableDiscriminator(true).build();
         ClassModel<McpReconRequest> mcpReconRequestClassModel = ClassModel.builder(McpReconRequest.class).enableDiscriminator(true).build();
         ClassModel<AgentConversationResult> agentConversationResultClassModel = ClassModel.builder(AgentConversationResult.class).enableDiscriminator(true).build();
         ClassModel<AgentTrafficLog> agentTrafficLogClassModel = ClassModel.builder(AgentTrafficLog.class).enableDiscriminator(true).build();
-
-
+        ClassModel<ApiSequences> apiSequencesClassModel = ClassModel.builder(ApiSequences.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -287,8 +287,8 @@ public class DaoInit {
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel, paramInfoClassModel,
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
-                riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, jobParams, tlsAuthClassModel, collectionTagsModel, mcpReconResultClassModel
-                , mcpReconRequestClassModel, agentConversationResultClassModel, agentTrafficLogClassModel).automatic(true).build());
+                riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, jobParams, tlsAuthClassModel, digestAuthParamClassModel, collectionTagsModel, mcpReconResultClassModel
+                , mcpReconRequestClassModel, agentConversationResultClassModel, agentTrafficLogClassModel, apiSequencesClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -392,7 +392,8 @@ public class DaoInit {
         McpReconRequestDao.instance.createIndicesIfAbsent();
         McpReconResultDao.instance.createIndicesIfAbsent();
         AgentTrafficLogDao.instance.createIndicesIfAbsent();
-
+        TestingRunWebhookDao.instance.createIndicesIfAbsent();
+        ApiSequencesDao.instance.createIndicesIfAbsent();
     }
 
 }

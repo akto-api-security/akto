@@ -4,6 +4,10 @@ import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.mongodb.client.model.Filters;
+
+import lombok.Getter;
+import lombok.Setter;
+
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
@@ -27,6 +31,11 @@ public class TestRoles {
     
     @BsonIgnore
     private String endpointLogicalGroupIdHexId;
+
+    @BsonIgnore
+    @Getter
+    @Setter
+    private long lastFetched;
 
     private String createdBy;
     private int createdTs;

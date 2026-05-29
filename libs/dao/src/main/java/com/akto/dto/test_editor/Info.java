@@ -28,6 +28,8 @@ public class Info {
 
     private List<String> cve;
 
+    private Boolean agenticTestingAllowed;
+
     public Info(String name, String description, String details, String impact, String remediation, Category category, String subCategory,
             String severity, List<String> tags, List<String> references, List<String> cwe, List<String> cve) {
         this.name = name;
@@ -141,6 +143,14 @@ public class Info {
 
     public void setCve(List<String> cve) {
         this.cve = cve;
+    }
+
+    public Boolean getAgenticTestingAllowed() {
+        return agenticTestingAllowed;
+    }
+
+    public void setAgenticTestingAllowed(Boolean agenticTestingAllowed) {
+        this.agenticTestingAllowed = agenticTestingAllowed;
     }
 
 }

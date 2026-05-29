@@ -34,9 +34,11 @@ import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.utility.UtilityServer;
 import com.akto.usage.OrgUtils;
 import com.akto.util.Constants;
+import com.akto.util.RecordedLoginFlowUtil;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.util.DashboardMode;
+import org.apache.commons.io.FileUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -44,7 +46,9 @@ import org.bson.types.ObjectId;
 
 import static com.akto.testing.Utils.readJsonContentFromFile;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -67,6 +71,8 @@ public class Main {
     private static final String customMiniTestingServiceName;
     static {
         customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME") == null? "Default_" + UUID.randomUUID().toString().substring(0, 4) : System.getenv("MINI_TESTING_NAME");
+        RecordedLoginFlowUtil.setScreenshotsPersistence(
+                (roleName, userId, screenshotsBase64) -> dataActor.persistRecordedLoginFlowScreenshots(roleName, userId, screenshotsBase64));
     }
 
     private static void setupRateLimitWatcher (AccountSettings settings) {
@@ -112,6 +118,12 @@ public class Main {
                             break;
                         case POSTMAN_IMPORTS:
                             handlePostmanImports(testingRunPlayground);
+                            break;
+                        case LOGIN_FLOW_TEST:
+                            handleLoginFlowTestPlayground(testingRunPlayground);
+                            break;
+                        case RECORDED_JSON_FLOW:
+                            handleRecordedJsonFlowPlayground(testingRunPlayground);
                             break;
                     }
                 } catch (Exception e) {
@@ -190,6 +202,62 @@ public class Main {
             testingRunResult.setMultiExecTestResults(list);
         }
         return testingRunResult;
+    }
+
+    private static void handleLoginFlowTestPlayground(TestingRunPlayground testingRunPlayground) {
+        LoginFlowParams params = null;
+        if (testingRunPlayground.isLoginFlowSingleStepOnly()) {
+            params = new LoginFlowParams(testingRunPlayground.getLoginFlowUserId(), true, testingRunPlayground.getLoginFlowNodeId());
+        }
+        LoginFlowResponse loginFlowResponse;
+        try {
+            loginFlowResponse = TestExecutor.executeLoginFlow(
+                    testingRunPlayground.getLoginFlowAuthMechanism(), params);
+        } catch (Exception e) {
+            loginFlowResponse = new LoginFlowResponse(null, e.getMessage(), false);
+        }
+        if (loginFlowResponse == null) {
+            loginFlowResponse = new LoginFlowResponse(null, "Login flow returned no response", false);
+        }
+        testingRunPlayground.setLoginFlowResponse(loginFlowResponse);
+        dataActor.updateTestingRunPlayground(testingRunPlayground);
+    }
+
+    private static void handleRecordedJsonFlowPlayground(TestingRunPlayground testingRunPlayground) {
+        File tmpOutputFile = null;
+        File tmpErrorFile = null;
+        try {
+            tmpOutputFile = File.createTempFile("output", ".json");
+            tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
+            String roleName = testingRunPlayground.getRecordedFlowRoleName();
+            if (roleName != null && roleName.trim().isEmpty()) {
+                roleName = null;
+            }
+            // userId 0 skips RecordedLoginInputDao / RecordedLoginScreenshotDao inside util (no direct DB from mini-testing).
+            // Token is returned via TestingRunPlayground + dataActor.updateTestingRunPlayground.
+            RecordedLoginFlowUtil.triggerFlow(
+                    testingRunPlayground.getRecordedFlowTokenFetchCommand(),
+                    testingRunPlayground.getRecordedFlowContent(),
+                    tmpOutputFile.getPath(),
+                    tmpErrorFile.getPath(),
+                    0,
+                    roleName);
+            String tokenJson = FileUtils.readFileToString(tmpOutputFile, StandardCharsets.UTF_8);
+            testingRunPlayground.setRecordedFlowTokenResult(tokenJson);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in recorded JSON flow playground: " + e.getMessage());
+            String msg = e.getMessage();
+            testingRunPlayground.setRecordedFlowErrorMessage(msg != null ? msg : "Recorded JSON flow failed");
+        } finally {
+            testingRunPlayground.setState(State.COMPLETED);
+            dataActor.updateTestingRunPlayground(testingRunPlayground);
+            if (tmpOutputFile != null) {
+                tmpOutputFile.delete();
+            }
+            if (tmpErrorFile != null) {
+                tmpErrorFile.delete();
+            }
+        }
     }
 
     private static void handlePostmanImports(TestingRunPlayground testingRunPlayground) {
@@ -443,6 +511,8 @@ public class Main {
         if(Constants.IS_NEW_TESTING_ENABLED){
             currentTestInfo = checkIfAlreadyTestIsRunningOnMachine();
         }
+        
+        AllMetrics.instance.init(LogDb.TESTING, false, dataActor, Context.getActualAccountId(), customMiniTestingServiceName, ModuleInfo.ModuleType.MINI_TESTING.name());
 
         if(currentTestInfo != null){
             try {
@@ -486,7 +556,7 @@ public class Main {
             // Reset current execution fallback flag for new test cycle
             testExecutor.resetCurrentExecutionFallback();
             PrometheusMetricsHandler.markModuleIdle();
-            int start = Context.now();
+            int start = Context.now();  
             long startDetailed = System.currentTimeMillis();
             int delta = start - 20*60;
             if (accountSettings.getTimeForScheduledSummaries() > 0) {
@@ -511,9 +581,23 @@ public class Main {
                 testingRun = dataActor.findTestingRun(trrs.getTestingRunId().toHexString());
             }
 
-            if (testingRun == null ||
-                    (testingRun.getMiniTestingServiceName() != null &&
-                            !testingRun.getMiniTestingServiceName().equalsIgnoreCase(customMiniTestingServiceName))) {
+            if (testingRun == null) {
+                Thread.sleep(1000);
+                continue;
+            }
+
+            // Check new list field (new runs) first, then fall back to legacy single-string field
+            List<String> allowedModules = testingRun.getAllowedMiniTestingServiceNames();
+            if (allowedModules != null && !allowedModules.isEmpty()) {
+                boolean eligible = allowedModules.stream()
+                        .filter(Objects::nonNull)
+                        .anyMatch(name -> name.equalsIgnoreCase(customMiniTestingServiceName));
+                if (!eligible) {
+                    Thread.sleep(1000);
+                    continue;
+                }
+            } else if (testingRun.getMiniTestingServiceName() != null
+                    && !testingRun.getMiniTestingServiceName().equalsIgnoreCase(customMiniTestingServiceName)) {
                 Thread.sleep(1000);
                 continue;
             }
@@ -695,6 +779,7 @@ public class Main {
                 Executor.clearRoleCache();
 
                 if(!maxRetriesReached){
+                    TestExecutor.initRunDeadline(testingRun);
                     if(Constants.IS_NEW_TESTING_ENABLED){
                         int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
                         testingProducer.initProducer(testingRun, summaryId, false, syncLimit);

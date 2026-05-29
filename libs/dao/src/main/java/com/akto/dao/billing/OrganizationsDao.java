@@ -1,5 +1,7 @@
 package com.akto.dao.billing;
 
+import java.util.UUID;
+
 import org.bson.conversions.Bson;
 
 import com.akto.dao.BillingContextDao;
@@ -7,8 +9,10 @@ import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
+import com.akto.util.UsageUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 
 public class OrganizationsDao extends BillingContextDao<Organization>{
 
@@ -59,19 +63,31 @@ public class OrganizationsDao extends BillingContextDao<Organization>{
                 Filters.eq(Tokens.ORG_ID, organization.getId()),
                 Filters.eq(Tokens.ACCOUNT_ID, accountId)
         );
-        String errMessage = "";
         tokens = TokensDao.instance.findOne(filters);
+        
+        // Regenerate token if it's missing or old
+        if (tokens == null || tokens.isOldToken()) {
+            Bson updates;
+            if (tokens == null) {
+                updates = Updates.combine(
+                    Updates.set(Tokens.UPDATED_AT, Context.now()),
+                    Updates.setOnInsert(Tokens.CREATED_AT, Context.now()),
+                    Updates.setOnInsert(Tokens.ORG_ID, organization.getId()),
+                    Updates.setOnInsert(Tokens.ACCOUNT_ID, accountId)
+                );
+            } else {
+                updates = Updates.set(Tokens.UPDATED_AT, Context.now());
+            }
+            String newToken = organization.getId() + "_" + accountId + "_" + UUID.randomUUID().toString().replace("-", "");
+            UsageUtils.saveToken(organization.getId(), accountId, updates, filters, newToken);
+            tokens = TokensDao.instance.findOne(filters);
+        }
+        
         if (tokens == null) {
-            errMessage = "error extracting ${akto_header}, token is missing";
+            return new BasicDBObject("error", "error extracting ${akto_header}, token is missing");        
         }
-        if (tokens.isOldToken()) {
-            errMessage = "error extracting ${akto_header}, token is old";
-        }
-        if(errMessage.length() > 0){
-            bDObject = new BasicDBObject("error", errMessage);
-        }else{
-            bDObject = new BasicDBObject("token", tokens.getToken());
-        }
+        
+        bDObject = new BasicDBObject("token", tokens.getToken());
         return bDObject;
     }
 

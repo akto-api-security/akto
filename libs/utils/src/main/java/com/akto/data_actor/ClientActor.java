@@ -3,11 +3,14 @@ package com.akto.data_actor;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.bulk_updates.BulkUpdates;
@@ -70,7 +73,9 @@ public class ClientActor extends DataActor {
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     public static final String CYBORG_URL = "https://cyborg.akto.io";
     public static final String ULTRON_URL = "https://ultron.akto.io";
+    private static final String PARAM_TEST_SCRIPT_TYPE = "testScriptType";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
+    private static ExecutorService sequenceThreadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
         
     /**
      * Dedicated thread pool for agent traffic log HTTP writes.
@@ -79,6 +84,21 @@ public class ClientActor extends DataActor {
      */
     private static final int maxAgentTrafficLogWrites = 5;
     private static ExecutorService agentTrafficLogThreadPool = Executors.newFixedThreadPool(maxAgentTrafficLogWrites);
+
+    private static final int AGENT_QUERY_BATCH_SIZE = 100;
+    private static final List<AgentQueryRecord> agentQueryRecordBuffer = new ArrayList<>();
+    private static final ScheduledExecutorService agentQueryFlushScheduler =
+            Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "agent-query-flush");
+                t.setDaemon(true);
+                return t;
+            });
+
+    static {
+        agentQueryFlushScheduler.scheduleAtFixedRate(
+                ClientActor::flushAgentQueryRecords, 5, 5, TimeUnit.SECONDS);
+    }
+
     private static AccountSettings accSettings;
 
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
@@ -104,6 +124,31 @@ public class ClientActor extends DataActor {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
         return dbAbsHost + "/api";
+    }
+
+    public Config.DatadogForwarderConfig fetchDatadogForwarderConfig() {
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDatadogForwarderConfig", "", "GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchDatadogForwarderConfig", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            try {
+                BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBObject configObj = (BasicDBObject) payloadObj.get("datadogForwarderConfig");
+                if (configObj == null) return null;
+                return objectMapper.readValue(configObj.toJson(), Config.DatadogForwarderConfig.class);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error parsing fetchDatadogForwarderConfig response: " + e, LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchDatadogForwarderConfig: " + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
     }
 
     public AccountSettings fetchAccountSettings() {
@@ -2127,6 +2172,7 @@ public class ClientActor extends DataActor {
                 apiCollection.remove("displayName");
                 apiCollection.remove("urlsCount");
                 apiCollection.remove("envType");
+                apiCollection.remove("conditions");
                 return objectMapper.readValue(apiCollection.toJson(), ApiCollection.class);
             } catch(Exception e) {
                 return null;
@@ -2137,10 +2183,12 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public List<ApiCollection> fetchAllApiCollectionsMeta() {
+    public List<ApiCollection> fetchAllApiCollectionsMeta(boolean includeTagsList) {
         Map<String, List<String>> headers = buildHeaders();
         List<ApiCollection> apiCollections = new ArrayList<>();
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAllApiCollectionsMeta", "", "GET", null, headers, "");
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("includeTagsList", includeTagsList);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAllApiCollectionsMeta", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
@@ -2649,6 +2697,9 @@ public class ClientActor extends DataActor {
                     case "TLS_AUTH":
                         authParam.put("_t", "com.akto.dto.testing.TLSAuthParam");
                         break;
+                    case "DIGEST_AUTH":
+                        authParam.put("_t", "com.akto.dto.testing.DigestAuthParam");
+                        break;
                     default:
                         break;
                 }
@@ -2670,6 +2721,9 @@ public class ClientActor extends DataActor {
                         break;
                     case "TLS_AUTH":
                         defaultAuthParam.put("_t", "com.akto.dto.testing.TLSAuthParam");
+                        break;
+                    case "DIGEST_AUTH":
+                        defaultAuthParam.put("_t", "com.akto.dto.testing.DigestAuthParam");
                         break;
                     default:
                         break;
@@ -2966,7 +3020,7 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("apiCollectionId", apiCollectionId);
         obj.put("url", urlVal);
-        obj.put("method", method);
+        obj.put("method", method.name());
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findSti", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -3062,7 +3116,7 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("apiCollectionId", apiCollectionId);
         obj.put("url", urlVal);
-        obj.put("method", method);
+        obj.put("method", method.name());
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchSampleDataById", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -3542,7 +3596,7 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public Map<String, List<String>> buildHeaders() {
+    public static Map<String, List<String>> buildHeaders() {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put(AUTHORIZATION, Collections.singletonList(getAuthToken()));
         return headers;
@@ -3845,6 +3899,25 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void persistRecordedLoginFlowScreenshots(String roleName, int userId, List<String> screenshotsBase64) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("recordedLoginScreenshotRoleName", roleName);
+        obj.put("userId", userId);
+        obj.put("recordedLoginFlowScreenshotsBase64", screenshotsBase64);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/persistRecordedLoginFlowScreenshots", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in persistRecordedLoginFlowScreenshots", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in persistRecordedLoginFlowScreenshots" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
     public Node fetchDependencyFlowNodesByApiInfoKey(int apiCollectionId, String urlVar, String method) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
@@ -3969,11 +4042,13 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public TestScript fetchTestScript(){
+    public TestScript fetchTestScript(TestScript.Type type){
         TestScript testScript = null;
 
         Map<String, List<String>> headers = buildHeaders();
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchTestScript", "", "GET", null, headers, "");
+        BasicDBObject obj = new BasicDBObject();
+        obj.put(PARAM_TEST_SCRIPT_TYPE, type != null ? type.name() : null);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchTestScript", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
@@ -4142,18 +4217,23 @@ public class ClientActor extends DataActor {
 
     public void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
         Map<String, List<String>> headers = buildHeaders();
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("testingRunPlaygroundId", testingRunPlayground.getHexId());
-        obj.put("testingRunPlaygroundType", testingRunPlayground.getTestingRunPlaygroundType());
+        Map<String, Object> body = new HashMap<>();
+        body.put("testingRunPlayground", testingRunPlayground);
         switch (testingRunPlayground.getTestingRunPlaygroundType()) {
             case TEST_EDITOR_PLAYGROUND:
-                obj.put("testingRunResult", testingRunPlayground.getTestingRunResult());
+                body.put("testingRunPlaygroundId", testingRunPlayground.getHexId());
+                body.put("testingRunPlaygroundType", TestingRunPlayground.TestingRunPlaygroundType.TEST_EDITOR_PLAYGROUND);
+                body.put("testingRunResult", testingRunPlayground.getTestingRunResult());
                 break;
             case POSTMAN_IMPORTS:
-                obj.put("originalHttpResponse", testingRunPlayground.getOriginalHttpResponse());
+                body.put("testingRunPlaygroundId", testingRunPlayground.getHexId());
+                body.put("testingRunPlaygroundType", TestingRunPlayground.TestingRunPlaygroundType.POSTMAN_IMPORTS);
+                body.put("originalHttpResponse", testingRunPlayground.getOriginalHttpResponse());
+                break;
+            default:
                 break;
         }
-        String jsonString = gson.toJson(obj);
+        String jsonString = gson.toJson(body);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestingRunPlaygroundStateAndResult", "", "POST",  jsonString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -4559,4 +4639,108 @@ public class ClientActor extends DataActor {
             return false;
         }
     }
+
+    @Override
+    public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunWebhook", testingRunWebhook);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeTestingRunWebhook", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in storeTestingRunWebhook", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in storeTestingRunWebhook" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
+
+    int sequenceBatchLimit = 100;
+    @Override
+    public void writeApiSequences(List<ApiSequences> sequences) {
+        if (sequences == null || sequences.isEmpty()) return;
+        List<ApiSequences> batch = new ArrayList<>();
+        for (int i = 0; i < sequences.size(); i++) {
+            batch.add(sequences.get(i));
+            if (batch.size() % sequenceBatchLimit == 0) {
+                List<ApiSequences> finalBatch = batch;
+                sequenceThreadPool.submit(() -> writeApiSequencesBatch(finalBatch));
+                batch = new ArrayList<>();
+            }
+        }
+        if (!batch.isEmpty()) {
+            List<ApiSequences> finalBatch = batch;
+            sequenceThreadPool.submit(() -> writeApiSequencesBatch(finalBatch));
+        }
+    }
+
+    private void writeApiSequencesBatch(List<ApiSequences> sequences) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiSequencesList", sequences);
+        String objString = gson.toJson(obj);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/writeApiSequences", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb(null, "non 2xx response in writeApiSequences", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in writeApiSequences: " + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+    public Map<String, String> fetchDeviceUserMap() {
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDeviceUserMap", "", "POST", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String body = response.getBody();
+            if (response.getStatusCode() != 200 || body == null) {
+                return new HashMap<>();
+            }
+            Map<String, String> result = gson.fromJson(body, Map.class);
+            return result != null ? result : new HashMap<>();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchDeviceUserMap: " + e, LoggerMaker.LogDb.RUNTIME);
+            return new HashMap<>();
+        }
+    }
+
+    public void storeAgentQueryData(AgentQueryRecord agentQueryRecord) {
+        boolean shouldFlush;
+        synchronized (agentQueryRecordBuffer) {
+            agentQueryRecordBuffer.add(agentQueryRecord);
+            shouldFlush = agentQueryRecordBuffer.size() >= AGENT_QUERY_BATCH_SIZE;
+        }
+        if (shouldFlush) {
+            agentTrafficLogThreadPool.submit(ClientActor::flushAgentQueryRecords);
+        }
+    }
+
+    private static void flushAgentQueryRecords() {
+        List<AgentQueryRecord> batch;
+        loggerMaker.infoAndAddToDb("Flushing agent query records", LoggerMaker.LogDb.RUNTIME);
+        synchronized (agentQueryRecordBuffer) {
+            if (agentQueryRecordBuffer.isEmpty()) return;
+            batch = new ArrayList<>(agentQueryRecordBuffer);
+            agentQueryRecordBuffer.clear();
+        }
+        loggerMaker.infoAndAddToDb("Flushing agent query records: " + batch.size(), LoggerMaker.LogDb.RUNTIME);
+        try {
+            Map<String, List<String>> headers = buildHeaders();
+            BasicDBObject obj = new BasicDBObject();
+            obj.put("agentQueryRecords", batch);
+            String jsonBody = gson.toJson(obj);
+            OriginalHttpRequest request = new OriginalHttpRequest(
+                    url + "/storeAgentQueryData", "", "POST", jsonBody, headers, "");
+            ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in flushAgentQueryRecords: " + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
 }

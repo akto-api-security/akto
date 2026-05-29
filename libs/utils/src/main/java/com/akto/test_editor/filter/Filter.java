@@ -1,6 +1,5 @@
 package com.akto.test_editor.filter;
 
-import com.akto.gpt.handlers.gpt_prompts.TestValidatorModifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -15,7 +14,6 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExtractOperator;
 import com.akto.dao.test_editor.TestEditorEnums.OperandTypes;
-import com.akto.data_actor.DataActor;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.RawApi;
 import com.akto.dto.billing.FeatureAccess;
@@ -181,7 +179,6 @@ public class Filter {
             int accountId = Context.getActualAccountId();
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             if (featureAccess.getIsGranted()) {
-
                 if (querySet instanceof String) {
                     String query = (String) querySet;
                     if (query.startsWith(Utils._MAGIC)) {
@@ -197,6 +194,7 @@ public class Filter {
                     }
                 }
 
+               
                 if(!operationPrompt.isEmpty()){
 
                     operation = operationTypeLower + ": " + operationPrompt;
@@ -209,21 +207,31 @@ public class Filter {
                     BasicDBObject queryData = new BasicDBObject();
 
                     RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+                    
+                    if (filterActionRequest.isValidationContext()) {
+                        operation = operation + "\n\nIMPORTANT - Strict validation rules for this check:\n"
+                            + "The request payload may appear in the response, but echoing alone does NOT confirm the operation. "
+                            + "You must verify that the response demonstrates actual exploitation or behavioral evidence — "
+                            + "not merely that the input was reflected back.\n"
+                            + "Return not_found immediately if the response:\n"
+                            + "  - No actual retry/tool recall/loop trigger occurred in the response\n"
+                            + "  - The response is a normal benign response with no behavioral change from the request\n"
+                            + "  - The phrase appears ONLY because it was echoed/reflected from the request payload " 
+                            + "(e.g., the query string was included back in the response). Reflection alone is" 
+                            + "NOT evidence of the vulnerability being triggered."
+                            + " - The phrase appears in a standard \"no results found\" or \"adjust your search\" message that any clean request would also produce"
+                            + "- Contains error indicators such as: invalid parameter, resource not found, bad request, unknown field, unrecognized input, operation not" 
+                            + "permitted,not allowed, unsupported, missing parameter, malformed, rejected, forbidden, unauthorized, resource does not exist, no such,"
+                            + "no results found, Try adjusting your search, adjust search criteria, no items found, nothing matched" 
+                            + "— or any equivalent phrasing indicating the server returned an empty or rejected result.";
+                    }
+                    queryData.put(TestExecutorModifier._OPERATION, operation);
                     String ogRequest = Utils.buildRequestIHttpFormat(rawApi);
                     String response = Utils.buildResponseIHttpFormat(rawApi);
+                    String request = "Request payload: \n" + ogRequest + "\n\nResponse payload: \n" + response;
+                    queryData.put(TestExecutorModifier._REQUEST, request);
+                    BasicDBObject  generatedData = new TestFilterModifier().handle(queryData);
 
-                    queryData.put(TestExecutorModifier._OPERATION, operation);
-                    BasicDBObject generatedData;
-                    if (filterActionRequest.isValidationContext()) {
-                        queryData.put(TestExecutorModifier._REQUEST, response);
-                        generatedData = new TestValidatorModifier().handle(queryData);
-                    } else {
-                        String request = "Request payload: \n" + ogRequest + "\n\nResponse payload: \n" + response;
-                        queryData.put(TestExecutorModifier._REQUEST, request);
-                        generatedData = new TestFilterModifier().handle(queryData);
-                    }
-
-                    loggerMaker.infoAndAddToDb("JARVIS_LLM_RESPONSE: " + generatedData);
                     if (generatedData.containsKey(operationTypeLower)) {
                         Object generatedQuerySet = generatedData.get(operationTypeLower);
                         if (generatedQuerySet instanceof JSONArray) {
@@ -242,8 +250,9 @@ public class Filter {
                     if(!querySetUpdated && !operationPrompt.isEmpty()){
                         newQuerySet = INVALID_QS_;
                      }
-                }
+                } 
             }
+
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error invoking operation " + operationTypeLower + " " + e.getMessage());

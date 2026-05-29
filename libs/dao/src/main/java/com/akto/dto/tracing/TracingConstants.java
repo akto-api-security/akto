@@ -10,6 +10,8 @@ public final class TracingConstants {
         public static final String WORKFLOW = "workflow";
         public static final String AGENT = "agent";
         public static final String LLM = "llm";
+        /** Snowflake / agent observability: a discrete planning or reasoning step (e.g. {@code agent.planning.*}). */
+        public static final String PLANNING = "planning";
         public static final String TOOL = "tool";
         public static final String MCP_SERVER = "mcp_server";
         public static final String RAG = "rag";

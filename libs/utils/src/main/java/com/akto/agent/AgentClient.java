@@ -30,11 +30,22 @@ public class AgentClient {
     
     private static final LoggerMaker loggerMaker = new LoggerMaker(AgentClient.class, LogDb.TESTING);
     private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    private static final String JSON_KEY_PROMPT = "prompt";
+    private static final String JSON_KEY_CONVERSATION_ID = "conversationId";
+    private static final String JSON_KEY_IS_LAST_REQUEST = "isLastRequest";
+    private static final String JSON_KEY_TESTING_RUN_RESULT_SUMMARY_ID = "testingRunResultSummaryId";
     
     private static final OkHttpClient agentHttpClient = CoreHTTPClient.client.newBuilder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(120, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
+            .build();
+    private static final OkHttpClient clientWithLongTimeout = CoreHTTPClient.client.newBuilder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.MINUTES)
+            .callTimeout(5, TimeUnit.MINUTES)
+            .writeTimeout(120, TimeUnit.SECONDS)
             .build();
     
     private final String agentBaseUrl;
@@ -44,7 +55,7 @@ public class AgentClient {
         this.agentBaseUrl = agentBaseUrl == null || agentBaseUrl.isEmpty() ? "" : agentBaseUrl.endsWith("/") ? agentBaseUrl.substring(0, agentBaseUrl.length() - 1) : agentBaseUrl;
     }
 
-    public List<TestResult> executeAgenticTest(RawApi rawApi, int apiCollectionId) throws Exception {
+    public List<TestResult> executeAgenticTest(RawApi rawApi, int apiCollectionId, String testingRunResultSummaryId) throws Exception {
         String conversationId = UUID.randomUUID().toString();
         List<String> promptsList = rawApi.getConversationsList();
         String testMode = getTestModeFromRole();
@@ -59,7 +70,7 @@ public class AgentClient {
         }
 
         try {
-            List<AgentConversationResult> conversationResults = processConversations(promptsList, conversationId, testMode);
+            List<AgentConversationResult> conversationResults = processConversations(promptsList, conversationId, testMode, testingRunResultSummaryId);
             boolean isVulnerable = conversationResults.get(conversationResults.size() - 1).isValidation();
             List<String> errors = new ArrayList<>();
 
@@ -83,14 +94,14 @@ public class AgentClient {
         }
     }
     
-    private List<AgentConversationResult> processConversations(List<String> prompts, String conversationId, String testMode) throws Exception {
+    private List<AgentConversationResult> processConversations(List<String> prompts, String conversationId, String testMode, String testingRunResultSummaryId) throws Exception {
         List<AgentConversationResult> results = new ArrayList<>();
         int index = 0;
         int totalRequests = prompts.size();
         for (String prompt : prompts) {
             index++;
             try {
-                AgentConversationResult result = sendChatRequest(prompt, conversationId, testMode, index == totalRequests);
+                AgentConversationResult result = sendChatRequest(prompt, conversationId, testMode, index == totalRequests, testingRunResultSummaryId);
                 results.add(result);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error processing prompt: " + prompt + ", error: " + e.getMessage());
@@ -101,12 +112,11 @@ public class AgentClient {
         return results;
     }
     
-    private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest);
+    private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest, String testingRunResultSummaryId) throws Exception {
+        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, testingRunResultSummaryId);
 
-        Call call = agentHttpClient.newCall(request);
-        call.timeout().timeout(120, TimeUnit.SECONDS);
-        
+        Call call = clientWithLongTimeout.newCall(request);
+
         try (Response response = call.execute()) {
             if (!response.isSuccessful()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
@@ -118,18 +128,19 @@ public class AgentClient {
         }
     }
     
-    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest) {
+    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String testingRunResultSummaryId) {
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("prompt", prompt);
-        requestBody.put("conversationId", conversationId);
-        requestBody.put("isLastRequest", isLastRequest);
+        requestBody.put(JSON_KEY_PROMPT, prompt);
+        requestBody.put(JSON_KEY_CONVERSATION_ID, conversationId);
+        requestBody.put(JSON_KEY_IS_LAST_REQUEST, isLastRequest);
+        requestBody.put(JSON_KEY_TESTING_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId != null ? testingRunResultSummaryId : "");
         
         String body;
         try {
             body = objectMapper.writeValueAsString(requestBody);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error serializing request body: " + e.getMessage());
-            body = "{\"prompt\":\"" + prompt.replace("\"", "\\\"") + "\"}";
+            body = "{\"" + JSON_KEY_PROMPT + "\":\"" + prompt.replace("\"", "\\\"") + "\"}";
         }
         
         RequestBody requestBodyObj = RequestBody.create(body, MediaType.parse("application/json"));
@@ -173,8 +184,21 @@ public class AgentClient {
             if(jsonNode.has("finalSentPrompt")) {
                 finalSentPrompt = jsonNode.get("finalSentPrompt").asText();
             }
+
+            Map<String,Object> toolsMetadata = new HashMap<>();
+            if(jsonNode.has("toolsMetadata") && jsonNode.get("toolsMetadata").isObject()) {
+                jsonNode.get("toolsMetadata").fields().forEachRemaining(entry -> {
+                    JsonNode toolNode = entry.getValue();
+                    Map<String, String> meta = new HashMap<>();
+                    meta.put("name", toolNode.path("name").asText(""));
+                    meta.put("source", toolNode.path("source").asText(""));
+                    meta.put("dataTrace", toolNode.path("dataTrace").asText(""));
+                    toolsMetadata.put(entry.getKey(), meta);
+                });
+            }
+
             
-            return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage);
+            return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage, toolsMetadata);
             
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error parsing agent response: " + e.getMessage() + ", response body: " + responseBody);
@@ -260,11 +284,12 @@ public class AgentClient {
         initializeAgent(requestBody);
     }
 
-    public void initializeAgent(String sessionUrl, String requestHeaders, String apiRequestBody, String conversationId) {
+    public void initializeAgent(String sessionUrl, String requestHeaders, String apiRequestBody, String requestMethod, String conversationId) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("sessionUrl", sessionUrl);
         requestBody.put("requestHeaders", requestHeaders);
         requestBody.put("requestBody", apiRequestBody);
+        requestBody.put("requestMethod", requestMethod != null && !requestMethod.isEmpty() ? requestMethod : "POST");
         requestBody.put("conversationId", conversationId);
         initializeAgent(requestBody);
     }

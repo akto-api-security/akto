@@ -23,6 +23,7 @@ public class ModuleInfoWorker {
     private final String version;
     private final DataActor dataActor;
     private final String moduleName;
+    private static ModuleInfo moduleInfo;
 
     private ModuleInfoWorker(ModuleInfo.ModuleType moduleType, String version, DataActor dataActor, String name) {
         this.moduleType = moduleType;
@@ -38,9 +39,13 @@ public class ModuleInfoWorker {
         this.moduleName = null;
     }
 
+    public static ModuleInfo getModuleInfo() {
+        return moduleInfo;
+    }
+
     private void scheduleHeartBeatUpdate() {
         ModuleInfoWorker _this = this;
-        ModuleInfo moduleInfo = new ModuleInfo();
+        moduleInfo = new ModuleInfo();
         moduleInfo.setModuleType(this.moduleType);
         moduleInfo.setCurrentVersion(this.version);
         moduleInfo.setStartedTs(this.startedTs);

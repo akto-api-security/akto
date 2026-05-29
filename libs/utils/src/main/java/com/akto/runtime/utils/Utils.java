@@ -20,6 +20,7 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.RuntimeUtil;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.mongodb.BasicDBObject;
@@ -41,6 +42,13 @@ public class Utils {
             return;
         }
         logger.infoAndAddToDb(o.toString());
+    }
+
+    public static void printDebugHostLog(Object o){
+        if( o == null ){
+            return;
+        }
+        logger.infoAndAddToDb("Found debug host: " + o.toString());
     }
 
 
@@ -208,15 +216,9 @@ public class Utils {
     }
 
     public static String printDebugHostLog(HttpResponseParams httpResponseParams) {
-        if (DEBUG_HOSTS_SET.isEmpty()) return null;
-        if (httpResponseParams == null || httpResponseParams.requestParams == null || httpResponseParams.requestParams.getHeaders() == null) {
-            return null;
-        }
-        Map<String, List<String>> headers = httpResponseParams.getRequestParams().getHeaders();
-        List<String> hosts = headers.get("host");
-        if (hosts == null || hosts.isEmpty()) return null;
-        String host = hosts.get(0);
-
+       
+        if (DEBUG_HOSTS_SET.isEmpty() || httpResponseParams == null || httpResponseParams.getRequestParams() == null) return null;
+        String host = RuntimeUtil.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
         return DEBUG_HOSTS_SET.contains(host) ? host : null;
     }
 

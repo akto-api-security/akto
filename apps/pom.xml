@@ -62,6 +62,17 @@
             </modules>
         </profile>
         <profile>
+            <id>datadog-trace-exporter</id>
+            <activation>
+                <file>
+                    <exists>datadog-trace-exporter/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>datadog-trace-exporter</module>
+            </modules>
+        </profile>
+        <profile>
             <id>fast-discovery</id>
             <activation>
                 <file>

@@ -42,7 +42,9 @@ import com.akto.util.JSONUtils;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
+import com.akto.mcp.McpToolDescriptionsRegistry;
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -88,6 +90,8 @@ public class TestExecutor {
     
     // Current execution fallback flag - used when Kafka fails during current test run
     private volatile boolean currentExecutionFallback = false;
+    private static int runPickedUp;
+    private static int runMaxSec;
     
     /**
      * Resets the current execution fallback flag for a new test cycle.
@@ -97,6 +101,17 @@ public class TestExecutor {
         currentExecutionFallback = false;
     }
 
+    public static void initRunDeadline(TestingRun testingRun) {
+        runPickedUp = testingRun.getPickedUpTimestamp() > 0 ? testingRun.getPickedUpTimestamp() : Context.now();
+        runMaxSec = testingRun.getTestRunTime() <= 0 ? 30 * 60 : testingRun.getTestRunTime();
+    }
+
+    public static boolean shouldContinueTestExecution(ObjectId summaryId) {
+        if (!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)) {
+            return false;
+        }
+        return Context.now() - runPickedUp < runMaxSec;
+    }
 
     /**
      * Executes all tests using legacy (non-Kafka) approach when Kafka fails.
@@ -115,7 +130,6 @@ public class TestExecutor {
         List<Future<Void>> testingRecords = new ArrayList<>();
         ExecutorService threadPool = Executors.newFixedThreadPool(maxThreads);
         CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
-        int tempRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
         
         // Process all API endpoints for legacy testing
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
@@ -157,11 +171,9 @@ public class TestExecutor {
         
         try {
             // Wait for all tests to complete with timeout handling
-            int waitTs = Context.now();
             int prevCalcTime = Context.now();
             int lastCheckedCount = 0;
-            while(latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
-                && (Context.now() - waitTs < tempRunTime)) {
+            while(latch.getCount() > 0 && shouldContinueTestExecution(summaryId)) {
                     loggerMaker.infoAndAddToDb("waiting for tests to finish, count left: " + totalTestsCount.get());
 
                     if(lastCheckedCount != totalTestsCount.get()){
@@ -183,6 +195,7 @@ public class TestExecutor {
                 future.cancel(true);
             }
             loggerMaker.insertImportantTestingLog("Legacy mode execution completed. All tests processed.");
+            threadPool.shutdownNow();
             
         } catch (Exception e) {
             loggerMaker.insertImportantTestingLog("Error during legacy mode execution: " + e.getMessage());
@@ -367,7 +380,7 @@ public class TestExecutor {
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
 
         // init the singleton class here
-        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed());
+        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed(), testingRun.getRunAutomatedTests());
         //Clear the cache for sample data
         VariableResolver.clearSampleDataCache();
         totalTestsCount.set(
@@ -429,10 +442,7 @@ public class TestExecutor {
 
             // create count down latch to know when inserting kafka records are completed.
             CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
-            int tempRunTime = 10 * 60;
-            if(!Constants.IS_NEW_TESTING_ENABLED){
-                tempRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
-            }else{
+            if(Constants.IS_NEW_TESTING_ENABLED){
                 try {
                     Producer.createTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
                 } catch (Exception e) {
@@ -441,10 +451,12 @@ public class TestExecutor {
                 }
             }
 
-            final int maxRunTime = tempRunTime;
             AtomicInteger totalRecords = new AtomicInteger(0);
             AtomicInteger throttleNumber = new AtomicInteger(0);
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
+                if (Constants.IS_NEW_TESTING_ENABLED && !shouldContinueTestExecution(summaryId)) {
+                    break;
+                }
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
                 if (messages == null || messages.isEmpty()) {
                     countDownLatch(latch);
@@ -472,6 +484,9 @@ public class TestExecutor {
                 }
                 if(Constants.IS_NEW_TESTING_ENABLED){
                     for (String testSubCategory: testingRunSubCategories) {
+                        if (!shouldContinueTestExecution(summaryId)) {
+                            break;
+                        }
                         if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
                             insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, new AtomicBoolean(false), totalRecords, throttleNumber);
                         }
@@ -488,13 +503,12 @@ public class TestExecutor {
                     }
                 }
             }
+            buildMcpToolDescriptions();
             try {
                 if(!Constants.IS_NEW_TESTING_ENABLED){
-                    int waitTs = Context.now();
                     int prevCalcTime = Context.now();
                     int lastCheckedCount = 0;
-                    while(latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
-                        && (Context.now() - waitTs < maxRunTime)) {
+                    while(latch.getCount() > 0 && shouldContinueTestExecution(summaryId)) {
                             loggerMaker.infoAndAddToDb("waiting for tests to finish, count left: " + totalTestsCount.get());
 
                             if(lastCheckedCount != totalTestsCount.get()){
@@ -512,9 +526,10 @@ public class TestExecutor {
                     }
     
                     for (Future<Void> future : testingRecords) {
-                        future.cancel(!Constants.IS_NEW_TESTING_ENABLED);
+                        future.cancel(true);
                     }
                     loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.");
+                    threadPool.shutdownNow();
                 }else{
                     // This else block only executes when IS_NEW_TESTING_ENABLED is true AND kafkaFallbackMode is false
                     // So we can directly proceed with Kafka completion logic
@@ -523,8 +538,11 @@ public class TestExecutor {
                     int unsentRecords = throttleNumber.get();
                     loggerMaker.insertImportantTestingLog("Finished inserting records in kafka, Total records: " + totalRecords.get() + " Unsent records: " + unsentRecords);
 
-                    // Add detailed logging for unsent records analysis
-                    if (unsentRecords == totalRecords.get()) {
+                    if (!shouldContinueTestExecution(summaryId)) {
+                        loggerMaker.infoAndAddToDb("Test run time expired during Kafka production; deleting topic and skipping consumer.");
+                        Producer.deleteTestResultsTopic();
+                        writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, null);
+                    } else if (unsentRecords == totalRecords.get()) {
                         // Check producer status
                         loggerMaker.infoAndAddToDb("Producer status: " + Producer.getProducerStatus());
                         loggerMaker.infoAndAddToDb("KAFKA FAILURE DETECTED: All " + totalRecords.get() + " records failed to send. Switching to legacy mode immediately to run all tests.");
@@ -542,6 +560,8 @@ public class TestExecutor {
                         // Normal Kafka completion - start consumer
                         dbObject.put("PRODUCER_RUNNING", false);
                         dbObject.put("CONSUMER_RUNNING", true);
+                        dbObject.put(TestingRun.PICKED_UP_TIMESTAMP, runPickedUp);
+                        dbObject.put("testRunMaxTimeSeconds", runMaxSec);
                         writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
                     }
                 }
@@ -550,6 +570,41 @@ public class TestExecutor {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+        }
+    }
+
+    private void buildMcpToolDescriptions() {
+        Map<String, String> toolDescriptions = new HashMap<>();
+        for (Map.Entry<ApiInfo.ApiInfoKey, RawApi> entry : TestingConfigurations.getInstance().getRawApiMap().entrySet()) {
+            String url = entry.getKey().getUrl();
+            if (url == null || !url.contains("tools/list")) {
+                continue;
+            }
+            RawApi rawApi = entry.getValue();
+            if (rawApi.getResponse() == null) continue;
+            String body = rawApi.getResponse().getBody();
+            if (body == null || body.isEmpty()) continue;
+            try {
+                com.alibaba.fastjson2.JSONObject jsonRpc = JSON.parseObject(body);
+                com.alibaba.fastjson2.JSONObject result = jsonRpc.getJSONObject("result");
+                if (result == null) continue;
+                JSONArray tools = result.getJSONArray("tools");
+                if (tools == null) continue;
+                for (int i = 0; i < tools.size(); i++) {
+                    com.alibaba.fastjson2.JSONObject tool = tools.getJSONObject(i);
+                    String name = tool.getString("name");
+                    String description = tool.getString("description");
+                    if (name != null && description != null) {
+                        toolDescriptions.put(name, description);
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed to parse tools/list response for MCP tool descriptions");
+            }
+            break;
+        }
+        if (!toolDescriptions.isEmpty()) {
+            McpToolDescriptionsRegistry.set(toolDescriptions);
         }
     }
 
@@ -841,10 +896,10 @@ public class TestExecutor {
         try {
             for (String testSubCategory: testingRunSubCategories) {
                 if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
-                    if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
+                    if(shouldContinueTestExecution(summaryId)){
                         insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, isApiInfoTested, new AtomicInteger(0), new AtomicInteger(0));
                     }else{
-                        loggerMaker.warnAndAddToDb("Test stopped for id: " + testingRun.getHexId());
+                        loggerMaker.warnAndAddToDb("Test stopped or run time expired for id: " + testingRun.getHexId());
                         break;
                     }
                 }
@@ -961,6 +1016,10 @@ public class TestExecutor {
             ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<String, TestConfig> testConfigMap,
             List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, AtomicBoolean isApiInfoTested, AtomicInteger totalRecords, AtomicInteger throttleNumber) {
         Context.accountId.set(accountId);
+        if (!shouldContinueTestExecution(summaryId)) {
+            totalTestsCount.decrementAndGet();
+            return null;
+        }
         TestConfig testConfig = testConfigMap.get(testSubCategory);
         if (testConfig == null) {
             totalTestsCount.decrementAndGet();
@@ -997,6 +1056,16 @@ public class TestExecutor {
                 Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload), totalRecords, throttleNumber);
             } catch (Exception e) {
                 loggerMaker.insertImportantTestingLog("Kafka push failed. Error: " + e.getMessage());
+                if (accountId == 1764738582) {
+                    loggerMaker.errorAndAddToDb(e, "[DEBUG-KAFKA-1764738582] Kafka push failed."
+                        + " apiInfoKey: " + apiInfoKey
+                        + " | subcategory: " + testSubType
+                        + " | summaryId: " + summaryId
+                        + " | currentExecutionFallback: " + currentExecutionFallback
+                        + " | errorType: " + e.getClass().getName()
+                        + " | cause: " + (e.getCause() != null ? e.getCause().getClass().getName() + " - " + e.getCause().getMessage() : "none")
+                        + " | producerStatus: " + Producer.getProducerStatus());
+                }
                 executeLegacyTesting(apiInfoKey, summaryId, messages, testConfig, testLogs, isApiInfoTested);
                 throttleNumber.decrementAndGet();
             }
@@ -1009,6 +1078,9 @@ public class TestExecutor {
         return null;
     }
 
+    private static final ExecutorService legacyTestTimeoutExecutor = Executors.newCachedThreadPool();
+    private static final int MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS = 5 * 60;
+
     /**
      * Executes legacy testing approach (fallback mode)
      * @return TestingRunResult if test executed, null otherwise
@@ -1017,17 +1089,31 @@ public class TestExecutor {
             List<String> messages, TestConfig testConfig, List<TestingRunResult.TestLog> testLogs, 
             AtomicBoolean isApiInfoTested) {
         
-        if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
+        if(shouldContinueTestExecution(summaryId)){
             TestingConfigurations instance = TestingConfigurations.getInstance();
             String sampleMessage = messages.get(messages.size() - 1);
-            TestingRunResult testingRunResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig, instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
+            int currentAccountId = Context.accountId.get();
+            TestingRunResult testingRunResult = null;
+            Future<TestingRunResult> future = legacyTestTimeoutExecutor.submit(() -> {
+                Context.accountId.set(currentAccountId);
+                return runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig,
+                    instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
+            });
+            try {
+                testingRunResult = future.get(MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            } catch (TimeoutException e) {
+                future.cancel(true);
+                loggerMaker.errorAndAddToDb(e, "Legacy test timed out after " + MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS + "s for apiInfoKey: " + apiInfoKey);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Legacy test execution error for apiInfoKey: " + apiInfoKey);
+            }
             if (testingRunResult != null) {
                 List<String> errorList = testingRunResult.getErrorsList();
                 if (errorList == null || !errorList.contains(TestResult.API_CALL_FAILED_ERROR_STRING)) {
                     isApiInfoTested.set(true);
                 }
+                insertResultsAndMakeIssues(Collections.singletonList(testingRunResult), summaryId);
             }
-            insertResultsAndMakeIssues(Collections.singletonList(testingRunResult), summaryId);
             return testingRunResult;
         }
         return null;
@@ -1074,6 +1160,7 @@ public class TestExecutor {
                                        ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, RawApi rawApi) {
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
+        Boolean agenticTestingAllowed = testConfig.getInfo().getAgenticTestingAllowed();
         if(shouldCallClientLayerForSampleData){
             try {
                 long start = System.currentTimeMillis();
@@ -1126,10 +1213,35 @@ public class TestExecutor {
 
         VariableResolver.resolveWordList(varMap, sampleMessageStore.getSampleDataMap(), apiInfoKey);
 
+        // Add SSRF tracking values to varMap
+        if(testRunId != null) {
+            varMap.put("testRunId", testRunId.toHexString());
+        }
+        if(testRunResultSummaryId != null) {
+            varMap.put("testRunResultSummaryId", testRunResultSummaryId.toHexString());
+        }
+        varMap.put("accountId", Context.accountId.get());
+        if(apiInfoKey != null) {
+            varMap.put("apiInfoKey", apiInfoKey.toString());
+        }
+        if(testSubType != null) {
+            varMap.put("testSubType", testSubType);
+        }
+        if(agenticTestingAllowed != null) {
+            varMap.put("agenticTestingAllowed", agenticTestingAllowed);
+        }
+        if (testConfig.getContent() != null) {
+            varMap.put("yaml_template_content", testConfig.getContent());
+        }
+
         String testExecutionLogId = UUID.randomUUID().toString();
         
         loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
             testSubType + " logId " + testExecutionLogId);
+
+        if (testingRunConfig != null && testRunResultSummaryId != null) {
+            testingRunConfig.setTestRunResultSummaryId(testRunResultSummaryId);
+        }
 
         com.akto.test_editor.execution.Executor executor = new Executor();
         executor.overrideTestUrl(rawApi, testingRunConfig);
@@ -1166,7 +1278,17 @@ public class TestExecutor {
         TestingRunResult ret = new TestingRunResult(
             testRunId, apiInfoKey, testSuperType, testSubType ,testResults.getTestResults(),
             vulnerable,singleTypeInfos,confidencePercentage,startTime,
-            endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs);  
+            endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs);
+
+        Object callbackUuidsObj = varMap.get("random_uuid");
+        if (callbackUuidsObj instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<String> callbackUuids = (List<String>) callbackUuidsObj;
+            ret.setCallbackUuids(callbackUuids);
+            if (!vulnerable && callbackUuids != null && !callbackUuids.isEmpty()) {
+                ret.setCallbackCheckPending(true);
+            }
+        }
 
         if (testingRunConfig!=null && testingRunConfig.getCleanUp()) {
             try {
@@ -1347,8 +1469,19 @@ public class TestExecutor {
 
     private boolean prefetchAuthWithRetry(TestRoles testRole, RawApi rawApi, int maxAttempts) {
         AuthMechanism authMechanism = testRole.findMatchingAuthMechanism(rawApi);
-        
-        if (authMechanism == null || !LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanism.getType())) {
+
+        if (authMechanism == null) {
+            return true; // No auth mechanism, no prefetch needed
+        }
+
+        String authType = authMechanism.getType();
+
+        // Handle digest authentication
+        if (LoginFlowEnums.AuthMechanismTypes.DIGEST_AUTH.toString().equalsIgnoreCase(authType)) {
+            return true; // Digest auth doesn't require prefetch - works directly via DigestAuthParam.addAuthTokens()
+        }
+
+        if (!LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authType)) {
             return true; // Not a login request type, no prefetch needed
         }
         

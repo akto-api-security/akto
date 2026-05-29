@@ -743,8 +743,12 @@ public class DbLayer {
         return ApiCollectionsDao.instance.getMeta(apiCollectionId);
     }
 
-    public static List<ApiCollection> fetchAllApiCollectionsMeta() {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject(), Projections.exclude("urls", "conditions"));
+    public static List<ApiCollection> fetchAllApiCollectionsMeta(boolean includeTagsList) {
+        List<String> excludeFields = new ArrayList<>(Arrays.asList("urls", "conditions", "envType"));
+        if (!includeTagsList) {
+            excludeFields.add("tagsList");
+        }
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject(), Projections.exclude(excludeFields));
         return apiCollections;
     }
 
@@ -1183,6 +1187,17 @@ public class DbLayer {
         return RecordedLoginInputDao.instance.findOne(new BasicDBObject());
     }
 
+    public static void persistRecordedLoginFlowScreenshots(String roleName, int userId, List<String> screenshotsBase64) {
+        Bson filter = Filters.and(Filters.eq("roleName", roleName), Filters.eq("userId", userId));
+        Bson update = Updates.combine(
+                Updates.setOnInsert("roleName", roleName),
+                Updates.setOnInsert("userId", userId),
+                Updates.set("screenshotsBase64", screenshotsBase64 != null ? screenshotsBase64 : Collections.emptyList()),
+                Updates.set("updatedAt", Context.now())
+        );
+        RecordedLoginScreenshotDao.instance.updateOne(filter, update);
+    }
+
     public static LoginFlowStepsData fetchLoginFlowStepsData(int userId) {
         Bson filters = Filters.and(
                 Filters.eq("userId", userId));
@@ -1228,8 +1243,8 @@ public class DbLayer {
     }
 
 
-    public static TestScript fetchTestScript(){
-        return TestScriptsDao.instance.fetchTestScript();
+    public static TestScript fetchTestScript(TestScript.Type type){
+        return TestScriptsDao.instance.fetchTestScript(type);
     }
 
     public static List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod) {
@@ -1276,11 +1291,38 @@ public class DbLayer {
     }
 
     public static void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
-        TestingRunPlaygroundDao.instance.updateOne(
-                Filters.eq(Constants.ID, testingRunPlayground.getId()),
-                Updates.combine(
-                        Updates.set(TestingRunPlayground.STATE, State.COMPLETED),
-                        Updates.set(TestingRunPlayground.TESTING_RUN_RESULT, testingRunPlayground.getTestingRunResult())));
+        Bson stateUpdate = Updates.set(TestingRunPlayground.STATE, State.COMPLETED);
+        if (testingRunPlayground.getTestingRunPlaygroundType()
+                == TestingRunPlayground.TestingRunPlaygroundType.LOGIN_FLOW_TEST) {
+            TestingRunPlaygroundDao.instance.updateOne(
+                    Filters.eq(Constants.ID, testingRunPlayground.getId()),
+                    Updates.combine(
+                            stateUpdate,
+                            Updates.set(TestingRunPlayground.LOGIN_FLOW_RESPONSE,
+                                    testingRunPlayground.getLoginFlowResponse())));
+        } else if (testingRunPlayground.getTestingRunPlaygroundType()
+                == TestingRunPlayground.TestingRunPlaygroundType.RECORDED_JSON_FLOW) {
+            List<Bson> recordedFlowUpdates = new ArrayList<>();
+            recordedFlowUpdates.add(stateUpdate);
+            if (testingRunPlayground.getRecordedFlowTokenResult() != null) {
+                recordedFlowUpdates.add(Updates.set(TestingRunPlayground.RECORDED_FLOW_TOKEN_RESULT,
+                        testingRunPlayground.getRecordedFlowTokenResult()));
+            }
+            if (testingRunPlayground.getRecordedFlowErrorMessage() != null) {
+                recordedFlowUpdates.add(Updates.set(TestingRunPlayground.RECORDED_FLOW_ERROR_MESSAGE,
+                        testingRunPlayground.getRecordedFlowErrorMessage()));
+            }
+            TestingRunPlaygroundDao.instance.updateOne(
+                    Filters.eq(Constants.ID, testingRunPlayground.getId()),
+                    Updates.combine(recordedFlowUpdates));
+        } else {
+            TestingRunPlaygroundDao.instance.updateOne(
+                    Filters.eq(Constants.ID, testingRunPlayground.getId()),
+                    Updates.combine(
+                            stateUpdate,
+                            Updates.set(TestingRunPlayground.TESTING_RUN_RESULT,
+                                    testingRunPlayground.getTestingRunResult())));
+        }
     }
 
     public static List<SlackWebhook> fetchSlackWebhooks() {
@@ -1413,6 +1455,10 @@ public class DbLayer {
         SpanDao.instance.insertMany(spans);
     }
 
+    public static void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
+        TestingRunWebhookDao.instance.insertOne(testingRunWebhook);
+    }
+
     public static boolean updateServiceGraphEdges(int apiCollectionId, Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges) {
         try {
             org.bson.conversions.Bson filter = com.mongodb.client.model.Filters.eq(ApiCollection.ID, apiCollectionId);
@@ -1424,4 +1470,5 @@ public class DbLayer {
             return false;
         }
     }
+
 }

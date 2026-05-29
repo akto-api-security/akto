@@ -1,6 +1,7 @@
 package com.akto.data_actor;
 
 import com.akto.dto.*;
+import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
@@ -51,6 +52,8 @@ import org.json.JSONObject;
 public abstract class DataActor {
 
     public abstract AccountSettings fetchAccountSettings();
+
+    public abstract Config.DatadogForwarderConfig fetchDatadogForwarderConfig();
 
     public abstract long fetchEstimatedDocCount();
 
@@ -174,7 +177,7 @@ public abstract class DataActor {
     public abstract TestingRunResultSummary fetchTestingRunResultSummary(String testingRunResultSummaryId);
     public abstract TestingRunResultSummary fetchRerunTestingRunResultSummary(String originalTestingRunResultSummaryId);
 
-    public abstract List<ApiCollection> fetchAllApiCollectionsMeta();
+    public abstract List<ApiCollection> fetchAllApiCollectionsMeta(boolean includeTagsList);
 
     public abstract WorkflowTest fetchWorkflowTest(int workFlowTestId);
 
@@ -297,6 +300,8 @@ public abstract class DataActor {
 
     public abstract void updateLoginFlowStepsData(int userId, Map<String, Object> valuesMap);
 
+    public abstract void persistRecordedLoginFlowScreenshots(String roleName, int userId, List<String> screenshotsBase64);
+
     public abstract Node fetchDependencyFlowNodesByApiInfoKey(int apiCollectionId, String url, String method);
 
     public abstract List<SampleData> fetchSampleDataForEndpoints(List<ApiInfo.ApiInfoKey> endpoints);
@@ -305,7 +310,7 @@ public abstract class DataActor {
 
     public abstract long countTestingRunResultSummaries(Bson filter);
 
-    public abstract TestScript fetchTestScript();
+    public abstract TestScript fetchTestScript(TestScript.Type type);
 
     public abstract List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod);
 
@@ -347,4 +352,10 @@ public abstract class DataActor {
     public abstract void storeSpans(List<Span> spans);
 
     public abstract boolean updateServiceGraphEdges(int apiCollectionId, Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges);
+
+    public abstract void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook);
+
+    public abstract void writeApiSequences(List<ApiSequences> sequences);
+    public abstract void storeAgentQueryData(AgentQueryRecord agentQueryRecord);
+    public abstract Map<String, String> fetchDeviceUserMap();
 }
