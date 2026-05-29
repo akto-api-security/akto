@@ -290,6 +290,16 @@ public class ApiCollectionsAction extends UserAction {
                 }
             }
         }
+        // Strip lastUpdatedTs and source from tagsList to reduce response size
+        for (ApiCollection c : this.apiCollections) {
+            List<CollectionTags> tags = c.getTagsList();
+            if (tags != null) {
+                for (CollectionTags tag : tags) {
+                    tag.setLastUpdatedTs(0);
+                    tag.setSource(null);
+                }
+            }
+        }
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] tags filtering took " + (System.currentTimeMillis() - stepStart) + "ms");
         stepStart = System.currentTimeMillis();
 
@@ -458,7 +468,7 @@ public class ApiCollectionsAction extends UserAction {
         return this.deleteMultipleCollections();
     }
 
-    @Audit(description = "User deleted multiple API collections", resource = Resource.API_COLLECTION, operation = Operation.DELETE, metadataGenerators = {"getApiCollectionIdsList"})
+    @Audit(description = "User deleted multiple API collections", resource = Resource.API_COLLECTION, operation = Operation.DELETE, metadataGenerators = {"fetchApiCollectionIdsList"})
     public String deleteMultipleCollections() {
         List<Integer> apiCollectionIds = new ArrayList<>();
         for(ApiCollection apiCollection: this.apiCollections) {
@@ -1031,7 +1041,7 @@ public class ApiCollectionsAction extends UserAction {
                 deactivatedFilter));
     }
 
-    @Audit(description = "User deactivated collections from inventory", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"getApiCollectionIdsList"})
+    @Audit(description = "User deactivated collections from inventory", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"fetchApiCollectionIdsList"})
     public String deactivateCollections() {
         this.apiCollections = filterCollections(this.apiCollections, false);
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections,Filters.empty());
@@ -1043,7 +1053,7 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    @Audit(description = "User activated collections in inventory", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"getApiCollectionIdsList"})
+    @Audit(description = "User activated collections in inventory", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"fetchApiCollectionIdsList"})
     public String activateCollections() {
         this.apiCollections = filterCollections(this.apiCollections, true);
         if (this.apiCollections.isEmpty()) {
@@ -1221,7 +1231,7 @@ public class ApiCollectionsAction extends UserAction {
     private List<CollectionTags> envType;
     private boolean resetEnvTypes;
     
-    @Audit(description = "User updated environment type", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"getApiCollectionIdsList"})
+    @Audit(description = "User updated environment type", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"fetchApiCollectionIdsList"})
     public String updateEnvType(){
         if(!resetEnvTypes && (envType == null || envType.isEmpty())) {
             addActionError("Please enter a valid ENV type.");
@@ -1843,7 +1853,7 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public List<Integer> getApiCollectionIdsList() {
+    public List<Integer> fetchApiCollectionIdsList() {
         List<Integer> apiCollectionIds = new ArrayList<>();
 
         if (this.apiCollectionIds != null) {
