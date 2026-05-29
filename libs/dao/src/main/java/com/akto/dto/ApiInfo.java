@@ -153,7 +153,7 @@ public class ApiInfo {
     private GuardrailSchema guardrailSchema;
 
     public enum ApiType {
-        REST, GRAPHQL, GRPC, SOAP
+        REST, GRAPHQL, GRPC, SOAP, WEBSOCKET
     }
 
     /**

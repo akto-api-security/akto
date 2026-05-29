@@ -6,7 +6,7 @@ import StyledEndpoint from "./api_collections/component/StyledEndpoint"
 import CopyEndpoint from "./api_collections/component/CopyEndpoint"
 import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor, ArrowUpMinor, ArrowDownMinor } from "@shopify/polaris-icons"
 import api from "./api";
-import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
+import GetPrettifyEndpoint, { MethodBox } from "./GetPrettifyEndpoint";
 import ShowListInBadge from "../../components/shared/ShowListInBadge";
 import { CATEGORY_ENDPOINT_SECURITY, getDashboardCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../main/labelHelper";
 import { CollectionIcon } from "../../components/shared/CollectionIcon";
@@ -760,7 +760,9 @@ const transform = {
                 hostName: (hostNameMap[url.apiCollectionId] !== null ? hostNameMap[url.apiCollectionId] : this.getHostName(url.endpoint)),
                 access_type: url.access_type,
                 auth_type: url.auth_type,
-                endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} isNew={this.isNewEndpoint(url.lastSeenTs)} guardrailEnabled={guardrailEnabled} isMalicious={url.isMalicious || false} />,
+                displayMethod: func.getEndpointMethodForDisplay({ method: url.method, url: url.endpoint, apiType: url.apiType }),
+                methodComp: <MethodBox method={url.method} url={url.endpoint} apiType={url.apiType} methodBoxWidth="48px" />,
+                endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} apiType={url.apiType} isNew={this.isNewEndpoint(url.lastSeenTs)} guardrailEnabled={guardrailEnabled} isMalicious={url.isMalicious || false} />,
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
                 riskScoreComp: <Badge status={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
                 isNew: this.isNewEndpoint(url.lastSeenTs),
