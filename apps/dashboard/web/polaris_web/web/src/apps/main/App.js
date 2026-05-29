@@ -219,11 +219,11 @@ const router = createBrowserRouter([
                                 element: <ApiCollections/>
                             },
                             {
-                                path: "agentic-assets",
+                                path: "agentic-assets-legacy",
                                 element: <Endpoints/>
                             },
                             {
-                                path: "agentic-assets-v2",
+                                path: "agentic-assets",
                                 element: <AgenticAssetsPage/>
                             },
                             {

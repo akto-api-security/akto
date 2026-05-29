@@ -234,7 +234,9 @@ export default function LeftNav() {
                 },
                 selected: leftNavSelected.includes("_observe"),
                 subNavigationItems: [
-                    ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
+                    ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [
+                    // { label: "Agentic assets (legacy)", onClick: () => { navigate("/dashboard/observe/agentic-assets"); handleSelect("dashboard_observe_agentic_assets"); setActive("active"); }, selected: leftNavSelected === "dashboard_observe_agentic_assets" },
+                    {
                         label: "Agentic assets",
                         onClick: () => {
                             navigate("/dashboard/observe/agentic-assets");
@@ -242,23 +244,9 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_agentic_assets",
-                    }, {
-                        label: "Agentic assets (new)",
-                        onClick: () => {
-                            navigate("/dashboard/observe/agentic-assets-v2");
-                            handleSelect("dashboard_observe_agentic_assets_v2");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_observe_agentic_assets_v2",
-                    }, {
-                        label: "Users and devices",
-                        onClick: () => {
-                            navigate("/dashboard/observe/users-and-devices");
-                            handleSelect("dashboard_observe_users_and_devices");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_observe_users_and_devices",
-                    }, {
+                    },
+                    // { label: "Users and devices", onClick: () => { navigate("/dashboard/observe/users-and-devices"); handleSelect("dashboard_observe_users_and_devices"); setActive("active"); }, selected: leftNavSelected === "dashboard_observe_users_and_devices" },
+                    {
                         label: "Endpoints",
                         onClick: () => {
                             navigate("/dashboard/observe/endpoints");

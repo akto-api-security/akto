@@ -13,7 +13,7 @@ import {
     MCP_TOOLS, MCP_RESOURCES, MCP_PROMPTS, TOOL_VIOLATIONS,
     DUMMY_SKILL_SAMPLE, SKILL_SCHEMA_PARAMS,
     generateToolSample, generateResourceSample, generatePromptSample,
-    AGENTIC_ASSET_DEVICES, AGENTIC_TREE_DATA,
+    AGENTIC_ASSET_DEVICES, AGENTIC_TREE_DATA, AGENTIC_FLAT_DATA,
     generateSkills, generateAssetViolations,
 } from "./agenticDummyData";
 import "../../../components/layouts/style.css";
@@ -775,16 +775,14 @@ function AgentComponentsView({ asset, onNavChange, onNavigateToAsset }) {
     const handleListRowClick = useCallback((e) => {
         if (!e.data) return;
         if (e.data._type === "MCP Server") {
-            // Navigate to that MCP's own flyout
             const mcpAsset = AGENTIC_FLAT_DATA.find(a => a.name === e.data.name || a.id === e.data.name)
                 || { ...e.data, id: e.data.name, type: "MCP Server" };
-            onNavigateToAsset?.(mcpAsset);
+            onNavigateToAsset(mcpAsset);
         } else if (e.data._type === "Skill") {
-            // Navigate to that Skill's own flyout
             const skillId = "skill-" + e.data.name.toLowerCase().replace(/ /g, "-");
             const skillAsset = AGENTIC_FLAT_DATA.find(a => a.name === e.data.name)
                 || { id: skillId, name: e.data.name, type: "Skill", riskScore: e.data.violations > 0 ? 3.5 : 2.0, violations: { critical: 0, high: 0, medium: e.data.violations > 0 ? 1 : 0, low: 0 }, deviceCount: 1, lastSeen: "Recently" };
-            onNavigateToAsset?.(skillAsset);
+            onNavigateToAsset(skillAsset);
         }
     }, [onNavigateToAsset]);
 

@@ -524,7 +524,7 @@ function AgenticsTab({ agents, onAgentClick }) {
         if (!e.data) return;
         if (!isAgentNavigable(e.data)) return;
         const params = new URLSearchParams({ asset: e.data.endpoint, type: e.data.type });
-        window.open(`/dashboard/observe/agentic-assets-v2?${params}`, "_blank");
+        window.open(`/dashboard/observe/agentic-assets?${params}`, "_blank");
     }, []);
 
     return (
