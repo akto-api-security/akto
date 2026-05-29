@@ -5,7 +5,10 @@ import transform from '../onboarding/transform'
 import observeFunc from "./transform"
 import { isAgenticSecurityCategory, isMCPSecurityCategory, isEndpointSecurityCategory } from '../../../main/labelHelper'
 
-export const getMethod = (url, method) => {
+export const getMethod = (url, method, apiType) => {
+    if (func.shouldHideHttpMethodForEndpoint({ apiType, url })) {
+        return func.WEBSOCKET_METHOD_LABEL
+    }
     if(isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()){
         if(url.includes("tool")){
             return "TOOL";
@@ -26,31 +29,40 @@ export const getMethod = (url, method) => {
     return method;
 }
 
-export function MethodBox({method, methodBoxWidth, url}){
-    const finalMethod = getMethod(url, method);
-    // Use TOOL color for CONFIG as well
+export function MethodBox({method, methodBoxWidth, url, apiType}){
+    const finalMethod = getMethod(url, method, apiType);
+    const label = (
+      <span
+        style={{
+          color: transform.getTextColor(finalMethod),
+          fontSize: "14px",
+          fontWeight: 500,
+          lineHeight: "20px",
+        }}
+      >
+        {finalMethod}
+      </span>
+    );
     return (
       <Box width={methodBoxWidth || "64px"}>
         <HorizontalStack align="end">
-          <span
-            style={{
-              color: transform.getTextColor(finalMethod),
-              fontSize: "14px",
-              fontWeight: 500,
-              lineHeight: "20px",
-            }}
-          >
-            {finalMethod}
-          </span>
+          {finalMethod === func.WEBSOCKET_METHOD_LABEL ? (
+            <Tooltip content="WebSocket" dismissOnMouseOut>
+              {label}
+            </Tooltip>
+          ) : label}
         </HorizontalStack>
       </Box>
     )
 }
 
-function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth, guardrailEnabled, isMalicious}){
+function GetPrettifyEndpoint({method, url, isNew, maxWidth, methodBoxWidth, guardrailEnabled, isMalicious, apiType}){
     const ref = useRef(null)
     const localUrl = url || "/"
     const [copyActive, setCopyActive] = useState(false)
+    const copyText = func.shouldHideHttpMethodForEndpoint({ apiType, url: localUrl })
+      ? localUrl
+      : getMethod(localUrl, method, apiType) + " " + localUrl
     return (
       <div
         style={{ display: "flex", gap: "4px" }}
@@ -58,7 +70,7 @@ function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth, guard
         onMouseEnter={() => setCopyActive(true)}
         onMouseLeave={() => setCopyActive(false)}
       >
-        <MethodBox method={method} methodBoxWidth={methodBoxWidth} url={url} />
+        <MethodBox method={method} methodBoxWidth={methodBoxWidth} url={url} apiType={apiType} />
         <Box width={maxWidth ? maxWidth : "30vw"}>
           <div
             style={{
@@ -90,7 +102,7 @@ function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth, guard
                   onClick={(e) => {
                     e.stopPropagation();
                     func.copyToClipboard(
-                      getMethod(localUrl, method) + " " + localUrl,
+                      copyText,
                       ref,
                       "URL copied"
                     );
