@@ -275,7 +275,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             c.rowStatus = 'critical'
             c.disableClick = true
         }
-        const tagsList = JSON.stringify(c?.tagsList || "")
+        const tagsList = JSON.stringify(c?.tagsList || c?.envType || "")
 
         // Split collection name - always extract endpointId/sourceId/serviceName for agentic collections
         // Pattern: <endpoint-id>.<source-id>.<service-name>
@@ -418,7 +418,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         deactivated: rawCollection.deactivated,
         urlsCount: rawCollection.urlsCount,
         startTs: rawCollection.startTs,
-        tagsList: rawCollection.tagsList,
+        tagsList: rawCollection.tagsList || rawCollection.envType || [],
         skills: rawCollection.skills,
         registryStatus: rawCollection.registryStatus,
         description: rawCollection.description,
