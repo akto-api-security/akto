@@ -139,6 +139,7 @@ import com.akto.utils.crons.*;
 import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.jobs.JobUtils;
+import com.akto.utils.scripts.BackwardCompatibilityUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.*;
@@ -182,6 +183,7 @@ public class InitializerListener implements ServletContextListener {
     TokenGeneratorCron tokenGeneratorCron = new TokenGeneratorCron();
     UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
     AgentBasePromptDetectionCron agentBasePromptDetectionCron = new AgentBasePromptDetectionCron();
+    UserAnalysisCron userAnalysisCron = new UserAnalysisCron();
 
     private static String domain = null;
     public static String subdomain = "https://app.akto.io";
@@ -2582,6 +2584,9 @@ public class InitializerListener implements ServletContextListener {
                         setUpTestEditorTemplatesScheduler();
                     }
                     if (runJobFunctions == 2) {
+                        logger.warn("Starting user analysis cron scheduler", LogDb.DASHBOARD);
+                        userAnalysisCron.setUpUserAnalysisCronScheduler();
+                        logger.warn("Ending user analysis cron scheduler", LogDb.DASHBOARD);
                         logger.warn("Starting CATEGORY 2 job schedulers", LogDb.DASHBOARD);
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                         syncCronInfo.setUpMcpMaliciousnessCronScheduler();
@@ -3641,6 +3646,16 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void moveUserDataFromModuleInfoToAgenticUsers(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getMoveUserDataFromModuleInfoToAgenticUsers() == 0){
+            BackwardCompatibilityUtils.moveUserDataFromModuleInfoToAgenticUsers();
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.MOVE_USER_DATA_FROM_MODULE_INFO_TO_AGENTIC_USERS, Context.now())
+            );
+        }
+    }
+
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
@@ -3650,6 +3665,7 @@ public class InitializerListener implements ServletContextListener {
         setAktoDefaultNewUI(backwardCompatibility);
         updateCustomDataTypeOperator(backwardCompatibility);
         markSummariesAsVulnerable(backwardCompatibility);
+        moveUserDataFromModuleInfoToAgenticUsers(backwardCompatibility);
         dropLastCronRunInfoField(backwardCompatibility);
         cleanupRbacEntriesForDeveloperRole(backwardCompatibility);
         fetchIntegratedConnections(backwardCompatibility);

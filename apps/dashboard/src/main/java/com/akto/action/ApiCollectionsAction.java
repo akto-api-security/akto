@@ -140,10 +140,10 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
-        int tsRandom = Context.now();
-        loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
+        long fillStart = System.currentTimeMillis();
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMapOptimized(filter, apiCollections);
-        loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("[fillApiCollectionsUrlCount] buildEndpointsCount took " + (System.currentTimeMillis() - fillStart) + "ms");
+        long loopStart = System.currentTimeMillis();
 
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
@@ -176,6 +176,7 @@ public class ApiCollectionsAction extends UserAction {
             // Populate URLs for MCP collections using the service
             populateCollectionUrls(apiCollection);
         }
+        loggerMaker.infoAndAddToDb("[fillApiCollectionsUrlCount] loop + populateUrls took " + (System.currentTimeMillis() - loopStart) + "ms");
         return apiCollections;
     }
 
@@ -255,14 +256,32 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchAllCollectionsBasic() {
+        long start = System.currentTimeMillis();
+        long stepStart = start;
+
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
-        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude("urls"));
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] deleteContextCollections took " + (System.currentTimeMillis() - stepStart) + "ms");
+        stepStart = System.currentTimeMillis();
+
+        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude(
+                "urls", "conditions", "serviceGraphEdges", "hostNames", "serviceTag",
+                "sampleCollectionsDropped", "redact", "runDependencyAnalyser",
+                "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
+                "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType"
+        ));
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] findAll took " + (System.currentTimeMillis() - stepStart) + "ms, size=" + this.apiCollections.size());
+        stepStart = System.currentTimeMillis();
+
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] fillApiCollectionsUrlCount took " + (System.currentTimeMillis() - stepStart) + "ms");
+        stepStart = System.currentTimeMillis();
 
         // Start background icon processing for all collections asynchronously
         // This runs in a separate thread to not block the main response
         com.akto.util.IconUtils.processIconsForCollections(this.apiCollections);
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] processIcons took " + (System.currentTimeMillis() - stepStart) + "ms");
 
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] TOTAL took " + (System.currentTimeMillis() - start) + "ms");
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -846,7 +865,13 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchLastSeenInfoInCollections(){
-        this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeen();
+        long start = System.currentTimeMillis();
+        if (Context.accountId.get() == 1736798101) {
+            this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeenNew();
+        } else {
+            this.lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeen();
+        }
+        loggerMaker.infoAndAddToDb("[fetchLastSeen] time=" + (System.currentTimeMillis() - start) + "ms, size=" + this.lastTrafficSeenMap.size());
         return Action.SUCCESS.toUpperCase();
     }
 

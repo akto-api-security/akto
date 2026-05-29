@@ -107,6 +107,9 @@ jobs:
           wget -O filetypes.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json
           wget -O automated_api_groups.csv https://raw.githubusercontent.com/akto-api-security/akto/master/automated-api-groups/automated-api-groups.csv
 
+      - name: Download dashboard static assets
+        run: bash apps/dashboard/scripts/download-dashboard-vendor-assets.sh
+
       - name: Prepare Dashboard polaris UI
         working-directory: ./apps/dashboard/web/polaris_web
         run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
