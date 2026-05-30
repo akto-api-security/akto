@@ -89,6 +89,103 @@ public class ApiCollectionsAction extends UserAction {
     abstract static class ApiCollectionBasicMixin {}
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class, LogDb.DASHBOARD);
+
+    // Cache for fetchAllCollectionsBasic response (only for account 1736798101)
+    private static final int CACHED_ACCOUNT_ID = 1736798101;
+    private static final long CACHE_TTL_MS = 45 * 60 * 1000L; // 45 minutes
+    private static final long CACHE_REFRESH_INTERVAL_MS = 30 * 60 * 1000L; // 30 minutes
+    private static volatile byte[] cachedAllCollectionsBasicResp = null;
+    private static volatile long cachedAllCollectionsBasicTs = 0;
+    private static final Object cacheLock = new Object();
+
+    private static byte[] buildAllCollectionsBasicResponse() {
+        try {
+            long start = System.currentTimeMillis();
+            long stepStart = start;
+            Context.accountId.set(CACHED_ACCOUNT_ID);
+
+            List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude(
+                    "urls", "conditions", "serviceGraphEdges", "hostNames", "serviceTag",
+                    "sampleCollectionsDropped", "redact", "runDependencyAnalyser",
+                    "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
+                    "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType"
+            ));
+            loggerMaker.warnAndAddToDb("[fetchAllCollectionsBasic-cache] findAll took " + (System.currentTimeMillis() - stepStart) + "ms, size=" + collections.size());
+            stepStart = System.currentTimeMillis();
+
+            // Build url counts
+            Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMapOptimized(
+                    Filters.empty(), collections);
+            loggerMaker.warnAndAddToDb("[fetchAllCollectionsBasic-cache] buildEndpointsCount took " + (System.currentTimeMillis() - stepStart) + "ms, countMap size=" + countMap.size());
+            stepStart = System.currentTimeMillis();
+
+            for (ApiCollection c : collections) {
+                Integer count = countMap.get(c.getId());
+                if (count != null && c.getHostName() != null) {
+                    c.setUrlsCount(count);
+                } else if (ApiCollection.Type.API_GROUP.equals(c.getType())) {
+                    c.setUrlsCount(count != null ? count : c.getUrlsCount());
+                } else {
+                    int fallback = c.getUrlsCount();
+                    if (fallback == 0 && count != null) fallback = count;
+                    c.setUrlsCount(fallback);
+                }
+            }
+            loggerMaker.warnAndAddToDb("[fetchAllCollectionsBasic-cache] urlCount loop took " + (System.currentTimeMillis() - stepStart) + "ms");
+            stepStart = System.currentTimeMillis();
+
+            // Trim tags to service tag only
+            String serviceTagKey = "privatecloud.agoda.com/service";
+            for (ApiCollection c : collections) {
+                List<CollectionTags> tags = c.getTagsList();
+                if (tags != null && !tags.isEmpty()) {
+                    tags.removeIf(tag -> !serviceTagKey.equals(tag.getKeyName()));
+                }
+                if (tags != null) {
+                    for (CollectionTags tag : tags) {
+                        tag.setLastUpdatedTs(0);
+                        tag.setSource(null);
+                    }
+                }
+            }
+            loggerMaker.warnAndAddToDb("[fetchAllCollectionsBasic-cache] tags filtering took " + (System.currentTimeMillis() - stepStart) + "ms");
+            stepStart = System.currentTimeMillis();
+
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.addMixIn(ApiCollection.class, ApiCollectionBasicMixin.class);
+            Map<String, Object> responseBody = new HashMap<>();
+            responseBody.put("apiCollections", collections);
+            byte[] bytes = mapper.writeValueAsBytes(responseBody);
+            loggerMaker.warnAndAddToDb("[fetchAllCollectionsBasic-cache] Jackson serialization took " + (System.currentTimeMillis() - stepStart) + "ms, bytes=" + bytes.length);
+
+            loggerMaker.warnAndAddToDb("[fetchAllCollectionsBasic-cache] TOTAL took " + (System.currentTimeMillis() - start) + "ms, size=" + collections.size());
+            return bytes;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("[fetchAllCollectionsBasic-cache] failed to build cache: " + e.getMessage(), LogDb.DASHBOARD);
+            return null;
+        }
+    }
+
+    public static void initAllCollectionsBasicCacheRefresher() {
+        java.util.concurrent.ScheduledExecutorService scheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "allCollectionsBasic-cache-refresher");
+            t.setDaemon(true);
+            return t;
+        });
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                byte[] resp = buildAllCollectionsBasicResponse();
+                if (resp != null) {
+                    synchronized (cacheLock) {
+                        cachedAllCollectionsBasicResp = resp;
+                        cachedAllCollectionsBasicTs = System.currentTimeMillis();
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("[fetchAllCollectionsBasic-cache] refresh failed: " + e.getMessage(), LogDb.DASHBOARD);
+            }
+        }, 0, CACHE_REFRESH_INTERVAL_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
     
     // Error codes
     private static final int MONGO_INVALID_REGEX_ERROR_CODE = 51091;
@@ -277,6 +374,21 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchAllCollectionsBasic() throws Exception {
         long start = System.currentTimeMillis();
+
+        // For account 1736798101, serve from cache if available and fresh
+        if (Context.accountId.get() == CACHED_ACCOUNT_ID) {
+            byte[] cached = cachedAllCollectionsBasicResp;
+            long cachedTs = cachedAllCollectionsBasicTs;
+            if (cached != null && (System.currentTimeMillis() - cachedTs) < CACHE_TTL_MS) {
+                HttpServletResponse httpResponse = ServletActionContext.getResponse();
+                httpResponse.setContentType("application/json");
+                httpResponse.setCharacterEncoding("UTF-8");
+                httpResponse.getOutputStream().write(cached);
+                loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] served from cache in " + (System.currentTimeMillis() - start) + "ms, bytes=" + cached.length);
+                return Action.NONE;
+            }
+        }
+
         long stepStart = start;
 
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
@@ -297,7 +409,7 @@ public class ApiCollectionsAction extends UserAction {
         stepStart = System.currentTimeMillis();
 
         // For account 1736798101, trim tags to only service tag to reduce response size
-        if (Context.accountId.get() == 1736798101) {
+        if (Context.accountId.get() == CACHED_ACCOUNT_ID) {
             String serviceTagKey = "privatecloud.agoda.com/service";
             for (ApiCollection c : this.apiCollections) {
                 List<CollectionTags> tags = c.getTagsList();
