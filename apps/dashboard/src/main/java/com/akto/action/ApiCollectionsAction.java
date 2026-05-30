@@ -61,6 +61,12 @@ import com.mongodb.client.model.UpdateOptions;
 import com.opensymphony.xwork2.Action;
 
 import lombok.Setter;
+
+import javax.servlet.http.HttpServletResponse;
+import org.apache.struts2.ServletActionContext;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
 
 import com.akto.dto.billing.UningestedApiOverage;
@@ -71,6 +77,16 @@ import com.akto.dto.ApiCollectionIcon;
 import com.mongodb.client.model.Projections;
 
 public class ApiCollectionsAction extends UserAction {
+
+    // Mixin to exclude fields from Jackson serialization for fetchAllCollectionsBasic
+    @JsonIgnoreProperties({
+        "urls", "tagsList", "conditions", "serviceGraphEdges", "hostNames", "serviceTag",
+        "sampleCollectionsDropped", "redact", "runDependencyAnalyser",
+        "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
+        "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType",
+        "mcpCollection", "dastCollection", "genAICollection", "guardRailCollection", "endpointCollection"
+    })
+    abstract static class ApiCollectionBasicMixin {}
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class, LogDb.DASHBOARD);
     
@@ -259,7 +275,7 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public String fetchAllCollectionsBasic() {
+    public String fetchAllCollectionsBasic() throws Exception {
         long start = System.currentTimeMillis();
         long stepStart = start;
 
@@ -307,9 +323,21 @@ public class ApiCollectionsAction extends UserAction {
         // This runs in a separate thread to not block the main response
         com.akto.util.IconUtils.processIconsForCollections(this.apiCollections);
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] processIcons took " + (System.currentTimeMillis() - stepStart) + "ms");
+        stepStart = System.currentTimeMillis();
+
+        // Bypass Struts JSON serialization — write directly with Jackson for 10x faster serialization
+        HttpServletResponse httpResponse = ServletActionContext.getResponse();
+        httpResponse.setContentType("application/json");
+        httpResponse.setCharacterEncoding("UTF-8");
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.addMixIn(ApiCollection.class, ApiCollectionBasicMixin.class);
+        Map<String, Object> responseBody = new HashMap<>();
+        responseBody.put("apiCollections", this.apiCollections);
+        mapper.writeValue(httpResponse.getOutputStream(), responseBody);
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] Jackson serialization took " + (System.currentTimeMillis() - stepStart) + "ms");
 
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] TOTAL took " + (System.currentTimeMillis() - start) + "ms");
-        return Action.SUCCESS.toUpperCase();
+        return Action.NONE;
     }
 
     public String fetchCollection() {
