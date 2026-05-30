@@ -1,8 +1,10 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
+import com.akto.agent.AgentClient;
 import com.akto.audit_logs_util.Audit;
 import com.akto.billing.UsageMetricUtils;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
@@ -208,7 +210,16 @@ public class StartTestAction extends UserAction {
                 testingEndpoints = new CustomTestingEndpoints(apiInfoKeyList);
                 break;
             case COLLECTION_WISE:
-                testingEndpoints = new CollectionWiseTestingEndpoints(apiCollectionId);
+                if (AgentClient.isCopilotBotCollection(apiCollectionId)) {
+                    List<ApiInfo.ApiInfoKey> botEndpoints = SingleTypeInfoDao.instance.fetchEndpointsInCollection(apiCollectionId);
+                    if (botEndpoints == null || botEndpoints.isEmpty()) {
+                        addActionError("No endpoints found in Copilot bot collection");
+                        return null;
+                    }
+                    testingEndpoints = new CustomTestingEndpoints(Collections.singletonList(botEndpoints.get(0)));
+                } else {
+                    testingEndpoints = new CollectionWiseTestingEndpoints(apiCollectionId);
+                }
                 break;
             case MULTI_COLLECTION:
                 if (this.apiCollectionIds == null || this.apiCollectionIds.isEmpty()) {

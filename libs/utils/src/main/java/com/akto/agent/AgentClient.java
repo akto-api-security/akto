@@ -1,6 +1,9 @@
 package com.akto.agent;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.testing.AgentConversationResultDao;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.CopilotAuthDetails;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.testing.GenericAgentConversation;
@@ -13,6 +16,7 @@ import okhttp3.*;
 import java.util.concurrent.TimeUnit;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.akto.util.JSONUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 
 import java.util.ArrayList;
@@ -48,16 +52,24 @@ public class AgentClient {
     }
 
     public TestResult executeAgenticTest(RawApi rawApi, int apiCollectionId) throws Exception {
+        return executeAgenticTest(rawApi, apiCollectionId, null, null);
+    }
+
+    public TestResult executeAgenticTest(RawApi rawApi, int apiCollectionId, CopilotAuthDetails copilotAuth, String agentSchema) throws Exception {
         String conversationId = UUID.randomUUID().toString();
         List<String> promptsList = rawApi.getConversationsList();
         String testMode = getTestModeFromRole();
-        
+
         try {
-            /*
-             * the rawApi already has been modified by the testRole, 
-             * and should have the updated auth request headers
-             */
-            AgenticUtils.checkAndInitializeAgent(conversationId, rawApi, apiCollectionId);
+            if (copilotAuth != null && agentSchema != null) {
+                initializeCopilotAgent(conversationId, agentSchema, copilotAuth);
+            } else {
+                /*
+                 * the rawApi already has been modified by the testRole,
+                 * and should have the updated auth request headers
+                 */
+                AgenticUtils.checkAndInitializeAgent(conversationId, rawApi, apiCollectionId);
+            }
         } catch(Exception e){
         }
 
@@ -248,6 +260,22 @@ public class AgentClient {
     public static boolean isRawApiValidForAgenticTest(RawApi rawApi) {
         List<String> temp = rawApi.getConversationsList();
         return (temp != null && !temp.isEmpty());
+    }
+
+    public static boolean isCopilotBotCollection(int apiCollectionId) {
+        ApiCollection col = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        if (col == null || col.getTagsList() == null) return false;
+        return col.getTagsList().stream().anyMatch(t -> "bot-schema".equals(t.getKeyName()));
+    }
+
+    public void initializeCopilotAgent(String conversationId, String agentSchema, CopilotAuthDetails auth) {
+        Map<String, Object> copilotConfig = JSONUtils.getMap(auth);
+        copilotConfig.put("agentSchema", agentSchema);
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("conversationId", conversationId);
+        requestBody.put("copilotConfig", copilotConfig);
+        initializeAgent(requestBody);
     }
     
     public boolean performHealthCheck() {
