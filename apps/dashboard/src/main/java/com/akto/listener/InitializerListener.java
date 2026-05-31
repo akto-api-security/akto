@@ -2554,6 +2554,9 @@ public class InitializerListener implements ServletContextListener {
 
                 SingleTypeInfo.init();
 
+                // Init cache refresher for fetchAllCollectionsBasic for specific account
+                com.akto.action.ApiCollectionsAction.initAllCollectionsBasicCacheRefresher();
+
                 int now = Context.now();
 
                 if (runJobFunctions > 0 || runJobFunctionsAnyway) {

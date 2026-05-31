@@ -589,16 +589,15 @@ public class IssuesAction extends UserAction {
             }
             if(!andFilters.isEmpty()){
                 Bson orFilters = Filters.or(andFilters);
-                this.testingRunResults = TestingRunResultDao.instance.findAll(orFilters);
+                this.testingRunResults = TestingRunResultDao.instance.findAllWithSummaryContext(orFilters);
             }
 
             if (!filtersForNewCollection.isEmpty()) {
                 this.testingRunResults.addAll(
-                    VulnerableTestingRunResultDao.instance.findAll(Filters.or(filtersForNewCollection))
+                    VulnerableTestingRunResultDao.instance.findAllWithSummaryContext(Filters.or(filtersForNewCollection))
                 );
             }
 
-            Map<String, String> sampleDataVsCurlMap = new HashMap<>();
             // todo: fix
             for (TestingRunResult runResult: this.testingRunResults) {
                 List<GenericTestResult> testResults = new ArrayList<>();
