@@ -2,12 +2,6 @@ package com.akto.test_editor.execution;
 
 import com.akto.agent.AgentClient;
 import com.akto.billing.UsageMetricUtils;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.CopilotAuthDetails;
-import com.akto.dto.traffic.CollectionTags;
 
 import com.akto.dao.billing.OrganizationsDao;
 import java.util.*;
@@ -220,19 +214,7 @@ public class Executor {
                 // follow redirects = true for now
                 TestResult res = null;
                 if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
-                    CopilotAuthDetails copilotAuth = null;
-                    String copilotAgentSchema = null;
-                    if (AgentClient.isCopilotBotCollection(apiInfoKey.getApiCollectionId())) {
-                        AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                        copilotAuth = settings != null ? settings.getCopilotAuthDetails() : null;
-                        if (copilotAuth == null) {
-                            loggerMaker.errorAndAddToDb("CopilotAuthDetails not configured in AccountSettings for Copilot bot test", LogDb.TESTING);
-                        } else {
-                            ApiCollection col = ApiCollectionsDao.instance.getMeta(apiInfoKey.getApiCollectionId());
-                            copilotAgentSchema = getTagValue(col, "bot-schema");
-                        }
-                    }
-                    res = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId(), copilotAuth, copilotAgentSchema);
+                    res = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
                 }else{
                     String url = testReq.getRequest().getUrl();
                     if (url.contains("sampl-aktol-1exannwybqov-67928726")) {
@@ -1110,14 +1092,6 @@ public class Executor {
                 return Utils.modifySampleDataUtil(operationType, rawApi, key, value, varMap, apiInfoKey, isMcpRequest);
 
         }
-    }
-
-    private static String getTagValue(ApiCollection col, String keyName) {
-        if (col == null || col.getTagsList() == null) return null;
-        return col.getTagsList().stream()
-                .filter(t -> keyName.equals(t.getKeyName()))
-                .map(CollectionTags::getValue)
-                .findFirst().orElse(null);
     }
 
 }

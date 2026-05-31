@@ -73,6 +73,10 @@ public class Constants {
     public static final String AKTO_MCP_SERVER_TYPE_TAG = "mcp-server-type";
     public static final String AKTO_MALICIOUS_MCP_SERVER_TAG = "malicious-mcp-server";
     public static final String AKTO_DAST_TAG = "dast";
+    public static final String AKTO_COPILOT_BOT_SCHEMA_TAG = "bot-schemaname";
+    public static final String AKTO_COPILOT_BOT_NAME_TAG = "bot-name";
+    public static final String AKTO_COPILOT_BOT_ENVIRONMENT_TAG = "bot-environment-id";
+    public static final String AKTO_COPILOT_SOURCE_VALUE = "COPILOT_STUDIO";
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
     public static final String AKTO_GUARD_RAIL_TAG = "guard-rail";
     public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";

@@ -1,9 +1,13 @@
 package com.akto.agent;
 
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.context.Context;
 import com.akto.dao.testing.AgentConversationResultDao;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.CopilotAuthDetails;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.testing.GenericAgentConversation;
@@ -16,7 +20,7 @@ import okhttp3.*;
 import java.util.concurrent.TimeUnit;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.akto.util.JSONUtils;
+import com.akto.util.Constants;
 import com.akto.util.http_util.CoreHTTPClient;
 
 import java.util.ArrayList;
@@ -25,6 +29,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import com.mongodb.client.model.Updates;
 
 import static com.akto.agent.AgenticUtils.getTestModeFromRole;
 
@@ -41,6 +47,9 @@ public class AgentClient {
             .build();
     
     private final String agentBaseUrl;
+
+    // key=accountId, value="accessToken|expiresAtMs"
+    private static final ConcurrentHashMap<Integer, String> copilotAccessTokenCache = new ConcurrentHashMap<>();
     
     public AgentClient(String agentBaseUrl) {
         this.agentBaseUrl = agentBaseUrl.endsWith("/") ? agentBaseUrl.substring(0, agentBaseUrl.length() - 1) : agentBaseUrl;
@@ -52,25 +61,29 @@ public class AgentClient {
     }
 
     public TestResult executeAgenticTest(RawApi rawApi, int apiCollectionId) throws Exception {
-        return executeAgenticTest(rawApi, apiCollectionId, null, null);
-    }
-
-    public TestResult executeAgenticTest(RawApi rawApi, int apiCollectionId, CopilotAuthDetails copilotAuth, String agentSchema) throws Exception {
         String conversationId = UUID.randomUUID().toString();
         List<String> promptsList = rawApi.getConversationsList();
         String testMode = getTestModeFromRole();
 
+        ApiCollection col = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        boolean isCopilot = isCopilotBotCollection(col);
+        loggerMaker.infoAndAddToDb("executeAgenticTest: starting conversationId=" + conversationId + " apiCollectionId=" + apiCollectionId + " prompts=" + promptsList.size() + " copilot=" + isCopilot);
+
         try {
-            if (copilotAuth != null && agentSchema != null) {
-                initializeCopilotAgent(conversationId, agentSchema, copilotAuth);
+            if (isCopilot) {
+                AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                CopilotAuthDetails copilotAuth = settings != null ? settings.getCopilotAuthDetails() : null;
+                if (copilotAuth == null) {
+                    throw new Exception("CopilotAuthDetails not configured in AccountSettings");
+                }
+                String accessToken = fetchAccessToken(copilotAuth);
+                loggerMaker.infoAndAddToDb("executeAgenticTest: initializing Copilot agent conversationId=" + conversationId);
+                initializeCopilotAgent(conversationId, col, accessToken);
             } else {
-                /*
-                 * the rawApi already has been modified by the testRole,
-                 * and should have the updated auth request headers
-                 */
                 AgenticUtils.checkAndInitializeAgent(conversationId, rawApi, apiCollectionId);
             }
         } catch(Exception e){
+            loggerMaker.errorAndAddToDb("executeAgenticTest: init failed conversationId=" + conversationId + " err=" + e.getMessage());
         }
 
         try {
@@ -264,18 +277,114 @@ public class AgentClient {
 
     public static boolean isCopilotBotCollection(int apiCollectionId) {
         ApiCollection col = ApiCollectionsDao.instance.getMeta(apiCollectionId);
-        if (col == null || col.getTagsList() == null) return false;
-        return col.getTagsList().stream().anyMatch(t -> "bot-schema".equals(t.getKeyName()));
+        return isCopilotBotCollection(col);
     }
 
-    public void initializeCopilotAgent(String conversationId, String agentSchema, CopilotAuthDetails auth) {
-        Map<String, Object> copilotConfig = JSONUtils.getMap(auth);
+    public static boolean isCopilotBotCollection(ApiCollection col) {
+        if (col == null || col.getTagsList() == null) {
+            loggerMaker.infoAndAddToDb("isCopilotBotCollection: collection not found or has no tags");
+            return false;
+        }
+        List<CollectionTags> tags = col.getTagsList();
+        loggerMaker.infoAndAddToDb("isCopilotBotCollection: collection " + col.getId() + " tags=" + tags.stream().map(t -> t.getKeyName() + "=" + t.getValue()).collect(java.util.stream.Collectors.joining(", ")));
+        boolean hasSource  = tags.stream().anyMatch(t -> Constants.AKTO_ENDPOINT_SOURCE_TAG.equals(t.getKeyName()) && Constants.AKTO_COPILOT_SOURCE_VALUE.equals(t.getValue()));
+        boolean hasBotName = tags.stream().anyMatch(t -> Constants.AKTO_COPILOT_BOT_NAME_TAG.equals(t.getKeyName()));
+        return hasSource && hasBotName;
+    }
+
+    private static String getTagValue(List<CollectionTags> tags, String keyName) {
+        if (tags == null) return null;
+        return tags.stream()
+            .filter(t -> keyName.equals(t.getKeyName()))
+            .map(CollectionTags::getValue)
+            .findFirst().orElse(null);
+    }
+
+    public void initializeCopilotAgent(String conversationId, ApiCollection col, String accessToken) {
+        List<CollectionTags> tags = col != null ? col.getTagsList() : null;
+        String environmentId = getTagValue(tags, Constants.AKTO_COPILOT_BOT_ENVIRONMENT_TAG);
+        String agentSchema   = getTagValue(tags, Constants.AKTO_COPILOT_BOT_SCHEMA_TAG);
+
+        Map<String, Object> copilotConfig = new HashMap<>();
+        copilotConfig.put("environmentId", environmentId);
         copilotConfig.put("agentSchema", agentSchema);
+        copilotConfig.put("accessToken", accessToken);
 
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("conversationId", conversationId);
         requestBody.put("copilotConfig", copilotConfig);
+
+        try {
+            loggerMaker.infoAndAddToDb("initializeCopilotAgent: POST /initializeMCP body=" + objectMapper.writeValueAsString(requestBody));
+        } catch (Exception ignored) {}
         initializeAgent(requestBody);
+    }
+
+    public String fetchAccessToken(CopilotAuthDetails auth) throws Exception {
+        int accountId = Context.accountId.get();
+        String cached = copilotAccessTokenCache.get(accountId);
+        if (cached != null) {
+            String[] parts = cached.split("\\|", 2);
+            if (parts.length == 2 && Long.parseLong(parts[1]) > System.currentTimeMillis() + 5 * 60 * 1000L) {
+                return parts[0];
+            }
+        }
+
+        String refreshToken = auth.getRefreshToken();
+        if (refreshToken == null || refreshToken.isEmpty()) {
+            throw new Exception("Copilot Studio refresh token missing — user must re-authenticate.");
+        }
+
+        loggerMaker.infoAndAddToDb("fetchAccessToken: fetching new access token via refresh_token grant");
+
+        okhttp3.RequestBody formBody = new okhttp3.FormBody.Builder()
+            .add("grant_type", "refresh_token")
+            .add("client_id", auth.getClientId())
+            .add("client_secret", auth.getClientSecret())
+            .add("refresh_token", refreshToken)
+            .add("scope", "https://api.powerplatform.com/CopilotStudio.Copilots.Invoke offline_access")
+            .build();
+
+        Request tokenRequest = new Request.Builder()
+            .url("https://login.microsoftonline.com/" + auth.getTenantId() + "/oauth2/v2.0/token")
+            .post(formBody)
+            .build();
+
+        try (Response response = agentHttpClient.newCall(tokenRequest).execute()) {
+            String body = response.body() != null ? response.body().string() : "";
+            if (!response.isSuccessful()) {
+                if (response.code() == 400 || response.code() == 401) {
+                    throw new Exception("Copilot Studio token refresh failed (code=" + response.code() + "). Refresh token may be expired — user must re-authenticate. Response: " + body);
+                }
+                throw new Exception("Copilot Studio token refresh failed (code=" + response.code() + "): " + body);
+            }
+
+            JsonNode json = objectMapper.readTree(body);
+            String newAccessToken  = json.has("access_token")  ? json.get("access_token").asText()  : null;
+            String newRefreshToken = json.has("refresh_token") ? json.get("refresh_token").asText() : null;
+            long   expiresIn       = json.has("expires_in")    ? json.get("expires_in").asLong()    : 3600L;
+
+            if (newAccessToken == null || newAccessToken.isEmpty()) {
+                throw new Exception("Copilot Studio token response missing access_token");
+            }
+
+            long expiresAtMs = System.currentTimeMillis() + expiresIn * 1000L;
+
+            // update in-memory cache
+            copilotAccessTokenCache.put(accountId, newAccessToken + "|" + expiresAtMs);
+
+            if (newRefreshToken != null && !newRefreshToken.isEmpty()) {
+                auth.setRefreshToken(newRefreshToken);
+                loggerMaker.infoAndAddToDb("fetchAccessToken: new refresh token received, persisting to AccountSettings");
+            }
+            AccountSettingsDao.instance.updateOneNoUpsert(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.COPILOT_AUTH_DETAILS + "." + CopilotAuthDetails.REFRESH_TOKEN, auth.getRefreshToken())
+            );
+
+            loggerMaker.infoAndAddToDb("fetchAccessToken: token obtained and cached, expiresIn=" + expiresIn + "s");
+            return newAccessToken;
+        }
     }
     
     public boolean performHealthCheck() {
