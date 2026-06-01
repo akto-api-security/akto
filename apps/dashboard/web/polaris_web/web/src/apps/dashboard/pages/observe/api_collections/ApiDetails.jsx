@@ -638,24 +638,18 @@ function ApiDetails(props) {
     }
     const isSkillEndpoint = apiDetail?.endpoint?.includes('/skills/')
 
-    console.log('[SkillTab] render — endpoint:', apiDetail?.endpoint, '| isSkillEndpoint:', isSkillEndpoint, '| sampleData.length:', sampleData.length)
-
     let skillMarkdown = null
     if (isSkillEndpoint && sampleData.length > 0) {
         try {
             const parsedMsg = JSON.parse(sampleData[0].message)
             const bodyStr = parsedMsg?.request?.body || parsedMsg?.requestPayload || '{}'
             const body = JSON.parse(bodyStr)
-            console.log('[SkillTab] parsedMsg:', parsedMsg)
-            console.log('[SkillTab] body:', body)
             if (body.skill_name) {
                 skillMarkdown = `# ${body.skill_name}\n\n` +
                     (body.skill_description ? `**${body.skill_description}**\n\n` : '') +
                     (body.skill_content || '')
             }
-        } catch (e) {
-            console.log('[SkillTab] parse error:', e)
-        }
+        } catch (_) {}
     }
 
     const ValuesTab = {
