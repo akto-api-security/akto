@@ -22,6 +22,11 @@ const normalizePattern = (raw) =>
 // Host/path glob characters: letters, digits and . - _ / : ~ % plus the * wildcard.
 const PATTERN_ALLOWED = /^[a-z0-9.\-_/:~%*]+$/;
 
+// The host part (before the first "/") must be either exactly "*" (any host) or a domain whose
+// labels may contain "*" but whose final label (TLD) is concrete — so "chatgpt.com",
+// "*.openai.com", "localhost" are valid, while "*.*" (no real TLD) is not.
+const HOST_PART = /^(\*|(?:[a-z0-9*]([a-z0-9*-]*[a-z0-9*])?\.)*[a-z0-9]([a-z0-9-]*[a-z0-9])?)$/;
+
 // Validate a normalized pattern. Returns an error string, or "" when valid.
 const validatePattern = (p) => {
     if (!p) {
@@ -37,9 +42,11 @@ const validatePattern = (p) => {
     if (/^[*/]+$/.test(p)) {
         return "Pattern is too broad — include a host or path (e.g. chatgpt.com/*)";
     }
-    // Must contain at least one host/path character, not just wildcards.
-    if (!/[a-z0-9]/.test(p)) {
-        return "Pattern must include a host or path";
+    // The host part (before the first "/") must be a real domain or "*" for any host.
+    const slash = p.indexOf("/");
+    const hostPart = slash === -1 ? p : p.slice(0, slash);
+    if (!HOST_PART.test(hostPart)) {
+        return "Host must be a domain (e.g. chatgpt.com, *.openai.com) or * for any host — not " + hostPart;
     }
     return "";
 };
