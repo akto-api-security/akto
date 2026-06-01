@@ -16,6 +16,8 @@ import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentere
 import { TYPE_STYLES, SEVERITY_COLORS, getRiskColor } from "./agenticStyles";
 import agenticObserveApi, { aggregateViolationsByCollectionId } from "./agenticObserveApi";
 import { buildDeviceEndpointsPageData } from "./agenticPageBuilders";
+import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
+import { groupCollectionsByUser } from "./constants";
 import api from "../api";
 
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
@@ -123,7 +125,7 @@ function TopSection({ summary }) {
             <div style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column" }}>
                 <Card padding="0">
                     <VerticalStack>
-                        <StatRow label="Total Endpoints"  value={summary?.totalEndpoints ?? 0} delta={0} sparklineData={sparklines.endpoints || []}  color="#7C3AED" />
+                        <StatRow label="Total Endpoints"  value={summary?.deviceCount ?? 0} delta={0} sparklineData={sparklines.endpoints || []}  color="#7C3AED" />
                         <Divider />
                         <StatRow label="Users"            value={summary?.totalUsers ?? 0} delta={0} sparklineData={sparklines.users || []}      color="#2563EB" />
                         <Divider />
@@ -545,25 +547,29 @@ export default function DeviceEndpoints() {
                     apiCollectionsResp,
                     trafficInfoResp,
                     riskScoreResp,
-                    moduleInfos,
+                    shieldResult,
                     violationRows,
                 ] = await Promise.all([
                     api.getAllCollectionsBasic(),
                     api.getLastTrafficSeen(),
                     api.getRiskScoreInfo(),
-                    agenticObserveApi.fetchEndpointShieldModules(),
+                    fetchEndpointShieldUserMetadata(),
                     agenticObserveApi.fetchAgenticViolations({}),
                 ]);
                 if (!isMountedRef.current) return;
+                const { usernameMap = {}, userMetadataMap = {} } = shieldResult || {};
+                const collections = apiCollectionsResp?.apiCollections || [];
                 const pageData = buildDeviceEndpointsPageData(
-                    apiCollectionsResp?.apiCollections || [],
+                    collections,
                     trafficInfoResp || {},
                     riskScoreResp?.riskScoreOfCollectionsMap || {},
                     {
-                        moduleInfos,
+                        usernameMap,
                         violationsByCollectionId: aggregateViolationsByCollectionId(violationRows),
                     },
                 );
+                const userRows = groupCollectionsByUser(collections, trafficInfoResp || {}, {}, riskScoreResp?.riskScoreOfCollectionsMap || {}, usernameMap, userMetadataMap);
+                pageData.summary.totalUsers = userRows.length;
                 setDeviceFlatData(pageData.deviceFlatData);
                 setAgentRiskData(pageData.agentRiskData);
                 setDevicesByUsername(pageData.devicesByUsername);

@@ -1139,14 +1139,37 @@ export default function AgenticAssetFlyout({
         return () => { cancelled = true; };
     }, [asset?.id, asset?.type, asset?.collectionIds]);
 
-    const chatMetadata = useMemo(() => buildAgenticObserveChatMetadata("asset", {
-        assetId: asset?.id,
-        assetName: asset?.name,
-        assetType: asset?.type,
-        riskScore: asset?.riskScore,
-        violations: asset?.violations,
-        deviceCount: asset?.deviceCount,
-    }), [asset]);
+    const chatMetadata = useMemo(() => {
+        if (!asset) return null;
+        const devices = (assetDevices[asset.id] || []).map(d => ({
+            deviceId: d.deviceId,
+            riskScore: d.riskScore,
+        }));
+        const linkedComponents = getAgentLinkedComponents(asset, agenticTreeData, agenticFlatData);
+        const componentList = linkedComponents.map(c => ({
+            name: c.name,
+            type: c.type,
+            riskScore: c.riskScore,
+        }));
+        return buildAgenticObserveChatMetadata("asset", {
+            assetId: asset?.id,
+            assetName: asset?.name,
+            assetType: asset?.type,
+            assetTagValue: asset?.assetTagValue,
+            riskScore: asset?.riskScore,
+            violations: asset?.violations,
+            deviceCount: devices.length || asset?.deviceCount,
+            deviceList: devices,
+            endpointCount: asset?.endpointCount,
+            skillCount: asset?.skillCount || 0,
+            aiInteractions: asset?.aiInteractions,
+            aiInteractionsDetail: asset?.aiInteractionsDetail,
+            lastSeen: asset?.lastSeen,
+            groups: asset?.groups,
+            mcpServers: asset?.mcpServers,
+            componentList,
+        });
+    }, [asset, assetDevices, agenticTreeData, agenticFlatData]);
 
     const handleTabSelect = useCallback((tab) => {
         setSelectedTab(tab);
@@ -1249,7 +1272,7 @@ export default function AgenticAssetFlyout({
                 <AiChatSection
                     placeholder="Ask anything about this agentic asset..."
                     resetKey={asset?.id}
-                    conversationType="ASK_AKTO"
+                    conversationType="AGENTIC_OBSERVE"
                     chatMetadata={chatMetadata}
                 />
             </div>

@@ -593,13 +593,39 @@ function ViolationsTab({ device }) {
 export default function DeviceFlyout({ device, agents, show, onClose, onAgentClick, agentRiskData = {} }) {
     const [selectedTab, setSelectedTab] = useState(0);
 
-    const chatMetadata = useMemo(() => buildAgenticObserveChatMetadata("device", {
-        deviceEndpoint: device?.endpoint,
-        deviceId: device?.path?.[0],
-        riskScore: device?.riskScore,
-        violations: device?.violations,
-        counts: { agents: (agents || []).length },
-    }), [device, agents]);
+    const chatMetadata = useMemo(() => {
+        const deviceId = device?.path?.[0];
+        const agentList = (agents || []).map(a => {
+            const riskKey = [deviceId, a.path?.[1] ?? a.endpoint].join("/");
+            const riskEntry = agentRiskData[riskKey] || {};
+            return {
+                name: a.endpoint,
+                type: a.type,
+                riskScore: riskEntry.riskScore ?? null,
+                violations: riskEntry.violations ?? null,
+                skillCount: a.skillCount ?? 0,
+            };
+        });
+        const maliciousAgents = agentList.filter(a => a.riskScore != null && a.riskScore >= 4);
+        return buildAgenticObserveChatMetadata("device", {
+            deviceEndpoint: device?.endpoint,
+            deviceId,
+            username: device?.username,
+            group: device?.group,
+            role: device?.role,
+            os: device?.os,
+            riskScore: device?.riskScore,
+            violations: device?.violations,
+            lastTraffic: device?.lastTraffic,
+            counts: {
+                totalAgents: agentList.length,
+                mcpServers: agentList.filter(a => a.type === "MCP Server").length,
+                aiAgents: agentList.filter(a => a.type === "AI Agent").length,
+                maliciousAgents: maliciousAgents.length,
+            },
+            agentList,
+        });
+    }, [device, agents, agentRiskData]);
 
     const lockScroll   = useCallback(() => { document.body.style.overflow = "hidden"; }, []);
     const unlockScroll = useCallback(() => { document.body.style.overflow = "";       }, []);
@@ -655,7 +681,7 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
                 <AiChatSection
                     placeholder="Ask anything about this device..."
                     resetKey={device?.endpoint}
-                    conversationType="ASK_AKTO"
+                    conversationType="AGENTIC_OBSERVE"
                     chatMetadata={chatMetadata}
                 />
             </div>

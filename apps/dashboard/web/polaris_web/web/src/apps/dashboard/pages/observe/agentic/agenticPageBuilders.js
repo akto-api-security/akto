@@ -6,6 +6,8 @@ import {
     formatDisplayName,
     getTypeFromTags,
 } from "./mcpClientHelper";
+import func from "@/util/func";
+import { getResolvedUsernameForCollection, DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
 
 const AGENTIC_ENV_KEYS = new Set([
     "mcp-server", "gen-ai", "browser-llm", "mcp-client", "ai-agent", "browser-llm-agent", "skill",
@@ -159,7 +161,7 @@ export function buildDeviceEndpointsPageData(
     collections,
     trafficMap = {},
     riskScoreMap = {},
-    { moduleInfos = [], violationsByCollectionId = {} } = {},
+    { moduleInfos = [], usernameMap = {}, violationsByCollectionId = {} } = {},
 ) {
     const agenticCollections = collections.filter(isAgenticCollection);
     const deviceModules = buildModuleDeviceMap(moduleInfos);
@@ -167,7 +169,7 @@ export function buildDeviceEndpointsPageData(
     const collectionIdToDevice = {};
 
     agenticCollections.forEach((collection) => {
-        const hostName = collection.hostName;
+        const hostName = collection.hostName || collection.displayName || collection.name;
         if (!hostName) return;
         const devId = extractEndpointId(hostName);
         if (!devId) return;
@@ -175,10 +177,12 @@ export function buildDeviceEndpointsPageData(
         collectionIdToDevice[collection.id] = devId;
         if (!deviceMap[devId]) {
             const mod = deviceModules[devId] || {};
+            const resolvedUsername = getResolvedUsernameForCollection(collection, usernameMap);
+            const username = resolvedUsername !== DEFAULT_VALUE ? resolvedUsername : (mod.username || "-");
             deviceMap[devId] = {
                 deviceId: devId,
                 os: inferOsFromDeviceId(devId),
-                username: mod.username || "-",
+                username,
                 team: mod.team || "",
                 role: mod.role || "",
                 maxRisk: 0,
@@ -255,7 +259,7 @@ export function buildDeviceEndpointsPageData(
             group: device.team,
             role: device.role,
             violations: toViolationsObject(device.violations),
-            lastTraffic: device.maxTraffic,
+            lastTraffic: device.maxTraffic > 0 ? func.prettifyEpoch(device.maxTraffic) : "-",
         };
         if (device.hasPersonalAccount) deviceRow.hasPersonalAccount = true;
         deviceFlatData.push(deviceRow);
@@ -273,7 +277,7 @@ export function buildDeviceEndpointsPageData(
                 type: child.type,
                 collectionIds: child.collectionIds,
                 skillCount: child.skillCount > 0 ? child.skillCount : undefined,
-                lastTraffic: child.lastTraffic,
+                lastTraffic: child.lastTraffic > 0 ? func.prettifyEpoch(child.lastTraffic) : "-",
             });
             const riskKey = path.join("/");
             const entry = { riskScore: Math.round(child.riskScore * 10) / 10 };
