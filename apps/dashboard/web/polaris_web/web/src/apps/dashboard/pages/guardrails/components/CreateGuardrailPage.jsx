@@ -279,12 +279,15 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             });
         }
 
-        steps.push({
-            number: BlockedHostsConfig.number,
-            title: BlockedHostsConfig.title,
-            summary: BlockedHostsConfig.getSummary(storedStateData),
-            ...BlockedHostsConfig.validate(storedStateData)
-        });
+        // "Block host / path" is an internal-only step — shown for @akto.io users only.
+        if (func.isAktoUser()) {
+            steps.push({
+                number: BlockedHostsConfig.number,
+                title: BlockedHostsConfig.title,
+                summary: BlockedHostsConfig.getSummary(storedStateData),
+                ...BlockedHostsConfig.validate(storedStateData)
+            });
+        }
 
         steps.push({
             number: ServerSettingsConfig.number,
