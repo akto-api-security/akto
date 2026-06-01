@@ -76,6 +76,15 @@ func parseBlockedHostRules(raw []byte) []blockedHostRule {
 	return rules
 }
 
+// blockedHostPatterns returns the raw patterns of the rules, for logging/diagnostics.
+func blockedHostPatterns(rules []blockedHostRule) []string {
+	patterns := make([]string, 0, len(rules))
+	for _, r := range rules {
+		patterns = append(patterns, r.pattern)
+	}
+	return patterns
+}
+
 // matchBlockedHostRule matches the request host+path against each rule's compiled pattern.
 // Returns (rule, matchedPattern, true) on the first match.
 func matchBlockedHostRule(host, endpoint string, rules []blockedHostRule) (blockedHostRule, string, bool) {

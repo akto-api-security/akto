@@ -541,6 +541,10 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 
 	// Blocked-host rules are parsed from the same raw response (block-only host blocklist).
 	blockedHostRules := parseBlockedHostRules(rawGuardrailPolicies)
+	s.logger.Info("[BLOCKED_HOST] parsed blocked-host rules from policies",
+		zap.String("feature", "blocked-host-v1"),
+		zap.Int("ruleCount", len(blockedHostRules)),
+		zap.Strings("patterns", blockedHostPatterns(blockedHostRules)))
 
 	s.logger.Debug("Raw guardrail policies response",
 		zap.Int("size", len(rawGuardrailPolicies)),
@@ -869,7 +873,14 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		s.cache.mu.RLock()
 		blockedHostRules := s.cache.blockedHosts
 		s.cache.mu.RUnlock()
-		if rule, matchedPattern, blocked := matchBlockedHostRule(extractHostHeader(valCtx.RequestHeaders), params.Path, blockedHostRules); blocked {
+		reqHost := extractHostHeader(valCtx.RequestHeaders)
+		s.logger.Info("[BLOCKED_HOST] running blocked-host check for browser-llm request",
+			zap.String("feature", "blocked-host-v1"),
+			zap.String("host", reqHost),
+			zap.String("path", params.Path),
+			zap.Int("ruleCount", len(blockedHostRules)),
+			zap.Strings("patterns", blockedHostPatterns(blockedHostRules)))
+		if rule, matchedPattern, blocked := matchBlockedHostRule(reqHost, params.Path, blockedHostRules); blocked {
 			s.logger.Warn("ValidateRequest - blocking browser extension request via blocked-host policy",
 				zap.String("path", params.Path),
 				zap.String("method", params.Method),
