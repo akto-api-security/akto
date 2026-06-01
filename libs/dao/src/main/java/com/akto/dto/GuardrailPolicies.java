@@ -251,24 +251,23 @@ public class GuardrailPolicies {
 
     /**
      * A single blocked host entry. This feature only ever blocks (no allow semantics).
-     * Kept as an object (rather than a plain host string) so the block can be shaped
-     * per-entry and extended later without a data migration:
-     *  - host only                -> block all traffic to that host (e.g. "chatgpt.com")
-     *  - host + includeSubdomains -> also block its sub-domains (e.g. "*.chatgpt.com")
-     *  - host + paths             -> block only those paths on the host (empty = all paths)
+     * Each entry is a glob pattern matched against the request's {@code host + path}, where
+     * {@code *} matches any sequence of characters (including {@code /}). Examples:
+     *  - {@code "chatgpt.com"}            -> block every path on that host
+     *  - {@code "chatgpt.com/*"}          -> block all paths on chatgpt.com
+     *  - {@code "*\/v1/chat/completions"} -> block that path on any host
+     *  - {@code "deepseek.com/api/v1/*"}  -> block everything under that prefix
+     * Kept as an object (rather than a plain string) so it can be extended later without a
+     * data migration.
      */
     @Getter
     @Setter
     @NoArgsConstructor
     public static class BlockedHostEntry {
-        private String host;
-        private List<String> paths;        // optional; empty/null = block all paths on this host
-        private boolean includeSubdomains; // when true, sub-domains of host are also blocked
+        private String pattern;
 
-        public BlockedHostEntry(String host, List<String> paths, boolean includeSubdomains) {
-            this.host = host;
-            this.paths = paths;
-            this.includeSubdomains = includeSubdomains;
+        public BlockedHostEntry(String pattern) {
+            this.pattern = pattern;
         }
     }
 

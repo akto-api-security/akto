@@ -10,19 +10,18 @@ import (
 const browserLlmTag = "browser-llm"
 
 // BlockedHostEntry mirrors the dashboard GuardrailPolicies.BlockedHostEntry DTO. Block-only
-// (no allow semantics). Modeled as an object so it can be extended later (new match fields)
-// without breaking the stored payload.
+// (no allow semantics). Each entry is a glob pattern matched against "host+path", e.g.
+// "chatgpt.com/*", "*/v1/chat/completions", "deepseek.com/api/v1/*". Modeled as an object so
+// it can be extended later without breaking the stored payload.
 type BlockedHostEntry struct {
-	Host              string   `json:"host"`
-	Paths             []string `json:"paths,omitempty"` // empty = all paths on the host
-	IncludeSubdomains bool     `json:"includeSubdomains,omitempty"`
+	Pattern string `json:"pattern"`
 }
 
-// blockedHostRule is a single blocked-host entry together with the policy it came from, so a
+// blockedHostRule is a single blocked-host pattern together with the policy it came from, so a
 // match can be attributed back to the originating policy.
 type blockedHostRule struct {
 	policyName string
-	entry      BlockedHostEntry
+	pattern    string
 }
 
 // isBrowserExtensionRequest reports whether the request originates from the browser LLM
@@ -40,8 +39,8 @@ func isBrowserExtensionRequest(tag string) bool {
 	return ok
 }
 
-// parseBlockedHostRules extracts blocked-host rules from the raw /fetchGuardrailPolicies
-// response body. Only active policies with at least one valid host contribute rules.
+// parseBlockedHostRules extracts blocked-host patterns from the raw /fetchGuardrailPolicies
+// response body. Only active policies with at least one non-empty pattern contribute rules.
 func parseBlockedHostRules(raw []byte) []blockedHostRule {
 	var response struct {
 		GuardrailPolicies []struct {
@@ -60,39 +59,69 @@ func parseBlockedHostRules(raw []byte) []blockedHostRule {
 			continue
 		}
 		for _, entry := range p.BlockedHosts {
-			if normalizeBlockedHost(entry.Host) == "" {
+			pattern := normalizePattern(entry.Pattern)
+			if pattern == "" {
 				continue
 			}
-			rules = append(rules, blockedHostRule{
-				policyName: p.Name,
-				entry:      entry,
-			})
+			rules = append(rules, blockedHostRule{policyName: p.Name, pattern: pattern})
 		}
 	}
 	return rules
 }
 
-// matchBlockedHostRule returns the first rule whose host/path covers the request.
-// Returns (rule, matchedHost, true) on a match.
+// matchBlockedHostRule matches the request host+path against each rule pattern.
+// Returns (rule, matchedPattern, true) on the first match.
 func matchBlockedHostRule(host, endpoint string, rules []blockedHostRule) (blockedHostRule, string, bool) {
-	reqHost := normalizeBlockedHost(host)
-	if reqHost == "" {
+	normHost := normalizeBlockedHost(host)
+	if normHost == "" {
 		return blockedHostRule{}, "", false
 	}
+	target := normHost + strings.ToLower(endpoint)
 	for _, rule := range rules {
-		entryHost := normalizeBlockedHost(rule.entry.Host)
-		if entryHost == "" {
-			continue
+		if patternMatches(rule.pattern, normHost, target) {
+			return rule, rule.pattern, true
 		}
-		if !hostMatchesBlockedEntry(reqHost, entryHost, rule.entry.IncludeSubdomains) {
-			continue
-		}
-		if !pathMatchesBlockedEntry(endpoint, rule.entry.Paths) {
-			continue
-		}
-		return rule, entryHost, true
 	}
 	return blockedHostRule{}, "", false
+}
+
+// patternMatches decides whether a blocked pattern covers the request. A bare host (no "/" and
+// no "*") blocks every path on that host; otherwise the pattern is glob-matched against the
+// full "host+path" target with "*" matching any sequence of characters (including "/").
+func patternMatches(pattern, host, target string) bool {
+	if pattern == "" {
+		return false
+	}
+	if !strings.ContainsAny(pattern, "*/") {
+		return host == pattern
+	}
+	return globMatch(pattern, target)
+}
+
+// globMatch reports whether s matches pattern, where "*" matches any (possibly empty) sequence
+// of characters. Classic two-pointer wildcard match; only "*" is special.
+func globMatch(pattern, s string) bool {
+	star, ss, p, sp := -1, 0, 0, 0
+	for sp < len(s) {
+		if p < len(pattern) && pattern[p] == s[sp] {
+			p++
+			sp++
+		} else if p < len(pattern) && pattern[p] == '*' {
+			star = p
+			ss = sp
+			p++
+		} else if star != -1 {
+			p = star + 1
+			ss++
+			sp = ss
+		} else {
+			return false
+		}
+	}
+	for p < len(pattern) && pattern[p] == '*' {
+		p++
+	}
+	return p == len(pattern)
 }
 
 // normalizeBlockedHost lowercases/trims and strips scheme, path and :port so values like
@@ -110,39 +139,11 @@ func normalizeBlockedHost(host string) string {
 	return host
 }
 
-// hostMatchesBlockedEntry reports whether reqHost is covered by entryHost, honouring
-// sub-domain matching when includeSubdomains is set (e.g. "a.chatgpt.com" vs "chatgpt.com").
-func hostMatchesBlockedEntry(reqHost, entryHost string, includeSubdomains bool) bool {
-	if reqHost == entryHost {
-		return true
-	}
-	if includeSubdomains && strings.HasSuffix(reqHost, "."+entryHost) {
-		return true
-	}
-	return false
-}
-
-// pathMatchesBlockedEntry reports whether the request endpoint is covered by the entry's path
-// list. An empty list (or a blank entry) means "all paths on the host". A trailing "*" is a
-// prefix wildcard, otherwise the path must match exactly.
-func pathMatchesBlockedEntry(endpoint string, paths []string) bool {
-	if len(paths) == 0 {
-		return true
-	}
-	for _, p := range paths {
-		p = strings.TrimSpace(p)
-		if p == "" {
-			return true
-		}
-		if strings.HasSuffix(p, "*") {
-			if strings.HasPrefix(endpoint, strings.TrimSuffix(p, "*")) {
-				return true
-			}
-			continue
-		}
-		if endpoint == p {
-			return true
-		}
-	}
-	return false
+// normalizePattern lowercases/trims a pattern and strips any scheme prefix, preserving "*" and
+// "/" so glob matching against "host+path" works.
+func normalizePattern(pattern string) string {
+	pattern = strings.ToLower(strings.TrimSpace(pattern))
+	pattern = strings.TrimPrefix(pattern, "http://")
+	pattern = strings.TrimPrefix(pattern, "https://")
+	return pattern
 }

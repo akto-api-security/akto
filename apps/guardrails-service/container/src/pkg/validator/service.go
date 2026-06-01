@@ -475,8 +475,8 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 
 // reportAndBlockHost tracks the blocked session, reports the threat (unless skipThreat) and
 // returns the blocked ValidationResult for a request that hit the browser-extension host blocklist.
-func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID, policyName, matchedHost string) *mcp.ValidationResult {
-	reason := "Host is blocked by guardrail policy: " + matchedHost
+func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID, policyName, matchedPattern string) *mcp.ValidationResult {
+	reason := "Request blocked by guardrail policy (blocked host pattern: " + matchedPattern + ")"
 	metadata := types.ThreatMetadata{
 		PolicyName:   policyName,
 		RuleViolated: "BlockedHost",
@@ -869,15 +869,15 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		s.cache.mu.RLock()
 		blockedHostRules := s.cache.blockedHosts
 		s.cache.mu.RUnlock()
-		if rule, matchedHost, blocked := matchBlockedHostRule(extractHostHeader(valCtx.RequestHeaders), params.Path, blockedHostRules); blocked {
+		if rule, matchedPattern, blocked := matchBlockedHostRule(extractHostHeader(valCtx.RequestHeaders), params.Path, blockedHostRules); blocked {
 			s.logger.Warn("ValidateRequest - blocking browser extension request via blocked-host policy",
 				zap.String("path", params.Path),
 				zap.String("method", params.Method),
-				zap.String("host", matchedHost),
+				zap.String("pattern", matchedPattern),
 				zap.String("policy", rule.policyName),
 				zap.String("sessionID", sessionID),
 				zap.String("requestID", requestID))
-			return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, rule.policyName, matchedHost), nil
+			return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, rule.policyName, matchedPattern), nil
 		}
 	}
 

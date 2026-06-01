@@ -574,11 +574,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyOnRequest(policy.applyOnRequest || false);
         setApplyToAllServers(policy.applyToAllServers ?? true);
 
-        // Blocked hosts (block-only objects: { host, paths, includeSubdomains })
+        // Blocked hosts (block-only glob patterns: { pattern })
         setBlockedHosts((policy.blockedHosts || []).map(entry => ({
-            host: entry.host || "",
-            paths: entry.paths || [],
-            includeSubdomains: !!entry.includeSubdomains
+            pattern: entry.pattern || ""
         })));
     };
 
@@ -625,14 +623,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     };
                 });
 
-            // Drop incomplete rows (no host) and normalize before persisting.
+            // Drop empty rows and normalize the glob patterns before persisting.
             const cleanedBlockedHosts = (blockedHosts || [])
-                .filter(entry => entry && (entry.host || "").trim())
-                .map(entry => ({
-                    host: entry.host.trim(),
-                    paths: (entry.paths || []).map(p => (p || "").trim()).filter(Boolean),
-                    includeSubdomains: !!entry.includeSubdomains
-                }));
+                .filter(entry => entry && (entry.pattern || "").trim())
+                .map(entry => ({ pattern: entry.pattern.trim() }));
 
             const b = normalizeBehaviourValue(policyBehaviour);
             const guardrailData = {
@@ -952,12 +946,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             selectedMcpServers: selectedMcpServers,
             selectedAgentServers: selectedAgentServers,
             blockedHosts: (blockedHosts || [])
-                .filter(entry => entry && (entry.host || "").trim())
-                .map(entry => ({
-                    host: entry.host.trim(),
-                    paths: (entry.paths || []).map(p => (p || "").trim()).filter(Boolean),
-                    includeSubdomains: !!entry.includeSubdomains
-                })),
+                .filter(entry => entry && (entry.pattern || "").trim())
+                .map(entry => ({ pattern: entry.pattern.trim() })),
             applyOnResponse: applyOnResponse,
             applyOnRequest: applyOnRequest
         };
