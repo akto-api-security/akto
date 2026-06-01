@@ -7,7 +7,7 @@ import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AiChatSection from "./AiChatSection";
 import { TYPE_STYLES, SEVERITY_COLORS, getRiskColor, getRiskLabel } from "./agenticStyles";
-import { AGENT_RISK_DATA, generateViolations } from "./agenticDummyData";
+import agenticObserveApi, { buildAgenticObserveChatMetadata } from "./agenticObserveApi";
 import "../../../components/layouts/style.css";
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -186,7 +186,8 @@ function ViolAgentCellRenderer({ data }) {
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
-const AGENTS_COL_DEFS = [
+function buildAgentsColDefs(agentRiskData) {
+    return [
     { field: "endpoint", headerName: "Agentic Asset", flex: 1, minWidth: 160, cellRenderer: AgentNameCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
     {
         field: "riskScore", headerName: "Risk", width: 80,
@@ -196,7 +197,7 @@ const AGENTS_COL_DEFS = [
         cellStyle: { display: "flex", alignItems: "center" },
         valueGetter: (p) => {
             if (!p.data) return null;
-            return AGENT_RISK_DATA[p.data.path?.join("/")]?.riskScore ?? null;
+            return agentRiskData[p.data.path?.join("/")]?.riskScore ?? null;
         },
     },
     {
@@ -206,11 +207,12 @@ const AGENTS_COL_DEFS = [
         cellStyle: { display: "flex", alignItems: "center" },
         valueGetter: (p) => {
             if (!p.data) return null;
-            return AGENT_RISK_DATA[p.data.path?.join("/")]?.violations ?? null;
+            return agentRiskData[p.data.path?.join("/")]?.violations ?? null;
         },
     },
     { field: "skillCount", headerName: "Skills", width: 80, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: AgentSkillsCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
 ];
+}
 
 const VIOLATIONS_COL_DEFS = [
     { field: "severity", headerName: "Severity", width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
@@ -514,11 +516,8 @@ function isAgentNavigable(data) {
     return !!data.type; // all typed assets are navigable
 }
 
-function AgenticsTab({ agents, onAgentClick }) {
-    const enriched = useMemo(() =>
-        agents.map(a => ({ ...a, _riskData: AGENT_RISK_DATA[a.path?.join("/")] })),
-        [agents]
-    );
+function AgenticsTab({ agents, onAgentClick, agentRiskData = {} }) {
+    const agentsColDefs = useMemo(() => buildAgentsColDefs(agentRiskData), [agentRiskData]);
 
     const handleRowClick = useCallback((e) => {
         if (!e.data) return;
@@ -529,8 +528,8 @@ function AgenticsTab({ agents, onAgentClick }) {
 
     return (
         <AgGridTable
-            rowData={enriched}
-            columnDefs={AGENTS_COL_DEFS}
+            rowData={agents}
+            columnDefs={agentsColDefs}
             defaultColDef={GRID_DEFAULT_COL}
             onRowClicked={handleRowClick}
             getRowStyle={({ data }) => isAgentNavigable(data) ? { cursor: "pointer" } : { cursor: "default" }}
@@ -545,8 +544,25 @@ function AgenticsTab({ agents, onAgentClick }) {
 
 // ─── Violations tab ───────────────────────────────────────────────────────────
 
-function ViolationsTab({ device, agents }) {
-    const violations = useMemo(() => generateViolations(device, agents), [device, agents]);
+function ViolationsTab({ device }) {
+    const [violations, setViolations] = useState([]);
+
+    useEffect(() => {
+        if (!device?.path?.[0]) {
+            setViolations([]);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const rows = await agenticObserveApi.fetchAgenticViolations({ deviceId: device.path[0] });
+                if (!cancelled) setViolations(rows);
+            } catch {
+                if (!cancelled) setViolations([]);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [device?.path?.[0]]);
 
     if (violations.length === 0) {
         return (
@@ -574,8 +590,16 @@ function ViolationsTab({ device, agents }) {
 
 // ─── Main DeviceFlyout ────────────────────────────────────────────────────────
 
-export default function DeviceFlyout({ device, agents, show, onClose, onAgentClick }) {
+export default function DeviceFlyout({ device, agents, show, onClose, onAgentClick, agentRiskData = {} }) {
     const [selectedTab, setSelectedTab] = useState(0);
+
+    const chatMetadata = useMemo(() => buildAgenticObserveChatMetadata("device", {
+        deviceEndpoint: device?.endpoint,
+        deviceId: device?.path?.[0],
+        riskScore: device?.riskScore,
+        violations: device?.violations,
+        counts: { agents: (agents || []).length },
+    }), [device, agents]);
 
     const lockScroll   = useCallback(() => { document.body.style.overflow = "hidden"; }, []);
     const unlockScroll = useCallback(() => { document.body.style.overflow = "";       }, []);
@@ -624,13 +648,15 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
                 {/* flex:1 + minHeight:0 required for AG Grid tabs to fill remaining space — Box props insufficient */}
                 <div style={{ flex: 1, minHeight: 0, overflowY: selectedTab === 0 ? "auto" : "hidden", display: "flex", flexDirection: "column" }}>
                     {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} onTabChange={setSelectedTab} />}
-                    {selectedTab === 1 && <AgenticsTab agents={agents || []} onAgentClick={onAgentClick} />}
-                    {selectedTab === 2 && <ViolationsTab device={device} agents={agents || []} />}
+                    {selectedTab === 1 && <AgenticsTab agents={agents || []} onAgentClick={onAgentClick} agentRiskData={agentRiskData} />}
+                    {selectedTab === 2 && <ViolationsTab device={device} agents={agents} />}
                 </div>
 
                 <AiChatSection
                     placeholder="Ask anything about this device..."
                     resetKey={device?.endpoint}
+                    conversationType="ASK_AKTO"
+                    chatMetadata={chatMetadata}
                 />
             </div>
         </div>

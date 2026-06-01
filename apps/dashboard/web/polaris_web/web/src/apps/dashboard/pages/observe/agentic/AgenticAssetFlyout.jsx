@@ -9,13 +9,9 @@ import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AiChatSection from "./AiChatSection";
 import { ParamNameCellRenderer, ParamTypeCellRenderer, ParamDescCellRenderer } from "./agenticCellRenderers";
 import { TYPE_STYLES, SEVERITY_COLORS, getRiskColor, getRiskLabel } from "./agenticStyles";
-import {
-    MCP_TOOLS, MCP_RESOURCES, MCP_PROMPTS, TOOL_VIOLATIONS,
-    DUMMY_SKILL_SAMPLE, SKILL_SCHEMA_PARAMS,
-    generateToolSample, generateResourceSample, generatePromptSample,
-    AGENTIC_ASSET_DEVICES, AGENTIC_TREE_DATA, AGENTIC_FLAT_DATA,
-    generateSkills, generateAssetViolations,
-} from "./agenticDummyData";
+import { generateToolSample, generateResourceSample, generatePromptSample, generateSkillSample } from "./agenticSampleHelpers";
+import agenticObserveApi, { buildAgenticObserveChatMetadata } from "./agenticObserveApi";
+import observeApi from "../api";
 import "../../../components/layouts/style.css";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -32,14 +28,6 @@ function TypeBadge({ type }) {
             whiteSpace: "nowrap",
         }}>{type}</span>
     );
-}
-
-function getToolsForAsset(asset) {
-    if (!asset || asset.type !== "MCP Server") return [];
-    const key = Object.keys(MCP_TOOLS).find(k =>
-        asset.name.toLowerCase().includes(k.replace("-mcp", "").replace("-stdio", "")) || asset.name.toLowerCase() === k
-    );
-    return key ? MCP_TOOLS[key] : [];
 }
 
 // ─── Topology graph ───────────────────────────────────────────────────────────
@@ -106,12 +94,32 @@ const TOPO_NODE_TYPES = { topoNode: TopoNode };
 const GRAPH_HEIGHT = 280;
 const NODE_H       = 84;
 
-function AssetTopologyGraph({ asset }) {
+/** Linked MCP/LLM rows for an AI agent (tree children when present, else flat asset data). */
+function getAgentLinkedComponents(asset, agenticTreeData = [], agenticFlatData = []) {
+    const fromTree = agenticTreeData.filter((r) => r.path?.length === 2 && r.path[0] === asset.id);
+    if (fromTree.length) return fromTree;
+
+    const seen = new Set();
+    const linked = [];
+    (asset.mcpServers || []).forEach((name) => {
+        const key = String(name).toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        const flat = agenticFlatData.find((a) => a.name === name || a.id === name);
+        linked.push({
+            name: flat?.name || name,
+            type: flat?.type || "MCP Server",
+        });
+    });
+    return linked;
+}
+
+function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [] }) {
     const { nodes, edges } = useMemo(() => {
-        const devices = AGENTIC_ASSET_DEVICES[asset.id] || [];
+        const devices = assetDevices[asset.id] || [];
 
         if (asset.type === "AI Agent") {
-            const children = AGENTIC_TREE_DATA.filter(r => r.path.length === 2 && r.path[0] === asset.id);
+            const children = getAgentLinkedComponents(asset, agenticTreeData, agenticFlatData);
             const mcps = children.filter(c => c.type === "MCP Server");
             const llms = children.filter(c => c.type === "LLM");
             const rightCount = mcps.length + llms.length;
@@ -160,7 +168,7 @@ function AssetTopologyGraph({ asset }) {
             ],
             edges: devices.map((_, i) => ({ id: `e-d${i}-a`, source: `dev-${i}`, target: "asset", type: "smoothstep", style: { stroke: edgeCol, strokeWidth: 1.5 } })),
         };
-    }, [asset]);
+    }, [asset, assetDevices, agenticTreeData, agenticFlatData]);
 
     // Fixed-size container — ReactFlow's fitView + zoom handles overflow
     return (
@@ -377,7 +385,7 @@ function getAssetNarrative(asset, factors) {
     return `${asset.name} carries a ${label} score of ${score}/5.0 because ${parts.join(", and ")}. ${(asset.violations?.critical || 0) > 0 ? "Immediate action is recommended." : "Monitor closely and review permissions."}`;
 }
 
-function OverviewTab({ asset, onTabChange }) {
+function OverviewTab({ asset, onTabChange, assetDevices = {}, agenticTreeData = [], agenticFlatData = [] }) {
     const totalV = useMemo(() =>
         (asset.violations?.critical || 0) + (asset.violations?.high || 0) + (asset.violations?.medium || 0) + (asset.violations?.low || 0),
         [asset.violations]
@@ -388,12 +396,12 @@ function OverviewTab({ asset, onTabChange }) {
     const narrative  = useMemo(() => getAssetNarrative(asset, rawFactors), [asset, rawFactors]);
 
     const stats = useMemo(() => {
-        const devices = AGENTIC_ASSET_DEVICES[asset.id] || [];
+        const devices = assetDevices[asset.id] || [];
         const devCount = devices.length;
         const children = asset.type === "AI Agent"
-            ? AGENTIC_TREE_DATA.filter(r => r.path.length === 2 && r.path[0] === asset.id)
+            ? getAgentLinkedComponents(asset, agenticTreeData, agenticFlatData)
             : [];
-        const mcpCount = children.filter(c => c.type === "MCP Server").length;
+        const mcpCount = children.filter((c) => c.type === "MCP Server").length;
 
         if (asset.type === "AI Agent") return [
             { label: devCount  === 1 ? "Device"     : "Devices",     value: devCount },
@@ -415,7 +423,7 @@ function OverviewTab({ asset, onTabChange }) {
             { label: devCount  === 1 ? "Device"     : "Devices",     value: devCount },
             { label: totalV    === 1 ? "Violation"  : "Violations",  value: totalV },
         ];
-    }, [asset, totalV]);
+    }, [asset, totalV, assetDevices, agenticTreeData, agenticFlatData]);
 
     return (
         <Box padding="4">
@@ -431,7 +439,7 @@ function OverviewTab({ asset, onTabChange }) {
                 </HorizontalGrid>
 
                 {/* Connection topology */}
-                <AssetTopologyGraph asset={asset} />
+                <AssetTopologyGraph asset={asset} assetDevices={assetDevices} agenticTreeData={agenticTreeData} agenticFlatData={agenticFlatData} />
 
                 {/* Risk narrative + clickable risk factors — mirrors DeviceFlyout's OverviewTab */}
                 <VerticalStack gap="3">
@@ -497,19 +505,6 @@ const PROMPTS_COL_DEFS = [
     { field: "description", headerName: "Prompt",        flex: 2, minWidth: 200, cellRenderer: PromptDescCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
 ];
 
-// Helper to look up resources / prompts for an MCP endpoint
-function getResourcesForAsset(name) {
-    const n = (name || "").toLowerCase();
-    const k = Object.keys(MCP_RESOURCES).find(k => n.includes(k.replace("-mcp","").replace("-stdio","")) || n === k);
-    return k ? MCP_RESOURCES[k] : [];
-}
-
-function getPromptsForAsset(name) {
-    const n = (name || "").toLowerCase();
-    const k = Object.keys(MCP_PROMPTS).find(k => n.includes(k.replace("-mcp","").replace("-stdio","")) || n === k);
-    return k ? MCP_PROMPTS[k] : [];
-}
-
 // ── Shared detail panels ──────────────────────────────────────────────────────
 
 function SamplePair({ sampleData }) {
@@ -555,7 +550,7 @@ function ToolDetailPanel({ tool, parentLabel, onBack, onNavChange, extraCrumbs }
 }
 
 function SkillDetailPanel({ skill }) {
-    return <SamplePair sampleData={DUMMY_SKILL_SAMPLE} />;
+    return <SamplePair sampleData={generateSkillSample(skill)} />;
 }
 
 function ResourcePromptDetailPanel({ item, type }) {
@@ -656,19 +651,38 @@ const COMBINED_MCP_COL_DEFS = [
         cellStyle: { display: "flex", alignItems: "center" },
         valueGetter: p => {
             if (!p.data) return 0;
-            return p.data._type === "Tool" ? (TOOL_VIOLATIONS[p.data.name] || 0) : 0;
+            return p.data._type === "Tool" ? (p.data.violationCount || 0) : 0;
         },
     },
 ];
 
 function McpComponentsView({ asset, onNavChange }) {
     const [selectedItem, setSelectedItem] = useState(null);
+    const [allRows, setAllRows] = useState([]);
 
-    const allRows = useMemo(() => [
-        ...getToolsForAsset(asset).map(t => ({ ...t, _type: "Tool" })),
-        ...getResourcesForAsset(asset.name).map(r => ({ ...r, _type: "Resource" })),
-        ...getPromptsForAsset(asset.name).map(p => ({ ...p, _type: "Prompt" })),
-    ], [asset]);
+    useEffect(() => {
+        const collectionId = asset?.collectionIds?.[0];
+        if (!collectionId) {
+            setAllRows([]);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const data = await agenticObserveApi.fetchMcpFlyoutData(collectionId);
+                if (cancelled) return;
+                const toolViolations = data.toolViolations || {};
+                setAllRows([
+                    ...(data.tools || []).map((t) => ({ ...t, _type: "Tool", violationCount: toolViolations[t.name] || 0 })),
+                    ...(data.resources || []).map((r) => ({ ...r, _type: "Resource" })),
+                    ...(data.prompts || []).map((p) => ({ ...p, _type: "Prompt" })),
+                ]);
+            } catch {
+                if (!cancelled) setAllRows([]);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [asset?.id, asset?.collectionIds]);
 
     const handleBack = useCallback(() => {
         setSelectedItem(null);
@@ -779,23 +793,106 @@ const COMBINED_AGENT_COL_DEFS = [
     },
 ];
 
-function AgentComponentsView({ asset, onNavChange, onNavigateToAsset }) {
+function AgentMcpToolsView({ asset, selectedMcp, agenticFlatData, goToList, onNavChange, setSelectedTool, setView }) {
+    const [mcpTools, setMcpTools] = useState([]);
+
+    useEffect(() => {
+        const flat = agenticFlatData.find((a) => a.name === selectedMcp.name || a.id === selectedMcp.name);
+        const collectionId = flat?.collectionIds?.[0];
+        if (!collectionId) {
+            setMcpTools([]);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const data = await agenticObserveApi.fetchMcpFlyoutData(collectionId);
+                if (!cancelled) setMcpTools(data.tools || []);
+            } catch {
+                if (!cancelled) setMcpTools([]);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [selectedMcp?.name, agenticFlatData]);
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+            {mcpTools.length === 0 ? (
+                <Box padding="4"><Text variant="bodySm" color="subdued">No tools found.</Text></Box>
+            ) : (
+                <AgGridTable
+                    rowData={mcpTools}
+                    columnDefs={TOOLS_COL_DEFS}
+                    defaultColDef={GRID_DEFAULT_COL}
+                    onRowClicked={(e) => {
+                        if (!e.data) return;
+                        setSelectedTool(e.data);
+                        setView("tool-detail");
+                        onNavChange?.([
+                            { label: asset.name, onClick: goToList },
+                            {
+                                label: selectedMcp.name,
+                                onClick: () => {
+                                    setView("mcp-tools");
+                                    setSelectedTool(null);
+                                    onNavChange?.([{ label: asset.name, onClick: goToList }, { label: selectedMcp.name }]);
+                                },
+                            },
+                            { label: e.data.name },
+                        ]);
+                    }}
+                    getRowStyle={() => ({ cursor: "pointer" })}
+                    fillHeight
+                    noOuterBorder
+                    searchPlaceholder="Search tools..."
+                    pagination={false}
+                    sideBar={false}
+                />
+            )}
+        </div>
+    );
+}
+
+function AgentComponentsView({ asset, onNavChange, onNavigateToAsset, agenticFlatData = [] }) {
     const [view,          setView]          = useState("list");
     const [selectedMcp,   setSelectedMcp]   = useState(null);
     const [selectedTool,  setSelectedTool]  = useState(null);
     const [selectedSkill, setSelectedSkill] = useState(null);
+    const [skills, setSkills] = useState([]);
 
     const connectedMcps = useMemo(() => {
         if (!asset.mcpServers?.length) return [];
-        return asset.mcpServers.map(mcpName => {
-            const k = Object.keys(MCP_TOOLS).find(k =>
-                mcpName.toLowerCase().includes(k.replace("-mcp","").replace("-stdio","")) || mcpName === k
-            );
-            return { id: mcpName, name: mcpName, endpoint: mcpName, toolCount: k ? MCP_TOOLS[k].length : 0 };
-        });
+        const seen = new Set();
+        return asset.mcpServers.filter((mcpName) => {
+            const key = String(mcpName).toLowerCase();
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        }).map((mcpName) => ({
+            id: mcpName,
+            name: mcpName,
+            endpoint: mcpName,
+            toolCount: 0,
+        }));
     }, [asset.mcpServers]);
 
-    const skills = useMemo(() => asset.skillCount ? generateSkills(asset.skillCount) : [], [asset.skillCount]);
+    useEffect(() => {
+        const collectionId = asset?.collectionIds?.[0];
+        if (!collectionId) {
+            setSkills([]);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const data = await agenticObserveApi.fetchSkillsFlyoutData(collectionId);
+                if (!cancelled) setSkills(data.skills || []);
+            } catch {
+                if (!cancelled) setSkills([]);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [asset?.id, asset?.collectionIds]);
 
     const goToList = useCallback(() => {
         setView("list"); setSelectedMcp(null); setSelectedTool(null); setSelectedSkill(null);
@@ -811,16 +908,19 @@ function AgentComponentsView({ asset, onNavChange, onNavigateToAsset }) {
     const handleListRowClick = useCallback((e) => {
         if (!e.data) return;
         if (e.data._type === "MCP Server") {
-            const mcpAsset = AGENTIC_FLAT_DATA.find(a => a.name === e.data.name || a.id === e.data.name)
+            // Navigate to that MCP's own flyout
+            const mcpAsset = agenticFlatData.find((a) => a.name === e.data.name || a.id === e.data.name)
                 || { ...e.data, id: e.data.name, type: "MCP Server" };
             onNavigateToAsset(mcpAsset);
         } else if (e.data._type === "Skill") {
-            const skillId = "skill-" + e.data.name.toLowerCase().replace(/ /g, "-");
-            const skillAsset = AGENTIC_FLAT_DATA.find(a => a.name === e.data.name)
-                || { id: skillId, name: e.data.name, type: "Skill", riskScore: e.data.violations > 0 ? 3.5 : 2.0, violations: { critical: 0, high: 0, medium: e.data.violations > 0 ? 1 : 0, low: 0 }, deviceCount: 1, lastSeen: "Recently" };
-            onNavigateToAsset(skillAsset);
+            const skillId = e.data.rawName
+                ? `skill-${e.data.rawName}`
+                : `skill-${e.data.name.toLowerCase().replace(/ /g, "-")}`;
+            const skillAsset = agenticFlatData.find((a) => a.name === e.data.name || a.id === skillId)
+                || { id: skillId, name: e.data.name, type: "Skill", riskScore: e.data.riskScore || 0, violations: { critical: 0, high: 0, medium: e.data.violations > 0 ? 1 : 0, low: 0 }, deviceCount: 1, lastSeen: "Recently" };
+            onNavigateToAsset?.(skillAsset);
         }
-    }, [onNavigateToAsset]);
+    }, [onNavigateToAsset, agenticFlatData]);
 
     if (view === "tool-detail" && selectedTool) {
         return <ToolDetailPanel tool={selectedTool} onBack={() => {
@@ -833,34 +933,16 @@ function AgentComponentsView({ asset, onNavChange, onNavigateToAsset }) {
     }
 
     if (view === "mcp-tools" && selectedMcp) {
-        const mcpTools = getToolsForAsset({ name: selectedMcp.name, type: "MCP Server" });
         return (
-            <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-                {mcpTools.length === 0 ? (
-                    <Box padding="4"><Text variant="bodySm" color="subdued">No tools found.</Text></Box>
-                ) : (
-                    <AgGridTable
-                        rowData={mcpTools}
-                        columnDefs={TOOLS_COL_DEFS}
-                        defaultColDef={GRID_DEFAULT_COL}
-                        onRowClicked={e => {
-                            if (!e.data) return;
-                            setSelectedTool(e.data); setView("tool-detail");
-                            onNavChange?.([
-                                { label: asset.name,       onClick: goToList },
-                                { label: selectedMcp.name, onClick: () => { setView("mcp-tools"); setSelectedTool(null); onNavChange?.([{ label: asset.name, onClick: goToList }, { label: selectedMcp.name }]); } },
-                                { label: e.data.name },
-                            ]);
-                        }}
-                        getRowStyle={() => ({ cursor: "pointer" })}
-                        fillHeight
-                        noOuterBorder
-                        searchPlaceholder="Search tools..."
-                        pagination={false}
-                        sideBar={false}
-                    />
-                )}
-            </div>
+            <AgentMcpToolsView
+                asset={asset}
+                selectedMcp={selectedMcp}
+                agenticFlatData={agenticFlatData}
+                goToList={goToList}
+                onNavChange={onNavChange}
+                setSelectedTool={setSelectedTool}
+                setView={setView}
+            />
         );
     }
 
@@ -917,19 +999,38 @@ function LlmConfigSection({ asset }) {
     );
 }
 
-function AgenticComponentsTab({ asset, onNavChange, onNavigateToAsset }) {
+function AgenticComponentsTab({ asset, onNavChange, onNavigateToAsset, agenticFlatData = [] }) {
     if (asset.type === "MCP Server") return <McpComponentsView asset={asset} onNavChange={onNavChange} />;
-    if (asset.type === "AI Agent")   return <AgentComponentsView asset={asset} onNavChange={onNavChange} onNavigateToAsset={onNavigateToAsset} />;
+    if (asset.type === "AI Agent")   return <AgentComponentsView asset={asset} onNavChange={onNavChange} onNavigateToAsset={onNavigateToAsset} agenticFlatData={agenticFlatData} />;
     if (asset.type === "LLM")        return <LlmConfigSection asset={asset} />;
 
-    // Skill — show request/response directly
-    return <SamplePair sampleData={DUMMY_SKILL_SAMPLE} />;
+    return <SamplePair sampleData={generateSkillSample(asset)} />;
 }
 
 // ─── Violations tab ───────────────────────────────────────────────────────────
 
 function ViolationsTab({ asset }) {
-    const violations = useMemo(() => generateAssetViolations(asset), [asset]);
+    const [violations, setViolations] = useState([]);
+
+    useEffect(() => {
+        if (!asset?.id) {
+            setViolations([]);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const rows = await agenticObserveApi.fetchAgenticViolations({
+                    apiCollectionIds: asset.collectionIds,
+                    assetId: asset.collectionIds?.length ? undefined : asset.id,
+                });
+                if (!cancelled) setViolations(rows);
+            } catch {
+                if (!cancelled) setViolations([]);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [asset?.id]);
 
     if (violations.length === 0) {
         return (
@@ -957,8 +1058,8 @@ function ViolationsTab({ asset }) {
 
 // ─── Devices tab ──────────────────────────────────────────────────────────────
 
-function DevicesTab({ asset }) {
-    const devices = useMemo(() => AGENTIC_ASSET_DEVICES[asset.id] || [], [asset.id]);
+function DevicesTab({ asset, assetDevices = {} }) {
+    const devices = useMemo(() => assetDevices[asset.id] || [], [asset.id, assetDevices]);
 
     const handleRowClick = useCallback((e) => {
         if (!e.data) return;
@@ -995,18 +1096,57 @@ function DevicesTab({ asset }) {
 
 // ─── Main AgenticAssetFlyout ──────────────────────────────────────────────────
 
-export default function AgenticAssetFlyout({ asset, show, onClose, onNavigateToAsset }) {
+export default function AgenticAssetFlyout({
+    asset,
+    show,
+    onClose,
+    onNavigateToAsset,
+    agenticTreeData = [],
+    agenticFlatData = [],
+    assetDevices = {},
+}) {
     const [selectedTab, setSelectedTab] = useState(0);
     // topNav: null = show tabs; array of {label, onClick?} = show drill breadcrumb
     const [topNav, setTopNav]           = useState(null);
     // topNavPicker: optional ReactNode rendered as FlyoutBreadcrumb children (dropdown on last crumb)
     const [topNavPicker, setTopNavPicker] = useState(null);
+    const [mcpComponentCount, setMcpComponentCount] = useState(0);
 
     const lockScroll   = useCallback(() => { document.body.style.overflow = "hidden"; }, []);
     const unlockScroll = useCallback(() => { document.body.style.overflow = "";       }, []);
 
     useEffect(() => { if (!show) document.body.style.overflow = ""; }, [show]);
     useEffect(() => { setSelectedTab(0); setTopNav(null); setTopNavPicker(null); }, [asset?.id]);
+
+    useEffect(() => {
+        const collectionId = asset?.collectionIds?.[0];
+        if (!collectionId || asset?.type !== "MCP Server") {
+            setMcpComponentCount(0);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const data = await agenticObserveApi.fetchMcpFlyoutData(collectionId);
+                if (cancelled) return;
+                setMcpComponentCount(
+                    (data.tools?.length || 0) + (data.resources?.length || 0) + (data.prompts?.length || 0)
+                );
+            } catch {
+                if (!cancelled) setMcpComponentCount(0);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [asset?.id, asset?.type, asset?.collectionIds]);
+
+    const chatMetadata = useMemo(() => buildAgenticObserveChatMetadata("asset", {
+        assetId: asset?.id,
+        assetName: asset?.name,
+        assetType: asset?.type,
+        riskScore: asset?.riskScore,
+        violations: asset?.violations,
+        deviceCount: asset?.deviceCount,
+    }), [asset]);
 
     const handleTabSelect = useCallback((tab) => {
         setSelectedTab(tab);
@@ -1023,13 +1163,13 @@ export default function AgenticAssetFlyout({ asset, show, onClose, onNavigateToA
     const tabs = useMemo(() => {
         if (!asset) return [];
         const totalV    = (asset.violations?.critical || 0) + (asset.violations?.high || 0) + (asset.violations?.medium || 0) + (asset.violations?.low || 0);
-        const devCount  = (AGENTIC_ASSET_DEVICES[asset.id] || []).length;
+        const devCount  = (assetDevices[asset.id] || []).length;
         let componentCount = 0;
         if (asset.type === "AI Agent") {
-            const children = AGENTIC_TREE_DATA.filter(r => r.path.length === 2 && r.path[0] === asset.id);
+            const children = getAgentLinkedComponents(asset, agenticTreeData, agenticFlatData);
             componentCount = children.length + (asset.skillCount || 0);
         } else if (asset.type === "MCP Server") {
-            componentCount = getToolsForAsset(asset).length + getResourcesForAsset(asset.name).length + getPromptsForAsset(asset.name).length;
+            componentCount = mcpComponentCount;
         }
         return [
             { id: "overview",   content: "Overview" },
@@ -1037,7 +1177,7 @@ export default function AgenticAssetFlyout({ asset, show, onClose, onNavigateToA
             { id: "violations", content: `Violations (${totalV})` },
             { id: "devices",    content: `Devices (${devCount})` },
         ];
-    }, [asset]);
+    }, [asset, assetDevices, agenticTreeData, agenticFlatData, mcpComponentCount]);
 
     if (!asset) return null;
 
@@ -1085,15 +1225,32 @@ export default function AgenticAssetFlyout({ asset, show, onClose, onNavigateToA
 
                 {/* flex:1 + minHeight:0 required for AG Grid tabs to fill remaining space — Box props insufficient */}
                 <div style={{ flex: 1, minHeight: 0, overflowY: selectedTab === 0 ? "auto" : "hidden", display: "flex", flexDirection: "column" }}>
-                    {selectedTab === 0 && <OverviewTab asset={asset} onTabChange={setSelectedTab} />}
-                    {selectedTab === 1 && <AgenticComponentsTab asset={asset} onNavChange={handleNavChange} onNavigateToAsset={onNavigateToAsset} />}
+                    {selectedTab === 0 && (
+                        <OverviewTab
+                            asset={asset}
+                            onTabChange={handleTabSelect}
+                            assetDevices={assetDevices}
+                            agenticTreeData={agenticTreeData}
+                            agenticFlatData={agenticFlatData}
+                        />
+                    )}
+                    {selectedTab === 1 && (
+                        <AgenticComponentsTab
+                            asset={asset}
+                            onNavChange={handleNavChange}
+                            onNavigateToAsset={onNavigateToAsset}
+                            agenticFlatData={agenticFlatData}
+                        />
+                    )}
                     {selectedTab === 2 && <ViolationsTab asset={asset} />}
-                    {selectedTab === 3 && <DevicesTab asset={asset} />}
+                    {selectedTab === 3 && <DevicesTab asset={asset} assetDevices={assetDevices} />}
                 </div>
 
                 <AiChatSection
                     placeholder="Ask anything about this agentic asset..."
                     resetKey={asset?.id}
+                    conversationType="ASK_AKTO"
+                    chatMetadata={chatMetadata}
                 />
             </div>
         </div>

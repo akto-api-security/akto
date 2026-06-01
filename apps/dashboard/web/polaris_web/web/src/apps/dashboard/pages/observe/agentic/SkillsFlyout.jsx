@@ -6,7 +6,9 @@ import AiChatSection from "./AiChatSection";
 import SampleDataComponent from "../../../components/shared/SampleDataComponent";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import { ParamNameCellRenderer, ParamTypeCellRenderer, ParamDescCellRenderer } from "./agenticCellRenderers";
-import { generateSkills, DUMMY_SKILL_SAMPLE, SKILL_SCHEMA_PARAMS, SKILL_VIOLATION_ROWS } from "./agenticDummyData";
+import { generateSkillSample } from "./agenticSampleHelpers";
+import agenticObserveApi, { buildAgenticObserveChatMetadata } from "./agenticObserveApi";
+import observeApi from "../api";
 import "../../../components/layouts/style.css";
 
 // ─── Cell renderers ───────────────────────────────────────────────────────────
@@ -109,6 +111,51 @@ function SkillDetailView({ skill, device, agent, skills, onBack, onClose, onSkil
     const [selectedTab, setSelectedTab] = useState(0);
     const [pickerOpen, setPickerOpen]   = useState(false);
     const [pickerSearch, setPickerSearch] = useState("");
+    const [skillSample, setSkillSample] = useState(() => generateSkillSample(skill));
+    const [violationRows, setViolationRows] = useState([]);
+    const collectionId = agent?.collectionIds?.[0];
+    const schemaParams = skill?.params?.length ? skill.params : [];
+
+    useEffect(() => {
+        let cancelled = false;
+        const loadSample = async () => {
+            const skillPath = skill?.rawName || skill?.name;
+            if (!collectionId || !skillPath) {
+                if (!cancelled) setSkillSample(generateSkillSample(skill));
+                return;
+            }
+            try {
+                const resp = await observeApi.fetchSampleData(`skills/${skillPath}`, collectionId, "POST");
+                const samples = resp?.sampleDataList || resp?.samples || [];
+                if (!cancelled && samples.length > 0 && samples[0]?.message) {
+                    setSkillSample({ message: samples[0].message });
+                    return;
+                }
+            } catch {
+                // fallback below
+            }
+            if (!cancelled) setSkillSample(generateSkillSample(skill));
+        };
+        loadSample();
+        return () => { cancelled = true; };
+    }, [skill, collectionId]);
+
+    useEffect(() => {
+        if (selectedTab !== 3 || !device?.path?.[0]) {
+            setViolationRows([]);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const rows = await agenticObserveApi.fetchAgenticViolations({ deviceId: device.path[0] });
+                if (!cancelled) setViolationRows(rows);
+            } catch {
+                if (!cancelled) setViolationRows([]);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [selectedTab, device?.path?.[0]]);
 
     const tabs = [
         ...DETAIL_TABS,
@@ -193,10 +240,10 @@ function SkillDetailView({ skill, device, agent, skills, onBack, onClose, onSkil
                         <Box padding="4">
                             <VerticalStack gap="4">
                                 <LegacyCard>
-                                    <SampleDataComponent type="request" sampleData={DUMMY_SKILL_SAMPLE} readOnly={true} />
+                                    <SampleDataComponent type="request" sampleData={skillSample} readOnly={true} />
                                 </LegacyCard>
                                 <LegacyCard>
-                                    <SampleDataComponent type="response" sampleData={DUMMY_SKILL_SAMPLE} readOnly={true} />
+                                    <SampleDataComponent type="response" sampleData={skillSample} readOnly={true} />
                                 </LegacyCard>
                             </VerticalStack>
                         </Box>
@@ -204,7 +251,7 @@ function SkillDetailView({ skill, device, agent, skills, onBack, onClose, onSkil
                 )}
                 {selectedTab === 1 && (
                     <AgGridTable
-                        rowData={SKILL_SCHEMA_PARAMS}
+                        rowData={schemaParams}
                         columnDefs={SKILL_SCHEMA_COL_DEFS}
                         defaultColDef={{ sortable: false, resizable: true }}
                         fillHeight
@@ -219,9 +266,9 @@ function SkillDetailView({ skill, device, agent, skills, onBack, onClose, onSkil
                     </Box>
                 )}
                 {selectedTab === 3 && (
-                    skill.violations > 0 ? (
+                    violationRows.length > 0 ? (
                         <AgGridTable
-                            rowData={SKILL_VIOLATION_ROWS.slice(0, skill.violations)}
+                            rowData={violationRows}
                             columnDefs={SKILL_VIOLATION_COL_DEFS}
                             defaultColDef={{ sortable: false, resizable: true }}
                             fillHeight
@@ -304,11 +351,37 @@ function SkillsListView({ agent, device, allSkills, onSkillClick, onClose, onDev
 
 export default function SkillsFlyout({ agent, device, show, onClose, onDeviceClick }) {
     const [selectedSkill, setSelectedSkill] = useState(null);
+    const [allSkills, setAllSkills] = useState([]);
+    const collectionId = agent?.collectionIds?.[0];
 
-    const allSkills = useMemo(() => generateSkills(agent?.skillCount || 0), [agent?.skillCount]);
+    useEffect(() => {
+        if (!show || !collectionId) {
+            setAllSkills([]);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const data = await agenticObserveApi.fetchSkillsFlyoutData(collectionId);
+                if (!cancelled) setAllSkills(data.skills || []);
+            } catch {
+                if (!cancelled) setAllSkills([]);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [show, collectionId, agent?.endpoint]);
 
     useEffect(() => { if (!show) setSelectedSkill(null); }, [show]);
     useEffect(() => { setSelectedSkill(null); }, [agent?.endpoint]);
+
+    const chatMetadata = useMemo(() => buildAgenticObserveChatMetadata("skills", {
+        deviceEndpoint: device?.endpoint,
+        deviceId: device?.path?.[0],
+        agentEndpoint: agent?.endpoint,
+        skillName: selectedSkill?.name,
+        riskScore: agent?.riskScore ?? device?.riskScore,
+        counts: { skills: allSkills.length },
+    }), [device, agent, selectedSkill, allSkills.length]);
 
     const lockScroll   = useCallback(() => { document.body.style.overflow = "hidden"; }, []);
     const unlockScroll = useCallback(() => { document.body.style.overflow = "";       }, []);
@@ -360,7 +433,9 @@ export default function SkillsFlyout({ agent, device, show, onClose, onDeviceCli
 
                 <AiChatSection
                     placeholder="Ask anything related to your skills..."
-                    resetKey={agent?.endpoint}
+                    resetKey={`${agent?.endpoint}-${selectedSkill?.name || ""}`}
+                    conversationType="ASK_AKTO"
+                    chatMetadata={chatMetadata}
                 />
             </div>
         </div>

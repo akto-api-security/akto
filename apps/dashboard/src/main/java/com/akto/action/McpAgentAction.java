@@ -143,6 +143,31 @@ public class McpAgentAction extends UserAction {
                         }
                         tokensLimit = 40000;
                     }
+                } else if (StringUtils.isNotEmpty(type) && type.equals("agentic_observe")) {
+                    Object data = metaData.get("data");
+                    if (data != null && data instanceof Map) {
+                        Map<String, Object> dataMap = (Map<String, Object>) data;
+                        StringBuilder sb = new StringBuilder("Agentic Observe Context:\n");
+                        sb.append("Scope: ").append(dataMap.getOrDefault("scope", "")).append("\n");
+                        appendIfPresent(sb, "Device", dataMap.get("deviceEndpoint"));
+                        appendIfPresent(sb, "Device ID", dataMap.get("deviceId"));
+                        appendIfPresent(sb, "Agent", dataMap.get("agentEndpoint"));
+                        appendIfPresent(sb, "Risk score", dataMap.get("riskScore"));
+                        appendIfPresent(sb, "Skill", dataMap.get("skillName"));
+                        appendIfPresent(sb, "Tool", dataMap.get("toolName"));
+                        appendIfPresent(sb, "Resource", dataMap.get("resourceName"));
+                        appendIfPresent(sb, "Prompt", dataMap.get("promptName"));
+                        Object violations = dataMap.get("violations");
+                        if (violations != null) {
+                            sb.append("Violations summary: ").append(violations).append("\n");
+                        }
+                        Object counts = dataMap.get("counts");
+                        if (counts != null) {
+                            sb.append("Counts: ").append(counts).append("\n");
+                        }
+                        contextString = sb.toString();
+                        tokensLimit = 40000;
+                    }
                 }
             }
 
@@ -218,6 +243,16 @@ public class McpAgentAction extends UserAction {
         } catch (Exception e) {
             logger.error("Error deleting conversation history", e);            addActionError("Failed to delete conversation history: " + e.getMessage());
             return ERROR.toUpperCase();
+        }
+    }
+
+    private static void appendIfPresent(StringBuilder sb, String label, Object value) {
+        if (value == null) {
+            return;
+        }
+        String text = value instanceof String ? (String) value : String.valueOf(value);
+        if (StringUtils.isNotEmpty(text)) {
+            sb.append(label).append(": ").append(text).append("\n");
         }
     }
 

@@ -32,6 +32,13 @@ public class EndpointShieldAgentAction extends UserAction {
     @Getter
     private UserAnalysisData userAnalysis;
 
+    @Getter
+    private List<UserAnalysisData> userAnalysisList = new ArrayList<>();
+
+    public String fetchUserAnalysisList() {
+        userAnalysisList = UserAnalysisDataDao.instance.findAll(Filters.empty());
+        return SUCCESS.toUpperCase();
+    }
 
     public String getMcpServersByAgent() {
         mcpServers = new ArrayList<>();

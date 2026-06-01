@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { Tabs, Button, Popover, ActionList, LegacyCard, Icon, TextField, Badge, Box, HorizontalStack, VerticalStack, Text, Divider } from "@shopify/polaris";
 import { ChevronDownMinor } from "@shopify/polaris-icons";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
@@ -6,31 +6,10 @@ import AiChatSection from "./AiChatSection";
 import SampleDataComponent from "../../../components/shared/SampleDataComponent";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import { ParamNameCellRenderer, ParamTypeCellRenderer, ParamDescCellRenderer } from "./agenticCellRenderers";
-import { MCP_TOOLS, MCP_RESOURCES, MCP_PROMPTS, TOOL_VIOLATIONS, generateResourceSample, generatePromptSample, generateToolSample } from "./agenticDummyData";
+import { generateResourceSample, generatePromptSample, generateToolSample } from "./agenticSampleHelpers";
+import agenticObserveApi, { buildAgenticObserveChatMetadata } from "./agenticObserveApi";
+import observeApi from "../api";
 import "../../../components/layouts/style.css";
-
-// ─── Server lookup helpers ────────────────────────────────────────────────────
-
-function getToolsForServer(endpoint) {
-    if (!endpoint) return [];
-    const normalised = endpoint.toLowerCase();
-    const key = Object.keys(MCP_TOOLS).find(k => normalised.includes(k.replace("-mcp","").replace("-stdio","")) || normalised === k);
-    return key ? MCP_TOOLS[key] : [];
-}
-
-function getResourcesForServer(endpoint) {
-    if (!endpoint) return [];
-    const n = endpoint.toLowerCase();
-    const key = Object.keys(MCP_RESOURCES).find(k => n.includes(k.replace("-mcp","").replace("-stdio","")) || n === k);
-    return key ? MCP_RESOURCES[key] : [];
-}
-
-function getPromptsForServer(endpoint) {
-    if (!endpoint) return [];
-    const n = endpoint.toLowerCase();
-    const key = Object.keys(MCP_PROMPTS).find(k => n.includes(k.replace("-mcp","").replace("-stdio","")) || n === k);
-    return key ? MCP_PROMPTS[key] : [];
-}
 
 // ─── Cell renderers ───────────────────────────────────────────────────────────
 // Exception: AG Grid cell renderers use inline styles (Polaris tokens don't reach into the grid sandbox)
@@ -48,7 +27,7 @@ function ToolNameCellRenderer({ data }) {
 
 function ToolViolationsCellRenderer({ data }) {
     if (!data) return null;
-    const count = TOOL_VIOLATIONS[data.name] || 0;
+    const count = data.violationCount || 0;
     if (!count) return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ color: "#C4C7CB" }}>—</span></div>;
     return (
         <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
@@ -89,7 +68,7 @@ function PromptDescCellRenderer({ data }) {
 
 const TOOLS_COL_DEFS = [
     { field: "name",       headerName: "Tool",       flex: 1,    minWidth: 160, filter: "agTextColumnFilter", cellRenderer: ToolNameCellRenderer,       cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "violations", headerName: "Violations", width: 110, sort: "desc", suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ToolViolationsCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, valueGetter: p => TOOL_VIOLATIONS[p.data?.name] || 0 },
+    { field: "violations", headerName: "Violations", width: 110, sort: "desc", suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ToolViolationsCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, valueGetter: p => p.data?.violationCount || 0 },
     { field: "params",     headerName: "Params",     width: 80,  suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ToolParamsCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, valueGetter: p => p.data?.params?.length ?? 0 },
 ];
 
@@ -123,8 +102,31 @@ function ToolDetailView({ tool, device, agent, allTools, onBack, onClose, onTool
     const [selectedTab, setSelectedTab] = useState(0);
     const [pickerOpen, setPickerOpen]   = useState(false);
     const [pickerSearch, setPickerSearch] = useState("");
+    const [sampleData, setSampleData] = useState(() => generateToolSample(tool));
+    const collectionId = agent?.collectionIds?.[0];
 
-    const sampleData = useMemo(() => generateToolSample(tool), [tool.id]);
+    useEffect(() => {
+        let cancelled = false;
+        const loadSample = async () => {
+            if (!collectionId || !tool?.name) {
+                setSampleData(generateToolSample(tool));
+                return;
+            }
+            try {
+                const resp = await observeApi.fetchSampleData(`tools/call/${tool.name}`, collectionId, "POST");
+                const samples = resp?.sampleDataList || resp?.samples || [];
+                if (!cancelled && samples.length > 0 && samples[0]?.message) {
+                    setSampleData({ message: samples[0].message });
+                    return;
+                }
+            } catch {
+                // fall through to generated sample
+            }
+            if (!cancelled) setSampleData(generateToolSample(tool));
+        };
+        loadSample();
+        return () => { cancelled = true; };
+    }, [tool?.id, tool?.name, collectionId]);
 
     const tabs = [
         ...TOOL_TABS,
@@ -431,10 +433,41 @@ export default function McpFlyout({ agent, device, show, onClose, onDeviceClick 
     const [selectedTool,     setSelectedTool]     = useState(null);
     const [selectedResource, setSelectedResource] = useState(null);
     const [selectedPrompt,   setSelectedPrompt]   = useState(null);
+    const [allTools, setAllTools] = useState([]);
+    const [allResources, setAllResources] = useState([]);
+    const [allPrompts, setAllPrompts] = useState([]);
+    const collectionId = agent?.collectionIds?.[0];
 
-    const allTools     = useMemo(() => getToolsForServer(agent?.endpoint),     [agent?.endpoint]);
-    const allResources = useMemo(() => getResourcesForServer(agent?.endpoint), [agent?.endpoint]);
-    const allPrompts   = useMemo(() => getPromptsForServer(agent?.endpoint),   [agent?.endpoint]);
+    useEffect(() => {
+        if (!show || !collectionId) {
+            setAllTools([]);
+            setAllResources([]);
+            setAllPrompts([]);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const data = await agenticObserveApi.fetchMcpFlyoutData(collectionId);
+                if (cancelled) return;
+                const toolViolations = data.toolViolations || {};
+                const tools = (data.tools || []).map((t) => ({
+                    ...t,
+                    violationCount: toolViolations[t.name] || 0,
+                }));
+                setAllTools(tools);
+                setAllResources(data.resources || []);
+                setAllPrompts(data.prompts || []);
+            } catch {
+                if (!cancelled) {
+                    setAllTools([]);
+                    setAllResources([]);
+                    setAllPrompts([]);
+                }
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [show, collectionId, agent?.endpoint]);
 
     React.useEffect(() => {
         if (!show) { setSelectedTool(null); setSelectedResource(null); setSelectedPrompt(null); }
@@ -442,6 +475,21 @@ export default function McpFlyout({ agent, device, show, onClose, onDeviceClick 
     React.useEffect(() => {
         setSelectedTool(null); setSelectedResource(null); setSelectedPrompt(null);
     }, [agent?.endpoint]);
+
+    const chatMetadata = useMemo(() => buildAgenticObserveChatMetadata("mcp", {
+        deviceEndpoint: device?.endpoint,
+        deviceId: device?.path?.[0],
+        agentEndpoint: agent?.endpoint,
+        riskScore: agent?.riskScore ?? device?.riskScore,
+        toolName: selectedTool?.name,
+        resourceName: selectedResource?.name,
+        promptName: selectedPrompt?.name,
+        counts: {
+            tools: allTools.length,
+            resources: allResources.length,
+            prompts: allPrompts.length,
+        },
+    }), [device, agent, selectedTool, selectedResource, selectedPrompt, allTools.length, allResources.length, allPrompts.length]);
 
     const lockScroll   = useCallback(() => { document.body.style.overflow = "hidden"; }, []);
     const unlockScroll = useCallback(() => { document.body.style.overflow = "";       }, []);
@@ -514,7 +562,9 @@ export default function McpFlyout({ agent, device, show, onClose, onDeviceClick 
 
                 <AiChatSection
                     placeholder="Ask about this MCP server's tools and risks..."
-                    resetKey={agent?.endpoint}
+                    resetKey={`${agent?.endpoint}-${selectedTool?.name || ""}-${selectedResource?.name || ""}-${selectedPrompt?.name || ""}`}
+                    conversationType="ASK_AKTO"
+                    chatMetadata={chatMetadata}
                 />
             </div>
         </div>

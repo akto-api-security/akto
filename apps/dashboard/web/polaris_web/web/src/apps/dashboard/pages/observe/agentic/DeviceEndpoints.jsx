@@ -12,8 +12,11 @@ import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithM
 import SkillsFlyout from "./SkillsFlyout";
 import DeviceFlyout from "./DeviceFlyout";
 import McpFlyout from "./McpFlyout";
+import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import { TYPE_STYLES, SEVERITY_COLORS, getRiskColor } from "./agenticStyles";
-import { AGENT_RISK_DATA, STAT_SPARKLINES, OS_TREND, VIOLATIONS_BY_SEVERITY, DEVICE_FLAT_DATA, USER_FLAT_DATA, devicesByUsername } from "./agenticDummyData";
+import agenticObserveApi, { aggregateViolationsByCollectionId } from "./agenticObserveApi";
+import { buildDeviceEndpointsPageData } from "./agenticPageBuilders";
+import api from "../api";
 
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
@@ -40,7 +43,7 @@ function makeSparklineConfig(data, color) {
     };
 }
 
-function makeOsTrendConfig() {
+function makeOsTrendConfig(osTrend) {
     return {
         chart:{type:"line",height:200,backgroundColor:"transparent",style:{fontFamily:"Inter, -apple-system, sans-serif"},margin:[8,8,64,44]},
         title:null, credits:{enabled:false}, exporting:{enabled:false},
@@ -50,28 +53,23 @@ function makeOsTrendConfig() {
         tooltip:{shared:true,backgroundColor:"white",borderColor:"#DFE3E8",borderRadius:8,style:{fontSize:"12px"}},
         plotOptions:{line:{marker:{enabled:false},lineWidth:2}},
         series:[
-            {name:"Mac",     data:OS_TREND.mac,     color:"#7C3AED"},
-            {name:"Windows", data:OS_TREND.windows, color:"#10B981"},
-            {name:"Linux",   data:OS_TREND.linux,   color:"#F59E0B"},
+            {name:"Mac",     data:osTrend.mac || [],     color:"#7C3AED"},
+            {name:"Windows", data:osTrend.windows || [], color:"#10B981"},
+            {name:"Linux",   data:osTrend.linux || [],   color:"#F59E0B"},
         ],
     };
 }
 
-function makeViolationsDonutConfig() {
+function makeViolationsDonutConfig(violationsBySeverity) {
     return {
         chart:{type:"pie",height:200,backgroundColor:"transparent",style:{fontFamily:"Inter, -apple-system, sans-serif"},margin:[4,0,48,0]},
         title:null, credits:{enabled:false}, exporting:{enabled:false},
         tooltip:{pointFormat:"<b>{point.y}</b> ({point.percentage:.0f}%)",backgroundColor:"white",borderColor:"#DFE3E8",borderRadius:8,style:{fontSize:"12px"}},
         plotOptions:{pie:{innerSize:"55%",size:"85%",center:["50%","45%"],borderWidth:2,borderColor:"white",dataLabels:{enabled:false},showInLegend:true}},
         legend:{align:"center",verticalAlign:"bottom",itemStyle:{fontSize:"12px",fontWeight:"400",color:"#6D7175"},symbolRadius:4,margin:10},
-        series:[{name:"Violations",data:VIOLATIONS_BY_SEVERITY}],
+        series:[{name:"Violations",data:violationsBySeverity || []}],
     };
 }
-
-// Hoist static chart configs — these depend only on module-level data so they
-// can be computed once instead of on every render of TopSection.
-const OS_TREND_OPTS = makeOsTrendConfig();
-const VIOLATIONS_DONUT_OPTS = makeViolationsDonutConfig();
 
 // ─── Stat + chart cards ───────────────────────────────────────────────────────
 
@@ -109,33 +107,41 @@ function ChartPanel({ title, children }) {
     );
 }
 
-function TopSection() {
+function TopSection({ summary }) {
+    const sparklines = summary?.statSparklines || {};
+    const osTrendOpts = useMemo(
+        () => makeOsTrendConfig(summary?.osTrend || {}),
+        [summary?.osTrend]
+    );
+    const violationsDonutOpts = useMemo(
+        () => makeViolationsDonutConfig(summary?.violationsBySeverity || []),
+        [summary?.violationsBySeverity]
+    );
+
     return (
         <HorizontalStack gap="4" align="start" blockAlign="stretch" wrap={false}>
-            {/* width + flexShrink prevent the stat card from growing; height:100% makes Card fill the stretched column */}
             <div style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column" }}>
                 <Card padding="0">
                     <VerticalStack>
-                        <StatRow label="Total Endpoints"  value={6403} delta={21} sparklineData={STAT_SPARKLINES.endpoints}  color="#7C3AED" />
+                        <StatRow label="Total Endpoints"  value={summary?.totalEndpoints ?? 0} delta={0} sparklineData={sparklines.endpoints || []}  color="#7C3AED" />
                         <Divider />
-                        <StatRow label="Users"            value={4203} delta={20} sparklineData={STAT_SPARKLINES.users}      color="#2563EB" />
+                        <StatRow label="Users"            value={summary?.totalUsers ?? 0} delta={0} sparklineData={sparklines.users || []}      color="#2563EB" />
                         <Divider />
-                        <StatRow label="Total Violations" value={1400} delta={24} sparklineData={STAT_SPARKLINES.violations} color="#DC2626" />
+                        <StatRow label="Total Violations" value={summary?.totalViolations ?? 0} delta={0} sparklineData={sparklines.violations || []} color="#DC2626" />
                     </VerticalStack>
                 </Card>
             </div>
-            {/* flex:1 + minWidth:0 needed for chart to expand — Box doesn't support flex child props */}
             <div style={{ flex: 1, minWidth: 0 }}>
                 <Card padding="0">
                     <ChartPanel title="Endpoints Over Time by OS Type">
-                        <HighchartsReact highcharts={Highcharts} options={OS_TREND_OPTS} />
+                        <HighchartsReact highcharts={Highcharts} options={osTrendOpts} />
                     </ChartPanel>
                 </Card>
             </div>
             <div style={{ width: 298, flexShrink: 0 }}>
                 <Card padding="0">
                     <ChartPanel title="Violations by Severity">
-                        <HighchartsReact highcharts={Highcharts} options={VIOLATIONS_DONUT_OPTS} />
+                        <HighchartsReact highcharts={Highcharts} options={violationsDonutOpts} />
                     </ChartPanel>
                 </Card>
             </div>
@@ -269,8 +275,8 @@ function UsernameCellRenderer({ data }) {
     );
 }
 
-function UserEndpointsCellRenderer({ data }) {
-    const devices = devicesByUsername[data.username];
+function UserEndpointsCellRenderer({ data, devicesByUsername }) {
+    const devices = devicesByUsername?.[data.username];
     if (!devices || devices.length === 0) return null;
     const primary = devices[0];
     const others  = devices.slice(1);
@@ -295,7 +301,8 @@ function UserEndpointsCellRenderer({ data }) {
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
-const DEVICE_COL_DEFS = [
+function buildDeviceColDefs(agentRiskData) {
+    return [
     {
         field: "riskScore",
         headerName: "Risk score",
@@ -307,7 +314,7 @@ const DEVICE_COL_DEFS = [
             if (!params.data) return null;
             if (!params.data.path || params.data.path.length <= 1) return params.data.riskScore ?? null;
             const key = params.data.path.join("/");
-            return AGENT_RISK_DATA[key]?.riskScore ?? null;
+            return agentRiskData[key]?.riskScore ?? null;
         },
     },
     { field: "username",    headerName: "Username",     flex: 1,   minWidth: 120, enableRowGroup: true },
@@ -324,11 +331,12 @@ const DEVICE_COL_DEFS = [
             if (!params.data) return null;
             if (!params.data.path || params.data.path.length <= 1) return params.data.violations ?? null;
             const key = params.data.path.join("/");
-            return AGENT_RISK_DATA[key]?.violations ?? null;
+            return agentRiskData[key]?.violations ?? null;
         },
     },
     { field: "lastTraffic", headerName: "Last Traffic", width: 130 },
 ];
+}
 
 const USER_COL_DEFS = [
     {
@@ -357,12 +365,22 @@ const DEFAULT_COL_DEF = {
 
 // ─── Table section ────────────────────────────────────────────────────────────
 
-function TableSection() {
+function TableSection({ deviceFlatData, agentRiskData, devicesByUsername }) {
     const [selectedCount, setSelectedCount] = useState(0);
     const [flyout, setFlyout] = useState(null);
     const [deviceFlyout, setDeviceFlyout] = useState(null);
     const [mcpFlyout, setMcpFlyout] = useState(null);
     const gridRef = useRef(null);
+
+    const deviceColDefs = useMemo(() => buildDeviceColDefs(agentRiskData), [agentRiskData]);
+
+    const findDeviceRow = useCallback((deviceId) =>
+        deviceFlatData.find((r) => r.path?.length === 1 && r.path[0] === deviceId),
+    [deviceFlatData]);
+
+    const findAgentsForDevice = useCallback((deviceId) =>
+        deviceFlatData.filter((r) => r.path?.length === 2 && r.path[0] === deviceId),
+    [deviceFlatData]);
 
     const closeAll = useCallback(() => {
         setFlyout(null);
@@ -370,35 +388,44 @@ function TableSection() {
         setMcpFlyout(null);
     }, []);
 
-    // Auto-open DeviceFlyout when arriving via ?device= URL param (e.g. from AgenticAssetFlyout Devices tab)
     useEffect(() => {
         const params   = new URLSearchParams(window.location.search);
         const deviceId = params.get("device");
         if (!deviceId) return;
-        const device = DEVICE_FLAT_DATA.find(r => r.path.length === 1 && r.path[0] === deviceId);
+        const device = findDeviceRow(deviceId);
         if (!device) return;
-        const agents = DEVICE_FLAT_DATA.filter(r => r.path.length === 2 && r.path[0] === deviceId);
-        setDeviceFlyout({ device, agents });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        setDeviceFlyout({ device, agents: findAgentsForDevice(deviceId) });
+    }, [deviceFlatData, findDeviceRow, findAgentsForDevice]);
 
-    // handleAgentClickFromDevice removed — agentic asset clicks now navigate to the Agentic Assets page
+    const handleAgentClickFromDevice = useCallback((agent) => {
+        if (!agent) return;
+        const device = deviceFlyout?.device;
+        if (agent.type === "MCP Server") {
+            setMcpFlyout({ agent, device });
+            setDeviceFlyout(null);
+            setFlyout(null);
+        } else if (agent.type === "AI Agent" && agent.skillCount > 0) {
+            setFlyout({ agent, device });
+            setDeviceFlyout(null);
+            setMcpFlyout(null);
+        }
+    }, [deviceFlyout]);
 
     const handleDeviceClickFromFlyout = useCallback((device) => {
         const deviceId = device?.path?.[0];
         if (!deviceId) return;
-        const agents = DEVICE_FLAT_DATA.filter(r => r.path.length === 2 && r.path[0] === deviceId);
+        const agents = findAgentsForDevice(deviceId);
         setFlyout(null);
         setMcpFlyout(null);
         setDeviceFlyout({ device, agents });
-    }, []);
+    }, [findAgentsForDevice]);
 
     const handleRowClick = useCallback((e) => {
         const { data, node } = e;
         if (!data) return;
         if (node.level === 0) {
             const deviceId = data.path[0];
-            const agents = DEVICE_FLAT_DATA.filter(r => r.path.length === 2 && r.path[0] === deviceId);
+            const agents = findAgentsForDevice(deviceId);
             setDeviceFlyout({ device: data, agents });
             setFlyout(null);
             setMcpFlyout(null);
@@ -411,8 +438,23 @@ function TableSection() {
             // Previously opened McpFlyout / SkillsFlyout inline — now handled on the Agentic Assets page
             // if (data.type === "MCP Server") { setMcpFlyout({ agent: data, device }); ... }
             // if (data.skillCount) { setFlyout({ agent: data, device }); ... }
+            if (data.type === "MCP Server") {
+                const deviceId = data.path[0];
+                const device = findDeviceRow(deviceId);
+                setMcpFlyout({ agent: data, device });
+                setFlyout(null);
+                setDeviceFlyout(null);
+                return;
+            }
+            if (data.skillCount) {
+                const deviceId = data.path[0];
+                const device = findDeviceRow(deviceId);
+                setFlyout({ agent: data, device });
+                setDeviceFlyout(null);
+                setMcpFlyout(null);
+            }
         }
-    }, []);
+    }, [findAgentsForDevice, findDeviceRow]);
 
     const getDataPath = useCallback((data) => data.path, []);
 
@@ -440,8 +482,8 @@ function TableSection() {
         <VerticalStack gap="0">
             <AgGridTable
                 gridRef={gridRef}
-                rowData={DEVICE_FLAT_DATA}
-                columnDefs={DEVICE_COL_DEFS}
+                rowData={deviceFlatData}
+                columnDefs={deviceColDefs}
                 defaultColDef={DEFAULT_COL_DEF}
                 autoGroupColumnDef={autoGroupColumnDef}
                 treeData
@@ -469,6 +511,15 @@ function TableSection() {
                 agents={deviceFlyout?.agents}
                 show={deviceFlyout !== null}
                 onClose={closeAll}
+                onAgentClick={handleAgentClickFromDevice}
+                agentRiskData={agentRiskData}
+            />
+            <McpFlyout
+                agent={mcpFlyout?.agent}
+                device={mcpFlyout?.device}
+                show={mcpFlyout !== null}
+                onClose={closeAll}
+                onDeviceClick={handleDeviceClickFromFlyout}
             />
             {/* McpFlyout removed — MCP Servers now open on the Agentic Assets page */}
             {/* <McpFlyout agent={mcpFlyout?.agent} device={mcpFlyout?.device} show={mcpFlyout !== null} onClose={closeAll} onDeviceClick={handleDeviceClickFromFlyout} /> */}
@@ -479,6 +530,74 @@ function TableSection() {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function DeviceEndpoints() {
+    const [loading, setLoading] = useState(true);
+    const [deviceFlatData, setDeviceFlatData] = useState([]);
+    const [agentRiskData, setAgentRiskData] = useState({});
+    const [devicesByUsername, setDevicesByUsername] = useState({});
+    const [summary, setSummary] = useState({});
+
+    useEffect(() => {
+        const isMountedRef = { current: true };
+        (async () => {
+            try {
+                setLoading(true);
+                const [
+                    apiCollectionsResp,
+                    trafficInfoResp,
+                    riskScoreResp,
+                    moduleInfos,
+                    violationRows,
+                ] = await Promise.all([
+                    api.getAllCollectionsBasic(),
+                    api.getLastTrafficSeen(),
+                    api.getRiskScoreInfo(),
+                    agenticObserveApi.fetchEndpointShieldModules(),
+                    agenticObserveApi.fetchAgenticViolations({}),
+                ]);
+                if (!isMountedRef.current) return;
+                const pageData = buildDeviceEndpointsPageData(
+                    apiCollectionsResp?.apiCollections || [],
+                    trafficInfoResp || {},
+                    riskScoreResp?.riskScoreOfCollectionsMap || {},
+                    {
+                        moduleInfos,
+                        violationsByCollectionId: aggregateViolationsByCollectionId(violationRows),
+                    },
+                );
+                setDeviceFlatData(pageData.deviceFlatData);
+                setAgentRiskData(pageData.agentRiskData);
+                setDevicesByUsername(pageData.devicesByUsername);
+                setSummary(pageData.summary);
+            } catch {
+                if (isMountedRef.current) {
+                    setDeviceFlatData([]);
+                    setAgentRiskData({});
+                    setDevicesByUsername({});
+                    setSummary({});
+                }
+            } finally {
+                if (isMountedRef.current) setLoading(false);
+            }
+        })();
+        return () => { isMountedRef.current = false; };
+    }, []);
+
+    if (loading) {
+        return (
+            <PageWithMultipleCards
+                title={
+                    <TitleWithInfo
+                        tooltipContent="View all endpoints by device and user — track AI agent activity, risk scores, and violations."
+                        titleText="Endpoints"
+                        docsUrl="https://ai-security-docs.akto.io/agentic-ai-discovery/get-started"
+                    />
+                }
+                isFirstPage={true}
+                components={[<SpinnerCentered key="loading" />]}
+            />
+        );
+    }
+
     return (
         <PageWithMultipleCards
             title={
@@ -490,8 +609,13 @@ export default function DeviceEndpoints() {
             }
             isFirstPage={true}
             components={[
-                <TopSection key="top"/>,
-                <TableSection key="table"/>,
+                <TopSection key="top" summary={summary} />,
+                <TableSection
+                    key="table"
+                    deviceFlatData={deviceFlatData}
+                    agentRiskData={agentRiskData}
+                    devicesByUsername={devicesByUsername}
+                />,
             ]}
         />
     );

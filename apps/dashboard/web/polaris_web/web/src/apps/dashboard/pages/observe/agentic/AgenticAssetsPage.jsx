@@ -13,16 +13,17 @@ import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithM
 import AgenticAssetFlyout from "./AgenticAssetFlyout";
 import { TYPE_STYLES, SEVERITY_COLORS, getRiskColor } from "./agenticStyles";
 import { getDomainForFavicon } from "./mcpClientHelper";
-import { AGENTIC_TREE_DATA, AGENTIC_FLAT_DATA } from "./agenticDummyData";
+import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
+import api from "../api";
+import agenticObserveApi, { aggregateViolationsByCollectionId } from "./agenticObserveApi";
+import { buildAgenticAssetsPageData, buildUserAnalysisLookup } from "./constants";
+import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
 LicenseManager.setLicenseKey(
     "[TRIAL]_this_{AG_Charts_and_AG_Grid}_Enterprise_key_{AG-129492}_is_granted_for_evaluation_only___Use_in_production_is_not_permitted___Please_report_misuse_to_legal@ag-grid.com___For_help_with_purchasing_a_production_key_please_contact_info@ag-grid.com___You_are_granted_a_{Single_Application}_Developer_License_for_one_application_only___All_Front-End_JavaScript_developers_working_on_the_application_would_need_to_be_licensed___This_key_will_deactivate_on_{18 June 2026}____[v3]_[0102]_MTc4MTczNzIwMDAwMA==d27c8a4487e577f42d9980e95824f43c"
 );
-
-// parent-only rows (path.length === 1)
-const FLAT_ROW_DATA = AGENTIC_TREE_DATA.filter(r => r.path.length === 1);
 
 // ─── Icon helpers ─────────────────────────────────────────────────────────────
 
@@ -98,9 +99,17 @@ function ViolationsCellRenderer({ value }) {
     );
 }
 
-function InteractionsCellRenderer({ value }) {
+function InteractionsCellRenderer({ value, data }) {
     if (value == null) return <span style={{ color: "#C4C7CB" }}>—</span>;
-    return <span style={{ fontSize: 12, color: "#202223" }}>{value.toLocaleString("en-IN")}</span>;
+    const detail = data?.aiInteractionsDetail;
+    const title = detail
+        ? `Input: ${Number(detail.totalInputTokens || 0).toLocaleString("en-IN")} · Output: ${Number(detail.totalOutputTokens || 0).toLocaleString("en-IN")}`
+        : undefined;
+    return (
+        <span style={{ fontSize: 12, color: "#202223" }} title={title}>
+            {Number(value).toLocaleString("en-IN")}
+        </span>
+    );
 }
 
 function GroupCellRenderer({ data }) {
@@ -187,6 +196,7 @@ const COL_DEFS = [
     {
         field: "aiInteractions",
         headerName: "AI Interactions",
+        headerTooltip: "Total tokens from UserAnalysisData (input + output) across devices using this asset.",
         width: 150,
         filter: false,
         cellRenderer: InteractionsCellRenderer,
@@ -446,28 +456,31 @@ function TopSection({ onTypeFilter, activeTypeFilter, onAssetClick }) {
 
 // ─── Table section ────────────────────────────────────────────────────────────
 
-function TableSection({ typeFilter, flyout, setFlyout }) {
+function TableSection({ agenticTreeData, agenticFlatData, assetDevices }) {
+    const [flyout, setFlyout] = useState(null);
     const gridRef = useRef(null);
 
-    // Auto-open flyout when arriving from DeviceFlyout via ?asset= param
+    const flatRowData = useMemo(
+        () => agenticTreeData.filter((r) => r.path?.length === 1),
+        [agenticTreeData]
+    );
+
     useEffect(() => {
         const params    = new URLSearchParams(window.location.search);
         const assetName = params.get("asset");
         if (!assetName) return;
-        // Check parent rows in table first
-        const row  = FLAT_ROW_DATA.find(r => r.name === assetName || r.path[0] === assetName);
-        // Also check AGENTIC_FLAT_DATA directly — covers child assets (e.g. kubernetes-mcp)
+        const row  = flatRowData.find((r) => r.name === assetName || r.path[0] === assetName);
         const flat = row
-            ? (AGENTIC_FLAT_DATA.find(a => a.id === row.path[0]) || { ...row, id: row.path[0] })
-            : AGENTIC_FLAT_DATA.find(a => a.name === assetName || a.id === assetName);
+            ? (agenticFlatData.find((a) => a.id === row.path[0]) || { ...row, id: row.path[0] })
+            : agenticFlatData.find((a) => a.name === assetName || a.id === assetName);
         if (flat) setFlyout(flat);
-    }, []);
+    }, [flatRowData, agenticFlatData]);
 
     const handleRowClick = useCallback((e) => {
         if (!e.data) return;
-        const flat = AGENTIC_FLAT_DATA.find(a => a.id === e.data.path?.[0]) || { ...e.data, id: e.data.path?.[0] };
+        const flat = agenticFlatData.find((a) => a.id === e.data.path?.[0]) || { ...e.data, id: e.data.path?.[0] };
         setFlyout(flat);
-    }, [setFlyout]);
+    }, [agenticFlatData]);
 
     const handleClose           = useCallback(() => setFlyout(null), [setFlyout]);
     const handleNavigateToAsset = useCallback((assetData) => setFlyout(assetData), [setFlyout]);
@@ -483,7 +496,7 @@ function TableSection({ typeFilter, flyout, setFlyout }) {
         <>
             <AgGridTable
                 gridRef={gridRef}
-                rowData={rowData}
+                rowData={flatRowData}
                 columnDefs={COL_DEFS}
                 defaultColDef={DEFAULT_COL_DEF}
                 height={800}
@@ -507,6 +520,9 @@ function TableSection({ typeFilter, flyout, setFlyout }) {
                 show={flyout !== null}
                 onClose={handleClose}
                 onNavigateToAsset={handleNavigateToAsset}
+                agenticTreeData={agenticTreeData}
+                agenticFlatData={agenticFlatData}
+                assetDevices={assetDevices}
             />
         </>
     );
@@ -517,6 +533,82 @@ function TableSection({ typeFilter, flyout, setFlyout }) {
 export default function AgenticAssetsPage() {
     const [typeFilter, setTypeFilter] = useState(null);
     const [flyout,     setFlyout]     = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [agenticTreeData, setAgenticTreeData] = useState([]);
+    const [agenticFlatData, setAgenticFlatData] = useState([]);
+    const [assetDevices, setAssetDevices] = useState({});
+
+    useEffect(() => {
+        const isMountedRef = { current: true };
+        (async () => {
+            try {
+                setLoading(true);
+                const [
+                    apiCollectionsResp,
+                    trafficInfoResp,
+                    riskScoreResp,
+                    sensitiveInfoResp,
+                    shieldResult,
+                    violationRows,
+                    userAnalysisList,
+                ] = await Promise.all([
+                    api.getAllCollectionsBasic(),
+                    api.getLastTrafficSeen(),
+                    api.getRiskScoreInfo(),
+                    api.getSensitiveInfoForCollections(),
+                    fetchEndpointShieldUserMetadata(),
+                    agenticObserveApi.fetchAgenticViolations({}),
+                    agenticObserveApi.listUserAnalysis(),
+                ]);
+
+                if (!isMountedRef.current) return;
+
+                const collections = apiCollectionsResp?.apiCollections || [];
+                const trafficMap = trafficInfoResp || {};
+                const riskScoreMap = riskScoreResp?.riskScoreOfCollectionsMap || {};
+                const sensitiveMap = sensitiveInfoResp?.sensitiveSubtypesInCollection || {};
+                const { usernameMap = {}, userMetadataMap = {} } = shieldResult || {};
+                const violationsByCollectionId = aggregateViolationsByCollectionId(violationRows);
+                const analysisByKey = buildUserAnalysisLookup(userAnalysisList);
+
+                const pageData = buildAgenticAssetsPageData(
+                    collections,
+                    trafficMap,
+                    riskScoreMap,
+                    sensitiveMap,
+                    { usernameMap, userMetadataMap, violationsByCollectionId, analysisByKey },
+                );
+
+                setAgenticTreeData(pageData.agenticTreeData);
+                setAgenticFlatData(pageData.agenticFlatData);
+                setAssetDevices(pageData.assetDevices);
+            } catch {
+                if (isMountedRef.current) {
+                    setAgenticTreeData([]);
+                    setAgenticFlatData([]);
+                    setAssetDevices({});
+                }
+            } finally {
+                if (isMountedRef.current) setLoading(false);
+            }
+        })();
+        return () => { isMountedRef.current = false; };
+    }, []);
+
+    if (loading) {
+        return (
+            <PageWithMultipleCards
+                title={
+                    <TitleWithInfo
+                        tooltipContent="All agentic assets observed across your environment — AI Agents, MCP Servers, LLMs, and Skills."
+                        titleText="Agentic assets"
+                    />
+                }
+                isFirstPage={true}
+                components={[<SpinnerCentered key="loading" />]}
+            />
+        );
+    }
 
     return (
         <PageWithMultipleCards
