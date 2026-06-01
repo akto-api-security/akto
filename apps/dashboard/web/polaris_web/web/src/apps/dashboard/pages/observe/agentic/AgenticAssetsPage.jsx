@@ -268,27 +268,33 @@ function TopSectionIcon({ row }) {
 
 // ─── Top section ──────────────────────────────────────────────────────────────
 
-function TopSection({ onTypeFilter, activeTypeFilter, onAssetClick }) {
-    const aiCount    = FLAT_ROW_DATA.filter(r => r.type === "AI Agent").length;
-    const mcpCount   = FLAT_ROW_DATA.filter(r => r.type === "MCP Server").length;
-    const llmCount   = FLAT_ROW_DATA.filter(r => r.type === "LLM").length;
-    const skillCount = FLAT_ROW_DATA.filter(r => r.type === "Skill").length;
-    const total      = FLAT_ROW_DATA.length;
+function violationTotal(row) {
+    const v = row?.violations;
+    if (!v) return 0;
+    return (v.critical || 0) + (v.high || 0) + (v.medium || 0) + (v.low || 0);
+}
 
-    const critV  = FLAT_ROW_DATA.reduce((s, r) => s + (r.violations?.critical || 0), 0);
-    const highV  = FLAT_ROW_DATA.reduce((s, r) => s + (r.violations?.high    || 0), 0);
-    const medV   = FLAT_ROW_DATA.reduce((s, r) => s + (r.violations?.medium  || 0), 0);
-    const lowV   = FLAT_ROW_DATA.reduce((s, r) => s + (r.violations?.low     || 0), 0);
+function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAssetClick }) {
+    const aiCount    = agenticFlatData.filter(r => r.type === "AI Agent").length;
+    const mcpCount   = agenticFlatData.filter(r => r.type === "MCP Server").length;
+    const llmCount   = agenticFlatData.filter(r => r.type === "LLM").length;
+    const skillCount = agenticFlatData.filter(r => r.type === "Skill").length;
+    const total      = agenticFlatData.length;
+
+    const critV  = agenticFlatData.reduce((s, r) => s + (r.violations?.critical || 0), 0);
+    const highV  = agenticFlatData.reduce((s, r) => s + (r.violations?.high    || 0), 0);
+    const medV   = agenticFlatData.reduce((s, r) => s + (r.violations?.medium  || 0), 0);
+    const lowV   = agenticFlatData.reduce((s, r) => s + (r.violations?.low     || 0), 0);
     const totalV = critV + highV + medV + lowV;
 
     const topApps = useMemo(() =>
-        [...FLAT_ROW_DATA].filter(r => r.aiInteractions > 0)
-            .sort((a, b) => b.aiInteractions - a.aiInteractions).slice(0, 5), []);
+        [...agenticFlatData].filter(r => r.aiInteractions > 0)
+            .sort((a, b) => b.aiInteractions - a.aiInteractions).slice(0, 5), [agenticFlatData]);
 
     const topViolations = useMemo(() =>
-        [...FLAT_ROW_DATA]
-            .map(r => ({ ...r, totalV: (r.violations?.critical||0)+(r.violations?.high||0)+(r.violations?.medium||0)+(r.violations?.low||0) }))
-            .filter(r => r.totalV > 0).sort((a, b) => b.totalV - a.totalV).slice(0, 5), []);
+        [...agenticFlatData]
+            .map(r => ({ ...r, totalV: violationTotal(r) }))
+            .filter(r => r.totalV > 0).sort((a, b) => b.totalV - a.totalV).slice(0, 5), [agenticFlatData]);
 
     // 1 — areaspline configs for the stat cards (full-width, height 80)
     // stat charts: width=140, height=50 — to the right of the number, same as DeviceEndpoints StatRow
@@ -329,10 +335,7 @@ function TopSection({ onTypeFilter, activeTypeFilter, onAssetClick }) {
                     <VerticalStack gap="3">
                         <Text variant="headingSm" fontWeight="semibold">Agentic Assets</Text>
                         <HorizontalStack align="space-between" blockAlign="center" gap="3">
-                            <HorizontalStack gap="2" blockAlign="center">
-                                <Text variant="heading2xl" as="p">{total}</Text>
-                                <Text variant="bodySm" fontWeight="semibold" color="success">+3</Text>
-                            </HorizontalStack>
+                            <Text variant="heading2xl" as="p">{total}</Text>
                             <HighchartsReact highcharts={Highcharts} options={assetChartOpts} immutable />
                         </HorizontalStack>
                         <VerticalStack gap="2">
@@ -363,10 +366,7 @@ function TopSection({ onTypeFilter, activeTypeFilter, onAssetClick }) {
                     <VerticalStack gap="3">
                         <Text variant="headingSm" fontWeight="semibold">Violations</Text>
                         <HorizontalStack align="space-between" blockAlign="center" gap="3">
-                            <HorizontalStack gap="2" blockAlign="center">
-                                <Text variant="heading2xl" as="p">{totalV}</Text>
-                                <Text variant="bodySm" fontWeight="semibold" color="critical">+{Math.round(totalV * 0.017)}</Text>
-                            </HorizontalStack>
+                            <Text variant="heading2xl" as="p">{totalV}</Text>
                             <HighchartsReact highcharts={Highcharts} options={violChartOpts} immutable />
                         </HorizontalStack>
                         <VerticalStack gap="2">
@@ -393,13 +393,11 @@ function TopSection({ onTypeFilter, activeTypeFilter, onAssetClick }) {
                         <Box paddingBlockEnd="3">
                             <Text variant="headingSm">Top Used Applications</Text>
                         </Box>
-                        {topApps.map((row, i) => {
-                            const asset = AGENTIC_FLAT_DATA.find(a => a.name === row.name) || { ...row, id: row.path[0] };
-                            return (
-                                <React.Fragment key={row.path[0]}>
+                        {topApps.map((row, i) => (
+                                <React.Fragment key={row.id}>
                                     {i > 0 && <Divider />}
                                     <Box paddingBlockStart="3" paddingBlockEnd="3">
-                                        <div onClick={() => onAssetClick?.(asset)} style={{ cursor: "pointer" }}>
+                                        <div onClick={() => onAssetClick?.(row)} style={{ cursor: "pointer" }}>
                                             <HorizontalStack blockAlign="center" gap="2" wrap={false}>
                                                 <TopSectionIcon row={row} />
                                                 <Text variant="bodySm" as="span" truncate>{row.name}</Text>
@@ -412,8 +410,7 @@ function TopSection({ onTypeFilter, activeTypeFilter, onAssetClick }) {
                                         </div>
                                     </Box>
                                 </React.Fragment>
-                            );
-                        })}
+                        ))}
                     </VerticalStack>
                 </Box>
             </LegacyCard>
@@ -425,13 +422,11 @@ function TopSection({ onTypeFilter, activeTypeFilter, onAssetClick }) {
                         <Box paddingBlockEnd="3">
                             <Text variant="headingSm">Top Agentic Asset with Violations</Text>
                         </Box>
-                        {topViolations.map((row, i) => {
-                            const asset = AGENTIC_FLAT_DATA.find(a => a.name === row.name) || { ...row, id: row.path[0] };
-                            return (
-                                <React.Fragment key={row.path[0]}>
+                        {topViolations.map((row, i) => (
+                                <React.Fragment key={row.id}>
                                     {i > 0 && <Divider />}
                                     <Box paddingBlockStart="3" paddingBlockEnd="3">
-                                        <div onClick={() => onAssetClick?.(asset)} style={{ cursor: "pointer" }}>
+                                        <div onClick={() => onAssetClick?.(row)} style={{ cursor: "pointer" }}>
                                             <HorizontalStack blockAlign="center" gap="2" wrap={false}>
                                                 <TopSectionIcon row={row} />
                                                 <Text variant="bodySm" as="span" truncate>{row.name}</Text>
@@ -444,8 +439,7 @@ function TopSection({ onTypeFilter, activeTypeFilter, onAssetClick }) {
                                         </div>
                                     </Box>
                                 </React.Fragment>
-                            );
-                        })}
+                        ))}
                     </VerticalStack>
                 </Box>
             </LegacyCard>
@@ -456,14 +450,13 @@ function TopSection({ onTypeFilter, activeTypeFilter, onAssetClick }) {
 
 // ─── Table section ────────────────────────────────────────────────────────────
 
-function TableSection({ agenticTreeData, agenticFlatData, assetDevices }) {
-    const [flyout, setFlyout] = useState(null);
+function TableSection({ agenticTreeData, agenticFlatData, assetDevices, typeFilter, flyout, setFlyout }) {
     const gridRef = useRef(null);
 
-    const flatRowData = useMemo(
-        () => agenticTreeData.filter((r) => r.path?.length === 1),
-        [agenticTreeData]
-    );
+    const flatRowData = useMemo(() => {
+        const rows = agenticTreeData.filter((r) => r.path?.length === 1);
+        return typeFilter ? rows.filter((r) => r.type === typeFilter) : rows;
+    }, [agenticTreeData, typeFilter]);
 
     useEffect(() => {
         const params    = new URLSearchParams(window.location.search);
@@ -474,23 +467,17 @@ function TableSection({ agenticTreeData, agenticFlatData, assetDevices }) {
             ? (agenticFlatData.find((a) => a.id === row.path[0]) || { ...row, id: row.path[0] })
             : agenticFlatData.find((a) => a.name === assetName || a.id === assetName);
         if (flat) setFlyout(flat);
-    }, [flatRowData, agenticFlatData]);
+    }, [flatRowData, agenticFlatData, setFlyout]);
 
     const handleRowClick = useCallback((e) => {
         if (!e.data) return;
         const flat = agenticFlatData.find((a) => a.id === e.data.path?.[0]) || { ...e.data, id: e.data.path?.[0] };
         setFlyout(flat);
-    }, [agenticFlatData]);
+    }, [agenticFlatData, setFlyout]);
 
     const handleClose           = useCallback(() => setFlyout(null), [setFlyout]);
     const handleNavigateToAsset = useCallback((assetData) => setFlyout(assetData), [setFlyout]);
     const getRowStyle = useCallback(() => ({ cursor: "pointer" }), []);
-
-    // Filter table by type when a legend segment is clicked in TopSection
-    const rowData = useMemo(() =>
-        typeFilter ? FLAT_ROW_DATA.filter(r => r.type === typeFilter) : FLAT_ROW_DATA,
-        [typeFilter]
-    );
 
     return (
         <>
@@ -622,12 +609,16 @@ export default function AgenticAssetsPage() {
             components={[
                 <TopSection
                     key="top"
+                    agenticFlatData={agenticFlatData}
                     onTypeFilter={t => setTypeFilter(prev => prev === t ? null : t)}
                     activeTypeFilter={typeFilter}
                     onAssetClick={setFlyout}
                 />,
                 <TableSection
                     key="table"
+                    agenticTreeData={agenticTreeData}
+                    agenticFlatData={agenticFlatData}
+                    assetDevices={assetDevices}
                     typeFilter={typeFilter}
                     flyout={flyout}
                     setFlyout={setFlyout}

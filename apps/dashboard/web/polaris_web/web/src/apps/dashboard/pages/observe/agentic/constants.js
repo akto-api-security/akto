@@ -714,6 +714,13 @@ export function buildAgenticAssetsPageData(
             toolCount: 0,
         };
         if (violations) flatRow.violations = violations;
+        if (aiInteractions) {
+            flatRow.aiInteractions = aiInteractions.total;
+            flatRow.aiInteractionsDetail = {
+                totalInputTokens: aiInteractions.totalInputTokens,
+                totalOutputTokens: aiInteractions.totalOutputTokens,
+            };
+        }
         if (group.rowType === ROW_TYPES.AGENT && group.clientType === CLIENT_TYPES.AI_AGENT) {
             const mcpNames = new Set();
             (group.collections || []).forEach((c) => {
