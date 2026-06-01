@@ -23,7 +23,7 @@ const normalizePattern = (raw) =>
 const PATTERN_ALLOWED = /^[a-z0-9.\-_/:~%*]+$/;
 
 // The host part (before the first "/") must be either exactly "*" (any host) or a domain whose
-// labels may contain "*" but whose final label (TLD) is concrete — so "chatgpt.com",
+// labels may contain "*" but whose final label (TLD) is concrete - so "chatgpt.com",
 // "*.openai.com", "localhost" are valid, while "*.*" (no real TLD) is not.
 const HOST_PART = /^(\*|(?:[a-z0-9*]([a-z0-9*-]*[a-z0-9*])?\.)*[a-z0-9]([a-z0-9-]*[a-z0-9])?)$/;
 
@@ -40,13 +40,13 @@ const validatePattern = (p) => {
     }
     // A pattern made only of wildcards / slashes (e.g. "*", "/*", "*/*") would block everything.
     if (/^[*/]+$/.test(p)) {
-        return "Pattern is too broad — include a host or path (e.g. chatgpt.com/*)";
+        return "Pattern is too broad - include a host or path (e.g. chatgpt.com/*)";
     }
     // The host part (before the first "/") must be a real domain or "*" for any host.
     const slash = p.indexOf("/");
     const hostPart = slash === -1 ? p : p.slice(0, slash);
     if (!HOST_PART.test(hostPart)) {
-        return "Host must be a domain (e.g. chatgpt.com, *.openai.com) or * for any host — not " + hostPart;
+        return "Host must be a domain (e.g. chatgpt.com, *.openai.com) or * for any host - not " + hostPart;
     }
     return "";
 };

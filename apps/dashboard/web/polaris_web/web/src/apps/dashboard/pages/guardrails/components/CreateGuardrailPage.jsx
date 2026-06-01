@@ -279,7 +279,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             });
         }
 
-        // "Block host / path" is an internal-only step — shown for @akto.io users only.
+        // "Block host / path" is an internal-only step - shown for @akto.io users only.
         if (func.isAktoUser()) {
             steps.push({
                 number: BlockedHostsConfig.number,
@@ -316,7 +316,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
     }, [allCollections]);
 
-    // Load browser extension configs — these supply host + path autosuggestions
+    // Load browser extension configs - these supply host + path autosuggestions
     // for the "Block host / path" step.
     useEffect(() => {
         let isActive = true;
