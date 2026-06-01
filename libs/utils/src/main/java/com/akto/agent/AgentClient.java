@@ -1,12 +1,10 @@
 package com.akto.agent;
 
-import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.context.Context;
 import com.akto.dao.testing.AgentConversationResultDao;
-import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
-import com.akto.dto.CopilotAuthDetails;
+import com.akto.dto.testing.CopilotOAuthAuthParam;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.AgentConversationResult;
@@ -18,6 +16,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import okhttp3.*;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.akto.util.Constants;
@@ -30,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import com.mongodb.client.model.Updates;
 
 import static com.akto.agent.AgenticUtils.getTestModeFromRole;
 
@@ -47,9 +45,6 @@ public class AgentClient {
             .build();
     
     private final String agentBaseUrl;
-
-    // key=accountId, value="accessToken|expiresAtMs"
-    private static final ConcurrentHashMap<Integer, String> copilotAccessTokenCache = new ConcurrentHashMap<>();
     
     public AgentClient(String agentBaseUrl) {
         this.agentBaseUrl = agentBaseUrl.endsWith("/") ? agentBaseUrl.substring(0, agentBaseUrl.length() - 1) : agentBaseUrl;
@@ -71,12 +66,13 @@ public class AgentClient {
 
         try {
             if (isCopilot) {
-                AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                CopilotAuthDetails copilotAuth = settings != null ? settings.getCopilotAuthDetails() : null;
-                if (copilotAuth == null) {
-                    throw new Exception("CopilotAuthDetails not configured in AccountSettings");
+                String accessToken = HttpRequestResponseUtils.getHeaderValue(
+                    rawApi.getRequest() != null ? rawApi.getRequest().getHeaders() : null,
+                    CopilotOAuthAuthParam.AUTHORIZATION_HEADER
+                );
+                if (StringUtils.isEmpty(accessToken)) {
+                    throw new Exception("No Authorization token found in request — OAuth not connected for this role");
                 }
-                String accessToken = fetchAccessToken(copilotAuth);
                 loggerMaker.infoAndAddToDb("executeAgenticTest: initializing Copilot agent conversationId=" + conversationId);
                 initializeCopilotAgent(conversationId, col, accessToken);
             } else {
@@ -315,76 +311,9 @@ public class AgentClient {
         requestBody.put("copilotConfig", copilotConfig);
 
         try {
-            loggerMaker.infoAndAddToDb("initializeCopilotAgent: POST /initializeMCP body=" + objectMapper.writeValueAsString(requestBody));
+            loggerMaker.infoAndAddToDb("initializeCopilotAgent: POST /initializeMCP ");
         } catch (Exception ignored) {}
         initializeAgent(requestBody);
-    }
-
-    public String fetchAccessToken(CopilotAuthDetails auth) throws Exception {
-        int accountId = Context.accountId.get();
-        String cached = copilotAccessTokenCache.get(accountId);
-        if (cached != null) {
-            String[] parts = cached.split("\\|", 2);
-            if (parts.length == 2 && Long.parseLong(parts[1]) > System.currentTimeMillis() + 5 * 60 * 1000L) {
-                return parts[0];
-            }
-        }
-
-        String refreshToken = auth.getRefreshToken();
-        if (refreshToken == null || refreshToken.isEmpty()) {
-            throw new Exception("Copilot Studio refresh token missing — user must re-authenticate.");
-        }
-
-        loggerMaker.infoAndAddToDb("fetchAccessToken: fetching new access token via refresh_token grant");
-
-        okhttp3.RequestBody formBody = new okhttp3.FormBody.Builder()
-            .add("grant_type", "refresh_token")
-            .add("client_id", auth.getClientId())
-            .add("client_secret", auth.getClientSecret())
-            .add("refresh_token", refreshToken)
-            .add("scope", "https://api.powerplatform.com/CopilotStudio.Copilots.Invoke offline_access")
-            .build();
-
-        Request tokenRequest = new Request.Builder()
-            .url("https://login.microsoftonline.com/" + auth.getTenantId() + "/oauth2/v2.0/token")
-            .post(formBody)
-            .build();
-
-        try (Response response = agentHttpClient.newCall(tokenRequest).execute()) {
-            String body = response.body() != null ? response.body().string() : "";
-            if (!response.isSuccessful()) {
-                if (response.code() == 400 || response.code() == 401) {
-                    throw new Exception("Copilot Studio token refresh failed (code=" + response.code() + "). Refresh token may be expired — user must re-authenticate. Response: " + body);
-                }
-                throw new Exception("Copilot Studio token refresh failed (code=" + response.code() + "): " + body);
-            }
-
-            JsonNode json = objectMapper.readTree(body);
-            String newAccessToken  = json.has("access_token")  ? json.get("access_token").asText()  : null;
-            String newRefreshToken = json.has("refresh_token") ? json.get("refresh_token").asText() : null;
-            long   expiresIn       = json.has("expires_in")    ? json.get("expires_in").asLong()    : 3600L;
-
-            if (newAccessToken == null || newAccessToken.isEmpty()) {
-                throw new Exception("Copilot Studio token response missing access_token");
-            }
-
-            long expiresAtMs = System.currentTimeMillis() + expiresIn * 1000L;
-
-            // update in-memory cache
-            copilotAccessTokenCache.put(accountId, newAccessToken + "|" + expiresAtMs);
-
-            if (newRefreshToken != null && !newRefreshToken.isEmpty()) {
-                auth.setRefreshToken(newRefreshToken);
-                loggerMaker.infoAndAddToDb("fetchAccessToken: new refresh token received, persisting to AccountSettings");
-            }
-            AccountSettingsDao.instance.updateOneNoUpsert(
-                AccountSettingsDao.generateFilter(),
-                Updates.set(AccountSettings.COPILOT_AUTH_DETAILS + "." + CopilotAuthDetails.REFRESH_TOKEN, auth.getRefreshToken())
-            );
-
-            loggerMaker.infoAndAddToDb("fetchAccessToken: token obtained and cached, expiresIn=" + expiresIn + "s");
-            return newAccessToken;
-        }
     }
     
     public boolean performHealthCheck() {

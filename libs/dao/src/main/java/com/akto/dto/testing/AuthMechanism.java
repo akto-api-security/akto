@@ -57,8 +57,8 @@ public class AuthMechanism {
         boolean modifiedAtLeastOne = false;
 
         for (AuthParam authParam1: authParamsToUse) {
-            // Special handling for DIGEST_AUTH: always compute credentials dynamically
-            if (authParam1 instanceof DigestAuthParam) {
+            // Special handling for DIGEST_AUTH and COPILOT_OAUTH: always compute credentials dynamically
+            if (authParam1 instanceof DigestAuthParam || authParam1 instanceof CopilotOAuthAuthParam) {
                 authParam1.addAuthTokens(request);
                 messageKeysPresent += authParam1.getKey()+", ";
                 modifiedAtLeastOne = true;
