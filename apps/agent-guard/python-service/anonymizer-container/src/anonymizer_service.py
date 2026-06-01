@@ -3,9 +3,12 @@ from typing import List, Optional
 from fastapi import FastAPI
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
+from presidio_anonymizer.entities import OperatorConfig
 from pydantic import BaseModel
 
 app = FastAPI(title="Akto Anonymizer Service", version="1.0.0")
+
+REDACTION_PLACEHOLDER = "[REDACTED]"
 
 analyzer = AnalyzerEngine()
 anonymizer = AnonymizerEngine()
@@ -41,7 +44,13 @@ def anonymize(req: AnonymizeRequest):
         language=req.language,
         entities=req.entities,
     )
-    anonymized = anonymizer.anonymize(text=req.text, analyzer_results=results)
+    anonymized = anonymizer.anonymize(
+        text=req.text,
+        analyzer_results=results,
+        operators={
+            "DEFAULT": OperatorConfig("replace", {"new_value": REDACTION_PLACEHOLDER})
+        },
+    )
     return AnonymizeResponse(
         sanitized_text=anonymized.text,
         entities_found=[

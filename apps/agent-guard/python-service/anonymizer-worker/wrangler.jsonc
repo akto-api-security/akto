@@ -17,16 +17,7 @@
 		{
 			"class_name": "AnonymizerContainer",
 			"image": "../anonymizer-container/Dockerfile",
-			// Presidio's NER is CPU-bound. standard-1 (0.5 vCPU) saturated under
-			// real traffic, so bumped to standard-3 (2 vCPU, 8 GiB). Memory was
-			// never the constraint after we left basic; CPU is.
-			//   lite:       1/16 vCPU, 256 MiB
-			//   basic:      1/4  vCPU, 1 GiB     ← OOM-killed on first request
-			//   standard-1: 1/2  vCPU, 4 GiB     ← CPU pegged at 100%
-			//   standard-2: 1    vCPU, 6 GiB
-			//   standard-3: 2    vCPU, 8 GiB     ← current
-			//   standard-4: 4    vCPU, 12 GiB
-			"instance_type": "standard-3",
+			"instance_type": "standard-4",
 			"max_instances": 5
 		}
 	],
