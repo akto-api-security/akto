@@ -601,43 +601,78 @@ function uniqueSkillNamesForGroup(group) {
     return names;
 }
 
+function userAnalysisCompositeKey(serviceId, deviceId) {
+    return `${serviceId}|${deviceId}`;
+}
+
+function putUserAnalysisKey(byKey, serviceId, deviceId, row) {
+    if (!serviceId || !deviceId) return;
+    byKey.set(userAnalysisCompositeKey(serviceId, deviceId), row);
+    byKey.set(userAnalysisCompositeKey(String(serviceId).toLowerCase(), String(deviceId).toLowerCase()), row);
+}
+
 export function buildUserAnalysisLookup(userAnalysisList = []) {
+    const rows = Array.isArray(userAnalysisList) ? userAnalysisList : [];
     const byKey = new Map();
-    userAnalysisList.forEach((row) => {
-        const serviceId = row?.id?.serviceId ?? row?.serviceId;
-        const deviceId = row?.id?.deviceId ?? row?.deviceId;
-        if (!serviceId || !deviceId) return;
-        byKey.set(`${serviceId}|${deviceId}`, row);
+    rows.forEach((row) => {
+        const key = row?.id ?? row?._id;
+        const serviceId = key?.serviceId ?? row?.serviceId;
+        const deviceId = key?.deviceId ?? row?.deviceId;
+        putUserAnalysisKey(byKey, serviceId, deviceId, row);
     });
     return byKey;
 }
 
-function analysisKeysForCollection(collection, tagValue) {
+function analysisKeysForCollection(collection, tagValue, userAnalysisKeysByDeviceId) {
     const hostName = collection.hostName || collection.displayName || collection.name;
     if (!hostName) return [];
     const parts = hostName.split(".");
     const deviceId = parts[0];
     if (!deviceId) return [];
     const keys = [];
-    if (parts.length >= 3) {
-        keys.push({ serviceId: parts.slice(2).join("."), deviceId });
-        if (parts[1]) keys.push({ serviceId: parts[1], deviceId });
+    const seen = new Set();
+    const addPair = (serviceId, devId) => {
+        if (!serviceId || !devId) return;
+        const sk = userAnalysisCompositeKey(serviceId, devId);
+        if (seen.has(sk)) return;
+        seen.add(sk);
+        keys.push({ serviceId, deviceId: devId });
+    };
+    const add = (serviceId) => addPair(serviceId, deviceId);
+
+    const shieldEntry = userAnalysisKeysByDeviceId?.get(deviceId)
+        ?? userAnalysisKeysByDeviceId?.get(String(deviceId).toLowerCase());
+    if (shieldEntry) {
+        addPair(shieldEntry.serviceId, shieldEntry.deviceId);
     }
-    if (tagValue) keys.push({ serviceId: tagValue, deviceId });
+    if (parts.length >= 3) {
+        add(parts.slice(2).join("."));
+        if (parts[1]) add(parts[1]);
+    } else if (parts.length === 2) {
+        add(parts[1]);
+    }
+    const assetTag = findAssetTag(collection.envType);
+    if (assetTag?.value) add(assetTag.value);
+    if (tagValue) add(tagValue);
     return keys;
 }
 
-export function aggregateAiInteractionsForGroup(group, analysisByKey) {
+function lookupUserAnalysisRow(analysisByKey, serviceId, deviceId) {
+    return analysisByKey.get(userAnalysisCompositeKey(serviceId, deviceId))
+        ?? analysisByKey.get(userAnalysisCompositeKey(String(serviceId).toLowerCase(), String(deviceId).toLowerCase()));
+}
+
+export function aggregateAiInteractionsForGroup(group, analysisByKey, userAnalysisKeysByDeviceId) {
     const seen = new Set();
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
     (group.collections || []).forEach((c) => {
-        const keys = analysisKeysForCollection(c, group.tagValue);
+        const keys = analysisKeysForCollection(c, group.tagValue, userAnalysisKeysByDeviceId);
         keys.forEach(({ serviceId, deviceId }) => {
-            const sk = `${serviceId}|${deviceId}`;
+            const sk = userAnalysisCompositeKey(serviceId, deviceId);
             if (seen.has(sk)) return;
             seen.add(sk);
-            const row = analysisByKey.get(sk);
+            const row = lookupUserAnalysisRow(analysisByKey, serviceId, deviceId);
             if (!row) return;
             totalInputTokens += Number(row.totalInputTokens) || 0;
             totalOutputTokens += Number(row.totalOutputTokens) || 0;
@@ -656,7 +691,13 @@ export function buildAgenticAssetsPageData(
     trafficMap = {},
     riskScoreMap = {},
     sensitiveMap = {},
-    { usernameMap = {}, userMetadataMap = {}, violationsByCollectionId = {}, analysisByKey = new Map() } = {},
+    {
+        usernameMap = {},
+        userMetadataMap = {},
+        violationsByCollectionId = {},
+        analysisByKey = new Map(),
+        userAnalysisKeysByDeviceId = new Map(),
+    } = {},
 ) {
     const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap, riskScoreMap);
     const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);
@@ -678,7 +719,7 @@ export function buildAgenticAssetsPageData(
         const skillNames = uniqueSkillNamesForGroup(group);
         const riskScore = group.riskScore ?? group.maxRiskScore ?? null;
         const lastSeen = group.detectedTimestamp || 0;
-        const aiInteractions = aggregateAiInteractionsForGroup(group, analysisByKey);
+        const aiInteractions = aggregateAiInteractionsForGroup(group, analysisByKey, userAnalysisKeysByDeviceId);
 
         const treeRow = {
             path: [group.id],

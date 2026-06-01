@@ -45,7 +45,9 @@ const agenticObserveApi = {
             method: "post",
             data: {},
         });
-        return resp || [];
+        if (Array.isArray(resp)) return resp;
+        if (Array.isArray(resp?.userAnalysisList)) return resp.userAnalysisList;
+        return [];
     },
 
     async fetchAgenticViolations({

@@ -1,7 +1,10 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import Highcharts from "highcharts";
+import HighchartsMore from "highcharts/highcharts-more";
 import { HighchartsReact } from "highcharts-react-official";
+
+HighchartsMore(Highcharts);
 import { LegacyCard, Box, HorizontalStack, VerticalStack, Text, Divider } from "@shopify/polaris";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
@@ -242,6 +245,12 @@ const DEFAULT_COL_DEF = {
 const ASSET_TREND     = [18,19,20,21,20,22,23,22,25,26,27,29];
 const VIOLATION_TREND = [900,920,950,980,1000,1020,1050,1090,1120,1150,1180,1203];
 
+function sparklineFromTemplate(template, intensity = 1) {
+    const tMax = Math.max(...template, 1);
+    const scale = Math.min(1, Math.max(0.15, intensity));
+    return template.map((v) => Math.max(1, Math.round((v / tMax) * 100 * scale)));
+}
+
 // areaspline smooth curves; omit width for full-container auto-width, or pass explicit width
 function makeAreasplineConfig(data, color, height = 50, width = undefined, margin = [2, 0, 2, 0]) {
     const min = Math.min(...data), max = Math.max(...data);
@@ -301,14 +310,26 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
     const assetChartOpts = useMemo(() => makeAreasplineConfig(ASSET_TREND,     "#9642FC", 50, 140), []);
     const violChartOpts  = useMemo(() => makeAreasplineConfig(VIOLATION_TREND, "#DC2626", 50, 140), []);
 
-    // mini charts for list rows: explicit width=80, height=36
-    const topAppOpts  = useMemo(() => topApps.map((row) =>
-        makeAreasplineConfig(ASSET_TREND.map((v, j) => Math.round(v * (row.aiInteractions / 29) * (0.85 + j * 0.01))), "#9642FC", 36, 80)
-    ), [topApps]);
+    const maxInteractions = useMemo(
+        () => Math.max(...topApps.map((r) => r.aiInteractions || 0), 1),
+        [topApps],
+    );
 
-    const topViolOpts = useMemo(() => topViolations.map((row) =>
-        makeAreasplineConfig(VIOLATION_TREND.map((v, j) => Math.round(v * (row.totalV / 1203) * (0.88 + j * 0.012))), "#EF4444", 36, 80)
-    ), [topViolations]);
+    // mini charts for list rows: explicit width=80, height=36
+    const topAppOpts = useMemo(() => topApps.map((row) => {
+        const intensity = (row.aiInteractions || 0) / maxInteractions;
+        return makeAreasplineConfig(sparklineFromTemplate(ASSET_TREND, intensity), "#9642FC", 36, 80);
+    }), [topApps, maxInteractions]);
+
+    const maxViolationCount = useMemo(
+        () => Math.max(...topViolations.map((r) => r.totalV || 0), 1),
+        [topViolations],
+    );
+
+    const topViolOpts = useMemo(() => topViolations.map((row) => {
+        const intensity = (row.totalV || 0) / maxViolationCount;
+        return makeAreasplineConfig(sparklineFromTemplate(VIOLATION_TREND, intensity), "#EF4444", 36, 80);
+    }), [topViolations, maxViolationCount]);
 
     const typeBreakdown = [
         { label: "Agents",      count: aiCount,    color: "#9642FC", typeKey: "AI Agent"   },
@@ -393,6 +414,9 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
                         <Box paddingBlockEnd="3">
                             <Text variant="headingSm">Top Used Applications</Text>
                         </Box>
+                        {topApps.length === 0 && (
+                            <Text variant="bodySm" color="subdued">No AI interaction data yet.</Text>
+                        )}
                         {topApps.map((row, i) => (
                                 <React.Fragment key={row.id}>
                                     {i > 0 && <Divider />}
@@ -403,8 +427,13 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
                                                 <Text variant="bodySm" as="span" truncate>{row.name}</Text>
                                                 <div style={{ flex: 1 }} />
                                                 <Text variant="bodySm" color="subdued">{row.aiInteractions.toLocaleString("en-IN")}</Text>
-                                                <div style={{ width: 80, flexShrink: 0 }}>
-                                                    <HighchartsReact highcharts={Highcharts} options={topAppOpts[i]} />
+                                                <div style={{ width: 80, height: 36, flexShrink: 0 }}>
+                                                    <HighchartsReact
+                                                        key={`app-chart-${row.id}`}
+                                                        highcharts={Highcharts}
+                                                        options={topAppOpts[i]}
+                                                        immutable
+                                                    />
                                                 </div>
                                             </HorizontalStack>
                                         </div>
@@ -432,8 +461,13 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
                                                 <Text variant="bodySm" as="span" truncate>{row.name}</Text>
                                                 <div style={{ flex: 1 }} />
                                                 <Text variant="bodySm" color="subdued">{row.totalV}</Text>
-                                                <div style={{ width: 80, flexShrink: 0 }}>
-                                                    <HighchartsReact highcharts={Highcharts} options={topViolOpts[i]} />
+                                                <div style={{ width: 80, height: 36, flexShrink: 0 }}>
+                                                    <HighchartsReact
+                                                        key={`viol-chart-${row.id}`}
+                                                        highcharts={Highcharts}
+                                                        options={topViolOpts[i]}
+                                                        immutable
+                                                    />
                                                 </div>
                                             </HorizontalStack>
                                         </div>
@@ -554,7 +588,11 @@ export default function AgenticAssetsPage() {
                 const trafficMap = trafficInfoResp || {};
                 const riskScoreMap = riskScoreResp?.riskScoreOfCollectionsMap || {};
                 const sensitiveMap = sensitiveInfoResp?.sensitiveSubtypesInCollection || {};
-                const { usernameMap = {}, userMetadataMap = {} } = shieldResult || {};
+                const {
+                    usernameMap = {},
+                    userMetadataMap = {},
+                    userAnalysisKeysByDeviceId = new Map(),
+                } = shieldResult || {};
                 const violationsByCollectionId = aggregateViolationsByCollectionId(violationRows);
                 const analysisByKey = buildUserAnalysisLookup(userAnalysisList);
 
@@ -563,7 +601,13 @@ export default function AgenticAssetsPage() {
                     trafficMap,
                     riskScoreMap,
                     sensitiveMap,
-                    { usernameMap, userMetadataMap, violationsByCollectionId, analysisByKey },
+                    {
+                        usernameMap,
+                        userMetadataMap,
+                        violationsByCollectionId,
+                        analysisByKey,
+                        userAnalysisKeysByDeviceId,
+                    },
                 );
 
                 setAgenticTreeData(pageData.agenticTreeData);
