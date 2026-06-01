@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Highcharts from "highcharts";
 import { HighchartsReact } from "highcharts-react-official";
-import { Card, Box, HorizontalStack, VerticalStack, Text, Icon, Divider } from "@shopify/polaris";
+import { Card, Box, HorizontalStack, VerticalStack, Text, Icon, Divider, Checkbox } from "@shopify/polaris";
 import { CustomersMajor, CustomersMinor } from "@shopify/polaris-icons";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
@@ -462,8 +463,8 @@ function TableSection({ deviceFlatData, agentRiskData, devicesByUsername }) {
 
     const autoGroupColumnDef = useMemo(() => ({
         headerName: "Endpoint",
-        flex: 2.5,
-        minWidth: 300,
+        width: 460,
+        minWidth: 200,
         pinned: "left",
         checkboxSelection: true,
         headerCheckboxSelection: true,
@@ -493,6 +494,7 @@ function TableSection({ deviceFlatData, agentRiskData, devicesByUsername }) {
                 groupDefaultExpanded={0}
                 height={800}
                 searchPlaceholder="Search..."
+                searchOffset={400}
                 bulkActionCount={selectedCount}
                 bulkActions={bulkActions}
                 onClearBulk={() => { gridRef.current?.api?.deselectAll(); setSelectedCount(0); }}
@@ -531,12 +533,25 @@ function TableSection({ deviceFlatData, agentRiskData, devicesByUsername }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+const LAYOUT_KEY = "akto_agentic_new_ui";
+
 export default function DeviceEndpoints() {
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [deviceFlatData, setDeviceFlatData] = useState([]);
     const [agentRiskData, setAgentRiskData] = useState({});
     const [devicesByUsername, setDevicesByUsername] = useState({});
     const [summary, setSummary] = useState({});
+    const [newLayout, setNewLayout] = useState(() => {
+        const stored = localStorage.getItem(LAYOUT_KEY);
+        return stored === null ? true : stored === "true";
+    });
+
+    const handleLayoutToggle = useCallback((checked) => {
+        localStorage.setItem(LAYOUT_KEY, String(checked));
+        setNewLayout(checked);
+        if (!checked) navigate("/dashboard/observe/users-and-devices");
+    }, [navigate]);
 
     useEffect(() => {
         const isMountedRef = { current: true };
@@ -588,17 +603,28 @@ export default function DeviceEndpoints() {
         return () => { isMountedRef.current = false; };
     }, []);
 
+    const layoutToggle = (
+        <Checkbox
+            label="New layout"
+            checked={newLayout}
+            onChange={handleLayoutToggle}
+        />
+    );
+
+    const pageTitle = (
+        <TitleWithInfo
+            tooltipContent="View all endpoints by device and user — track AI agent activity, risk scores, and violations."
+            titleText="Endpoints"
+            docsUrl="https://ai-security-docs.akto.io/agentic-ai-discovery/get-started"
+        />
+    );
+
     if (loading) {
         return (
             <PageWithMultipleCards
-                title={
-                    <TitleWithInfo
-                        tooltipContent="View all endpoints by device and user — track AI agent activity, risk scores, and violations."
-                        titleText="Endpoints"
-                        docsUrl="https://ai-security-docs.akto.io/agentic-ai-discovery/get-started"
-                    />
-                }
+                title={pageTitle}
                 isFirstPage={true}
+                secondaryActions={layoutToggle}
                 components={[<SpinnerCentered key="loading" />]}
             />
         );
@@ -606,14 +632,9 @@ export default function DeviceEndpoints() {
 
     return (
         <PageWithMultipleCards
-            title={
-                <TitleWithInfo
-                    tooltipContent="View all endpoints by device and user — track AI agent activity, risk scores, and violations."
-                    titleText="Endpoints"
-                    docsUrl="https://ai-security-docs.akto.io/agentic-ai-discovery/get-started"
-                />
-            }
+            title={pageTitle}
             isFirstPage={true}
+            secondaryActions={layoutToggle}
             components={[
                 <TopSection key="top" summary={summary} />,
                 <TableSection

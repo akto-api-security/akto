@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Box, Badge, HorizontalStack, Text } from "@shopify/polaris";
+import { IndexFiltersMode, Box, Badge, HorizontalStack, Text, Checkbox } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -33,6 +33,12 @@ const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills'];
 function Endpoints() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (localStorage.getItem("akto_agentic_new_ui") === "true") {
+            navigate("/dashboard/observe/agentic-assets", { replace: true });
+        }
+    }, [navigate]);
     const [data, setData] = useState({ all: [], 'ai_agents': [], 'mcp_servers': [], llms: [], skills: [] });
     const [skillEnrichVersion, setSkillEnrichVersion] = useState(0);
     const [summaryData, setSummaryData] = useState({ totalAssets: 0, totalEndpoints: 0 });
@@ -310,11 +316,23 @@ function Endpoints() {
         />
     ), []);
 
+    const layoutToggle = (
+        <Checkbox
+            label="New layout"
+            checked={false}
+            onChange={(checked) => {
+                localStorage.setItem("akto_agentic_new_ui", "true");
+                if (checked) navigate("/dashboard/observe/agentic-assets");
+            }}
+        />
+    );
+
     if (loading) {
         return (
             <PageWithMultipleCards
                 title={pageTitle}
                 isFirstPage={true}
+                secondaryActions={layoutToggle}
                 components={[<SpinnerCentered key="loading" />]}
             />
         );
@@ -324,6 +342,7 @@ function Endpoints() {
         <PageWithMultipleCards
             title={pageTitle}
             isFirstPage={true}
+            secondaryActions={layoutToggle}
             components={[summaryComponent, tableComponent]}
         />
     );

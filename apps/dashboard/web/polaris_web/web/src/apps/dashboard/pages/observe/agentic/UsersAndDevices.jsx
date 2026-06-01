@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Badge, HorizontalStack, Text, Modal, TextField, FormLayout } from "@shopify/polaris";
+import { IndexFiltersMode, Badge, HorizontalStack, Text, Modal, TextField, FormLayout, Checkbox } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -35,6 +35,12 @@ const usersAndDevicesCountColumnOpts = {
 function UsersAndDevices() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (localStorage.getItem("akto_agentic_new_ui") === "true") {
+            navigate("/dashboard/observe/endpoints", { replace: true });
+        }
+    }, [navigate]);
     const [data, setData] = useState({ users: [], devices: [] });
     const [userEnrichVersion, setUserEnrichVersion] = useState(0);
     const [summaryData, setSummaryData] = useState({ profileCount: 0, collectionCount: 0 });
@@ -334,11 +340,23 @@ function UsersAndDevices() {
         [],
     );
 
+    const layoutToggle = (
+        <Checkbox
+            label="New layout"
+            checked={false}
+            onChange={(checked) => {
+                localStorage.setItem("akto_agentic_new_ui", "true");
+                if (checked) navigate("/dashboard/observe/endpoints");
+            }}
+        />
+    );
+
     if (loading) {
         return (
             <PageWithMultipleCards
                 title={pageTitle}
                 isFirstPage={true}
+                secondaryActions={layoutToggle}
                 components={[<SpinnerCentered key="loading" />]}
             />
         );
@@ -378,6 +396,7 @@ function UsersAndDevices() {
             <PageWithMultipleCards
                 title={pageTitle}
                 isFirstPage={true}
+                secondaryActions={layoutToggle}
                 components={[summaryComponent, tableComponent]}
             />
             {editTagModalComp}

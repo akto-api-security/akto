@@ -1,15 +1,15 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import Highcharts from "highcharts";
 import HighchartsMore from "highcharts/highcharts-more";
 import { HighchartsReact } from "highcharts-react-official";
-
-HighchartsMore(Highcharts);
-import { LegacyCard, Box, HorizontalStack, VerticalStack, Text, Divider } from "@shopify/polaris";
+import { LegacyCard, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Checkbox } from "@shopify/polaris";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import LaptopIcon from "@/assets/Laptop.svg";
+import PersonLockIcon from "@/assets/PersonLockIcon.svg";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
@@ -19,8 +19,11 @@ import { getDomainForFavicon } from "./mcpClientHelper";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import api from "../api";
 import agenticObserveApi, { aggregateViolationsByCollectionId } from "./agenticObserveApi";
-import { buildAgenticAssetsPageData, buildUserAnalysisLookup } from "./constants";
+import { buildAgenticAssetsPageData, buildUserAnalysisLookup, fetchAndCacheSkillApiData } from "./constants";
+import PersistStore from "../../../../main/PersistStore";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
+
+HighchartsMore(Highcharts);
 
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
@@ -50,12 +53,32 @@ function AgentIconImg({ data }) {
 
 function AssetNameCellRenderer({ data }) {
     if (!data) return null;
+    // Match old UI: personal-account + local-MCP markers for non-Skill rows; malicious marker for Skills
+    const isSkill = data.type === "Skill";
+    const showLocalMcp = data.hasLocalMcpServer && !isSkill;
+    const showPersonal = data.hasPersonalAccount && !isSkill;
+    const showMalicious = data.isMalicious && isSkill;
     return (
         <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", overflow: "hidden" }}>
             <AgentIconImg data={data} />
             <span style={{ fontSize: 13, color: "#202223", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {data.name}
             </span>
+            {showLocalMcp && (
+                <span title="Local MCP Server" style={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
+                    <img src={MCPIcon} width={16} height={16} alt="Local MCP Server" style={{ pointerEvents: "none" }} />
+                </span>
+            )}
+            {showPersonal && (
+                <span title="Contains personal account" style={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
+                    <img src={PersonLockIcon} width={16} height={16} alt="Contains personal account" style={{ pointerEvents: "none" }} />
+                </span>
+            )}
+            {showMalicious && (
+                <span title="Malicious skill" style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", padding: "1px 6px", borderRadius: 10, fontSize: 10, fontWeight: 600, background: "#FBEAE5", color: "#C4320A" }}>
+                    Malicious
+                </span>
+            )}
         </div>
     );
 }
@@ -162,10 +185,12 @@ const COL_DEFS = [
     {
         field: "name",
         headerName: "Agentic Assets",
-        flex: 2,
-        minWidth: 220,
+        width: 460,
+        minWidth: 200,
         pinned: "left",
         filter: "agTextColumnFilter",
+        checkboxSelection: true,
+        headerCheckboxSelection: true,
         cellRenderer: AssetNameCellRenderer,
         cellStyle: { display: "flex", alignItems: "center" },
     },
@@ -307,8 +332,8 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
 
     // 1 — areaspline configs for the stat cards (full-width, height 80)
     // stat charts: width=140, height=50 — to the right of the number, same as DeviceEndpoints StatRow
-    const assetChartOpts = useMemo(() => makeAreasplineConfig(ASSET_TREND,     "#9642FC", 50, 140), []);
-    const violChartOpts  = useMemo(() => makeAreasplineConfig(VIOLATION_TREND, "#DC2626", 50, 140), []);
+    const assetChartOpts = useMemo(() => makeAreasplineConfig(ASSET_TREND,     "#9642FC", 40, 140), []);
+    const violChartOpts  = useMemo(() => makeAreasplineConfig(VIOLATION_TREND, "#DC2626", 40, 140), []);
 
     const maxInteractions = useMemo(
         () => Math.max(...topApps.map((r) => r.aiInteractions || 0), 1),
@@ -344,16 +369,13 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
         { label: "Low",      count: lowV,  color: "#D1D5DB" },
     ];
 
-    // Stats card uses full-width vertical chart layout — section padding tuned so
-    // natural content height ≈ apps/violations cards (5 rows × ~60px each ≈ 370px)
     return (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+        <HorizontalGrid columns={3} gap="4">
 
-            {/* ── Card 1: Stats — vertical chart layout, padding tuned for equal natural height ── */}
-            {/* Stats card — chart to the right of number, matching the reference design */}
+            {/* ── Card 1: Stats — two sections, each half of the 300px card height ── */}
             <LegacyCard>
-                <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="5" paddingBlockEnd="4">
-                    <VerticalStack gap="3">
+                <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="4" paddingBlockEnd="3" minHeight="150px">
+                    <VerticalStack gap="2">
                         <Text variant="headingSm" fontWeight="semibold">Agentic Assets</Text>
                         <HorizontalStack align="space-between" blockAlign="center" gap="3">
                             <Text variant="heading2xl" as="p">{total}</Text>
@@ -361,20 +383,20 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
                         </HorizontalStack>
                         <VerticalStack gap="2">
                             <div style={{ display: "flex", height: 5, borderRadius: 3, overflow: "hidden", gap: 1 }}>
-                                {typeBreakdown.map(b => total > 0 && <div key={b.label} style={{ flex: b.count, background: b.color, minWidth: b.count > 0 ? 2 : 0 }} />)}
+                                {typeBreakdown.map(b => total > 0 && <div key={b.label} title={`${b.label}: ${b.count}`} style={{ flex: b.count, background: b.color, minWidth: b.count > 0 ? 2 : 0 }} />)}
                             </div>
-                            {/* Clickable legend — filters the table below */}
-                            <HorizontalStack gap="3" wrap>
+                            <HorizontalStack gap="2" wrap>
                                 {typeBreakdown.map(b => {
-                                    const active = activeTypeFilter === b.typeKey;
+                                    const active = activeTypeFilter?.has(b.typeKey);
                                     return (
                                         <div
                                             key={b.label}
-                                            onClick={() => onTypeFilter?.(active ? null : b.typeKey)}
-                                            style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 4, padding: "2px 6px", borderRadius: 12, background: active ? b.color + "22" : "transparent", border: active ? `1px solid ${b.color}` : "1px solid transparent", transition: "all 0.15s" }}
+                                            onClick={() => onTypeFilter?.(b.typeKey)}
+                                            title={`${b.typeKey}: ${b.count}`}
+                                            style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 12, background: active ? b.color + "22" : "transparent", border: active ? `1px solid ${b.color}` : "1px solid transparent", transition: "all 0.15s" }}
                                         >
                                             <div style={{ width: 7, height: 7, borderRadius: "50%", background: b.color, flexShrink: 0 }} />
-                                            <Text variant="bodySm" color="subdued">{b.label}</Text>
+                                            <Text variant="bodySm" color="subdued">{b.label} ({b.count})</Text>
                                         </div>
                                     );
                                 })}
@@ -383,8 +405,8 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
                     </VerticalStack>
                 </Box>
                 <Divider />
-                <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="4" paddingBlockEnd="5">
-                    <VerticalStack gap="3">
+                <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="3" paddingBlockEnd="4" minHeight="150px">
+                    <VerticalStack gap="2">
                         <Text variant="headingSm" fontWeight="semibold">Violations</Text>
                         <HorizontalStack align="space-between" blockAlign="center" gap="3">
                             <Text variant="heading2xl" as="p">{totalV}</Text>
@@ -409,7 +431,7 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
 
             {/* ── Card 2: Top Used Applications — each row opens the asset flyout ── */}
             <LegacyCard>
-                <Box padding="4">
+                <Box padding="4" minHeight="300px" overflowX="hidden" overflowY="hidden">
                     <VerticalStack gap="0">
                         <Box paddingBlockEnd="3">
                             <Text variant="headingSm">Top Used Applications</Text>
@@ -446,7 +468,7 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
 
             {/* ── Card 3: Top Agentic Asset with Violations — each row opens the asset flyout ── */}
             <LegacyCard>
-                <Box padding="4">
+                <Box padding="4" minHeight="300px" overflowX="hidden" overflowY="hidden">
                     <VerticalStack gap="0">
                         <Box paddingBlockEnd="3">
                             <Text variant="headingSm">Top Agentic Asset with Violations</Text>
@@ -478,7 +500,7 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
                 </Box>
             </LegacyCard>
 
-        </div>
+        </HorizontalGrid>
     );
 }
 
@@ -489,7 +511,8 @@ function TableSection({ agenticTreeData, agenticFlatData, assetDevices, typeFilt
 
     const flatRowData = useMemo(() => {
         const rows = agenticTreeData.filter((r) => r.path?.length === 1);
-        return typeFilter ? rows.filter((r) => r.type === typeFilter) : rows;
+        if (!typeFilter || typeFilter.size === 0) return rows;
+        return rows.filter((r) => typeFilter.has(r.type));
     }, [agenticTreeData, typeFilter]);
 
     useEffect(() => {
@@ -524,6 +547,7 @@ function TableSection({ agenticTreeData, agenticFlatData, assetDevices, typeFilt
                 rowHeight={44}
                 headerHeight={40}
                 searchPlaceholder="Search agentic assets..."
+                searchOffset={700}
                 onRowClicked={handleRowClick}
                 getRowStyle={getRowStyle}
                 animateRows
@@ -551,13 +575,26 @@ function TableSection({ agenticTreeData, agenticFlatData, assetDevices, typeFilt
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+const LAYOUT_KEY = "akto_agentic_new_ui";
+
 export default function AgenticAssetsPage() {
-    const [typeFilter, setTypeFilter] = useState(null);
+    const navigate = useNavigate();
+    const [typeFilter, setTypeFilter] = useState(new Set());
     const [flyout,     setFlyout]     = useState(null);
     const [loading, setLoading] = useState(true);
     const [agenticTreeData, setAgenticTreeData] = useState([]);
     const [agenticFlatData, setAgenticFlatData] = useState([]);
     const [assetDevices, setAssetDevices] = useState({});
+    const [newLayout, setNewLayout] = useState(() => {
+        const stored = localStorage.getItem(LAYOUT_KEY);
+        return stored === null ? true : stored === "true";
+    });
+
+    const handleLayoutToggle = useCallback((checked) => {
+        localStorage.setItem(LAYOUT_KEY, String(checked));
+        setNewLayout(checked);
+        if (!checked) navigate("/dashboard/observe/agentic-assets-legacy");
+    }, [navigate]);
 
     useEffect(() => {
         const isMountedRef = { current: true };
@@ -613,6 +650,26 @@ export default function AgenticAssetsPage() {
                 setAgenticTreeData(pageData.agenticTreeData);
                 setAgenticFlatData(pageData.agenticFlatData);
                 setAssetDevices(pageData.assetDevices);
+
+                // Enrich Skill rows with malicious flag (same source as old UI) — async, non-blocking
+                const skillCollectionIds = [];
+                collections.forEach((c) => {
+                    if (!skillCollectionIds.includes(c.id)) skillCollectionIds.push(c.id);
+                });
+                if (skillCollectionIds.length) {
+                    fetchAndCacheSkillApiData(skillCollectionIds, { api, PersistStore })
+                        .then(({ maliciousSkills }) => {
+                            if (!isMountedRef.current || !maliciousSkills?.size) return;
+                            const markMalicious = (rows) => rows.map((r) =>
+                                r.type === "Skill" && maliciousSkills.has(r.name)
+                                    ? { ...r, isMalicious: true }
+                                    : r
+                            );
+                            setAgenticTreeData((prev) => markMalicious(prev));
+                            setAgenticFlatData((prev) => markMalicious(prev));
+                        })
+                        .catch(() => {});
+                }
             } catch {
                 if (isMountedRef.current) {
                     setAgenticTreeData([]);
@@ -626,16 +683,27 @@ export default function AgenticAssetsPage() {
         return () => { isMountedRef.current = false; };
     }, []);
 
+    const layoutToggle = (
+        <Checkbox
+            label="New layout"
+            checked={newLayout}
+            onChange={handleLayoutToggle}
+        />
+    );
+
+    const pageTitle = (
+        <TitleWithInfo
+            tooltipContent="All agentic assets observed across your environment — AI Agents, MCP Servers, LLMs, and Skills."
+            titleText="Agentic assets"
+        />
+    );
+
     if (loading) {
         return (
             <PageWithMultipleCards
-                title={
-                    <TitleWithInfo
-                        tooltipContent="All agentic assets observed across your environment — AI Agents, MCP Servers, LLMs, and Skills."
-                        titleText="Agentic assets"
-                    />
-                }
+                title={pageTitle}
                 isFirstPage={true}
+                secondaryActions={layoutToggle}
                 components={[<SpinnerCentered key="loading" />]}
             />
         );
@@ -643,18 +711,18 @@ export default function AgenticAssetsPage() {
 
     return (
         <PageWithMultipleCards
-            title={
-                <TitleWithInfo
-                    tooltipContent="All agentic assets observed across your environment — AI Agents, MCP Servers, LLMs, and Skills."
-                    titleText="Agentic assets"
-                />
-            }
+            title={pageTitle}
             isFirstPage={true}
+            secondaryActions={layoutToggle}
             components={[
                 <TopSection
                     key="top"
                     agenticFlatData={agenticFlatData}
-                    onTypeFilter={t => setTypeFilter(prev => prev === t ? null : t)}
+                    onTypeFilter={t => setTypeFilter(prev => {
+                        const next = new Set(prev);
+                        if (next.has(t)) next.delete(t); else next.add(t);
+                        return next;
+                    })}
                     activeTypeFilter={typeFilter}
                     onAssetClick={setFlyout}
                 />,

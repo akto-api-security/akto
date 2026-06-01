@@ -40,10 +40,11 @@ export const agTableThemeInner = agTableTheme.withParams({
 // ─── SearchBar ────────────────────────────────────────────────────────────────
 // Plain <input> (not Polaris TextField) so it blends with the grid container border.
 
-function SearchBar({ value, onChange, placeholder }) {
+function SearchBar({ value, onChange, placeholder, offset = 0 }) {
     return (
         <div style={{
             padding: "7px 12px",
+            paddingLeft: offset > 0 ? offset : 12,
             borderBottom: "1px solid #E1E3E5",
             display: "flex",
             alignItems: "center",
@@ -148,6 +149,7 @@ export default function AgGridTable({
     fillHeight = false,
     noOuterBorder = false,
     searchPlaceholder,
+    searchOffset = 0,
     quickFilter: quickFilterProp,
     onQuickFilterChange,
     rowHeight = 44,
@@ -188,6 +190,7 @@ export default function AgGridTable({
             rowHeight={rowHeight}
             headerHeight={headerHeight}
             animateRows={animateRows}
+            enableBrowserTooltips
             suppressCellFocus={suppressCellFocus}
             rowSelection={rowSelection}
             suppressRowClickSelection={suppressRowClickSelection}
@@ -213,7 +216,7 @@ export default function AgGridTable({
         return (
             <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                 <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} noRadius />
-                {hasSearch && <SearchBar value={quickFilter} onChange={handleQuickFilterChange} placeholder={searchPlaceholder} />}
+                {hasSearch && <SearchBar value={quickFilter} onChange={handleQuickFilterChange} placeholder={searchPlaceholder} offset={searchOffset} />}
                 <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
                     {gridNode}
                 </div>

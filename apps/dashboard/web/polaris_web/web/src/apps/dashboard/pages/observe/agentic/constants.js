@@ -730,6 +730,8 @@ export function buildAgenticAssetsPageData(
             endpointCount: group.endpointsCount,
             deviceCount: group.endpointsCount,
             lastSeen: lastSeen > 0 ? func.prettifyEpoch(lastSeen) : "",
+            hasPersonalAccount: group.hasPersonalAccount || false,
+            hasLocalMcpServer: group.hasLocalMcpServer || false,
         };
         if (aiInteractions) {
             treeRow.aiInteractions = aiInteractions.total;
@@ -753,6 +755,8 @@ export function buildAgenticAssetsPageData(
             lastSeen: lastSeen > 0 ? func.prettifyEpoch(lastSeen) : "",
             skillCount: skillNames.size,
             toolCount: 0,
+            hasPersonalAccount: group.hasPersonalAccount || false,
+            hasLocalMcpServer: group.hasLocalMcpServer || false,
         };
         if (violations) flatRow.violations = violations;
         if (aiInteractions) {
