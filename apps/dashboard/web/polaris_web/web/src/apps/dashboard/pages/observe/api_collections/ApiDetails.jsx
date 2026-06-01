@@ -23,6 +23,7 @@ import GridRows from "../../../components/shared/GridRows";
 import Dropdown from "../../../components/layouts/Dropdown";
 import ApiIssuesTab from "./ApiIssuesTab";
 import ForbiddenRole from "../../../components/shared/ForbiddenRole";
+import MarkdownViewer from "../../../components/shared/MarkdownViewer";
 
 import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
@@ -635,21 +636,45 @@ function ApiDetails(props) {
             </VerticalStack>
         </Box>
     }
+    const isSkillEndpoint = apiDetail?.endpoint?.includes('/skills/')
+
+    console.log('[SkillTab] render — endpoint:', apiDetail?.endpoint, '| isSkillEndpoint:', isSkillEndpoint, '| sampleData.length:', sampleData.length)
+
+    let skillMarkdown = null
+    if (isSkillEndpoint && sampleData.length > 0) {
+        try {
+            const parsedMsg = JSON.parse(sampleData[0].message)
+            const bodyStr = parsedMsg?.request?.body || parsedMsg?.requestPayload || '{}'
+            const body = JSON.parse(bodyStr)
+            console.log('[SkillTab] parsedMsg:', parsedMsg)
+            console.log('[SkillTab] body:', body)
+            if (body.skill_name) {
+                skillMarkdown = `# ${body.skill_name}\n\n` +
+                    (body.skill_description ? `**${body.skill_description}**\n\n` : '') +
+                    (body.skill_content || '')
+            }
+        } catch (e) {
+            console.log('[SkillTab] parse error:', e)
+        }
+    }
+
     const ValuesTab = {
         id: 'values',
         content: "Values",
-        component: sampleData.length > 0 && <Box paddingBlockStart={"4"}>
-            <SampleDataList
-                key="Sample values"
-                sampleData={sampleData}
-                heading={"Sample values"}
-                minHeight={"35vh"}
-                vertical={true}
-                isAPISampleData={true}
-                isWebSocket={isWebSocket}
-                metadata={headersWithData.map(x => x.split(" ")[0])}
-            />
-        </Box>,
+        component: isSkillEndpoint && skillMarkdown
+            ? <MarkdownViewer markdown={skillMarkdown} />
+            : sampleData.length > 0 && <Box paddingBlockStart={"4"}>
+                <SampleDataList
+                    key="Sample values"
+                    sampleData={sampleData}
+                    heading={"Sample values"}
+                    minHeight={"35vh"}
+                    vertical={true}
+                    isAPISampleData={true}
+                    isWebSocket={isWebSocket}
+                    metadata={headersWithData.map(x => x.split(" ")[0])}
+                />
+            </Box>,
     }
     const DependencyTab = {
         id: 'dependency',
