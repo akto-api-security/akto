@@ -474,6 +474,8 @@ function GuardrailPolicies() {
                 // Add V2 fields for enhanced server data
                 selectedMcpServersV2: guardrailData.selectedMcpServersV2 || [],
                 selectedAgentServersV2: guardrailData.selectedAgentServersV2 || [],
+                // Block-only host blocklist
+                blockedHosts: guardrailData.blockedHosts || [],
                 deniedTopics: guardrailData.deniedTopics || [],
                 regexPatterns: guardrailData.regexPatterns || [],
                 // Add V2 field for enhanced regex data
