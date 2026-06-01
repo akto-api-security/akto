@@ -19,6 +19,31 @@ const createEntry = (pattern) => ({ pattern });
 const normalizePattern = (raw) =>
     (raw || "").trim().toLowerCase().replace(/^https?:\/\//, "");
 
+// Host/path glob characters: letters, digits and . - _ / : ~ % plus the * wildcard.
+const PATTERN_ALLOWED = /^[a-z0-9.\-_/:~%*]+$/;
+
+// Validate a normalized pattern. Returns an error string, or "" when valid.
+const validatePattern = (p) => {
+    if (!p) {
+        return "Enter a host or path pattern";
+    }
+    if (/\s/.test(p)) {
+        return "Pattern cannot contain spaces";
+    }
+    if (!PATTERN_ALLOWED.test(p)) {
+        return "Use only letters, numbers and . - _ / : and * (wildcard)";
+    }
+    // A pattern made only of wildcards / slashes (e.g. "*", "/*", "*/*") would block everything.
+    if (/^[*/]+$/.test(p)) {
+        return "Pattern is too broad — include a host or path (e.g. chatgpt.com/*)";
+    }
+    // Must contain at least one host/path character, not just wildcards.
+    if (!/[a-z0-9]/.test(p)) {
+        return "Pattern must include a host or path";
+    }
+    return "";
+};
+
 export const BlockedHostsConfig = {
     number: 11,
     title: "Block host / path",
@@ -50,8 +75,9 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, hostSuggestions = [] 
             setError("");
             return;
         }
-        if (/\s/.test(p)) {
-            setError("Pattern cannot contain spaces");
+        const validationError = validatePattern(p);
+        if (validationError) {
+            setError(validationError);
             return;
         }
         if (existingPatterns.includes(p)) {
