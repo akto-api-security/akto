@@ -53,6 +53,40 @@ func TestMatchBlockedHostRule(t *testing.T) {
 	}
 }
 
+// Policies without a blockedHosts key (or empty / malformed responses) must not break the
+// service — they simply yield no rules and never block.
+func TestParseBlockedHostRulesNoData(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+	}{
+		{"no blockedHosts key", `{"guardrailPolicies":[{"name":"p1","active":true}]}`},
+		{"empty blockedHosts", `{"guardrailPolicies":[{"name":"p1","active":true,"blockedHosts":[]}]}`},
+		{"null blockedHosts", `{"guardrailPolicies":[{"name":"p1","active":true,"blockedHosts":null}]}`},
+		{"empty policies", `{"guardrailPolicies":[]}`},
+		{"empty object", `{}`},
+		{"empty bytes", ``},
+		{"malformed json", `{not json`},
+		{"inactive policy with hosts", `{"guardrailPolicies":[{"name":"p1","active":false,"blockedHosts":[{"pattern":"chatgpt.com/*"}]}]}`},
+		{"blank pattern", `{"guardrailPolicies":[{"name":"p1","active":true,"blockedHosts":[{"pattern":"  "}]}]}`},
+	}
+	for _, c := range cases {
+		rules := parseBlockedHostRules([]byte(c.raw))
+		if len(rules) != 0 {
+			t.Errorf("%s: expected 0 rules, got %d", c.name, len(rules))
+		}
+		// Matching against no rules must never block and must not panic.
+		if _, _, ok := matchBlockedHostRule("chatgpt.com", "/v1/chat", rules); ok {
+			t.Errorf("%s: expected no block with empty rules", c.name)
+		}
+	}
+
+	// nil rules slice is also safe.
+	if _, _, ok := matchBlockedHostRule("chatgpt.com", "/v1/chat", nil); ok {
+		t.Errorf("nil rules: expected no block")
+	}
+}
+
 func TestIsBrowserExtensionRequest(t *testing.T) {
 	cases := []struct {
 		tag  string
