@@ -1160,6 +1160,27 @@ const settingRequests = {
             data: {}
         })
     },
+    fetchOpenTelemetryIntegration() {
+        return request({
+            url: '/api/fetchOpenTelemetryIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addOpenTelemetryIntegration(endpoint, apiKey) {
+        return request({
+            url: '/api/addOpenTelemetryIntegration',
+            method: 'post',
+            data: { endpoint, apiKey }
+        })
+    },
+    removeOpenTelemetryIntegration() {
+        return request({
+            url: '/api/removeOpenTelemetryIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
     updateAccountDomains(domainKey, domainsToAdd, domainsToRemove) {
         return request({
             url: '/api/updateAccountDomains',

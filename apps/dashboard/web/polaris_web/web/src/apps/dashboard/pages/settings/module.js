@@ -463,6 +463,27 @@ const settingFunctions = {
       })
       return trafficData
     },
+    fetchOpenTelemetryIntegration: async function(){
+      let openTelemetryIntegration = {}
+      await settingRequests.fetchOpenTelemetryIntegration().then((resp)=>{
+        openTelemetryIntegration = resp.openTelemetryIntegration
+      })
+      return openTelemetryIntegration
+    },
+    addOpenTelemetryIntegration: async function(endpoint, apiKey) {
+      let result = {}
+      await settingRequests.addOpenTelemetryIntegration(endpoint, apiKey).then((resp)=>{
+        result = resp
+      })
+      return result
+    },
+    removeOpenTelemetryIntegration: async function() {
+      let result = {}
+      await settingRequests.removeOpenTelemetryIntegration().then((resp)=>{
+        result = resp
+      })
+      return result
+    },
 }
 
 export default settingFunctions
