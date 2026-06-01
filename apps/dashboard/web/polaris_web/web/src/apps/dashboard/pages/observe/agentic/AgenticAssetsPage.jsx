@@ -1,5 +1,6 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo, useReducer } from "react";
 import { createPortal } from "react-dom";
+import { produce } from "immer";
 import { useNavigate } from "react-router-dom";
 import Highcharts from "highcharts";
 import HighchartsMore from "highcharts/highcharts-more";
@@ -22,6 +23,9 @@ import agenticObserveApi, { aggregateViolationsByCollectionId } from "./agenticO
 import { buildAgenticAssetsPageData, buildUserAnalysisLookup, fetchAndCacheSkillApiData } from "./constants";
 import PersistStore from "../../../../main/PersistStore";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
+import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
+import values from "@/util/values";
+import func from "@/util/func";
 
 HighchartsMore(Highcharts);
 
@@ -75,8 +79,11 @@ function AssetNameCellRenderer({ data }) {
                 </span>
             )}
             {showMalicious && (
-                <span title="Malicious skill" style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", padding: "1px 6px", borderRadius: 10, fontSize: 10, fontWeight: 600, background: "#FBEAE5", color: "#C4320A" }}>
-                    Malicious
+                <span title="Malicious skill" style={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
+                    {/* swap text below with <img src={MaliciousIcon} .../> when SVG is ready */}
+                    <span style={{ padding: "0 5px", borderRadius: 8, fontSize: 9, fontWeight: 600, lineHeight: "16px", background: "#FBEAE5", color: "#C4320A", letterSpacing: "0.2px" }}>
+                        ⚠ malicious
+                    </span>
                 </span>
             )}
         </div>
@@ -374,7 +381,7 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
 
             {/* ── Card 1: Stats — two sections, each half of the 300px card height ── */}
             <LegacyCard>
-                <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="4" paddingBlockEnd="3" minHeight="150px">
+                <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="4" paddingBlockEnd="3" height="169px">
                     <VerticalStack gap="2">
                         <Text variant="headingSm" fontWeight="semibold">Agentic Assets</Text>
                         <HorizontalStack align="space-between" blockAlign="center" gap="3">
@@ -405,7 +412,7 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
                     </VerticalStack>
                 </Box>
                 <Divider />
-                <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="3" paddingBlockEnd="4" minHeight="150px">
+                <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="3" paddingBlockEnd="4" height="170px">
                     <VerticalStack gap="2">
                         <Text variant="headingSm" fontWeight="semibold">Violations</Text>
                         <HorizontalStack align="space-between" blockAlign="center" gap="3">
@@ -431,7 +438,7 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
 
             {/* ── Card 2: Top Used Applications — each row opens the asset flyout ── */}
             <LegacyCard>
-                <Box padding="4" minHeight="300px" overflowX="hidden" overflowY="hidden">
+                <Box padding="4" height="340px" overflowX="hidden" overflowY="hidden">
                     <VerticalStack gap="0">
                         <Box paddingBlockEnd="3">
                             <Text variant="headingSm">Top Used Applications</Text>
@@ -468,7 +475,7 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
 
             {/* ── Card 3: Top Agentic Asset with Violations — each row opens the asset flyout ── */}
             <LegacyCard>
-                <Box padding="4" minHeight="300px" overflowX="hidden" overflowY="hidden">
+                <Box padding="4" height="340px" overflowX="hidden" overflowY="hidden">
                     <VerticalStack gap="0">
                         <Box paddingBlockEnd="3">
                             <Text variant="headingSm">Top Agentic Asset with Violations</Text>
@@ -590,6 +597,14 @@ export default function AgenticAssetsPage() {
         return stored === null ? true : stored === "true";
     });
 
+    // Date range — only data with real time fields is filtered (violations + last-seen)
+    const [currDateRange, dispatchCurrDateRange] = useReducer(
+        produce((draft, action) => func.dateRangeReducer(draft, action)),
+        values.ranges[4],
+    );
+    const startTimestamp = Math.floor(Date.parse(currDateRange.period.since) / 1000);
+    const endTimestamp = Math.floor(Date.parse(currDateRange.period.until) / 1000);
+
     const handleLayoutToggle = useCallback((checked) => {
         localStorage.setItem(LAYOUT_KEY, String(checked));
         setNewLayout(checked);
@@ -615,7 +630,7 @@ export default function AgenticAssetsPage() {
                     api.getRiskScoreInfo(),
                     api.getSensitiveInfoForCollections(),
                     fetchEndpointShieldUserMetadata(),
-                    agenticObserveApi.fetchAgenticViolations({}),
+                    agenticObserveApi.fetchAgenticViolations({ startTimestamp, endTimestamp }),
                     agenticObserveApi.listUserAnalysis(),
                 ]);
 
@@ -681,14 +696,20 @@ export default function AgenticAssetsPage() {
             }
         })();
         return () => { isMountedRef.current = false; };
-    }, []);
+    }, [startTimestamp, endTimestamp]);
 
-    const layoutToggle = (
-        <Checkbox
-            label="New layout"
-            checked={newLayout}
-            onChange={handleLayoutToggle}
-        />
+    const headerActions = (
+        <HorizontalStack gap="3" blockAlign="center">
+            <Checkbox
+                label="New layout"
+                checked={newLayout}
+                onChange={handleLayoutToggle}
+            />
+            <DateRangeFilter
+                initialDispatch={currDateRange}
+                dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })}
+            />
+        </HorizontalStack>
     );
 
     const pageTitle = (
@@ -703,7 +724,7 @@ export default function AgenticAssetsPage() {
             <PageWithMultipleCards
                 title={pageTitle}
                 isFirstPage={true}
-                secondaryActions={layoutToggle}
+                secondaryActions={headerActions}
                 components={[<SpinnerCentered key="loading" />]}
             />
         );
@@ -713,7 +734,7 @@ export default function AgenticAssetsPage() {
         <PageWithMultipleCards
             title={pageTitle}
             isFirstPage={true}
-            secondaryActions={layoutToggle}
+            secondaryActions={headerActions}
             components={[
                 <TopSection
                     key="top"
