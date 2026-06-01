@@ -79,6 +79,11 @@ public class GuardrailPolicies {
     private boolean applyOnRequest;
     private boolean applyToAllServers;
 
+    // Blocked host/path list — any traffic from a listed host is blocked outright.
+    // Modeled as objects (not bare strings) so the entry schema can be extended later
+    // (e.g. match type, per-entry behaviour) without a data migration.
+    private List<BlockedHostEntry> blockedHosts;
+
     /** Policy-wide rule behaviour: {@code "block"}, {@code "warn"}, or {@code "alert"}. */
     private String behaviour;
 
@@ -241,6 +246,29 @@ public class GuardrailPolicies {
         public SelectedServer(String id, String name) {
             this.id = id;
             this.name = name;
+        }
+    }
+
+    /**
+     * A single blocked host entry. This feature only ever blocks (no allow semantics).
+     * Kept as an object (rather than a plain host string) so the block can be shaped
+     * per-entry and extended later without a data migration:
+     *  - host only                -> block all traffic to that host (e.g. "chatgpt.com")
+     *  - host + includeSubdomains -> also block its sub-domains (e.g. "*.chatgpt.com")
+     *  - host + paths             -> block only those paths on the host (empty = all paths)
+     */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class BlockedHostEntry {
+        private String host;
+        private List<String> paths;        // optional; empty/null = block all paths on this host
+        private boolean includeSubdomains; // when true, sub-domains of host are also blocked
+
+        public BlockedHostEntry(String host, List<String> paths, boolean includeSubdomains) {
+            this.host = host;
+            this.paths = paths;
+            this.includeSubdomains = includeSubdomains;
         }
     }
 

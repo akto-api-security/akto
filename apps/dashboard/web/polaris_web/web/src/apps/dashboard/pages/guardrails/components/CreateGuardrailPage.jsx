@@ -43,6 +43,8 @@ import {
     AnomalyDetectionConfig,
     ToolsGuardrailsStep,
     ToolsGuardrailsConfig,
+    BlockedHostsStep,
+    BlockedHostsConfig,
     ServerSettingsStep,
     ServerSettingsConfig
 } from './steps';
@@ -129,6 +131,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableMaliciousTools, setEnableMaliciousTools] = useState(true);
     const [enableToolNameDescriptionMismatch, setEnableToolNameDescriptionMismatch] = useState(true);
 
+    // Step 11: Blocked hosts/paths (block-only)
+    // Host + path suggestions are sourced from the browser extension configs.
+    const [blockedHosts, setBlockedHosts] = useState([]);
+    const [browserConfigs, setBrowserConfigs] = useState([]);
+
     // Step 10: Server settings
     const [applyToAllServers, setApplyToAllServers] = useState(true);
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
@@ -195,6 +202,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableToolMisuse,
         enableMaliciousTools,
         enableToolNameDescriptionMismatch,
+        // Step 11
+        blockedHosts,
         // Step 10
         applyToAllServers,
         selectedMcpServers,
@@ -271,6 +280,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
 
         steps.push({
+            number: BlockedHostsConfig.number,
+            title: BlockedHostsConfig.title,
+            summary: BlockedHostsConfig.getSummary(storedStateData),
+            ...BlockedHostsConfig.validate(storedStateData)
+        });
+
+        steps.push({
             number: ServerSettingsConfig.number,
             title: ServerSettingsConfig.title,
             summary: ServerSettingsConfig.getSummary(storedStateData),
@@ -296,6 +312,23 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             setCollectionsLoading(false);
         }
     }, [allCollections]);
+
+    // Load browser extension configs — these supply host + path autosuggestions
+    // for the "Block host / path" step.
+    useEffect(() => {
+        let isActive = true;
+        (async () => {
+            try {
+                const response = await guardrailApi.fetchBrowserExtensionConfigs();
+                if (isActive && response?.browserExtensionConfigs) {
+                    setBrowserConfigs(response.browserExtensionConfigs);
+                }
+            } catch (error) {
+                console.error("Error fetching browser extension configs:", error);
+            }
+        })();
+        return () => { isActive = false; };
+    }, []);
 
     // Auto-scroll to bottom when new messages are added
     useEffect(() => {
@@ -415,6 +448,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyToAllServers(true);
         setSelectedMcpServers([]);
         setSelectedAgentServers([]);
+        setBlockedHosts([]);
         setApplyOnResponse(false);
         setApplyOnRequest(false);
         setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
@@ -539,6 +573,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
         setApplyToAllServers(policy.applyToAllServers ?? true);
+
+        // Blocked hosts (block-only objects: { host, paths, includeSubdomains })
+        setBlockedHosts((policy.blockedHosts || []).map(entry => ({
+            host: entry.host || "",
+            paths: entry.paths || [],
+            includeSubdomains: !!entry.includeSubdomains
+        })));
     };
 
     const handleClose = () => {
@@ -583,6 +624,15 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         name: server ? server.label : serverId.toString()
                     };
                 });
+
+            // Drop incomplete rows (no host) and normalize before persisting.
+            const cleanedBlockedHosts = (blockedHosts || [])
+                .filter(entry => entry && (entry.host || "").trim())
+                .map(entry => ({
+                    host: entry.host.trim(),
+                    paths: (entry.paths || []).map(p => (p || "").trim()).filter(Boolean),
+                    includeSubdomains: !!entry.includeSubdomains
+                }));
 
             const b = normalizeBehaviourValue(policyBehaviour);
             const guardrailData = {
@@ -649,6 +699,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 selectedAgentServers: selectedAgentServers,
                 selectedMcpServersV2: transformedMcpServers,
                 selectedAgentServersV2: transformedAgentServers,
+                blockedHosts: cleanedBlockedHosts,
                 applyOnResponse,
                 applyOnRequest,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
@@ -802,6 +853,21 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableToolNameDescriptionMismatch={setEnableToolNameDescriptionMismatch}
                     />
                 );
+            case 11: {
+                // Host suggestions come from the browser extension configs.
+                const hostSuggestions = Array.from(new Set(
+                    (browserConfigs || [])
+                        .map(c => (c.host || "").trim())
+                        .filter(Boolean)
+                )).sort();
+                return (
+                    <BlockedHostsStep
+                        blockedHosts={blockedHosts}
+                        setBlockedHosts={setBlockedHosts}
+                        hostSuggestions={hostSuggestions}
+                    />
+                );
+            }
             case 10:
                 return (
                     <ServerSettingsStep
@@ -885,6 +951,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             applyToAllServers: applyToAllServers,
             selectedMcpServers: selectedMcpServers,
             selectedAgentServers: selectedAgentServers,
+            blockedHosts: (blockedHosts || [])
+                .filter(entry => entry && (entry.host || "").trim())
+                .map(entry => ({
+                    host: entry.host.trim(),
+                    paths: (entry.paths || []).map(p => (p || "").trim()).filter(Boolean),
+                    includeSubdomains: !!entry.includeSubdomains
+                })),
             applyOnResponse: applyOnResponse,
             applyOnRequest: applyOnRequest
         };

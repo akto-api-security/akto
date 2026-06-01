@@ -24,6 +24,7 @@ type policyCache struct {
 	auditPolicies map[string]*types.AuditPolicy
 	compiledRules map[string]*regexp.Regexp
 	hasAuditRules bool
+	blockedHosts  []blockedHostRule
 	lastFetched   time.Time
 	mu            sync.RWMutex
 }
@@ -294,7 +295,7 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 
 	s.logger.Info("Refreshing policies cache - fetching ALL policies")
 
-	policies, auditPolicies, compiledRules, hasAuditRules, err := s.fetchAndParsePolicies()
+	policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, err := s.fetchAndParsePolicies()
 	if err != nil {
 		return nil, nil, nil, false, err
 	}
@@ -304,6 +305,7 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	s.cache.auditPolicies = auditPolicies
 	s.cache.compiledRules = compiledRules
 	s.cache.hasAuditRules = hasAuditRules
+	s.cache.blockedHosts = blockedHostRules
 	s.cache.lastFetched = time.Now()
 
 	s.logger.Info("Policy cache refreshed with ALL policies",
@@ -471,6 +473,54 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 	}
 }
 
+// reportAndBlockHost tracks the blocked session, reports the threat (unless skipThreat) and
+// returns the blocked ValidationResult for a request that hit the browser-extension host blocklist.
+func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID, policyName, matchedHost string) *mcp.ValidationResult {
+	reason := "Host is blocked by guardrail policy: " + matchedHost
+	metadata := types.ThreatMetadata{
+		PolicyName:   policyName,
+		RuleViolated: "BlockedHost",
+		Severity:     "HIGH",
+		Reason:       reason,
+	}
+
+	if s.sessionMgr != nil && sessionID != "" {
+		s.sessionMgr.TrackResponse(sessionID, requestID, reason, true)
+		s.sessionMgr.UpdateBlockedReason(sessionID, reason)
+	}
+
+	if !params.EffectiveSkipThreat() {
+		go func() {
+			if err := mcp.ReportThreat(
+				context.Background(),
+				payloadToValidate,
+				"",
+				metadata,
+				params.IP,
+				params.Path,
+				params.Method,
+				valCtx.RequestHeaders,
+				nil,
+				valCtx.StatusCode,
+				types.ContextSource(params.ContextSource),
+				extractHostHeader(valCtx.RequestHeaders),
+				sessionID,
+			); err != nil {
+				s.logger.Warn("Failed to report threat for blocked host", zap.Error(err))
+			}
+		}()
+	}
+
+	return &mcp.ValidationResult{
+		Allowed:         false,
+		Modified:        false,
+		ModifiedPayload: payloadToValidate,
+		Reason:          reason,
+		Metadata:        metadata,
+		Behaviour:       "block",
+	}
+}
+
 // extractHostHeader extracts the host header value from request headers
 func extractHostHeader(headers map[string]string) string {
 	if host, ok := headers["Host"]; ok {
@@ -483,11 +533,14 @@ func extractHostHeader(headers map[string]string) string {
 }
 
 // fetchAndParsePolicies fetches policies from database abstractor and parses them
-func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
+func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, []blockedHostRule, error) {
 	rawGuardrailPolicies, err := s.dbClient.FetchGuardrailPolicies()
 	if err != nil {
-		return nil, nil, nil, false, fmt.Errorf("failed to fetch guardrail policies: %w", err)
+		return nil, nil, nil, false, nil, fmt.Errorf("failed to fetch guardrail policies: %w", err)
 	}
+
+	// Blocked-host rules are parsed from the same raw response (block-only host blocklist).
+	blockedHostRules := parseBlockedHostRules(rawGuardrailPolicies)
 
 	s.logger.Debug("Raw guardrail policies response",
 		zap.Int("size", len(rawGuardrailPolicies)),
@@ -501,7 +554,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		s.logger.Error("Failed to parse guardrail policies",
 			zap.Error(err),
 			zap.String("rawResponse", string(rawGuardrailPolicies)))
-		return nil, nil, nil, false, fmt.Errorf("failed to parse guardrail policies: %w", err)
+		return nil, nil, nil, false, nil, fmt.Errorf("failed to parse guardrail policies: %w", err)
 	}
 
 	s.logger.Info("Parsed guardrail policies",
@@ -588,7 +641,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		zap.Int("auditPolicies", len(auditPolicies)),
 		zap.Int("compiledRules", len(compiledRules)))
 
-	return policies, auditPolicies, compiledRules, hasAuditRules, nil
+	return policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, nil
 }
 
 // validationContextFromParams builds mcp.ValidationContext from traffic params and explicit payload strings for the context.
@@ -808,6 +861,25 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 
 	// Create validation context with full request metadata (matching batch flow)
 	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList)
+
+	// Host blocklist (block-only) — only for browser LLM extension traffic, identified by the
+	// "browser-llm" tag. MCP / gen-AI sources are handled separately. If the request host
+	// matches any active policy's blocked hosts, block immediately (independent of filter rules).
+	if isBrowserExtensionRequest(valCtx.Tag) {
+		s.cache.mu.RLock()
+		blockedHostRules := s.cache.blockedHosts
+		s.cache.mu.RUnlock()
+		if rule, matchedHost, blocked := matchBlockedHostRule(extractHostHeader(valCtx.RequestHeaders), params.Path, blockedHostRules); blocked {
+			s.logger.Warn("ValidateRequest - blocking browser extension request via blocked-host policy",
+				zap.String("path", params.Path),
+				zap.String("method", params.Method),
+				zap.String("host", matchedHost),
+				zap.String("policy", rule.policyName),
+				zap.String("sessionID", sessionID),
+				zap.String("requestID", requestID))
+			return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, rule.policyName, matchedHost), nil
+		}
+	}
 
 	// Filter policies by MCP server name — policies with no server configured are skipped
 	policies = filterPoliciesByMcpServer(policies, valCtx.McpServerName)
