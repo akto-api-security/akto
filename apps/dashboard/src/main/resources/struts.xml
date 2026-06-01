@@ -3825,7 +3825,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">MCP_SECURITY</param>
+                <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User initiated MCP reconnaissance</param>
             </interceptor-ref>
@@ -3884,7 +3884,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">AWS_API_GATEWAY</param>
+                <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added AWS account IDs for API Gateway logging</param>
             </interceptor-ref>
@@ -3913,8 +3913,8 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">AWS_API_GATEWAY</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ</param>
                 <param name="actionDescription">AWS account IDs for API Gateway logging</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
