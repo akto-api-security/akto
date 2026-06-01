@@ -151,6 +151,11 @@ public class DigestAuthParam extends AuthParam {
     }
 
     @Override
+    boolean addAuthTokens(OriginalHttpRequest request, boolean forceApply) {
+        return addAuthTokens(request);
+    }
+
+    @Override
     public boolean removeAuthTokens(OriginalHttpRequest request) {
         if (this.key == null) return false;
         // Remove any existing Authorization header

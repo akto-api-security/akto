@@ -6,6 +6,10 @@ import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 
 import com.akto.util.enums.LoginFlowEnums;
+
+import lombok.Getter;
+import lombok.Setter;
+
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
@@ -36,6 +40,11 @@ public class AuthMechanism {
     @BsonIgnore
     private RecordedLoginFlowInput recordedLoginFlowInput;
 
+    @BsonIgnore
+    @Getter
+    @Setter
+    private boolean forceApply;
+
     public AuthMechanism() {
     }
 
@@ -59,11 +68,11 @@ public class AuthMechanism {
         for (AuthParam authParam1: authParamsToUse) {
             // Special handling for DIGEST_AUTH: always compute credentials dynamically
             if (authParam1 instanceof DigestAuthParam) {
-                authParam1.addAuthTokens(request);
+                authParam1.addAuthTokens(request, forceApply);
                 messageKeysPresent += authParam1.getKey()+", ";
                 modifiedAtLeastOne = true;
-            } else if(authParam1.authTokenPresent(request)){
-                authParam1.addAuthTokens(request);
+            } else if (forceApply || authParam1.authTokenPresent(request)) {
+                authParam1.addAuthTokens(request, forceApply);
                 messageKeysPresent += authParam1.getKey()+", ";
                 modifiedAtLeastOne = true;
             } else {
