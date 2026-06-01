@@ -2,6 +2,7 @@ package validator
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 )
 
@@ -18,10 +19,12 @@ type BlockedHostEntry struct {
 }
 
 // blockedHostRule is a single blocked-host pattern together with the policy it came from, so a
-// match can be attributed back to the originating policy.
+// match can be attributed back to the originating policy. The pattern is compiled once into an
+// anchored regex (re) so matching is robust for patterns such as "*.*/v1/chat/*".
 type blockedHostRule struct {
 	policyName string
 	pattern    string
+	re         *regexp.Regexp
 }
 
 // isBrowserExtensionRequest reports whether the request originates from the browser LLM
@@ -63,13 +66,17 @@ func parseBlockedHostRules(raw []byte) []blockedHostRule {
 			if pattern == "" {
 				continue
 			}
-			rules = append(rules, blockedHostRule{policyName: p.Name, pattern: pattern})
+			re, err := compileBlockedPattern(pattern)
+			if err != nil {
+				continue // skip patterns that fail to compile rather than blocking everything
+			}
+			rules = append(rules, blockedHostRule{policyName: p.Name, pattern: pattern, re: re})
 		}
 	}
 	return rules
 }
 
-// matchBlockedHostRule matches the request host+path against each rule pattern.
+// matchBlockedHostRule matches the request host+path against each rule's compiled pattern.
 // Returns (rule, matchedPattern, true) on the first match.
 func matchBlockedHostRule(host, endpoint string, rules []blockedHostRule) (blockedHostRule, string, bool) {
 	normHost := normalizeBlockedHost(host)
@@ -78,50 +85,34 @@ func matchBlockedHostRule(host, endpoint string, rules []blockedHostRule) (block
 	}
 	target := normHost + strings.ToLower(endpoint)
 	for _, rule := range rules {
-		if patternMatches(rule.pattern, normHost, target) {
+		if rule.re != nil && rule.re.MatchString(target) {
 			return rule, rule.pattern, true
 		}
 	}
 	return blockedHostRule{}, "", false
 }
 
-// patternMatches decides whether a blocked pattern covers the request. A bare host (no "/" and
-// no "*") blocks every path on that host; otherwise the pattern is glob-matched against the
-// full "host+path" target with "*" matching any sequence of characters (including "/").
-func patternMatches(pattern, host, target string) bool {
-	if pattern == "" {
-		return false
-	}
+// compileBlockedPattern turns a (normalized) glob pattern into an anchored regex matched against
+// the request's "host+path". "*" becomes ".*" (matches any sequence, including "/"); all other
+// characters are taken literally. A bare host (no "/" and no "*") matches the host and every
+// path under it, e.g. "chatgpt.com" -> ^chatgpt\.com(/.*)?$. This handles compound wildcard
+// patterns such as "*.*/v1/chat/*" correctly.
+func compileBlockedPattern(pattern string) (*regexp.Regexp, error) {
 	if !strings.ContainsAny(pattern, "*/") {
-		return host == pattern
+		return regexp.Compile("^" + regexp.QuoteMeta(pattern) + "(/.*)?$")
 	}
-	return globMatch(pattern, target)
-}
 
-// globMatch reports whether s matches pattern, where "*" matches any (possibly empty) sequence
-// of characters. Classic two-pointer wildcard match; only "*" is special.
-func globMatch(pattern, s string) bool {
-	star, ss, p, sp := -1, 0, 0, 0
-	for sp < len(s) {
-		if p < len(pattern) && pattern[p] == s[sp] {
-			p++
-			sp++
-		} else if p < len(pattern) && pattern[p] == '*' {
-			star = p
-			ss = sp
-			p++
-		} else if star != -1 {
-			p = star + 1
-			ss++
-			sp = ss
+	var b strings.Builder
+	b.WriteString("^")
+	for i := 0; i < len(pattern); i++ {
+		if pattern[i] == '*' {
+			b.WriteString(".*")
 		} else {
-			return false
+			b.WriteString(regexp.QuoteMeta(string(pattern[i])))
 		}
 	}
-	for p < len(pattern) && pattern[p] == '*' {
-		p++
-	}
-	return p == len(pattern)
+	b.WriteString("$")
+	return regexp.Compile(b.String())
 }
 
 // normalizeBlockedHost lowercases/trims and strips scheme, path and :port so values like
