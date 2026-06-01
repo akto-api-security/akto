@@ -118,7 +118,7 @@ const ApiIssuesTab = ({ apiDetail, collectionIssuesData, isThreatEnabled }) => {
                 finalEndpoint = url.pathname;
             }
             const isSkill = endpoint.includes('/skills/')
-            const host = hostNameMap[apiCollectionId] || apiCollectionMap[apiCollectionId]?.hostName
+            const host = hostNameMap[apiCollectionId] || apiCollectionMap[apiCollectionId]
             const collIds = isSkill ? [] : [apiCollectionId]
             const hosts = isSkill && host ? [host] : []
             const resp = await threatDetectionApi.fetchSuspectSampleData(0, [], collIds, [finalEndpoint], [], {}, 0, func.timeNow(), [], 10, 'ACTIVE', true, 'threat', hosts, '', [method]);
@@ -209,7 +209,7 @@ const ApiIssuesTab = ({ apiDetail, collectionIssuesData, isThreatEnabled }) => {
             {loadingIssues ? (
                 <SpinnerCentered />
             ) : (
-                apiDetail?.endpoint?.includes('/skills/') ? (
+                isThreatEnabled && apiDetail?.endpoint?.includes('/skills/') ? (
                     skillSampleData.length > 0
                         ? <SampleDataList
                             sampleData={skillSampleData}
