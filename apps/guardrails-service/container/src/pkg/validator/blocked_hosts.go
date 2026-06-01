@@ -83,6 +83,10 @@ func matchBlockedHostRule(host, endpoint string, rules []blockedHostRule) (block
 	if normHost == "" {
 		return blockedHostRule{}, "", false
 	}
+	// Drop any query string / fragment so path patterns match regardless of query params.
+	if i := strings.IndexAny(endpoint, "?#"); i >= 0 {
+		endpoint = endpoint[:i]
+	}
 	target := normHost + strings.ToLower(endpoint)
 	for _, rule := range rules {
 		if rule.re != nil && rule.re.MatchString(target) {

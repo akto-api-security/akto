@@ -53,6 +53,50 @@ func TestMatchBlockedHostRule(t *testing.T) {
 	}
 }
 
+// TestBlockedPatternEdgeCases covers regex-sensitive and URL edge cases: query strings,
+// regex metacharacters (which must be treated as literals), ports, trailing slashes and case.
+func TestBlockedPatternEdgeCases(t *testing.T) {
+	mk := func(pattern string) []blockedHostRule {
+		re, err := compileBlockedPattern(normalizePattern(pattern))
+		if err != nil {
+			t.Fatalf("compile %q: %v", pattern, err)
+		}
+		return []blockedHostRule{{policyName: "t", pattern: pattern, re: re}}
+	}
+
+	cases := []struct {
+		name    string
+		pattern string
+		host    string
+		path    string
+		want    bool
+	}{
+		{"query stripped, exact path matches", "chatgpt.com/v1/chat", "chatgpt.com", "/v1/chat?model=x&t=1", true},
+		{"fragment stripped", "chatgpt.com/v1/chat", "chatgpt.com", "/v1/chat#frag", true},
+		{"query does not falsely extend prefix", "deepseek.com/api/v1/*", "deepseek.com", "/api/v1/chat?a=b", true},
+		{"dot is literal not any-char", "chatgpt.com/*", "chatgptxcom", "/v1", false},
+		{"regex meta in literal path is escaped", "site.com/a+b", "site.com", "/a+b", true},
+		{"regex meta literal does not match as quantifier", "site.com/a+b", "site.com", "/aaab", false},
+		{"port on request host is stripped", "chatgpt.com/*", "chatgpt.com:8443", "/v1", true},
+		{"uppercase host and path", "chatgpt.com/v1/*", "CHATGPT.COM", "/V1/Chat", true},
+		{"scheme in request host stripped", "chatgpt.com/*", "https://chatgpt.com", "/v1", true},
+		{"bare host matches root", "chatgpt.com", "chatgpt.com", "/", true},
+		{"bare host matches deep path", "chatgpt.com", "chatgpt.com", "/a/b/c", true},
+		{"host/* needs a slash", "chatgpt.com/*", "chatgpt.com", "", false},
+		{"trailing-slash pattern exact", "chatgpt.com/v1/", "chatgpt.com", "/v1/", true},
+		{"middle wildcard", "*.openai.com/v1/*", "api.openai.com", "/v1/chat", true},
+		{"middle wildcard host mismatch", "*.openai.com/v1/*", "openai.com", "/v1/chat", false},
+	}
+
+	for _, c := range cases {
+		rules := mk(c.pattern)
+		_, _, ok := matchBlockedHostRule(c.host, c.path, rules)
+		if ok != c.want {
+			t.Errorf("%s: pattern=%q host=%q path=%q -> got %v, want %v", c.name, c.pattern, c.host, c.path, ok, c.want)
+		}
+	}
+}
+
 // Policies without a blockedHosts key (or empty / malformed responses) must not break the
 // service — they simply yield no rules and never block.
 func TestParseBlockedHostRulesNoData(t *testing.T) {
