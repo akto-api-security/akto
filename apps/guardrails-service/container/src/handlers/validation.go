@@ -10,6 +10,7 @@ import (
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
+	"github.com/akto-api-security/guardrails-service/pkg/metrics"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/guardrails-service/pkg/slack"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
@@ -23,15 +24,17 @@ type ValidationHandler struct {
 	logger           *zap.Logger
 	cfg              *config.Config
 	fileRegistry     *fileprocessor.Registry
+	metrics          *metrics.Accumulator
 }
 
 // NewValidationHandler creates a new validation handler
-func NewValidationHandler(validatorService *validator.Service, logger *zap.Logger, cfg *config.Config, fileRegistry *fileprocessor.Registry) *ValidationHandler {
+func NewValidationHandler(validatorService *validator.Service, logger *zap.Logger, cfg *config.Config, fileRegistry *fileprocessor.Registry, acc *metrics.Accumulator) *ValidationHandler {
 	return &ValidationHandler{
 		validatorService: validatorService,
 		logger:           logger,
 		cfg:              cfg,
 		fileRegistry:     fileRegistry,
+		metrics:          acc,
 	}
 }
 
@@ -184,6 +187,8 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		return
 	}
 
+	elapsed := time.Since(start)
+	latencyMs := elapsed.Milliseconds()
 	h.logger.Info("ValidateRequest - completed",
 		zap.String("path", req.Path),
 		zap.String("method", req.Method),
@@ -192,7 +197,11 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
 		zap.String("behaviour", result.Behaviour),
-		zap.Int64("latencyMs", time.Since(start).Milliseconds()))
+		zap.Int64("latencyMs", latencyMs))
+
+	if h.metrics != nil && req.AktoAccountID != "" {
+		h.metrics.RecordRequest(req.AktoAccountID, elapsed.Nanoseconds())
+	}
 
 	status := "ALLOWED"
 	if !result.Allowed {
@@ -346,6 +355,8 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		return
 	}
 
+	elapsed := time.Since(start)
+	latencyMs := elapsed.Milliseconds()
 	h.logger.Info("ValidateResponse - completed",
 		zap.String("path", req.Path),
 		zap.String("method", req.Method),
@@ -354,7 +365,11 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
 		zap.String("behaviour", result.Behaviour),
-		zap.Int64("latencyMs", time.Since(start).Milliseconds()))
+		zap.Int64("latencyMs", latencyMs))
+
+	if h.metrics != nil && req.AktoAccountID != "" {
+		h.metrics.RecordResponse(req.AktoAccountID, elapsed.Nanoseconds())
+	}
 
 	responseStatus := "ALLOWED"
 	if !result.Allowed {

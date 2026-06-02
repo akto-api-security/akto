@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 
+	"time"
+
 	"github.com/akto-api-security/akto-endpoint-shield/utils"
 	"github.com/akto-api-security/guardrails-service/handlers"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
@@ -14,6 +16,7 @@ import (
 	"github.com/akto-api-security/guardrails-service/pkg/kafka"
 	"github.com/akto-api-security/guardrails-service/pkg/logsink"
 	"github.com/akto-api-security/guardrails-service/pkg/mediaprovider"
+	"github.com/akto-api-security/guardrails-service/pkg/metrics"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -59,7 +62,26 @@ func main() {
 func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logger *zap.Logger) {
 	fileRegistry := fileprocessor.DefaultRegistry(cfg.File.MaxTextFileBytes)
 	registerMediaProcessors(fileRegistry, cfg, logger)
-	validationHandler := handlers.NewValidationHandler(validatorService, logger, cfg, fileRegistry)
+
+	acc := metrics.NewAccumulator()
+	dbClient := dbabstractor.NewClient(logger)
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			for accountId, batch := range acc.DrainAll() {
+				payload := make([]interface{}, len(batch))
+				for i, m := range batch {
+					payload[i] = m
+				}
+				if err := dbClient.IngestMetrics(payload); err != nil {
+					logger.Error("Failed to flush guardrail metrics", zap.String("account", accountId), zap.Error(err))
+				}
+			}
+		}
+	}()
+
+	validationHandler := handlers.NewValidationHandler(validatorService, logger, cfg, fileRegistry, acc)
 
 	router := setupRouter(validationHandler, logger)
 
