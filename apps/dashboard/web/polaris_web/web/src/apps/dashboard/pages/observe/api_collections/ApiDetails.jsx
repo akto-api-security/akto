@@ -912,13 +912,13 @@ function ApiDetails(props) {
                 key="tabs"
                 tabs={[
                     ValuesTab,
-                    SchemaTab,
+                    ...(!isSkillEndpoint ? [SchemaTab] : []),
                     ...(shouldShowBasePromptTab ? [BasePromptTab] : []),
                     ...(hasIssues ? [IssuesTab] : []),
                     ...(apiDetail?.isThreatEnabled ? [ThreatIssuesTab] : []),
                     ApiCallStatsTab,
                     DependencyTab,
-                    ...(showTraces ? [TracesTab] : [])
+                    ...(!isSkillEndpoint && showTraces ? [TracesTab] : [])
                 ]}
                 currTab={(tab) => setSelectedTabId(tab.id)}
                 disabledTabs={disabledTabs}

@@ -776,6 +776,18 @@ const tcpObj = {
     component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/virtual-machines/tcp-agent" bannerTitle="Setup using TCP Agent" innerUrl="https://docs.akto.io/traffic-connector/virtual-machines/tcp-agent" />
 }
 
+const mitmProxyObj = {
+    icon: '/public/mitm_proxy.svg',
+    label: "MITM Proxy",
+    text: "Capture and analyze API traffic using MITM Proxy to build your API inventory in Akto.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/virtual-machines/connect-akto-with-mitm-proxy',
+    key: "MITM_PROXY",
+    component: <BannerComponent
+        content="Capture and analyze API traffic using MITM Proxy to build your API inventory in Akto."
+        docsUrl='https://docs.akto.io/traffic-connector/virtual-machines/connect-akto-with-mitm-proxy'
+    />
+}
+
 const hybridSaasObj = {
     icon: '/public/aws.svg',
     label: "Hybrid Saas",
@@ -2022,7 +2034,7 @@ const quickStartFunc = {
     getConnectorsListCategorized: function () {
         // Virtual Machines
         const vm = [
-            dockerObj, tcpObj
+            dockerObj, tcpObj, mitmProxyObj
         ];
         
         // Source code

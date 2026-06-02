@@ -8,6 +8,7 @@ import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import DonutChart from "../../../components/shared/DonutChart";
 import ThreatWorldMap from "./ThreatWorldMap";
 import { formatCategoryName, getFlagSrc, openThreatActivityPage } from "../utils/threatDashboardUtils";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
 const TAB_KEYS = {
     TOTAL_THREATS: 0,
@@ -124,10 +125,11 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
         setSelectedTab(tabIndex);
     };
 
+    const category = getDashboardCategory();
     const tabs = [
-        { label: "Total Threats", count: totalThreatsCount },
-        { label: "APIs Under Threat", count: apisUnderThreatCount },
-        { label: "Threat Actors", count: threatActorsCount },
+        { label: mapLabel("Total Threats", category), count: totalThreatsCount },
+        { label: mapLabel("APIs Under Threat", category), count: apisUnderThreatCount },
+        { label: mapLabel("Threat Actors", category), count: threatActorsCount },
     ];
 
     const STATUS_NAME_TO_EVENT_STATUS = {
@@ -172,8 +174,8 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
                 <DataTable
                     columnContentTypes={["text", "numeric"]}
                     headings={[
-                        <Text variant="headingSm" key="h1">Threat Name</Text>,
-                        <Text variant="headingSm" key="h2">APIs Affected</Text>,
+                        <Text variant="headingSm" key="h1">{mapLabel("Threat Name", category)}</Text>,
+                        <Text variant="headingSm" key="h2">{mapLabel("APIs Affected", category)}</Text>,
                     ]}
                     rows={threatCategoryData.map((item) => [
                         <div
@@ -208,7 +210,7 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
             <DataTable
                 columnContentTypes={["text", "numeric", "numeric", "text"]}
                 headings={[
-                    <Text variant="headingSm" key="h1">API Endpoint</Text>,
+                    <Text variant="headingSm" key="h1">{mapLabel("API Endpoint", category)}</Text>,
                     <Text variant="headingSm" key="h2">Bad Actors</Text>,
                     <Text variant="headingSm" key="h3">Malicious Requests</Text>,
                     <Text variant="headingSm" key="h4">Host</Text>,
@@ -254,8 +256,8 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
                 <DataTable
                     columnContentTypes={["text", "numeric", "text"]}
                     headings={[
-                        <Text variant="headingSm" key="h1">Threat Actor</Text>,
-                        <Text variant="headingSm" key="h2">Threat Requests</Text>,
+                        <Text variant="headingSm" key="h1">{mapLabel("Threat Actor", category)}</Text>,
+                        <Text variant="headingSm" key="h2">{mapLabel("Threat Requests", category)}</Text>,
                         <Text variant="headingSm" key="h3">Latest Attack</Text>,
                     ]}
                     rows={actorsData.map((actor) => [
