@@ -37,6 +37,10 @@ public class OpenTelemetryIntegrationAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
+        if (endpoint.endsWith("/")) {
+            endpoint = endpoint.substring(0, endpoint.length() - 1);
+        }
+
         Bson combineUpdates = Updates.combine(
             Updates.set(OpenTelemetryIntegration.ENDPOINT, endpoint),
             Updates.set(OpenTelemetryIntegration.API_KEY, apiKey),
