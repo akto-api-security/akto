@@ -2006,7 +2006,7 @@ function ApiEndpoints(props) {
         // Check for special characters
         const allowedChars = /^[a-zA-Z0-9\s.,!?;:'"()\-_/&]+$/;
 
-        if (!allowedChars.test(editableDescription)) {
+        if (editableDescription.length > 0 && !allowedChars.test(editableDescription)) {
             func.setToast(true, true, "Description contains invalid characters.");
             return;
         }
