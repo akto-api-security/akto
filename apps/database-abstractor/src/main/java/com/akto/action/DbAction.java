@@ -92,6 +92,7 @@ import com.akto.utils.KafkaUtils;
 import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
 import com.akto.utils.StiCountAlert;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -2632,6 +2633,7 @@ public class DbAction extends ActionSupport {
                 e.printStackTrace();
             }
             TestingRunResult testingRunResult = objectMapper.readValue(this.testingRunResult.toJson(), TestingRunResult.class);
+            applyAiSummaryTracesFromPayload(testingRunResult, this.testingRunResult);
 
             try {
                 if (!data.isEmpty()) {
@@ -2647,6 +2649,7 @@ public class DbAction extends ActionSupport {
             }else if(testingRunResult.getMultiExecTestResults() !=null){
                 testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getMultiExecTestResults()));
             }
+            applyAiSummaryTracesFromPayload(testingRunResult, this.testingRunResult);
 
             if (testingRunResult.getTestRunHexId() != null) {
                 ObjectId id = new ObjectId(testingRunResult.getTestRunHexId());
@@ -3647,11 +3650,13 @@ public class DbAction extends ActionSupport {
                         e.printStackTrace();
                     }
                     TestingRunResult testingRunResult = objectMapper.readValue(this.testingRunResult.toJson(), TestingRunResult.class);
+                    applyAiSummaryTracesFromPayload(testingRunResult, this.testingRunResult);
                     if(testingRunResult.getSingleTestResults()!=null){
                         testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getSingleTestResults()));
                     }else if(testingRunResult.getMultiExecTestResults() !=null){
                         testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getMultiExecTestResults()));
                     }
+                    applyAiSummaryTracesFromPayload(testingRunResult, this.testingRunResult);
 
                     try {
                         if (!data.isEmpty()) {
@@ -6299,5 +6304,58 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Ensures {@code aiSummaryTraces} is stored on {@link TestingRunResult}, not nested under {@code testResults}.
+     */
+    private void applyAiSummaryTracesFromPayload(TestingRunResult testingRunResult, BasicDBObject rawPayload) {
+        if (testingRunResult == null) {
+            return;
+        }
+        if (testingRunResult.getAiSummaryTraces() != null && !testingRunResult.getAiSummaryTraces().isEmpty()) {
+            return;
+        }
+        List<AiSummaryEntry> aiSummaryTraces = null;
+        if (rawPayload != null && rawPayload.containsField(TestingRunResult.AI_SUMMARY_TRACES)) {
+            aiSummaryTraces = parseAiSummaryTraces(rawPayload.get(TestingRunResult.AI_SUMMARY_TRACES));
+        }
+        if ((aiSummaryTraces == null || aiSummaryTraces.isEmpty()) && rawPayload != null) {
+            aiSummaryTraces = extractAiSummaryTracesFromNestedTestResults(rawPayload);
+        }
+        if (aiSummaryTraces != null && !aiSummaryTraces.isEmpty()) {
+            testingRunResult.setAiSummaryTraces(aiSummaryTraces);
+        }
+    }
+
+    private List<AiSummaryEntry> parseAiSummaryTraces(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return objectMapper.convertValue(raw, new TypeReference<List<AiSummaryEntry>>() {});
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing aiSummaryTraces in insertTestingRunResults");
+            return null;
+        }
+    }
+
+    private List<AiSummaryEntry> extractAiSummaryTracesFromNestedTestResults(BasicDBObject rawPayload) {
+        for (String key : new String[] { "singleTestResults", TestingRunResult.TEST_RESULTS }) {
+            Object testResults = rawPayload.get(key);
+            if (!(testResults instanceof List) || ((List<?>) testResults).isEmpty()) {
+                continue;
+            }
+            Object first = ((List<?>) testResults).get(0);
+            if (first instanceof BasicDBObject) {
+                BasicDBObject firstResult = (BasicDBObject) first;
+                List<AiSummaryEntry> aiSummaryTraces = parseAiSummaryTraces(
+                        firstResult.get(TestingRunResult.AI_SUMMARY_TRACES));
+                if (aiSummaryTraces != null && !aiSummaryTraces.isEmpty()) {
+                    return aiSummaryTraces;
+                }
+            }
+        }
+        return null;
     }
 }
