@@ -44,7 +44,7 @@ function OpenTelemetry() {
             func.setToast(true, true, "Please enter a valid endpoint")
             return
         }
-        if (apiKey === null || !apiKey?.trim()) {
+        if (!apiKey?.trim()) {
             func.setToast(true, true, "Please enter a valid API key")
             return
         }
@@ -78,7 +78,7 @@ function OpenTelemetry() {
         return isSaving || !endpoint?.trim() || (apiKey === null ? true : !apiKey?.trim())
     }
 
-    const cardContent = "Send API traffic data from Akto's hybrid modules to your OpenTelemetry collector endpoint."
+    const cardContent = "Send metrics and heartbeat events from Akto's hybrid modules to an OpenTelemetry endpoint."
 
     const openTelemetryCard = (
         <LegacyCard
@@ -101,16 +101,15 @@ function OpenTelemetry() {
             <LegacyCard.Section>
                 <VerticalStack gap={"4"}>
                     <TextField
-                        label="Collector Endpoint"
-                        helpText="Specify the OpenTelemetry collector endpoint URL (e.g. https://otel-collector:4318)."
+                        label="OLTP Endpoint"
+                        helpText="Specify the OLTP endpoint URL"
                         value={endpoint}
                         onChange={setEndpoint}
                         requiredIndicator
-                        autoComplete="off"
                     />
                     <PasswordTextField
                         label="API Key"
-                        helpText="Specify the API key for authenticating with your OpenTelemetry collector."
+                        helpText="Specify the API key for authenticating with your OLTP endpoint."
                         field={apiKey === null ? '' : apiKey}
                         onFunc={true}
                         setField={setApiKey}
