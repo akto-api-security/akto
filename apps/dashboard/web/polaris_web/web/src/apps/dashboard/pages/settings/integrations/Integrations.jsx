@@ -201,7 +201,7 @@ function Integrations() {
     let openTelemetryObj = {
       id: 'open_telemetry',
       name: 'OpenTelemetry',
-      source: '/public/open-telemetry-logo.svg'
+      source: '/public/opentelemetry-logo.svg'
     }
 
     let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, googleWorkSpaceObj]
