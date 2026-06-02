@@ -6,6 +6,7 @@ public class YamlTestResult {
     
     List<GenericTestResult> testResults;
     WorkflowTest workflowTest;
+    List<AiSummaryEntry> aiSummaryTraces;
 
     public YamlTestResult() {
         
@@ -30,6 +31,14 @@ public class YamlTestResult {
 
     public void setWorkflowTest(WorkflowTest workflowTest) {
         this.workflowTest = workflowTest;
+    }
+
+    public List<AiSummaryEntry> getAiSummaryTraces() {
+        return aiSummaryTraces;
+    }
+
+    public void setAiSummaryTraces(List<AiSummaryEntry> aiSummaryTraces) {
+        this.aiSummaryTraces = aiSummaryTraces;
     }
 
 }
