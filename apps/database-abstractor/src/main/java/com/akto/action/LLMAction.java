@@ -9,7 +9,6 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 import java.util.HashMap;
@@ -74,7 +73,7 @@ public class LLMAction extends ActionSupport {
     public String getLLMResponseV2() {
         Map<String, String> headers = new HashMap<>();
 
-        Model model = AgentModelDao.instance.findOne(Filters.eq("type", ModelType.MISTRAL_AI.name()));
+        Model model = AgentModelDao.instance.findOne(AgentModelDao.instance.filterByType(ModelType.MISTRAL_AI));
         String endpoint = "";
         try {
             endpoint = buildAzureOpenAIUrl();
