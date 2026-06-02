@@ -1101,7 +1101,22 @@ public class StartTestAction extends UserAction {
             return Action.ERROR;
         }
         ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
-        this.testingRunResult = VulnerableTestingRunResultDao.instance.findOneWithComparison(Filters.eq(Constants.ID, testingRunResultId), null);
+        Bson projection = Projections.include(
+                TestingRunResult.TEST_RUN_ID,
+                TestingRunResult.API_INFO_KEY,
+                TestingRunResult.TEST_SUPER_TYPE,
+                TestingRunResult.TEST_SUB_TYPE,
+                TestingRunResult.VULNERABLE,
+                TestingRunResult.CONFIDENCE_PERCENTAGE,
+                TestingRunResult.START_TIMESTAMP,
+                TestingRunResult.END_TIMESTAMP,
+                TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
+                TestingRunResult.TEST_RESULTS,
+                TestingRunResult.AI_SUMMARY_TRACES,
+                TestingRunResult.SINGLE_TYPE_INFOS,
+                TestingRunResult.ERRORS_LIST
+        );
+        this.testingRunResult = VulnerableTestingRunResultDao.instance.findOneWithComparison(Filters.eq(Constants.ID, testingRunResultId), projection);
         List<GenericTestResult> runResults = new ArrayList<>();
 
         for (GenericTestResult testResult: this.testingRunResult.getTestResults()) {
