@@ -34,9 +34,10 @@ const convertFunc = {
                 aktoTests[test.superCategory.name].push(obj)
                 totalAktoTests++
             }
+            const searchKey = `${test.testName}${test.superCategory.displayName}`.toLowerCase().replace(/ /g, "")
             let dataObj = {
-                content: test?.content||"",
                 lastUpdated: func.prettifyEpoch(test.updatedTs),
+                searchKey,
                 superCategory: test.superCategory.name,
                 type: test.templateSource._name,
                 category: test.superCategory.displayName,
@@ -126,6 +127,101 @@ const convertFunc = {
             count = testObj?.totalAktoTests;
         }
         return {items: arr, count: count}
+    },
+
+    normalizeSearchTerm(searchText) {
+        return (searchText || "").toLowerCase().replace(/ /g, "")
+    },
+
+    testMatchesSearch(test, testObj, contentSearchIndex, q) {
+        const searchKey = testObj.mapTestToData[test.label]?.searchKey || ""
+        if (searchKey.includes(q)) return true
+        const contentKey = contentSearchIndex?.[test.value]
+        return contentKey ? contentKey.includes(q) : false
+    },
+
+    getFilteredExplorerData(testObj, searchText, contentSearchIndex) {
+        if (!testObj) {
+            return { customGroups: {}, aktoGroups: {}, customCount: 0, aktoCount: 0 }
+        }
+        const q = this.normalizeSearchTerm(searchText)
+        if (!q) {
+            return {
+                customGroups: testObj.customTests,
+                aktoGroups: testObj.aktoTests,
+                customCount: testObj.totalCustomTests,
+                aktoCount: testObj.totalAktoTests,
+            }
+        }
+
+        const filterGroups = (groups) => {
+            const filtered = {}
+            let count = 0
+            for (const key in groups) {
+                if (!Object.prototype.hasOwnProperty.call(groups, key)) continue
+                const tests = groups[key]
+                const matching = tests.filter((test) => this.testMatchesSearch(test, testObj, contentSearchIndex, q))
+                if (matching.length > 0) {
+                    filtered[key] = matching
+                    count += matching.length
+                }
+            }
+            return { filtered, count }
+        }
+
+        const custom = filterGroups(testObj.customTests)
+        const akto = filterGroups(testObj.aktoTests)
+        return {
+            customGroups: custom.filtered,
+            aktoGroups: akto.filtered,
+            customCount: custom.count,
+            aktoCount: akto.count,
+        }
+    },
+
+    toFilteredTestObj(testObj, filtered) {
+        return {
+            ...testObj,
+            customTests: filtered.customGroups,
+            aktoTests: filtered.aktoGroups,
+            totalCustomTests: filtered.customCount,
+            totalAktoTests: filtered.aktoCount,
+        }
+    },
+
+    buildContentSearchIndexIdle(subCategories, onComplete) {
+        const index = {}
+        if (!subCategories?.length) {
+            onComplete(index)
+            return
+        }
+        let i = 0
+        const chunkSize = 250
+
+        const step = () => {
+            const end = Math.min(i + chunkSize, subCategories.length)
+            for (; i < end; i++) {
+                const test = subCategories[i]
+                if (test?.content) {
+                    index[test.name] = this.normalizeSearchTerm(test.content)
+                }
+            }
+            if (i < subCategories.length) {
+                if (typeof requestIdleCallback === "function") {
+                    requestIdleCallback(step, { timeout: 100 })
+                } else {
+                    setTimeout(step, 0)
+                }
+            } else {
+                onComplete(index)
+            }
+        }
+
+        if (typeof requestIdleCallback === "function") {
+            requestIdleCallback(step, { timeout: 100 })
+        } else {
+            setTimeout(step, 0)
+        }
     },
 
     mapVulnerableRequests(vulnerableRequests){

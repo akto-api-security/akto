@@ -1,224 +1,271 @@
-import { useEffect, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { Tree } from "react-arborist"
 
 import { Badge, Box, Button, HorizontalStack, Icon, Navigation, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
-import {ChevronDownMinor, ChevronRightMinor, SearchMinor, CirclePlusMinor} from "@shopify/polaris-icons"
+import { ChevronDownMinor, ChevronRightMinor, SearchMinor } from "@shopify/polaris-icons"
 
 import TestEditorStore from "../testEditorStore"
-
 import convertFunc from "../transform"
-
 import "../TestEditor.css"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import func from "../../../../../util/func"
 import { isAgenticSecurityCategory } from "../../../../main/labelHelper"
 
-const TestEditorFileExplorer = ({addCustomTest}) => {
+const SEARCH_DEBOUNCE_MS = 300
+const VIRTUAL_LIST_THRESHOLD = 80
+const ROW_HEIGHT = 36
+const MAX_LIST_HEIGHT = 520
 
-    const testObj = TestEditorStore(state => state.testsObj)
-    const selectedTest = TestEditorStore(state => state.selectedTest)
-    const setSelectedTest = TestEditorStore(state => state.setSelectedTest)
+const TestNavRow = memo(function TestNavRow({ node, style, selectedTestLabel, onSelectTest }) {
+    const item = node.data.testItem
+    const isActive = selectedTestLabel === item.label
 
-    const [selectedCategory, setSelectedCategory] = useState('none')
-    const [customItems, setCustomItems] = useState({items: [] , count : 0})
-    const [aktoItems, setAktoItems] = useState({items: [] , count : 0})
-    const [searchText, setSearchText] = useState('')
+    return (
+        <div
+            style={{ ...style, boxSizing: "border-box" }}
+            className="Polaris-Navigation__ItemWrapper"
+            onClick={() => onSelectTest(item)}
+        >
+            <div className="Polaris-Navigation__Item Polaris-Navigation__Item--secondary">
+                <Tooltip content={item.label} dismissOnMouseOut width="wide" preferredPosition="below">
+                    <div className={isActive ? "active-left-test" : ""}>
+                        <Text
+                            variant={isActive ? "headingSm" : "bodyMd"}
+                            as="h4"
+                            color={isActive ? "default" : "subdued"}
+                            truncate
+                        >
+                            {item.label}
+                        </Text>
+                    </div>
+                </Tooltip>
+            </div>
+        </div>
+    )
+})
+
+function VirtualTestRows({ tests, selectedTestLabel, onSelectTest }) {
+    const treeData = useMemo(
+        () => tests.map((testItem) => ({ id: testItem.value, name: testItem.label, testItem })),
+        [tests]
+    )
+    const height = Math.min(treeData.length * ROW_HEIGHT, MAX_LIST_HEIGHT)
+    if (!treeData.length) return null
+
+    return (
+        <div className="Polaris-Navigation__SecondaryNavigation test-editor-virtual-subnav">
+            <Tree
+                data={treeData}
+                openByDefault
+                width="100%"
+                height={height}
+                indent={0}
+                rowHeight={ROW_HEIGHT}
+                overscanCount={12}
+                disableDrag
+                disableDrop
+            >
+                {(props) => (
+                    <TestNavRow
+                        {...props}
+                        selectedTestLabel={selectedTestLabel}
+                        onSelectTest={onSelectTest}
+                    />
+                )}
+            </Tree>
+        </div>
+    )
+}
+
+const TestEditorFileExplorer = ({ addCustomTest }) => {
+    const testObj = TestEditorStore((state) => state.testsObj)
+    const selectedTestLabel = TestEditorStore((state) => state.selectedTest?.label)
+    const setSelectedTest = TestEditorStore((state) => state.setSelectedTest)
+    const contentSearchIndex = TestEditorStore((state) => state.contentSearchIndex)
+
+    const [selectedCategory, setSelectedCategory] = useState("none")
+    const [customItems, setCustomItems] = useState({ items: [], count: 0 })
+    const [aktoItems, setAktoItems] = useState({ items: [], count: 0 })
+    const [searchText, setSearchText] = useState("")
+    const [debouncedSearch, setDebouncedSearch] = useState("")
     const [showCustom, setShowCustom] = useState(false)
     const [showAkto, setShowAkto] = useState(false)
 
     const navigate = useNavigate()
 
-    const selectedFunc = (val) =>{
-        setSelectedCategory((prev) => {
-            if(prev === val){
-                return "none"
-            }else{
-                return val
-            }
-        })
-    }
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(searchText), SEARCH_DEBOUNCE_MS)
+        return () => clearTimeout(timer)
+    }, [searchText])
 
-    const toggleFunc = (param) =>{
-        if(param === 'CUSTOM'){
-            if(showCustom){
-                setShowCustom(false)
-            }else{
-                setShowCustom(true)
-            }
+    const selectedFunc = useCallback((val) => {
+        setSelectedCategory((prev) => (prev === val ? "none" : val))
+    }, [])
+
+    const toggleFunc = (param) => {
+        if (param === "CUSTOM") {
+            setShowCustom((prev) => !prev)
             setShowAkto(false)
-        }else{
-            if(showAkto){
-                setShowAkto(false)
-            }else{
-                setShowAkto(true)
-            }
+        } else {
+            setShowAkto((prev) => !prev)
             setShowCustom(false)
         }
     }
 
-    const searchFunction = (cloneObj, searchString) =>{
-        let customTotal = 0
-        let aktoTotal = 0
-
-        for (let key in cloneObj.aktoTests) {
-            if (cloneObj.aktoTests.hasOwnProperty(key)) {
-                let obj = cloneObj.aktoTests[key]
-                let arr = obj.filter((test)=>{
-                    let name = test.label.toString().toLowerCase().replace(/ /g, "")
-                    let category = test.category.toString().toLowerCase().replace(/ /g, "")
-                    let content = cloneObj.mapTestToData[test.label].content.toString().toLowerCase();
-                    if(name.includes(searchString) || category.includes(searchString) || content.includes(searchString)){
-                        aktoTotal++
-                        return true
-                    }
-                })
-                cloneObj.aktoTests[key] = arr
-            }
+    useEffect(() => {
+        if (!testObj) return
+        const q = convertFunc.normalizeSearchTerm(debouncedSearch)
+        let searchObj = testObj
+        if (q) {
+            const filtered = convertFunc.getFilteredExplorerData(testObj, debouncedSearch, contentSearchIndex)
+            searchObj = convertFunc.toFilteredTestObj(testObj, filtered)
         }
-
-        for (let key in cloneObj.customTests) {
-            if (cloneObj.customTests.hasOwnProperty(key)) {
-                let obj = cloneObj.customTests[key]
-                let arr = obj.filter((test)=>{
-                    let name = test.label.toString().toLowerCase().replace(/ /g, "")
-                    let category = test.category.toString().toLowerCase().replace(/ /g, "")
-                    let content = cloneObj.mapTestToData[test.label].content.toString().toLowerCase();
-                    if(name.includes(searchString) || category.includes(searchString) || content.includes(searchString)){
-                        customTotal++
-                        return true
-                    }
-                })
-                cloneObj.customTests[key] = arr
-            }
-        }
-
-        cloneObj.totalCustomTests = customTotal
-        cloneObj.totalAktoTests = aktoTotal
-        return cloneObj
-    }
-
-    const searchResult = (val) => {
-        let cloneObj = JSON.parse(JSON.stringify(testObj))
-        setSearchText(val)
-        let searchObj = searchFunction(cloneObj, val.toLowerCase())
-
-        setCustomItems(convertFunc.getNavigationItems(searchObj,"CUSTOM",selectedFunc))
-        setAktoItems(convertFunc.getNavigationItems(searchObj,"Akto",selectedFunc))
-    }
-
-    useEffect(()=>{
-        setCustomItems(convertFunc.getNavigationItems(testObj,"CUSTOM",selectedFunc))
-        setAktoItems(convertFunc.getNavigationItems(testObj,"Akto",selectedFunc))
-    },[testObj])
+        setCustomItems(convertFunc.getNavigationItems(searchObj, "CUSTOM", selectedFunc))
+        setAktoItems(convertFunc.getNavigationItems(searchObj, "Akto", selectedFunc))
+    }, [testObj, debouncedSearch, contentSearchIndex, selectedFunc])
 
     useEffect(() => {
-        if (selectedTest) {
-            const testData = testObj.mapTestToData[selectedTest.label]
-            if(testData.type === 'CUSTOM'){
-                setSelectedCategory(testData.superCategory + '_custom')
-            }else{
-                setSelectedCategory(testData.superCategory + '_akto')
-            }
+        if (!selectedTestLabel || !testObj) return
+        const testData = testObj.mapTestToData[selectedTestLabel]
+        if (!testData) return
+        if (testData.type === "CUSTOM") {
+            setSelectedCategory(testData.superCategory + "_custom")
+        } else {
+            setSelectedCategory(testData.superCategory + "_akto")
         }
-     
-    }, [selectedTest])
+    }, [selectedTestLabel, testObj])
 
-    useEffect(()=> {
+    useEffect(() => {
+        if (!testObj) return
+        const selectedTest = TestEditorStore.getState().selectedTest
+        if (!selectedTest) return
         const testData = testObj.mapTestToData[selectedTest.label]
-        toggleFunc(testData.type)
-    },[])
-
-    function getItems(aktoItems){
-        let arr = aktoItems.map(obj => ({
-            ...obj,
-            selected: selectedCategory === (obj.key+obj.param),
-            icon: selectedCategory === (obj.key+obj.param) ? ChevronDownMinor : ChevronRightMinor,
-            subNavigationItems: obj.subNavigationItems.map((item)=>{
-                return{
-                    label: (
-                        <Tooltip content={item.label} dismissOnMouseOut width="wide" preferredPosition="below">
-                            <div className={item.label === selectedTest.label ? "active-left-test" : ""}>
-                                <Text 
-                                    variant={item.label === selectedTest.label ? "headingSm" : "bodyMd"} as="h4" 
-                                    color={item.label === selectedTest.label ? "default" : "subdued"} truncate
-                                >
-                                    {item.label} 
-                                </Text>
-                            </div>
-                        </Tooltip>
-                    ),
-                    onClick: (()=> {
-                        navigate(`/dashboard/test-editor/${item.value}`)
-                        setSelectedTest(item)                        
-                    }),
-                    key: item.value
-                }
-            })
-        }))
-        if(isAgenticSecurityCategory()){
-            arr = func.sortByCategoryPriority(arr, 'key')
+        if (testData?.type) {
+            toggleFunc(testData.type)
         }
-        
-        return arr;
-    }
+    }, [])
+
+    const onSelectTest = useCallback((item) => {
+        navigate(`/dashboard/test-editor/${item.value}`)
+        setSelectedTest(item)
+    }, [navigate, setSelectedTest])
+
+    const buildSubNavigationItems = useCallback((tests) => {
+        if (!tests?.length) return []
+        if (tests.length > VIRTUAL_LIST_THRESHOLD) {
+            return [{
+                label: (
+                    <VirtualTestRows
+                        tests={tests}
+                        selectedTestLabel={selectedTestLabel}
+                        onSelectTest={onSelectTest}
+                    />
+                ),
+                onClick: () => {},
+                key: "virtual-test-list",
+            }]
+        }
+        return tests.map((item) => ({
+            label: (
+                <Tooltip content={item.label} dismissOnMouseOut width="wide" preferredPosition="below">
+                    <div className={item.label === selectedTestLabel ? "active-left-test" : ""}>
+                        <Text
+                            variant={item.label === selectedTestLabel ? "headingSm" : "bodyMd"}
+                            as="h4"
+                            color={item.label === selectedTestLabel ? "default" : "subdued"}
+                            truncate
+                        >
+                            {item.label}
+                        </Text>
+                    </div>
+                </Tooltip>
+            ),
+            onClick: () => onSelectTest(item),
+            key: item.value,
+        }))
+    }, [selectedTestLabel, onSelectTest])
+
+    const getItems = useCallback((navItems) => {
+        let arr = navItems.map((obj) => {
+            const isExpanded = selectedCategory === obj.key + obj.param
+            return {
+                ...obj,
+                selected: isExpanded,
+                icon: isExpanded ? ChevronDownMinor : ChevronRightMinor,
+                subNavigationItems: isExpanded ? buildSubNavigationItems(obj.subNavigationItems) : [],
+            }
+        })
+        if (isAgenticSecurityCategory()) {
+            arr = func.sortByCategoryPriority(arr, "key")
+        }
+        return arr
+    }, [selectedCategory, buildSubNavigationItems])
+
+    const customNavItems = useMemo(() => getItems(customItems.items), [customItems.items, getItems])
+    const aktoNavItems = useMemo(() => getItems(aktoItems.items), [aktoItems.items, getItems])
+
     return (
-        <div className="editor-navbar" style={{'overflowY' : 'scroll', overflowX: 'hidden', width: '18rem'}}>
+        <div className="editor-navbar" style={{ overflowY: "scroll", overflowX: "hidden", width: "18rem" }}>
             <Navigation location="/">
                 <VerticalStack gap="4">
-                    <TextField  
-                        id={"test-search"}
-                        prefix={<Icon source={SearchMinor} />} 
-                        onChange={searchResult} 
+                    <TextField
+                        id="test-search"
+                        prefix={<Icon source={SearchMinor} />}
+                        onChange={setSearchText}
                         value={searchText}
-                        placeholder={`Search for Tests`}
+                        placeholder="Search for Tests"
+                        autoComplete="off"
                     />
 
                     <Box>
-                        <Button id={"create-custom-test-button"}
-                            plain monochrome onClick={()=> toggleFunc("CUSTOM")} removeUnderline fullWidth
+                        <Button
+                            id="create-custom-test-button"
+                            plain
+                            monochrome
+                            onClick={() => toggleFunc("CUSTOM")}
+                            removeUnderline
+                            fullWidth
                         >
                             <HorizontalStack align="space-between">
-                                <HorizontalStack gap={"1"}>
+                                <HorizontalStack gap="1">
                                     <Box>
-                                        <Icon source={showCustom ? ChevronDownMinor : ChevronRightMinor}/>
+                                        <Icon source={showCustom ? ChevronDownMinor : ChevronRightMinor} />
                                     </Box>
-                                    <TitleWithInfo 
-                                        tooltipContent={"Custom tests"} 
-                                        titleText={"Custom"} 
-                                        textProps={{variant: 'headingMd'}} 
-                                        docsUrl={"https://docs.akto.io/test-editor/concepts/custom-test"}
+                                    <TitleWithInfo
+                                        tooltipContent="Custom tests"
+                                        titleText="Custom"
+                                        textProps={{ variant: "headingMd" }}
+                                        docsUrl="https://docs.akto.io/test-editor/concepts/custom-test"
                                     />
                                 </HorizontalStack>
-                                <div style={{marginRight: '-2px'}}>
+                                <div style={{ marginRight: "-2px" }}>
                                     <Badge size="small" status="new">{customItems.count.toString()}</Badge>
                                 </div>
-                                {/* <Box onClick={(e) => addCustomTest(e)}>
-                                    <Icon source={CirclePlusMinor} />
-                                </Box> */}
                             </HorizontalStack>
                         </Button>
-                        {showCustom ? <Navigation.Section items={getItems(customItems.items)} /> : null}
+                        {showCustom ? <Navigation.Section items={customNavItems} /> : null}
                     </Box>
                     <Box>
                         <Button plain monochrome onClick={() => toggleFunc("Akto")} removeUnderline fullWidth>
                             <HorizontalStack align="space-between">
                                 <HorizontalStack gap="1">
                                     <Box>
-                                        <Icon source={showAkto ? ChevronDownMinor : ChevronRightMinor}/>
+                                        <Icon source={showAkto ? ChevronDownMinor : ChevronRightMinor} />
                                     </Box>
-                                    <TitleWithInfo 
-                                        tooltipContent={"Akto's test library"} 
-                                        titleText={"Akto default"} 
-                                        textProps={{variant: 'headingMd'}} 
-                                        docsUrl={"https://docs.akto.io/test-editor/concepts/test-library"}
+                                    <TitleWithInfo
+                                        tooltipContent="Akto's test library"
+                                        titleText="Akto default"
+                                        textProps={{ variant: "headingMd" }}
+                                        docsUrl="https://docs.akto.io/test-editor/concepts/test-library"
                                     />
                                 </HorizontalStack>
-                                <div style={{marginRight: '-2px'}}>
+                                <div style={{ marginRight: "-2px" }}>
                                     <Badge size="small" status="new">{aktoItems.count.toString()}</Badge>
                                 </div>
                             </HorizontalStack>
                         </Button>
-                        {showAkto ? <Navigation.Section items={getItems(aktoItems.items)} /> : null}
+                        {showAkto ? <Navigation.Section items={aktoNavItems} /> : null}
                     </Box>
                 </VerticalStack>
             </Navigation>

@@ -9,6 +9,7 @@ import api from "../../testing/api"
 import testEditorRequests from "../api";
 import func from "@/util/func";
 import TestEditorStore from "../testEditorStore"
+import editorContentBridge from "../editorContentBridge"
 import "../TestEditor.css"
 import TestRunResultPage from "../../testing/TestRunResultPage/TestRunResultPage";
 import PersistStore from "../../../../main/PersistStore";
@@ -44,7 +45,6 @@ const SampleApi = () => {
     const [callbackStatus, setCallbackStatus] = useState(null)
     const [isCheckingCallback, setIsCheckingCallback] = useState(false)
 
-    const currentContent = TestEditorStore(state => state.currentContent)
     const selectedTest = TestEditorStore(state => state.selectedTest)
     const vulnerableRequestsObj = TestEditorStore(state => state.vulnerableRequestsMap)
     const defaultRequest = TestEditorStore(state => state.defaultRequest)
@@ -202,13 +202,19 @@ const SampleApi = () => {
         }
     }, [testResult])
 
-    useEffect(()=>{
-        if(currentContent && currentContent.length > 0 && currentContent.includes("test_mode") && currentContent.includes(": agent")) {
-            setIsChatBotOpen(true)
-        }else{
-            setIsChatBotOpen(false)
+    useEffect(() => {
+        const checkAgentMode = () => {
+            const content = editorContentBridge.getContent()
+            if (content && content.includes("test_mode") && content.includes(": agent")) {
+                setIsChatBotOpen(true)
+            } else {
+                setIsChatBotOpen(false)
+            }
         }
-    }, [currentContent])
+        checkAgentMode()
+        const interval = setInterval(checkAgentMode, 500)
+        return () => clearInterval(interval)
+    }, [selectedTest?.value])
 
 
     const handleTabChange = (selectedTabIndex) => {
@@ -359,7 +365,7 @@ const SampleApi = () => {
             overriddenTestAppUrl: hasOverriddenTestAppUrl ? overriddenTestAppUrl : "",
             testRoleId: selectedRole || undefined
         };
-        let resp = await testEditorRequests.runTestForTemplate(currentContent, apiKeyInfo, sampleDataList, selectedMiniTestingServiceName, testingRunConfig)
+        let resp = await testEditorRequests.runTestForTemplate(editorContentBridge.getContent(), apiKeyInfo, sampleDataList, selectedMiniTestingServiceName, testingRunConfig)
             if(resp?.testingRunPlaygroundHexId != null) {
                 await new Promise((resolve) => {
                     intervalRef.current = startPlaygroundPolling({

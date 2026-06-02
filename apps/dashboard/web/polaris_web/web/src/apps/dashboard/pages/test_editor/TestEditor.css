@@ -52,6 +52,15 @@
     color: unset !important;
 }
 
+.test-editor-virtual-subnav {
+    margin-left: 2.2vw;
+    max-width: 17vw;
+}
+
+.test-editor-virtual-subnav .Polaris-Navigation__Item {
+    padding-left: unset !important;
+}
+
 .editor-header {
     display: flex;
     justify-content: space-between;

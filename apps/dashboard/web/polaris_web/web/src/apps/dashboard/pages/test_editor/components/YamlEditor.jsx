@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Box, Button, Divider, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Button, Divider, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris"
 import { InfoMinor, ClipboardMinor, CircleTickMinor, CircleCancelMinor } from "@shopify/polaris-icons"
 
 import Store from "../../../store";
 import TestEditorStore from "../testEditorStore";
-
 import testEditorRequests from "../api";
+import editorContentBridge from "../editorContentBridge";
 
 import func from "@/util/func";
 
@@ -39,7 +39,9 @@ const YamlEditor = ({ fetchAllTests }) => {
     const selectedTest = TestEditorStore(state => state.selectedTest)
     const setSelectedTest = TestEditorStore(state => state.setSelectedTest)
     const setTestsObj = TestEditorStore(state => state.setTestsObj)
-    const setCurrentContent = TestEditorStore(state => state.setCurrentContent)
+    const contentCache = TestEditorStore(state => state.contentCache)
+    const setContentCacheEntry = TestEditorStore(state => state.setContentCacheEntry)
+    const updateContentSearchIndexEntry = TestEditorStore(state => state.updateContentSearchIndexEntry)
 
     const [ isEdited, setIsEdited ] = useState(false)
     const [ editorInstance, _setEditorInstance ] = useState()
@@ -50,13 +52,18 @@ const YamlEditor = ({ fetchAllTests }) => {
     }
 
     const yamlEditorRef = useRef(null)
+    const loadRequestRef = useRef(0)
+    const savedContentRef = useRef("")
+
+    useEffect(() => {
+        editorContentBridge.setContentGetter(() => editorInstanceRef.current?.getValue() || "")
+        return () => editorContentBridge.setContentGetter(() => "")
+    }, [])
 
     const handleYamlUpdate = () => {
         const Editor = editorInstanceRef.current
-        const currentYaml = Editor.getValue()
-        setCurrentContent(currentYaml)
-        const existingYaml = testsObj.mapTestToData[selectedTest.label].content 
-        setIsEdited(currentYaml !== existingYaml)
+        if (!Editor) return
+        setIsEdited(Editor.getValue() !== savedContentRef.current)
     }
 
     const handleSave = async () => {
@@ -69,15 +76,22 @@ const YamlEditor = ({ fetchAllTests }) => {
                 isError: false,
                 message: "Test saved successfully!"
             })
-            navigate(`/dashboard/test-editor/${addTestTemplateResponse.finalTestId}`) 
+            const newContent = Editor.getValue()
+            const savedTestId = addTestTemplateResponse.finalTestId || selectedTest.value
+            savedContentRef.current = newContent
+            setContentCacheEntry(savedTestId, newContent)
+            updateContentSearchIndexEntry(savedTestId, newContent)
+            TestEditorStore.getState().setCurrentContent(newContent)
+            setIsEdited(false)
+            navigate(`/dashboard/test-editor/${addTestTemplateResponse.finalTestId}`)
             fetchAllTests()
         } catch(error) {
-            
+
         }
-        
+
     }
-    
-    useEffect(()=>{        
+
+    useEffect(() => {
         let Editor = null
 
         if (!editorInstance) {
@@ -90,7 +104,7 @@ const YamlEditor = ({ fetchAllTests }) => {
                 scrollBeyondLastLine: false,
                 theme: "customTheme"
               }
-      
+
                 editorSetup.registerLanguage()
                 editorSetup.setTokenizer()
                 editorSetup.setEditorTheme()
@@ -104,12 +118,35 @@ const YamlEditor = ({ fetchAllTests }) => {
             Editor = editorInstance
         }
 
-        if (selectedTest) {
-            const value = testsObj.mapTestToData[selectedTest.label].content
-            Editor.setValue(value)
+        if (!selectedTest) return
+
+        const requestId = ++loadRequestRef.current
+        const testId = selectedTest.value
+        const cached = contentCache[testId]
+
+        const applyContent = (value) => {
+            if (requestId !== loadRequestRef.current) return
+            Editor.setValue(value || "")
+            savedContentRef.current = value || ""
+            TestEditorStore.getState().setCurrentContent(value || "")
             setIsEdited(false)
-        }    
-      }, [selectedTest])
+        }
+
+        if (cached !== undefined) {
+            applyContent(cached)
+            return
+        }
+
+        testEditorRequests.fetchTestContent(testId).then((resp) => {
+            const value = typeof resp === "string" ? resp : (resp?.content ?? "")
+            setContentCacheEntry(testId, value)
+            applyContent(value)
+        }).catch(() => {
+            if (requestId === loadRequestRef.current) {
+                func.setToast(true, true, "Failed to load test content")
+            }
+        })
+      }, [selectedTest?.value])
 
     const copyTestName = () =>{
         func.copyToClipboard(editorInstance.getValue(), ref)
@@ -125,10 +162,10 @@ const YamlEditor = ({ fetchAllTests }) => {
             setSelectedTest({...selectedTest, inactive: newVal})
             let obj = {...testsObj}
             let dataObj = obj.mapTestToData[selectedTest.label]
-            obj.mapTestToData[selectedTest.label] = {...dataObj, 
+            obj.mapTestToData[selectedTest.label] = {...dataObj,
                 lastUpdated: func.prettifyEpoch(func.timeNow()), inactive: selectedTest.inactive}
             let type = dataObj.type === 'CUSTOM' ? 'customTests' : 'aktoTests'
-            
+
             obj[type][dataObj.superCategory].forEach((x, i) => {
                 if(x.value == selectedTest.value){
                     obj[type][dataObj.superCategory][i].inactive = newVal
@@ -149,16 +186,16 @@ const YamlEditor = ({ fetchAllTests }) => {
                         <Text variant="headingSm" as="h5" truncate>{selectedTest.label + '.yaml'}</Text>
                     </Tooltip>
                     <Tooltip content={`Last Updated ${testsObj.mapTestToData[selectedTest.label].lastUpdated}`} preferredPosition="below" dismissOnMouseOut>
-                        <Icon source={InfoMinor}/> 
+                        <Icon source={InfoMinor}/>
                     </Tooltip>
                     <Tooltip content="Copy Content" dismissOnMouseOut preferredPosition="below">
                         <Button icon={ClipboardMinor} plain onClick={copyTestName} />
-                    </Tooltip>  
+                    </Tooltip>
                     <Tooltip content={`Set as ${selectedTest.inactive ? "active" : "inactive" }`} dismissOnMouseOut preferredPosition="below">
                         <Button icon={selectedTest.inactive ? CircleTickMinor : CircleCancelMinor} plain onClick={setTestInactive} />
-                    </Tooltip>  
+                    </Tooltip>
                 </HorizontalStack>
-        
+
                 <Button id={"save-button"} disabled={!isEdited} onClick={handleSave} size="slim">Save</Button>
             </div>
 

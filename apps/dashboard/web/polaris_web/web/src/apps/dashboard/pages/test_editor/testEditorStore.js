@@ -1,5 +1,6 @@
 import {create} from "zustand"
 import {devtools} from "zustand/middleware"
+import convertFunc from "./transform"
 
 let testEditorStore = (set)=>({
     testsObj : null,
@@ -25,6 +26,31 @@ let testEditorStore = (set)=>({
     currentContent: null,
     setCurrentContent:(currentContent)=>{
         set({currentContent: currentContent})
+    },
+
+    contentCache: {},
+    hydrateContentCache:(entries)=>{
+        set((state) => ({
+            contentCache: { ...state.contentCache, ...entries },
+        }))
+    },
+    setContentCacheEntry:(testId, content)=>{
+        set((state) => ({
+            contentCache: { ...state.contentCache, [testId]: content },
+        }))
+    },
+
+    contentSearchIndex: {},
+    setContentSearchIndex:(contentSearchIndex)=>{
+        set({ contentSearchIndex })
+    },
+    updateContentSearchIndexEntry:(testId, content)=>{
+        set((state) => ({
+            contentSearchIndex: {
+                ...(state.contentSearchIndex || {}),
+                [testId]: convertFunc.normalizeSearchTerm(content),
+            },
+        }))
     },
 
     selectedRole: null,

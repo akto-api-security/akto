@@ -26,6 +26,8 @@ const TestEditor = () => {
     const navigate = useNavigate()
 
     const setTestsObj = TestEditorStore(state => state.setTestsObj)
+    const setContentSearchIndex = TestEditorStore(state => state.setContentSearchIndex)
+    const hydrateContentCache = TestEditorStore(state => state.hydrateContentCache)
     const setSelectedTest = TestEditorStore(state => state.setSelectedTest)
     const setVulnerableRequestMap = TestEditorStore(state => state.setVulnerableRequestMap)
     const setDefaultRequest = TestEditorStore(state => state.setDefaultRequest)
@@ -65,48 +67,55 @@ const TestEditor = () => {
     }
 
     const fetchAllTests = async () => {
-        const testId = window.location.pathname.split('/').pop();
-
-
+        const testId = window.location.pathname.split('/').pop()
         const subCategories = await fetchSubcategories()
-        let vulnerableRequests = []
-        try {
-            vulnerableRequests = await fetchVulnerableRequests()
-        } catch (err) {
-            console.error(err)
-        }
 
         if (subCategories && subCategories.length > 0) {
             try {
+                const cacheEntries = {}
+                subCategories.forEach((x) => {
+                    if (x?.content) {
+                        cacheEntries[x.name] = x.content
+                    }
+                })
+                hydrateContentCache(cacheEntries)
+
+                convertFunc.buildContentSearchIndexIdle(subCategories, (index) => {
+                    setContentSearchIndex(index)
+                })
+
+                subCategories.forEach((x) => func.trimContentFromSubCategory(x))
+
                 const obj = convertFunc.mapCategoryToSubcategory(subCategories)
                 setTestsObj(obj)
-    
-                const testName = obj.mapIdtoTest[testId]
-                const selectedTestObj = {
-                    label: testName,
-                    value: testId,
-                    category: obj.mapTestToData[testName].category,
-                    inactive: obj.mapTestToData[testName].inactive
-                }
-                setSelectedTest(selectedTestObj)
-    
-                const requestObj = convertFunc.mapVulnerableRequests(vulnerableRequests)
-                setVulnerableRequestMap(requestObj)
-                const vulnerableRequest = vulnerableRequests?.length > 0 ? vulnerableRequests[0]?.id : {}
-                setDefaultRequest(vulnerableRequest)
 
-                let subCategoryMap = {};
+                const testName = obj.mapIdtoTest[testId]
+                if (testName) {
+                    setSelectedTest({
+                        label: testName,
+                        value: testId,
+                        category: obj.mapTestToData[testName].category,
+                        inactive: obj.mapTestToData[testName].inactive
+                    })
+                }
+
+                const subCategoryMap = {}
                 subCategories.forEach((x) => {
-                    subCategoryMap[x.name] = x;
-                    func.trimContentFromSubCategory(x)
-                });
-                setSubCategoryMap(subCategoryMap);
-    
-                setLoading(false) 
+                    subCategoryMap[x.name] = x
+                })
+                setSubCategoryMap(subCategoryMap)
+
+                setLoading(false)
+
+                fetchVulnerableRequests().then((fetchedRequests) => {
+                    const requestObj = convertFunc.mapVulnerableRequests(fetchedRequests)
+                    setVulnerableRequestMap(requestObj)
+                    const vulnerableRequest = fetchedRequests?.length > 0 ? fetchedRequests[0]?.id : {}
+                    setDefaultRequest(vulnerableRequest)
+                }).catch((err) => console.error(err))
             } catch (error) {
                 setLoading(false)
             }
-            
         }
     }
 
@@ -115,8 +124,6 @@ const TestEditor = () => {
         console.log("add test")
     }
 
-    // Get category-specific learn more data
-    // Note: This logic mirrors PageWithMultipleCards.jsx for consistent category handling
     const learnMoreObjEditor = useMemo(() => {
         const category = getDashboardCategory()
         const categoryKey = category?.toLowerCase().replace(/ /g, '_')
@@ -124,7 +131,6 @@ const TestEditor = () => {
 
         if (!pageData) return null
 
-        // Check if category-specific data exists
         if (pageData[categoryKey] && typeof pageData[categoryKey] === 'object') {
             const categoryData = pageData[categoryKey]
             return {
@@ -135,7 +141,6 @@ const TestEditor = () => {
             }
         }
 
-        // Fallback to root-level data
         const hasRootDocs = Array.isArray(pageData.docsLink)
         const hasRootVideos = Array.isArray(pageData.videoLink)
 
@@ -149,7 +154,7 @@ const TestEditor = () => {
         }
 
         return null
-    }, []) // Empty dependency array as category and learnMoreObject are stable
+    }, [])
 
     const headerComp = (
         <div className="header-css">
@@ -165,14 +170,10 @@ const TestEditor = () => {
             )}
         </div>
     )
-    
 
     const headerEditor = (
         <TopBar secondaryMenu={headerComp} />
     )
-
-   
-
 
     const defaultId = "REMOVE_TOKENS";
 
@@ -188,19 +189,14 @@ const TestEditor = () => {
     return (
         loading ?
             <SpinnerCentered height="100vh" text={`Loading tests... ${testsLoaded} tests loaded`}/>
-        : 
-        <Frame topBar={
-            headerEditor
-        }
-            navigation={ <TestEditorFileExplorer addCustomTest={(e) => addCustomTest(e)}/> }
-        >
+        :
+        <Frame topBar={headerEditor} navigation={<TestEditorFileExplorer addCustomTest={(e) => addCustomTest(e)}/>}>
             <Box paddingInlineStart={12}>
                 <HorizontalGrid columns={2}>
                     <YamlEditor fetchAllTests={fetchAllTests} />
                     <SampleApi />
                 </HorizontalGrid>
             </Box>
-
         </Frame>
     )
 }
