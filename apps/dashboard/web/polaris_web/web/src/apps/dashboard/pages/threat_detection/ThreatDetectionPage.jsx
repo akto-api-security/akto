@@ -523,11 +523,11 @@ function ThreatDetectionPage() {
         };
 
         const DEMO_ACCOUNT_ID = 1669322524;
-        const REAL_ACCOUNT_ID = 1726615470;
         const activeAccount = Number(window.ACTIVE_ACCOUNT);
+        const isAktoUser = (window.USER_NAME || '').includes('@akto.io');
 
         const fetchLatencyData = async () => {
-            if (activeAccount !== REAL_ACCOUNT_ID && activeAccount !== DEMO_ACCOUNT_ID) return;
+            if (!isAktoUser) return;
 
             if (activeAccount === DEMO_ACCOUNT_ID) {
                 const latencyValues = [
@@ -704,7 +704,7 @@ function ThreatDetectionPage() {
     // Normal mode - show table, charts, and sidebar
     const components = [
         <ChartComponent subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
-        ...(([1726615470, 1669322524].includes(Number(window.ACTIVE_ACCOUNT))) ? [
+        ...((window.USER_NAME || '').includes('@akto.io') ? [
             <P95LatencyGraph
                 key="threat-detection-latency"
                 title={`${mapLabel("Threat", getDashboardCategory())} Detection Latency`}
