@@ -126,11 +126,7 @@ for m = 1, numMessages do
         if count == 1 then
             redis.call('HINCRBY', distKey, newBucket, 1)
         elseif oldBucket ~= newBucket then
-            -- Only decrement old bucket if it's positive (prevent negative counts due to CMS expiration or out-of-order messages)
-            local oldBucketValue = redis.call('HGET', distKey, oldBucket)
-            if oldBucketValue and tonumber(oldBucketValue) > 0 then
-                redis.call('HINCRBY', distKey, oldBucket, -1)
-            end
+            redis.call('HINCRBY', distKey, oldBucket, -1)
             redis.call('HINCRBY', distKey, newBucket, 1)
         end
 
