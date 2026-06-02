@@ -83,12 +83,6 @@ const getHeaders = () => {
       maxWidth: "200px",
     },
     {
-      text: "successfulExploit",
-      value: "successfulComp",
-      title: "Successful Exploit",
-      maxWidth: "90px",
-    },
-    {
       text: "Collection",
       value: "apiCollectionName",
       title: "Collection",
@@ -516,10 +510,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     });
     
     const sort = { [sortKey]: sortOrder };
-    const successfulFilterValue = Array.isArray(filters?.successfulExploit) ? filters?.successfulExploit?.[0] : filters?.successfulExploit;
-    const successfulBool = (successfulFilterValue === true || successfulFilterValue === 'true') ? true
-                          : (successfulFilterValue === false || successfulFilterValue === 'false') ? false
-                          : undefined;
     const res = await api.fetchSuspectSampleData(
       skip,
       sourceIpsFilter,
@@ -532,7 +522,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       latestAttack,
       limit,
       currentTab.toUpperCase(),
-      successfulBool,
+      undefined,
       label, // Use the label prop (THREAT or GUARDRAIL)
       hostFilter,
       latestApiOrigRegex
@@ -586,9 +576,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
-        successfulComp: (
-          <Badge size="small">{x?.successfulExploit ? "True" : "False"}</Badge>
-        ),
         severityComp: (<div className={`badge-wrapper-${severity}`}>
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
@@ -703,16 +690,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         type: 'select',
         choices: attackTypeChoices,
         multiple: true
-      },
-      {
-        key: 'successfulExploit',
-        label: 'Successful Exploit',
-        title: 'Successful Exploit',
-        choices: [
-          { label: 'True', value: 'true' },
-          { label: 'False', value: 'false' }
-        ],
-        singleSelect: true
       },
     ];
   }
