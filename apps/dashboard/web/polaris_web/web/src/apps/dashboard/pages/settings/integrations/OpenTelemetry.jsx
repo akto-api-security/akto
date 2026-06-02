@@ -101,15 +101,15 @@ function OpenTelemetry() {
             <LegacyCard.Section>
                 <VerticalStack gap={"4"}>
                     <TextField
-                        label="OLTP Endpoint"
-                        helpText="Specify the OLTP endpoint URL"
+                        label="OTLP Endpoint"
+                        helpText="Specify the OTLP endpoint URL"
                         value={endpoint}
                         onChange={setEndpoint}
                         requiredIndicator
                     />
                     <PasswordTextField
                         label="API Key"
-                        helpText="Specify the API key for authenticating with your OLTP endpoint."
+                        helpText="Specify the API key for authenticating with your OTLP endpoint."
                         field={apiKey === null ? '' : apiKey}
                         onFunc={true}
                         setField={setApiKey}
