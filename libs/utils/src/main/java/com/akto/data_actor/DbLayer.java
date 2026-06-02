@@ -125,6 +125,7 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.new_relic.NewRelicUtils;
+import com.akto.dao.AgentUsersDao;
 import com.akto.dao.billing.UningestedApiOverageDao;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.usage.UsageMetricCalculator;
@@ -202,61 +203,6 @@ public class DbLayer {
         );
     }
 
-    private static final int rebootThresholdSeconds = 2 * 60; // 2 minutes 
-    private static void updateModuleEnvAndReboot(ModuleInfo moduleInfo) {
-
-        try {
-            Map<String, Object> additionalData = moduleInfo.getAdditionalData();
-            if (additionalData == null || !(additionalData.get("env") instanceof Map)) {
-                return;
-            }
-            Map<?, ?> env = (Map<?, ?>) additionalData.get("env");
-            Object val = env.get("AGGREGATION_RULES_ENABLED");
-            if (!"true".equalsIgnoreCase(String.valueOf(val))) {
-                return;
-            }
-        } catch (Exception ignored) {
-            return;
-        }
-
-        try {
-            int deltaTimeForReboot = Context.now() - rebootThresholdSeconds;
-
-
-            Bson moduleFilter = Filters.and(
-                Filters.eq(ModuleInfo.NAME, moduleInfo.getName()),
-                Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, deltaTimeForReboot),
-                Filters.ne(ModuleInfo.ADDITIONAL_DATA, null),
-                Filters.eq(ModuleInfo.ADDITIONAL_DATA + ".env.AGGREGATION_RULES_ENABLED", "true")
-            );
-
-
-            List<Bson> updates = new ArrayList<>();
-            updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".env.AGGREGATION_RULES_ENABLED", false));
-            updates.add(Updates.set(ModuleInfo._REBOOT, true));
-
-
-            ModuleInfoDao.instance.updateMany(moduleFilter, Updates.combine(updates));
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> env = (Map<String, Object>) moduleInfo.getAdditionalData().get("env");
-            env.put("AGGREGATION_RULES_ENABLED", "false");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private static List<Bson> buildAdditionalDataUpdates(Map<String, Object> additionalData) {
-        List<Bson> updates = new ArrayList<>();
-        if (additionalData == null || additionalData.isEmpty()) {
-            return updates;
-        }
-        for (Map.Entry<String, Object> entry : additionalData.entrySet()) {
-            updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + "." + entry.getKey(), entry.getValue()));
-        }
-        return updates;
-    }
-
     public static ModuleInfo updateModuleInfo(ModuleInfo moduleInfo) {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
@@ -267,10 +213,6 @@ public class DbLayer {
                 moduleInfo.setAdditionalData(new HashMap<>());
             }
             moduleInfo.getAdditionalData().put("tokenExpired", true);
-        }
-
-        if(Context.accountId.get() == 1758787662){
-           updateModuleEnvAndReboot(moduleInfo);
         }
 
         boolean forwardToNewRelic = NewRelicIntegrationDao.instance.findOne(new BasicDBObject()) != null;
@@ -297,10 +239,44 @@ public class DbLayer {
         updateList.add(Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()));
         updateList.addAll(buildAdditionalDataUpdates(moduleInfo.getAdditionalData()));
 
-        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(
+        ModuleInfo result = ModuleInfoDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
                 Updates.combine(updateList),
                 updateOptions);
+
+        syncAgentUserFromModuleInfo(moduleInfo);
+
+        return result;
+    }
+
+    private static List<Bson> buildAdditionalDataUpdates(Map<String, Object> additionalData) {
+        List<Bson> updates = new ArrayList<>();
+        if (additionalData == null || additionalData.isEmpty()) {
+            return updates;
+        }
+        for (Map.Entry<String, Object> entry : additionalData.entrySet()) {
+            updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + "." + entry.getKey(), entry.getValue()));
+        }
+        return updates;
+    }
+
+    private static void syncAgentUserFromModuleInfo(ModuleInfo moduleInfo) {
+        if (moduleInfo == null) {
+            return;
+        }
+        Map<String, Object> additionalData = moduleInfo.getAdditionalData();
+        if (additionalData == null || !additionalData.containsKey("username")) {
+            return;
+        }
+        try {
+            String userName = String.valueOf(additionalData.get("username"));
+            String teamName = additionalData.containsKey("team") ? String.valueOf(additionalData.get("team")) : null;
+            String userRole = additionalData.containsKey("userRole") ? String.valueOf(additionalData.get("userRole")) : null;
+            String device = moduleInfo.getName();
+            AgentUsersDao.instance.upsertAgentUser(userName, teamName, userRole, device, Context.now());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error syncing agent user from module info: " + e.getMessage(), LogDb.DB_ABS);
+        }
     }
 
     public static void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList) {
@@ -332,6 +308,10 @@ public class DbLayer {
         }
 
         ModuleInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
+
+        for (ModuleInfo moduleInfo : moduleInfoList) {
+            syncAgentUserFromModuleInfo(moduleInfo);
+        }
 
         ModuleHeartbeatProfilingMetrics.recordGaugeUpdates(moduleInfoList);
     }
@@ -480,8 +460,27 @@ public class DbLayer {
         );
     }
 
+    private static final int FETCH_API_INFO_LAST_SEEN_CUTOFF_DAYS = 15;
+
     public static List<ApiInfo> fetchApiInfos() {
-        return ApiInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(ApiInfo.RATELIMITS));
+        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(ApiInfo.RATELIMITS));
+        Set<Integer> deactivated = UsageMetricCalculator.getDeactivated();
+        int cutoffEpoch = Context.now() - FETCH_API_INFO_LAST_SEEN_CUTOFF_DAYS * 24 * 60 * 60;
+
+        apiInfos.removeIf(apiInfo -> {
+            // Never skip template URLs — they prevent URL explosion in the policy engine
+            if (APICatalog.isTemplateUrl(apiInfo.getId().getUrl())) {
+                return false;
+            }
+            // Skip static URLs from deactivated collections
+            if (!deactivated.isEmpty() && deactivated.contains(apiInfo.getId().getApiCollectionId())) {
+                return true;
+            }
+            // Skip static URLs with lastSeen older than cutoff
+            return apiInfo.getLastSeen() < cutoffEpoch;
+        });
+
+        return apiInfos;
     }
 
     public static List<ApiInfo> fetchApiInfosByCollection(int apiCollectionId) {
@@ -1332,6 +1331,10 @@ public class DbLayer {
         AwsApiGatewayLogsDao.instance.insertOne(log);
     }
 
+    public static void insertGuardrailsServiceLog(Log log) {
+        GuardrailsServiceLogsDao.instance.insertOne(log);
+    }
+
     public static void insertEndpointShieldLog(LogsEndpointShield log) {
         LogsEndpointShieldDao.instance.insertOne(log);
     }
@@ -1809,6 +1812,20 @@ public class DbLayer {
     public static List<TestingRunResult> fetchLatestTestingRunResult(String testingRunResultSummaryId) {
         ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
         return fetchLatestTestingRunResultFromComparison(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId));
+    }
+
+    /**
+     * True if any {@link TestingRunResult} exists for this summary (standard or vulnerable collection).
+     * Uses {@code findOne} + {@code _id} projection only.
+     */
+    public static boolean hasAnyTestingRunResultForSummary(String testingRunResultSummaryId) {
+        ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
+        Bson filter = Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId);
+        Bson projection = Projections.include(Constants.ID);
+        if (TestingRunResultDao.instance.findOne(filter, projection) != null) {
+            return true;
+        }
+        return VulnerableTestingRunResultDao.instance.findOne(filter, projection) != null;
     }
 
     public static TestingRunResultSummary fetchTestingRunResultSummary(String testingRunResultSummaryId) {
@@ -3076,7 +3093,20 @@ public class DbLayer {
         }
     }
 
-    public static void storeAgentQueryData(AgentQueryData agentQueryData) {
-        AgentQueryDataDao.instance.insertOne(agentQueryData);
+    public static Map<String, String> fetchDeviceUserMap() {
+        List<ModuleInfo> modules = ModuleInfoDao.instance.findAll(
+            Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD.name()),
+            Projections.include(ModuleInfo.NAME, ModuleInfo.ADDITIONAL_DATA + ".username")
+        );
+        Map<String, String> result = new HashMap<>();
+        if (modules == null) return result;
+        for (ModuleInfo m : modules) {
+            if (m.getName() == null || m.getAdditionalData() == null) continue;
+            Object usernameObj = m.getAdditionalData().get("username");
+            if (usernameObj instanceof String && !((String) usernameObj).isEmpty()) {
+                result.put(m.getName(), (String) usernameObj);
+            }
+        }
+        return result;
     }
 }

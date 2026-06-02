@@ -867,7 +867,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
-                <param name="excludeProperties">apiCollections\[\d+\]\.envType</param>
+                <param name="excludeProperties">apiCollections\[\d+\]\.(envType|displayName|sampleCollectionsDropped|genAICollection|startTs|sseCallbackUrl|userSetEnvType|deactivated|automated|skills|urlsCount|name|vxlanId|type|serviceGraphEdges)</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -2417,6 +2417,17 @@
             </result>
         </action>
 
+        <action name="api/insertGuardrailsServiceLog" class="com.akto.action.DbAction" method="insertGuardrailsServiceLog">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchPendingDastJobs" class="com.akto.action.DbAction" method="fetchPendingDastJobs">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2553,10 +2564,26 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-        <action name="api/storeAgentQueryData" class="com.akto.action.DbAction" method="storeAgentQueryData">
+
+        <action name="api/storeAgentQueryData" class="com.akto.action.DbAction" method="storeAgentQueryRecords">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchDeviceUserMap" class="com.akto.action.DbAction" method="fetchDeviceUserMap">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">deviceUserMap</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>

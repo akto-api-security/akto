@@ -3394,6 +3394,28 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void insertGuardrailsServiceLog(Log log) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertGuardrailsServiceLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                System.out.println("non 2xx response in insertGuardrailsServiceLog");
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("error in insertGuardrailsServiceLog" + e);
+            return;
+        }
+    }
+
     public void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
         BasicDBObject obj = new BasicDBObject();
         obj.put("dependencyNodeList", dependencyNodeList);
@@ -4467,17 +4489,4 @@ public class ClientActor extends DataActor {
         }
     }
 
-    @Override
-    public void storeAgentQueryData(AgentQueryData agentQueryData) {
-        Map<String, List<String>> headers = buildHeaders();
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("agentQueryData", agentQueryData);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeAgentQueryData", "", "POST", obj.toString(), headers, "");
-        try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in storeAgentQueryData" + e, LoggerMaker.LogDb.RUNTIME);
-            return;
-        }
-    }   
 }

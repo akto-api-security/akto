@@ -24,6 +24,7 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import org.json.JSONObject;
+import org.springframework.core.MethodParameter;
 
 @Getter
 @Setter
@@ -253,7 +254,7 @@ public class SkillValidationAction extends ActionSupport {
         else if (maliciousScore >= 0.3) severity = "MEDIUM";
 
         long now = System.currentTimeMillis() / 1000;
-        String endpoint = "/skill/" + skillName;
+        String endpoint = "/skills/" + skillName;
 
         String requestPayloadStr = String.format(
                 "{\"skill_name\":\"%s\",\"skill_description\":\"%s\",\"agent\":\"%s\",\"file_path\":\"%s\",\"content_length\":%d}",
@@ -264,7 +265,7 @@ public class SkillValidationAction extends ActionSupport {
                 maliciousScore, matchScore, escape(reason), severity, escape(evidence));
 
         JSONObject apiPayload = new JSONObject();
-        apiPayload.put("method", "SKILL");
+        apiPayload.put("method", Method.POST.name());
         apiPayload.put("requestPayload", requestPayloadStr);
         apiPayload.put("responsePayload", responsePayloadStr);
         apiPayload.put("ip", agentName);
@@ -292,7 +293,7 @@ public class SkillValidationAction extends ActionSupport {
         maliciousEvent.put("detectedAt", String.valueOf(now));
         maliciousEvent.put("latestApiIp", agentName);
         maliciousEvent.put("latestApiEndpoint", endpoint);
-        maliciousEvent.put("latestApiMethod", "SKILL");
+        maliciousEvent.put("latestApiMethod", Method.POST.name());
         maliciousEvent.put("latestApiCollectionId", now);
         maliciousEvent.put("latestApiPayload", apiPayload.toString());
         maliciousEvent.put("eventType", "EVENT_TYPE_SINGLE");

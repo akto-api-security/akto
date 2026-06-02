@@ -87,8 +87,12 @@ public class GuardrailPolicies {
     private SecretsDetection secretsDetection;
     private boolean applyToAllServers;
 
+    // Blocked host/path list — block-only glob patterns matched against the request host+path.
+    // Object-shaped so it can be extended later without a data migration.
+    private List<BlockedHostEntry> blockedHosts;
+
     // Modal config
-    private ArrayList<ModalConfig> modalConfigs;
+    private ArrayList<ModelConfig> modelConfigs;
 
     public String getHexId() {
         if (this.id != null) {
@@ -231,6 +235,22 @@ public class GuardrailPolicies {
         }
     }
 
+    /**
+     * A single blocked host entry (block-only). {@code pattern} is a glob matched against the
+     * request's {@code host + path}, where {@code *} matches any sequence (e.g. "chatgpt.com/*",
+     * "*.deepseek.com/*"). Kept as an object so it can be extended later without a migration.
+     */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class BlockedHostEntry {
+        private String pattern;
+
+        public BlockedHostEntry(String pattern) {
+            this.pattern = pattern;
+        }
+    }
+
     @Getter
     @Setter
     @NoArgsConstructor
@@ -325,20 +345,25 @@ public class GuardrailPolicies {
         }
     }
 
-
+    public enum ModelRole {
+        FAST_THREAT_FILTER,     
+        FAST_FALLBACK_SAFE_FILTER,  
+        FINAL_ARBITER    
+    }
     @Getter
     @Setter
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class ModalConfig {
+    public static class ModelConfig {
         private String provider;
         private String model;
         private String baseUrl;
-        private double blockThreshold;
-        private double allowThreshold;
         private int timeoutMs;
         private boolean strictBlock;
         private boolean strictAllow;
+        private ModelRole modelRole;
+        private String attackType;
+        private double safeDecisionThreshold;
     }
 
 }

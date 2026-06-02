@@ -2,6 +2,7 @@ package com.akto.bulk_update_util;
 
 import com.akto.dao.ApiInfoDao;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
@@ -51,6 +52,14 @@ public class ApiInfoBulkUpdate {
 
             // last seen
             subUpdates.add(Updates.set(ApiInfo.LAST_SEEN, apiInfo.getLastSeen()));
+
+            // tagsList — addEachToSet so USER/KUBERNETES tags are preserved; AKTO tags deduplicated by keyName+value+source
+            List<CollectionTags> tagsList = apiInfo.getTagsList();
+            if (tagsList != null && !tagsList.isEmpty()) {
+                subUpdates.add(Updates.addEachToSet(ApiInfo.TAGS_STRING, tagsList));
+            } else {
+                subUpdates.add(Updates.setOnInsert(ApiInfo.TAGS_STRING, new ArrayList<>()));
+            }
 
             // discoveredTimestamp (only set on insert, not update)
             if (apiInfo.getDiscoveredTimestamp() > 0) {

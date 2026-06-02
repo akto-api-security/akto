@@ -384,6 +384,8 @@ public abstract class DataActor {
 
     public abstract void insertAwsApiGatewayLog(Log log);
 
+    public abstract void insertGuardrailsServiceLog(Log log);
+
     public abstract void insertMCPAuditDataLog(McpAuditInfo auditInfo);
 
     public abstract List<McpReconRequest> fetchPendingMcpReconRequests();
@@ -406,5 +408,4 @@ public abstract class DataActor {
 
     public abstract void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook);
 
-    public abstract void storeAgentQueryData(AgentQueryData agentQueryData);
 }

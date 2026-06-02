@@ -562,6 +562,10 @@ public class DbActor extends DataActor {
         DbLayer.insertAwsApiGatewayLog(log);
     }
 
+    public void insertGuardrailsServiceLog(Log log) {
+        DbLayer.insertGuardrailsServiceLog(log);
+    }
+
     public void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
         DbLayer.bulkWriteDependencyNodes(dependencyNodeList);
     }
@@ -748,10 +752,5 @@ public class DbActor extends DataActor {
     @Override
     public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
         DbLayer.storeTestingRunWebhook(testingRunWebhook);
-    }
-
-    @Override
-    public void storeAgentQueryData(AgentQueryData agentQueryData) {
-        DbLayer.storeAgentQueryData(agentQueryData);
     }
 }

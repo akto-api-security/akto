@@ -51,6 +51,11 @@ public abstract class SlackAlerts {
         return new BasicDBObject("type", "section").append("text", textObj);
     }
 
+    protected BasicDBObject createPlainTextSection(String sectionText) {
+        BasicDBObject textObj = createText(sectionText, plaintextType);
+        return new BasicDBObject("type", "section").append("text", textObj);
+    }
+
     BasicDBList createNewIssuesSection(int index, NewIssuesModel newIssuesModel) {
         String issueTitle = "[New issue #"+index+"] " + "<"+newIssuesModel.getIssueUrl() + "|" + newIssuesModel.getIssueTitle() + ">";
         BasicDBObject textObj = createTextSection(issueTitle);
