@@ -7876,6 +7876,7 @@
             </result>
         </action>
 
+        <!-- Unauthenticated API: OAuth callback from Microsoft, state nonce used for verification -->
         <action name="copilot/oauth/callback" class="com.akto.action.CopilotOAuthCallbackAction">
             <interceptor-ref name="defaultStack"/>
             <result name="SUCCESS" type="redirect">${redirectUrl}</result>
