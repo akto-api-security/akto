@@ -7876,7 +7876,7 @@
             </result>
         </action>
 
-        <action name="copilot/oauth/callback" class="com.akto.action.CopilotStudioAction" method="oauthCallback">
+        <action name="copilot/oauth/callback" class="com.akto.action.CopilotOAuthCallbackAction">
             <interceptor-ref name="defaultStack"/>
             <result name="SUCCESS" type="redirect">${redirectUrl}</result>
             <result name="ERROR" type="redirect">${redirectUrl}</result>
