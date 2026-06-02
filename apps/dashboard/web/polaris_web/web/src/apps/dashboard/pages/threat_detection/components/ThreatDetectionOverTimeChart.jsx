@@ -5,6 +5,7 @@ import LineChart from "../../../components/charts/LineChart";
 import api from "../api";
 import observeFunc from "../../observe/transform";
 import dayjs from "dayjs";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
 const SERIES_COLORS = {
     totalThreats: "#E45858",
@@ -81,14 +82,15 @@ function ThreatDetectionOverTimeChart({ startTimestamp, endTimestamp }) {
                 const allDays = new Set([...dailyThreatMap.keys(), ...dailyActorMap.keys()]);
                 const sortedDays = Array.from(allDays).sort((a, b) => a - b);
 
+                const cat = getDashboardCategory();
                 setChartData([
                     {
-                        name: "Total Threats",
+                        name: mapLabel("Total Threats", cat),
                         data: sortedDays.map((d) => [d, dailyThreatMap.get(d) || 0]),
                         color: SERIES_COLORS.totalThreats,
                     },
                     {
-                        name: "Threat Actors",
+                        name: mapLabel("Threat Actors", cat),
                         data: sortedDays.map((d) => [d, dailyActorMap.get(d) || 0]),
                         color: SERIES_COLORS.threatActors,
                     },
@@ -104,17 +106,18 @@ function ThreatDetectionOverTimeChart({ startTimestamp, endTimestamp }) {
         return () => { mounted = false; };
     }, [startTimestamp, endTimestamp]);
 
+    const category = getDashboardCategory();
     const metricItems = [
-        { label: "Total Threats", value: summaryMetrics.totalThreats, change: changes.totalThreats },
-        { label: "APIs Under Threat", value: summaryMetrics.apisUnderThreat, change: changes.apisUnderThreat },
-        { label: "Threat Actors", value: summaryMetrics.threatActors, change: changes.threatActors },
+        { label: mapLabel("Total Threats", category), value: summaryMetrics.totalThreats, change: changes.totalThreats },
+        { label: mapLabel("APIs Under Threat", category), value: summaryMetrics.apisUnderThreat, change: changes.apisUnderThreat },
+        { label: mapLabel("Threat Actors", category), value: summaryMetrics.threatActors, change: changes.threatActors },
     ];
 
     return (
         <Card padding={5}>
             <VerticalStack gap="4">
                 <HorizontalStack align="space-between" blockAlign="center">
-                    <Text variant="headingMd">Threat detection over time</Text>
+                    <Text variant="headingMd">{mapLabel("Threat detection over time", category)}</Text>
                     {(
                         <HorizontalStack gap="1" blockAlign="center">
                             <Text variant="bodySm" color="subdued">Last 5 min:</Text>
