@@ -214,6 +214,7 @@ public class Executor {
                 // follow redirects = true for now
                 TestResult res = null;
                 if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
+                    // execute agentic test here
                     res = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
                 }else{
                     String url = testReq.getRequest().getUrl();

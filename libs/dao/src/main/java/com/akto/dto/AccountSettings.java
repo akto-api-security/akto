@@ -166,9 +166,6 @@ public class AccountSettings {
     public static final String ENDPOINT_SHIELD_SETTINGS = "endpointShieldSettings";
     @Getter @Setter private EndpointShieldSettings endpointShieldSettings;
 
-    public static final String COPILOT_AUTH_DETAILS = "copilotAuthDetails";
-    @Getter @Setter private CopilotAuthDetails copilotAuthDetails;
-
     public static final String MATCHING_PATTERNS_FOR_PROXY = "matchingPatternsForProxy";
     private Map<String, ProxyPatternInfo> matchingPatternsForProxy;
 
