@@ -1,6 +1,7 @@
 package com.akto.threat.backend.service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -37,47 +38,50 @@ public class ApiDistributionDataService {
         this.apiDistributionDataDao = apiDistributionDataDao;
     }
 
+    List<String> RL_ALLOWED_ACCOUNTS = Arrays.asList("1662680463");
     public ApiDistributionDataResponsePayload saveApiDistributionData(String accountId, ApiDistributionDataRequestPayload payload) {
-        return ApiDistributionDataResponsePayload.newBuilder().build();
-        // List<WriteModel<ApiDistributionDataModel>> bulkUpdates = new ArrayList<>();
+        if (!RL_ALLOWED_ACCOUNTS.contains(accountId)) {
+            return ApiDistributionDataResponsePayload.newBuilder().build();
+        }
+        List<WriteModel<ApiDistributionDataModel>> bulkUpdates = new ArrayList<>();
         
         
-        // Map<String, List<ApiDistributionDataRequestPayload.DistributionData>> frequencyBuckets = new HashMap<>();
+        Map<String, List<ApiDistributionDataRequestPayload.DistributionData>> frequencyBuckets = new HashMap<>();
 
-        // for (ApiDistributionDataRequestPayload.DistributionData protoData : payload.getDistributionDataList()) {
-        //     Bson filter = Filters.and(
-        //         Filters.eq("apiCollectionId", protoData.getApiCollectionId()),
-        //         Filters.eq("url", protoData.getUrl()),
-        //         Filters.eq("method", protoData.getMethod()),
-        //         Filters.eq("windowSize", protoData.getWindowSize()),
-        //         Filters.eq("windowStart", protoData.getWindowStartEpochMin())
-        //     );
+        for (ApiDistributionDataRequestPayload.DistributionData protoData : payload.getDistributionDataList()) {
+            Bson filter = Filters.and(
+                Filters.eq("apiCollectionId", protoData.getApiCollectionId()),
+                Filters.eq("url", protoData.getUrl()),
+                Filters.eq("method", protoData.getMethod()),
+                Filters.eq("windowSize", protoData.getWindowSize()),
+                Filters.eq("windowStart", protoData.getWindowStartEpochMin())
+            );
 
-        //     Bson update = Updates.combine(
-        //         Updates.set("distribution", protoData.getDistributionMap()),
-        //         Updates.set("apiCollectionId", protoData.getApiCollectionId()),
-        //         Updates.set("url", protoData.getUrl()),
-        //         Updates.set("method", protoData.getMethod()),
-        //         Updates.set("windowSize", protoData.getWindowSize()),
-        //         Updates.set("windowStart", protoData.getWindowStartEpochMin())
-        //     );
+            Bson update = Updates.combine(
+                Updates.set("distribution", protoData.getDistributionMap()),
+                Updates.set("apiCollectionId", protoData.getApiCollectionId()),
+                Updates.set("url", protoData.getUrl()),
+                Updates.set("method", protoData.getMethod()),
+                Updates.set("windowSize", protoData.getWindowSize()),
+                Updates.set("windowStart", protoData.getWindowStartEpochMin())
+            );
 
             
-        //     frequencyBuckets.computeIfAbsent(
-        //             ApiRateLimitBucketStatisticsModel.getBucketStatsDocIdForApi(protoData.getApiCollectionId(),
-        //                     protoData.getMethod(), protoData.getUrl(), protoData.getWindowSize()),
-        //             k -> new ArrayList<>()).add(protoData);
+            frequencyBuckets.computeIfAbsent(
+                    ApiRateLimitBucketStatisticsModel.getBucketStatsDocIdForApi(protoData.getApiCollectionId(),
+                            protoData.getMethod(), protoData.getUrl(), protoData.getWindowSize()),
+                    k -> new ArrayList<>()).add(protoData);
 
-        //     UpdateOptions options = new UpdateOptions().upsert(true);
+            UpdateOptions options = new UpdateOptions().upsert(true);
 
-        //     bulkUpdates.add(new UpdateOneModel<>(filter, update, options));
-        // }
+            bulkUpdates.add(new UpdateOneModel<>(filter, update, options));
+        }
 
-        // apiDistributionDataDao.getCollection(accountId)
-        //     .bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
+        apiDistributionDataDao.getCollection(accountId)
+            .bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
 
-        // ApiRateLimitBucketStatisticsModel.calculateStatistics(accountId, ApiRateLimitBucketStatisticsDao.instance, frequencyBuckets);
-        // return ApiDistributionDataResponsePayload.newBuilder().build();
+        ApiRateLimitBucketStatisticsModel.calculateStatistics(accountId, ApiRateLimitBucketStatisticsDao.instance, frequencyBuckets);
+        return ApiDistributionDataResponsePayload.newBuilder().build();
     }
 
     public static List<BucketStats> fetchBucketStats(String accountId, Bson filters, ApiDistributionDataDao dao) {
