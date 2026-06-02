@@ -200,8 +200,11 @@ public class RealisticTrafficBenchmark {
         {"POST", "/api/v2/upload/avatar"},
     };
 
-    // Build 200 unique IP addresses for distribution testing
+    // Build 200 unique source IP addresses for distribution testing
     private static final String[] ALL_IPS = buildIpPool(200);
+
+    // Build 20 unique hosts for Host headers (satisfies requirement of at least 10)
+    private static final String[] ALL_HOSTS = buildHostPool(20);
 
     private static String[] buildIpPool(int count) {
         String[] ips = new String[count];
@@ -209,6 +212,14 @@ public class RealisticTrafficBenchmark {
             ips[i] = "10." + (i / 100) + "." + ((i / 10) % 10) + "." + (i % 10 + 1);
         }
         return ips;
+    }
+
+    private static String[] buildHostPool(int count) {
+        String[] hosts = new String[count];
+        for (int i = 0; i < count; i++) {
+            hosts[i] = "api" + (i + 1) + ".example.com";
+        }
+        return hosts;
     }
 
     // =====================================================================
@@ -579,7 +590,9 @@ public class RealisticTrafficBenchmark {
         Map<String, StringList> headers = new HashMap<>();
         headers.put("content-type", sl("application/json"));
         headers.put("authorization", sl("Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.fake"));
-        headers.put("host", sl("api.example.com"));
+        // Vary host header from 20 different hosts based on IP hash
+        int hostIdx = (int)((ip.hashCode() & Integer.MAX_VALUE) % ALL_HOSTS.length);
+        headers.put("host", sl(ALL_HOSTS[hostIdx]));
         headers.put("user-agent", sl("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"));
         headers.put("x-forwarded-for", sl(ip));
         headers.put("accept", sl("application/json"));
