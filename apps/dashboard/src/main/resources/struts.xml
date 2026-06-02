@@ -7876,6 +7876,36 @@
             </result>
         </action>
 
+        <!-- Unauthenticated API: OAuth callback from Microsoft, state nonce used for verification -->
+        <action name="copilot/oauth/callback" class="com.akto.action.CopilotOAuthCallbackAction">
+            <interceptor-ref name="defaultStack"/>
+            <result name="SUCCESS" type="redirect">${redirectUrl}</result>
+            <result name="ERROR" type="redirect">${redirectUrl}</result>
+        </action>
+
+        <action name="api/copilot/getAuthorizationUrl" class="com.akto.action.CopilotStudioAction" method="fetchAuthorizationUrl">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="ignoreHierarchy">false</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchEndpointsBasedOnHostName" class="com.akto.action.observe.InventoryAction" method="fetchEndpointsBasedOnHostName">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
