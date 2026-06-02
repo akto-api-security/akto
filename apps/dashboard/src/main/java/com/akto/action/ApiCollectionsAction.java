@@ -1576,9 +1576,13 @@ public class ApiCollectionsAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
+        Bson update = description.isEmpty()
+                ? Updates.unset(ApiCollection.DESCRIPTION)
+                : Updates.set(ApiCollection.DESCRIPTION, description);
+
         ApiCollectionsDao.instance.updateOneNoUpsert(
                 Filters.eq(ApiCollection.ID, apiCollectionId),
-                Updates.set(ApiCollection.DESCRIPTION, description)
+                update
         );
 
         return SUCCESS.toUpperCase();

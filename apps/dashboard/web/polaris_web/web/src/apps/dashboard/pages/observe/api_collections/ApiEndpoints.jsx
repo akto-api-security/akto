@@ -2004,9 +2004,10 @@ function ApiEndpoints(props) {
 
     const handleSaveDescription = () => {
         // Check for special characters
-        const specialChars = /[!@#$%^&*()\-_=+\[\]{}\\|;:'",.<>/?~]/;
-        if (specialChars.test(editableDescription)) {
-            func.setToast(true, true, "Description contains special characters that are not allowed.");
+        const allowedChars = /^[a-zA-Z0-9\s.,!?;:'"()\-_/&]+$/;
+
+        if (editableDescription.length > 0 && !allowedChars.test(editableDescription)) {
+            func.setToast(true, true, "Description contains invalid characters.");
             return;
         }
         

@@ -32,6 +32,7 @@ public class TestingConfigurations {
     private int maxAgentTokens = -1;
     private final AtomicLong runningAgentTokenCount = new AtomicLong(0);
     private Map<String, String> mcpToolDescriptions = new HashMap<>();
+    private Map<Integer, String> apiCollectionDescriptionMap = new HashMap<>();
 
     private TestingConfigurations() {
     }
@@ -135,5 +136,13 @@ public class TestingConfigurations {
 
     public void setDoNotMarkIssuesAsFixed(boolean doNotMarkIssuesAsFixed) {
         this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
+    }
+
+    public Map<Integer, String> getApiCollectionDescriptionMap() {
+        return apiCollectionDescriptionMap;
+    }
+
+    public void setApiCollectionDescriptionMap(Map<Integer, String> apiCollectionDescriptionMap) {
+        this.apiCollectionDescriptionMap = apiCollectionDescriptionMap;
     }
 }
