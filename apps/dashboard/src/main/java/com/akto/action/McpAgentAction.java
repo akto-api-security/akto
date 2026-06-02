@@ -17,6 +17,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import org.bson.conversions.Bson;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -144,122 +145,24 @@ public class McpAgentAction extends UserAction {
                         tokensLimit = 40000;
                     }
                 } else if (StringUtils.isNotEmpty(type) && type.equals("agentic_observe")) {
+                    // Pass only the minimal asset/device identity. The MCP agent fetches the
+                    // asset's endpoints/components/violations on demand via akto_agentic_asset_details
+                    // (see the agentic_observe system prompt in test-editor-services).
                     Object data = metaData.get("data");
                     if (data != null && data instanceof Map) {
                         Map<String, Object> dataMap = (Map<String, Object>) data;
                         String scope = (String) dataMap.getOrDefault("scope", "");
-                        StringBuilder sb = new StringBuilder();
-
-                        if ("device".equals(scope)) {
-                            sb.append("CONTEXT SCOPE: Single device. Answer questions about THIS device and its agents only.\n");
-                            sb.append("You have the full agent inventory for this device below. Do NOT speculate about other devices.\n\n");
-                            sb.append("--- Device Context ---\n");
-                            appendIfPresent(sb, "Device endpoint", dataMap.get("deviceEndpoint"));
-                            appendIfPresent(sb, "Device ID", dataMap.get("deviceId"));
-                            appendIfPresent(sb, "Username", dataMap.get("username"));
-                            appendIfPresent(sb, "Group/Team", dataMap.get("group"));
-                            appendIfPresent(sb, "Role", dataMap.get("role"));
-                            appendIfPresent(sb, "OS", dataMap.get("os"));
-                            appendIfPresent(sb, "Risk score", dataMap.get("riskScore"));
-                            appendIfPresent(sb, "Last traffic", dataMap.get("lastTraffic"));
-                            Object violations = dataMap.get("violations");
-                            if (violations != null) {
-                                sb.append("Violations: ").append(violations).append("\n");
-                            }
-                            Object counts = dataMap.get("counts");
-                            if (counts instanceof Map) {
-                                Map<?, ?> c = (Map<?, ?>) counts;
-                                sb.append("Agentic asset counts on this device: total=").append(c.get("totalAgents"))
-                                  .append(", MCP servers=").append(c.get("mcpServers"))
-                                  .append(", AI agents=").append(c.get("aiAgents"))
-                                  .append(", high-risk agents=").append(c.get("maliciousAgents"))
-                                  .append("\n");
-                            }
-                            Object agentList = dataMap.get("agentList");
-                            if (agentList instanceof List) {
-                                sb.append("Agentic assets on this device (name | type | riskScore | violations | skillCount):\n");
-                                for (Object item : (List<?>) agentList) {
-                                    if (item instanceof Map) {
-                                        Map<?, ?> a = (Map<?, ?>) item;
-                                        sb.append("  - ").append(a.get("name"))
-                                          .append(" | ").append(a.get("type"))
-                                          .append(" | risk=").append(a.get("riskScore"))
-                                          .append(" | violations=").append(a.get("violations"))
-                                          .append(" | skills=").append(a.get("skillCount"))
-                                          .append("\n");
-                                    }
-                                }
-                            }
-                        } else if ("asset".equals(scope)) {
-                            sb.append("CONTEXT SCOPE: Single agentic asset. Answer questions about THIS asset only.\n");
-                            sb.append("You have the full device list and component list for this asset below. Do NOT speculate about other assets.\n\n");
-                            sb.append("--- Asset Context ---\n");
-                            appendIfPresent(sb, "Asset name", dataMap.get("assetName"));
-                            appendIfPresent(sb, "Asset type", dataMap.get("assetType"));
-                            appendIfPresent(sb, "Asset tag", dataMap.get("assetTagValue"));
-                            appendIfPresent(sb, "Risk score", dataMap.get("riskScore"));
-                            appendIfPresent(sb, "Last seen", dataMap.get("lastSeen"));
-                            appendIfPresent(sb, "Device count", dataMap.get("deviceCount"));
-                            appendIfPresent(sb, "Endpoint count", dataMap.get("endpointCount"));
-                            appendIfPresent(sb, "Skill count", dataMap.get("skillCount"));
-                            appendIfPresent(sb, "AI interactions (tokens)", dataMap.get("aiInteractions"));
-                            Object violations = dataMap.get("violations");
-                            if (violations != null) {
-                                sb.append("Violations: ").append(violations).append("\n");
-                            }
-                            Object deviceList = dataMap.get("deviceList");
-                            if (deviceList instanceof List) {
-                                sb.append("Devices this asset is present on (deviceId | riskScore):\n");
-                                for (Object item : (List<?>) deviceList) {
-                                    if (item instanceof Map) {
-                                        Map<?, ?> d = (Map<?, ?>) item;
-                                        sb.append("  - ").append(d.get("deviceId"))
-                                          .append(" | risk=").append(d.get("riskScore"))
-                                          .append("\n");
-                                    }
-                                }
-                            }
-                            Object componentList = dataMap.get("componentList");
-                            if (componentList instanceof List) {
-                                sb.append("Linked components (name | type | riskScore):\n");
-                                for (Object item : (List<?>) componentList) {
-                                    if (item instanceof Map) {
-                                        Map<?, ?> c = (Map<?, ?>) item;
-                                        sb.append("  - ").append(c.get("name"))
-                                          .append(" | ").append(c.get("type"))
-                                          .append(" | risk=").append(c.get("riskScore"))
-                                          .append("\n");
-                                    }
-                                }
-                            }
-                            Object groups = dataMap.get("groups");
-                            if (groups != null) {
-                                sb.append("Team groups using this asset: ").append(groups).append("\n");
-                            }
-                            Object mcpServers = dataMap.get("mcpServers");
-                            if (mcpServers != null) {
-                                sb.append("MCP servers connected: ").append(mcpServers).append("\n");
-                            }
-                        } else {
-                            appendIfPresent(sb, "Device", dataMap.get("deviceEndpoint"));
-                            appendIfPresent(sb, "Device ID", dataMap.get("deviceId"));
-                            appendIfPresent(sb, "Agent", dataMap.get("agentEndpoint"));
-                            appendIfPresent(sb, "Risk score", dataMap.get("riskScore"));
-                            appendIfPresent(sb, "Skill", dataMap.get("skillName"));
-                            appendIfPresent(sb, "Tool", dataMap.get("toolName"));
-                            appendIfPresent(sb, "Resource", dataMap.get("resourceName"));
-                            appendIfPresent(sb, "Prompt", dataMap.get("promptName"));
-                            Object violations = dataMap.get("violations");
-                            if (violations != null) {
-                                sb.append("Violations summary: ").append(violations).append("\n");
-                            }
-                            Object counts = dataMap.get("counts");
-                            if (counts != null) {
-                                sb.append("Counts: ").append(counts).append("\n");
-                            }
+                        String scopeLabel = "device".equals(scope) ? "Single device" : "asset".equals(scope) ? "Single agentic asset" : "Agentic context";
+                        try {
+                            ObjectMapper mapper = new ObjectMapper();
+                            contextString = "CONTEXT SCOPE: " + scopeLabel
+                                + ". This is only the asset/device identity — use akto_agentic_asset_details "
+                                + "(with the collectionIds or deviceId below) to fetch its data before answering.\n\n"
+                                + mapper.writeValueAsString(dataMap);
+                        } catch (Exception e) {
+                            contextString = "Agentic Observe Context: " + dataMap.toString();
                         }
-                        contextString = sb.toString();
-                        tokensLimit = 40000;
+                        tokensLimit = 20000;
                     }
                 }
             }

@@ -5,12 +5,14 @@ import { useNavigate } from "react-router-dom";
 import Highcharts from "highcharts";
 import HighchartsMore from "highcharts/highcharts-more";
 import { HighchartsReact } from "highcharts-react-official";
-import { LegacyCard, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Checkbox } from "@shopify/polaris";
+import { Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Tooltip, Checkbox } from "@shopify/polaris";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import MCPIcon from "@/assets/MCP_Icon.svg";
-import LaptopIcon from "@/assets/Laptop.svg";
+import McpRedIcon from "@/assets/McpRedIcon.svg";
 import PersonLockIcon from "@/assets/PersonLockIcon.svg";
+import LaptopIcon from "@/assets/Laptop.svg";
+import MaliciousSkillIcon from "@/assets/MaliciousSkill.svg";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
@@ -69,22 +71,25 @@ function AssetNameCellRenderer({ data }) {
                 {data.name}
             </span>
             {showLocalMcp && (
-                <span title="Local MCP Server" style={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
-                    <img src={MCPIcon} width={16} height={16} alt="Local MCP Server" style={{ pointerEvents: "none" }} />
-                </span>
+                <Tooltip content="Local MCP Server" dismissOnMouseOut>
+                    <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
+                        <img src={McpRedIcon} width={16} height={16} alt="Local MCP Server" style={{ pointerEvents: "none" }} />
+                    </span>
+                </Tooltip>
             )}
             {showPersonal && (
-                <span title="Contains personal account" style={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
-                    <img src={PersonLockIcon} width={16} height={16} alt="Contains personal account" style={{ pointerEvents: "none" }} />
-                </span>
+                <Tooltip content="Contains personal account" dismissOnMouseOut>
+                    <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
+                        <img src={PersonLockIcon} width={16} height={16} alt="Contains personal account" style={{ pointerEvents: "none" }} />
+                    </span>
+                </Tooltip>
             )}
             {showMalicious && (
-                <span title="Malicious skill" style={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
-                    {/* swap text below with <img src={MaliciousIcon} .../> when SVG is ready */}
-                    <span style={{ padding: "0 5px", borderRadius: 8, fontSize: 9, fontWeight: 600, lineHeight: "16px", background: "#FBEAE5", color: "#C4320A", letterSpacing: "0.2px" }}>
-                        ⚠ malicious
+                <Tooltip content="Malicious skill" dismissOnMouseOut>
+                    <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
+                        <img src={MaliciousSkillIcon} width={16} height={16} alt="Malicious skill" style={{ pointerEvents: "none" }} />
                     </span>
-                </span>
+                </Tooltip>
             )}
         </div>
     );
@@ -284,7 +289,7 @@ function sparklineFromTemplate(template, intensity = 1) {
 }
 
 // areaspline smooth curves; omit width for full-container auto-width, or pass explicit width
-function makeAreasplineConfig(data, color, height = 50, width = undefined, margin = [2, 0, 2, 0]) {
+function makeAreasplineConfig(data, color, height = 50, width = undefined, margin = [4, 0, 2, 0]) {
     const min = Math.min(...data), max = Math.max(...data);
     const pad = (max - min) * 0.2 || 1;
     return {
@@ -347,10 +352,10 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
         [topApps],
     );
 
-    // mini charts for list rows: explicit width=80, height=36
+    // mini charts for list rows: explicit width=80, height=28
     const topAppOpts = useMemo(() => topApps.map((row) => {
         const intensity = (row.aiInteractions || 0) / maxInteractions;
-        return makeAreasplineConfig(sparklineFromTemplate(ASSET_TREND, intensity), "#9642FC", 36, 80);
+        return makeAreasplineConfig(sparklineFromTemplate(ASSET_TREND, intensity), "#9642FC", 28, 80);
     }), [topApps, maxInteractions]);
 
     const maxViolationCount = useMemo(
@@ -360,7 +365,7 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
 
     const topViolOpts = useMemo(() => topViolations.map((row) => {
         const intensity = (row.totalV || 0) / maxViolationCount;
-        return makeAreasplineConfig(sparklineFromTemplate(VIOLATION_TREND, intensity), "#EF4444", 36, 80);
+        return makeAreasplineConfig(sparklineFromTemplate(VIOLATION_TREND, intensity), "#EF4444", 28, 80);
     }), [topViolations, maxViolationCount]);
 
     const typeBreakdown = [
@@ -377,11 +382,11 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
     ];
 
     return (
-        <HorizontalGrid columns={3} gap="4">
+        <HorizontalGrid columns={3} gap="4" alignItems="stretch">
 
-            {/* ── Card 1: Stats — two sections, each half of the 300px card height ── */}
-            <LegacyCard>
-                <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="4" paddingBlockEnd="3" height="169px">
+            {/* ── Card 1: Stats ── */}
+            <Box background="bg" shadow="md" borderRadius="2" overflowX="hidden" overflowY="hidden">
+                <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="4" paddingBlockEnd="3">
                     <VerticalStack gap="2">
                         <Text variant="headingSm" fontWeight="semibold">Agentic Assets</Text>
                         <HorizontalStack align="space-between" blockAlign="center" gap="3">
@@ -412,7 +417,7 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
                     </VerticalStack>
                 </Box>
                 <Divider />
-                <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="3" paddingBlockEnd="4" height="170px">
+                <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="3" paddingBlockEnd="4">
                     <VerticalStack gap="2">
                         <Text variant="headingSm" fontWeight="semibold">Violations</Text>
                         <HorizontalStack align="space-between" blockAlign="center" gap="3">
@@ -434,78 +439,80 @@ function TopSection({ agenticFlatData = [], onTypeFilter, activeTypeFilter, onAs
                         </VerticalStack>
                     </VerticalStack>
                 </Box>
-            </LegacyCard>
+            </Box>
 
-            {/* ── Card 2: Top Used Applications — each row opens the asset flyout ── */}
-            <LegacyCard>
-                <Box padding="4" height="340px" overflowX="hidden" overflowY="hidden">
-                    <VerticalStack gap="0">
-                        <Box paddingBlockEnd="3">
-                            <Text variant="headingSm">Top Used Applications</Text>
-                        </Box>
-                        {topApps.length === 0 && (
-                            <Text variant="bodySm" color="subdued">No AI interaction data yet.</Text>
-                        )}
-                        {topApps.map((row, i) => (
-                                <React.Fragment key={row.id}>
-                                    {i > 0 && <Divider />}
-                                    <Box paddingBlockStart="3" paddingBlockEnd="3">
-                                        <div onClick={() => onAssetClick?.(row)} style={{ cursor: "pointer" }}>
-                                            <HorizontalStack blockAlign="center" gap="2" wrap={false}>
-                                                <TopSectionIcon row={row} />
-                                                <Text variant="bodySm" as="span" truncate>{row.name}</Text>
-                                                <div style={{ flex: 1 }} />
-                                                <Text variant="bodySm" color="subdued">{row.aiInteractions.toLocaleString("en-IN")}</Text>
-                                                <div style={{ width: 80, height: 36, flexShrink: 0 }}>
-                                                    <HighchartsReact
-                                                        key={`app-chart-${row.id}`}
-                                                        highcharts={Highcharts}
-                                                        options={topAppOpts[i]}
-                                                        immutable
-                                                    />
-                                                </div>
-                                            </HorizontalStack>
-                                        </div>
-                                    </Box>
-                                </React.Fragment>
-                        ))}
-                    </VerticalStack>
-                </Box>
-            </LegacyCard>
+            {/* ── Card 2: Top Used Applications ── */}
+            <Box background="bg" shadow="md" borderRadius="2" overflowX="hidden" overflowY="hidden" padding="4">
+                <VerticalStack gap="0">
+                    <Box paddingBlockEnd="2">
+                        <Text variant="headingSm">Top Used Applications</Text>
+                    </Box>
+                    {topApps.length === 0 && (
+                        <Text variant="bodySm" color="subdued">No AI interaction data yet.</Text>
+                    )}
+                    {topApps.map((row, i) => (
+                        <React.Fragment key={row.id}>
+                            {i > 0 && <Divider />}
+                            <Box paddingBlockStart="2" paddingBlockEnd="2">
+                                <div onClick={() => onAssetClick?.(row)} style={{ cursor: "pointer" }}>
+                                    <HorizontalStack align="space-between" blockAlign="center" gap="2" wrap={false}>
+                                        <HorizontalStack blockAlign="center" gap="2" wrap={false}>
+                                            <TopSectionIcon row={row} />
+                                            <Text variant="bodySm" as="span" truncate>{row.name}</Text>
+                                        </HorizontalStack>
+                                        <HorizontalStack blockAlign="center" gap="2" wrap={false}>
+                                            <Text variant="bodySm" color="subdued">{row.aiInteractions.toLocaleString("en-IN")}</Text>
+                                            <div style={{ width: 80, height: 28, flexShrink: 0 }}>
+                                                <HighchartsReact
+                                                    key={`app-chart-${row.id}`}
+                                                    highcharts={Highcharts}
+                                                    options={topAppOpts[i]}
+                                                    immutable
+                                                />
+                                            </div>
+                                        </HorizontalStack>
+                                    </HorizontalStack>
+                                </div>
+                            </Box>
+                        </React.Fragment>
+                    ))}
+                </VerticalStack>
+            </Box>
 
-            {/* ── Card 3: Top Agentic Asset with Violations — each row opens the asset flyout ── */}
-            <LegacyCard>
-                <Box padding="4" height="340px" overflowX="hidden" overflowY="hidden">
-                    <VerticalStack gap="0">
-                        <Box paddingBlockEnd="3">
-                            <Text variant="headingSm">Top Agentic Asset with Violations</Text>
-                        </Box>
-                        {topViolations.map((row, i) => (
-                                <React.Fragment key={row.id}>
-                                    {i > 0 && <Divider />}
-                                    <Box paddingBlockStart="3" paddingBlockEnd="3">
-                                        <div onClick={() => onAssetClick?.(row)} style={{ cursor: "pointer" }}>
-                                            <HorizontalStack blockAlign="center" gap="2" wrap={false}>
-                                                <TopSectionIcon row={row} />
-                                                <Text variant="bodySm" as="span" truncate>{row.name}</Text>
-                                                <div style={{ flex: 1 }} />
-                                                <Text variant="bodySm" color="subdued">{row.totalV}</Text>
-                                                <div style={{ width: 80, height: 36, flexShrink: 0 }}>
-                                                    <HighchartsReact
-                                                        key={`viol-chart-${row.id}`}
-                                                        highcharts={Highcharts}
-                                                        options={topViolOpts[i]}
-                                                        immutable
-                                                    />
-                                                </div>
-                                            </HorizontalStack>
-                                        </div>
-                                    </Box>
-                                </React.Fragment>
-                        ))}
-                    </VerticalStack>
-                </Box>
-            </LegacyCard>
+            {/* ── Card 3: Top Agentic Asset with Violations ── */}
+            <Box background="bg" shadow="md" borderRadius="2" overflowX="hidden" overflowY="hidden" padding="4">
+                <VerticalStack gap="0">
+                    <Box paddingBlockEnd="2">
+                        <Text variant="headingSm">Top Agentic Asset with Violations</Text>
+                    </Box>
+                    {topViolations.map((row, i) => (
+                        <React.Fragment key={row.id}>
+                            {i > 0 && <Divider />}
+                            <Box paddingBlockStart="2" paddingBlockEnd="2">
+                                <div onClick={() => onAssetClick?.(row)} style={{ cursor: "pointer" }}>
+                                    <HorizontalStack align="space-between" blockAlign="center" gap="2" wrap={false}>
+                                        <HorizontalStack blockAlign="center" gap="2" wrap={false}>
+                                            <TopSectionIcon row={row} />
+                                            <Text variant="bodySm" as="span" truncate>{row.name}</Text>
+                                        </HorizontalStack>
+                                        <HorizontalStack blockAlign="center" gap="2" wrap={false}>
+                                            <Text variant="bodySm" color="subdued">{row.totalV}</Text>
+                                            <div style={{ width: 80, height: 28, flexShrink: 0 }}>
+                                                <HighchartsReact
+                                                    key={`viol-chart-${row.id}`}
+                                                    highcharts={Highcharts}
+                                                    options={topViolOpts[i]}
+                                                    immutable
+                                                />
+                                            </div>
+                                        </HorizontalStack>
+                                    </HorizontalStack>
+                                </div>
+                            </Box>
+                        </React.Fragment>
+                    ))}
+                </VerticalStack>
+            </Box>
 
         </HorizontalGrid>
     );
@@ -594,8 +601,14 @@ export default function AgenticAssetsPage() {
     const [assetDevices, setAssetDevices] = useState({});
     const [newLayout, setNewLayout] = useState(() => {
         const stored = localStorage.getItem(LAYOUT_KEY);
-        return stored === null ? true : stored === "true";
+        return stored === null ? false : stored === "true";
     });
+
+    useEffect(() => {
+        if (localStorage.getItem(LAYOUT_KEY) === "false") {
+            navigate("/dashboard/observe/agentic-assets-legacy", { replace: true });
+        }
+    }, [navigate]);
 
     // Date range — only data with real time fields is filtered (violations + last-seen)
     const [currDateRange, dispatchCurrDateRange] = useReducer(
@@ -701,7 +714,7 @@ export default function AgenticAssetsPage() {
     const headerActions = (
         <HorizontalStack gap="3" blockAlign="center">
             <Checkbox
-                label="New layout"
+                label="New UI"
                 checked={newLayout}
                 onChange={handleLayoutToggle}
             />

@@ -342,12 +342,9 @@ function UsersAndDevices() {
 
     const layoutToggle = (
         <Checkbox
-            label="New layout"
+            label="New UI"
             checked={false}
-            onChange={(checked) => {
-                localStorage.setItem("akto_agentic_new_ui", "true");
-                if (checked) navigate("/dashboard/observe/endpoints");
-            }}
+            onChange={() => { localStorage.setItem("akto_agentic_new_ui", "true"); navigate("/dashboard/observe/endpoints"); }}
         />
     );
 

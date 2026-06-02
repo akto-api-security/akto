@@ -581,14 +581,22 @@ function buildDevicesForGroup(group) {
     (group.collections || []).forEach((c) => {
         const hostName = c.hostName || c.displayName || c.name;
         const deviceId = extractEndpointId(hostName);
-        if (!deviceId || byDevice.has(deviceId)) return;
-        byDevice.set(deviceId, {
-            deviceId,
-            endpoint: deviceId,
-            os: "mac",
-            riskScore: group.riskScore ?? group.maxRiskScore ?? null,
-            lastSeen: group.detectedTimestamp || 0,
-        });
+        if (!deviceId) return;
+        const serviceName = extractServiceName(hostName);
+        if (!byDevice.has(deviceId)) {
+            byDevice.set(deviceId, {
+                deviceId,
+                endpoint: deviceId,
+                os: "mac",
+                riskScore: group.riskScore ?? group.maxRiskScore ?? null,
+                lastSeen: group.detectedTimestamp || 0,
+                services: [],
+            });
+        }
+        const entry = byDevice.get(deviceId);
+        if (serviceName && !entry.services.includes(serviceName)) {
+            entry.services.push(serviceName);
+        }
     });
     return [...byDevice.values()];
 }

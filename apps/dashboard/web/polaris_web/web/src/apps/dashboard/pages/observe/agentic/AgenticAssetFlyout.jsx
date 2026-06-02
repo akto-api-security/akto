@@ -1111,6 +1111,7 @@ export default function AgenticAssetFlyout({
     // topNavPicker: optional ReactNode rendered as FlyoutBreadcrumb children (dropdown on last crumb)
     const [topNavPicker, setTopNavPicker] = useState(null);
     const [mcpComponentCount, setMcpComponentCount] = useState(0);
+    const [mcpFlyoutData, setMcpFlyoutData] = useState(null);
 
     const lockScroll   = useCallback(() => { document.body.style.overflow = "hidden"; }, []);
     const unlockScroll = useCallback(() => { document.body.style.overflow = "";       }, []);
@@ -1122,6 +1123,7 @@ export default function AgenticAssetFlyout({
         const collectionId = asset?.collectionIds?.[0];
         if (!collectionId || asset?.type !== "MCP Server") {
             setMcpComponentCount(0);
+            setMcpFlyoutData(null);
             return;
         }
         let cancelled = false;
@@ -1132,44 +1134,25 @@ export default function AgenticAssetFlyout({
                 setMcpComponentCount(
                     (data.tools?.length || 0) + (data.resources?.length || 0) + (data.prompts?.length || 0)
                 );
+                setMcpFlyoutData(data);
             } catch {
-                if (!cancelled) setMcpComponentCount(0);
+                if (!cancelled) { setMcpComponentCount(0); setMcpFlyoutData(null); }
             }
         })();
         return () => { cancelled = true; };
     }, [asset?.id, asset?.type, asset?.collectionIds]);
 
+    // Minimal identity only — the MCP agent fetches endpoints/components/violations on demand
+    // via akto_agentic_asset_details using these collectionIds (see agentic_observe system prompt).
     const chatMetadata = useMemo(() => {
         if (!asset) return null;
-        const devices = (assetDevices[asset.id] || []).map(d => ({
-            deviceId: d.deviceId,
-            riskScore: d.riskScore,
-        }));
-        const linkedComponents = getAgentLinkedComponents(asset, agenticTreeData, agenticFlatData);
-        const componentList = linkedComponents.map(c => ({
-            name: c.name,
-            type: c.type,
-            riskScore: c.riskScore,
-        }));
         return buildAgenticObserveChatMetadata("asset", {
-            assetId: asset?.id,
-            assetName: asset?.name,
-            assetType: asset?.type,
-            assetTagValue: asset?.assetTagValue,
-            riskScore: asset?.riskScore,
-            violations: asset?.violations,
-            deviceCount: devices.length || asset?.deviceCount,
-            deviceList: devices,
-            endpointCount: asset?.endpointCount,
-            skillCount: asset?.skillCount || 0,
-            aiInteractions: asset?.aiInteractions,
-            aiInteractionsDetail: asset?.aiInteractionsDetail,
-            lastSeen: asset?.lastSeen,
-            groups: asset?.groups,
-            mcpServers: asset?.mcpServers,
-            componentList,
+            assetName: asset.name,
+            assetType: asset.type,
+            collectionIds: asset.collectionIds || [],
+            assetTagValue: asset.assetTagValue,
         });
-    }, [asset, assetDevices, agenticTreeData, agenticFlatData]);
+    }, [asset]);
 
     const handleTabSelect = useCallback((tab) => {
         setSelectedTab(tab);

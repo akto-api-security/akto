@@ -2,10 +2,10 @@
 // All badge colours in this folder must come from here — never introduce new values.
 
 export const TYPE_STYLES = {
-    "AI Agent":   { bg: "#EFF6FF", color: "#1D4ED8", border: "#BFDBFE" },
-    "MCP Server": { bg: "#FFFBEB", color: "#92400E", border: "#FDE68A" },
-    "LLM":        { bg: "#F0FDF4", color: "#166534", border: "#BBF7D0" },
-    "Skill":      { bg: "#F3E8FF", color: "#7E22CE", border: "#DDD6FE" },
+    "AI Agent":   { bg: "#F3E8FF", color: "#9642FC", border: "#D8B4FE" },
+    "MCP Server": { bg: "#ECFDF5", color: "#0D9488", border: "#99F6E4" },
+    "LLM":        { bg: "#FEFCE8", color: "#CA8A04", border: "#FDE047" },
+    "Skill":      { bg: "#F9FAFB", color: "#6B7280", border: "#D1D5DB" },
 };
 
 export const SEVERITY_COLORS = {

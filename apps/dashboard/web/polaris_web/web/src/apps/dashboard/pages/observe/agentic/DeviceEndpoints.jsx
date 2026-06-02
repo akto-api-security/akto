@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect, useReducer } from "react";
 import { useNavigate } from "react-router-dom";
+import { produce } from "immer";
 import Highcharts from "highcharts";
 import { HighchartsReact } from "highcharts-react-official";
 import { Card, Box, HorizontalStack, VerticalStack, Text, Icon, Divider, Checkbox } from "@shopify/polaris";
@@ -19,6 +20,9 @@ import agenticObserveApi, { aggregateViolationsByCollectionId } from "./agenticO
 import { buildDeviceEndpointsPageData } from "./agenticPageBuilders";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 import { groupCollectionsByUser } from "./constants";
+import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
+import values from "@/util/values";
+import func from "@/util/func";
 import api from "../api";
 
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
@@ -547,7 +551,21 @@ export default function DeviceEndpoints() {
         return stored === null ? true : stored === "true";
     });
 
-    const handleLayoutToggle = useCallback((checked) => {
+    const [currDateRange, dispatchCurrDateRange] = useReducer(
+        produce((draft, action) => func.dateRangeReducer(draft, action)),
+        values.ranges[4],
+    );
+    const startTimestamp = Math.floor(Date.parse(currDateRange.period.since) / 1000);
+    const endTimestamp = Math.floor(Date.parse(currDateRange.period.until) / 1000);
+
+    useEffect(() => {
+        if (localStorage.getItem(LAYOUT_KEY) === "false") {
+            navigate("/dashboard/observe/users-and-devices", { replace: true });
+        }
+    }, [navigate]);
+
+    const handleLayoutToggle = useCallback((val) => {
+        const checked = val === true;
         localStorage.setItem(LAYOUT_KEY, String(checked));
         setNewLayout(checked);
         if (!checked) navigate("/dashboard/observe/users-and-devices");
@@ -569,7 +587,7 @@ export default function DeviceEndpoints() {
                     api.getLastTrafficSeen(),
                     api.getRiskScoreInfo(),
                     fetchEndpointShieldUserMetadata(),
-                    agenticObserveApi.fetchAgenticViolations({}),
+                    agenticObserveApi.fetchAgenticViolations({ startTimestamp, endTimestamp }),
                 ]);
                 if (!isMountedRef.current) return;
                 const { usernameMap = {}, userMetadataMap = {} } = shieldResult || {};
@@ -601,14 +619,20 @@ export default function DeviceEndpoints() {
             }
         })();
         return () => { isMountedRef.current = false; };
-    }, []);
+    }, [startTimestamp, endTimestamp]);
 
-    const layoutToggle = (
-        <Checkbox
-            label="New layout"
-            checked={newLayout}
-            onChange={handleLayoutToggle}
-        />
+    const headerActions = (
+        <HorizontalStack gap="3" blockAlign="center">
+            <Checkbox
+                label="New UI"
+                checked={newLayout}
+                onChange={handleLayoutToggle}
+            />
+            <DateRangeFilter
+                initialDispatch={currDateRange}
+                dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })}
+            />
+        </HorizontalStack>
     );
 
     const pageTitle = (
@@ -624,7 +648,7 @@ export default function DeviceEndpoints() {
             <PageWithMultipleCards
                 title={pageTitle}
                 isFirstPage={true}
-                secondaryActions={layoutToggle}
+                secondaryActions={headerActions}
                 components={[<SpinnerCentered key="loading" />]}
             />
         );
@@ -634,7 +658,7 @@ export default function DeviceEndpoints() {
         <PageWithMultipleCards
             title={pageTitle}
             isFirstPage={true}
-            secondaryActions={layoutToggle}
+            secondaryActions={headerActions}
             components={[
                 <TopSection key="top" summary={summary} />,
                 <TableSection
