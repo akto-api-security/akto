@@ -295,16 +295,13 @@ const AuthComponent = ({
     setCopilotConnecting(true);
     try {
       const resp = await handleSaveAuthMechanism();
-      console.log(resp)
       if (!resp?.selectedRole) {
         func.setToast(true, true, "Failed to save auth — no role returned.");
         setCopilotConnecting(false);
         return;
       }
       const roleId = resp.selectedRole.hexId;
-      console.log("getting copilot auth url")
       const urlResp = await api.getCopilotOAuthAuthorizationUrl(roleId);
-      console.log("url : ", urlResp)
       if (urlResp?.authorizationUrl) {
         window.location.href = urlResp.authorizationUrl;
       } else {
@@ -312,7 +309,6 @@ const AuthComponent = ({
         setCopilotConnecting(false);
       }
     } catch (e) {
-      console.error("Copilot OAuth error:", e);
       func.setToast(true, true, "Error initiating OAuth flow: " + (e?.message || e));
       setCopilotConnecting(false);
     }
