@@ -145,9 +145,10 @@ public class McpAgentAction extends UserAction {
                         tokensLimit = 40000;
                     }
                 } else if (StringUtils.isNotEmpty(type) && type.equals("agentic_observe")) {
-                    // Pass only the minimal asset/device identity. The MCP agent fetches the
-                    // asset's endpoints/components/violations on demand via akto_agentic_asset_details
-                    // (see the agentic_observe system prompt in test-editor-services).
+                    // Pass only the minimal asset/device identity (assetName/assetType/collectionIds
+                    // or deviceId). The MCP agent fetches what it needs on demand via the focused
+                    // akto_agentic_* tools (collections_search / users_search / skills / audit_data)
+                    // — see the agentic_observe system prompt in test-editor-services.
                     Object data = metaData.get("data");
                     if (data != null && data instanceof Map) {
                         Map<String, Object> dataMap = (Map<String, Object>) data;
@@ -156,8 +157,8 @@ public class McpAgentAction extends UserAction {
                         try {
                             ObjectMapper mapper = new ObjectMapper();
                             contextString = "CONTEXT SCOPE: " + scopeLabel
-                                + ". This is only the asset/device identity — use akto_agentic_asset_details "
-                                + "(with the collectionIds or deviceId below) to fetch its data before answering.\n\n"
+                                + ". This is only the asset/device identity — use the akto_agentic_* tools "
+                                + "(with the collectionIds, assetName, or deviceId below) to fetch its data before answering.\n\n"
                                 + mapper.writeValueAsString(dataMap);
                         } catch (Exception e) {
                             contextString = "Agentic Observe Context: " + dataMap.toString();
