@@ -567,8 +567,6 @@ etc/packagekit
 etc/pam.conf
 etc/pam.d
 etc/pam.d/proftpd
-etc/passwd
-etc/password
 etc/pcmcia
 etc/perl
 etc/php
