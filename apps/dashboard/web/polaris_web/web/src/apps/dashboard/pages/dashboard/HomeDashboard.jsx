@@ -708,7 +708,7 @@ function HomeDashboard() {
         }
 
         if (totalAPIs && totalAPIs> 0 && apisTestedInLookBackPeriod) {
-            const testCoverage = 100 * apisTestedInLookBackPeriod / totalAPIs
+            const testCoverage = Math.min(100 * apisTestedInLookBackPeriod / totalAPIs, 100);
             setTestCoverage(parseFloat(testCoverage.toFixed(2)))
         } else {
             setTestCoverage(0)
