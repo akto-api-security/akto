@@ -1,6 +1,5 @@
-package com.akto.action.quick_start;
+package com.akto.action;
 
-import com.akto.action.UserAction;
 import com.akto.dao.OAuthStatesDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestRolesDao;

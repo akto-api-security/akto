@@ -7876,13 +7876,13 @@
             </result>
         </action>
 
-        <action name="copilot/oauth/callback" class="com.akto.action.quick_start.CopilotStudioAction" method="oauthCallback">
+        <action name="copilot/oauth/callback" class="com.akto.action.CopilotStudioAction" method="oauthCallback">
             <interceptor-ref name="defaultStack"/>
             <result name="SUCCESS" type="redirect">${redirectUrl}</result>
             <result name="ERROR" type="redirect">${redirectUrl}</result>
         </action>
 
-        <action name="api/copilot/getAuthorizationUrl" class="com.akto.action.quick_start.CopilotStudioAction" method="fetchAuthorizationUrl">
+        <action name="api/copilot/getAuthorizationUrl" class="com.akto.action.CopilotStudioAction" method="fetchAuthorizationUrl">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
