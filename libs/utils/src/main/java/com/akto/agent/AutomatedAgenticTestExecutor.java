@@ -4,6 +4,7 @@ import com.akto.data_actor.ClientActor;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
+import com.akto.dto.testing.AiSummaryEntry;
 import com.akto.dto.testing.TestResult;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -42,7 +43,25 @@ public class AutomatedAgenticTestExecutor {
             .callTimeout(10, TimeUnit.MINUTES)
             .build();
 
-    public List<TestResult> executeAgenticTest(RawApi testReq, String testSubType) {
+    public static class PentestExecutionResult {
+        private final List<TestResult> testResults;
+        private final List<AiSummaryEntry> aiSummaryTraces;
+
+        public PentestExecutionResult(List<TestResult> testResults, List<AiSummaryEntry> aiSummaryTraces) {
+            this.testResults = testResults;
+            this.aiSummaryTraces = aiSummaryTraces;
+        }
+
+        public List<TestResult> getTestResults() {
+            return testResults;
+        }
+
+        public List<AiSummaryEntry> getAiSummaryTraces() {
+            return aiSummaryTraces;
+        }
+    }
+
+    public PentestExecutionResult executeAgenticTest(RawApi testReq, String testSubType) {
         try {
             String body = buildRequestBody(testReq, testSubType);
             RequestBody requestBody = RequestBody.create(body, MediaType.parse("application/json"));
@@ -62,14 +81,15 @@ public class AutomatedAgenticTestExecutor {
                 if (!response.isSuccessful()) {
                     String responseBody = response.body() != null ? response.body().string() : "";
                     loggerMaker.errorAndAddToDb("AutomatedAgenticTestExecutor: request failed with status " + response.code() + ", body: " + responseBody);
-                    return Collections.emptyList();
+                    return new PentestExecutionResult(Collections.emptyList(), null);
                 }
                 String responseBody = response.body() != null ? response.body().string() : null;
                 if (responseBody == null || responseBody.isEmpty()) {
-                    return Collections.emptyList();
+                    return new PentestExecutionResult(Collections.emptyList(), null);
                 }
                 List<TestResult> results = new ArrayList<>();
                 JsonNode root = objectMapper.readTree(responseBody);
+                List<AiSummaryEntry> aiSummaryTraces = extractRootAiSummaryTraces(root);
                 JsonNode arr = root.has("attempts") ? root.get("attempts") : root;
                 for (JsonNode node : arr) {
                     TestResult result = new TestResult();
@@ -89,12 +109,36 @@ public class AutomatedAgenticTestExecutor {
                     result.setResultTypeAgentic(true);
                     results.add(result);
                 }
-                return results;
+                return new PentestExecutionResult(results, aiSummaryTraces);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("AutomatedAgenticTestExecutor: error executing agentic test: " + e.getMessage());
-            return Collections.emptyList();
+            return new PentestExecutionResult(Collections.emptyList(), null);
         }
+    }
+
+    private static List<AiSummaryEntry> extractRootAiSummaryTraces(JsonNode root) {
+        if (root == null || !root.has("aiSummaryTraces") || !root.get("aiSummaryTraces").isArray()) {
+            return null;
+        }
+        List<AiSummaryEntry> entries = new ArrayList<>();
+        for (JsonNode item : root.get("aiSummaryTraces")) {
+            if (item == null || item.isNull()) {
+                continue;
+            }
+            AiSummaryEntry entry = new AiSummaryEntry();
+            if (item.has("phase") && !item.get("phase").isNull()) {
+                entry.setPhase(item.get("phase").asText());
+            }
+            if (item.has("attempt") && !item.get("attempt").isNull()) {
+                entry.setAttempt(item.get("attempt").asInt());
+            }
+            if (item.has("content") && !item.get("content").isNull()) {
+                entry.setContent(item.get("content").asText());
+            }
+            entries.add(entry);
+        }
+        return entries.isEmpty() ? null : entries;
     }
 
     private String buildRequestBody(RawApi testReq, String testSubType) throws Exception {
