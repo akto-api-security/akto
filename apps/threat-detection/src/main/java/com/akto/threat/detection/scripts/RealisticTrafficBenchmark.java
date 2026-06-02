@@ -7,12 +7,19 @@ import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
 import com.akto.proto.http_response_param.v1.StringList;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
+import com.mongodb.BasicDBObject;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.StringSerializer;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -23,16 +30,31 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * High-scale realistic traffic benchmark: 90% clean traffic, 10% malicious (spread across all threat categories).
  * Supports 1M+ records with multi-threaded producer, temporal distribution across windows.
+ * Can produce records in multiple formats: proto (threat detection), JSON (mini-runtime), or both.
  *
  * Usage examples:
- *   mvn exec:java -Dexec.mainClass="..." -Dnum.records=1000000 -Dnum.threads=8
- *   THREAD_COUNT=16 NUM_RECORDS=1000000 java ... RealisticTrafficBenchmark
+ *   mvn exec:java -Dexec.mainClass="..." -Dnum.records=1000000 -Dnum.threads=8 -Dmode=threat
+ *   mvn exec:java -Dexec.mainClass="..." -Dnum.records=1000000 -Dnum.threads=8 -Dmode=mini-runtime
+ *   mvn exec:java -Dexec.mainClass="..." -Dnum.records=1000000 -Dnum.threads=8 -Dmode=both
  */
 public class RealisticTrafficBenchmark {
 
     // Configurable: read from system property, env var, or default
     public static long numRecords = readLongConfig("num.records", "NUM_RECORDS", 100L);
     public static int numThreads = readIntConfig("num.threads", "THREAD_COUNT", Runtime.getRuntime().availableProcessors());
+    public static String mode = readStringConfig("mode", "MODE", "threat");  // threat, mini-runtime, or both
+
+    private static String readStringConfig(String sysProp, String envVar, String defaultValue) {
+        String sysPropVal = System.getProperty(sysProp);
+        if (sysPropVal != null && !sysPropVal.isEmpty()) {
+            return sysPropVal.toLowerCase();
+        }
+        String envVal = System.getenv(envVar);
+        if (envVal != null && !envVal.isEmpty()) {
+            return envVal.toLowerCase();
+        }
+        return defaultValue;
+    }
 
     private static long readLongConfig(String sysProp, String envVar, long defaultValue) {
         String sysPropVal = System.getProperty(sysProp);
@@ -59,6 +81,7 @@ public class RealisticTrafficBenchmark {
     }
 
     public static final String THREAT_TOPIC = "akto.api.logs2";
+    public static final String INGEST_TOPIC = "akto.api.logs";
     public static final String KAFKA_URL = "localhost:9092";
     private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
     private static final Random random = new Random(42);
@@ -78,7 +101,82 @@ public class RealisticTrafficBenchmark {
             .setValueSerializer(Serializer.BYTE_ARRAY)
             .build();
 
-    private static final KafkaProtoProducer producer = new KafkaProtoProducer(kafkaConfig);
+    private static final KafkaProtoProducer protoProducer = new KafkaProtoProducer(kafkaConfig);
+    private static KafkaProducer<String, String> jsonProducer = null;
+
+    // =====================================================================
+    //  IngestDataBatch — JSON format for mini-runtime ingestion
+    // =====================================================================
+
+    private static class IngestDataBatch {
+        String path;
+        String requestHeaders;
+        String responseHeaders;
+        String method;
+        String requestPayload;
+        String responsePayload;
+        String ip;
+        String time;
+        String statusCode;
+        String type;
+        String status;
+        String akto_account_id;
+        String akto_vxlan_id;
+        String is_pending;
+        String source;
+
+        IngestDataBatch(String path, String requestHeaders, String responseHeaders, String method,
+                        String requestPayload, String responsePayload, String ip, String time,
+                        String statusCode, String type, String status, String akto_account_id,
+                        String akto_vxlan_id, String is_pending, String source) {
+            this.path = path;
+            this.requestHeaders = requestHeaders;
+            this.responseHeaders = responseHeaders;
+            this.method = method;
+            this.requestPayload = requestPayload;
+            this.responsePayload = responsePayload;
+            this.ip = ip;
+            this.time = time;
+            this.statusCode = statusCode;
+            this.type = type;
+            this.status = status;
+            this.akto_account_id = akto_account_id;
+            this.akto_vxlan_id = akto_vxlan_id;
+            this.is_pending = is_pending;
+            this.source = source;
+        }
+    }
+
+    private static String ingestDataBatchToJson(IngestDataBatch payload) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("path", payload.path);
+        obj.put("requestHeaders", payload.requestHeaders);
+        obj.put("responseHeaders", payload.responseHeaders);
+        obj.put("method", payload.method);
+        obj.put("requestPayload", payload.requestPayload);
+        obj.put("responsePayload", payload.responsePayload);
+        obj.put("ip", payload.ip);
+        obj.put("time", payload.time);
+        obj.put("statusCode", payload.statusCode);
+        obj.put("type", payload.type);
+        obj.put("status", payload.status);
+        obj.put("akto_account_id", payload.akto_account_id);
+        obj.put("akto_vxlan_id", payload.akto_vxlan_id);
+        obj.put("is_pending", payload.is_pending);
+        obj.put("source", payload.source);
+        return obj.toString();
+    }
+
+    private static void initJsonProducer() {
+        Properties props = new Properties();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_URL);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4");
+        props.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384);
+        props.put(ProducerConfig.LINGER_MS_CONFIG, 100);
+        jsonProducer = new KafkaProducer<>(props);
+    }
 
     // =====================================================================
     //  Clean API endpoints (realistic REST APIs)
@@ -176,8 +274,23 @@ public class RealisticTrafficBenchmark {
     // =====================================================================
 
     public static void main(String[] args) throws Exception {
+        // Validate mode
+        if (!mode.equals("threat") && !mode.equals("mini-runtime") && !mode.equals("both")) {
+            System.err.println("Invalid mode: " + mode);
+            System.err.println("Valid modes: threat, mini-runtime, both");
+            System.exit(1);
+        }
+
+        // Initialize JSON producer if needed
+        if (mode.equals("mini-runtime") || mode.equals("both")) {
+            initJsonProducer();
+        }
+
         System.out.printf("\n\n******* High-Scale Realistic Traffic Benchmark *******\n\n");
-        System.out.printf("Total records: %,d | Threads: %d | 90%% clean, 10%% malicious\n", numRecords, numThreads);
+        System.out.printf("Mode: %s | Total records: %,d | Threads: %d | 90%% clean, 10%% malicious\n", mode.toUpperCase(), numRecords, numThreads);
+        System.out.printf("Topics: %s%s\n",
+            (mode.equals("threat") || mode.equals("both")) ? THREAT_TOPIC : "",
+            (mode.equals("mini-runtime") || mode.equals("both")) ? (", " + INGEST_TOPIC) : "");
         System.out.printf("Malicious categories: %d templates | IP pool: %d unique IPs\n", MALICIOUS_TEMPLATES.length, ALL_IPS.length);
         System.out.printf("API collections: 101, 102, 103 | Records per window: 1000\n\n");
 
@@ -221,16 +334,30 @@ public class RealisticTrafficBenchmark {
 
                 for (long globalIdx = threadStartIdx; globalIdx < threadEndIdx; globalIdx++) {
                     try {
-                        HttpResponseParam record;
-                        if (globalIdx % 10 == 0) {
-                            // Every 10th record is malicious
+                        HttpResponseParam protoRecord = null;
+                        IngestDataBatch jsonRecord = null;
+                        boolean isMalicious = globalIdx % 10 == 0;
+
+                        if (isMalicious) {
                             int templateIdx = (int)(threadMalCount.getAndIncrement() % MALICIOUS_TEMPLATES.length);
-                            record = buildMaliciousRecord(MALICIOUS_TEMPLATES[templateIdx], paddingBody, globalIdx, baseEpochMin, RECORDS_PER_WINDOW, threadRandom);
+                            protoRecord = buildMaliciousRecord(MALICIOUS_TEMPLATES[templateIdx], paddingBody, globalIdx, baseEpochMin, RECORDS_PER_WINDOW, threadRandom);
                             malSent.incrementAndGet();
                         } else {
-                            record = buildCleanRecord(paddingBody, globalIdx, baseEpochMin, RECORDS_PER_WINDOW, threadRandom);
+                            protoRecord = buildCleanRecord(paddingBody, globalIdx, baseEpochMin, RECORDS_PER_WINDOW, threadRandom);
                         }
-                        producer.send(THREAT_TOPIC, record);
+
+                        // Send proto format if in threat or both mode
+                        if (mode.equals("threat") || mode.equals("both")) {
+                            protoProducer.send(THREAT_TOPIC, protoRecord);
+                        }
+
+                        // Send JSON format if in mini-runtime or both mode
+                        if (mode.equals("mini-runtime") || mode.equals("both")) {
+                            jsonRecord = convertProtoToJson(protoRecord);
+                            String jsonStr = ingestDataBatchToJson(jsonRecord);
+                            jsonProducer.send(new ProducerRecord<>(INGEST_TOPIC, jsonStr));
+                        }
+
                         sent.incrementAndGet();
                     } catch (Exception e) {
                         errors.incrementAndGet();
@@ -250,8 +377,14 @@ public class RealisticTrafficBenchmark {
         }
 
         // Flush all in-flight messages
-        System.out.println("\nFlushing Kafka producer...");
-        producer.flush();
+        System.out.println("\nFlushing Kafka producers...");
+        if (mode.equals("threat") || mode.equals("both")) {
+            protoProducer.flush();
+        }
+        if (mode.equals("mini-runtime") || mode.equals("both")) {
+            jsonProducer.flush();
+            jsonProducer.close();
+        }
 
         // Final stats
         long totalMs = (System.nanoTime() - startTime) / 1_000_000;
@@ -287,6 +420,52 @@ public class RealisticTrafficBenchmark {
                 Thread.currentThread().interrupt();
                 break;
             }
+        }
+    }
+
+    // =====================================================================
+    //  Proto to JSON conversion
+    // =====================================================================
+
+    private static IngestDataBatch convertProtoToJson(HttpResponseParam proto) {
+        // Convert protobuf record to JSON format
+        Map<String, StringList> reqHeaders = proto.getRequestHeadersMap();
+        Map<String, StringList> respHeaders = proto.getResponseHeadersMap();
+
+        String requestHeaders = mapToJsonString(reqHeaders);
+        String responseHeaders = mapToJsonString(respHeaders);
+
+        return new IngestDataBatch(
+            proto.getPath(),
+            requestHeaders,
+            responseHeaders,
+            proto.getMethod(),
+            proto.getRequestPayload(),
+            proto.getResponsePayload(),
+            proto.getIp(),
+            String.valueOf(proto.getTime()),
+            String.valueOf(proto.getStatusCode()),
+            proto.getType(),
+            proto.getStatus(),
+            proto.getAktoAccountId(),
+            proto.getAktoVxlanId(),
+            String.valueOf(proto.getIsPending()),
+            proto.getSource()
+        );
+    }
+
+    private static String mapToJsonString(Map<String, StringList> headerMap) {
+        Map<String, String> flatMap = new HashMap<>();
+        for (Map.Entry<String, StringList> entry : headerMap.entrySet()) {
+            if (entry.getValue().getValuesList().size() > 0) {
+                flatMap.put(entry.getKey(), entry.getValue().getValues(0));
+            }
+        }
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.writeValueAsString(flatMap);
+        } catch (Exception e) {
+            return "{}";
         }
     }
 
