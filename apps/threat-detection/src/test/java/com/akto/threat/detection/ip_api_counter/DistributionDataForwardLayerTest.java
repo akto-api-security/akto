@@ -180,8 +180,10 @@ class DistributionDataForwardLayerTest extends DistributionIntegrationTestBase {
 
         // Then: Should have multiple windows
         assertThat(windowCount).isGreaterThan(0);
-        // For 8 hours and 5-min windows: (8*60)/5 = 96 windows
-        assertThat(windowCount).isEqualTo((int) ((lookbackHours * 60) / windowSize));
+        // For 8 hours and 5-min windows: range is [lookbackStart, safeWindowEnd] inclusive
+        // Number of windows = (safeWindowEnd - lookbackStart) / windowSize + 1
+        // = (480 / 5) + 1 = 96 + 1 = 97 windows
+        assertThat(windowCount).isEqualTo((int) ((lookbackHours * 60) / windowSize + 1));
     }
 
     @Test
