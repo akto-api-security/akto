@@ -2,74 +2,50 @@ import React, { useState, useEffect } from 'react';
 import { HighchartsReact } from "highcharts-react-official";
 import Highcharts from "highcharts";
 import InfoCard from "../../pages/dashboard/new_components/InfoCard";
-import { Spinner } from '@shopify/polaris';
 import dayjs from 'dayjs';
+
+const COLORMAP = {
+    incoming: 'rgb(255, 107, 107)',
+    output: 'rgb(78, 205, 196)',
+    total: 'rgb(69, 183, 209)',
+};
 
 const P95LatencyGraph = ({ title, subtitle, dataType = 'mcp-security', startTimestamp, endTimestamp, onLatencyClick, latencyData }) => {
     const [seriesData, setSeriesData] = useState([]);
-    const [loading, setLoading] = useState(false);
     const [sortedTimelines, setSortedTimelines] = useState([]);
 
-    const COLORMAP = {
-        'incoming': 'rgb(255, 107, 107)', // Red
-        'output': 'rgb(78, 205, 196)',   // Teal  
-        'total': 'rgb(69, 183, 209)'     // Blue
-    }
-
-
-    const fetchLatencyData = async () => {
-        setLoading(true);
-        
-        if (latencyData && latencyData.length > 0) {
-            // Use provided latency data from threat page
-            setSortedTimelines(latencyData);
-            
-            const series = [
-                {
-                    color: COLORMAP.incoming,
-                    name: 'Incoming Request P95',
-                    data: latencyData.map(item => item.incomingRequestP95),
-                    events: {
-                        click: (e) => {
-                            if (onLatencyClick) onLatencyClick('incoming');
-                        }
-                    }
-                },
-                {
-                    color: COLORMAP.output,
-                    name: 'Output Result P95', 
-                    data: latencyData.map(item => item.outputResultP95),
-                    events: {
-                        click: (e) => {
-                            if (onLatencyClick) onLatencyClick('output');
-                        }
-                    }
-                },
-                {
-                    color: COLORMAP.total,
-                    name: 'Total Latency P95',
-                    data: latencyData.map(item => item.totalP95),
-                    events: {
-                        click: (e) => {
-                            if (onLatencyClick) onLatencyClick('total');
-                        }
-                    }
-                }
-            ];
-            
-            setSeriesData(series);
-        } else {
-            // No data provided, show empty state
+    useEffect(() => {
+        if (!latencyData || latencyData.length === 0) {
             setSortedTimelines([]);
             setSeriesData([]);
+            return;
         }
-        
-        setLoading(false);
-    };
 
-    useEffect(() => {
-        fetchLatencyData();
-    }, [startTimestamp, endTimestamp, dataType, latencyData]);
+        setSortedTimelines(latencyData);
+
+        const series = [
+            {
+                color: COLORMAP.incoming,
+                name: 'Incoming Request P95',
+                data: latencyData.map(item => item.incomingRequestP95),
+                events: { click: () => { if (onLatencyClick) onLatencyClick('incoming'); } }
+            },
+            {
+                color: COLORMAP.output,
+                name: 'Output Result P95',
+                data: latencyData.map(item => item.outputResultP95),
+                events: { click: () => { if (onLatencyClick) onLatencyClick('output'); } }
+            },
+            {
+                color: COLORMAP.total,
+                name: 'Total Latency P95',
+                data: latencyData.map(item => item.totalP95),
+                events: { click: () => { if (onLatencyClick) onLatencyClick('total'); } }
+            },
+        ];
+
+        setSeriesData(series.filter(s => s.data.some(v => v > 0)));
+    }, [startTimestamp, endTimestamp, dataType, latencyData, onLatencyClick]);
 
     const chartOptions = {
         chart: {
@@ -89,15 +65,20 @@ const P95LatencyGraph = ({ title, subtitle, dataType = 'mcp-security', startTime
             title: {
                 text: "Timeline"
             },
-            categories: sortedTimelines.map(item => dayjs(item.timestamp * 1000).format('D MMM')),
+            categories: sortedTimelines.map(item => dayjs(item.timestamp * 1000).format('D MMM HH:mm')),
             labels: {
-                step: Math.max(1, Math.floor(sortedTimelines.length / 8)), // Show ~8 labels max
+                step: Math.max(1, Math.floor(sortedTimelines.length / 8)),
                 rotation: -45
             }
         },
         yAxis: {
             title: {
                 text: "Latency (ms)"
+            },
+            labels: {
+                formatter: function() {
+                    return this.value;
+                }
             }
         },
         plotOptions: {
@@ -119,20 +100,15 @@ const P95LatencyGraph = ({ title, subtitle, dataType = 'mcp-security', startTime
         },
         tooltip: {
             formatter: function() {
-                const timestamp = dayjs(this.x).format('MMM DD, HH:mm');
-                let tooltip = `<b>${timestamp}</b><br/>`;
-                this.points.forEach(point => {
-                    tooltip += `<span style="color:${point.color}">●</span> ${point.series.name}: <b>${point.y}ms</b><br/>`;
+                let tooltip = '<b>' + this.x + '</b><br/>';
+                this.points.forEach(function(point) {
+                    tooltip += '<span style="color:' + point.color + '">&#9679;</span> ' + point.series.name + ': <b>' + Math.round(point.y) + 'ms</b><br/>';
                 });
                 return tooltip;
             },
             shared: true
         },
         series: seriesData,
-    }
-
-    if (loading) {
-        return <Spinner />;
     }
 
     return (

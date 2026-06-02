@@ -327,6 +327,13 @@ const threatDetectionRequests = {
             method: 'post',
             data: { sessionId }
         })
+    },
+    fetchGuardrailLatency(startTs, endTs) {
+        return request({
+            url: '/api/metrics',
+            method: 'post',
+            data: { startTime: startTs, endTime: endTs, metricIdPrefix: 'GUARDRAIL_' }
+        })
     }
 }
 export default threatDetectionRequests
