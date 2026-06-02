@@ -107,11 +107,16 @@ public class CopilotOAuthAuthParam extends AuthParam {
     private String getValidAccessToken() {
         if (cachedAccessToken != null
                 && System.currentTimeMillis() < cachedAccessTokenExpiresAt - 5 * 60 * 1000L) {
+            System.out.println("CopilotOAuthAuthParam: Copilot access token cache hit");
             return cachedAccessToken;
         }
 
-        if (refreshToken == null || refreshToken.isEmpty())
+        System.out.println("CopilotOAuthAuthParam: Copilot access token cache miss, refreshing via Microsoft token endpoint");
+
+        if (refreshToken == null || refreshToken.isEmpty()) {
+            System.out.println("CopilotOAuthAuthParam: Copilot refresh token is missing, cannot obtain access token");
             return null;
+        }
 
         try {
             FormBody formBody = new FormBody.Builder()
@@ -127,8 +132,10 @@ public class CopilotOAuthAuthParam extends AuthParam {
 
             try (Response response = httpClient.newCall(request).execute()) {
                 String body = response.body() != null ? response.body().string() : "";
-                if (!response.isSuccessful())
+                if (!response.isSuccessful()) {
+                    System.out.println("CopilotOAuthAuthParam: Copilot token refresh failed. status=" + response.code() + " body=" + body);
                     return null;
+                }
 
                 JsonNode json = objectMapper.readTree(body);
                 String newAccessToken =
@@ -137,8 +144,10 @@ public class CopilotOAuthAuthParam extends AuthParam {
                         json.has("refresh_token") ? json.get("refresh_token").asText() : null;
                 long expiresIn = json.has("expires_in") ? json.get("expires_in").asLong() : 180L;
 
-                if (newAccessToken == null || newAccessToken.isEmpty())
+                if (newAccessToken == null || newAccessToken.isEmpty()) {
+                    System.out.println("CopilotOAuthAuthParam: Copilot token refresh response missing access_token. body=" + body);
                     return null;
+                }
 
                 cachedAccessToken = newAccessToken;
                 cachedAccessTokenExpiresAt = System.currentTimeMillis() + expiresIn * 1000L;
@@ -146,6 +155,7 @@ public class CopilotOAuthAuthParam extends AuthParam {
                 // Microsoft rotates refresh tokens — persist new one
                 if (newRefreshToken != null && !newRefreshToken.isEmpty()
                         && !newRefreshToken.equals(refreshToken)) {
+                    System.out.println("CopilotOAuthAuthParam: Copilot refresh token rotated, persisting new token for roleId=" + roleId);
                     refreshToken = newRefreshToken;
                     persistRefreshToken(newRefreshToken);
                 }
@@ -153,17 +163,23 @@ public class CopilotOAuthAuthParam extends AuthParam {
                 return newAccessToken;
             }
         } catch (Exception e) {
+            System.out.println("CopilotOAuthAuthParam: Exception during Copilot token refresh: " + e.getMessage());
+            e.printStackTrace();
             return null;
         }
     }
 
     private void persistRefreshToken(String newRefreshToken) {
-        if (roleId == null || roleId.isEmpty())
+        if (roleId == null || roleId.isEmpty()) {
+            System.out.println("CopilotOAuthAuthParam: Cannot persist Copilot refresh token — roleId is missing");
             return;
+        }
         try {
             TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(roleId)));
-            if (role == null || role.getAuthWithCondList() == null)
+            if (role == null || role.getAuthWithCondList() == null) {
+                System.out.println("CopilotOAuthAuthParam: Cannot persist Copilot refresh token — role not found for roleId=" + roleId);
                 return;
+            }
 
             for (AuthWithCond authWithCond : role.getAuthWithCondList()) {
                 if (authWithCond.getAuthMechanism() == null)
@@ -180,7 +196,9 @@ public class CopilotOAuthAuthParam extends AuthParam {
 
             TestRolesDao.instance.updateOneNoUpsert(Filters.eq("_id", new ObjectId(roleId)),
                     Updates.set(TestRoles.AUTH_WITH_COND_LIST, role.getAuthWithCondList()));
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            System.out.println("CopilotOAuthAuthParam: Error persisting Copilot refresh token for roleId=" + roleId + ": " + e.getMessage());
+            e.printStackTrace();
         }
     }
 }
