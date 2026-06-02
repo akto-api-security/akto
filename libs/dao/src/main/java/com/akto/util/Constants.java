@@ -78,6 +78,7 @@ public class Constants {
     public static final String AKTO_COPILOT_BOT_ENVIRONMENT_TAG = "bot-environment-id";
     public static final String AKTO_COPILOT_SOURCE_VALUE = "COPILOT_STUDIO";
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
+    public static final String AKTO_AGENT_PROXY_TAG = "agent-proxy";
     public static final String AKTO_GUARD_RAIL_TAG = "guard-rail";
     public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";
     public static final String AKTO_MCP_RESOURCES_TAG = "mcp-resource";
