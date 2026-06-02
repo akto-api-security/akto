@@ -131,6 +131,89 @@ func TestParseBlockedHostRulesNoData(t *testing.T) {
 	}
 }
 
+// TestMatchBlockedToolRule covers the endpoint / MCP-server matcher against synthetic hosts. The
+// AI-tool token lives in a dotted segment after the device label and carries connector-specific
+// suffixes (claudecli, codexcli), so matching is prefix/alias based, and "chatgpt" must block
+// "codex"/"codexcli" via the vendor alias map.
+func TestMatchBlockedToolRule(t *testing.T) {
+	mk := func(patterns ...string) []blockedHostRule {
+		var rules []blockedHostRule
+		for _, p := range patterns {
+			np := normalizePattern(p)
+			re, err := compileBlockedPattern(np)
+			if err != nil {
+				t.Fatalf("compile %q: %v", p, err)
+			}
+			rules = append(rules, blockedHostRule{policyName: "test", pattern: np, re: re})
+		}
+		return rules
+	}
+
+	dev := "rahul-s-macbook-pro--2--be4f9b91"
+	cases := []struct {
+		name    string
+		pattern string
+		tag     string
+		host    string
+		want    bool
+	}{
+		// claude family — prefix match covers cli suffix and "-desktop".
+		{"claude blocks claudecli (hook host)", "claude.com/*", "", dev + ".ai-agent.claudecli", true},
+		{"claude blocks claude (discovery host)", "claude.com/*", "", dev + ".ai-agent.claude", true},
+		{"claude blocks claude-desktop", "claude.com", "", dev + ".ai-agent.claude-desktop", true},
+		{"claude via ai-agent tag value", "claude.com/*", `{"source":"ENDPOINT","ai-agent":"claudecli"}`, dev + ".ai-agent.claudecli", true},
+		{"claude via mcp-client tag value", "claude.com", `{"mcp-client":"claude-desktop"}`, dev + ".ai-agent.claude-desktop", true},
+		// chatgpt -> codex alias.
+		{"chatgpt blocks codexcli", "chatgpt.com", "", dev + ".ai-agent.codexcli", true},
+		{"chatgpt blocks codex", "chatgpt.com", "", dev + ".ai-agent.codex", true},
+		{"bare codex pattern blocks codexcli", "codex", "", dev + ".ai-agent.codexcli", true},
+		// other vendors.
+		{"cursor blocks cursor", "cursor.com", "", dev + ".ai-agent.cursor", true},
+		{"gemini blocks geminicli", "gemini.com", "", dev + ".ai-agent.geminicli", true},
+		// negatives — no cross-vendor leakage, device label ignored, TLD not an alias.
+		{"claude does not block codexcli", "claude.com/*", "", dev + ".ai-agent.codexcli", false},
+		{"claude does not block cursor", "claude.com", "", dev + ".ai-agent.cursor", false},
+		{"chatgpt does not block claude", "chatgpt.com", "", dev + ".ai-agent.claude", false},
+		{"device label is not matched", "claude.com", "", "claude-laptop-abc.ai-agent.codexcli", false},
+		{"unrelated vendor not blocked", "claude.com", "", dev + ".ai-agent.vscode", false},
+	}
+
+	for _, c := range cases {
+		rules := mk(c.pattern)
+		rule, matched, ok := matchBlockedToolRule(c.tag, c.host, rules)
+		if ok != c.want {
+			t.Errorf("%s: pattern=%q tag=%q host=%q -> got %v, want %v (matched=%q)", c.name, c.pattern, c.tag, c.host, ok, c.want, matched)
+			continue
+		}
+		if c.want && rule.pattern != normalizePattern(c.pattern) {
+			t.Errorf("%s: matched pattern=%q, want %q", c.name, rule.pattern, normalizePattern(c.pattern))
+		}
+	}
+}
+
+func TestIsEndpointOrMcpRequest(t *testing.T) {
+	cases := []struct {
+		tag           string
+		contextSource string
+		want          bool
+	}{
+		{`{"gen-ai":"Gen AI","hook":"UserPromptSubmit","ai-agent":"claudecli","source":"ENDPOINT"}`, "ENDPOINT", true},
+		{`{"source":"ENDPOINT"}`, "", true},
+		{`{"mcp-server":"x"}`, "", true},
+		{"", "ENDPOINT", true},
+		{"", "endpoint", true}, // case-insensitive
+		{`{"gen-ai":"Gen AI"}`, "", false},
+		{`{"browser-llm":"Browser LLM"}`, "", false},
+		{"", "", false},
+		{"not-json", "", false},
+	}
+	for _, c := range cases {
+		if got := isEndpointOrMcpRequest(c.tag, c.contextSource); got != c.want {
+			t.Errorf("tag=%q contextSource=%q: got %v, want %v", c.tag, c.contextSource, got, c.want)
+		}
+	}
+}
+
 func TestIsBrowserExtensionRequest(t *testing.T) {
 	cases := []struct {
 		tag  string

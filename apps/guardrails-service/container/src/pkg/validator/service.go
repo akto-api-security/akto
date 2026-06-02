@@ -475,6 +475,61 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 
 // reportAndBlockHost tracks the blocked session, reports the threat (unless skipThreat) and
 // returns the blocked ValidationResult for a request that hit the browser-extension host blocklist.
+// checkBlockedHost evaluates the request against the cached blocked-host rules and returns a block
+// ValidationResult on a match, or nil to allow. The matcher depends on the traffic source:
+//   - browser-extension traffic carries a real host -> glob match on host+path (matchBlockedHostRule)
+//   - endpoint / MCP-server traffic carries a synthetic host (deviceLabel.ai-agent.<tool>) -> match
+//     on the AI-tool token / vendor alias (matchBlockedToolRule); glob is tried first so a real MCP
+//     target host still works.
+func (s *Service) checkBlockedHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID string) *mcp.ValidationResult {
+	isExtension := isBrowserExtensionRequest(valCtx.Tag)
+	isEndpointOrMcp := isEndpointOrMcpRequest(valCtx.Tag, params.ContextSource)
+	if !isExtension && !isEndpointOrMcp {
+		return nil
+	}
+
+	s.cache.mu.RLock()
+	blockedHostRules := s.cache.blockedHosts
+	s.cache.mu.RUnlock()
+	if len(blockedHostRules) == 0 {
+		return nil
+	}
+
+	reqHost := extractHostHeader(valCtx.RequestHeaders)
+	mode := "browser-llm"
+	if isEndpointOrMcp {
+		mode = "endpoint-mcp"
+	}
+	s.logger.Info("[BLOCKED_HOST] running blocked-host check",
+		zap.String("feature", "blocked-host-v1"),
+		zap.String("mode", mode),
+		zap.String("host", reqHost),
+		zap.String("path", params.Path),
+		zap.Int("ruleCount", len(blockedHostRules)),
+		zap.Strings("patterns", blockedHostPatterns(blockedHostRules)))
+
+	// Glob match on host+path (real domains) — applies to all sources.
+	rule, matchedPattern, blocked := matchBlockedHostRule(reqHost, params.Path, blockedHostRules)
+	// Token / vendor-alias match for synthetic endpoint / MCP-server hosts.
+	if !blocked && isEndpointOrMcp {
+		rule, matchedPattern, blocked = matchBlockedToolRule(valCtx.Tag, reqHost, blockedHostRules)
+	}
+	if !blocked {
+		return nil
+	}
+
+	s.logger.Warn("ValidateRequest - blocking request via blocked-host policy",
+		zap.String("mode", mode),
+		zap.String("path", params.Path),
+		zap.String("method", params.Method),
+		zap.String("host", reqHost),
+		zap.String("pattern", matchedPattern),
+		zap.String("policy", rule.policyName),
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID))
+	return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, rule.policyName, matchedPattern)
+}
+
 func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID, policyName, matchedPattern string) *mcp.ValidationResult {
 	reason := "Request blocked by guardrail policy (blocked host pattern: " + matchedPattern + ")"
 	metadata := types.ThreatMetadata{
@@ -866,30 +921,12 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Create validation context with full request metadata (matching batch flow)
 	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList)
 
-	// Host blocklist (block-only) — only for browser LLM extension traffic, identified by the
-	// "browser-llm" tag. MCP / gen-AI sources are handled separately. If the request host
-	// matches any active policy's blocked hosts, block immediately (independent of filter rules).
-	if isBrowserExtensionRequest(valCtx.Tag) {
-		s.cache.mu.RLock()
-		blockedHostRules := s.cache.blockedHosts
-		s.cache.mu.RUnlock()
-		reqHost := extractHostHeader(valCtx.RequestHeaders)
-		s.logger.Info("[BLOCKED_HOST] running blocked-host check for browser-llm request",
-			zap.String("feature", "blocked-host-v1"),
-			zap.String("host", reqHost),
-			zap.String("path", params.Path),
-			zap.Int("ruleCount", len(blockedHostRules)),
-			zap.Strings("patterns", blockedHostPatterns(blockedHostRules)))
-		if rule, matchedPattern, blocked := matchBlockedHostRule(reqHost, params.Path, blockedHostRules); blocked {
-			s.logger.Warn("ValidateRequest - blocking browser extension request via blocked-host policy",
-				zap.String("path", params.Path),
-				zap.String("method", params.Method),
-				zap.String("pattern", matchedPattern),
-				zap.String("policy", rule.policyName),
-				zap.String("sessionID", sessionID),
-				zap.String("requestID", requestID))
-			return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, rule.policyName, matchedPattern), nil
-		}
+	// Host blocklist (block-only). If the request matches any active policy's blocked hosts, block
+	// immediately (independent of filter rules). Browser-extension traffic carries a real host and
+	// is glob-matched; endpoint / MCP-server traffic carries a synthetic host and is matched on the
+	// AI-tool token (see checkBlockedHost).
+	if blockResult := s.checkBlockedHost(params, valCtx, payloadToValidate, sessionID, requestID); blockResult != nil {
+		return blockResult, nil
 	}
 
 	// Filter policies by MCP server name — policies with no server configured are skipped
