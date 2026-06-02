@@ -1,8 +1,10 @@
 package com.akto.action.quick_start;
 
 import com.akto.action.UserAction;
+import com.akto.dao.OAuthStatesDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestRolesDao;
+import com.akto.dto.OAuthState;
 import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.CopilotOAuthAuthParam;
 import com.akto.dto.testing.TestRoles;
@@ -26,7 +28,10 @@ import org.bson.types.ObjectId;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 public class CopilotStudioAction extends UserAction {
 
@@ -69,7 +74,12 @@ public class CopilotStudioAction extends UserAction {
 
         try {
             String callbackUrl = Constants.DEFAULT_AKTO_DASHBOARD_URL + "/copilot/oauth/callback";
-            String stateValue  = accountId + "|" + roleId;
+            String nonce = UUID.randomUUID().toString();
+            int expiresAt = Context.now() + OAuthState.EXPIRY_SECONDS;
+            Map<String, String> stateData = new HashMap<>();
+            stateData.put("accountId", String.valueOf(accountId));
+            stateData.put("roleId", roleId);
+            OAuthStatesDao.instance.insertOne(new OAuthState(nonce, stateData, expiresAt));
 
             authorizationUrl = String.format(AUTH_ENDPOINT_TEMPLATE, copilotParam.getTenantId())
                 + "?response_type=code"
@@ -77,7 +87,7 @@ public class CopilotStudioAction extends UserAction {
                 + "&client_id=" + encode(copilotParam.getClientId())
                 + "&redirect_uri=" + encode(callbackUrl)
                 + "&scope=" + encode(SCOPE)
-                + "&state=" + encode(stateValue);
+                + "&state=" + encode(nonce);
 
             logger.infoAndAddToDb("getAuthorizationUrl: generated for accountId=" + accountId + " roleId=" + roleId);
             return Action.SUCCESS.toUpperCase();
@@ -104,27 +114,25 @@ public class CopilotStudioAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        String[] parts = state.split("\\|", 2);
-        if (parts.length != 2) {
-            logger.errorAndAddToDb("oauthCallback: invalid state=" + state);
+        OAuthState oauthState = OAuthStatesDao.instance.getMCollection().findOneAndDelete(Filters.eq(OAuthState.NONCE, state));
+        if (oauthState == null) {
+            logger.errorAndAddToDb("oauthCallback: unknown or expired state nonce");
+            redirectUrl = rolesListUrl + "?copilotOauthError=invalid_state";
+            return Action.ERROR.toUpperCase();
+        }
+        if (oauthState.getExpiresAt() < Context.now()) {
+            logger.errorAndAddToDb("oauthCallback: state nonce expired");
             redirectUrl = rolesListUrl + "?copilotOauthError=invalid_state";
             return Action.ERROR.toUpperCase();
         }
 
-        int accountId;
-        String callbackRoleId;
-        try {
-            accountId      = Integer.parseInt(parts[0]);
-            callbackRoleId = parts[1];
-        } catch (NumberFormatException e) {
-            logger.errorAndAddToDb("oauthCallback: invalid accountId in state=" + state);
-            redirectUrl = rolesListUrl + "?copilotOauthError=invalid_state";
-            return Action.ERROR.toUpperCase();
-        }
+        Map<String, String> stateData = oauthState.getData();
+        int accountId = Integer.parseInt(stateData.get("accountId"));
+        String callbackRoleId = stateData.get("roleId");
 
         Context.accountId.set(accountId);
 
-        TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(callbackRoleId)));
+        TestRoles role = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(callbackRoleId)));
         if (role == null) {
             logger.errorAndAddToDb("oauthCallback: TestRole not found roleId=" + callbackRoleId);
             redirectUrl = rolesListUrl + "?copilotOauthError=role_not_found";

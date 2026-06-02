@@ -563,5 +563,6 @@ public class DaoInit {
         ApiCollectionIconsDao.instance.createIndicesIfAbsent();
         UserAnalysisDataDao.instance.createIndicesIfAbsent();
         AgentUsersDao.instance.createIndicesIfAbsent();
+        OAuthStatesDao.instance.createIndicesIfAbsent();
     }
 }
