@@ -15,9 +15,13 @@ public class TokenPayloadModifier {
     private static final Logger logger = LoggerFactory.getLogger(TokenPayloadModifier.class);
 
     public static Boolean tokenPayloadModifier(OriginalHttpRequest request, String key, String value, AuthParam.Location where) {
+        return tokenPayloadModifier(request, key, value, where, false);
+    }
+
+    public static Boolean tokenPayloadModifier(OriginalHttpRequest request, String key, String value, AuthParam.Location where, boolean createIfAbsent) {
         if (where.toString().equals(AuthParam.Location.BODY.toString())) {
             try {
-                String resp = JsonStringPayloadModifier.jsonStringPayloadModifier(request.getBody(), key, value);
+                String resp = JsonStringPayloadModifier.jsonStringPayloadModifier(request.getBody(), key, value, createIfAbsent);
                 request.setBody(resp);
             } catch(Exception e) {
                 logger.info("error adding auth param to body" + e.getMessage());
@@ -32,7 +36,7 @@ public class TokenPayloadModifier {
                 headers.remove(k);
                 CookieTransformer.modifyCookie(cookieList, key, value);
             } else {
-                if (headers.containsKey(k)) {
+                if (headers.containsKey(k) || createIfAbsent) {
                     headers.put(k, Arrays.asList(value));
                 }
                 if (CookieTransformer.isKeyPresentInCookie(cookieList, key)) {

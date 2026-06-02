@@ -320,11 +320,11 @@ export default {
             }
         })
     },
-    addAuthToRole(roleName, apiCond, urlRegex, authParamData, authAutomationType, reqData, recordedLoginFlowInput) {
+    addAuthToRole(roleName, apiCond, urlRegex, authParamData, authAutomationType, reqData, recordedLoginFlowInput, forceApply = false) {
         return request({
             url: '/api/addAuthToRole',
             method: 'post',
-            data: {roleName, apiCond, urlRegex, authParamData, authAutomationType, reqData, recordedLoginFlowInput}
+            data: {roleName, apiCond, urlRegex, authParamData, authAutomationType, reqData, recordedLoginFlowInput, forceApply}
         })
     },
     deleteAuthFromRole(roleName, index) {
@@ -334,11 +334,11 @@ export default {
             data: {roleName, index}
         })
     },
-    updateAuthInRole(roleName, apiCond, urlRegex, index, authParamData, authAutomationType, reqData, recordedLoginFlowInput) {
+    updateAuthInRole(roleName, apiCond, urlRegex, index, authParamData, authAutomationType, reqData, recordedLoginFlowInput, forceApply = false) {
         return request({
             url: '/api/updateAuthInRole',
             method: 'post',
-            data: {roleName, apiCond, urlRegex, index, authParamData, authAutomationType, reqData, recordedLoginFlowInput}
+            data: {roleName, apiCond, urlRegex, index, authParamData, authAutomationType, reqData, recordedLoginFlowInput, forceApply}
         })
     },
     deleteTestRuns(testRunIds){

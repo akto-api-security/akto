@@ -2,16 +2,25 @@ package com.akto.dto.testing.sources;
 
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.testing.AuthMechanism;
+
+import lombok.Getter;
+import lombok.Setter;
+
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import java.util.Map;
 import java.util.regex.Pattern;
 
 public class AuthWithCond {
+    public static final String FORCE_APPLY = "forceApply";
+
     AuthMechanism authMechanism;
     RecordedLoginFlowInput recordedLoginFlowInput;
     Map<String, String> headerKVPairs;
     String urlRegex;
+    @Getter
+    @Setter
+    boolean forceApply;
     @BsonIgnore
     private transient volatile Pattern compiledUrlRegexPattern;
 

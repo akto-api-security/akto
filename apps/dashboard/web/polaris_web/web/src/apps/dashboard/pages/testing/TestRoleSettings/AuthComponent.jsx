@@ -12,6 +12,7 @@ import {
   TextField,
   Tooltip,
   Icon,
+  Checkbox,
 } from "@shopify/polaris";
 import api from '../api';
 import func from "@/util/func";
@@ -54,6 +55,7 @@ const AuthComponent = ({
   const [headerKey, setHeaderKey] = useState("");
   const [headerValue, setHeaderValue] = useState("");
   const [urlRegex, setUrlRegex] = useState("");
+  const [forceApply, setForceApply] = useState(false);
   const [automationType, setAutomationType] = useState("LOGIN_STEP_BUILDER");
   const [hardCodeAuthInfo, setHardCodeAuthInfo] = useState({ authParams: [] });
   const [sampleDataAuthInfo, setSampleDataAuthInfo] = useState({ authParams: [] });
@@ -68,6 +70,7 @@ const AuthComponent = ({
       setHeaderKey(keys.length > 0 ? keys[0] : "");
       setHeaderValue(keys.length > 0 ? headerKVPairs[keys[0]] : "");
       setUrlRegex(authObj.urlRegex && String(authObj.urlRegex).trim() ? authObj.urlRegex : "");
+      setForceApply(!!authObj.forceApply);
     }
   }, [showAuthComponent, editableDoc, initialItems?.authWithCondList]);
 
@@ -131,6 +134,7 @@ const AuthComponent = ({
     setHeaderKey("");
     setHeaderValue("");
     setUrlRegex("");
+    setForceApply(false);
     setHardCodeAuthInfo({ authParams: [] });
     setSampleDataAuthInfo ({authParams: []});
     setAuthMechanism(null);
@@ -160,7 +164,10 @@ const AuthComponent = ({
           urlRegexToSend,
           editableDoc,
           authParamData,
-          currentAutomationType
+          currentAutomationType,
+          null,
+          null,
+          forceApply
         );
       } else {
         resp = await api.addAuthToRole(
@@ -169,7 +176,9 @@ const AuthComponent = ({
           urlRegexToSend,
           authParamData,
           currentAutomationType,
-          null
+          null,
+          null,
+          forceApply
         );
       }
     } else if (openAuth === LOGIN_REQUEST) {
@@ -195,7 +204,8 @@ const AuthComponent = ({
             currentInfo.authParams,
             currentAutomationType,
             currentInfo.steps,
-            recordedLoginFlowInput
+            recordedLoginFlowInput,
+            forceApply
           );
         } else {
           resp = await api.addAuthToRole(
@@ -205,7 +215,8 @@ const AuthComponent = ({
             currentInfo.authParams,
             currentAutomationType,
             currentInfo.steps,
-            recordedLoginFlowInput
+            recordedLoginFlowInput,
+            forceApply
           );
         }
       } else {
@@ -215,9 +226,9 @@ const AuthComponent = ({
         const currentAutomationType = TLS_AUTH;
         const authParamData = tlsAuthInfo.authParams
         if(editableDoc > -1){
-            resp = await api.updateAuthInRole(initialItems.name, apiCond, urlRegexToSend, editableDoc, authParamData, currentAutomationType)
+            resp = await api.updateAuthInRole(initialItems.name, apiCond, urlRegexToSend, editableDoc, authParamData, currentAutomationType, null, null, forceApply)
         }else{
-            resp = await api.addAuthToRole(initialItems.name, apiCond, urlRegexToSend, authParamData, currentAutomationType, null)
+            resp = await api.addAuthToRole(initialItems.name, apiCond, urlRegexToSend, authParamData, currentAutomationType, null, null, forceApply)
         }
     } else if (openAuth == SAMPLE_DATA) {
         const currentAutomationType = SAMPLE_DATA;
@@ -229,7 +240,10 @@ const AuthComponent = ({
             urlRegexToSend,
             editableDoc,
             authParamData,
-            currentAutomationType
+            currentAutomationType,
+            null,
+            null,
+            forceApply
           );
         } else {
           resp = await api.addAuthToRole(
@@ -238,7 +252,9 @@ const AuthComponent = ({
             urlRegexToSend,
             authParamData,
             currentAutomationType,
-            null
+            null,
+            null,
+            forceApply
           );
         }
     } else if (openAuth === DIGEST_AUTH) {
@@ -251,7 +267,10 @@ const AuthComponent = ({
             urlRegexToSend,
             editableDoc,
             authParamData,
-            currentAutomationType
+            currentAutomationType,
+            null,
+            null,
+            forceApply
           );
         } else {
           resp = await api.addAuthToRole(
@@ -260,7 +279,9 @@ const AuthComponent = ({
             urlRegexToSend,
             authParamData,
             currentAutomationType,
-            null
+            null,
+            null,
+            forceApply
           );
         }
     }
@@ -502,6 +523,24 @@ const AuthComponent = ({
                     />
                   </FormLayout.Group>
                 </FormLayout>
+              </VerticalStack>
+              <VerticalStack gap={"2"}>
+                <HorizontalStack gap="2" blockAlign="center">
+                  <Checkbox
+                    id="auth-force-apply-checkbox"
+                    label="Force apply tokens"
+                    checked={forceApply}
+                    onChange={setForceApply}
+                  />
+                  <Tooltip
+                    content="When enabled, auth tokens are applied even if the header, cookie, or body field (including nested paths like auth.token) is not already present on the request."
+                    dismissOnMouseOut
+                    width="wide"
+                    preferredPosition="below"
+                  >
+                    <Icon source={InfoMinor} color="base" />
+                  </Tooltip>
+                </HorizontalStack>
               </VerticalStack>
               <VerticalStack gap={"2"}>
                 <Box width="100%">

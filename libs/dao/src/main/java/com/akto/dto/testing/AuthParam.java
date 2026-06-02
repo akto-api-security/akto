@@ -5,6 +5,9 @@ import com.akto.dto.OriginalHttpRequest;
 public abstract class AuthParam {
 
     abstract boolean addAuthTokens(OriginalHttpRequest request);
+
+    abstract boolean addAuthTokens(OriginalHttpRequest request, boolean forceApply);
+
     public abstract boolean removeAuthTokens(OriginalHttpRequest request);
 
     public abstract boolean authTokenPresent(OriginalHttpRequest request);

@@ -65,12 +65,7 @@ public class TestRoles {
                 boolean noHeaderCond = authWithCond.getHeaderKVPairs() == null || authWithCond.getHeaderKVPairs().isEmpty();
                 boolean noUrlCond = authWithCond.getUrlRegex() == null || authWithCond.getUrlRegex().isEmpty();
                 if (noHeaderCond && noUrlCond) {
-                    AuthMechanism ret = authWithCond.getAuthMechanism();
-                    if(authWithCond.getRecordedLoginFlowInput()!=null){
-                        ret.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
-                    }
-
-                    return ret;
+                    return prepareAuthMechanism(authWithCond);
                 }
             }
         } catch (Exception e) {
@@ -118,11 +113,7 @@ public class TestRoles {
                 }
 
                 if (allSatisfied) {
-                    AuthMechanism ret = authWithCond.getAuthMechanism();
-                    if(authWithCond.getRecordedLoginFlowInput()!=null){
-                        ret.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
-                    }
-                    return ret;
+                    return prepareAuthMechanism(authWithCond);
                 }
             } catch (Exception e) {
                 // Handle exception if needed
@@ -130,6 +121,15 @@ public class TestRoles {
         }
         
         return findDefaultAuthMechanism();
+    }
+
+    private AuthMechanism prepareAuthMechanism(AuthWithCond authWithCond) {
+        AuthMechanism ret = authWithCond.getAuthMechanism();
+        if (authWithCond.getRecordedLoginFlowInput() != null) {
+            ret.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
+        }
+        ret.setForceApply(authWithCond.isForceApply());
+        return ret;
     }
 
     public ObjectId getId() {

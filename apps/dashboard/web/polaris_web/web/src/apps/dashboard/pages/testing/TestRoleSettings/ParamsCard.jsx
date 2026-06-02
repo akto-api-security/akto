@@ -67,6 +67,7 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
                         <TitleComponent title={"Token details"} />
                         <Box paddingInlineStart={4}>
                             <VerticalStack gap={2}>
+                                <LineComponent title={"Force apply :"} value={dataObj.forceApply ? "Yes" : "No"}/>
                                 <LineComponent title={"Token type :"} value={authMechanism.type}/>
                                 <HorizontalStack gap="2" blockAlign="center">
                                     <Box maxWidth='200px'>

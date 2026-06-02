@@ -64,6 +64,8 @@ public class TestRolesAction extends UserAction {
     private Map<String, String> apiCond;
     @Getter @Setter
     private String urlRegex;
+    @Getter @Setter
+    private boolean forceApply;
     private String authAutomationType;
     private ArrayList<RequestData> reqData;
     private RecordedLoginFlowInput recordedLoginFlowInput;
@@ -230,6 +232,7 @@ public class TestRolesAction extends UserAction {
 
             AuthMechanism authM = new AuthMechanism(authParams, this.reqData, authAutomationType, null);
             AuthWithCond authWithCond = new AuthWithCond(authM, apiCond, recordedLoginFlowInput, urlRegex);
+            authWithCond.setForceApply(forceApply);
             return authWithCond;
         } else {
             return null;

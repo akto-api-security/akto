@@ -1,6 +1,7 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.OriginalHttpRequest;
+import com.mongodb.BasicDBObject;
 import org.junit.Test;
 
 import java.util.*;
@@ -39,8 +40,51 @@ public class AuthMechanismTests {
         validate(request, "Header1", Collections.singletonList("Value"));
         validate(request, " Header2  ", Collections.singletonList("Value"));
         validate(request, "InvalidHeader", null);
+    }
 
+    @Test
+    public void testAddAuthToRequestForceApply() {
+        Map<String, List<String>> headers = new HashMap<>();
+        OriginalHttpRequest request = new OriginalHttpRequest("", "", "GET", "", headers, "HTTP/1.1");
 
+        AuthMechanism authMechanism = new AuthMechanism();
+        authMechanism.setAuthParams(Collections.singletonList(
+            new HardcodedAuthParam(AuthParam.Location.HEADER, "x-api-key", "secret", true)));
+        authMechanism.setForceApply(true);
+
+        authMechanism.addAuthToRequest(request, false);
+        assertEquals(Collections.singletonList("secret"), request.getHeaders().get("x-api-key"));
+    }
+
+    @Test
+    public void testAddAuthToRequestForceApplyBody() throws Exception {
+        String requestPayload = "{\"existing\":\"keep\"}";
+        OriginalHttpRequest request = new OriginalHttpRequest("", "", "POST", requestPayload, new HashMap<>(), "HTTP/1.1");
+
+        AuthMechanism authMechanism = new AuthMechanism();
+        authMechanism.setAuthParams(Collections.singletonList(
+            new HardcodedAuthParam(AuthParam.Location.BODY, "apiKey", "secret", true)));
+        authMechanism.setForceApply(true);
+
+        authMechanism.addAuthToRequest(request, false);
+        BasicDBObject body = BasicDBObject.parse(request.getBody());
+        assertEquals("keep", body.getString("existing"));
+        assertEquals("secret", body.getString("apiKey"));
+    }
+
+    @Test
+    public void testAddAuthToRequestForceApplyNestedBody() throws Exception {
+        OriginalHttpRequest request = new OriginalHttpRequest("", "", "POST", "{}", new HashMap<>(), "HTTP/1.1");
+
+        AuthMechanism authMechanism = new AuthMechanism();
+        authMechanism.setAuthParams(Collections.singletonList(
+            new HardcodedAuthParam(AuthParam.Location.BODY, "auth.token", "nested-secret", true)));
+        authMechanism.setForceApply(true);
+
+        authMechanism.addAuthToRequest(request, false);
+        BasicDBObject body = BasicDBObject.parse(request.getBody());
+        BasicDBObject auth = (BasicDBObject) body.get("auth");
+        assertEquals("nested-secret", auth.getString("token"));
     }
 
 

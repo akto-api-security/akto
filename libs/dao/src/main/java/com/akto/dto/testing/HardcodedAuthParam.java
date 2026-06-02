@@ -21,8 +21,13 @@ public class HardcodedAuthParam extends AuthParam {
 
     @Override
     boolean addAuthTokens(OriginalHttpRequest request) {
+        return addAuthTokens(request, false);
+    }
+
+    @Override
+    boolean addAuthTokens(OriginalHttpRequest request, boolean forceApply) {
         if (this.key == null) return false;
-        return TokenPayloadModifier.tokenPayloadModifier(request, this.key, this.value, this.where);
+        return TokenPayloadModifier.tokenPayloadModifier(request, this.key, this.value, this.where, forceApply);
     }
 
     @Override
