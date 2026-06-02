@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, Modal, VerticalStack} from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, Modal, VerticalStack, Tooltip} from "@shopify/polaris"
 import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import RegistryBadge from "../../../components/shared/RegistryBadge";
 import RunTest from "./RunTest";
@@ -275,7 +275,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             c.rowStatus = 'critical'
             c.disableClick = true
         }
-        const tagsList = JSON.stringify(c?.tagsList || "")
+        const tagsList = JSON.stringify(c?.tagsList || c?.envType || "")
 
         // Split collection name - always extract endpointId/sourceId/serviceName for agentic collections
         // Pattern: <endpoint-id>.<source-id>.<service-name>
@@ -333,7 +333,11 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             detectedTimestamp: trafficInfoMap[c.id] || 0,
             riskScore: c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] || 0),
             discovered: func.prettifyEpoch(c.startTs || 0),
-            descriptionComp: (<Box maxWidth="350px"><Text>{c.description}</Text></Box>),
+            descriptionComp: c.description ? (
+                <Tooltip content={c.description} dismissOnMouseOut>
+                    <Box maxWidth="350px"><Text truncate>{c.description}</Text></Box>
+                </Tooltip>
+            ) : null,
             outOfTestingScopeComp: c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>),
             username: getUsernameForCollection(c, usernameMap),
         ...((tagsList.includes("mcp-server") || tagsList.includes("gen-ai") || tagsList.includes("browser-llm") || ((isApiSecurityCategory() || isDastCategory()) && c.hostName)) ? {
@@ -418,7 +422,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         deactivated: rawCollection.deactivated,
         urlsCount: rawCollection.urlsCount,
         startTs: rawCollection.startTs,
-        tagsList: rawCollection.tagsList,
+        tagsList: rawCollection.tagsList || rawCollection.envType || [],
         skills: rawCollection.skills,
         registryStatus: rawCollection.registryStatus,
         description: rawCollection.description,

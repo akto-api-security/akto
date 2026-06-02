@@ -138,6 +138,7 @@ import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.*;
 import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
+import com.akto.utils.jobs.EmptyCollectionCleanupJob;
 import com.akto.utils.jobs.JobUtils;
 import com.akto.utils.scripts.BackwardCompatibilityUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -2554,6 +2555,9 @@ public class InitializerListener implements ServletContextListener {
 
                 SingleTypeInfo.init();
 
+                // Init cache refresher for fetchAllCollectionsBasic for specific account
+                com.akto.action.ApiCollectionsAction.initAllCollectionsBasicCacheRefresher();
+
                 int now = Context.now();
 
                 if (runJobFunctions > 0 || runJobFunctionsAnyway) {
@@ -2612,6 +2616,8 @@ public class InitializerListener implements ServletContextListener {
                         setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
 
+
+                        EmptyCollectionCleanupJob.emptyCollectionCleanupJobRunner();
 
                         // CleanInventory.cleanInventoryJobRunner();
 

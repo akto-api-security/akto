@@ -184,6 +184,7 @@ if(!getDashboardCategory().includes("MCP")){
     headers.push({
         text: 'Method',
         filterKey: 'method',
+        value: 'methodComp',
         showFilter: true,
         textValue: 'method',
         sortActive: true
@@ -1185,6 +1186,9 @@ function ApiEndpoints(props) {
 
     const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
 
+    const isAgentProxyCollection = Array.isArray(collectionsObj?.envType) &&
+        collectionsObj.envType.some(tag => tag.keyName === 'agent-proxy')
+
     const isApiGroup = collectionsObj?.type === 'API_GROUP'
     const isHostnameCollection = hostNameMap[collectionsObj?.id] !== null && hostNameMap[collectionsObj?.id] !== undefined
     const collectionTypeListComp = getCollectionTypeListComp(collectionsObj)
@@ -1522,8 +1526,8 @@ function ApiEndpoints(props) {
             onAction: () => handleBulkDeMerge(selectedResources)
         })
 
-        // Add bulk guardrail actions (only for Argus dashboard)
-        if (isAgenticSecurityCategory()) {
+        // Add bulk guardrail actions (only for agent proxy collections in Argus dashboard)
+        if (isAgenticSecurityCategory() && isAgentProxyCollection) {
             ret.push({
                 content: 'Enable guardrails',
                 onAction: () => handleBulkGuardrail(selectedResources, true)
@@ -1800,8 +1804,8 @@ function ApiEndpoints(props) {
         
         const actions = []
         
-        // Add guardrail actions (only for Argus dashboard)
-        if (isAgenticSecurityCategory()) {
+        // Add guardrail actions (only for agent proxy collections in Argus dashboard)
+        if (isAgenticSecurityCategory() && isAgentProxyCollection) {
             if (guardrailEnabled) {
                 actions.push({
                     content: 'Disable guardrails for this endpoint',
@@ -2003,9 +2007,10 @@ function ApiEndpoints(props) {
 
     const handleSaveDescription = () => {
         // Check for special characters
-        const specialChars = /[!@#$%^&*()\-_=+\[\]{}\\|;:'",.<>/?~]/;
-        if (specialChars.test(editableDescription)) {
-            func.setToast(true, true, "Description contains special characters that are not allowed.");
+        const allowedChars = /^[a-zA-Z0-9\s.,!?;:'"()\-_/&]+$/;
+
+        if (editableDescription.length > 0 && !allowedChars.test(editableDescription)) {
+            func.setToast(true, true, "Description contains invalid characters.");
             return;
         }
         

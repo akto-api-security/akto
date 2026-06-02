@@ -203,6 +203,7 @@ public class ProfileAction extends UserAction {
                 .append("activeAccount", sessionAccId)
                 .append("dashboardMode", DashboardMode.getDashboardMode())
                 .append("isSaas","true".equals(System.getenv("IS_SAAS")))
+                .append("airgapped", "true".equalsIgnoreCase(System.getenv("AIRGAPPED")))
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
                 .append("cloudType", Utils.getCloudType())
                 .append("accountName", accountName)

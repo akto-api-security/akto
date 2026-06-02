@@ -3,7 +3,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable"
 import api from "../api"
 import { Box, Button, IndexFiltersMode } from "@shopify/polaris"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import func from "@/util/func"
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout"
 import { ROLES_PAGE_DOCS_URL } from "../../../../main/onboardingData"
@@ -71,6 +71,7 @@ function TestRolesPage(){
     const [loading, setLoading] = useState(false);
     const [showEmptyScreen, setShowEmptyScreen] = useState(false)
     const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
 
     const [data, setData] = useState({ 'all': [], 'system': [], 'custom': []})
 
@@ -146,6 +147,13 @@ function TestRolesPage(){
         }
         return false
     })()
+
+    useEffect(() => {
+        const oauthError = searchParams.get("copilotOauthError");
+        if (oauthError) {
+            func.setToast(true, true, "Copilot OAuth failed: " + oauthError);
+        }
+    }, [searchParams])
 
     useEffect(() => {
         setLoading(true);

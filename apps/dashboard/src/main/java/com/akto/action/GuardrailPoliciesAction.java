@@ -254,6 +254,9 @@ public class GuardrailPoliciesAction extends UserAction {
         if (p.getSelectedAgentServersV2() != null) {
             updates.add(Updates.set("selectedAgentServersV2", p.getSelectedAgentServersV2()));
         }
+        if (p.getBlockedHosts() != null) {
+            updates.add(Updates.set("blockedHosts", p.getBlockedHosts()));
+        }
         if (StringUtils.isNotBlank(p.getBehaviour())) {
             updates.add(Updates.set("behaviour", p.getBehaviour()));
         }

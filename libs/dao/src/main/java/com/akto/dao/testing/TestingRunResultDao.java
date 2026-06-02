@@ -291,6 +291,10 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         return super.findAllNoRbacFilter(finalFilter, projection);
     }
 
+    public List<TestingRunResult> findAllWithSummaryContext(Bson q) {
+        return findAllWithSummaryContext(q, null);
+    }
+
     public void createIndicesIfAbsent() {
         
         String dbName = Context.accountId.get()+"";

@@ -78,6 +78,16 @@ function TestRoleSettings() {
   const [selectedMiniTestingServiceName, setSelectedMiniTestingServiceName] = useState('')
 
   useEffect(() => {
+    const oauthSuccess = searchParams.get("copilotOauthSuccess");
+    const oauthError   = searchParams.get("copilotOauthError");
+    if (oauthSuccess === "true") {
+      func.setToast(true, false, "Microsoft Copilot Studio connected successfully.");
+    } else if (oauthError) {
+      func.setToast(true, true, "Copilot OAuth failed: " + oauthError);
+    }
+  }, []);
+
+  useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {

@@ -9,6 +9,7 @@ import com.akto.dao.ActivitiesDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.DependencyNodeDao;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
@@ -18,6 +19,7 @@ import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
@@ -289,6 +291,16 @@ public class TestExecutor {
         TestingRunResultSummariesDao.instance.updateOne(
             Filters.eq("_id", summaryId),
             Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size()));
+
+        Set<Integer> collectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(Constants.ID, collectionIds), Projections.include(ApiCollection.ID, ApiCollection.DESCRIPTION));
+        Map<Integer, String> apiCollectionDescriptionMap = new HashMap<>();
+        for (ApiCollection col : apiCollections) {
+            if (!StringUtils.isEmpty(col.getDescription())) {
+                apiCollectionDescriptionMap.put(col.getId(), col.getDescription());
+            }
+        }
+        TestingConfigurations.getInstance().setApiCollectionDescriptionMap(apiCollectionDescriptionMap);
 
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
         TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
@@ -1209,6 +1221,11 @@ public class TestExecutor {
         }
         for (String key: wordListsMap.keySet()) {
             varMap.put("wordList_" + key, wordListsMap.get(key));
+        }
+
+        String collectionDescription = TestingConfigurations.getInstance().getApiCollectionDescriptionMap().get(apiInfoKey.getApiCollectionId());
+        if (!StringUtils.isEmpty(collectionDescription)) {
+            varMap.put("wordList_data_context", Collections.singletonList(collectionDescription));
         }
 
         VariableResolver.resolveWordList(varMap, sampleMessageStore.getSampleDataMap(), apiInfoKey);
