@@ -11,22 +11,55 @@ import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.function.Supplier;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Realistic traffic benchmark: 90% clean traffic, 10% malicious (spread across all threat categories).
- * Average payload size ~200KB.
+ * High-scale realistic traffic benchmark: 90% clean traffic, 10% malicious (spread across all threat categories).
+ * Supports 1M+ records with multi-threaded producer, temporal distribution across windows.
  *
- * Usage: run main() — pushes numRecords messages to local Kafka, then waits for consumer to process.
+ * Usage examples:
+ *   mvn exec:java -Dexec.mainClass="..." -Dnum.records=1000000 -Dnum.threads=8
+ *   THREAD_COUNT=16 NUM_RECORDS=1000000 java ... RealisticTrafficBenchmark
  */
 public class RealisticTrafficBenchmark {
 
-    public static long numRecords = 100L;
+    // Configurable: read from system property, env var, or default
+    public static long numRecords = readLongConfig("num.records", "NUM_RECORDS", 100L);
+    public static int numThreads = readIntConfig("num.threads", "THREAD_COUNT", Runtime.getRuntime().availableProcessors());
+
+    private static long readLongConfig(String sysProp, String envVar, long defaultValue) {
+        String sysPropVal = System.getProperty(sysProp);
+        if (sysPropVal != null) {
+            try { return Long.parseLong(sysPropVal); } catch (NumberFormatException e) {}
+        }
+        String envVal = System.getenv(envVar);
+        if (envVal != null) {
+            try { return Long.parseLong(envVal); } catch (NumberFormatException e) {}
+        }
+        return defaultValue;
+    }
+
+    private static int readIntConfig(String sysProp, String envVar, int defaultValue) {
+        String sysPropVal = System.getProperty(sysProp);
+        if (sysPropVal != null) {
+            try { return Integer.parseInt(sysPropVal); } catch (NumberFormatException e) {}
+        }
+        String envVal = System.getenv(envVar);
+        if (envVal != null) {
+            try { return Integer.parseInt(envVal); } catch (NumberFormatException e) {}
+        }
+        return defaultValue;
+    }
 
     public static final String THREAT_TOPIC = "akto.api.logs2";
-    public static final String KAFKA_URL = "localhost:29092";
+    public static final String KAFKA_URL = "localhost:9092";
     private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
     private static final Random random = new Random(42);
 
@@ -69,11 +102,16 @@ public class RealisticTrafficBenchmark {
         {"POST", "/api/v2/upload/avatar"},
     };
 
-    private static final String[] CLEAN_IPS = {
-        "203.45.167.23", "91.102.34.56", "172.217.14.206", "52.84.23.101",
-        "185.60.219.11", "104.16.132.229", "45.33.32.156", "198.51.100.42",
-        "64.233.160.0", "157.240.1.35", "23.185.0.2", "76.76.21.21"
-    };
+    // Build 200 unique IP addresses for distribution testing
+    private static final String[] ALL_IPS = buildIpPool(200);
+
+    private static String[] buildIpPool(int count) {
+        String[] ips = new String[count];
+        for (int i = 0; i < count; i++) {
+            ips[i] = "10." + (i / 100) + "." + ((i / 10) % 10) + "." + (i % 10 + 1);
+        }
+        return ips;
+    }
 
     // =====================================================================
     //  Malicious payloads — one per threat category
@@ -138,60 +176,142 @@ public class RealisticTrafficBenchmark {
     // =====================================================================
 
     public static void main(String[] args) throws Exception {
-        System.out.printf("\n\n******* Realistic Traffic Benchmark *******\n\n");
-        System.out.printf("Total records: %,d (90%% clean, 10%% malicious)\n", numRecords);
-        System.out.printf("Malicious categories: %d templates\n", MALICIOUS_TEMPLATES.length);
+        System.out.printf("\n\n******* High-Scale Realistic Traffic Benchmark *******\n\n");
+        System.out.printf("Total records: %,d | Threads: %d | 90%% clean, 10%% malicious\n", numRecords, numThreads);
+        System.out.printf("Malicious categories: %d templates | IP pool: %d unique IPs\n", MALICIOUS_TEMPLATES.length, ALL_IPS.length);
+        System.out.printf("API collections: 101, 102, 103 | Records per window: 1000\n\n");
 
         long maliciousCount = numRecords / 10;
         long cleanCount = numRecords - maliciousCount;
-
         System.out.printf("Clean: %,d | Malicious: %,d\n\n", cleanCount, maliciousCount);
 
-        // Build padded body for ~10KB average
+        // Pre-allocate padding payload once (reuse across all records)
         String paddingBody = generatePaddingPayload(8500);
 
+        // Temporal distribution: start 8 hours ago
+        long baseEpochMin = System.currentTimeMillis() / 60000 - 480;
+        final int RECORDS_PER_WINDOW = 1000;
+
+        // Shared state across threads
+        final AtomicLong sent = new AtomicLong(0);
+        final AtomicLong errors = new AtomicLong(0);
+        final AtomicLong malSent = new AtomicLong(0);
+        final AtomicBoolean stopReporter = new AtomicBoolean(false);
+
         long startTime = System.nanoTime();
-        long sent = 0;
-        long malSent = 0;
 
-        for (long i = 0; i < numRecords; i++) {
-            HttpResponseParam record;
-            if (i % 10 == 0) {
-                // Every 10th record is malicious — rotate through all templates
-                int templateIdx = (int)(malSent % MALICIOUS_TEMPLATES.length);
-                record = buildMaliciousRecord(MALICIOUS_TEMPLATES[templateIdx], paddingBody);
-                malSent++;
-            } else {
-                record = buildCleanRecord(paddingBody);
-            }
-            producer.send(THREAT_TOPIC, record);
-            sent++;
+        // Start reporter thread
+        Thread reporter = new Thread(() -> reportProgress(sent, malSent, errors, numRecords, startTime, stopReporter));
+        reporter.setDaemon(true);
+        reporter.start();
 
-            if (sent % 1000 == 0) {
-                long elapsed = (System.nanoTime() - startTime) / 1_000_000;
-                double rate = (sent * 1000.0) / Math.max(elapsed, 1);
-                System.out.printf("\rSent %,d / %,d (%.0f msg/sec) [malicious: %,d]", sent, numRecords, rate, malSent);
-            }
+        // Multi-threaded producer
+        ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+        List<Future<?>> futures = new ArrayList<>();
+        long recordsPerThread = numRecords / numThreads;
+
+        for (int threadIdx = 0; threadIdx < numThreads; threadIdx++) {
+            final int tIdx = threadIdx;
+            final long threadStartIdx = threadIdx * recordsPerThread;
+            final long threadEndIdx = (threadIdx == numThreads - 1) ? numRecords : (threadIdx + 1) * recordsPerThread;
+
+            futures.add(executor.submit(() -> {
+                Random threadRandom = new Random(42 + tIdx);
+                AtomicLong threadMalCount = new AtomicLong(0);
+
+                for (long globalIdx = threadStartIdx; globalIdx < threadEndIdx; globalIdx++) {
+                    try {
+                        HttpResponseParam record;
+                        if (globalIdx % 10 == 0) {
+                            // Every 10th record is malicious
+                            int templateIdx = (int)(threadMalCount.getAndIncrement() % MALICIOUS_TEMPLATES.length);
+                            record = buildMaliciousRecord(MALICIOUS_TEMPLATES[templateIdx], paddingBody, globalIdx, baseEpochMin, RECORDS_PER_WINDOW, threadRandom);
+                            malSent.incrementAndGet();
+                        } else {
+                            record = buildCleanRecord(paddingBody, globalIdx, baseEpochMin, RECORDS_PER_WINDOW, threadRandom);
+                        }
+                        producer.send(THREAT_TOPIC, record);
+                        sent.incrementAndGet();
+                    } catch (Exception e) {
+                        errors.incrementAndGet();
+                    }
+                }
+            }));
         }
 
+        // Wait for all threads to finish
+        executor.shutdown();
+        boolean completed = executor.awaitTermination(10, TimeUnit.MINUTES);
+        stopReporter.set(true);
+
+        if (!completed) {
+            System.out.println("\n[WARNING] Executor did not complete within 10 minutes");
+            executor.shutdownNow();
+        }
+
+        // Flush all in-flight messages
+        System.out.println("\nFlushing Kafka producer...");
+        producer.flush();
+
+        // Final stats
         long totalMs = (System.nanoTime() - startTime) / 1_000_000;
-        double finalRate = (sent * 1000.0) / Math.max(totalMs, 1);
-        System.out.printf("\n\nDone. Sent %,d records in %,d ms (%.0f msg/sec)\n", sent, totalMs, finalRate);
-        System.out.printf("Malicious: %,d (%d templates, ~%d per template)\n",
-                malSent, MALICIOUS_TEMPLATES.length, malSent / MALICIOUS_TEMPLATES.length);
-        System.out.println("Waiting 30s for consumer to process...");
-        Thread.sleep(30000);
+        double finalRate = (sent.get() * 1000.0) / Math.max(totalMs, 1);
+        long sentCount = sent.get();
+        long errorCount = errors.get();
+
+        System.out.printf("\n\n====== Final Summary ======\n");
+        System.out.printf("Sent: %,d | Errors: %,d | Success rate: %.2f%%\n", sentCount, errorCount, 100.0 * sentCount / (sentCount + errorCount));
+        System.out.printf("Time: %d ms (%.1f sec) | Throughput: %.0f msg/sec\n", totalMs, totalMs / 1000.0, finalRate);
+        System.out.printf("Malicious: %,d | Est. bytes: %,d MB\n", malSent.get(), (sentCount * 10) / 1024);
+        System.out.printf("Windows covered: ~%d | Distribution hashes to check: dist|5|*\n", numRecords / RECORDS_PER_WINDOW);
+        System.out.println("\nConsumer will process these records in the background.");
+    }
+
+    private static void reportProgress(AtomicLong sent, AtomicLong malSent, AtomicLong errors, long total, long startTime, AtomicBoolean stop) {
+        while (!stop.get()) {
+            try {
+                long current = sent.get();
+                long elapsed = (System.nanoTime() - startTime) / 1_000_000;
+                long elapsedSec = elapsed / 1000;
+                long remaining = total - current;
+                double rate = current > 0 ? (current * 1000.0) / Math.max(elapsed, 1) : 0;
+                long etaMs = remaining > 0 ? (long)(remaining / (rate / 1000.0)) : 0;
+
+                System.out.printf("\r[%02d:%02d] %,d / %,d (%.0f msg/s) | Malicious: %,d | Errors: %,d | ETA: %02d:%02d",
+                    elapsedSec / 60, elapsedSec % 60, current, total, rate, malSent.get(), errors.get(),
+                    etaMs / 60000, (etaMs % 60000) / 1000);
+                System.out.flush();
+
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
     }
 
     // =====================================================================
     //  Record builders
     // =====================================================================
 
-    private static HttpResponseParam buildCleanRecord(String paddingBody) {
-        String[] endpoint = CLEAN_ENDPOINTS[random.nextInt(CLEAN_ENDPOINTS.length)];
+    private static HttpResponseParam buildCleanRecord(String paddingBody, long globalIdx, long baseEpochMin, int recordsPerWindow, Random threadRandom) {
+        // Temporal distribution: epoch minute based on global index
+        long windowOffset = globalIdx / recordsPerWindow;
+        long epochMin = baseEpochMin + windowOffset;
+        int timeSeconds = (int)(epochMin * 60);
+
+        // IP selection based on global index (gives deterministic distribution)
+        int ipIdx = (int)((globalIdx * 13) % ALL_IPS.length);
+        String ip = ALL_IPS[ipIdx];
+
+        // Endpoint selection (varies per thread with thread-local random)
+        int endpointIdx = threadRandom.nextInt(CLEAN_ENDPOINTS.length);
+        String[] endpoint = CLEAN_ENDPOINTS[endpointIdx];
         String method = endpoint[0];
         String path = endpoint[1];
-        String ip = CLEAN_IPS[random.nextInt(CLEAN_IPS.length)];
+
+        // API collection varies by endpoint: 101, 102, 103
+        int apiCollectionId = 101 + (endpointIdx / 5);
 
         String requestBody = method.equals("GET") || method.equals("DELETE")
             ? ""
@@ -200,16 +320,24 @@ public class RealisticTrafficBenchmark {
         String responseBody = "{\"status\": \"ok\", \"data\": " + paddingBody + "}";
 
         return buildRecord(method, path, ip, buildCleanRequestHeaders(ip), buildCleanResponseHeaders(),
-                requestBody, responseBody, 200, "OK");
+                requestBody, responseBody, 200, "OK", timeSeconds, apiCollectionId);
     }
 
-    private static HttpResponseParam buildMaliciousRecord(String[] template, String paddingBody) {
+    private static HttpResponseParam buildMaliciousRecord(String[] template, String paddingBody, long globalIdx, long baseEpochMin, int recordsPerWindow, Random threadRandom) {
+        // Temporal distribution: epoch minute based on global index
+        long windowOffset = globalIdx / recordsPerWindow;
+        long epochMin = baseEpochMin + windowOffset;
+        int timeSeconds = (int)(epochMin * 60);
+
+        // IP selection based on global index
+        int ipIdx = (int)((globalIdx * 13) % ALL_IPS.length);
+        String ip = ALL_IPS[ipIdx];
+
         String method = template[1];
         String path = template[2];
         String malHeaderKey = template[3];
         String malHeaderValue = template[4];
         String malBody = template[5];
-        String ip = CLEAN_IPS[random.nextInt(CLEAN_IPS.length)];
 
         Map<String, StringList> reqHeaders = buildCleanRequestHeaders(ip);
         if (!malHeaderKey.isEmpty()) {
@@ -226,18 +354,21 @@ public class RealisticTrafficBenchmark {
         }
 
         String responseBody = "{\"status\": \"ok\", \"data\": " + paddingBody + "}";
-        int statusCode = random.nextInt(10) == 0 ? 401 : 200;
+        int statusCode = threadRandom.nextInt(10) == 0 ? 401 : 200;
         String status = statusCode == 401 ? "Unauthorized" : "OK";
 
+        // API collection varies: use fixed mapping for malicious (101, 102, 103)
+        int apiCollectionId = 101 + (int)(globalIdx % 3);
+
         return buildRecord(method, path, ip, reqHeaders, buildCleanResponseHeaders(),
-                requestBody, responseBody, statusCode, status);
+                requestBody, responseBody, statusCode, status, timeSeconds, apiCollectionId);
     }
 
     private static HttpResponseParam buildRecord(
             String method, String path, String ip,
             Map<String, StringList> requestHeaders, Map<String, StringList> responseHeaders,
             String requestBody, String responseBody,
-            int statusCode, String status) {
+            int statusCode, String status, int timeSeconds, int apiCollectionId) {
 
         return HttpResponseParam.newBuilder()
             .setMethod(method)
@@ -247,10 +378,10 @@ public class RealisticTrafficBenchmark {
             .putAllResponseHeaders(responseHeaders)
             .setRequestPayload(requestBody)
             .setResponsePayload(responseBody)
-            .setApiCollectionId(123)
+            .setApiCollectionId(apiCollectionId)
             .setStatusCode(statusCode)
             .setStatus(status)
-            .setTime((int) (System.currentTimeMillis() / 1000))
+            .setTime(timeSeconds)
             .setAktoAccountId("1000000")
             .setIp(ip)
             .setDestIp("154.248.155.13")
