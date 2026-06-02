@@ -1,4 +1,4 @@
-package com.akto.dto.open_telemetry_integration;
+package com.akto.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

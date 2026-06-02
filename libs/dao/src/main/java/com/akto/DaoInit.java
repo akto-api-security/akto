@@ -26,7 +26,6 @@ import com.akto.dto.loaders.NormalLoader;
 import com.akto.dto.loaders.PostmanUploadLoader;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.new_relic_integration.NewRelicIntegration;
-import com.akto.dto.open_telemetry_integration.OpenTelemetryIntegration;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.runtime_filters.FieldExistsFilter;

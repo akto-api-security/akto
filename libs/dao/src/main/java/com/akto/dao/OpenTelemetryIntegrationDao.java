@@ -1,6 +1,6 @@
 package com.akto.dao;
 
-import com.akto.dto.open_telemetry_integration.OpenTelemetryIntegration;
+import com.akto.dto.OpenTelemetryIntegration;
 
 public class OpenTelemetryIntegrationDao extends AccountsContextDao<OpenTelemetryIntegration> {
 

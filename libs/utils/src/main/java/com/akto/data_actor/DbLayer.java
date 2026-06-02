@@ -125,7 +125,7 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.new_relic.NewRelicUtils;
-import com.akto.dao.AgentUsersDao;
+import com.akto.open_telemetry.OpenTelemetryUtils;
 import com.akto.dao.billing.UningestedApiOverageDao;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.usage.UsageMetricCalculator;
@@ -160,6 +160,7 @@ public class DbLayer {
     private static final long COLLECTION_SIZE_THRESHOLD = 100_000;
 
     private static final ExecutorService newRelicExecutorService = Executors.newFixedThreadPool(1);
+    private static final ExecutorService openTelemetryExecutorService = Executors.newFixedThreadPool(1);
 
     private static int getLastUpdatedTsForAccount(int accountId) {
         return lastUpdatedTsMap.computeIfAbsent(accountId, k -> 0);
@@ -227,6 +228,21 @@ public class DbLayer {
                 });
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error submitting module heartbeat forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
+            }
+        }
+
+        boolean forwardToOpenTelemetry = OpenTelemetryIntegrationDao.instance.findOne(new BasicDBObject()) != null;
+        if (forwardToOpenTelemetry) {
+            int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb(String.format("Forwarding module heartbeat to OTLP endpoint configured for module %s (account %d)", moduleInfo.getName(), accountId), LogDb.DB_ABS);
+
+            try {
+                openTelemetryExecutorService.submit(() -> {
+                    Context.accountId.set(accountId);
+                    OpenTelemetryUtils.forwardModuleHeartbeatEvent(moduleInfo);
+                });
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error submitting opentelemetry module heartbeat forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
             }
         }
         
@@ -2330,6 +2346,21 @@ public class DbLayer {
                 });
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error submitting metrics forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
+            }
+        }
+
+        boolean forwardToOpenTelemetry = OpenTelemetryIntegrationDao.instance.findOne(new BasicDBObject()) != null;
+        if (forwardToOpenTelemetry) {
+            int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb(String.format("Forwarding %d metrics to OTLP endpoint configured for account %d", metricData.size(), accountId), LogDb.DB_ABS);
+
+            try {
+                openTelemetryExecutorService.submit(() -> {
+                    Context.accountId.set(accountId);
+                    OpenTelemetryUtils.forwardMetrics(metricData);
+                });
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error submitting open telemetry metrics forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
             }
         }
     }
