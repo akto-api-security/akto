@@ -5,9 +5,15 @@ import java.util.List;
 import java.util.Map;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dto.traffic.CollectionTags;
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -119,26 +125,43 @@ public class GuardrailPolicies {
         if (selectedMcpServersV2 != null && !selectedMcpServersV2.isEmpty()) {
             return selectedMcpServersV2;
         }
-        // Convert old format to new format for compatibility
         if (selectedMcpServers != null && !selectedMcpServers.isEmpty()) {
             return selectedMcpServers.stream()
-                    .map(serverId -> new SelectedServer(serverId, serverId)) // ID as name for old data
+                    .map(serverId -> new SelectedServer(serverId, serverId))
                     .collect(java.util.stream.Collectors.toList());
         }
-        return new java.util.ArrayList<>();
+            
+        return fetchApplicableServersByTag(Constants.AKTO_MCP_SERVER_TAG);
     }
 
     public List<SelectedServer> getEffectiveSelectedAgentServers() {
         if (selectedAgentServersV2 != null && !selectedAgentServersV2.isEmpty()) {
             return selectedAgentServersV2;
         }
-        // Convert old format to new format for compatibility
         if (selectedAgentServers != null && !selectedAgentServers.isEmpty()) {
             return selectedAgentServers.stream()
-                    .map(serverId -> new SelectedServer(serverId, serverId)) // ID as name for old data
+                    .map(serverId -> new SelectedServer(serverId, serverId))
                     .collect(java.util.stream.Collectors.toList());
         }
-        return new java.util.ArrayList<>();
+            
+        return fetchApplicableServersByTag(Constants.AKTO_GEN_AI_TAG);
+    }
+
+    // empty server lists = "apply to all"; returns inline-only when block mode, all servers otherwise
+    private List<SelectedServer> fetchApplicableServersByTag(String serverTypeTag) {
+        boolean isBlock = "block".equals(this.behaviour);
+        Bson filter = Filters.elemMatch(ApiCollection.TAGS_STRING,
+                Filters.eq(CollectionTags.KEY_NAME, serverTypeTag));
+        if (isBlock) {
+            filter = Filters.and(filter, Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
+                    Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GUARDRAIL_MODE),
+                    Filters.eq(CollectionTags.VALUE, Constants.AKTO_GUARDRAIL_MODE_INLINE)
+            )));
+        }
+        return ApiCollectionsDao.instance.findAll(filter, Projections.include(ApiCollection.ID, "name"))
+                .stream()
+                .map(c -> new SelectedServer(String.valueOf(c.getId()), c.getName()))
+                .collect(java.util.stream.Collectors.toList());
     }
 
     public GuardrailPolicies(String name, String description, String blockedMessage, String severity, int createdTimestamp,
