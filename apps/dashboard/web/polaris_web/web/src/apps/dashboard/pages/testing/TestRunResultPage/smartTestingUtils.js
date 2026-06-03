@@ -4,8 +4,15 @@ export function isRunAutomatedTestsEnabled(value) {
     return value === true || value === 'true' || value === 1;
 }
 
+export function isAgenticTestRunFeatureEnabled() {
+    return (
+        window?.STIGG_FEATURE_WISE_ALLOWED?.AUTOMATED_AGENTIC_TEST_RUN?.isGranted === true ||
+        window?.USER_NAME?.indexOf('@akto.io') !== -1
+    );
+}
+
 export function shouldShowSmartTestingExecutionTrace(runAutomatedTests) {
-    return isRunAutomatedTestsEnabled(runAutomatedTests);
+    return isRunAutomatedTestsEnabled(runAutomatedTests) && isAgenticTestRunFeatureEnabled();
 }
 
 export function transformAiSummaryToEvents(aiSummaryArray) {
