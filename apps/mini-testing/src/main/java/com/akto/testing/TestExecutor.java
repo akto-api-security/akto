@@ -1305,6 +1305,7 @@ public class TestExecutor {
             testRunId, apiInfoKey, testSuperType, testSubType ,testResults.getTestResults(),
             vulnerable,singleTypeInfos,confidencePercentage,startTime,
             endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs);
+        ret.setAiSummaryTraces(testResults.getAiSummaryTraces());
 
         Object callbackUuidsObj = varMap.get("random_uuid");
         if (callbackUuidsObj instanceof List) {

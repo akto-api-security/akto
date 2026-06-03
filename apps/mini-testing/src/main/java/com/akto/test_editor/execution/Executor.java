@@ -2,6 +2,7 @@ package com.akto.test_editor.execution;
 
 import com.akto.agent.AgentClient;
 import com.akto.agent.AutomatedAgenticTestExecutor;
+import com.akto.agent.PentestExecutionResult;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
@@ -75,6 +76,7 @@ public class Executor {
                                   List<CustomAuthType> customAuthTypes, boolean debug, List<TestingRunResult.TestLog> testLogs,
                                   Memory memory) {
         List<GenericTestResult> result = new ArrayList<>();
+        List<AiSummaryEntry> aiSummaryTraces = null;
 
         ExecutionListBuilder executionListBuilder = new ExecutionListBuilder();
         List<ExecutorNode> executorNodes = new ArrayList<>();
@@ -201,7 +203,10 @@ public class Executor {
 
         if (runAutomatedPentest) {
             String testSubType = varMap.containsKey("testSubType") ? varMap.get("testSubType").toString() : "unknown";
-            List<TestResult> automatedAgenticResults = automatedAgenticTestExecutor.executeAgenticTest(origRawApi, testSubType);
+            PentestExecutionResult pentestResult =
+                    automatedAgenticTestExecutor.executeAgenticTest(origRawApi, testSubType);
+            List<TestResult> automatedAgenticResults = pentestResult.getTestResults();
+            aiSummaryTraces = pentestResult.getAiSummaryTraces();
             if (automatedAgenticResults != null && !automatedAgenticResults.isEmpty()) {
                 requestAttempted = true;
                 String originalMessage = origRawApi.getOriginalMessage();
@@ -312,6 +317,7 @@ public class Executor {
         }
 
         yamlTestResult = new YamlTestResult(result, workflowTest);
+        yamlTestResult.setAiSummaryTraces(aiSummaryTraces);
 
         return yamlTestResult;
     }
