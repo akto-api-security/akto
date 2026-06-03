@@ -27,6 +27,9 @@ public class OpenTelemetryIntegrationAction extends UserAction {
     @Getter @Setter
     private String apiKey;
 
+    @Getter @Setter
+    private String headerName;
+
     public String addOpenTelemetryIntegration() {
         if (endpoint == null || endpoint.isEmpty()) {
             addActionError("Please enter a valid endpoint.");
@@ -34,6 +37,10 @@ public class OpenTelemetryIntegrationAction extends UserAction {
         }
         if (apiKey == null || apiKey.isEmpty()) {
             addActionError("Please enter a valid API key.");
+            return Action.ERROR.toUpperCase();
+        }
+        if (headerName == null || headerName.isEmpty()) {
+            addActionError("Please enter a valid header name.");
             return Action.ERROR.toUpperCase();
         }
 
@@ -44,6 +51,7 @@ public class OpenTelemetryIntegrationAction extends UserAction {
         Bson combineUpdates = Updates.combine(
             Updates.set(OpenTelemetryIntegration.ENDPOINT, endpoint),
             Updates.set(OpenTelemetryIntegration.API_KEY, apiKey),
+            Updates.set(OpenTelemetryIntegration.HEADER_NAME, headerName),
             Updates.setOnInsert(OpenTelemetryIntegration.CREATED_TS, Context.now()),
             Updates.set(OpenTelemetryIntegration.UPDATED_TS, Context.now())
         );

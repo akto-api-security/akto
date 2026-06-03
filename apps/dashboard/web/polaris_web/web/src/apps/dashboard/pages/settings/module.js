@@ -470,9 +470,9 @@ const settingFunctions = {
       })
       return openTelemetryIntegration
     },
-    addOpenTelemetryIntegration: async function(endpoint, apiKey) {
+    addOpenTelemetryIntegration: async function(endpoint, apiKey, headerName) {
       let result = {}
-      await settingRequests.addOpenTelemetryIntegration(endpoint, apiKey).then((resp)=>{
+      await settingRequests.addOpenTelemetryIntegration(endpoint, apiKey, headerName).then((resp)=>{
         result = resp
       })
       return result

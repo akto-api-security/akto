@@ -9,12 +9,14 @@ function OpenTelemetry() {
 
     const [endpoint, setEndpoint] = useState('')
     const [apiKey, setApiKey] = useState('')
+    const [headerName, setHeaderName] = useState('')
     const [isSaving, setIsSaving] = useState(false)
     const [isRemoveable, setIsRemoveable] = useState(false)
 
     const resetFields = () => {
         setEndpoint('')
         setApiKey('')
+        setHeaderName('')
         setIsRemoveable(false)
     }
 
@@ -24,6 +26,7 @@ function OpenTelemetry() {
 
             if (openTelemetryIntegration) {
                 setEndpoint(openTelemetryIntegration.endpoint || '')
+                setHeaderName(openTelemetryIntegration.headerName || '')
                 setApiKey(null) // Don't show existing secret
                 setIsRemoveable(true)
             } else {
@@ -44,6 +47,10 @@ function OpenTelemetry() {
             func.setToast(true, true, "Please enter a valid endpoint")
             return
         }
+        if (!headerName?.trim()) {
+            func.setToast(true, true, "Please enter a valid header name")
+            return
+        }
         if (!apiKey?.trim()) {
             func.setToast(true, true, "Please enter a valid API key")
             return
@@ -51,7 +58,7 @@ function OpenTelemetry() {
 
         setIsSaving(true)
         try {
-            await settingFunctions.addOpenTelemetryIntegration(endpoint, apiKey)
+            await settingFunctions.addOpenTelemetryIntegration(endpoint, apiKey, headerName)
             func.setToast(true, false, "Successfully added OpenTelemetry Integration")
             fetchOpenTelemetryIntegration()
         } catch (error) {
@@ -75,7 +82,7 @@ function OpenTelemetry() {
     }
 
     const isSaveDisabled = () => {
-        return isSaving || !endpoint?.trim() || (apiKey === null ? true : !apiKey?.trim())
+        return isSaving || !endpoint?.trim() || !headerName?.trim() || (apiKey === null ? true : !apiKey?.trim())
     }
 
     const cardContent = "Send metrics and heartbeat events from Akto's hybrid modules to an OpenTelemetry endpoint."
@@ -105,6 +112,13 @@ function OpenTelemetry() {
                         helpText="Specify the OTLP endpoint URL"
                         value={endpoint}
                         onChange={setEndpoint}
+                        requiredIndicator
+                    />
+                    <TextField
+                        label="Header Name"
+                        helpText="Specify the HTTP header name used to pass the API key (e.g. api-key, Authorization)."
+                        value={headerName}
+                        onChange={setHeaderName}
                         requiredIndicator
                     />
                     <PasswordTextField

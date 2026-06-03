@@ -1167,11 +1167,11 @@ const settingRequests = {
             data: {}
         })
     },
-    addOpenTelemetryIntegration(endpoint, apiKey) {
+    addOpenTelemetryIntegration(endpoint, apiKey, headerName) {
         return request({
             url: '/api/addOpenTelemetryIntegration',
             method: 'post',
-            data: { endpoint, apiKey }
+            data: { endpoint, apiKey, headerName }
         })
     },
     removeOpenTelemetryIntegration() {
