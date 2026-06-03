@@ -1360,6 +1360,40 @@ public class ClientActor extends DataActor {
         return apiCollections;
     }
 
+    public List<ApiCollection> fetchApiCollectionsByIds(List<Integer> apiCollectionIds, LogDb logDb) {
+        Map<String, List<String>> headers = buildHeaders();
+        List<ApiCollection> apiCollections = new ArrayList<>();
+        loggerMaker.infoAndAddToDb("fetchApiCollectionsByIds api called ", logDb);
+        BasicDBObject requestBody = new BasicDBObject("apiCollectionIds", apiCollectionIds);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchApiCollectionsByIds", "", "POST", requestBody.toJson(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in fetchApiCollectionsByIds", logDb);
+                return apiCollections;
+            }
+            try {
+                BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList apiCollectionList = (BasicDBList) payloadObj.get("apiCollections");
+                for (Object obj : apiCollectionList) {
+                    BasicDBObject aObj = (BasicDBObject) obj;
+                    aObj.remove("displayName");
+                    aObj.remove("urlsCount");
+                    aObj.remove("envType");
+                    ApiCollection col = objectMapper.readValue(aObj.toJson(), ApiCollection.class);
+                    apiCollections.add(col);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchApiCollectionsByIds" + e, logDb);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchApiCollectionsByIds" + e, logDb);
+        }
+        loggerMaker.infoAndAddToDb("fetchApiCollectionsByIds api called size " + apiCollections.size(), logDb);
+        return apiCollections;
+    }
+
     public List<ApiCollection> fetchAllCollections() {
         Map<String, List<String>> headers = buildHeaders();
         List<ApiCollection> apiCollections = new ArrayList<>();

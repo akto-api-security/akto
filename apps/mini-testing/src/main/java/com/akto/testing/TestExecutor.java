@@ -6,6 +6,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
@@ -381,6 +382,19 @@ public class TestExecutor {
 
         // init the singleton class here
         TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed(), testingRun.getRunAutomatedTests());
+
+        Set<Integer> collectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
+        List<ApiCollection> apiCollections = dataActor.fetchApiCollectionsByIds(new ArrayList<>(collectionIds), LogDb.TESTING);
+        Map<Integer, String> apiCollectionDescriptionMap = new HashMap<>();
+        if (apiCollections != null) {
+            for (ApiCollection col : apiCollections) {
+                if (!StringUtils.isEmpty(col.getDescription())) {
+                    apiCollectionDescriptionMap.put(col.getId(), col.getDescription());
+                }
+            }
+        }
+        TestingConfigurations.getInstance().setApiCollectionDescriptionMap(apiCollectionDescriptionMap);
+
         //Clear the cache for sample data
         VariableResolver.clearSampleDataCache();
         totalTestsCount.set(
@@ -1232,6 +1246,18 @@ public class TestExecutor {
         }
         if (testConfig.getContent() != null) {
             varMap.put("yaml_template_content", testConfig.getContent());
+        }
+
+        String collectionDescription = TestingConfigurations.getInstance().getApiCollectionDescriptionMap().get(apiInfoKey.getApiCollectionId());
+        if (!StringUtils.isEmpty(collectionDescription)) {
+            @SuppressWarnings("unchecked")
+            List<String> contextList = (List<String>) varMap.getOrDefault("wordList_data_context", new ArrayList<>());
+            if (contextList.isEmpty()) {
+                contextList.add(collectionDescription);
+            } else {
+                contextList.set(0, contextList.get(0) + "\n\n" + collectionDescription + "\n");
+            }
+            varMap.put("wordList_data_context", contextList);
         }
 
         String testExecutionLogId = UUID.randomUUID().toString();
