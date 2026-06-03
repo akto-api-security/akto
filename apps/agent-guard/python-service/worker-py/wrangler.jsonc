@@ -9,5 +9,13 @@
 	"workers_dev": true,
 	"observability": {
 		"enabled": true
-	}
+	},
+	// Service binding to the sibling JS worker that owns the Presidio container.
+	// Used by remote_scanner.py to handle scanner_name="Anonymize" requests.
+	"services": [
+		{
+			"binding": "ANONYMIZER_WORKER",
+			"service": "akto-anonymizer-worker"
+		}
+	]
 }

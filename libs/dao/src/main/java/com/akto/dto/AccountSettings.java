@@ -59,6 +59,9 @@ public class AccountSettings {
     private boolean enableDebugLogs;
     public static final String ENABLE_DEBUG_LOGS = "enableDebugLogs";
 
+    private boolean enableEmptyCollectionCleanup;
+    public static final String ENABLE_EMPTY_COLLECTION_CLEANUP = "enableEmptyCollectionCleanup";
+
     public static final String INIT_STACK_TYPE = "initStackType";
 
     private Map<String, String> filterHeaderValueMap;
@@ -437,6 +440,14 @@ public class AccountSettings {
 
     public void setEnableDebugLogs(boolean enableDebugLogs) {
         this.enableDebugLogs = enableDebugLogs;
+    }
+
+    public boolean isEnableEmptyCollectionCleanup() {
+        return enableEmptyCollectionCleanup;
+    }
+
+    public void setEnableEmptyCollectionCleanup(boolean enableEmptyCollectionCleanup) {
+        this.enableEmptyCollectionCleanup = enableEmptyCollectionCleanup;
     }
 
     public Map<String, String> getFilterHeaderValueMap() {

@@ -27,6 +27,7 @@ import com.akto.dto.testing.LoginRequestAuthParam;
 import com.akto.dto.testing.RequestData;
 import com.akto.dto.testing.SampleDataAuthParam;
 import com.akto.dto.testing.TLSAuthParam;
+import com.akto.dto.testing.CopilotOAuthAuthParam;
 import com.akto.dto.testing.DigestAuthParam;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.config.TestCollectionProperty;
@@ -168,6 +169,10 @@ public class TestRolesAction extends UserAction {
                         // Skip individual processing since we handle it below
                         param = null;
                         break;
+                    case COPILOT_OAUTH:
+                        // handled separately below
+                        param = null;
+                        break;
                     default:
                         break;
                 }
@@ -206,6 +211,18 @@ public class TestRolesAction extends UserAction {
                 DigestAuthParam digestParam = new DigestAuthParam(username, password, targetUrl, method, algorithm);
                 authParams.clear(); // Remove any null entries
                 authParams.add(digestParam);
+            }
+
+            // Handle COPILOT_OAUTH — reads tenantId/clientId/clientSecret from the single authParamData entry
+            if (AuthMechanismTypes.valueOf(authAutomationType.toUpperCase()) == AuthMechanismTypes.COPILOT_OAUTH) {
+                if (!authParamData.isEmpty()) {
+                    AuthParamData d = authParamData.get(0);
+                    String roleHexId = role != null ? role.getHexId() : null;
+                    CopilotOAuthAuthParam copilotParam = new CopilotOAuthAuthParam(
+                        d.getTenantId(), d.getClientId(), d.getClientSecret(), roleHexId);
+                    authParams.clear();
+                    authParams.add(copilotParam);
+                }
             }
 
             // Extract otpRefUuid from fetchOtpData URLs

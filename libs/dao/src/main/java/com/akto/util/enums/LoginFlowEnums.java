@@ -7,7 +7,8 @@ public class LoginFlowEnums {
         LOGIN_REQUEST,
         TLS_AUTH,
         SAMPLE_DATA,
-        DIGEST_AUTH
+        DIGEST_AUTH,
+        COPILOT_OAUTH
     }
 
     public enum LoginStepTypesEnums {

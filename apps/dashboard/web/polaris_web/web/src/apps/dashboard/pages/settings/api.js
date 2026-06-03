@@ -512,6 +512,15 @@ const settingRequests = {
             }
         });
     },
+    toggleEmptyCollectionCleanup(enableEmptyCollectionCleanup) {
+        return request({
+            url: '/api/toggleEmptyCollectionCleanup',
+            method: 'post',
+            data: {
+                enableEmptyCollectionCleanup
+            }
+        });
+    },
     addFilterHeaderValueMap(filterHeaderValueMap){
         return request({
             url: '/api/addFilterHeaderValueMap',

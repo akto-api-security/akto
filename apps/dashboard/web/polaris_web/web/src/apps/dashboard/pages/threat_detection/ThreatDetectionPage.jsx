@@ -522,20 +522,99 @@ function ThreatDetectionPage() {
             setSeverityCountMap(convertToGraphData(severityMap));
         };
 
-        fetchThreatCategoryCount();
-        fetchCountBySeverity();
-        
-        // Generate latency data for demo mode
-        if (isDemoMode) {
+        const DEMO_ACCOUNT_ID = 1669322524;
+        const activeAccount = Number(window.ACTIVE_ACCOUNT);
+        const isAktoUser = window.USER_NAME === 'umesh@akto.io';
+
+        const fetchLatencyData = async () => {
+            if (!isAktoUser) return;
+
+            if (activeAccount === DEMO_ACCOUNT_ID) {
+                const latencyValues = [
+                    { incoming: 12.5, output: 8.2,  total: 21.4 },
+                    { incoming: 15.3, output: 9.8,  total: 25.7 },
+                    { incoming: 11.7, output: 7.4,  total: 20.3 },
+                    { incoming: 10.3, output: 16.1, total: 27.9 },
+                    { incoming: 13.8, output: 8.6,  total: 23.1 },
+                    { incoming: 14.6, output: 9.9,  total: 25.5 },
+                    { incoming: 12.2, output: 7.5,  total: 20.8 },
+                    { incoming: 10.6, output: 15.6, total: 26.2 },
+                    { incoming: 16.4, output: 11.8, total: 29.2 },
+                    { incoming: 13.1, output: 9.3,  total: 23.7 },
+                    { incoming: 11.9, output: 14.2, total: 27.1 },
+                    { incoming: 15.7, output: 8.9,  total: 25.8 },
+                    { incoming: 12.8, output: 10.4, total: 24.3 },
+                    { incoming: 14.2, output: 12.1, total: 27.6 },
+                    { incoming: 11.4, output: 13.7, total: 26.4 },
+                    { incoming: 16.1, output: 9.5,  total: 27.2 },
+                    { incoming: 13.5, output: 11.2, total: 25.8 },
+                    { incoming: 15.8, output: 9.6,  total: 26.7 },
+                    { incoming: 12.1, output: 14.8, total: 28.1 },
+                    { incoming: 14.9, output: 8.7,  total: 24.9 },
+                ];
+                const now = Date.now();
+                const data = [];
+                for (let i = 0; i < 21; i++) {
+                    const latency = latencyValues[i % latencyValues.length];
+                    data.push({
+                        timestamp: Math.floor((now - i * 3 * 24 * 60 * 60 * 1000) / 1000),
+                        incomingRequestP95: latency.incoming,
+                        outputResultP95: latency.output,
+                        totalP95: latency.total,
+                    });
+                }
+                setLatencyData(data.sort((a, b) => a.timestamp - b.timestamp));
+                return;
+            }
+
             try {
-                const latency = generateLatencyData();
+                const res = await api.fetchGuardrailLatency(startTimestamp, endTimestamp);
+                const metrics = res?.result?.metrics || [];
+
+                const byTimestamp = {};
+                metrics.forEach(m => {
+                    if (!byTimestamp[m.timestamp]) byTimestamp[m.timestamp] = {};
+                    if (m.metricId === 'GUARDRAIL_REQUEST_LATENCY')  byTimestamp[m.timestamp].incomingRequestP95 = m.value;
+                    if (m.metricId === 'GUARDRAIL_RESPONSE_LATENCY') byTimestamp[m.timestamp].outputResultP95    = m.value;
+                });
+
+                const raw = Object.entries(byTimestamp)
+                    .map(([ts, vals]) => {
+                        const req = vals.incomingRequestP95 || 0;
+                        const res = vals.outputResultP95    || 0;
+                        return { timestamp: parseInt(ts), incomingRequestP95: req, outputResultP95: res, totalP95: req + res };
+                    })
+                    .sort((a, b) => a.timestamp - b.timestamp);
+
+                const MAX_POINTS = 100;
+                let latency;
+                if (raw.length <= MAX_POINTS) {
+                    latency = raw;
+                } else {
+                    const bucketSize = Math.ceil(raw.length / MAX_POINTS);
+                    latency = [];
+                    for (let i = 0; i < raw.length; i += bucketSize) {
+                        const bucket = raw.slice(i, i + bucketSize);
+                        const avg = field => bucket.reduce((sum, m) => sum + m[field], 0) / bucket.length;
+                        latency.push({
+                            timestamp: bucket[Math.floor(bucket.length / 2)].timestamp,
+                            incomingRequestP95: avg('incomingRequestP95'),
+                            outputResultP95:    avg('outputResultP95'),
+                            totalP95:           avg('totalP95'),
+                        });
+                    }
+                }
                 setLatencyData(latency);
             } catch (error) {
-                console.error('Error generating demo latency data:', error);
+                console.error('Error fetching latency data:', error);
                 setLatencyData([]);
             }
-        }
-      }, [startTimestamp, endTimestamp, isDemoMode, generateLatencyData]);
+        };
+
+        fetchThreatCategoryCount();
+        fetchCountBySeverity();
+        fetchLatencyData();
+      }, [startTimestamp, endTimestamp]);
 
       // Fetch event data when required query params are in URL
       const fetchEventDetails = useCallback(async (isMountedRef) => {
@@ -625,8 +704,7 @@ function ThreatDetectionPage() {
     // Normal mode - show table, charts, and sidebar
     const components = [
         <ChartComponent subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
-        // Add P95 latency graphs for MCP and AI Agent security in demo mode
-        ...(isDemoMode && !(isApiSecurityCategory() || isDastCategory()) ? [
+        ...(window.USER_NAME === 'umesh@akto.io' ? [
             <P95LatencyGraph
                 key="threat-detection-latency"
                 title={`${mapLabel("Threat", getDashboardCategory())} Detection Latency`}
@@ -634,7 +712,6 @@ function ThreatDetectionPage() {
                 dataType="threat-security"
                 startTimestamp={startTimestamp}
                 endTimestamp={endTimestamp}
-                onLatencyClick={(latencyType) => console.log('Latency clicked:', latencyType)}
                 latencyData={latencyData}
             />
         ] : []),

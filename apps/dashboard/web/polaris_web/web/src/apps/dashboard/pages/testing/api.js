@@ -327,6 +327,13 @@ export default {
             data: {roleName, apiCond, urlRegex, authParamData, authAutomationType, reqData, recordedLoginFlowInput}
         })
     },
+    getCopilotOAuthAuthorizationUrl(roleId) {
+        return request({
+            url: '/api/copilot/getAuthorizationUrl',
+            method: 'post',
+            data: { roleId }
+        })
+    },
     deleteAuthFromRole(roleName, index) {
         return request({
             url: '/api/deleteAuthFromRole',

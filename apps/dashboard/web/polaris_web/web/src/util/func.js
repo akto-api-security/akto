@@ -2566,6 +2566,10 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
         || window.USER_NAME.indexOf("@razorpay.com")>0;
     },
 
+    isAktoUser(){
+      return !!window?.USER_NAME && window.USER_NAME.toLowerCase().indexOf("@akto.io") > 0;
+    },
+
     isTempAccount(){
       if (!window?.USER_NAME) return false;
       

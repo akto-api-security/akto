@@ -88,6 +88,7 @@ public class AdminSettingsAction extends UserAction {
     private Set<String> privateCidrList;
 
     public Boolean enableTelemetry;
+    private boolean enableEmptyCollectionCleanup;
 
 	private Set<String> partnerIpList;
     private List<String> allowRedundantEndpointsList;
@@ -159,6 +160,18 @@ public class AdminSettingsAction extends UserAction {
         telemetrySettings.setCustomerEnabled(enableTelemetry);
         telemetrySettings.setCustomerEnabledAt(Context.now());
         AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.TELEMETRY_SETTINGS, telemetrySettings));
+        return SUCCESS.toUpperCase();
+    }
+
+    public String toggleEmptyCollectionCleanup() {
+        if (!DashboardMode.isOnPremDeployment()) return Action.ERROR.toUpperCase();
+
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.ENABLE_EMPTY_COLLECTION_CLEANUP, this.enableEmptyCollectionCleanup),
+                new UpdateOptions().upsert(true)
+        );
+
         return SUCCESS.toUpperCase();
     }
 
@@ -715,6 +728,14 @@ public class AdminSettingsAction extends UserAction {
         this.trafficAlertThresholdSeconds = trafficAlertThresholdSeconds;
     }
 
+
+    public boolean isEnableEmptyCollectionCleanup() {
+        return enableEmptyCollectionCleanup;
+    }
+
+    public void setEnableEmptyCollectionCleanup(boolean enableEmptyCollectionCleanup) {
+        this.enableEmptyCollectionCleanup = enableEmptyCollectionCleanup;
+    }
 
     public Boolean getEnableTelemetry() {
         return enableTelemetry;
