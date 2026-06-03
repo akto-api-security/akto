@@ -166,7 +166,7 @@ const headings = [
         textValue: "tagsString",
         title: "Tags",
         showFilter: true,
-        filterKey: "tagsString",
+        filterKey: "tagsFilterList",
     },
     {
         text: "Description",
@@ -538,6 +538,7 @@ function ApiEndpoints(props) {
                 ...obj,
                 tagsComp: endpointTagsFormatted.length > 0 ? getTagsCompactComponent(endpointTagsFormatted) : null,
                 tagsString: endpointTagsFormatted.join(" "),
+                tagsFilterList: endpointTagsFormatted,
                 isNew: transform.isNewEndpoint(obj.lastSeenTs),
                 open:  obj.auth_type === undefined || obj.auth_type.toLowerCase() === "unauthenticated" || obj.auth_type.toLowerCase() === "no auth type found",
                 componentRiskAnalysisComp: riskCompByEndpoint.get(obj.endpoint) ?? null
@@ -624,9 +625,11 @@ function ApiEndpoints(props) {
                 if (endpointTagsFormatted.length > 0) {
                     obj.tagsComp = getTagsCompactComponent(endpointTagsFormatted);
                     obj.tagsString = endpointTagsFormatted.join(" ");
+                    obj.tagsFilterList = endpointTagsFormatted;
                 } else {
                     obj.tagsComp = null;
                     obj.tagsString = "";
+                    obj.tagsFilterList = [];
                 }
             });
             return prettified;
@@ -673,9 +676,11 @@ function ApiEndpoints(props) {
                 if (endpointTagsFormatted.length > 0) {
                     obj.tagsComp = getTagsCompactComponent(endpointTagsFormatted);
                     obj.tagsString = endpointTagsFormatted.join(" ");
+                    obj.tagsFilterList = endpointTagsFormatted;
                 } else {
                     obj.tagsComp = null;
                     obj.tagsString = "";
+                    obj.tagsFilterList = [];
                 }
             });
 
