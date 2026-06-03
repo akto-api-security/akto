@@ -1360,6 +1360,11 @@ public class DbLayer {
             Projections.exclude("urls", "conditions", "envType"));
     }
 
+    public static List<ApiCollection> fetchApiCollectionsByIds(List<Integer> apiCollectionIds) {
+        return ApiCollectionsDao.instance.findAll(Filters.in("_id", apiCollectionIds),
+            Projections.exclude("urls", "conditions", "envType"));
+    }
+
     public static Organization fetchOrganization(int accountId) {
         return OrganizationsDao.instance.findOne(Filters.eq(Organization.ACCOUNTS, accountId));
     }

@@ -1835,6 +1835,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchApiCollectionsByIds() {
+        try {
+            apiCollections = DbLayer.fetchApiCollectionsByIds(apiCollectionIds);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchApiCollectionsByIds " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String createCollectionSimple() {
         try {
             DbLayer.createCollectionSimple(vxlanId);
