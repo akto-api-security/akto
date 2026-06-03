@@ -68,6 +68,9 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     @BsonIgnore
     private boolean callbackCheckPending;
 
+    public static final String AI_SUMMARY_TRACES = "aiSummaryTraces";
+    private List<AiSummaryEntry> aiSummaryTraces;
+
     public boolean isRerun() {
         return rerun;
     }
@@ -398,6 +401,14 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public void setCallbackCheckPending(boolean callbackCheckPending) {
         this.callbackCheckPending = callbackCheckPending;
+    }
+
+    public List<AiSummaryEntry> getAiSummaryTraces() {
+        return aiSummaryTraces;
+    }
+
+    public void setAiSummaryTraces(List<AiSummaryEntry> aiSummaryTraces) {
+        this.aiSummaryTraces = aiSummaryTraces;
     }
 
 }
