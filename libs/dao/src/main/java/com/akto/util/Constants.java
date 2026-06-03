@@ -40,6 +40,10 @@ public class Constants {
     public static final List<String> MERGING_ALLOWED_TAG_SUBSTRINGS = Arrays.asList("proxy", "gateway");
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
 
+    public static final String AKTO_GUARDRAIL_MODE = "mode";
+    public static final String AKTO_GUARDRAIL_MODE_INLINE = "inline";
+    public static final String AKTO_GUARDRAIL_MODE_OBSERVE = "observe";
+
     public static boolean SHOULD_SAVE_TAGS = System.getenv("SHOULD_SAVE_TAGS") == null || System.getenv("SHOULD_SAVE_TAGS").equalsIgnoreCase("true");
 
     // Account ID for filtering merged URLs in STI fetch
