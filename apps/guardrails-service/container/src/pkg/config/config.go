@@ -39,6 +39,11 @@ type Config struct {
 	SessionSyncIntervalMin int
 	SessionEnabled         bool
 
+	// Async CPU-based LLM config (for Kafka consumer + WARN/ALERT policy deferral)
+	AsyncScannerBaseURL  string // ASYNC_SCANNER_BASE_URL e.g. https://jarvis.akto.io/v1
+	AsyncScannerModel    string // ASYNC_SCANNER_MODEL e.g. gemma4:e4b
+	KafkaProducerEnabled bool   // KAFKA_PRODUCER_ENABLED — enables async producer in HTTP mode
+
 	File FileConfig
 }
 
@@ -92,6 +97,9 @@ func LoadConfig() *Config {
 		FilterPath:               getEnv("FILTER_PATH", ""),
 		SessionSyncIntervalMin:   getEnvAsInt("SESSION_SYNC_INTERVAL_MIN", 5),
 		SessionEnabled:           getEnvAsBool("SESSION_ENABLED", true),
+		AsyncScannerBaseURL:      getEnv("ASYNC_SCANNER_BASE_URL", ""),
+		AsyncScannerModel:        getEnv("ASYNC_SCANNER_MODEL", "gemma4:e4b"),
+		KafkaProducerEnabled:     getEnvAsBool("KAFKA_PRODUCER_ENABLED", false),
 		McpAllowedListRefreshIntervalMin:  getEnvAsInt("MCP_ALLOWLIST_REFRESH_INTERVAL_MIN", 1),
 		CollectionRefreshIntervalMin:   getEnvAsInt("COLLECTION_REFRESH_INTERVAL_MIN", 5),
 		File: FileConfig{

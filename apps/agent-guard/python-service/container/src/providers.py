@@ -503,7 +503,8 @@ def build_provider_from_config(entry: Dict[str, Any]) -> Optional[LLMProvider]:
     name = (entry.get("provider") or "").strip().lower()
     model = (entry.get("model") or "").strip()
     if name in ("openai", "ollama", "openai_compatible"):
-        # Entry-level baseUrl wins, then OPENAI_COMPATIBLE_BASE_URL, then default.
-        base_url = (entry.get("baseUrl") or "").strip() or settings.OPENAI_COMPATIBLE_BASE_URL
+        # Entry-level baseUrl wins, then OLLAMA_BASE_URL, then OPENAI_COMPATIBLE_BASE_URL.
+        base_url = (entry.get("baseUrl") or "").strip() or settings.OLLAMA_BASE_URL or settings.OPENAI_COMPATIBLE_BASE_URL
+        model = model or settings.OLLAMA_MODEL
         return _dispatch("openai_compatible", model, base_url)
     return _dispatch(name, model, "")

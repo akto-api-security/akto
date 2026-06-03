@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = ""
     OPENAI_COMPATIBLE_BASE_URL: str = ""
 
+    # ── Ollama (CPU-based async evaluation) ──────────────────────────────
+    OLLAMA_BASE_URL: str = ""
+    OLLAMA_MODEL: str = "gemma4:e4b"
+
     # ── Anthropic ────────────────────────────────────────────────────────
     ANTHROPIC_API_KEY: str = ""
     ANTHROPIC_MODEL: str = ""

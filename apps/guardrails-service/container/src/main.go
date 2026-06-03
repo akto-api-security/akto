@@ -60,6 +60,21 @@ func main() {
 }
 
 func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logger *zap.Logger) {
+	// Wire async Kafka producer when enabled — WARN/ALERT LLM policies are deferred
+	// to the Kafka consumer (CPU-based, jarvis.akto.io/v1) instead of GPU inline.
+	if cfg.KafkaProducerEnabled {
+		producer, err := kafka.NewProducer(cfg, logger)
+		if err != nil {
+			logger.Warn("Failed to create async Kafka producer; WARN/ALERT LLM policies will run inline",
+				zap.Error(err))
+		} else {
+			validatorService.SetAsyncProducer(producer)
+			logger.Info("Async Kafka producer attached",
+				zap.String("broker", cfg.KafkaBrokerURL),
+				zap.String("topic", cfg.KafkaTopic))
+		}
+	}
+
 	fileRegistry := fileprocessor.DefaultRegistry(cfg.File.MaxTextFileBytes)
 	registerMediaProcessors(fileRegistry, cfg, logger)
 

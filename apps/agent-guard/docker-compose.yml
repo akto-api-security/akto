@@ -37,8 +37,11 @@ services:
       - QWEN3GUARD_LOCATION=${QWEN3GUARD_LOCATION:-}
       - QWEN3GUARD_ENDPOINT_ID=${QWEN3GUARD_ENDPOINT_ID:-}
       - QWEN3GUARD_DEDICATED_DNS=${QWEN3GUARD_DEDICATED_DNS:-}
-      # OpenAI-compatible base URL — set to http://host.docker.internal:11434/v1
-      # to use a locally running Ollama instance from inside the container.
+      # Ollama / CPU-based async evaluation (used for WARN/ALERT policy deferral).
+      # Override these to point at a different Ollama instance or model.
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://jarvis.akto.io/v1}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma4:e4b}
+      # Generic OpenAI-compatible base URL (used when SCANNER_LLM_PROVIDER=openai_compatible).
       - OPENAI_COMPATIBLE_BASE_URL=${OPENAI_COMPATIBLE_BASE_URL:-}
       # DB abstractor endpoint for persisting per-model results when
       # config.storeAllResults=true (POST /api/storeGuardrailModelResults).
