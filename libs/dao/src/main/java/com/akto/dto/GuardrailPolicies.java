@@ -130,8 +130,10 @@ public class GuardrailPolicies {
                     .map(serverId -> new SelectedServer(serverId, serverId))
                     .collect(java.util.stream.Collectors.toList());
         }
-            
-        return fetchApplicableServersByTag(Constants.AKTO_MCP_SERVER_TAG);
+        if (applyToAllServers && "block".equals(this.behaviour)) {
+            return fetchApplicableServersByTag(Constants.AKTO_MCP_SERVER_TAG);
+        }
+        return new ArrayList<>();
     }
 
     public List<SelectedServer> getEffectiveSelectedAgentServers() {
@@ -143,21 +145,22 @@ public class GuardrailPolicies {
                     .map(serverId -> new SelectedServer(serverId, serverId))
                     .collect(java.util.stream.Collectors.toList());
         }
-            
-        return fetchApplicableServersByTag(Constants.AKTO_GEN_AI_TAG);
+        if (applyToAllServers && "block".equals(this.behaviour)) {
+            return fetchApplicableServersByTag(Constants.AKTO_GEN_AI_TAG);
+        }
+        return new ArrayList<>();
     }
 
-    // empty server lists = "apply to all"; returns inline-only when block mode, all servers otherwise
+    // called only when applyToAllServers + block mode: returns inline-mode servers of the given type
     private List<SelectedServer> fetchApplicableServersByTag(String serverTypeTag) {
-        boolean isBlock = "block".equals(this.behaviour);
-        Bson filter = Filters.elemMatch(ApiCollection.TAGS_STRING,
-                Filters.eq(CollectionTags.KEY_NAME, serverTypeTag));
-        if (isBlock) {
-            filter = Filters.and(filter, Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
-                    Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GUARDRAIL_MODE),
-                    Filters.eq(CollectionTags.VALUE, Constants.AKTO_GUARDRAIL_MODE_INLINE)
-            )));
-        }
+        Bson filter = Filters.and(
+                Filters.elemMatch(ApiCollection.TAGS_STRING,
+                        Filters.eq(CollectionTags.KEY_NAME, serverTypeTag)),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
+                        Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GUARDRAIL_MODE),
+                        Filters.eq(CollectionTags.VALUE, Constants.AKTO_GUARDRAIL_MODE_INLINE)
+                ))
+        );
         return ApiCollectionsDao.instance.findAll(filter, Projections.include(ApiCollection.ID, "name"))
                 .stream()
                 .map(c -> new SelectedServer(String.valueOf(c.getId()), c.getName()))
