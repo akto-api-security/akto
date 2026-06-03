@@ -1,6 +1,8 @@
 package com.akto.dto;
 
 import com.akto.util.Constants;
+import lombok.Getter;
+import lombok.Setter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -63,6 +65,12 @@ public class ApiCollection {
 
     String accessType;
     public static final String ACCESS_TYPE = "accessType";
+
+    public static final String DESCRIPTION = "description";
+
+    @Getter
+    @Setter
+    private String description;
 
     public enum AccessType {
         INTERNAL("Internal"),
