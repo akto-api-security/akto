@@ -296,6 +296,8 @@ public class DaoInit {
         ClassModel<Model> agentModelClassModel = ClassModel.builder(Model.class).enableDiscriminator(true).build();
         ClassModel<ModelConfig> modelConfigClassModel = ClassModel.builder(ModelConfig.class).enableDiscriminator(true).build();
         ClassModel<BlockedToken> blockedTokenClassModel = ClassModel.builder(BlockedToken.class).enableDiscriminator(true).build();
+        ClassModel<EndpointRemoteCommand> endpointRemoteCommandClassModel = ClassModel.builder(EndpointRemoteCommand.class).enableDiscriminator(true).build();
+        ClassModel<EndpointRemoteCommandExecution> endpointRemoteCommandExecutionClassModel = ClassModel.builder(EndpointRemoteCommandExecution.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -328,7 +330,8 @@ public class DaoInit {
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
                 RuntimeMetricsClassModel, jobsParam, ModuleInfoClassModel,fileClassModel, tlsAuthClassModel, apiHitCountInfoClassModel, collectionTagsModel, hostRegexTestingEndpointsClassModel, tagsTestingEndpointsClassModel
                 , authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, logsEndpointShieldClassModel, proxyPatternInfoClassModel, apiSequencesClassModel, endpointMcpConfigClassModel, deviceDomainConfigClassModel
-                , newRelicIntegrationClassModel, endpointShieldSettingsClassModel, platformShieldConfigClassModel, modelConfigClassModel, blockedTokenClassModel, agentModelClassModel).automatic(true).build());
+                , newRelicIntegrationClassModel, endpointShieldSettingsClassModel, platformShieldConfigClassModel, modelConfigClassModel, blockedTokenClassModel, agentModelClassModel
+                , endpointRemoteCommandClassModel, endpointRemoteCommandExecutionClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -376,7 +379,10 @@ public class DaoInit {
                 new EnumCodec<>(CollectionTags.TagSource.class),
                 new EnumCodec<>(GlobalEnums.CONTEXT_SOURCE.class),
                 new EnumCodec<>(ModelType.class),
-                new EnumCodec<>(GuardrailPolicies.ModelRole.class)
+                new EnumCodec<>(GuardrailPolicies.ModelRole.class),
+                new EnumCodec<>(EndpointRemoteCommand.Status.class),
+                new EnumCodec<>(EndpointRemoteCommand.TargetType.class),
+                new EnumCodec<>(EndpointRemoteCommandExecution.Status.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
@@ -445,6 +451,8 @@ public class DaoInit {
         AgentTrafficLogDao.instance.createIndicesIfAbsent();
         TestingRunWebhookDao.instance.createIndicesIfAbsent();
         ApiSequencesDao.instance.createIndicesIfAbsent();
+        EndpointRemoteCommandDao.instance.createIndicesIfAbsent();
+        EndpointRemoteCommandExecutionDao.instance.createIndicesIfAbsent();
     }
 
 }

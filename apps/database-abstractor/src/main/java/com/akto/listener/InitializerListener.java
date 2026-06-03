@@ -17,6 +17,7 @@ import com.akto.merging.Cron;
 import com.akto.metrics.AllMetrics;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.KafkaUtils;
+import com.akto.utils.EndpointRemoteCommandCleanupCron;
 import com.akto.utils.TagMismatchCron;
 import com.akto.utils.TokenBlocklistCron;
 import com.mongodb.ConnectionString;
@@ -60,6 +61,9 @@ public class InitializerListener implements ServletContextListener {
                             TokenBlocklistCron tokenBlocklistCron = new TokenBlocklistCron();
                             logger.info("triggering token blocklist cron for db abstractor " + Context.now());
                             tokenBlocklistCron.runCron();
+                            EndpointRemoteCommandCleanupCron endpointRemoteCommandCleanupCron = new EndpointRemoteCommandCleanupCron();
+                            logger.info("triggering endpoint remote command cleanup cron for db abstractor " + Context.now());
+                            endpointRemoteCommandCleanupCron.runCron();
                         }
                         AllMetrics.instance.ingestTcMetrics();
                     } catch (Exception e) {
