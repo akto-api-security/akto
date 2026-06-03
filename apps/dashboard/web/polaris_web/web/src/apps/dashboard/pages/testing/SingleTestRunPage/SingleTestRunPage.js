@@ -185,6 +185,7 @@ function SingleTestRunPage() {
   const [selectedTestResultItems, setSelectedTestResultItems] = useState([]);
   const [severityUpdateInProgress, setSeverityUpdateInProgress] = useState(false);
   const [chartRefreshCounter, setChartRefreshCounter] = useState(0);
+  const [summariesErrorCounts, setSummariesErrorCounts] = useState({});
 
   const tableTabMap = {
     vulnerable: "VULNERABLE",
@@ -678,7 +679,9 @@ function SingleTestRunPage() {
         ${func.getTimeTakenByTest(selectedTestRun.startTimestamp, selectedTestRun.endTimestamp)} ${earlyFinish}`;
       case "FAILED":
       case "FAIL":
-        return "Test execution has failed during run";
+        return selectedTestRun?.authError || "Test execution has failed during run";
+      case "INCORRECT":
+        return "Test run finished incorrectly";
       default:
         return "No summary for test exists";
     }
@@ -948,7 +951,7 @@ function SingleTestRunPage() {
 
 
   const components = [
-    runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={true} totalVulnerabilities={tableCountObj.vulnerable} refreshTrigger={chartRefreshCounter} />,
+    runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={true} totalVulnerabilities={tableCountObj.vulnerable} refreshTrigger={chartRefreshCounter} testingRun={testingRunResultSummariesObj?.testingRun} onSummariesErrorCountsChange={setSummariesErrorCounts} />,
     tokenRateLimitBannerComp, metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
   const openVulnerabilityReport = async (summaryMode = false) => {
@@ -1099,6 +1102,26 @@ function SingleTestRunPage() {
               </HorizontalStack>
             </>
           )}
+          {(() => {
+            const selectedSummaryErrorData = summariesErrorCounts[currentSummary?.hexId] || {};
+            const errorSummary = transform.buildErrorSummaryFromCountMap(
+              testRunCountMap,
+              selectedTestRun?.summaryState,
+              currentSummary?.metadata,
+              selectedSummaryErrorData.highlights
+            );
+            const errorChips = transform.prettifyErrorSummaryChips(errorSummary);
+            if (!errorChips) return null;
+            return (
+              <>
+                <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
+                <HorizontalStack gap={"1"} align="center">
+                  <Text color="subdued" variant="bodyMd">Errors:</Text>
+                  {errorChips}
+                </HorizontalStack>
+              </>
+            );
+          })()}
           {allTestResultsStats.totalCount > 0 && (
             <>
               <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />

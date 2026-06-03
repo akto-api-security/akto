@@ -7,12 +7,17 @@ import { GithubRow } from '../../../components/tables/rows/GithubRow'
 import observeFunc from "../../observe/transform"
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper'
 
-function SummaryTable({testingRunResultSummaries, setSummary}) {
+function SummaryTable({testingRunResultSummaries, setSummary, testingRun, errorCountsBySummaryId}) {
 
     const [data, setData] = useState([])
 
     // Memoize headers to prevent recreation on every render
     const headers = useMemo(() => [
+        {
+            title: 'Status',
+            value: 'statusIcon',
+            isCustom: true
+        },
         {
             title: mapLabel("Test", getDashboardCategory()) + " started",
             value: 'startTime',
@@ -24,6 +29,11 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
         {
             title: 'Vulnerabilities',
             value: 'prettifiedSeverities',
+            isCustom: true
+        },
+        {
+            title: 'Errors',
+            value: 'prettifiedErrors',
             isCustom: true
         },
         {
@@ -59,8 +69,12 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
       ]};
 
     useEffect(() => {
-        setData(transform.prettifySummaryTable(testingRunResultSummaries))
-    },[testingRunResultSummaries])
+        setData(transform.prettifySummaryTable(
+            testingRunResultSummaries,
+            testingRun?.state,
+            errorCountsBySummaryId
+        ))
+    }, [testingRunResultSummaries, testingRun, errorCountsBySummaryId])
 
     const resourceIDResolver = (data) => {
         return data.id;

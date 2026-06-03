@@ -1,5 +1,5 @@
 import func from "@/util/func";
-import { Badge, Box, Button, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
@@ -449,6 +449,101 @@ const transform = {
                 }
             </HorizontalStack>
         )
+    },
+
+    getErrorsList(errorSummary) {
+        if (!errorSummary) {
+            return <Text fontWeight="regular" variant="bodyMd" color="subdued">-</Text>;
+        }
+        const {
+            errorInfo,
+            runLevelFailure,
+            runLevelLabel,
+            runLevelBadgeLabel,
+            runLevelDetail,
+            totalErrors,
+            errorHighlights = [],
+        } = errorSummary;
+        const errorLabels = [
+            { key: 'NEED_CONFIG', label: 'Need config' },
+            { key: 'SKIPPED', label: 'Skipped' },
+            { key: 'UNREACHABLE', label: 'Unreachable' },
+        ];
+        if (totalErrors <= 0) {
+            return <Text fontWeight="regular" variant="bodyMd" color="subdued">-</Text>;
+        }
+
+        const testErrorLines = errorLabels
+            .map(({ key, label }) => ({ key, label, count: errorInfo?.[key] || 0 }))
+            .filter(({ count }) => count > 0);
+
+        const usableHighlights = errorHighlights.filter(
+            ({ message }) => message && message !== '[]' && String(message).trim() !== ''
+        );
+        const previewText = usableHighlights
+            .slice(0, 2)
+            .map(({ message, count }) => `${message} (${count})`)
+            .join(' · ');
+
+        const tooltipContent = (
+            <VerticalStack gap="2">
+                {runLevelFailure ? (
+                    <VerticalStack gap="1">
+                        <Text variant="bodySm" fontWeight="semibold">{runLevelLabel}</Text>
+                        {runLevelDetail ? (
+                            <Text variant="bodySm">{runLevelDetail}</Text>
+                        ) : null}
+                    </VerticalStack>
+                ) : null}
+                {usableHighlights.length > 0 ? (
+                    <VerticalStack gap="1">
+                        <Text variant="bodySm" fontWeight="semibold">Why tests failed or were skipped</Text>
+                        {usableHighlights.map(({ message, count, type }, index) => (
+                            <Text key={`${type}-${index}`} variant="bodySm">{message}: {count}</Text>
+                        ))}
+                    </VerticalStack>
+                ) : null}
+                {testErrorLines.length > 0 ? (
+                    <VerticalStack gap="1">
+                        <Text variant="bodySm" fontWeight="semibold">
+                            {usableHighlights.length > 0 ? 'By category' : 'Test errors'}
+                        </Text>
+                        {testErrorLines.map(({ key, label, count }) => (
+                            <Text key={key} variant="bodySm">{label}: {count}</Text>
+                        ))}
+                    </VerticalStack>
+                ) : null}
+                <Text variant="bodySm" color="subdued">Total errors: {totalErrors}</Text>
+            </VerticalStack>
+        );
+
+        return (
+            <Tooltip content={tooltipContent} dismissOnMouseOut>
+                <div className="summary-errors-cell">
+                    <HorizontalStack gap="1" wrap={false}>
+                        {runLevelFailure ? (
+                            <div className="badge-wrapper-RUN_LEVEL">
+                                <Badge size="small">{runLevelBadgeLabel || 'Run'}</Badge>
+                            </div>
+                        ) : null}
+                        {errorLabels.map(({ key, label }, index) => {
+                            const count = errorInfo?.[key] || 0;
+                            if (count <= 0) {
+                                return null;
+                            }
+                            return (
+                                <div key={`error-badge-${key}-${index}`} className={`badge-wrapper-${key}`}>
+                                    <Badge size="small">{count.toString()}</Badge>
+                                </div>
+                            );
+                        })}
+                    </HorizontalStack>
+                    {previewText ? (
+                        <div className="summary-error-preview" title={previewText}>{previewText}</div>
+                    ) : null}
+                </div>
+            </Tooltip>
+        );
     },
 
     getCollectionTypeList(envType, maxItems, wrap){

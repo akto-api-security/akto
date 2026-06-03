@@ -420,6 +420,13 @@ prettifyEpoch(epoch) {
           tooltipContent: "Error occurred while running the test."
         }
 
+      case "INCORRECT":
+        return {
+          color: "warning",
+          icon: CircleAlertMajor,
+          tooltipContent: "Test run finished incorrectly."
+        }
+
       case "STOPPED":
         return{
           tooltipContent: "Error occurred while running the test.",

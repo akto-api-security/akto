@@ -24,6 +24,18 @@ export default {
         })
         return resp
     },
+    async fetchSummariesErrorCounts(testingRunHexId, startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/fetchSummariesErrorCounts',
+            method: 'post',
+            data: {
+                testingRunHexId,
+                startTimestamp,
+                endTimestamp
+            }
+        })
+        return resp || {}
+    },
     async fetchTestingRunResults(testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, reportFilterList, queryValue) {
         const resp = await request({
             url: '/api/fetchTestingRunResults',

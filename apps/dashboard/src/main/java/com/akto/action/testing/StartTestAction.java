@@ -710,6 +710,195 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private Map<String, Map<String, Object>> summariesErrorCounts;
+
+    public Map<String, Map<String, Object>> getSummariesErrorCounts() {
+        return summariesErrorCounts;
+    }
+
+    private static final int ERROR_HIGHLIGHTS_LIMIT = 3;
+    private static final int ERROR_HIGHLIGHTS_PER_MODE = 2;
+
+    private BasicDBObject buildErrorHighlightMessageExpression() {
+        return new BasicDBObject("$let", new BasicDBObject()
+                .append("vars", new BasicDBObject("lastResult",
+                        new BasicDBObject("$arrayElemAt", Arrays.asList("$" + TestingRunResult.TEST_RESULTS, -1))))
+                .append("in", new BasicDBObject("$let", new BasicDBObject()
+                        .append("vars", new BasicDBObject("lastError",
+                                new BasicDBObject("$arrayElemAt", Arrays.asList("$$lastResult." + TestResult._ERRORS, 0))))
+                        .append("in", new BasicDBObject("$cond", Arrays.asList(
+                                new BasicDBObject("$eq", Arrays.asList(
+                                        new BasicDBObject("$type", "$$lastError"), "string")),
+                                "$$lastError",
+                                new BasicDBObject("$cond", Arrays.asList(
+                                        new BasicDBObject("$eq", Arrays.asList(
+                                                new BasicDBObject("$type", "$" + TestingRunResultDao.ERRORS_KEY), "string")),
+                                        "$" + TestingRunResultDao.ERRORS_KEY,
+                                        null
+                                ))
+                        )))
+                )));
+    }
+
+    private String resolveHighlightErrorMessage(Object groupId) {
+        if (groupId == null) {
+            return null;
+        }
+        if (groupId instanceof List) {
+            for (Object item : (List<?>) groupId) {
+                String message = resolveHighlightErrorMessage(item);
+                if (StringUtils.isNotBlank(message)) {
+                    return message;
+                }
+            }
+            return null;
+        }
+        String message = groupId.toString().trim();
+        if (message.isEmpty() || "[]".equals(message)) {
+            return null;
+        }
+        return message;
+    }
+
+    private List<Map<String, Object>> getErrorHighlightsForSummary(ObjectId summaryId, int accountId) {
+        Context.accountId.set(accountId);
+        List<Map<String, Object>> highlights = new ArrayList<>();
+        highlights.addAll(getTopErrorHighlightsForQueryMode(summaryId, QueryMode.SKIPPED_EXEC, "SKIPPED", false));
+        highlights.addAll(getTopErrorHighlightsForQueryMode(summaryId, QueryMode.SKIPPED_EXEC_API_REQUEST_FAILED, "UNREACHABLE", false));
+        highlights.addAll(getTopErrorHighlightsForQueryMode(summaryId, QueryMode.SKIPPED_EXEC_NEED_CONFIG, "NEED_CONFIG", true));
+        highlights.sort((a, b) -> Integer.compare((Integer) b.get("count"), (Integer) a.get("count")));
+        return highlights.size() > ERROR_HIGHLIGHTS_LIMIT
+                ? highlights.subList(0, ERROR_HIGHLIGHTS_LIMIT)
+                : highlights;
+    }
+
+    private List<Map<String, Object>> getTopErrorHighlightsForQueryMode(
+            ObjectId summaryId, QueryMode queryMode, String type, boolean formatNeedConfig) {
+        List<Bson> filterList = prepareTestRunResultsFilters(summaryId, queryMode, false);
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(Filters.and(filterList)));
+        pipeline.add(Aggregates.project(Projections.computed("errorMessage", buildErrorHighlightMessageExpression())));
+        pipeline.add(Aggregates.match(Filters.and(
+                Filters.type("errorMessage", "string"),
+                Filters.ne("errorMessage", ""))));
+        pipeline.add(Aggregates.group("$errorMessage", Accumulators.sum("count", 1)));
+        pipeline.add(Aggregates.sort(Sorts.descending("count")));
+        pipeline.add(Aggregates.limit(ERROR_HIGHLIGHTS_PER_MODE));
+
+        List<Map<String, Object>> results = new ArrayList<>();
+        MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).cursor();
+        try {
+            while (cursor.hasNext()) {
+                BasicDBObject doc = cursor.next();
+                String rawMessage = resolveHighlightErrorMessage(doc.get("_id"));
+                if (rawMessage == null) {
+                    continue;
+                }
+                String message = formatNeedConfig ? formatNeedConfigMessage(rawMessage) : rawMessage;
+                Map<String, Object> item = new HashMap<>();
+                item.put("message", message);
+                item.put("count", doc.getInt("count", 0));
+                item.put("type", type);
+                results.add(item);
+            }
+        } finally {
+            cursor.close();
+        }
+        return results;
+    }
+
+    private String formatNeedConfigMessage(String errorsListFirst) {
+        if (errorsListFirst == null || errorsListFirst.isEmpty() || "[]".equals(errorsListFirst)) {
+            return "Configuration missing";
+        }
+        String suffix = TestError.ROLE_NOT_FOUND.getMessage();
+        int idx = errorsListFirst.indexOf(suffix);
+        if (idx > 0) {
+            String configPart = errorsListFirst.substring(0, idx).replace("_", " ").trim();
+            if (!configPart.isEmpty()) {
+                return toSentenceCase(configPart) + " config missing";
+            }
+        }
+        return errorsListFirst;
+    }
+
+    private String toSentenceCase(String value) {
+        if (value == null || value.isEmpty()) {
+            return value;
+        }
+        return value.substring(0, 1).toUpperCase() + value.substring(1).toLowerCase();
+    }
+
+    public String fetchSummariesErrorCounts() {
+        ObjectId testingRunId;
+        try {
+            testingRunId = new ObjectId(testingRunHexId);
+        } catch (Exception e) {
+            addActionError("Invalid test id");
+            return ERROR.toUpperCase();
+        }
+
+        List<Bson> filterQ = new ArrayList<>();
+        filterQ.add(Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId));
+
+        if (this.startTimestamp != 0) {
+            filterQ.add(Filters.gte(TestingRunResultSummary.START_TIMESTAMP, this.startTimestamp));
+        }
+
+        if (this.endTimestamp != 0) {
+            filterQ.add(Filters.lte(TestingRunResultSummary.START_TIMESTAMP, this.endTimestamp));
+        }
+
+        Bson sort = Sorts.descending(TestingRunResultSummary.START_TIMESTAMP);
+
+        List<TestingRunResultSummary> summaries = TestingRunResultSummariesDao.instance.findAll(
+                Filters.and(filterQ), 0, limitForTestingRunResultSummary, sort);
+
+        summariesErrorCounts = new ConcurrentHashMap<>();
+        int accountId = Context.accountId.get();
+
+        List<QueryMode> errorCountModes = Arrays.asList(
+                QueryMode.SKIPPED_EXEC_NEED_CONFIG,
+                QueryMode.SKIPPED_EXEC,
+                QueryMode.SKIPPED_EXEC_API_REQUEST_FAILED);
+
+        List<Callable<Void>> jobs = new ArrayList<>();
+        for (TestingRunResultSummary summary : summaries) {
+            ObjectId summaryId = summary.getId();
+            String summaryHexId = summary.getHexId();
+            jobs.add(() -> {
+                Map<String, Integer> counts = new HashMap<>();
+                for (QueryMode qm : errorCountModes) {
+                    counts.putAll(getCountMapForQueryMode(summaryId, qm, accountId));
+                }
+                Map<String, Object> summaryData = new HashMap<>(counts);
+                summaryData.put("highlights", getErrorHighlightsForSummary(summaryId, accountId));
+                summariesErrorCounts.put(summaryHexId, summaryData);
+                return null;
+            });
+        }
+
+        try {
+            List<Future<Void>> futures = new ArrayList<>();
+            for (Callable<Void> job : jobs) {
+                futures.add(multiExecService.submit(job));
+            }
+            for (Future<Void> future : futures) {
+                try {
+                    future.get();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ERROR.toUpperCase();
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
     public String fetchTestingRunResultSummary() {
         this.testingRunResultSummaries = new ArrayList<>();
         this.testingRunResultSummaries.add(

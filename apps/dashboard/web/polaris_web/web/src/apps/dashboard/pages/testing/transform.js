@@ -82,7 +82,8 @@ function getOrderPriority(state) {
     case "SCHEDULED": return 2;
     case "STOPPED": return 4;
     case "FAILED":
-    case "FAIL": return 5;
+    case "FAIL":
+    case "INCORRECT": return 5;
     default: return 3;
   }
 }
@@ -136,6 +137,7 @@ function getAlternateTestsInfo(state) {
     case "STOPPED": return "Tests have been stopped";
     case "FAILED":
     case "FAIL": return "Test execution has failed during run";
+    case "INCORRECT": return "Test run finished incorrectly";
     default: return "Information unavailable";
   }
 }
@@ -155,10 +157,23 @@ function minimizeTagList(items) {
 }
 
 function checkTestFailure(summaryState, testRunState) {
-  if (testRunState === 'COMPLETED' && summaryState !== 'COMPLETED' && summaryState !== "STOPPED") {
+  const runStatus = getStatus(testRunState);
+  const summaryStatus = getStatus(summaryState);
+  if (runStatus === 'COMPLETED' && summaryStatus !== 'COMPLETED' && summaryStatus !== "STOPPED") {
     return true;
   }
   return false;
+}
+
+function getEffectiveSummaryStatus(summaryState, testRunState) {
+  const summaryStatus = getStatus(summaryState);
+  if (summaryStatus === 'FAILED') {
+    return 'FAILED';
+  }
+  if (checkTestFailure(summaryState, testRunState)) {
+    return 'INCORRECT';
+  }
+  return summaryStatus || summaryState;
 }
 
 function getCweLink(item) {
@@ -188,6 +203,40 @@ function getScanFrequency(periodInSeconds) {
     return "Monthly"
   } else {
     return "-"
+  }
+}
+
+function getRunLevelFailureDetail(effectiveStatus, summaryMetadata) {
+  if (summaryMetadata?.error) {
+    return summaryMetadata.error;
+  }
+  if (summaryMetadata?.tokenRateLimited) {
+    return typeof summaryMetadata.tokenRateLimited === 'string'
+      ? summaryMetadata.tokenRateLimited
+      : 'Token rate limit exceeded';
+  }
+  switch (effectiveStatus) {
+    case 'FAILED':
+      return 'Error occurred while running the test.';
+    case 'INCORRECT':
+      return 'Test run finished incorrectly.';
+    case 'STOPPED':
+      return 'Test was stopped before completion.';
+    default:
+      return null;
+  }
+}
+
+function getRunLevelFailureInfo(effectiveStatus) {
+  switch (effectiveStatus) {
+    case 'FAILED':
+      return { label: 'Run failed', badgeLabel: 'Failed' };
+    case 'INCORRECT':
+      return { label: 'Run incorrect', badgeLabel: 'Incorrect' };
+    case 'STOPPED':
+      return { label: 'Run stopped', badgeLabel: 'Stopped' };
+    default:
+      return { label: null, badgeLabel: null };
   }
 }
 
@@ -224,20 +273,19 @@ const transform = {
   prepareDataFromSummary: (data, testRunState) => {
     let obj = {};
     obj['testingRunResultSummaryHexId'] = data?.hexId;
-    let state = data?.state;
-    if (checkTestFailure(state, testRunState)) {
-      state = 'FAIL'
-    }
+    const state = getEffectiveSummaryStatus(data?.state, testRunState);
     const iconObj = func.getTestingRunIconObj(state)
     obj['orderPriority'] = getOrderPriority(state)
     obj['icon'] = iconObj.icon;
     obj['iconColor'] = iconObj?.iconColor || ''
     obj['summaryState'] = getStatus(state)
+    obj['effectiveStatus'] = state
     obj['startTimestamp'] = data?.startTimestamp
     obj['endTimestamp'] = data?.endTimestamp
     obj['severity'] = func.getSeverity(data?.countIssues)
     obj['severityStatus'] = func.getSeverityStatus(data?.countIssues)
     obj['metadata'] = func.flattenObject(data?.metadata)
+    obj['authError'] = data?.metadata?.error || null
     return obj;
   },
   prepareCountIssues: (data) => {
@@ -279,10 +327,10 @@ const transform = {
       testingRunResultSummary = {};
     }
 
-    let state = cicd ? testingRunResultSummary.state : data.state;
-    if (cicd !== true && checkTestFailure(testingRunResultSummary.state, state)) {
-      state = 'FAIL'
-    }
+    const testRunState = cicd ? testingRunResultSummary.state : data.state;
+    let state = testingRunResultSummary?.state
+      ? getEffectiveSummaryStatus(testingRunResultSummary.state, testRunState)
+      : getStatus(data.state);
 
     let apiCollectionId = -1
     if (Object.keys(data).length > 0) {
@@ -315,8 +363,8 @@ const transform = {
     obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary?.countIssues)
     obj['runTypeStatus'] = [obj['run_type']]
     obj['nextUrl'] = "/dashboard/testing/" + data.hexId
-    obj['testRunState'] = state
-    obj['summaryState'] = testingRunResultSummary?.state
+    obj['testRunState'] = getStatus(testRunState)
+    obj['summaryState'] = getStatus(state)
     obj['startTimestamp'] = testingRunResultSummary?.startTimestamp
     obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
     
@@ -790,18 +838,134 @@ const transform = {
     PersistStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap);
     LocalStore.getState().setCategoryMap(categoryMap);
   },
-  prettifySummaryTable(summaries) {
-    summaries = summaries.map((obj) => {
-      const date = new Date(obj.startTimestamp * 1000)
+  buildSummaryErrorInfo(countsMap, effectiveStatus, summaryMetadata) {
+    const errorInfo = {
+      NEED_CONFIG: countsMap?.SKIPPED_EXEC_NEED_CONFIG || 0,
+      SKIPPED: countsMap?.SKIPPED_EXEC || 0,
+      UNREACHABLE: countsMap?.SKIPPED_EXEC_API_REQUEST_FAILED || 0,
+    };
+    const testErrorTotal = errorInfo.NEED_CONFIG + errorInfo.SKIPPED + errorInfo.UNREACHABLE;
+    const errorHighlights = Array.isArray(countsMap?.highlights) ? countsMap.highlights : [];
+    const runLevelFailure = effectiveStatus === 'FAILED' || effectiveStatus === 'INCORRECT';
+    const { label: runLevelLabel, badgeLabel: runLevelBadgeLabel } = getRunLevelFailureInfo(effectiveStatus);
+    const runLevelDetail = runLevelFailure
+      ? getRunLevelFailureDetail(effectiveStatus, summaryMetadata)
+      : null;
+    const runLevelCount = runLevelFailure ? 1 : 0;
+    const totalErrors = testErrorTotal + runLevelCount;
+    return {
+      errorInfo,
+      runLevelFailure,
+      runLevelLabel,
+      runLevelBadgeLabel,
+      runLevelDetail,
+      testErrorTotal,
+      totalErrors,
+      runLevelCount,
+      effectiveStatus,
+      errorHighlights,
+    };
+  },
+
+  buildErrorSummaryFromCountMap(countMap, effectiveStatus, summaryMetadata, errorHighlights) {
+    return transform.buildSummaryErrorInfo(
+      {
+        SKIPPED_EXEC_NEED_CONFIG: countMap?.SKIPPED_EXEC_NEED_CONFIG,
+        SKIPPED_EXEC: countMap?.SKIPPED_EXEC,
+        SKIPPED_EXEC_API_REQUEST_FAILED: countMap?.SKIPPED_EXEC_API_REQUEST_FAILED,
+        highlights: errorHighlights || countMap?.highlights,
+      },
+      effectiveStatus,
+      summaryMetadata
+    );
+  },
+
+  processErrorChartData(summaries, errorCountsBySummaryId, testingRunState) {
+    const testRunState = testingRunState?._name || testingRunState?.name || testingRunState;
+    const needConfig = [];
+    const skipped = [];
+    const unreachable = [];
+    const runLevel = [];
+
+    summaries.forEach((summary) => {
+      const ts = summary.startTimestamp * 1000;
+      const effectiveStatus = getEffectiveSummaryStatus(summary.state, testRunState);
+      const { errorInfo, runLevelCount } = transform.buildSummaryErrorInfo(
+        errorCountsBySummaryId?.[summary.hexId] || {},
+        effectiveStatus,
+        summary.metadata
+      );
+      needConfig.push([ts, errorInfo.NEED_CONFIG]);
+      skipped.push([ts, errorInfo.SKIPPED]);
+      unreachable.push([ts, errorInfo.UNREACHABLE]);
+      runLevel.push([ts, runLevelCount]);
+    });
+
+    return [
+      { data: needConfig, color: '#d97706', name: 'Need config' },
+      { data: skipped, color: '#6b7280', name: 'Skipped' },
+      { data: unreachable, color: '#dc2626', name: 'Unreachable' },
+      { data: runLevel, color: '#ea580c', name: 'Run failure' },
+    ];
+  },
+
+  computeTotalErrors(summaries, errorCountsBySummaryId, testingRunState) {
+    const testRunState = testingRunState?._name || testingRunState?.name || testingRunState;
+    return summaries.reduce((acc, summary) => {
+      const effectiveStatus = getEffectiveSummaryStatus(summary.state, testRunState);
+      const { totalErrors } = transform.buildSummaryErrorInfo(
+        errorCountsBySummaryId?.[summary.hexId] || {},
+        effectiveStatus,
+        summary.metadata
+      );
+      return acc + totalErrors;
+    }, 0);
+  },
+
+  getSummaryStatusTooltip(effectiveStatus, summaryMetadata) {
+    const status = effectiveStatus?._name || effectiveStatus?.name || effectiveStatus;
+    if (status === 'FAILED' || status === 'INCORRECT' || status === 'STOPPED') {
+      return getRunLevelFailureDetail(status, summaryMetadata);
+    }
+    return func.getTestingRunIconObj(effectiveStatus).tooltipContent;
+  },
+
+  prettifySummaryStatusIcon(effectiveStatus, summaryMetadata) {
+    const iconObj = func.getTestingRunIconObj(effectiveStatus);
+    const tooltipContent = transform.getSummaryStatusTooltip(effectiveStatus, summaryMetadata);
+    return (
+      <Tooltip content={tooltipContent} dismissOnMouseOut>
+        <Box><Icon source={iconObj.icon} color={iconObj.color} /></Box>
+      </Tooltip>
+    );
+  },
+
+  prettifyErrorSummaryChips(errorSummary) {
+    if (!errorSummary || errorSummary.totalErrors <= 0) {
+      return null;
+    }
+    return observeFunc.getErrorsList(errorSummary);
+  },
+
+  prettifySummaryTable(summaries, testingRunState, errorCountsBySummaryId) {
+    const testRunState = testingRunState?._name || testingRunState?.name || testingRunState;
+    return summaries.map((obj) => {
+      const date = new Date(obj.startTimestamp * 1000);
+      const effectiveStatus = getEffectiveSummaryStatus(obj.state, testRunState);
+      const countsMap = errorCountsBySummaryId?.[obj.hexId] || {};
+      const errorSummary = transform.buildSummaryErrorInfo(countsMap, effectiveStatus, obj.metadata);
       return {
         ...obj,
+        effectiveStatus,
+        errorSummary,
         prettifiedSeverities: observeFunc.getIssuesList(obj.countIssues || { "CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0 }),
+        statusIcon: transform.prettifySummaryStatusIcon(effectiveStatus, obj.metadata),
+        prettifiedErrors: observeFunc.getErrorsList(errorSummary),
         startTime: date.toLocaleString('en-US', { timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE }) + " on " + date.toLocaleDateString('en-US', { timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE }),
         id: obj.hexId,
         totalExternalApiTokens: obj.totalExternalApiTokens || 0
-      }
-    })
-    return summaries;
+      };
+    });
   },
 
   getInfoSectionsHeaders() {

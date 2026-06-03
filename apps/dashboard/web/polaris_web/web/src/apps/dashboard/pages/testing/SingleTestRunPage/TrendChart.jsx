@@ -16,6 +16,7 @@ import {
 import DateRangePicker from "../../../components/layouts/DateRangePicker"
 import func from '@/util/func';
 import { produce } from "immer"
+import transform from "../transform";
 import "./style.css"
 import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
 import SummaryTable from "./SummaryTable";
@@ -26,10 +27,26 @@ function TrendChart(props) {
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
     const [appliedFilters, setAppliedFilters] = useState([]);
     const [testingRunResultSummaries, setTestingRunResultSummaries] = useState([]);
+    const [summariesErrorCounts, setSummariesErrorCounts] = useState({});
     const [metadataFilterData, setMetadataFilterData] = useState([]);
     const [totalVulnerabilities, setTotalVulnerabilites] = useState(0);
+    const [totalErrorsCount, setTotalErrorsCount] = useState(0);
     const [collapsible, setCollapsible] = useState(true)
+    const [errorsCollapsible, setErrorsCollapsible] = useState(true)
     const [hideFilter, setHideFilter] = useState(false)
+
+    function getFilteredSummaries(data) {
+        return data.filter((x) => {
+            let ret = true;
+            appliedFilters.forEach((filter) => {
+                if (filter.key == "dateRange") {
+                    return;
+                }
+                ret &= filter.value.includes(x?.metadata?.[filter.key])
+            })
+            return ret
+        })
+    }
 
     const dateRangeFilter =
     {
@@ -55,18 +72,7 @@ function TrendChart(props) {
         let retM = []
         let retL = []
 
-        let items = data;
-
-        items = items.filter((x) => {
-            let ret = true;
-            appliedFilters.forEach((filter) => {
-                if (filter.key == "dateRange") {
-                    return;
-                }
-                ret &= filter.value.includes(x?.metadata?.[filter.key])
-            })
-            return ret
-        })
+        let items = getFilteredSummaries(data);
 
         items.forEach((x) => {
             let ts = x["startTimestamp"] * 1000
@@ -151,7 +157,13 @@ function TrendChart(props) {
             en = 0;
         }
 
-        await api.fetchTestingRunResultSummaries(hexId, st, en).then(async ({ testingRunResultSummaries }) => {
+        const summariesPromise = api.fetchTestingRunResultSummaries(hexId, st, en);
+        const errorCountsPromise = api.fetchSummariesErrorCounts(hexId, st, en).catch(() => ({}));
+
+        await Promise.all([summariesPromise, errorCountsPromise]).then(async ([{ testingRunResultSummaries }, errorCounts]) => {
+            const resolvedErrorCounts = errorCounts || {};
+            setSummariesErrorCounts(resolvedErrorCounts);
+            props.onSummariesErrorCountsChange?.(resolvedErrorCounts);
             setTestingRunResultSummaries((prev) => {
                 if (func.deepComparison(prev, testingRunResultSummaries)) {
                     return prev;
@@ -169,6 +181,11 @@ function TrendChart(props) {
             })
 
             setTotalVulnerabilites(Math.max(count, 0))
+            setTotalErrorsCount(transform.computeTotalErrors(
+                testingRunResultSummaries,
+                errorCounts || {},
+                props.testingRun?.state
+            ))
 
             if (firstTime) {
 
@@ -215,6 +232,16 @@ function TrendChart(props) {
             setTotalVulnerabilites(props.totalVulnerabilities);
         }
     }, [props.totalVulnerabilities])
+
+    useEffect(() => {
+        if (testingRunResultSummaries.length > 0) {
+            setTotalErrorsCount(transform.computeTotalErrors(
+                testingRunResultSummaries,
+                summariesErrorCounts,
+                props.testingRun?.state
+            ));
+        }
+    }, [testingRunResultSummaries, summariesErrorCounts, props.testingRun?.state])
 
 
     const defaultChartOptions = {
@@ -330,6 +357,13 @@ function TrendChart(props) {
     }
 
     const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
+    const errorsIconSource = errorsCollapsible ? ChevronUpMinor : ChevronDownMinor
+    const filteredSummaries = getFilteredSummaries(testingRunResultSummaries)
+    const filteredTotalErrors = transform.computeTotalErrors(
+        filteredSummaries,
+        summariesErrorCounts,
+        props.testingRun?.state
+    )
 
     return (
         <LegacyCard>
@@ -373,8 +407,45 @@ function TrendChart(props) {
                     </LegacyCard.Section>
                 </Collapsible>
             </LegacyCard.Section>
+            <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Errors</Text>}>
+                <HorizontalStack align="space-between">
+                    <Text fontWeight="semibold" variant="bodyMd">
+                        Found {appliedFilters.length > 0 ? filteredTotalErrors : totalErrorsCount} errors in total
+                    </Text>
+                    <Button plain monochrome icon={errorsIconSource} onClick={() => setErrorsCollapsible(!errorsCollapsible)} />
+                </HorizontalStack>
+                <Collapsible open={errorsCollapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
+                    <Box paddingBlockStart={3}><Divider/></Box>
+                    <LegacyCard.Section>
+                        <StackedChart
+                            key={`errors-chart-${hexId}`}
+                            type='column'
+                            color='#ea580c'
+                            areaFillHex="true"
+                            height="330"
+                            background-color="#ffffff"
+                            data={transform.processErrorChartData(filteredSummaries, summariesErrorCounts, props.testingRun?.state)}
+                            testingRunResultSummaries={filteredSummaries}
+                            defaultChartOptions={{
+                                legend: { enabled: true },
+                            }}
+                            text="true"
+                            yAxisTitle="Number of errors"
+                            dateClicked={dateClicked}
+                            graphPointClick={graphPointClick}
+                            tooltip={tooltip}
+                            width={50}
+                        />
+                    </LegacyCard.Section>
+                </Collapsible>
+            </LegacyCard.Section>
             <LegacyCard.Section>
-                <SummaryTable setSummary={setSummary} testingRunResultSummaries={testingRunResultSummaries} />
+                <SummaryTable
+                    setSummary={setSummary}
+                    testingRunResultSummaries={testingRunResultSummaries}
+                    testingRun={props.testingRun}
+                    errorCountsBySummaryId={summariesErrorCounts}
+                />
             </LegacyCard.Section>
         </LegacyCard>
     )
