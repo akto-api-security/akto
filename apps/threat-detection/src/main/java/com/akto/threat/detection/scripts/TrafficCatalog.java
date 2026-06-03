@@ -177,6 +177,49 @@ public class TrafficCatalog {
                 .build();
     }
 
+    public static HttpResponseParam buildMessage(String path, String method,
+                                                  String ip, long epochMinute, Random random) {
+        int timeSeconds = (int)(epochMinute * 60) + random.nextInt(60);
+
+        Map<String, StringList> reqHeaders = new HashMap<>();
+        reqHeaders.put("content-type", sl("application/json"));
+        reqHeaders.put("authorization", sl("Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDAwMDAwIn0.sim"));
+        reqHeaders.put("host", sl("apiratelimit.example.com"));
+        reqHeaders.put("x-forwarded-for", sl(ip));
+        reqHeaders.put("user-agent", sl(USER_AGENT));
+        reqHeaders.put("accept", sl("application/json"));
+
+        Map<String, StringList> respHeaders = new HashMap<>();
+        respHeaders.put("content-type", sl("application/json; charset=utf-8"));
+        respHeaders.put("x-request-id", sl("sim-" + timeSeconds + "-" + random.nextInt(99999)));
+
+        String requestBody = method.equals("GET") ? ""
+                : "{\"timestamp\": " + timeSeconds + ", \"source\": \"sim\"}";
+        String responseBody = "{\"status\": \"ok\", \"ts\": " + timeSeconds + "}";
+        int statusCode = random.nextInt(20) == 0 ? 500 : 200;
+
+        return HttpResponseParam.newBuilder()
+                .setMethod(method)
+                .setPath(path)
+                .setType("HTTP/1.1")
+                .putAllRequestHeaders(reqHeaders)
+                .putAllResponseHeaders(respHeaders)
+                .setRequestPayload(requestBody)
+                .setResponsePayload(responseBody)
+                .setApiCollectionId(COLLECTION_ID)
+                .setStatusCode(statusCode)
+                .setStatus(statusCode == 200 ? "OK" : "Internal Server Error")
+                .setTime(timeSeconds)
+                .setAktoAccountId("1000000")
+                .setIp(ip)
+                .setDestIp("10.0.0.1")
+                .setDirection("INBOUND")
+                .setIsPending(false)
+                .setSource("MIRRORING")
+                .setAktoVxlanId("1313121")
+                .build();
+    }
+
     private static StringList sl(String value) {
         return StringList.newBuilder().addValues(value).build();
     }

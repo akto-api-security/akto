@@ -7,7 +7,6 @@ import com.akto.kafka.Serializer;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.scripts.TrafficCatalog.ApiProfile;
-import com.akto.threat.detection.scripts.TrafficCatalog.IpEntry;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
 import java.util.ArrayList;
@@ -23,35 +22,106 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * E2E traffic simulator for verifying distribution and API hit count graphs.
  *
- * Pushes realistic Kafka traffic for collection 1000 with 11 APIs (HIGH/MEDIUM/LOW usage).
- * Each API has a Zipf-split IP pool (CASUAL/REGULAR/POWER/ANOMALOUS tiers) so distribution
- * buckets b1-b14 populate with a realistic long-tail shape.
+ * Uses explicit SimTier configs — each tier targets a specific distribution bucket range
+ * by controlling callsPerMin and activeMinutes. Higher-bucket tiers are only active for
+ * a short window at the end of the simulation so their per-window accumulation lands in
+ * the right bucket without blowing the total message budget.
  *
- * Total messages are capped by sim.total.messages; the simulator derives a per-minute budget
- * and applies a scale factor to tier call counts so the cap is respected.
- *
- * Supports both threat-detection (proto) and mini-runtime (JSON) Kafka topics.
+ * Target: ~1M messages, covers b1–b12, 5–50 IPs per bucket.
  *
  * Usage:
  *   mvn exec:java -Dexec.mainClass="com.akto.threat.detection.scripts.EndToEndTrafficSimulator" \
- *     -Dsim.duration.mins=1440 -Dsim.total.messages=1000000 -Dsim.threads=8 \
- *     -Dkafka.url=localhost:9092 -Dmode=mini-runtime
+ *     -Dsim.duration.mins=30 -Dsim.total.messages=1000000 \
+ *     -Dkafka.url=localhost:9092 -Dmode=threat
  *
+ *   Filter to one API: -Dsim.api=/api/v1/feed
  *   Modes: threat (default), mini-runtime, both
  */
 public class EndToEndTrafficSimulator {
 
-    private static final int    SIM_DURATION_MINS  = RealisticTrafficBenchmark.readIntConfig("sim.duration.mins",    "SIM_DURATION_MINS",   1440);
-    private static final long   TOTAL_MESSAGES      = RealisticTrafficBenchmark.readLongConfig("sim.total.messages", "SIM_TOTAL_MESSAGES",  1_000_000L);
-    private static final int    NUM_THREADS         = RealisticTrafficBenchmark.readIntConfig("sim.threads",         "SIM_THREADS",         Runtime.getRuntime().availableProcessors());
-    private static final String KAFKA_URL           = RealisticTrafficBenchmark.readStringConfig("kafka.url",        "KAFKA_URL",           "localhost:9092");
-    private static final String MODE                = RealisticTrafficBenchmark.readStringConfig("mode",             "MODE",                "threat");
+    private static final int    SIM_DURATION_MINS = RealisticTrafficBenchmark.readIntConfig("sim.duration.mins", "SIM_DURATION_MINS", 30);
+    private static final int    NUM_THREADS       = RealisticTrafficBenchmark.readIntConfig("sim.threads",        "SIM_THREADS",       Runtime.getRuntime().availableProcessors());
+    private static final String KAFKA_URL          = RealisticTrafficBenchmark.readStringConfig("kafka.url",        "KAFKA_URL",           "localhost:9092");
+    private static final String MODE               = RealisticTrafficBenchmark.readStringConfig("mode",             "MODE",                "threat");
+    // Optional: filter to a single API path, e.g. -Dsim.api=/api/v1/feed
+    // If not set, all APIs in the catalog are simulated.
+    private static final String SIM_API            = System.getProperty("sim.api", "/api/v1/cart");
 
-    // Natural catalog throughput per minute (computed from tier averages and pool sizes):
-    //   HIGH  (200 IPs): casual(120)×4.5 + regular(50)×25 + power(24)×290 + anomalous(6)×5000 ≈ 38,750/min
-    //   MEDIUM(100 IPs): ≈ 19,375/min   LOW(40 IPs): ≈ 7,750/min
-    //   Total: 3×38750 + 4×19375 + 4×7750 ≈ 225,000/min
-    private static final double NATURAL_MSG_PER_MIN = 225_000.0;
+    // -------------------------------------------------------------------------
+    // SimTier: explicit bucket-targeting tier config
+    //
+    // callsPerMin  — calls per IP per active minute
+    // ipCount      — number of unique IPs in this tier
+    // startMin     — minute offset (within sim) at which this tier becomes active
+    // activeMinutes — how many consecutive minutes this tier fires
+    // subnet       — IP prefix for this tier (e.g. "192.168.1.")
+    //
+    // Window total = callsPerMin × min(activeMinutes, windowSize)
+    // With windowSize=5, to land in bucket bN, window total must fall in bN's range.
+    //
+    // b1–b5: active full 30 min → smooth baseline across the whole graph
+    // b6–b12: short bursts spread evenly so spikes appear across the timeline, not all at the end
+    //
+    // Budget math (30-min sim, window=5):
+    //   b1  (1-10):       1/min ×  50 IPs × 30 min =     1,500
+    //   b2  (11-50):      5/min ×  30 IPs × 30 min =     4,500
+    //   b3  (51-250):    20/min ×  20 IPs × 30 min =    12,000
+    //   b4  (251-1000): 100/min ×  15 IPs × 30 min =    45,000
+    //   b5  (1001-2500):300/min ×  10 IPs × 30 min =    90,000
+    //   b6  (2501-5000):700/min ×   8 IPs ×  5 min =    28,000  starts min 0
+    //   b7  (5001-10k):1400/min ×   6 IPs ×  5 min =    42,000  starts min 5
+    //   b8  (10k-25k): 3000/min ×   5 IPs ×  2 min =    30,000  starts min 10
+    //   b9  (25k-50k): 6000/min ×   5 IPs ×  1 min =    30,000  starts min 14
+    //   b10 (50k-100k):12000/min×   5 IPs ×  1 min =    60,000  starts min 18
+    //   b11 (100k-250k):25000/min×  5 IPs ×  1 min =   125,000  starts min 22
+    //   b12 (250k-500k):60000/min×  5 IPs ×  1 min =   300,000  starts min 26
+    //   Total ≈ 768,000 < 1M ✓
+    // -------------------------------------------------------------------------
+
+    private static class SimTier {
+        final String label;
+        final int    callsPerMin;
+        final int    ipCount;
+        final int    startMin;      // minute offset when this tier becomes active
+        final int    activeMinutes; // how many consecutive minutes it fires
+        final String subnet;
+        final String targetBucket;
+
+        SimTier(String label, int callsPerMin, int ipCount, int startMin, int activeMinutes,
+                String subnet, String targetBucket) {
+            this.label         = label;
+            this.callsPerMin   = callsPerMin;
+            this.ipCount       = ipCount;
+            this.startMin      = startMin;
+            this.activeMinutes = activeMinutes;
+            this.subnet        = subnet;
+            this.targetBucket  = targetBucket;
+        }
+
+        boolean isActiveAt(int min) {
+            return min >= startMin && min < startMin + activeMinutes;
+        }
+
+        long estimatedMessages() {
+            return (long) callsPerMin * ipCount * activeMinutes;
+        }
+    }
+
+    // label, callsPerMin, ipCount, startMin, activeMinutes, subnet, targetBucket
+    private static final SimTier[] SIM_TIERS = {
+        new SimTier("b1  (1-10)",          1,  50,  0, 30, "192.168.1.",  "b1"),
+        new SimTier("b2  (11-50)",          5,  30,  0, 30, "192.168.2.",  "b2"),
+        new SimTier("b3  (51-250)",        20,  20,  0, 30, "192.168.3.",  "b3"),
+        new SimTier("b4  (251-1000)",     100,  15,  0, 30, "192.168.4.",  "b4"),
+        new SimTier("b5  (1001-2500)",    300,  10,  0, 30, "192.168.5.",  "b5"),
+        new SimTier("b6  (2501-5000)",    700,   8,  0,  5, "192.168.6.",  "b6"),
+        new SimTier("b7  (5001-10k)",    1400,   6,  5,  5, "192.168.7.",  "b7"),
+        new SimTier("b8  (10k-25k)",     3000,   5, 10,  2, "192.168.8.",  "b8"),
+        new SimTier("b9  (25k-50k)",     6000,   5, 14,  1, "192.168.9.",  "b9"),
+        new SimTier("b10 (50k-100k)",   12000,   5, 18,  1, "192.168.10.", "b10"),
+        new SimTier("b11 (100k-250k)",  25000,   5, 22,  1, "192.168.11.", "b11"),
+        new SimTier("b12 (250k-500k)",  60000,   5, 26,  1, "192.168.12.", "b12"),
+    };
 
     public static void main(String[] args) throws Exception {
         if (!MODE.equals("threat") && !MODE.equals("mini-runtime") && !MODE.equals("both")) {
@@ -59,12 +129,22 @@ public class EndToEndTrafficSimulator {
             System.exit(1);
         }
 
-        List<ApiProfile> catalog = TrafficCatalog.buildCatalog();
-
-        // Derive scale factor so total messages ≈ TOTAL_MESSAGES
-        double scale = TOTAL_MESSAGES / (NATURAL_MSG_PER_MIN * SIM_DURATION_MINS);
-        // Floor at a value that lets ANOMALOUS still fire at least 1 call/min
-        scale = Math.max(scale, 1.0 / 8000.0);
+        // Resolve target API path + method
+        List<ApiProfile> fullCatalog = TrafficCatalog.buildCatalog();
+        List<ApiProfile> catalog = new ArrayList<>();
+        for (ApiProfile p : fullCatalog) {
+            if (SIM_API.isEmpty() || SIM_API.equals(p.path)) {
+                catalog.add(p);
+            }
+        }
+        if (catalog.isEmpty()) {
+            System.err.println("No API matched sim.api=" + SIM_API
+                    + ". Available: " + fullCatalog.stream()
+                        .map(p -> p.path).reduce((a, b) -> a + ", " + b).orElse("none"));
+            System.exit(1);
+        }
+        // When multiple APIs match, round-robin assign SimTier IPs across APIs
+        final int apiCount = catalog.size();
 
         KafkaProtoProducer protoProducer = buildProtoProducer();
         if (MODE.equals("mini-runtime") || MODE.equals("both")) {
@@ -72,34 +152,34 @@ public class EndToEndTrafficSimulator {
         }
 
         long baseEpochMin = System.currentTimeMillis() / 60000 - SIM_DURATION_MINS;
-
         AtomicLong totalSent   = new AtomicLong(0);
         AtomicLong totalErrors = new AtomicLong(0);
         AtomicBoolean stopReporter = new AtomicBoolean(false);
 
+        long estimatedTotal = 0;
+        for (SimTier t : SIM_TIERS) estimatedTotal += t.estimatedMessages() * apiCount;
+
         System.out.printf("\n====== E2E Traffic Simulator ======\n");
-        System.out.printf("Mode: %s | Duration: %d min (~%.1f hrs) | Target: %,d messages\n",
-                MODE.toUpperCase(), SIM_DURATION_MINS, SIM_DURATION_MINS / 60.0, TOTAL_MESSAGES);
-        System.out.printf("Scale: %.5f | Est. msg/min: %.0f | Threads: %d\n",
-                scale, NATURAL_MSG_PER_MIN * scale, NUM_THREADS);
-        System.out.printf("Collection: %d | APIs: %d | Kafka: %s\n\n",
-                TrafficCatalog.COLLECTION_ID, catalog.size(), KAFKA_URL);
-        printCatalogSummary(catalog);
+        System.out.printf("Mode: %s | Duration: %d min | Est. messages: %,d | Threads: %d\n",
+                MODE.toUpperCase(), SIM_DURATION_MINS, estimatedTotal, NUM_THREADS);
+        System.out.printf("APIs: %d%s | Kafka: %s\n\n",
+                apiCount, SIM_API.isEmpty() ? "" : " (filtered: " + SIM_API + ")", KAFKA_URL);
+        printTierSummary(estimatedTotal);
 
         long startTime = System.nanoTime();
 
         // Progress reporter
-        final double finalScale = scale;
+        final long finalEstimate = estimatedTotal;
         Thread reporter = new Thread(() -> {
             while (!stopReporter.get()) {
                 try {
                     long sent = totalSent.get();
                     long elapsedMs = (System.nanoTime() - startTime) / 1_000_000;
                     double rate = sent * 1000.0 / Math.max(elapsedMs, 1);
-                    long eta = (long)((TOTAL_MESSAGES - sent) / Math.max(rate, 1) * 1000);
-                    System.out.printf("\r[%02d:%02d] sent=%,d / %,d (%.0f msg/s) errors=%,d ETA=%02d:%02d",
+                    long eta = rate > 0 ? (long)((finalEstimate - sent) / rate * 1000) : 0;
+                    System.out.printf("\r[%02d:%02d] sent=%,d (%.0f msg/s) errors=%,d ETA=%02d:%02d",
                             elapsedMs / 60000, (elapsedMs % 60000) / 1000,
-                            sent, TOTAL_MESSAGES, rate, totalErrors.get(),
+                            sent, rate, totalErrors.get(),
                             eta / 60000, (eta % 60000) / 1000);
                     System.out.flush();
                     Thread.sleep(1000);
@@ -115,30 +195,31 @@ public class EndToEndTrafficSimulator {
         // Split minute range across threads
         ExecutorService executor = Executors.newFixedThreadPool(NUM_THREADS);
         List<Future<?>> futures = new ArrayList<>();
-        int minsPerThread = SIM_DURATION_MINS / NUM_THREADS;
+        int minsPerThread = Math.max(1, SIM_DURATION_MINS / NUM_THREADS);
 
         for (int t = 0; t < NUM_THREADS; t++) {
             final int threadIdx = t;
-            final int minStart = t * minsPerThread;
-            final int minEnd   = (t == NUM_THREADS - 1) ? SIM_DURATION_MINS : (t + 1) * minsPerThread;
+            final int minStart  = t * minsPerThread;
+            final int minEnd    = (t == NUM_THREADS - 1) ? SIM_DURATION_MINS : (t + 1) * minsPerThread;
 
             futures.add(executor.submit(() -> {
                 Random rng = new Random(42 + threadIdx);
 
                 for (int min = minStart; min < minEnd; min++) {
                     long epochMinute = baseEpochMin + min;
-                    double todMultiplier = timeOfDayMultiplier(min, SIM_DURATION_MINS);
 
-                    for (ApiProfile profile : catalog) {
-                        for (IpEntry ipEntry : profile.ipPool) {
-                            double effectiveScale = finalScale * todMultiplier;
-                            int callCount = scaledCallCount(ipEntry.tier, effectiveScale, rng);
-                            if (callCount == 0) continue;
+                    for (SimTier tier : SIM_TIERS) {
+                        if (!tier.isActiveAt(min)) continue;
 
-                            for (int c = 0; c < callCount; c++) {
+                        for (int ipIdx = 0; ipIdx < tier.ipCount; ipIdx++) {
+                            String ip = tier.subnet + (ipIdx + 1);
+                            // Round-robin IPs across APIs so each API gets its own IP set
+                            ApiProfile profile = catalog.get(ipIdx % apiCount);
+
+                            for (int c = 0; c < tier.callsPerMin; c++) {
                                 try {
                                     HttpResponseParam msg = TrafficCatalog.buildMessage(
-                                            profile, ipEntry, epochMinute, rng);
+                                            profile.path, profile.method, ip, epochMinute, rng);
 
                                     if (MODE.equals("threat") || MODE.equals("both")) {
                                         protoProducer.send(RealisticTrafficBenchmark.THREAT_TOPIC, msg);
@@ -182,48 +263,21 @@ public class EndToEndTrafficSimulator {
                 totalSent.get() * 1000.0 / Math.max(totalMs, 1));
         System.out.printf("Simulated epoch minutes: [%d .. %d]\n",
                 baseEpochMin, baseEpochMin + SIM_DURATION_MINS - 1);
-        System.out.println("Now check the distribution and API hit count graphs for collection "
-                + TrafficCatalog.COLLECTION_ID);
+        System.out.println("Check distribution graph for collection " + TrafficCatalog.COLLECTION_ID);
     }
 
-    /**
-     * Scale a tier's call count by the given factor.
-     * For fractional expected counts (e.g. scale=0.003 × min=1 → expected=0.003),
-     * we use probabilistic rounding so the average is correct over many minutes.
-     */
-    private static int scaledCallCount(TrafficCatalog.Tier tier, double scale, Random rng) {
-        int naturalMin = tier.minCallsPerMin;
-        int naturalMax = tier.maxCallsPerMin;
-        double naturalCount = naturalMin + rng.nextInt(naturalMax - naturalMin + 1);
-        double scaled = naturalCount * scale;
-
-        int floor = (int) scaled;
-        double remainder = scaled - floor;
-        // Probabilistic rounding: add 1 with probability = fractional part
-        return floor + (rng.nextDouble() < remainder ? 1 : 0);
-    }
-
-    /**
-     * Time-of-day multiplier based on position in the simulation window.
-     * Maps minute offset to a sine-curve peaking at 60% of duration (afternoon peak).
-     * Range: 0.2 (overnight trough) to 1.5 (peak hours).
-     */
-    private static double timeOfDayMultiplier(int minOffset, int totalMins) {
-        // Treat minOffset as position in a 24-hour cycle
-        double hourOfDay = (minOffset % 1440) / 60.0;
-        // Sine curve: peak at 14:00, trough at 02:00
-        double angle = (hourOfDay - 2.0) / 24.0 * 2 * Math.PI;
-        double raw = Math.sin(angle); // -1 to 1
-        // Map to [0.2, 1.5]
-        return 0.2 + (raw + 1.0) / 2.0 * 1.3;
-    }
-
-    private static void printCatalogSummary(List<ApiProfile> catalog) {
-        System.out.printf("%-40s %-6s %-7s %6s IPs\n", "Path", "Method", "Usage", "Pool");
-        System.out.println("----------------------------------------------------------------");
-        for (ApiProfile p : catalog) {
-            System.out.printf("%-40s %-6s %-7s %6d\n", p.path, p.method, p.usageLevel, p.ipPool.size());
+    private static void printTierSummary(long estimatedTotal) {
+        System.out.printf("%-20s %-6s %10s %6s %9s %12s %12s %14s\n",
+                "Tier", "bucket", "calls/min", "IPs", "startMin", "activeMins", "est.msgs", "windowTotal");
+        System.out.println("--------------------------------------------------------------------------------------------");
+        for (SimTier t : SIM_TIERS) {
+            long est = t.estimatedMessages();
+            int windowTotal = t.callsPerMin * Math.min(t.activeMinutes, 5);
+            System.out.printf("%-20s %-6s %10d %6d %9d %12d %,12d %14d\n",
+                    t.label, t.targetBucket, t.callsPerMin, t.ipCount, t.startMin, t.activeMinutes, est, windowTotal);
         }
+        System.out.printf("%-20s %-6s %10s %6s %9s %12s %,12d\n",
+                "TOTAL", "", "", "", "", "", estimatedTotal);
         System.out.println();
     }
 
