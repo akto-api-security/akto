@@ -458,10 +458,34 @@ const aiAgentGlobalProxy = {
 const aiAgentGateway = {
     icon: '/public/aws_bedrock.svg',
     label: "Gateway",
-    text: "Gateway to be deployed on premise for securing AI agents and MCP servers in your network",
+    text: "A gateway to be deployed on-premises for securing AI agents and MCP servers in your network.",
     docsUrl: 'https://ai-security-docs.akto.io/agentic-guardrails/overview/akto-agent-proxy',
     key: "AI_AGENT_GATEWAY",
     component : <AIAgentsGateway />
+}
+
+const asyncGuardrailObj = {
+    icon: '/public/akto.svg',
+    label: "Async Guardrail",
+    text: "Asynchronously evaluate AI agent requests and responses against Akto guardrails, enabling policy enforcement without blocking the request flow.",
+    docsUrl: 'https://ai-security-docs.akto.io/agentic-guardrails/overview/guardrails-api',
+    key: "ASYNC_GUARDRAIL",
+    component: <BannerComponent
+        content="Asynchronously evaluate AI agent requests and responses against Akto guardrails, enabling policy enforcement without blocking the request flow."
+        docsUrl='https://ai-security-docs.akto.io/agentic-guardrails/overview/guardrails-api'
+    />
+}
+
+const inlineGuardrailObj = {
+    icon: '/public/akto.svg',
+    label: "Inline Guardrail",
+    text: "Synchronously enforce Akto guardrails within your AI agent's request flow, blocking non-compliant requests in real time.",
+    docsUrl: 'https://ai-security-docs.akto.io/agentic-guardrails/overview/guardrails-api',
+    key: "INLINE_GUARDRAIL",
+    component: <BannerComponent
+        content="Synchronously enforce Akto guardrails within your AI agent's request flow, blocking non-compliant requests in real time."
+        docsUrl='https://ai-security-docs.akto.io/agentic-guardrails/overview/guardrails-api'
+    />
 }
 
 const sidecarEgressProxy = {
@@ -2093,14 +2117,21 @@ const quickStartFunc = {
 
         const agenticProxies = [
             aiAgentGlobalProxy, aiAgentGateway
+        ]
 
+        const apiConnectors = [
+            asyncGuardrailObj, inlineGuardrailObj
         ]
 
         const aiAgentConnectors = [
             awsBedrockObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
-            n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, snowflakeObj,
-            trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, salesforceImportObj,
+            n8nImportObj, langchainImportObj, copilotStudioImportObj, snowflakeObj,
+            vertexAICustomDeployedModelImportObj, salesforceImportObj,
             anthropicImportObj, openaiImportObj
+        ]
+
+        const aiMcpGatewayConnectors = [
+            litellmImportObj, trueFoundryImportObj, arcadeImportObj
         ]
 
         // MCP Scan
@@ -2151,7 +2182,9 @@ const quickStartFunc = {
         if(isAgenticSecurityCategory()){
             connectors = {
                 "Agentic Proxies": [...agenticProxies, sidecarEgressProxy],
+                "APIs": apiConnectors,
                 "AI Agent Platforms": aiAgentConnectors,
+                "AI/MCP Gateway": aiMcpGatewayConnectors,
                 "AI Model Security": aiScanConnectors,
                 "MCP": mcpScan,
                 "Kubernetes": kubernetes,
