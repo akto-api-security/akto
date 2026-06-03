@@ -47,6 +47,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.jobs.JobScheduler;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
@@ -252,7 +253,7 @@ public class DbActor extends DataActor {
         return DbLayer.fetchAllApiCollections();
     }
 
-    public List<ApiCollection> fetchApiCollectionsByIds(List<Integer> apiCollectionIds) {
+    public List<ApiCollection> fetchApiCollectionsByIds(List<Integer> apiCollectionIds, LogDb logDb) {
         return DbLayer.fetchApiCollectionsByIds(apiCollectionIds);
     }
 
