@@ -44,7 +44,7 @@ public class RealisticTrafficBenchmark {
     public static int numThreads = readIntConfig("num.threads", "THREAD_COUNT", Runtime.getRuntime().availableProcessors());
     public static String mode = readStringConfig("mode", "MODE", "threat");  // threat, mini-runtime, or both
 
-    private static String readStringConfig(String sysProp, String envVar, String defaultValue) {
+    static String readStringConfig(String sysProp, String envVar, String defaultValue) {
         String sysPropVal = System.getProperty(sysProp);
         if (sysPropVal != null && !sysPropVal.isEmpty()) {
             return sysPropVal.toLowerCase();
@@ -56,7 +56,7 @@ public class RealisticTrafficBenchmark {
         return defaultValue;
     }
 
-    private static long readLongConfig(String sysProp, String envVar, long defaultValue) {
+    static long readLongConfig(String sysProp, String envVar, long defaultValue) {
         String sysPropVal = System.getProperty(sysProp);
         if (sysPropVal != null) {
             try { return Long.parseLong(sysPropVal); } catch (NumberFormatException e) {}
@@ -68,7 +68,7 @@ public class RealisticTrafficBenchmark {
         return defaultValue;
     }
 
-    private static int readIntConfig(String sysProp, String envVar, int defaultValue) {
+    static int readIntConfig(String sysProp, String envVar, int defaultValue) {
         String sysPropVal = System.getProperty(sysProp);
         if (sysPropVal != null) {
             try { return Integer.parseInt(sysPropVal); } catch (NumberFormatException e) {}
@@ -80,8 +80,8 @@ public class RealisticTrafficBenchmark {
         return defaultValue;
     }
 
-    public static final String THREAT_TOPIC = "akto.api.logs2";
-    public static final String INGEST_TOPIC = "akto.api.logs";
+    static final String THREAT_TOPIC = "akto.api.logs2";
+    static final String INGEST_TOPIC = "akto.api.logs";
     public static final String KAFKA_URL = "localhost:9092";
     private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
     private static final Random random = new Random(42);
@@ -102,13 +102,13 @@ public class RealisticTrafficBenchmark {
             .build();
 
     private static final KafkaProtoProducer protoProducer = new KafkaProtoProducer(kafkaConfig);
-    private static KafkaProducer<String, String> jsonProducer = null;
+    static KafkaProducer<String, String> jsonProducer = null;
 
     // =====================================================================
     //  IngestDataBatch — JSON format for mini-runtime ingestion
     // =====================================================================
 
-    private static class IngestDataBatch {
+    static class IngestDataBatch {
         String path;
         String requestHeaders;
         String responseHeaders;
@@ -147,7 +147,7 @@ public class RealisticTrafficBenchmark {
         }
     }
 
-    private static String ingestDataBatchToJson(IngestDataBatch payload) {
+    static String ingestDataBatchToJson(IngestDataBatch payload) {
         BasicDBObject obj = new BasicDBObject();
         obj.put("path", payload.path);
         obj.put("requestHeaders", payload.requestHeaders);
@@ -167,9 +167,13 @@ public class RealisticTrafficBenchmark {
         return obj.toString();
     }
 
-    private static void initJsonProducer() {
+    static void initJsonProducer() {
+        initJsonProducer(KAFKA_URL);
+    }
+
+    static void initJsonProducer(String bootstrapServers) {
         Properties props = new Properties();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_URL);
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4");
@@ -438,7 +442,7 @@ public class RealisticTrafficBenchmark {
     //  Proto to JSON conversion
     // =====================================================================
 
-    private static IngestDataBatch convertProtoToJson(HttpResponseParam proto) {
+    static IngestDataBatch convertProtoToJson(HttpResponseParam proto) {
         // Convert protobuf record to JSON format
         Map<String, StringList> reqHeaders = proto.getRequestHeadersMap();
         Map<String, StringList> respHeaders = proto.getResponseHeadersMap();
@@ -465,7 +469,7 @@ public class RealisticTrafficBenchmark {
         );
     }
 
-    private static String mapToJsonString(Map<String, StringList> headerMap) {
+    static String mapToJsonString(Map<String, StringList> headerMap) {
         Map<String, String> flatMap = new HashMap<>();
         for (Map.Entry<String, StringList> entry : headerMap.entrySet()) {
             if (entry.getValue().getValuesList().size() > 0) {

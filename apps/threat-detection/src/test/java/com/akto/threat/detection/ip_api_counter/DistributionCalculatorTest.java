@@ -37,7 +37,9 @@ class DistributionCalculatorTest extends DistributionIntegrationTestBase {
             "test-acct",
             1234567890,
             "US",
-            "US"
+            "US",
+            0,   // apiLevelWindow (disabled)
+            0    // apiLevelThreshold (disabled)
         );
 
         // Then: Message appears in stream (async, so wait a bit)
@@ -68,7 +70,9 @@ class DistributionCalculatorTest extends DistributionIntegrationTestBase {
             accountId,
             timestamp,
             "US",
-            "DE"
+            "DE",
+            0,
+            0
         );
 
         Thread.sleep(500);
@@ -110,7 +114,7 @@ class DistributionCalculatorTest extends DistributionIntegrationTestBase {
             distributionCalculator.processRequest(
                 apiKey, 120, ipCmsKey, 30, -1, 300,
                 ip, "host", "acct", (int) (System.currentTimeMillis() / 1000),
-                "US", "US"
+                "US", "US", 0, 0
             );
         }
 
@@ -132,7 +136,7 @@ class DistributionCalculatorTest extends DistributionIntegrationTestBase {
             distributionCalculator.processRequest(
                 apiKey, 120 + (i / 5), ipCmsKey, 30, -1, 300,
                 ip, "host", "acct", (int) (System.currentTimeMillis() / 1000),
-                "US", "US"
+                "US", "US", 0, 0
             );
         }
 
@@ -162,7 +166,9 @@ class DistributionCalculatorTest extends DistributionIntegrationTestBase {
             null,  // accountId
             1234567890,
             "US",
-            "US"
+            "US",
+            0,
+            0
         );
 
         Thread.sleep(500);
@@ -192,7 +198,7 @@ class DistributionCalculatorTest extends DistributionIntegrationTestBase {
             "ipApiCmsData|123|192.168.1.1|/api/users|GET",
             30, -1, 300,
             "192.168.1.1", "host", "acct", 1234567890,
-            "US", "US"
+            "US", "US", 0, 0
         );
 
         long endTime = System.currentTimeMillis();
@@ -221,7 +227,9 @@ class DistributionCalculatorTest extends DistributionIntegrationTestBase {
             "acct-999",
             1111111111,
             "GB",
-            "FR"
+            "FR",
+            0,
+            0
         );
 
         Thread.sleep(500);
@@ -236,7 +244,7 @@ class DistributionCalculatorTest extends DistributionIntegrationTestBase {
         Map<String, String> body = messages.get(0).getBody();
 
         // Verify all expected fields exist
-        assertThat(body).hasSize(12);  // ipApiCmsKey, apiKey, minute, rateLimitWindow, threshold, mitigationPeriod, actor, host, accountId, timestamp, countryCode, destCountryCode
+        assertThat(body).hasSize(14);  // ipApiCmsKey, apiKey, minute, rateLimitWindow, threshold, mitigationPeriod, actor, host, accountId, timestamp, countryCode, destCountryCode, apiLevelWindow, apiLevelThreshold
 
         // Verify numeric fields are strings but parseable
         assertThat(Integer.parseInt(body.get("minute"))).isEqualTo(250);

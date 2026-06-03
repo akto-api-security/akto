@@ -15,7 +15,7 @@ class DistributionStreamConsumerTest extends DistributionIntegrationTestBase {
     @Test
     void testSingleIPMakesNRequestsLandsInCorrectBucket() throws Exception {
         // Given: 1 IP makes 8 requests to /api/users in a window
-        startConsumer();
+
         long currentEpochMin = 120;
         int windowSize = 5;
         String ip = "192.168.1.1";
@@ -40,7 +40,7 @@ class DistributionStreamConsumerTest extends DistributionIntegrationTestBase {
     @Test
     void testMultipleIPsAreBucketedIndependently() throws Exception {
         // Given: 3 IPs calling same API with different counts
-        startConsumer();
+
         long currentEpochMin = 120;
         int windowSize = 5;
         String apiKey = "123|/api/users|GET";
@@ -76,7 +76,7 @@ class DistributionStreamConsumerTest extends DistributionIntegrationTestBase {
     @Test
     void testBucketTransitionWhenCountCrossesBoundary() throws Exception {
         // Given: 1 IP with 10 requests (in b1)
-        startConsumer();
+
         long currentEpochMin = 120;
         int windowSize = 5;
         String apiKey = "123|/api/users|GET";
@@ -108,7 +108,7 @@ class DistributionStreamConsumerTest extends DistributionIntegrationTestBase {
     @Test
     void testDistributionComputedAcrossAllWindowSizes() throws Exception {
         // Given: Messages spread across 31 minutes
-        startConsumer();
+
         String apiKey = "123|/api/users|GET";
         String ip = "192.168.1.1";
         String ipCmsKey = "ipApiCmsData|123|" + ip + "|/api/users|GET";
@@ -139,7 +139,7 @@ class DistributionStreamConsumerTest extends DistributionIntegrationTestBase {
     @Test
     void testDifferentAPIsHaveIndependentDistributions() throws Exception {
         // Given: 1 IP calling 3 different APIs with different counts
-        startConsumer();
+
         long currentEpochMin = 120;
         int windowSize = 5;
         String ip = "192.168.1.1";
@@ -177,7 +177,7 @@ class DistributionStreamConsumerTest extends DistributionIntegrationTestBase {
     @Test
     void testCMSCountAccuracy() throws Exception {
         // Given: Multiple minutes of data for same IP/API
-        startConsumer();
+
         long baseEpochMin = 120;
         String apiKey = "123|/api/users|GET";
         String ip = "192.168.1.1";
@@ -200,7 +200,7 @@ class DistributionStreamConsumerTest extends DistributionIntegrationTestBase {
     @Test
     void testStreamAcknowledgment() throws Exception {
         // Given: Consumer started and stream populated
-        startConsumer();
+
         long currentEpochMin = 120;
         String apiKey = "123|/api/users|GET";
         String ip = "192.168.1.1";
@@ -225,7 +225,7 @@ class DistributionStreamConsumerTest extends DistributionIntegrationTestBase {
     @Test
     void testBucketIncrementDecrement() throws Exception {
         // Given: Start with 1 request (b1: 1)
-        startConsumer();
+
         long currentEpochMin = 120;
         int windowSize = 5;
         String apiKey = "123|/api/users|GET";

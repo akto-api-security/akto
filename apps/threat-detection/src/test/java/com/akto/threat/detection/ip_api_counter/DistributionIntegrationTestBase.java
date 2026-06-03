@@ -1,185 +1,158 @@
 package com.akto.threat.detection.ip_api_counter;
 
+import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import io.lettuce.core.RedisClient;
+import io.lettuce.core.XReadArgs;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.sync.RedisCommands;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.mockito.Mockito;
 
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Base class for IP/API distribution integration tests.
- * Provides Redis connection, component initialization, and cleanup.
+ *
+ * All shared resources (Redis, consumer, executor) are initialized once per test class
+ * in @BeforeAll and torn down in @AfterAll. This avoids shutting down the Lettuce
+ * EventLoopGroup between tests, which was causing RedisCommandInterruptedException noise
+ * when shutdownNow() raced with a blocking xreadgroup call.
+ *
+ * Between tests (@BeforeEach): Redis data is flushed and the mock Kafka producer is reset.
  */
 public abstract class DistributionIntegrationTestBase {
-
-    protected RedisClient redisClient;
-    protected StatefulRedisConnection<String, String> redis;
-    protected RedisCommands<String, String> syncRedis;
-
-    protected DistributionCalculator distributionCalculator;
-    protected DistributionStreamConsumer distributionStreamConsumer;
-    protected ExecutorService executorService;
 
     protected static final String REDIS_URL = "redis://localhost:6379";
     protected static final String TEST_CONSUMER_ID = "test-consumer-" + System.nanoTime();
 
-    @BeforeEach
-    void setUp() throws Exception {
-        // Initialize Redis connection
+    protected static RedisClient redisClient;
+    protected static StatefulRedisConnection<String, String> redis;
+    protected static RedisCommands<String, String> syncRedis;
+    protected static DistributionCalculator distributionCalculator;
+    protected static DistributionStreamConsumer distributionStreamConsumer;
+    protected static KafkaProtoProducer mockKafka;
+    protected static ExecutorService executorService;
+
+    @BeforeAll
+    static void setUpShared() throws Exception {
         redisClient = RedisClient.create(REDIS_URL);
         redis = redisClient.connect();
         syncRedis = redis.sync();
-
-        // Clear all data
         syncRedis.flushdb();
 
-        // Initialize components
         distributionCalculator = new DistributionCalculator(redisClient);
-
-        // Initialize executor service for consumer thread
+        mockKafka = Mockito.mock(KafkaProtoProducer.class);
         executorService = Executors.newFixedThreadPool(1);
 
-        // Note: DistributionStreamConsumer is not started by default in tests
-        // Individual tests can start it if needed
-    }
-
-    @AfterEach
-    void tearDown() throws Exception {
-        // Stop consumer if running
-        if (distributionStreamConsumer != null) {
-            stopConsumer();
-        }
-
-        // Shutdown executor
-        if (executorService != null) {
-            executorService.shutdownNow();
-        }
-
-        // Clear Redis
-        if (syncRedis != null) {
-            syncRedis.flushdb();
-        }
-
-        // Close connections
-        if (redis != null) {
-            redis.close();
-        }
-        if (redisClient != null) {
-            redisClient.shutdown();
-        }
-    }
-
-    /**
-     * Start the DistributionStreamConsumer in a background thread.
-     */
-    protected void startConsumer() throws Exception {
-        // Ensure stream exists by adding and removing a dummy entry
+        // Ensure stream exists before creating consumer group
         try {
             String id = syncRedis.xadd("threat_input_stream", "*", "init", "1");
-            if (id != null) {
-                syncRedis.xdel("threat_input_stream", id);
-            }
-        } catch (Exception e) {
-            // Stream might already exist or have entries
-        }
+            if (id != null) syncRedis.xdel("threat_input_stream", id);
+        } catch (Exception ignored) {}
 
-        if (distributionStreamConsumer == null) {
-            distributionStreamConsumer = new DistributionStreamConsumer(
-                redisClient,
-                TEST_CONSUMER_ID,
-                createMockKafkaProducer()
-            );
-        }
+        distributionStreamConsumer = new DistributionStreamConsumer(redisClient, TEST_CONSUMER_ID, mockKafka);
         executorService.submit(distributionStreamConsumer);
-        // Give consumer time to initialize consumer group
         Thread.sleep(1000);
     }
 
-    /**
-     * Stop the consumer (if running).
-     */
-    protected void stopConsumer() throws Exception {
-        if (distributionStreamConsumer != null) {
-            // The consumer doesn't have a stop method, so we just let it run
-            // It will be cleaned up in tearDown when executorService is shut down
+    @AfterAll
+    static void tearDownShared() throws Exception {
+        if (executorService != null) {
+            executorService.shutdownNow();
+            executorService.awaitTermination(3, TimeUnit.SECONDS);
         }
+        if (redis != null) redis.close();
+        if (redisClient != null) redisClient.shutdown();
     }
 
-    /**
-     * Helper: Push multiple messages to stream via DistributionCalculator.
-     */
+    @BeforeEach
+    void setUp() throws Exception {
+        // Delete all keys except the stream and consumer group so the already-running
+        // consumer thread never sees NOGROUP. flushdb() would destroy the group and
+        // leave a window where the consumer errors before we can recreate it.
+        for (String key : syncRedis.keys("*")) {
+            if (!key.equals("threat_input_stream")) {
+                syncRedis.del(key);
+            }
+        }
+        // Trim all messages from the stream so each test starts with an empty stream,
+        // then reset the consumer group's read position to the latest entry.
+        syncRedis.xtrim("threat_input_stream", 0);
+        syncRedis.xgroupSetid(XReadArgs.StreamOffset.from("threat_input_stream", "$"), "threat_group");
+        Mockito.reset(mockKafka);
+    }
+
+    // -------------------------------------------------------------------------
+    // Stream push helpers
+    // -------------------------------------------------------------------------
+
     protected void pushMessagesToStream(int count, String ipApiCmsKey, String apiKey,
-                                       long epochMin, String ip) {
+                                        long epochMin, String ip) {
         for (int i = 0; i < count; i++) {
             distributionCalculator.processRequest(
-                apiKey,
-                epochMin,
-                ipApiCmsKey,
-                30,  // rateLimitWindow
-                -1,  // threshold (no check for distribution tests)
-                300, // mitigationPeriod
-                ip,
-                "test-host",
-                "test-acct",
+                apiKey, epochMin, ipApiCmsKey,
+                30, -1, 300,
+                ip, "test-host", "test-acct",
                 (int) (System.currentTimeMillis() / 1000),
-                "US",
-                "US"
+                "US", "US",
+                0, 0
             );
         }
     }
 
-    /**
-     * Helper: Calculate window start for a given minute and window size.
-     * Formula: ((currentMin - 1) / windowSize + 1) * windowSize
-     */
+    protected void pushMessagesToStreamWithApiRateLimit(int count, String ipApiCmsKey, String apiKey,
+                                                        long epochMin, String ip,
+                                                        int apiLevelWindow, int apiLevelThreshold) {
+        for (int i = 0; i < count; i++) {
+            distributionCalculator.processRequest(
+                apiKey, epochMin, ipApiCmsKey,
+                30, -1, 300,
+                ip, "test-host", "test-acct",
+                (int) (System.currentTimeMillis() / 1000),
+                "US", "US",
+                apiLevelWindow, apiLevelThreshold
+            );
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Redis read helpers
+    // -------------------------------------------------------------------------
+
+    protected long getApiCount(String apiKey, long binId) {
+        String val = syncRedis.get("apiCount|" + apiKey + "|" + binId);
+        return val != null ? Long.parseLong(val) : 0;
+    }
+
+    protected Double getIndexScore(String apiKey) {
+        return syncRedis.zscore("apiCountIndex", apiKey);
+    }
+
     protected long getWindowStartForMinute(long epochMin, int windowSize) {
         return ((epochMin - 1) / windowSize + 1) * windowSize - windowSize + 1;
     }
 
-    /**
-     * Helper: Get bucket count from distribution hash.
-     */
     protected long getDistributionBucketCount(int windowSize, long windowStart,
-                                             String apiKey, String bucket) {
+                                              String apiKey, String bucket) {
         String distKey = "dist|" + windowSize + "|" + windowStart + "|" + apiKey;
         String count = syncRedis.hget(distKey, bucket);
         return count != null ? Long.parseLong(count) : 0;
     }
 
-    /**
-     * Helper: Check if API is in active set for a window.
-     */
     protected boolean isApiActiveInWindow(int windowSize, long windowStart, String apiKey) {
-        String apisKey = "distApis|" + windowSize + "|" + windowStart;
-        return syncRedis.sismember(apisKey, apiKey);
+        return syncRedis.sismember("distApis|" + windowSize + "|" + windowStart, apiKey);
     }
 
-    /**
-     * Helper: Get all buckets in a distribution hash.
-     */
-    protected java.util.Map<String, String> getDistributionBuckets(int windowSize, long windowStart,
-                                                                    String apiKey) {
-        String distKey = "dist|" + windowSize + "|" + windowStart + "|" + apiKey;
-        return syncRedis.hgetall(distKey);
+    protected Map<String, String> getDistributionBuckets(int windowSize, long windowStart, String apiKey) {
+        return syncRedis.hgetall("dist|" + windowSize + "|" + windowStart + "|" + apiKey);
     }
 
-    /**
-     * Helper: Get stream length.
-     */
     protected long getStreamLength() {
         return syncRedis.xlen("threat_input_stream");
-    }
-
-    /**
-     * Create a mock Kafka producer (no-op for tests).
-     */
-    private com.akto.threat.detection.kafka.KafkaProtoProducer createMockKafkaProducer() {
-        // Return a mock that doesn't try to instantiate with null config
-        return org.mockito.Mockito.mock(
-            com.akto.threat.detection.kafka.KafkaProtoProducer.class
-        );
     }
 }

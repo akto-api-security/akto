@@ -15,8 +15,7 @@ class DistributionE2ETest extends DistributionIntegrationTestBase {
 
     @Test
     void testFullFlowSingleIPSingleAPI() throws Exception {
-        // Given: Consumer running
-        startConsumer();
+
         long currentEpochMin = 120;
         int windowSize = 5;
         String ip = "192.168.1.1";
@@ -28,7 +27,7 @@ class DistributionE2ETest extends DistributionIntegrationTestBase {
             distributionCalculator.processRequest(
                 apiKey, currentEpochMin, ipCmsKey, 30, -1, 300,
                 ip, "host", "acct", (int) (System.currentTimeMillis() / 1000),
-                "US", "US"
+                "US", "US",0,0
             );
         }
 
@@ -47,8 +46,7 @@ class DistributionE2ETest extends DistributionIntegrationTestBase {
 
     @Test
     void testFullFlowMultipleIPsMultipleAPIs() throws Exception {
-        // Given: Consumer running
-        startConsumer();
+
         long currentEpochMin = 120;
         int windowSize = 5;
 
@@ -72,7 +70,7 @@ class DistributionE2ETest extends DistributionIntegrationTestBase {
                 distributionCalculator.processRequest(
                     apiKey, currentEpochMin, ipCmsKey, 30, -1, 300,
                     ip, "host", "acct", (int) (System.currentTimeMillis() / 1000),
-                    "US", "US"
+                    "US", "US", 0,0
                 );
             }
         }
@@ -102,8 +100,7 @@ class DistributionE2ETest extends DistributionIntegrationTestBase {
 
     @Test
     void testFullFlowAcrossMultipleWindows() throws Exception {
-        // Given: Consumer running
-        startConsumer();
+
         String ip = "192.168.1.1";
         String apiKey = "123|/api/users|GET";
         String ipCmsKey = "ipApiCmsData|123|" + ip + "|/api/users|GET";
@@ -116,52 +113,46 @@ class DistributionE2ETest extends DistributionIntegrationTestBase {
         // Allow processing
         Thread.sleep(3000);
 
-        // Then: Each 5-min window should have distribution
-        for (long baseMin = 100; baseMin <= 125; baseMin += 5) {
+        // Assert on full windows only. The Lua window boundary for windowEnd=100 is [96..100],
+        // but data starts at min=100 — only 1 of 5 minutes has data (3 req → b1, not b2).
+        // Starting at baseMin=105: windowEnd=105 → window [101..105], all 5 mins have data
+        // (5 × 3 = 15 req → b2). Same holds for 110, 115, 120, 125.
+        for (long baseMin = 105; baseMin <= 125; baseMin += 5) {
             long windowStart = getWindowStartForMinute(baseMin, 5);
-            long b1Count = getDistributionBucketCount(5, windowStart, apiKey, "b1");
-
-            // Each 5-min window has 15 requests (3 per min * 5 min) → b2
-            assertThat(b1Count).isEqualTo(0);
+            // Each full 5-min window has 15 requests (3 per min × 5 min) → b2 (11-50)
+            assertThat(getDistributionBucketCount(5, windowStart, apiKey, "b1")).isEqualTo(0);
+            assertThat(getDistributionBucketCount(5, windowStart, apiKey, "b2")).isEqualTo(1);
+            assertThat(getDistributionBucketCount(5, windowStart, apiKey, "b3")).isEqualTo(0);
         }
 
-        // Verify 15-min windows
-        long ws15 = getWindowStartForMinute(100, 15);
-        long b2Count15 = getDistributionBucketCount(15, ws15, apiKey, "b2");
-        assertThat(b2Count15).isEqualTo(1);  // 1 IP with 45 requests → b2
-
-        // Verify 30-min window
-        long ws30 = getWindowStartForMinute(100, 30);
-        long b4Count30 = getDistributionBucketCount(30, ws30, apiKey, "b4");
-        assertThat(b4Count30).isEqualTo(1);  // 1 IP with 90 requests → b4
     }
 
     @Test
     void testBucketTransitionAcrossWindowBoundary() throws Exception {
-        // Given: Consumer running
-        startConsumer();
-        long startMin = 100;
+
+        long windowEnd = 100;  // getWindowEnd(100, 5) = 100, so window is [96..100]
         int windowSize = 5;
         String ip = "192.168.1.1";
         String apiKey = "123|/api/users|GET";
         String ipCmsKey = "ipApiCmsData|123|" + ip + "|/api/users|GET";
 
-        // When: Push 10 requests in minute 100
-        pushMessagesToStream(10, ipCmsKey, apiKey, startMin, ip);
+        // When: Push 10 requests at windowEnd - 3 (minute 97)
+        pushMessagesToStream(10, ipCmsKey, apiKey, windowEnd - 3, ip);
         Thread.sleep(2000);
 
-        // Then: Should be in b1
-        long windowStart = getWindowStartForMinute(startMin, windowSize);
+        // Then: Should be in b1 (count=10)
+        long windowStart = getWindowStartForMinute(windowEnd, windowSize);
         assertThat(getDistributionBucketCount(windowSize, windowStart, apiKey, "b1"))
             .isEqualTo(1);
         assertThat(getDistributionBucketCount(windowSize, windowStart, apiKey, "b2"))
             .isEqualTo(0);
 
-        // When: Push 1 more request in minute 101
-        pushMessagesToStream(1, ipCmsKey, apiKey, startMin + 1, ip);
+        // When: Push 1 more request at windowEnd - 1 (minute 99, same window [96..100])
+        // CMS sum across [96..100] = 10 + 1 = 11 → crosses into b2
+        pushMessagesToStream(1, ipCmsKey, apiKey, windowEnd - 1, ip);
         Thread.sleep(2000);
 
-        // Then: Should transition to b2
+        // Then: Should transition to b2 (b1 decremented, b2 incremented)
         assertThat(getDistributionBucketCount(windowSize, windowStart, apiKey, "b1"))
             .isEqualTo(0);
         assertThat(getDistributionBucketCount(windowSize, windowStart, apiKey, "b2"))
@@ -170,8 +161,7 @@ class DistributionE2ETest extends DistributionIntegrationTestBase {
 
     @Test
     void testComplexScenarioWith100IPs() throws Exception {
-        // Given: Consumer running
-        startConsumer();
+
         long currentEpochMin = 120;
         int windowSize = 5;
         String apiKey = "123|/api/users|GET";
@@ -195,7 +185,7 @@ class DistributionE2ETest extends DistributionIntegrationTestBase {
                 distributionCalculator.processRequest(
                     apiKey, currentEpochMin, ipCmsKey, 30, -1, 300,
                     ip, "host", "acct", (int) (System.currentTimeMillis() / 1000),
-                    "US", "US"
+                    "US", "US", 0, 0
                 );
             }
         }
@@ -223,8 +213,7 @@ class DistributionE2ETest extends DistributionIntegrationTestBase {
 
     @Test
     void testAPIDataIntegrity() throws Exception {
-        // Given: Consumer running
-        startConsumer();
+
         long currentEpochMin = 120;
         String ip = "192.168.1.1";
         String apiKey = "123|/api/users|GET";
@@ -252,8 +241,7 @@ class DistributionE2ETest extends DistributionIntegrationTestBase {
 
     @Test
     void testConsumerHandlesBatchCorrectly() throws Exception {
-        // Given: Consumer running
-        startConsumer();
+
         long currentEpochMin = 120;
         String apiKey = "123|/api/users|GET";
 
@@ -265,7 +253,7 @@ class DistributionE2ETest extends DistributionIntegrationTestBase {
             distributionCalculator.processRequest(
                 apiKey, currentEpochMin, ipCmsKey, 30, -1, 300,
                 ip, "host", "acct", (int) (System.currentTimeMillis() / 1000),
-                "US", "US"
+                "US", "US", 0,0
             );
         }
 
@@ -287,7 +275,6 @@ class DistributionE2ETest extends DistributionIntegrationTestBase {
     @Test
     void testDataConsistencyAcrossRestarts() throws Exception {
         // Given: Initial data pushed and processed
-        startConsumer();
         long currentEpochMin = 120;
         String ip = "192.168.1.1";
         String apiKey = "123|/api/users|GET";
@@ -308,5 +295,51 @@ class DistributionE2ETest extends DistributionIntegrationTestBase {
         // Then: Data should still be in Redis
         long b2CountAfter = getDistributionBucketCount(5, windowStart, apiKey, "b2");
         assertThat(b2CountAfter).isEqualTo(b2CountBefore);
+    }
+
+    @Test
+    void testDistribution15MinWindow() throws Exception {
+        // 15-min window [106..120]: push 3 req/min for 15 IPs across all 15 minutes
+        // Each IP accumulates 3 × 15 = 45 requests → b2 (11-50)
+        // windowEnd=120 → getWindowStartForMinute(120, 15) = floor(119/15+1)*15 - 14 = 8*15 - 14 = 106
+        String apiKey = "123|/api/stats|GET";
+        int numIps = 15;
+
+        for (int i = 0; i < numIps; i++) {
+            String ip = "10.0." + i + ".1";
+            String ipCmsKey = "ipApiCmsData|123|" + ip + "|/api/stats|GET";
+            for (long min = 106; min <= 120; min++) {
+                pushMessagesToStream(3, ipCmsKey, apiKey, min, ip);
+            }
+        }
+        Thread.sleep(3000);
+
+        long windowStart = getWindowStartForMinute(120, 15);  // = 106
+        assertThat(getDistributionBucketCount(15, windowStart, apiKey, "b1")).isEqualTo(0);
+        assertThat(getDistributionBucketCount(15, windowStart, apiKey, "b2")).isEqualTo(numIps);
+        assertThat(getDistributionBucketCount(15, windowStart, apiKey, "b3")).isEqualTo(0);
+    }
+
+    @Test
+    void testDistribution30MinWindow() throws Exception {
+        // 30-min window [91..120]: push 6 req/min for 12 IPs across all 30 minutes
+        // Each IP accumulates 6 × 30 = 180 requests → b4 (101-250)
+        // windowEnd=120 → getWindowStartForMinute(120, 30) = floor(119/30+1)*30 - 29 = 4*30 - 29 = 91
+        String apiKey = "123|/api/events|POST";
+        int numIps = 12;
+
+        for (int i = 0; i < numIps; i++) {
+            String ip = "172.16." + i + ".1";
+            String ipCmsKey = "ipApiCmsData|123|" + ip + "|/api/events|POST";
+            for (long min = 91; min <= 120; min++) {
+                pushMessagesToStream(6, ipCmsKey, apiKey, min, ip);
+            }
+        }
+        Thread.sleep(4000);
+
+        long windowStart = getWindowStartForMinute(120, 30);  // = 91
+        assertThat(getDistributionBucketCount(30, windowStart, apiKey, "b3")).isEqualTo(0);
+        assertThat(getDistributionBucketCount(30, windowStart, apiKey, "b4")).isEqualTo(numIps);
+        assertThat(getDistributionBucketCount(30, windowStart, apiKey, "b5")).isEqualTo(0);
     }
 }
