@@ -31,6 +31,8 @@ import io.opentelemetry.sdk.metrics.SdkMeterProvider;
 import io.opentelemetry.sdk.metrics.export.PeriodicMetricReader;
 import io.opentelemetry.sdk.resources.Resource;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -118,6 +120,15 @@ public class OpenTelemetryUtils {
 
         String endpoint = openTelemetryIntegration.getEndpoint();
         String apiKey = openTelemetryIntegration.getApiKey();
+        String headerName = openTelemetryIntegration.getHeaderName();
+
+        if (apiKey != null && !apiKey.isEmpty()) {
+            try {
+                apiKey = URLDecoder.decode(apiKey, "UTF-8");
+            } catch (UnsupportedEncodingException e) {
+                // UTF-8 is always supported
+            }
+        }
 
         Resource resource = Resource.getDefault().toBuilder()
                 .put(AttributeKey.stringKey("service.name"), "akto-telemetry")
@@ -127,7 +138,7 @@ public class OpenTelemetryUtils {
                 .setEndpoint(endpoint + "/v1/metrics")
                 .setTimeout(Duration.ofSeconds(10));
         if (apiKey != null && !apiKey.isEmpty()) {
-            metricExporterBuilder.addHeader("api-key", apiKey);
+            metricExporterBuilder.addHeader(headerName, apiKey);
         }
 
         SdkMeterProvider meterProvider = SdkMeterProvider.builder()
@@ -142,7 +153,7 @@ public class OpenTelemetryUtils {
                 .setEndpoint(endpoint + "/v1/logs")
                 .setTimeout(Duration.ofSeconds(10));
         if (apiKey != null && !apiKey.isEmpty()) {
-            logExporterBuilder.addHeader("api-key", apiKey);
+            logExporterBuilder.addHeader(headerName, apiKey);
         }
 
         SdkLoggerProvider loggerProvider = SdkLoggerProvider.builder()
