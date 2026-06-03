@@ -27,6 +27,8 @@ public class ApiCollection {
     public static final String ID = "_id";
     public static final String NAME = "name";
     String name;
+    public static final String DESCRIPTION = "description";
+    String description;
     int startTs;
     public static final String _URLS = "urls";
     public static final String START_TS = "startTs";
@@ -514,6 +516,14 @@ public class ApiCollection {
 
     public void setServiceGraphEdges(Map<String, ServiceGraphEdgeInfo> serviceGraphEdges) {
         this.serviceGraphEdges = serviceGraphEdges;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
 }
