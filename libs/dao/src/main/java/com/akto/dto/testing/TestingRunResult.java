@@ -62,6 +62,9 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     private WorkflowTest workflowTest;
 
+    public static final String AI_SUMMARY_TRACES = "aiSummaryTraces";
+    private List<AiSummaryEntry> aiSummaryTraces;
+
     @BsonIgnore
     private List<TestLog> testLogs = new ArrayList<>();
 
@@ -381,6 +384,14 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public void setMultiExecTestResults(List<MultiExecTestResult> multiExecTestResults) {
         this.multiExecTestResults = multiExecTestResults;
+    }
+
+    public List<AiSummaryEntry> getAiSummaryTraces() {
+        return aiSummaryTraces;
+    }
+
+    public void setAiSummaryTraces(List<AiSummaryEntry> aiSummaryTraces) {
+        this.aiSummaryTraces = aiSummaryTraces;
     }
 
 }
