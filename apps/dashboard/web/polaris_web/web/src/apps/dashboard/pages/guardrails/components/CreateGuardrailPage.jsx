@@ -367,7 +367,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             .map(collection => ({
                 label: collection.displayName,
                 value: collection.id.toString(),
-                isInline: collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'inline') ?? false
+                isInline: !collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe')
             }));
 
 
@@ -381,7 +381,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             .map(collection => ({
                 label: collection.displayName,
                 value: collection.id.toString(),
-                isInline: collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'inline') ?? false
+                isInline: !collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe')
             }));
 
             setMcpServers(mcpServerCollections);

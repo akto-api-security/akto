@@ -17,12 +17,38 @@ public final class AIAgentConnectorConstants {
 
     // Connectors that proxy traffic inline (sync mode) — support guardrail block mode
     public static final Set<String> INLINE_MODE_CONNECTORS = Collections.unmodifiableSet(
-        new HashSet<>(Arrays.asList("litellm", "claude_code_cli", "cursor"))
+        new HashSet<>(Arrays.asList(
+            "litellm",
+            "claude_code_cli",
+            "claude_agent_sdk",
+            "cursor",
+            "langchain",
+            "hermes",
+            "gemini_cli",
+            "codex_cli",
+            "opencode",
+            "copilot_cli",
+            "vscode",
+            "vertex-ai-adk",
+            "neovim"
+        ))
     );
 
     // Connectors that deliver data out-of-band (webhook / async) — observe mode only
     public static final Set<String> OBSERVE_MODE_CONNECTORS = Collections.unmodifiableSet(
-        new HashSet<>(Arrays.asList("arcade", "truefoundry"))
+        new HashSet<>(Arrays.asList(
+            "arcade",
+            "truefoundry",
+            // Binary importers — pull data asynchronously from external systems
+            "n8n",
+            "copilot_studio",
+            "databricks",
+            "snowflake",
+            "vertex_ai_custom_deployed_model",
+            "salesforce",
+            "anthropic",
+            "openai"
+        ))
     );
 
     // Job Types (for AccountJob.jobType)
