@@ -80,6 +80,9 @@ public class Constants {
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
     public static final String AKTO_AGENT_PROXY_TAG = "agent-proxy";
     public static final String AKTO_GUARD_RAIL_TAG = "guard-rail";
+    public static final String AKTO_GUARDRAIL_MODE = "mode";
+    public static final String AKTO_GUARDRAIL_MODE_INLINE = "inline";
+    public static final String AKTO_GUARDRAIL_MODE_OBSERVE = "observe";
     public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";
     public static final String AKTO_MCP_RESOURCES_TAG = "mcp-resource";
     public static final String AKTO_MCP_PROMPTS_TAG = "mcp-prompt";

@@ -1,5 +1,10 @@
 package com.akto.jobs.executors;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * Constants for AI Agent Connector operations.
  * Centralized location for all connector-related constants.
@@ -9,6 +14,42 @@ public final class AIAgentConnectorConstants {
     private AIAgentConnectorConstants() {
         // Prevent instantiation
     }
+
+    // Connectors that proxy traffic inline (sync mode) — support guardrail block mode
+    public static final Set<String> INLINE_MODE_CONNECTORS = Collections.unmodifiableSet(
+        new HashSet<>(Arrays.asList(
+            "litellm",
+            "claude_code_cli",
+            "claude_agent_sdk",
+            "cursor",
+            "langchain",
+            "hermes",
+            "gemini_cli",
+            "codex_cli",
+            "opencode",
+            "copilot_cli",
+            "vscode",
+            "vertex-ai-adk",
+            "neovim"
+        ))
+    );
+
+    // Connectors that deliver data out-of-band (webhook / async) — observe mode only
+    public static final Set<String> OBSERVE_MODE_CONNECTORS = Collections.unmodifiableSet(
+        new HashSet<>(Arrays.asList(
+            "arcade",
+            "truefoundry",
+            // Binary importers — pull data asynchronously from external systems
+            "n8n",
+            "copilot_studio",
+            "databricks",
+            "snowflake",
+            "vertex_ai_custom_deployed_model",
+            "salesforce",
+            "anthropic",
+            "openai"
+        ))
+    );
 
     // Job Types (for AccountJob.jobType)
     public static final String JOB_TYPE_AI_AGENT_CONNECTOR = "AI_AGENT_CONNECTOR";

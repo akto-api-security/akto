@@ -366,7 +366,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
             .map(collection => ({
                 label: collection.displayName,
-                value: collection.id.toString()
+                value: collection.id.toString(),
+                isInline: !collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe')
             }));
 
 
@@ -379,7 +380,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
             .map(collection => ({
                 label: collection.displayName,
-                value: collection.id.toString()
+                value: collection.id.toString(),
+                isInline: !collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe')
             }));
 
             setMcpServers(mcpServerCollections);
