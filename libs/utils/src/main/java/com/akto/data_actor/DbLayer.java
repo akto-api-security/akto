@@ -159,8 +159,7 @@ public class DbLayer {
     private static final int CLEANUP_JITTER_SECONDS = 3 * 60; // 3 minutes max jitter
     private static final long COLLECTION_SIZE_THRESHOLD = 100_000;
 
-    private static final ExecutorService newRelicExecutorService = Executors.newFixedThreadPool(1);
-    private static final ExecutorService openTelemetryExecutorService = Executors.newFixedThreadPool(1);
+    private static final ExecutorService telemetryForwardingExecutorService = Executors.newFixedThreadPool(1);
 
     private static int getLastUpdatedTsForAccount(int accountId) {
         return lastUpdatedTsMap.computeIfAbsent(accountId, k -> 0);
@@ -216,33 +215,31 @@ public class DbLayer {
             moduleInfo.getAdditionalData().put("tokenExpired", true);
         }
 
+        int accountId = Context.accountId.get();
         boolean forwardToNewRelic = NewRelicIntegrationDao.instance.findOne(new BasicDBObject()) != null;
-        if (forwardToNewRelic) {
-            int accountId = Context.accountId.get();
-            loggerMaker.infoAndAddToDb(String.format("Forwarding module heartbeat to New Relic for module %s (account %d)", moduleInfo.getName(), accountId), LogDb.DB_ABS);
+        boolean forwardToOpenTelemetry = OpenTelemetryIntegrationDao.instance.findOne(new BasicDBObject()) != null;
 
+        if (forwardToNewRelic) {
+            loggerMaker.infoAndAddToDb(String.format("Forwarding module heartbeat to New Relic for module %s (account %d)", moduleInfo.getName(), accountId), LogDb.DB_ABS);
             try {
-                newRelicExecutorService.submit(() -> {
+                telemetryForwardingExecutorService.submit(() -> {
                     Context.accountId.set(accountId);
                     NewRelicUtils.forwardModuleHeartbeatEvent(moduleInfo);
                 });
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error submitting module heartbeat forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
+                loggerMaker.errorAndAddToDb(e, "Error submitting NR heartbeat task: " + e.getMessage(), LogDb.DB_ABS);
             }
         }
 
-        boolean forwardToOpenTelemetry = OpenTelemetryIntegrationDao.instance.findOne(new BasicDBObject()) != null;
         if (forwardToOpenTelemetry) {
-            int accountId = Context.accountId.get();
-            loggerMaker.infoAndAddToDb(String.format("Forwarding module heartbeat to OTLP endpoint configured for module %s (account %d)", moduleInfo.getName(), accountId), LogDb.DB_ABS);
-
+            loggerMaker.infoAndAddToDb(String.format("Forwarding module heartbeat to OpenTelemetry for module %s (account %d)", moduleInfo.getName(), accountId), LogDb.DB_ABS);
             try {
-                openTelemetryExecutorService.submit(() -> {
+                telemetryForwardingExecutorService.submit(() -> {
                     Context.accountId.set(accountId);
                     OpenTelemetryUtils.forwardModuleHeartbeatEvent(moduleInfo);
                 });
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error submitting opentelemetry module heartbeat forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
+                loggerMaker.errorAndAddToDb(e, "Error submitting OT heartbeat task: " + e.getMessage(), LogDb.DB_ABS);
             }
         }
         
@@ -2334,33 +2331,31 @@ public class DbLayer {
         }
         MetricDataDao.instance.insertMany(metricData);
 
+        int accountId = Context.accountId.get();
         boolean forwardToNewRelic = NewRelicIntegrationDao.instance.findOne(new BasicDBObject()) != null;
+        boolean forwardToOpenTelemetry = OpenTelemetryIntegrationDao.instance.findOne(new BasicDBObject()) != null;
+
         if (forwardToNewRelic) {
-            int accountId = Context.accountId.get();
             loggerMaker.infoAndAddToDb(String.format("Forwarding %d metrics to New Relic for account %d", metricData.size(), accountId), LogDb.DB_ABS);
-        
             try {
-                newRelicExecutorService.submit(() -> {
+                telemetryForwardingExecutorService.submit(() -> {
                     Context.accountId.set(accountId);
                     NewRelicUtils.forwardMetrics(metricData);
                 });
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error submitting metrics forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
+                loggerMaker.errorAndAddToDb(e, "Error submitting NR metrics task: " + e.getMessage(), LogDb.DB_ABS);
             }
         }
 
-        boolean forwardToOpenTelemetry = OpenTelemetryIntegrationDao.instance.findOne(new BasicDBObject()) != null;
         if (forwardToOpenTelemetry) {
-            int accountId = Context.accountId.get();
-            loggerMaker.infoAndAddToDb(String.format("Forwarding %d metrics to OTLP endpoint configured for account %d", metricData.size(), accountId), LogDb.DB_ABS);
-
+            loggerMaker.infoAndAddToDb(String.format("Forwarding %d metrics to OpenTelemetry for account %d", metricData.size(), accountId), LogDb.DB_ABS);
             try {
-                openTelemetryExecutorService.submit(() -> {
+                telemetryForwardingExecutorService.submit(() -> {
                     Context.accountId.set(accountId);
                     OpenTelemetryUtils.forwardMetrics(metricData);
                 });
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error submitting open telemetry metrics forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
+                loggerMaker.errorAndAddToDb(e, "Error submitting OT metrics task: " + e.getMessage(), LogDb.DB_ABS);
             }
         }
     }
