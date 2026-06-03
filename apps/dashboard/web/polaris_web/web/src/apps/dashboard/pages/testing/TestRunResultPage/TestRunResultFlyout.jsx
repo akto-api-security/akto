@@ -813,7 +813,7 @@ function TestRunResultFlyout(props) {
         return (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
                 <VerticalStack gap="3">
-                    <AiExecutionJourney runAutomatedTests={runAutomatedTests} />
+                    <AiExecutionJourney runAutomatedTests={runAutomatedTests} aiSummaryTraces={selectedTestRunResult?.aiSummaryTraces} />
                     <Box padding="3" background="bg-surface-secondary" borderRadius="2">
                         <LegendLabel />
                     </Box>
@@ -870,7 +870,6 @@ function TestRunResultFlyout(props) {
         if (typeof selectedTestRunResult !== "object") return null;
 
         // TODO: Replace with real AI analysis from backend
-        // Mock analysis for UI development - replace when backend endpoint is ready
         const analysis = "Your AI Agent exposed its system instructions after a follow up request framed as internal debugging. The disclosure occurred while interacting with getAutomationTestCommandLogs, indicating a multi part prompt injection vulnerability.";
 
         // TODO: Implement real message sending handler
@@ -889,6 +888,7 @@ function TestRunResultFlyout(props) {
                 isStreaming={false}
                 testResults={selectedTestRunResult?.testResults || []}
                 runAutomatedTests={runAutomatedTests}
+                selectedTestRunResult={selectedTestRunResult}
             />
         }
     }, [selectedTestRunResult, conversations, runAutomatedTests])

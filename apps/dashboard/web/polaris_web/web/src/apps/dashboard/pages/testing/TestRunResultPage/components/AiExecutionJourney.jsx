@@ -9,7 +9,7 @@ import {
 import PropTypes from 'prop-types';
 import { MOCK_EXECUTION_TRACE } from './mockExecutionData';
 import { CHAT_ASSETS, JOURNEY_TEXT } from './chatConstants';
-import { shouldShowSmartTestingExecutionTrace } from '../smartTestingUtils';
+import { shouldShowSmartTestingExecutionTrace, transformAiSummaryToEvents, SMART_TESTING_TRACE_ACCOUNT_ID } from '../smartTestingUtils';
 
 const TRACE_SCROLL_MAX_HEIGHT = 'min(40vh, 360px)';
 
@@ -94,12 +94,28 @@ function TraceEvent({ event, isLast }) {
     );
 }
 
-function AiExecutionJourney({ runAutomatedTests = false }) {
+function AiExecutionJourney({ runAutomatedTests = false, aiSummaryTraces = null }) {
     if (!shouldShowSmartTestingExecutionTrace(runAutomatedTests)) {
         return null;
     }
 
-    const { agent, runMode, endpoint, objective, events } = MOCK_EXECUTION_TRACE;
+    const isSpecialAccount = Number(window.ACTIVE_ACCOUNT) === SMART_TESTING_TRACE_ACCOUNT_ID;
+
+    let aiEvents = null;
+    let isUsingRealData = false;
+
+    if (isSpecialAccount) {
+        aiEvents = MOCK_EXECUTION_TRACE.events;
+    } else if (aiSummaryTraces) {
+        aiEvents = transformAiSummaryToEvents(aiSummaryTraces);
+        isUsingRealData = true;
+    } else {
+        return null;
+    }
+
+    const { agent, runMode, endpoint, objective, events } = isUsingRealData
+        ? { agent: 'Akto Smart Test Agent', runMode: 'Smart Automated Testing', endpoint: '', objective: '', events: aiEvents }
+        : MOCK_EXECUTION_TRACE;
 
     return (
         <Box padding="3" background="bg-surface-secondary" borderRadius="2" borderWidth="1" borderColor="border">
@@ -118,19 +134,21 @@ function AiExecutionJourney({ runAutomatedTests = false }) {
                             </Text>
                         </VerticalStack>
                     </HorizontalStack>
-                    <Badge tone="attention" size="small">
-                        {JOURNEY_TEXT.MOCK_BADGE}
-                    </Badge>
+                    {!isUsingRealData && (
+                        <Badge tone="attention" size="small">
+                            {JOURNEY_TEXT.MOCK_BADGE}
+                        </Badge>
+                    )}
                 </HorizontalStack>
 
                 <Box padding="3" background="bg-surface" borderRadius="2">
                     <VerticalStack gap="2">
-                        <Text variant="bodyMd" fontWeight="semibold" breakWord style={layout.mono}>
+                        {endpoint && <Text variant="bodyMd" fontWeight="semibold" breakWord style={layout.mono}>
                             {endpoint}
-                        </Text>
-                        <Text variant="bodyMd" tone="subdued">
+                        </Text>}
+                        {objective && <Text variant="bodyMd" tone="subdued">
                             {objective}
-                        </Text>
+                        </Text>}
                     </VerticalStack>
                 </Box>
 
@@ -165,6 +183,7 @@ function AiExecutionJourney({ runAutomatedTests = false }) {
 
 AiExecutionJourney.propTypes = {
     runAutomatedTests: PropTypes.bool,
+    aiSummaryTraces: PropTypes.array,
 };
 
 export default AiExecutionJourney;

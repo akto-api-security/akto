@@ -92,6 +92,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 TestingRunResult.START_TIMESTAMP,
                 TestingRunResult.END_TIMESTAMP,
                 TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
+                TestingRunResult.AI_SUMMARY_TRACES,
                 TestingRunResult.TEST_RESULTS + "." + GenericTestResult._CONFIDENCE,
                 TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS
         ));
@@ -172,6 +173,10 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 testingRunResult.setTestRunResultSummaryId(
                         new ObjectId(doc.getString(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID)));        
     
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> aiSummaryTraces = (List<Map<String, Object>>) doc.get(TestingRunResult.AI_SUMMARY_TRACES);
+                testingRunResult.setAiSummaryTraces(aiSummaryTraces);
+
                 BasicDBList testResultsList = (BasicDBList)doc.get(TestingRunResult.TEST_RESULTS);
     
                 List<String> errors = new ArrayList<>();
