@@ -552,6 +552,11 @@ public class DbLayer {
             Projections.exclude("urls"));
     }
 
+    public static List<ApiCollection> fetchApiCollectionsByIds(List<Integer> apiCollectionIds) {
+        return ApiCollectionsDao.instance.findAll(Filters.in("_id", apiCollectionIds),
+            Projections.exclude("urls"));
+    }
+
     public static List<ApiCollection> fetchAllCollections() {
         return ApiCollectionsDao.instance.findAll(new BasicDBObject(),
             Projections.include("_id", "hostName"));

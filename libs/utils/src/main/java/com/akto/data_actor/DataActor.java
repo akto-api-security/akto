@@ -39,6 +39,7 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
 
 import java.util.List;
@@ -111,6 +112,7 @@ public abstract class DataActor {
 
     public abstract List<ApiCollection> fetchApiCollections();
     public abstract List<ApiCollection> fetchAllApiCollections();
+    public abstract List<ApiCollection> fetchApiCollectionsByIds(List<Integer> apiCollectionIds, LogDb logDb);
     public abstract List<ApiCollection> fetchAllCollections();
 
     public abstract void createCollectionSimple(int vxlanId);
