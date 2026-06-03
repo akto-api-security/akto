@@ -1360,17 +1360,17 @@ public class ClientActor extends DataActor {
         return apiCollections;
     }
 
-    public List<ApiCollection> fetchApiCollectionsByIds(List<Integer> apiCollectionIds) {
+    public List<ApiCollection> fetchApiCollectionsByIds(List<Integer> apiCollectionIds, LogDb logDb) {
         Map<String, List<String>> headers = buildHeaders();
         List<ApiCollection> apiCollections = new ArrayList<>();
-        loggerMaker.infoAndAddToDb("fetchApiCollectionsByIds api called ", LoggerMaker.LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("fetchApiCollectionsByIds api called ", logDb);
         BasicDBObject requestBody = new BasicDBObject("apiCollectionIds", apiCollectionIds);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchApiCollectionsByIds", "", "POST", requestBody.toJson(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("invalid response in fetchApiCollectionsByIds", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("invalid response in fetchApiCollectionsByIds", logDb);
                 return apiCollections;
             }
             try {
@@ -1385,12 +1385,12 @@ public class ClientActor extends DataActor {
                     apiCollections.add(col);
                 }
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in fetchApiCollectionsByIds" + e, LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("error extracting response in fetchApiCollectionsByIds" + e, logDb);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchApiCollectionsByIds" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in fetchApiCollectionsByIds" + e, logDb);
         }
-        loggerMaker.infoAndAddToDb("fetchApiCollectionsByIds api called size " + apiCollections.size(), LoggerMaker.LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("fetchApiCollectionsByIds api called size " + apiCollections.size(), logDb);
         return apiCollections;
     }
 

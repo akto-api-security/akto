@@ -384,7 +384,7 @@ public class TestExecutor {
         TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed(), testingRun.getRunAutomatedTests());
 
         Set<Integer> collectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
-        List<ApiCollection> apiCollections = dataActor.fetchApiCollectionsByIds(new ArrayList<>(collectionIds));
+        List<ApiCollection> apiCollections = dataActor.fetchApiCollectionsByIds(new ArrayList<>(collectionIds), LogDb.TESTING);
         Map<Integer, String> apiCollectionDescriptionMap = new HashMap<>();
         if (apiCollections != null) {
             for (ApiCollection col : apiCollections) {
