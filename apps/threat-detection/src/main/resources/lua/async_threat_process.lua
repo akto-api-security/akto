@@ -117,8 +117,9 @@ for m = 1, numMessages do
 
         local distKey = "dist|" .. windowSize .. "|" .. windowStart .. "|" .. apiKey
         local apisKey = "distApis|" .. windowSize .. "|" .. windowStart
+        local prevBucketHashKey = "prevBuckets|" .. windowSize .. "|" .. windowStart
 
-        -- Initialize distribution hash if it doesn't exist
+        -- Initialize dist hash with all buckets at 0 if it doesn't exist
         if redis.call('EXISTS', distKey) == 0 then
             for _, b in ipairs(buckets) do
                 redis.call('HSET', distKey, b.label, 0)
@@ -127,15 +128,19 @@ for m = 1, numMessages do
         redis.call('EXPIRE', distKey, distTTL)
 
         local newBucket = getBucketLabel(count)
-        local oldBucket = getBucketLabel(count - 1)
+        local prevBucket = redis.call('HGET', prevBucketHashKey, ipApiCmsKey)
 
         -- Update bucket counts
-        if count == 1 then
+        if prevBucket == false then
+            -- First time this IP+API is seen in this window
             redis.call('HINCRBY', distKey, newBucket, 1)
-        elseif oldBucket ~= newBucket then
-            redis.call('HINCRBY', distKey, oldBucket, -1)
+        elseif prevBucket ~= newBucket then
+            redis.call('HINCRBY', distKey, prevBucket, -1)
             redis.call('HINCRBY', distKey, newBucket, 1)
         end
+
+        redis.call('HSET', prevBucketHashKey, ipApiCmsKey, newBucket)
+        redis.call('EXPIRE', prevBucketHashKey, distTTL)
 
         -- Track this API as active in this window
         redis.call('SADD', apisKey, apiKey)

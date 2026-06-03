@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class RealisticTrafficBenchmark {
 
     // Configurable: read from system property, env var, or default
-    public static long numRecords = readLongConfig("num.records", "NUM_RECORDS", 100L);
+    public static long numRecords = readLongConfig("num.records", "NUM_RECORDS", 1000000L);
     public static int numThreads = readIntConfig("num.threads", "THREAD_COUNT", Runtime.getRuntime().availableProcessors());
     public static String mode = readStringConfig("mode", "MODE", "threat");  // threat, mini-runtime, or both
 
