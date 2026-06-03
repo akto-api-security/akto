@@ -2,6 +2,7 @@ package com.akto.test_editor.execution;
 
 import com.akto.agent.AgentClient;
 import com.akto.agent.AutomatedAgenticTestExecutor;
+import com.akto.agent.PentestExecutionResult;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
@@ -202,7 +203,7 @@ public class Executor {
 
         if (runAutomatedPentest) {
             String testSubType = varMap.containsKey("testSubType") ? varMap.get("testSubType").toString() : "unknown";
-            AutomatedAgenticTestExecutor.PentestExecutionResult pentestResult =
+            PentestExecutionResult pentestResult =
                     automatedAgenticTestExecutor.executeAgenticTest(origRawApi, testSubType);
             List<TestResult> automatedAgenticResults = pentestResult.getTestResults();
             aiSummaryTraces = pentestResult.getAiSummaryTraces();

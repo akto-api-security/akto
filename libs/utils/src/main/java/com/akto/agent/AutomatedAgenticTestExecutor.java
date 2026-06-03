@@ -43,24 +43,6 @@ public class AutomatedAgenticTestExecutor {
             .callTimeout(10, TimeUnit.MINUTES)
             .build();
 
-    public static class PentestExecutionResult {
-        private final List<TestResult> testResults;
-        private final List<AiSummaryEntry> aiSummaryTraces;
-
-        public PentestExecutionResult(List<TestResult> testResults, List<AiSummaryEntry> aiSummaryTraces) {
-            this.testResults = testResults;
-            this.aiSummaryTraces = aiSummaryTraces;
-        }
-
-        public List<TestResult> getTestResults() {
-            return testResults;
-        }
-
-        public List<AiSummaryEntry> getAiSummaryTraces() {
-            return aiSummaryTraces;
-        }
-    }
-
     public PentestExecutionResult executeAgenticTest(RawApi testReq, String testSubType) {
         try {
             String body = buildRequestBody(testReq, testSubType);
