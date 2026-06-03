@@ -15,10 +15,11 @@ from pyodide.ffi import create_proxy
 from workers import Response, waitUntil
 
 import alerts
-from constants import CASCADE_SCANNERS, LOCAL_SCANNERS, SUPPORTED_SCANNERS, get_default_config
+from constants import CASCADE_SCANNERS, LOCAL_SCANNERS, REMOTE_SCANNERS, SUPPORTED_SCANNERS, get_default_config
 from scanners import scan_local
 from settings import settings
 from llm_scanner import scan_with_model_map
+from remote_scanner import scan_anonymize
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ def _shape(scanner_name, is_valid, risk_score, sanitized_text, details) -> dict:
     }
 
 
-async def _scan(payload: dict) -> dict:
+async def _scan(payload: dict, env=None) -> dict:
     """Run one scan and return the ScanResponse-shaped dict."""
     scanner_name = payload.get("scanner_name", "")
     scanner_type = payload.get("scanner_type", "prompt")
@@ -70,6 +71,12 @@ async def _scan(payload: dict) -> dict:
     if scanner_name not in SUPPORTED_SCANNERS:
         return _shape(scanner_name, True, 0.0, text,
                       {"error": f"unsupported scanner: {scanner_name}"})
+
+    if scanner_name in REMOTE_SCANNERS:
+        if scanner_name == "Anonymize":
+            r = await scan_anonymize(text, config, env)
+            return _shape(scanner_name, r["is_valid"], r["risk_score"],
+                          r["sanitized_text"], r["details"])
 
     if scanner_name in CASCADE_SCANNERS:
         if not config.get("modelConfigs"):
@@ -119,10 +126,10 @@ async def on_fetch(request, env, ctx):
 
     if path == "/scan" and request.method == "POST":
         payload = json.loads(await request.text())
-        return _json(await _scan(payload))
+        return _json(await _scan(payload, env))
 
     if path == "/scan/batch" and request.method == "POST":
         payloads = json.loads(await request.text())
-        return _json([await _scan(p) for p in payloads])
+        return _json([await _scan(p, env) for p in payloads])
 
     return _json({"error": "not found", "path": path}, status=404)
