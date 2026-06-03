@@ -174,9 +174,12 @@ const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setC
 const [severityMap, setSeverityMap] = useState({})
 const [subCategoryInfo, setSubCategoryInfo] = useState({})
 const [collapsible, setCollapsible] = useState(true)
+const [executionCollapsible, setExecutionCollapsible] = useState(true)
 const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 const [totalNumberOfTests, setTotalNumberOfTests] = useState(0)
 const [summaryLoading, setSummaryLoading] = useState(false)
+const [executionSummary, setExecutionSummary] = useState({})
+const [executionSummaryLoading, setExecutionSummaryLoading] = useState(false)
 
   async function fetchTableData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) {
     setLoading(true);
@@ -317,6 +320,13 @@ const [summaryLoading, setSummaryLoading] = useState(false)
     })
   }
 
+  const fetchExecutionSummaryInfo = async () => {
+    await api.fetchTestRunsExecutionSummary(startTimestamp, endTimestamp, pageScopeApiCollectionIds)
+      .then((resp) => {
+        setExecutionSummary(resp || {})
+      })
+  }
+
   const fetchTotalCount = async () =>{
     setLoading(true)
     await api.getUserTestRuns().then((resp)=> {
@@ -328,10 +338,12 @@ const [summaryLoading, setSummaryLoading] = useState(false)
   useEffect(()=>{
     async function fetchData() {
       setSummaryLoading(true)
+      setExecutionSummaryLoading(true)
       await fetchTotalCount()
       await fetchCountsMap()
-      await fetchSummaryInfo()
+      await Promise.all([fetchSummaryInfo(), fetchExecutionSummaryInfo()])
       setSummaryLoading(false)
+      setExecutionSummaryLoading(false)
     }
     fetchData()
   },[currDateRange, selectedCollectionId])
@@ -402,9 +414,13 @@ const components = !hasUserInitiatedTestRuns ? [
     subCategoryInfo={subCategoryInfo}
     collapsible={collapsible}
     setCollapsible={setCollapsible}
+    executionCollapsible={executionCollapsible}
+    setExecutionCollapsible={setExecutionCollapsible}
     startTimestamp={startTimestamp}
     endTimestamp={endTimestamp}
     loading={summaryLoading}
+    executionSummary={executionSummary}
+    executionSummaryLoading={executionSummaryLoading}
     apiCollectionIds={pageScopeApiCollectionIds}
   />,
   <TestrunsBannerComponent key={"banner-comp"}/>, 
@@ -416,9 +432,13 @@ const components = !hasUserInitiatedTestRuns ? [
     subCategoryInfo={subCategoryInfo}
     collapsible={collapsible}
     setCollapsible={setCollapsible}
+    executionCollapsible={executionCollapsible}
+    setExecutionCollapsible={setExecutionCollapsible}
     startTimestamp={startTimestamp}
     endTimestamp={endTimestamp}
     loading={summaryLoading}
+    executionSummary={executionSummary}
+    executionSummaryLoading={executionSummaryLoading}
     apiCollectionIds={pageScopeApiCollectionIds}
   />, 
   coreTable

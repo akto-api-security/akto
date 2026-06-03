@@ -18,6 +18,8 @@ public class TestingRunResultSummary {
     public static final String METADATA_STRING = "metadata";
     public static final String TESTS_INITIATED_COUNT = "testInitiatedCount";
     public static final String TOTAL_EXTERNAL_API_TOKENS = "totalExternalApiTokens";
+    public static final String EXECUTION_RESULT_COUNTS = "executionResultCounts";
+    public static final String HTTP_ERROR_COUNTS = "httpErrorCounts";
 
     private ObjectId id;
     private int startTimestamp;
@@ -48,6 +50,8 @@ public class TestingRunResultSummary {
     private String hexId;
 
     private Map<String,String> metadata;
+    private Map<String, Integer> executionResultCounts;
+    private Map<String, Integer> httpErrorCounts;
 
     public TestingRunResultSummary() {
     }
@@ -206,5 +210,21 @@ public class TestingRunResultSummary {
 
     public void setOriginalTestingRunResultSummaryId(ObjectId originalTestingRunResultSummaryId) {
         this.originalTestingRunResultSummaryId = originalTestingRunResultSummaryId;
+    }
+
+    public Map<String, Integer> getExecutionResultCounts() {
+        return executionResultCounts;
+    }
+
+    public void setExecutionResultCounts(Map<String, Integer> executionResultCounts) {
+        this.executionResultCounts = executionResultCounts;
+    }
+
+    public Map<String, Integer> getHttpErrorCounts() {
+        return httpErrorCounts;
+    }
+
+    public void setHttpErrorCounts(Map<String, Integer> httpErrorCounts) {
+        this.httpErrorCounts = httpErrorCounts;
     }
 }

@@ -161,6 +161,49 @@ function checkTestFailure(summaryState, testRunState) {
   return false;
 }
 
+function isIncorrectTestRun(testingRunResultSummary, runState) {
+  if (!testingRunResultSummary) {
+    return false;
+  }
+
+  const authError = testingRunResultSummary?.metadata?.error;
+  if (authError) {
+    return true;
+  }
+
+  const effectiveState = getStatus(runState);
+  if (effectiveState === 'FAILED' || effectiveState === 'FAIL' || effectiveState === 'STOPPED') {
+    return false;
+  }
+  if (effectiveState === 'RUNNING' || effectiveState === 'SCHEDULED') {
+    return false;
+  }
+
+  const executionCounts = testingRunResultSummary?.executionResultCounts || {};
+  const httpCounts = testingRunResultSummary?.httpErrorCounts || {};
+  const all = executionCounts.ALL || 0;
+  const secured = executionCounts.SECURED || 0;
+  const vulnerable = executionCounts.VULNERABLE || 0;
+  const http403 = httpCounts.HTTP_403 || 0;
+  const http401 = httpCounts.HTTP_401 || 0;
+
+  if (all > 0 && secured + vulnerable === 0) {
+    return true;
+  }
+  if (secured > 0 && (http403 + http401) >= secured) {
+    return true;
+  }
+  return false;
+}
+
+function resolveTestRunIconState(state, testingRunResultSummary, runState) {
+  const effectiveState = getStatus(state);
+  if (effectiveState === 'COMPLETED' && isIncorrectTestRun(testingRunResultSummary, runState)) {
+    return 'EXECUTION_ISSUES';
+  }
+  return state;
+}
+
 function getCweLink(item) {
   let linkUrl = ""
   let cwe = item.split("-")
@@ -283,6 +326,8 @@ const transform = {
     if (cicd !== true && checkTestFailure(testingRunResultSummary.state, state)) {
       state = 'FAIL'
     }
+    const iconState = resolveTestRunIconState(state, testingRunResultSummary, data.state);
+    const iconObj = func.getTestingRunIconObj(iconState)
 
     let apiCollectionId = -1
     if (Object.keys(data).length > 0) {
@@ -296,7 +341,6 @@ const transform = {
         apiCollectionId = data?.testingEndpoints?.apisList[0]?.apiCollectionId
       }
     }
-    const iconObj = func.getTestingRunIconObj(state)
 
     obj['id'] = data.hexId;
     obj['testingRunResultSummaryHexId'] = testingRunResultSummary?.hexId;
@@ -316,6 +360,7 @@ const transform = {
     obj['runTypeStatus'] = [obj['run_type']]
     obj['nextUrl'] = "/dashboard/testing/" + data.hexId
     obj['testRunState'] = state
+    obj['iconState'] = iconState
     obj['summaryState'] = testingRunResultSummary?.state
     obj['startTimestamp'] = testingRunResultSummary?.startTimestamp
     obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
@@ -328,6 +373,9 @@ const transform = {
     
     obj['authError'] = authError; // For clean display near title/created by
     obj['metadata'] = func.flattenObject(filteredMetadata)
+    obj['executionResultCounts'] = testingRunResultSummary?.executionResultCounts
+    obj['httpErrorCounts'] = testingRunResultSummary?.httpErrorCounts
+    obj['isIncorrectTestRun'] = isIncorrectTestRun(testingRunResultSummary, data.state)
     obj['apiCollectionId'] = apiCollectionId
     obj['testingEndpoints'] = data?.testingEndpoints
     obj['userEmail'] = data.userEmail
@@ -339,7 +387,9 @@ const transform = {
       const prettifiedTest = {
         ...obj,
         testName: transform.prettifyTestName(data.name || "Test", iconObj.icon, iconObj.color, iconObj.tooltipContent),
-        severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues || { "CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0 }))
+        severity: obj.isIncorrectTestRun && !(testingRunResultSummary?.countIssues && Object.values(testingRunResultSummary.countIssues).some((value) => value > 0))
+          ? ["Execution errors"]
+          : observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues || { "CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0 }))
       }
       return prettifiedTest
     } else {

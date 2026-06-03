@@ -46,6 +46,7 @@ import com.akto.utils.ApiInfoKeyResult;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
+import com.akto.testing.TestingRunExecutionSummaryUtils;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -1329,6 +1330,134 @@ public class StartTestAction extends UserAction {
         this.issuesSummaryInfoMap = totalSubcategoriesCountMap;
 
         return SUCCESS.toUpperCase();
+    }
+
+    @Getter
+    private Map<String, Object> testRunsExecutionSummary = new HashMap<>();
+
+    public String fetchTestRunsExecutionSummary() {
+        if (this.endTimestamp == 0) {
+            this.endTimestamp = Context.now();
+        }
+
+        ArrayList<Bson> testingRunFilters = new ArrayList<>();
+        testingRunFilters.addAll(prepareFilters(startTimestamp, endTimestamp));
+        if (issueSummaryFilterCollectionIds != null && !issueSummaryFilterCollectionIds.isEmpty()) {
+            testingRunFilters.add(Filters.or(
+                    Filters.in(TestingRun._API_COLLECTION_ID, issueSummaryFilterCollectionIds),
+                    Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, issueSummaryFilterCollectionIds),
+                    Filters.in(TestingRun._API_COLLECTION_IDS_MULTI, issueSummaryFilterCollectionIds)));
+        } else {
+            testingRunFilters.addAll(getTableFilters());
+        }
+
+        List<TestingRun> scopedRuns = TestingRunDao.instance.findAllWithRbacAndContext(
+                Filters.and(testingRunFilters), 0, 1000000, prepareSort());
+
+        List<ObjectId> testingRunIds = scopedRuns.stream()
+                .map(TestingRun::getId)
+                .collect(Collectors.toList());
+
+        Map<ObjectId, TestingRunResultSummary> summariesByRunId = testingRunIds.isEmpty()
+                ? new HashMap<>()
+                : TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(testingRunIds);
+
+        Map<String, Integer> runStatusCounts = new HashMap<>();
+        runStatusCounts.put("successful", 0);
+        runStatusCounts.put("incorrect", 0);
+        runStatusCounts.put("failed", 0);
+        runStatusCounts.put("stopped", 0);
+        runStatusCounts.put("running", 0);
+
+        Map<String, Integer> resultCounts = initResultCountsMap();
+        Map<String, Integer> httpErrorCounts = initHttpErrorCountsMap();
+        int authErrorRuns = 0;
+        Map<String, Integer> failureReasonCounts = new HashMap<>();
+
+        Map<ObjectId, TestingRun> runsById = scopedRuns.stream()
+                .collect(Collectors.toMap(TestingRun::getId, run -> run, (a, b) -> a));
+
+        for (ObjectId runId : testingRunIds) {
+            TestingRun run = runsById.get(runId);
+            TestingRunResultSummary summary = summariesByRunId.get(runId);
+            if (run == null) {
+                continue;
+            }
+
+            if (summary != null) {
+                mergeExecutionCounts(resultCounts, summary.getExecutionResultCounts());
+                mergeHttpErrorCounts(httpErrorCounts, summary.getHttpErrorCounts());
+                if (summary.getMetadata() != null
+                        && summary.getMetadata().get("error") != null
+                        && !summary.getMetadata().get("error").isEmpty()) {
+                    authErrorRuns++;
+                    String errorMessage = summary.getMetadata().get("error");
+                    failureReasonCounts.put(errorMessage,
+                            failureReasonCounts.getOrDefault(errorMessage, 0) + 1);
+                }
+            }
+
+            State displayState = TestingRunExecutionSummaryUtils.resolveDisplayState(run, summary);
+            if (displayState == State.RUNNING || displayState == State.SCHEDULED) {
+                runStatusCounts.put("running", runStatusCounts.get("running") + 1);
+            } else if (displayState == State.FAILED) {
+                runStatusCounts.put("failed", runStatusCounts.get("failed") + 1);
+            } else if (displayState == State.STOPPED) {
+                runStatusCounts.put("stopped", runStatusCounts.get("stopped") + 1);
+            } else if (TestingRunExecutionSummaryUtils.isIncorrectTestRun(summary, displayState)) {
+                runStatusCounts.put("incorrect", runStatusCounts.get("incorrect") + 1);
+            } else {
+                runStatusCounts.put("successful", runStatusCounts.get("successful") + 1);
+            }
+        }
+
+        testRunsExecutionSummary = new HashMap<>();
+        testRunsExecutionSummary.put("runStatusCounts", runStatusCounts);
+        testRunsExecutionSummary.put("resultCounts", resultCounts);
+        testRunsExecutionSummary.put("httpErrorCounts", httpErrorCounts);
+        testRunsExecutionSummary.put("authErrorRuns", authErrorRuns);
+        testRunsExecutionSummary.put("failureReasonCounts", failureReasonCounts);
+        testRunsExecutionSummary.put("totalRuns", testingRunIds.size());
+
+        return SUCCESS.toUpperCase();
+    }
+
+    private Map<String, Integer> initResultCountsMap() {
+        Map<String, Integer> counts = new HashMap<>();
+        counts.put(QueryMode.VULNERABLE.name(), 0);
+        counts.put(QueryMode.SECURED.name(), 0);
+        counts.put(QueryMode.SKIPPED_EXEC.name(), 0);
+        counts.put(QueryMode.SKIPPED_EXEC_NEED_CONFIG.name(), 0);
+        counts.put(QueryMode.SKIPPED_EXEC_API_REQUEST_FAILED.name(), 0);
+        return counts;
+    }
+
+    private Map<String, Integer> initHttpErrorCountsMap() {
+        Map<String, Integer> counts = new HashMap<>();
+        counts.put(TestingRunExecutionSummaryUtils.HTTP_403, 0);
+        counts.put(TestingRunExecutionSummaryUtils.HTTP_401, 0);
+        counts.put(TestingRunExecutionSummaryUtils.HTTP_429, 0);
+        counts.put(TestingRunExecutionSummaryUtils.HTTP_5XX, 0);
+        counts.put(TestingRunExecutionSummaryUtils.CLOUDFLARE, 0);
+        return counts;
+    }
+
+    private void mergeExecutionCounts(Map<String, Integer> target, Map<String, Integer> source) {
+        if (source == null) {
+            return;
+        }
+        for (String key : target.keySet()) {
+            target.put(key, target.get(key) + source.getOrDefault(key, 0));
+        }
+    }
+
+    private void mergeHttpErrorCounts(Map<String, Integer> target, Map<String, Integer> source) {
+        if (source == null) {
+            return;
+        }
+        for (String key : target.keySet()) {
+            target.put(key, target.get(key) + source.getOrDefault(key, 0));
+        }
     }
 
     private List<String> testRunIds;

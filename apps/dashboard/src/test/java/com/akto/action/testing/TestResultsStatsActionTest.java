@@ -193,18 +193,32 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
     public void testRegexPatternFor429Detection() {
         String regex = TestResultsStatsAction.REGEX_429;
 
-        // Should match these 429 patterns
         assertTrue("{\"statusCode\": 429}".matches(".*" + regex + ".*"));
         assertTrue("{\"statusCode\":429}".matches(".*" + regex + ".*"));
         assertTrue("{\"statusCode\"   :   429}".matches(".*" + regex + ".*"));
 
-        // Should NOT match these patterns
         assertFalse("{\"statusCode\": 200}".matches(".*" + regex + ".*"));
         assertFalse("{\"statusCode\": \"429\"}".matches(".*" + regex + ".*"));
         assertFalse("{\"status\": 429}".matches(".*" + regex + ".*"));
     }
 
+    @Test
+    public void testRegexPatternFor403Detection() {
+        String regex = TestResultsStatsAction.REGEX_403;
 
+        assertTrue("{\"statusCode\": 403}".matches(".*" + regex + ".*"));
+        assertTrue("{\"statusCode\":403}".matches(".*" + regex + ".*"));
+        assertFalse("{\"statusCode\": 401}".matches(".*" + regex + ".*"));
+    }
+
+    @Test
+    public void testRegexPatternFor401Detection() {
+        String regex = TestResultsStatsAction.REGEX_401;
+
+        assertTrue("{\"statusCode\": 401}".matches(".*" + regex + ".*"));
+        assertTrue("{\"statusCode\":401}".matches(".*" + regex + ".*"));
+        assertFalse("{\"statusCode\": 403}".matches(".*" + regex + ".*"));
+    }
 
     @Test
     public void testRegexPatternForCloudflareNegatives() {

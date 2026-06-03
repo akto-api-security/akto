@@ -309,6 +309,18 @@ export default {
             }
         })
     },
+
+    async fetchTestRunsExecutionSummary(startTimestamp, endTimestamp, issueSummaryFilterCollectionIds) {
+        return await request({
+            url: '/api/fetchTestRunsExecutionSummary',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp,
+                issueSummaryFilterCollectionIds: issueSummaryFilterCollectionIds || [],
+            }
+        })
+    },
     fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip, reportFilterList) {
         return request({
             url: '/api/fetchVulnerableTestRunResults',

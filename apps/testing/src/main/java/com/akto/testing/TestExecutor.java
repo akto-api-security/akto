@@ -684,12 +684,18 @@ public class TestExecutor {
         
         Map<String,Integer> finalCountMap = Utils.finalCountIssuesMap(summaryId);
         loggerMaker.debugAndAddToDb("Final count map calculated is " + finalCountMap.toString());
+
+        Map<String, Integer> executionResultCounts = TestingRunExecutionSummaryUtils.computeExecutionResultCounts(summaryId);
+        Map<String, Integer> httpErrorCounts = TestingRunExecutionSummaryUtils.computeHttpErrorCounts(summaryId);
+
         TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
                 Filters.eq(Constants.ID, summaryId),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
                         Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap),
-                        Updates.set(TestingRunResultSummary.STATE, updatedState)),
+                        Updates.set(TestingRunResultSummary.STATE, updatedState),
+                        Updates.set(TestingRunResultSummary.EXECUTION_RESULT_COUNTS, executionResultCounts),
+                        Updates.set(TestingRunResultSummary.HTTP_ERROR_COUNTS, httpErrorCounts)),
                 options);
 
         if (TestingConfigurations.getInstance().isAgentTokenLimitExceeded()) {

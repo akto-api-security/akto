@@ -12,7 +12,7 @@ import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
 
-import { circle_cancel, circle_tick_minor, car_icon } from "@/apps/dashboard/components/icons";
+import { circle_cancel, circle_tick_minor, circle_warning_minor, car_icon } from "@/apps/dashboard/components/icons";
 import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
 import { Box } from '@shopify/polaris';
 import TooltipText from '../apps/dashboard/components/shared/TooltipText';
@@ -425,6 +425,11 @@ prettifyEpoch(epoch) {
           tooltipContent: "Error occurred while running the test.",
           icon: circle_cancel,
         }
+      case "EXECUTION_ISSUES":
+        return {
+          tooltipContent: "Scan completed but tests did not run successfully.",
+          icon: circle_warning_minor,
+        }
       case "COMPLETED": 
         return {
           tooltipContent: "Test has been completed.",
@@ -445,6 +450,7 @@ prettifyEpoch(epoch) {
   },
   getTestResultStatus(item) {
     let localItem = item.toUpperCase();
+    if(localItem.includes("EXECUTION")) return 'warning';
     if(localItem.includes("HIGH")) return 'critical';
     if(localItem.includes("MEDIUM")) return 'warning';
     if(localItem.includes("LOW")) return 'neutral';
