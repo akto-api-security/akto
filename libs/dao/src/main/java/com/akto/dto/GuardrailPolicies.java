@@ -87,6 +87,10 @@ public class GuardrailPolicies {
     private SecretsDetection secretsDetection;
     private boolean applyToAllServers;
 
+    // Blocked host/path list — block-only glob patterns matched against the request host+path.
+    // Object-shaped so it can be extended later without a data migration.
+    private List<BlockedHostEntry> blockedHosts;
+
     // Modal config
     private ArrayList<ModelConfig> modelConfigs;
 
@@ -228,6 +232,22 @@ public class GuardrailPolicies {
         public SelectedServer(String id, String name) {
             this.id = id;
             this.name = name;
+        }
+    }
+
+    /**
+     * A single blocked host entry (block-only). {@code pattern} is a glob matched against the
+     * request's {@code host + path}, where {@code *} matches any sequence (e.g. "chatgpt.com/*",
+     * "*.deepseek.com/*"). Kept as an object so it can be extended later without a migration.
+     */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class BlockedHostEntry {
+        private String pattern;
+
+        public BlockedHostEntry(String pattern) {
+            this.pattern = pattern;
         }
     }
 

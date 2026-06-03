@@ -63,6 +63,8 @@ import com.akto.util.DbMode;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.EnumCodec;
 import com.akto.util.LastCronRunInfo;
+import com.akto.dto.agents.Model;
+import com.akto.dto.agents.ModelType;
 import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.DependencyNode.ParamInfo;
@@ -70,7 +72,6 @@ import com.akto.dto.GuardrailPolicies.ModelConfig;
 import com.akto.dto.auth.APIAuth;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.OrganizationFlags;
-import com.akto.dto.DeviceDomainConfig;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
@@ -292,6 +293,7 @@ public class DaoInit {
         ClassModel<OpenTelemetryIntegration> openTelemetryIntegrationClassModel = ClassModel.builder(OpenTelemetryIntegration.class).enableDiscriminator(true).build();
         ClassModel<EndpointShieldSettings> endpointShieldSettingsClassModel = ClassModel.builder(EndpointShieldSettings.class).enableDiscriminator(true).build();
         ClassModel<PlatformShieldConfig> platformShieldConfigClassModel = ClassModel.builder(PlatformShieldConfig.class).enableDiscriminator(true).build();
+        ClassModel<Model> agentModelClassModel = ClassModel.builder(Model.class).enableDiscriminator(true).build();
         ClassModel<ModelConfig> modelConfigClassModel = ClassModel.builder(ModelConfig.class).enableDiscriminator(true).build();
         ClassModel<BlockedToken> blockedTokenClassModel = ClassModel.builder(BlockedToken.class).enableDiscriminator(true).build();
 
@@ -326,7 +328,7 @@ public class DaoInit {
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
                 RuntimeMetricsClassModel, jobsParam, ModuleInfoClassModel,fileClassModel, tlsAuthClassModel, apiHitCountInfoClassModel, collectionTagsModel, hostRegexTestingEndpointsClassModel, tagsTestingEndpointsClassModel
                 , authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, logsEndpointShieldClassModel, proxyPatternInfoClassModel, apiSequencesClassModel, endpointMcpConfigClassModel, deviceDomainConfigClassModel
-                , newRelicIntegrationClassModel, openTelemetryIntegrationClassModel, endpointShieldSettingsClassModel, platformShieldConfigClassModel, modelConfigClassModel, blockedTokenClassModel).automatic(true).build());
+                , newRelicIntegrationClassModel, openTelemetryIntegrationClassModel, endpointShieldSettingsClassModel, platformShieldConfigClassModel, modelConfigClassModel, blockedTokenClassModel, agentModelClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -373,6 +375,7 @@ public class DaoInit {
                 new EnumCodec<>(TLSAuthParam.CertificateType.class),
                 new EnumCodec<>(CollectionTags.TagSource.class),
                 new EnumCodec<>(GlobalEnums.CONTEXT_SOURCE.class),
+                new EnumCodec<>(ModelType.class),
                 new EnumCodec<>(GuardrailPolicies.ModelRole.class)
         );
 

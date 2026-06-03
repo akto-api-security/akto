@@ -8,7 +8,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.google.gson.Gson;
-import com.mongodb.client.model.Filters;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import okhttp3.MediaType;
@@ -56,7 +55,7 @@ public class LLMService {
         String apiKey = AZURE_OPENAI_API_KEY;
         String modelNameFinal = "";
 
-        Model model = AgentModelDao.instance.findOne(Filters.eq("type", ModelType.MISTRAL_AI.name()));
+        Model model = AgentModelDao.instance.findOne(AgentModelDao.instance.filterByType(ModelType.MISTRAL_AI));
         if (model != null) {
             endpoint = model.getParams().getOrDefault("azureOpenAIEndpoint", "");
             apiKey = model.getParams().getOrDefault("apiKey", "");

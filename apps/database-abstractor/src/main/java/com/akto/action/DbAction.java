@@ -2922,12 +2922,26 @@ public class DbAction extends ActionSupport {
     }
 
     public String ingestMetricsData() {
+        int defaultAccountId = Context.accountId.get();
         try {
-            // Then ingest the new metrics
-            DbLayer.ingestMetricsData(metricData);
+            // Group metrics by their embedded accountId. External services (e.g. guardrails-service)
+            // set accountId per metric so data lands in the correct account's collection.
+            // Metrics from Java modules leave accountId null and fall back to the token's account.
+            Map<Integer, List<MetricData>> byAccount = new HashMap<>();
+            for (MetricData m : metricData) {
+                int target = (m.getAccountId() != null) ? m.getAccountId() : defaultAccountId;
+                byAccount.computeIfAbsent(target, k -> new ArrayList<>()).add(m);
+            }
+
+            for (Map.Entry<Integer, List<MetricData>> entry : byAccount.entrySet()) {
+                Context.accountId.set(entry.getKey());
+                DbLayer.ingestMetricsData(entry.getValue());
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in ingestMetricsData: " + e.getMessage());
             return Action.ERROR.toUpperCase();
+        } finally {
+            Context.accountId.set(defaultAccountId);
         }
         return Action.SUCCESS.toUpperCase();
     }
