@@ -252,6 +252,10 @@ public class DbActor extends DataActor {
         return DbLayer.fetchAllApiCollections();
     }
 
+    public List<ApiCollection> fetchApiCollectionsByIds(List<Integer> apiCollectionIds) {
+        return DbLayer.fetchApiCollectionsByIds(apiCollectionIds);
+    }
+
     public List<ApiCollection> fetchAllCollections() {
         return DbLayer.fetchAllCollections();
     }

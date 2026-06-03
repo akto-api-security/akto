@@ -111,6 +111,7 @@ public abstract class DataActor {
 
     public abstract List<ApiCollection> fetchApiCollections();
     public abstract List<ApiCollection> fetchAllApiCollections();
+    public abstract List<ApiCollection> fetchApiCollectionsByIds(List<Integer> apiCollectionIds);
     public abstract List<ApiCollection> fetchAllCollections();
 
     public abstract void createCollectionSimple(int vxlanId);
