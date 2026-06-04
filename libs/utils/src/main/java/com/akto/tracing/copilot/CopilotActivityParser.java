@@ -181,12 +181,11 @@ public class CopilotActivityParser implements TraceParser {
         }
 
         // ── Pass 2: planning and tool spans ───────────────────────────────
-        // planId → most recently created planning span (for step parenting and debug event)
         Map<String, Span> lastPlanByPlanId = new LinkedHashMap<>();
-        // stepId → tool span
         Map<String, Span> toolByStepId = new LinkedHashMap<>();
-        // most recently opened (unterminated) tool span
         Span activeToolSpan = null;
+        int planningRound = 0;          // counter for "Planning Round N"
+        Map<String, Integer> stepIndexByPlanId = new LinkedHashMap<>();  // step counter per plan
 
         for (JsonNode act : acts) {
             if (!TYPE_EVENT.equals(act.path("type").asText())) continue;
@@ -197,6 +196,7 @@ public class CopilotActivityParser implements TraceParser {
             if (EVENT_PLAN_RECEIVED.equals(name)) {
                 String planId = value.path("planIdentifier").asText(null);
                 if (planId == null) continue;
+                planningRound++;
                 String eventId = act.path("id").asText(UUID.randomUUID().toString());
                 boolean isFinalPlan = value.path("isFinalPlan").asBoolean(false);
                 List<String> steps = new ArrayList<>();
@@ -206,31 +206,29 @@ public class CopilotActivityParser implements TraceParser {
                 planMeta.put("sourceType", SOURCE_TYPE);
                 planMeta.put("planIdentifier", planId);
                 planMeta.put("isFinalPlan", isFinalPlan);
-                planMeta.put("steps", steps);
+
+                // input shows what this planning round intends to do
+                Map<String, Object> planInput = new LinkedHashMap<>();
+                planInput.put("plannedSteps", steps);
 
                 Span planSpan = Span.builder()
                         .id(eventId).traceId(traceId).parentSpanId(rootSpanId)
                         .spanKind(TracingConstants.SpanKind.PLANNING)
-                        .name("Planning")
+                        .name("Planning Round " + planningRound)
                         .startTimeMillis(tsMs).endTimeMillis(tsMs)
                         .status(status)
-                        .input(new LinkedHashMap<>()).output(new LinkedHashMap<>())
+                        .input(planInput).output(new LinkedHashMap<>())
                         .metadata(planMeta)
                         .depth(1).tags(Arrays.asList(SOURCE_TYPE, "planning"))
                         .build();
 
                 lastPlanByPlanId.put(planId, planSpan);
+                stepIndexByPlanId.put(planId, 0);
                 spans.add(planSpan);
 
             } else if (EVENT_PLAN_RECEIVED_DEBUG.equals(name)) {
-                String planId = value.path("planIdentifier").asText(null);
-                if (planId == null) continue;
-                Span planSpan = lastPlanByPlanId.get(planId);
-                if (planSpan == null) continue;
-                String ask = value.path("ask").asText(null);
-                if (ask != null && !ask.isEmpty()) {
-                    planSpan.getInput().put("ask", truncate(ask, MAX_TEXT_LEN));
-                }
+                // DynamicPlanReceivedDebug just repeats the user ask — skip it,
+                // the root span already holds the user question.
 
             } else if (EVENT_STEP_TRIGGERED.equals(name)) {
                 String stepId = value.path("stepId").asText(null);
@@ -242,15 +240,29 @@ public class CopilotActivityParser implements TraceParser {
                 Span parentPlan = planId != null ? lastPlanByPlanId.get(planId) : null;
                 String parentId = parentPlan != null ? parentPlan.getId() : rootSpanId;
 
+                // thought is the planner's reasoning — put it on the PLANNING span, not the tool span
+                if (thought != null && !thought.isEmpty() && parentPlan != null) {
+                    Map<String, Object> planInput = parentPlan.getInput();
+                    if (planInput == null) { planInput = new LinkedHashMap<>(); parentPlan.setInput(planInput); }
+                    // accumulate per-step reasoning under planningReason list
+                    @SuppressWarnings("unchecked")
+                    List<String> reasons = (List<String>) planInput.get("planningReason");
+                    if (reasons == null) { reasons = new ArrayList<>(); planInput.put("planningReason", reasons); }
+                    reasons.add(truncate(thought, MAX_THOUGHT_LEN));
+                }
+
+                // step number within this planning round
+                int stepIdx = stepIndexByPlanId.getOrDefault(planId, 0) + 1;
+                if (planId != null) stepIndexByPlanId.put(planId, stepIdx);
+                String toolDisplayName = toolName + " (Step " + stepIdx + ")";
+
                 Map<String, Object> toolMeta = new LinkedHashMap<>();
                 toolMeta.put("sourceType", SOURCE_TYPE);
-                if (thought != null && !thought.isEmpty())
-                    toolMeta.put("thought", truncate(thought, MAX_THOUGHT_LEN));
 
                 Span toolSpan = Span.builder()
                         .id(stepId).traceId(traceId).parentSpanId(parentId)
                         .spanKind(TracingConstants.SpanKind.TOOL)
-                        .name(toolName)
+                        .name(toolDisplayName)
                         .startTimeMillis(tsMs).endTimeMillis(tsMs)
                         .status("running")
                         .input(new LinkedHashMap<>()).output(new LinkedHashMap<>())
@@ -307,12 +319,20 @@ public class CopilotActivityParser implements TraceParser {
                 if (execTime != null) toolSpan.getMetadata().put("executionTime", execTime);
                 if (cost >= 0) toolSpan.getMetadata().put("displayedCost", cost);
 
-                // Update parent planning span: extend end time, accumulate output
+                // Update parent planning span: extend end time, update completion summary in output
                 if (planId != null) {
                     Span planSpan = lastPlanByPlanId.get(planId);
                     if (planSpan != null) {
                         if (tsMs > planSpan.getEndTimeMillis()) planSpan.setEndTimeMillis(tsMs);
-                        accumulateToOutput(planSpan, toolOutput);
+                        Map<String, Object> planOutput = planSpan.getOutput();
+                        if (planOutput == null) { planOutput = new LinkedHashMap<>(); planSpan.setOutput(planOutput); }
+                        int completed = ((Number) planOutput.getOrDefault("completedSteps", 0)).intValue() + 1;
+                        planOutput.put("completedSteps", completed);
+                        int resultsFound = 0;
+                        Object sr = toolOutput.get("search_results");
+                        if (sr instanceof List) resultsFound = ((List<?>) sr).size();
+                        int prev = ((Number) planOutput.getOrDefault("totalResultsFound", 0)).intValue();
+                        planOutput.put("totalResultsFound", prev + resultsFound);
                     }
                 }
             }
@@ -413,18 +433,6 @@ public class CopilotActivityParser implements TraceParser {
         });
         if (!list.isEmpty()) output.put("search_results", list);
         return output;
-    }
-
-    /** Accumulates tool search results into the parent planning span's output. */
-    @SuppressWarnings("unchecked")
-    private void accumulateToOutput(Span planSpan, Map<String, Object> toolOutput) {
-        if (toolOutput.isEmpty()) return;
-        Map<String, Object> planOutput = planSpan.getOutput();
-        if (planOutput == null) { planOutput = new LinkedHashMap<>(); planSpan.setOutput(planOutput); }
-        List<Map<String, Object>> existing = (List<Map<String, Object>>) planOutput.get("search_results");
-        if (existing == null) { existing = new ArrayList<>(); planOutput.put("search_results", existing); }
-        Object sr = toolOutput.get("search_results");
-        if (sr instanceof List) existing.addAll((List<Map<String, Object>>) sr);
     }
 
     private static Map<String, Object> edgeParam(String type, String data) {

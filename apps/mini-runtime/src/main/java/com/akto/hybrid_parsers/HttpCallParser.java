@@ -576,10 +576,14 @@ public class HttpCallParser {
             }
             loggerMaker.warn("Copilot trace: attempting to parse activities");
             TraceParseResult result = CopilotActivityParser.getInstance().parse(payload);
+            if (result.getTrace() != null && httpResponseParam.getRequestParams() != null) {
+                result.getTrace().setApiCollectionId(httpResponseParam.getRequestParams().getApiCollectionId());
+            }
             loggerMaker.warn("Copilot trace: parsed " +
                     (result.getSpans() != null ? result.getSpans().size() : 0) +
                     " spans, traceId=" + (result.getTrace() != null ? result.getTrace().getId() : "null") +
-                    ", status=" + (result.getTrace() != null ? result.getTrace().getStatus() : "null"));
+                    ", status=" + (result.getTrace() != null ? result.getTrace().getStatus() : "null") +
+                    ", apiCollectionId=" + (result.getTrace() != null ? result.getTrace().getApiCollectionId() : "null"));
             dataActor.storeTrace(result.getTrace());
             if (result.getSpans() != null && !result.getSpans().isEmpty()) {
                 dataActor.storeSpans(result.getSpans());
