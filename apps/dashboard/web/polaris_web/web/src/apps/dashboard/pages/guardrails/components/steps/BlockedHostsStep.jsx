@@ -6,8 +6,7 @@ import {
     Text,
     Button,
     Badge,
-    Autocomplete,
-    Icon
+    Autocomplete
 } from "@shopify/polaris";
 import { DeleteMajor } from "@shopify/polaris-icons";
 
@@ -180,8 +179,7 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, hostSuggestions = [] 
                                     <Text variant="bodyMd" fontWeight="semibold" alignment="start">{entry.pattern}</Text>
                                     <Button
                                         plain
-                                        monochrome
-                                        icon={<Icon source={DeleteMajor} color="critical" />}
+                                        icon={DeleteMajor}
                                         onClick={() => removePattern(index)}
                                         accessibilityLabel={`Delete ${entry.pattern}`}
                                     />
