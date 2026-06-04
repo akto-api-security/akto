@@ -52,6 +52,18 @@ const headers = [
     tooltipContent: (<Text variant="bodySm">Count of attempted testing run results</Text>)
   },
   {
+    text: 'Run message',
+    title: 'Run message',
+    value: 'run_message',
+    type: CellType.TEXT,
+    maxWidth: '220px',
+    tooltipContent: (
+      <Text variant="bodySm">
+        Run-level status or error (e.g. stopped, auth failure). Individual test results are in Issues and inside the test run.
+      </Text>
+    )
+  },
+  {
     text:"Severity",
     value: 'severity',
     title: 'Issues',

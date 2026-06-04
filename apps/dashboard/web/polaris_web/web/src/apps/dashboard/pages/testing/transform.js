@@ -140,8 +140,22 @@ function getAlternateTestsInfo(state) {
   }
 }
 
-function getTestsInfo(testResultsCount, state) {
-  return (testResultsCount == null) ? getAlternateTestsInfo(state) : testResultsCount
+function getRunMessage(state, metadata) {
+  if (metadata?.error) {
+    return metadata.error;
+  }
+  if (metadata?.tokenRateLimited) {
+    return metadata.tokenRateLimited;
+  }
+  const reason = getAlternateTestsInfo(state);
+  if (reason === "Tests are still running" || reason === "Tests have been scheduled" || reason === "Information unavailable") {
+    return "-";
+  }
+  return reason;
+}
+
+function getTestsInfo(testResultsCount) {
+  return testResultsCount == null ? "-" : testResultsCount;
 }
 
 function minimizeTagList(items) {
@@ -304,7 +318,8 @@ const transform = {
     obj['icon'] = iconObj.icon;
     obj['iconColor'] = iconObj.color
     obj['name'] = data.name || "Test"
-    obj['number_of_tests'] = data.testIdConfig == 1 ? "-" : getTestsInfo(testingRunResultSummary?.testResultsCount, state)
+    obj['number_of_tests'] = data.testIdConfig == 1 ? "-" : getTestsInfo(testingRunResultSummary?.testResultsCount)
+    obj['run_message'] = getRunMessage(state, testingRunResultSummary?.metadata)
     obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
     obj['run_time_epoch'] = Math.max(data.scheduleTimestamp, (cicd ? (testingRunResultSummary?.endTimestamp) : (data.endTimestamp)))
     obj['scheduleTimestamp'] = data.scheduleTimestamp
