@@ -77,7 +77,7 @@ public class Cron {
 
     }
 
-    public static void triggerMerging(int accountId) {
+    public void triggerMerging(int accountId) {
         if (!Lock.acquireLock(accountId)) {
             loggerMaker.infoAndAddToDb("Unable to acquire lock, merging process ignored for account " + accountId);
             return;

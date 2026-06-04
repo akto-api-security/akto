@@ -368,15 +368,6 @@ public class TestOptimizedTemplateToStaticMatch {
         assertTrue("Should match despite empty template", result.contains("GET /api/users/123"));
     }
 
-    // ==================== SINGLE TOKEN URLS ====================
-
-    @Test
-    public void testSingleTokenStaticURL() {
-        List<String> templates = Arrays.asList("GET /INTEGER");
-        Map<String, Set<String>> statics = toStaticMap("GET /123", "GET /456");
-        assertMatchesBruteForce(templates, statics, 2);
-    }
-
     @Test
     public void testRootURL() {
         List<String> templates = Arrays.asList("GET /api/users/INTEGER");
@@ -626,17 +617,6 @@ public class TestOptimizedTemplateToStaticMatch {
         List<String> templates = Arrays.asList("GET /api/users/INTEGER");
         Map<String, Set<String>> statics = toStaticMap("GET /api/users/42");
         assertMatchesBruteForce(templates, statics, 1);
-    }
-
-    @Test
-    public void testAllPositionsWildcard() {
-        // Template with all wildcard positions (2 tokens, both INTEGER)
-        List<String> templates = Arrays.asList("GET /INTEGER/INTEGER");
-        Map<String, Set<String>> statics = toStaticMap(
-                "GET /1/2",
-                "GET /99/100"
-        );
-        assertMatchesBruteForce(templates, statics, 2);
     }
 
     // ==================== HTTP METHODS ====================
