@@ -29,6 +29,7 @@ import MCPIcon from "@/assets/MCP_Icon.svg";
 import McpRedIcon from "@/assets/McpRedIcon.svg";
 import PersonLockIcon from "@/assets/PersonLockIcon.svg";
 import LaptopIcon from "@/assets/Laptop.svg";
+import SkillIcon from "@/assets/Skill.svg";
 import MaliciousSkillIcon from "@/assets/MaliciousSkill.svg";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
@@ -80,11 +81,11 @@ function AgentIconImg({ data }) {
   if (data.type === "Skill") {
     return (
       <img
-        src={LaptopIcon}
+        src={SkillIcon}
         width={18}
         height={18}
         alt=""
-        style={{ flexShrink: 0, opacity: 0.7 }}
+        style={{ flexShrink: 0 }}
       />
     );
   }
@@ -880,7 +881,9 @@ function TopSection({
             </VerticalStack>
           </VerticalStack>
         </Box>
-        <Divider />
+        <Box paddingBlockStart="4" paddingBlockEnd="4">
+          <Divider />
+        </Box>
         <Box
           paddingInlineStart="5"
           paddingInlineEnd="5"
