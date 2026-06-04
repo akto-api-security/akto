@@ -52,8 +52,8 @@ const headers = [
     tooltipContent: (<Text variant="bodySm">Count of attempted testing run results</Text>)
   },
   {
-    text: 'Run message',
-    title: 'Run message',
+    text: mapLabel("Test", getDashboardCategory()) + " run status",
+    title: mapLabel("Test", getDashboardCategory()) + " run status",
     value: 'run_message',
     type: CellType.TEXT,
     maxWidth: '220px',
