@@ -1,4 +1,4 @@
-.flyLayout{
+.flyLayout {
     position: absolute;
     top: 0;
     right: -50vw;
@@ -7,13 +7,89 @@
     height: 100vh;
 }
 
-.innerFlyLayout{
+.innerFlyLayout {
     height: 100vh;
     position: fixed;
     overflow-y: scroll;
     scrollbar-width: none;
 }
 
-.show{
-    right:0;
+.show {
+    right: 0;
+}
+
+.agentic-top-list-row {
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--p-color-border-subdued, #e1e3e5);
+    min-height: 44px;
+    padding-inline: var(--p-space-500, 20px);
+    padding-block: var(--p-space-300, 12px);
+}
+
+.agentic-top-list-row:hover {
+    background-color: var(--p-color-bg-hover, #f6f6f7);
+}
+
+/* Remove divider on last row */
+.agentic-top-list-row:last-child {
+    border-bottom: none;
+}
+
+/* Make the inner HorizontalStack fill the full row width */
+.agentic-top-list-row > * {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Card 1 legend chips — clickable label with dot; no hover/active background */
+.agentic-chip {
+    cursor: pointer;
+    border-radius: var(--p-border-radius-full, 9999px);
+    user-select: none;
+}
+.agentic-chip:focus {
+    outline: none;
+}
+
+/* Card 2/3 flex column wrapper — fills card height */
+.agentic-card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Card 2/3 row list — takes remaining card height */
+.agentic-row-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Segmented proportion bar */
+.agentic-seg-bar {
+    display: flex;
+    height: 5px;
+    border-radius: 3px;
+    overflow: hidden;
+    gap: 1px;
+}
+.agentic-seg-bar > .agentic-seg {
+    min-width: 2px;
+}
+
+/* Small legend dot — colour via --dot-color; active adds outline ring */
+.agentic-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--dot-color);
+}
+.agentic-dot--active {
+    outline: 2px solid var(--dot-color);
+    outline-offset: 1px;
 }

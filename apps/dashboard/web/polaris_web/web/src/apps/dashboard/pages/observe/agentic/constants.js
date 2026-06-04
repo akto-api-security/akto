@@ -576,7 +576,7 @@ function buildTeamGroupsForAsset(group, usernameMap, userMetadataMap) {
     return Object.entries(teamCounts).map(([name, count]) => ({ name, count }));
 }
 
-function buildDevicesForGroup(group) {
+function buildDevicesForGroup(group, usernameMap = {}) {
     const byDevice = new Map();
     (group.collections || []).forEach((c) => {
         const hostName = c.hostName || c.displayName || c.name;
@@ -584,12 +584,16 @@ function buildDevicesForGroup(group) {
         if (!deviceId) return;
         const serviceName = extractServiceName(hostName);
         if (!byDevice.has(deviceId)) {
+            const resolved = getResolvedUsernameForCollection(c, usernameMap);
+            const username = (resolved && resolved !== DEFAULT_VALUE) ? resolved : "";
+            const maxTraffic = group.detectedTimestamp || 0;
             byDevice.set(deviceId, {
                 deviceId,
                 endpoint: deviceId,
+                username,
                 os: "mac",
                 riskScore: group.riskScore ?? group.maxRiskScore ?? null,
-                lastSeen: group.detectedTimestamp || 0,
+                lastSeen: maxTraffic > 0 ? func.prettifyEpoch(maxTraffic) : "—",
                 services: [],
             });
         }
@@ -723,7 +727,7 @@ export function buildAgenticAssetsPageData(
         const collectionIds = (group.collections || []).map((c) => c.id);
         const violations = violationsForCollections(collectionIds, violationsByCollectionId);
         const groups = buildTeamGroupsForAsset(group, usernameMap, userMetadataMap);
-        const devices = buildDevicesForGroup(group);
+        const devices = buildDevicesForGroup(group, usernameMap);
         const skillNames = uniqueSkillNamesForGroup(group);
         const riskScore = group.riskScore ?? group.maxRiskScore ?? null;
         const lastSeen = group.detectedTimestamp || 0;
@@ -738,6 +742,7 @@ export function buildAgenticAssetsPageData(
             endpointCount: group.endpointsCount,
             deviceCount: group.endpointsCount,
             lastSeen: lastSeen > 0 ? func.prettifyEpoch(lastSeen) : "",
+            lastSeenEpoch: lastSeen,
             hasPersonalAccount: group.hasPersonalAccount || false,
             hasLocalMcpServer: group.hasLocalMcpServer || false,
         };
@@ -761,6 +766,7 @@ export function buildAgenticAssetsPageData(
             assetTagValue: group.tagValue,
             deviceCount: group.endpointsCount,
             lastSeen: lastSeen > 0 ? func.prettifyEpoch(lastSeen) : "",
+            lastSeenEpoch: lastSeen,
             skillCount: skillNames.size,
             toolCount: 0,
             hasPersonalAccount: group.hasPersonalAccount || false,

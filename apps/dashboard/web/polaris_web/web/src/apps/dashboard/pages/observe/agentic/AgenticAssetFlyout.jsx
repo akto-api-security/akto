@@ -131,7 +131,7 @@ function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], ag
             return {
                 nodes: [
                     { id: "agent", type: "topoNode", draggable: false, position: { x: 270, y: agentY }, data: { component: { category: "agent",    type: "AI Agent",    label: asset.name } } },
-                    ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: 40,  y: devOffset + i * NODE_H          }, data: { component: { category: "external",  type: "Device",      label: d.endpoint } } })),
+                    ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: 40,  y: devOffset + i * NODE_H          }, data: { component: { category: "external",  type: "User",        label: d.username || d.endpoint } } })),
                     ...mcps.map((m, i)    => ({ id: `mcp-${i}`, type: "topoNode", draggable: false, position: { x: 500, y: i * NODE_H                       }, data: { component: { category: "mcp",       type: "MCP Server",  label: m.name     } } })),
                     ...llms.map((l, i)    => ({ id: `llm-${i}`, type: "topoNode", draggable: false, position: { x: 500, y: (mcps.length + i) * NODE_H       }, data: { component: { category: "ai-model",  type: "LLM",         label: l.name     } } })),
                 ],
@@ -149,7 +149,7 @@ function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], ag
             const skillY  = (totalH - 44) / 2;
             return {
                 nodes: [
-                    ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: 40,  y: i * NODE_H }, data: { component: { category: "external", type: "Device", label: d.endpoint } } })),
+                    ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: 40,  y: i * NODE_H }, data: { component: { category: "external", type: "User", label: d.username || d.endpoint } } })),
                     { id: "skill", type: "topoNode", draggable: false, position: { x: 380, y: skillY }, data: { component: { category: "skill", type: "Skill", label: asset.name } } },
                 ],
                 edges: devices.map((_, i) => ({ id: `e-d${i}-s`, source: `dev-${i}`, target: "skill", type: "smoothstep", style: { stroke: "#7E22CE", strokeWidth: 1.5 } })),
@@ -164,7 +164,7 @@ function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], ag
         return {
             nodes: [
                 { id: "asset", type: "topoNode", draggable: false, position: { x: 310, y: assetY }, data: { component: { category: cat, type: asset.type, label: asset.name } } },
-                ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: 40, y: i * NODE_H }, data: { component: { category: "external", type: "Device", label: d.endpoint } } })),
+                ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: 40, y: i * NODE_H }, data: { component: { category: "external", type: "User", label: d.username || d.endpoint } } })),
             ],
             edges: devices.map((_, i) => ({ id: `e-d${i}-a`, source: `dev-${i}`, target: "asset", type: "smoothstep", style: { stroke: edgeCol, strokeWidth: 1.5 } })),
         };
@@ -327,16 +327,16 @@ const TOOLS_COL_DEFS = [
 ];
 
 const VIOLATIONS_COL_DEFS = [
-    { field: "severity", headerName: "Severity", width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "time",     headerName: "Time",      width: 130, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" } },
+    { field: "severity", headerName: "Severity",  width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
     { field: "title",    headerName: "Violation", flex: 1, minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "time",     headerName: "Time",      width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" } },
 ];
 
 const DEVICES_COL_DEFS = [
-    { field: "endpoint",  headerName: "Device",    flex: 1.5, minWidth: 180, cellRenderer: DeviceNameCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "username",  headerName: "User",      flex: 1,   minWidth: 120, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#202223" } },
+    { field: "username",  headerName: "User",      flex: 1,   minWidth: 120, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#202223" }, valueFormatter: p => p.value || "—" },
+    { field: "endpoint",  headerName: "Device ID", flex: 1.5, minWidth: 180, cellRenderer: DeviceNameCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
     { field: "riskScore", headerName: "Risk",      width: 80, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: DeviceRiskCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "lastSeen",  headerName: "Last Seen", width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" } },
+    { field: "lastSeen",  headerName: "Last Seen", width: 130, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, valueFormatter: p => p.value || "—" },
 ];
 
 const CONNECTED_MCP_COL_DEFS = [
@@ -440,6 +440,25 @@ function OverviewTab({ asset, onTabChange, assetDevices = {}, agenticTreeData = 
 
                 {/* Connection topology */}
                 <AssetTopologyGraph asset={asset} assetDevices={assetDevices} agenticTreeData={agenticTreeData} agenticFlatData={agenticFlatData} />
+
+                {/* Asset Details */}
+                <VerticalStack gap="2">
+                    <Text variant="headingXs" color="subdued">Asset Details</Text>
+                    <HorizontalStack gap="4" blockAlign="center">
+                        <Box minWidth="140px"><Text variant="bodySm" color="subdued">AI Interactions</Text></Box>
+                        <Text variant="bodySm" fontWeight="semibold">
+                            {asset.aiInteractions != null ? Number(asset.aiInteractions).toLocaleString("en-US") : "—"}
+                        </Text>
+                    </HorizontalStack>
+                    <HorizontalStack gap="4" blockAlign="center">
+                        <Box minWidth="140px"><Text variant="bodySm" color="subdued">Last Traffic Seen</Text></Box>
+                        <Text variant="bodySm" fontWeight="semibold">{asset.lastSeen || "—"}</Text>
+                    </HorizontalStack>
+                    <HorizontalStack gap="4" blockAlign="center">
+                        <Box minWidth="140px"><Text variant="bodySm" color="subdued">Group</Text></Box>
+                        <Text variant="bodySm" fontWeight="semibold">{asset.groups?.[0]?.name || "—"}</Text>
+                    </HorizontalStack>
+                </VerticalStack>
 
                 {/* Risk narrative + clickable risk factors — mirrors DeviceFlyout's OverviewTab */}
                 <VerticalStack gap="3">
@@ -760,7 +779,7 @@ function AgentComponentTypeCellRenderer({ value }) {
 const COMBINED_AGENT_COL_DEFS = [
     {
         field: "name",
-        headerName: "Component",
+        headerName: "Component Name",
         flex: 2,
         minWidth: 200,
         filter: "agTextColumnFilter",
@@ -775,6 +794,16 @@ const COMBINED_AGENT_COL_DEFS = [
         suppressHeaderMenuButton: true,
         suppressHeaderFilterButton: true,
         cellRenderer: AgentComponentTypeCellRenderer,
+        cellStyle: { display: "flex", alignItems: "center" },
+    },
+    {
+        field: "riskScore",
+        headerName: "Risk Score",
+        width: 100,
+        filter: false,
+        suppressHeaderMenuButton: true,
+        suppressHeaderFilterButton: true,
+        cellRenderer: DeviceRiskCellRenderer,
         cellStyle: { display: "flex", alignItems: "center" },
     },
     {
@@ -1048,9 +1077,13 @@ function ViolationsTab({ asset }) {
             rowData={violations}
             columnDefs={VIOLATIONS_COL_DEFS}
             defaultColDef={GRID_DEFAULT_COL}
+            onRowClicked={() => window.open("/dashboard/guardrails/activity", "_blank")}
+            getRowStyle={() => ({ cursor: "pointer" })}
             fillHeight
             noOuterBorder
-            pagination={false}
+            searchPlaceholder="Search violations..."
+            pagination
+            paginationPageSize={20}
             sideBar={false}
         />
     );
@@ -1088,7 +1121,8 @@ function DevicesTab({ asset, assetDevices = {} }) {
             fillHeight
             noOuterBorder
             searchPlaceholder="Search devices..."
-            pagination={false}
+            pagination
+            paginationPageSize={20}
             sideBar={false}
         />
     );

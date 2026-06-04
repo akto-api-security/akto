@@ -224,21 +224,25 @@ function earliestTs(seriesList) {
  * Items dated before the first slot seed the baseline so the line is a TRUE cumulative
  * total (ends at the count of all items <= windowEnd), not just within-window additions.
  */
-function cumulativeCounts(items, getTs, slots, end) {
+function cumulativeCounts(items, getTs, slots, end, getWeight) {
     const n = slots.length;
     const firstBoundary = slots[0].boundary;
     let baseline = 0;
     const perMonth = new Array(n).fill(0);
 
     items.forEach((item) => {
+        const w = getWeight ? getWeight(item) : 1;
         const ts = getTs(item);
-        if (!ts || ts <= 0 || ts > end) return;
-        if (ts < firstBoundary) { baseline++; return; } // existed before the window → baseline
+        // Items without a usable in-window timestamp (missing, zero, or dated before the first
+        // slot) still exist — seed them into the baseline so the running total reaches the true
+        // grand total at the final month. Only genuinely future items (ts > end) are excluded.
+        if (!ts || ts <= 0 || ts < firstBoundary) { baseline += w; return; }
+        if (ts > end) return;
         let idx = -1;
         for (let i = 0; i < n; i++) {
             if (ts >= slots[i].boundary) idx = i;
         }
-        if (idx >= 0) perMonth[idx]++;
+        if (idx >= 0) perMonth[idx] += w;
     });
 
     const counts = new Array(n).fill(0);
@@ -249,14 +253,15 @@ function cumulativeCounts(items, getTs, slots, end) {
 
 /**
  * Cumulative monthly series for a single metric over the selected window.
- * Returns { labels, counts } — counts is a running total ending at the all-time count.
+ * Returns { labels, counts } — counts is a running total ending at the all-time total.
+ * Pass `getWeight` to sum a per-item value (e.g. AI interactions) instead of counting rows.
  */
-function cumulativeByMonth(items, getTs, windowStart, windowEnd) {
+export function cumulativeByMonth(items, getTs, windowStart, windowEnd, getWeight) {
     const nowSec = Math.floor(Date.now() / 1000);
     const end = windowEnd > 0 ? windowEnd : nowSec;
     const dataMin = earliestTs([{ items, getTs }]);
     const slots = buildWindowSlots(windowStart, windowEnd, dataMin);
-    return { labels: slots.map((s) => s.label), counts: cumulativeCounts(items, getTs, slots, end) };
+    return { labels: slots.map((s) => s.label), counts: cumulativeCounts(items, getTs, slots, end, getWeight) };
 }
 
 /**
