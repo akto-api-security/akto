@@ -42,6 +42,7 @@ import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.dto.tracing.Span;
 import com.akto.tracing.ServiceGraphBuilder;
 import com.akto.tracing.TraceParseResult;
+import com.akto.tracing.copilot.CopilotActivityParser;
 import com.akto.tracing.n8n.N8nTraceParser;
 import com.akto.tracing.snowflake.SnowflakeTraceParser;
 import com.akto.usage.OrgUtils;
@@ -557,6 +558,105 @@ public class HttpCallParser {
         return Constants.AI_AGENT_SOURCE_SNOWFLAKE.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
     }
 
+    private boolean isCopilotTraffic(Map<String, String> tagsMap) {
+        if (tagsMap == null) return false;
+        return Constants.AI_AGENT_SOURCE_COPILOT_STUDIO.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+    }
+
+    private boolean isCopilotTrafficRaw(HttpResponseParams httpResponseParam) {
+        try {
+            String tagsJson = httpResponseParam.getTags();
+            if (tagsJson == null || tagsJson.isEmpty()) return false;
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            return tagsMap != null && Constants.AI_AGENT_SOURCE_COPILOT_STUDIO.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+        } catch (Exception e) { return false; }
+    }
+
+    private boolean shouldStoreSnowflakeAgentTrace(HttpResponseParams httpResponseParam) {
+        try {
+            String tagsJson = httpResponseParam.getTags();
+            if (tagsJson == null || tagsJson.isEmpty()) return false;
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            String source = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_SOURCE) : null;
+            return source != null && Constants.AI_AGENT_SOURCE_SNOWFLAKE.equalsIgnoreCase(source.trim());
+        } catch (Exception e) { return false; }
+    }
+
+    private String resolveAgentNameFromTags(String tagsJson) {
+        try {
+            if (tagsJson == null || tagsJson.isEmpty()) return null;
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) return null;
+            String name = tagsMap.get(Constants.AI_AGENT_TAG_BOT_NAME);
+            if (name != null && !name.isEmpty()) return name;
+            name = tagsMap.get("agent");
+            if (name != null && !name.isEmpty()) return name;
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    private void parseCopilotTrace(HttpResponseParams httpResponseParam) {
+        try {
+            String payload = httpResponseParam.getPayload();
+            if (payload == null || payload.isEmpty()) {
+                loggerMaker.warn("Copilot trace: payload is null or empty, skipping");
+                return;
+            }
+            if (!CopilotActivityParser.getInstance().canParse(payload)) {
+                loggerMaker.warn("Copilot trace: canParse returned false, skipping");
+                return;
+            }
+            loggerMaker.warn("Copilot trace: attempting to parse activities");
+            TraceParseResult result = CopilotActivityParser.getInstance().parse(payload);
+            if (result.getTrace() != null) {
+                if (httpResponseParam.getRequestParams() != null) {
+                    result.getTrace().setApiCollectionId(httpResponseParam.getRequestParams().getApiCollectionId());
+                }
+                // Enrich agent name from HTTP tags if parser only found the default
+                String resolvedName = resolveAgentNameFromTags(httpResponseParam.getTags());
+                if (resolvedName != null && result.getTrace().getAiAgentName() != null
+                        && result.getTrace().getAiAgentName().equals("Copilot Agent")) {
+                    result.getTrace().setAiAgentName(resolvedName);
+                    result.getTrace().setName(resolvedName);
+                    // Also update root span name
+                    if (result.getSpans() != null) {
+                        result.getSpans().stream()
+                                .filter(s -> s.getParentSpanId() == null)
+                                .findFirst()
+                                .ifPresent(root -> root.setName(resolvedName));
+                    }
+                }
+            }
+            loggerMaker.warn("Copilot trace: parsed " +
+                    (result.getSpans() != null ? result.getSpans().size() : 0) +
+                    " spans, traceId=" + (result.getTrace() != null ? result.getTrace().getId() : "null") +
+                    ", status=" + (result.getTrace() != null ? result.getTrace().getStatus() : "null") +
+                    ", apiCollectionId=" + (result.getTrace() != null ? result.getTrace().getApiCollectionId() : "null"));
+            dataActor.storeTrace(result.getTrace());
+            if (result.getSpans() != null && !result.getSpans().isEmpty()) {
+                dataActor.storeSpans(result.getSpans());
+            }
+            if (httpResponseParam.getRequestParams() != null) {
+                int apiCollectionId = httpResponseParam.getRequestParams().getApiCollectionId();
+                if (apiCollectionId != -1) {
+                    Map<String, ServiceGraphEdgeInfo> edges = buildServiceGraphFromSpans(result.getSpans());
+                    if (edges != null && !edges.isEmpty()) {
+                        ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
+                    }
+                    loggerMaker.warn("Copilot trace: service graph updated with " +
+                            (edges != null ? edges.size() : 0) + " edges for collectionId=" + apiCollectionId);
+                }
+            }
+            loggerMaker.warn("Copilot trace: stored successfully, spans=" +
+                    (result.getSpans() != null ? result.getSpans().size() : 0));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing Copilot trace: " + e.getMessage());
+        }
+    }
+
     private boolean isAgenticTraffic(Map<String, String> tagsMap) {
         if (tagsMap == null) {
             return false;
@@ -809,16 +909,27 @@ public class HttpCallParser {
         Map<String, Span> byId = new HashMap<>();
         for (Span s : spans) byId.put(s.getId(), s);
         for (Span span : spans) {
-            if (span.getParentSpanId() == null) continue;
-            Span parent = byId.get(span.getParentSpanId());
-            String sourceService = parent != null ? parent.getName() : "AGENT";
-            String targetService = span.getName();
+            String targetService = sanitizeServiceName(span.getName());
+            String spanKind = span.getSpanKind();
             Map<String, Object> meta = new HashMap<>();
-            meta.put("type", span.getSpanKind());
-            meta.put("edgeParam", span.getSpanKind());
-            edges.put(targetService, new ServiceGraphEdgeInfo(sourceService, targetService, meta));
+            meta.put("type", spanKind);
+            meta.put("edgeParam", spanKind);
+
+            if (span.getParentSpanId() == null) {
+                // Root (agent) span — add as a target so the UI shows it as "AI Agent"
+                edges.put(targetService, new ServiceGraphEdgeInfo("User", targetService, meta));
+            } else {
+                Span parent = byId.get(span.getParentSpanId());
+                String sourceService = parent != null ? sanitizeServiceName(parent.getName()) : "User";
+                edges.put(targetService, new ServiceGraphEdgeInfo(sourceService, targetService, meta));
+            }
         }
         return edges;
+    }
+
+    private static String sanitizeServiceName(String name) {
+        if (name == null) return "unknown";
+        return name.replaceAll("[^a-zA-Z0-9_\\-]", "_");
     }
 
     private List<HttpResponseParams> filterDefaultPayloads(List<HttpResponseParams> filteredResponseParams, Map<String, DefaultPayload> defaultPayloadMap) {
@@ -1453,7 +1564,7 @@ public class HttpCallParser {
                         + httpResponseParam.getRequestParams().getURL());
             }
 
-            if (isAtlasTraffic(httpResponseParam) || isArgusTraffic(httpResponseParam)) {
+            if (isAtlasTraffic(httpResponseParam) || isArgusTraffic(httpResponseParam) || shouldStoreSnowflakeAgentTrace(httpResponseParam) || isCopilotTrafficRaw(httpResponseParam)) {
                 if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
                     loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams skipping advanced filters for agentic traffic "
                             + httpResponseParam.getRequestParams().getURL());
@@ -1523,6 +1634,10 @@ public class HttpCallParser {
 
             if (isSnowflakeTraffic(tagsMap)) {
                 storeSnowflakeAgentTrace(httpResponseParam);
+            }
+
+            if (isCopilotTraffic(tagsMap)) {
+                parseCopilotTrace(httpResponseParam);
             }
 
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
