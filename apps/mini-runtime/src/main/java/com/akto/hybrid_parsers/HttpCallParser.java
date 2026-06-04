@@ -566,9 +566,20 @@ public class HttpCallParser {
     private void parseCopilotTrace(HttpResponseParams httpResponseParam) {
         try {
             String payload = httpResponseParam.getPayload();
-            if (payload == null || payload.isEmpty()) return;
-            if (!CopilotActivityParser.getInstance().canParse(payload)) return;
+            if (payload == null || payload.isEmpty()) {
+                loggerMaker.warn("Copilot trace: payload is null or empty, skipping");
+                return;
+            }
+            if (!CopilotActivityParser.getInstance().canParse(payload)) {
+                loggerMaker.warn("Copilot trace: canParse returned false, skipping");
+                return;
+            }
+            loggerMaker.warn("Copilot trace: attempting to parse activities");
             TraceParseResult result = CopilotActivityParser.getInstance().parse(payload);
+            loggerMaker.warn("Copilot trace: parsed " +
+                    (result.getSpans() != null ? result.getSpans().size() : 0) +
+                    " spans, traceId=" + (result.getTrace() != null ? result.getTrace().getId() : "null") +
+                    ", status=" + (result.getTrace() != null ? result.getTrace().getStatus() : "null"));
             dataActor.storeTrace(result.getTrace());
             if (result.getSpans() != null && !result.getSpans().isEmpty()) {
                 dataActor.storeSpans(result.getSpans());
@@ -580,10 +591,12 @@ public class HttpCallParser {
                     if (edges != null && !edges.isEmpty()) {
                         ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
                     }
+                    loggerMaker.warn("Copilot trace: service graph updated with " +
+                            (edges != null ? edges.size() : 0) + " edges for collectionId=" + apiCollectionId);
                 }
             }
-            loggerMaker.info("Stored Copilot Studio trace with " +
-                    (result.getSpans() != null ? result.getSpans().size() : 0) + " spans", LogDb.RUNTIME);
+            loggerMaker.warn("Copilot trace: stored successfully, spans=" +
+                    (result.getSpans() != null ? result.getSpans().size() : 0));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error parsing Copilot trace: " + e.getMessage());
         }
