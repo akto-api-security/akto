@@ -66,7 +66,7 @@ public class CopilotActivityParser implements TraceParser {
         try {
             String json = toJson(input);
             JsonNode root = OBJECT_MAPPER.readTree(json);
-            JsonNode activities = root.path("activities");
+            JsonNode activities = root.path("traces");
             if (!activities.isArray() || activities.size() == 0) return false;
             boolean hasUserMessage = false;
             boolean hasDynamicPlan = false;
@@ -89,7 +89,7 @@ public class CopilotActivityParser implements TraceParser {
         String json = toJson(input);
         JsonNode root = OBJECT_MAPPER.readTree(json);
         List<JsonNode> acts = new ArrayList<>();
-        root.path("activities").forEach(acts::add);
+        root.path("traces").forEach(acts::add);
 
         // ── Pass 1: anchor IDs, timestamps, top-level metadata ────────────
         String userMessageId = null;
@@ -377,7 +377,7 @@ public class CopilotActivityParser implements TraceParser {
         String currentPlanLabel = null;
         int toolStepSeq = 0;    // global step sequence for unique edge keys
 
-        for (JsonNode act : root.path("activities")) {
+        for (JsonNode act : root.path("traces")) {
             String type = act.path("type").asText("");
             String name = act.path("name").asText("");
             int role = act.path("from").path("role").asInt(-1);
