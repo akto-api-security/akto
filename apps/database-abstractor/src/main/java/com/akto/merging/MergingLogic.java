@@ -40,6 +40,13 @@ public class MergingLogic {
     private static final int OPTIMIZED_MERGING_ACCOUNT_ID = 1736798101;
 
     private static final boolean shouldUseOptimizedMerging = "true".equalsIgnoreCase(System.getenv("USE_OPTIMIZED_MERGING"));
+    private static final int OPTIMIZED_MERGING_LIMIT = parseEnvInt("OPTIMIZED_MERGING_LIMIT", 150_000);
+
+    private static int parseEnvInt(String key, int defaultValue) {
+        String val = System.getenv(key);
+        if (val == null) return defaultValue;
+        try { return Integer.parseInt(val); } catch (NumberFormatException e) { return defaultValue; }
+    }
 
     private static Set<MergedUrls> mergedUrls = new HashSet<>();
 
@@ -298,7 +305,7 @@ public class MergingLogic {
         }
 
         int offset = 0;
-        int limit = optimized ? 150_000 : (mergeUrlsBasic ? 10_000 : 50_000);
+        int limit = optimized ? OPTIMIZED_MERGING_LIMIT : (mergeUrlsBasic ? 10_000 : 50_000);
 
         // Load already-audited static URLs so we skip them (optimized dry-run only)
         Set<String> alreadyAudited = optimized ? loadAuditedUrls(apiCollectionId) : Collections.emptySet();
