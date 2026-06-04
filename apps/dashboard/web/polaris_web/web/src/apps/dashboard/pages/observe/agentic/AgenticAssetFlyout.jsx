@@ -325,16 +325,18 @@ const TOOLS_COL_DEFS = [
     { field: "params",    headerName: "Params",    width: 80,  suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ToolParamsCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, valueGetter: p => p.data?.params?.length ?? 0 },
 ];
 
+const SEVERITY_ORDER = { low: 1, medium: 2, high: 3, critical: 4 };
+
 const VIOLATIONS_COL_DEFS = [
-    { field: "time",     headerName: "Time",      width: 130, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" } },
-    { field: "severity", headerName: "Severity",  width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "time",     headerName: "Time",      width: 130, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.timeEpoch || 0) - (nodeB?.data?.timeEpoch || 0) },
+    { field: "severity", headerName: "Severity",  width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, comparator: (a, b) => (SEVERITY_ORDER[a] || 0) - (SEVERITY_ORDER[b] || 0) },
     { field: "title",    headerName: "Violation", flex: 1, minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
 ];
 
 const DEVICES_COL_DEFS = [
     { field: "username",  headerName: "User",      flex: 1,   minWidth: 120, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#202223" }, valueFormatter: p => p.value || "-" },
 
-    { field: "lastSeen",  headerName: "Last Seen", width: 130, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, valueFormatter: p => p.value || "-" },
+    { field: "lastSeen",  headerName: "Last Seen", width: 130, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, valueFormatter: p => p.value || "-", comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.lastSeenEpoch || 0) - (nodeB?.data?.lastSeenEpoch || 0) },
 ];
 
 const CONNECTED_MCP_COL_DEFS = [
@@ -1074,7 +1076,7 @@ function ViolationsTab({ asset }) {
             rowData={violations}
             columnDefs={VIOLATIONS_COL_DEFS}
             defaultColDef={GRID_DEFAULT_COL}
-            onRowClicked={() => window.open("/dashboard/guardrails/activity", "_blank")}
+            onRowClicked={() => window.open("/dashboard/protection/threat-activity", "_blank")}
             getRowStyle={() => ({ cursor: "pointer" })}
             fillHeight
             noOuterBorder
@@ -1219,13 +1221,11 @@ export default function AgenticAssetFlyout({
     if (!asset) return null;
 
     return (
-        <Box className={"flyLayout " + (show ? "show" : "")} style={{ width: 720 }}>
-            <Box
-                className="innerFlyLayout"
-                onMouseEnter={lockScroll}
-                onMouseLeave={unlockScroll}
+        <Box className={"flyLayout " + (show ? "show" : "")} style={{ width: 800 }}>
+            <Box className={"flyOuterLayout " + (show ? "show" : "")}
                 style={{
-                    width: 720, top: "3.5rem",
+                    position: "fixed", right: 0, top: 0, zIndex: 1000,
+                    width: 800, top: "3.5rem",
                     height: "calc(100vh - 3.5rem)",
                     overflowY: "hidden",
                     display: "flex", flexDirection: "column",

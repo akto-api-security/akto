@@ -594,6 +594,7 @@ function buildDevicesForGroup(group, usernameMap = {}) {
                 os: "mac",
                 riskScore: group.riskScore ?? group.maxRiskScore ?? null,
                 lastSeen: maxTraffic > 0 ? func.prettifyEpoch(maxTraffic) : "-",
+                lastSeenEpoch: maxTraffic,
                 services: [],
             });
         }

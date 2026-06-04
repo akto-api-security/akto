@@ -177,11 +177,9 @@ function ViolTitleCellRenderer({ data }) {
 
 function ViolAgentCellRenderer({ data }) {
     if (!data) return null;
-    const displayAgent = data.agent ? formatDisplayName(data.agent) : null;
     return (
-        <Box style={{ display: "flex", alignItems: "center", height: "100%", gap: 5, overflow: "hidden" }}>
+        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
             <TypeBadge type={data.agentType} />
-            {displayAgent && <Box as="span" style={{ fontSize: 12, color: "#6D7175", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayAgent}</Box>}
         </Box>
     );
 }
@@ -211,14 +209,20 @@ function buildAgentsColDefs(agentRiskData) {
             if (!p.data) return null;
             return agentRiskData[p.data.path?.join("/")]?.violations ?? null;
         },
+        comparator: (a, b) => {
+            const sum = (v) => v ? (v.critical || 0) + (v.high || 0) + (v.medium || 0) + (v.low || 0) : 0;
+            return sum(a) - sum(b);
+        },
     },
     { field: "skillCount", headerName: "Skills", width: 80, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: AgentSkillsCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
 ];
 }
 
+const SEVERITY_ORDER = { low: 1, medium: 2, high: 3, critical: 4 };
+
 const VIOLATIONS_COL_DEFS = [
-    { field: "time",     headerName: "Time",               width: 120, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" } },
-    { field: "severity", headerName: "Severity",           width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "time",     headerName: "Time",               width: 120, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.timeEpoch || 0) - (nodeB?.data?.timeEpoch || 0) },
+    { field: "severity", headerName: "Severity",           width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, comparator: (a, b) => (SEVERITY_ORDER[a] || 0) - (SEVERITY_ORDER[b] || 0) },
     { field: "title",    headerName: "Violation",          flex: 1, minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
     { field: "agent",    headerName: "Agentic Component",  width: 200, cellRenderer: ViolAgentCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
 ];
@@ -571,7 +575,7 @@ function ViolationsTab({ device }) {
 
     const handleViolationClick = useCallback((e) => {
         if (!e.data) return;
-        window.open("/dashboard/guardrails/policies", "_blank");
+        window.open("/dashboard/protection/threat-activity", "_blank");
     }, []);
 
     if (violations.length === 0) {
@@ -631,13 +635,11 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
     if (!device) return null;
 
     return (
-        <Box className={"flyLayout " + (show ? "show" : "")} style={{ width: 720 }}>
-            <Box
-                className="innerFlyLayout"
-                onMouseEnter={lockScroll}
-                onMouseLeave={unlockScroll}
+        <Box className={"flyLayout " + (show ? "show" : "")} style={{ width: 800 }}>
+            <Box className={"flyOuterLayout " + (show ? "show" : "")}
                 style={{
-                    width: 720, top: "3.5rem",
+                    position: "fixed", right: 0, top: 0, zIndex: 1000,
+                    width: 800, top: "3.5rem",
                     height: "calc(100vh - 3.5rem)",
                     overflowY: "hidden",
                     display: "flex", flexDirection: "column",

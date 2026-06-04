@@ -74,10 +74,12 @@ const SKILL_SCHEMA_COL_DEFS = [
     { field: "desc", headerName: "Description", flex: 2,    minWidth: 160, cellRenderer: ParamDescCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
 ];
 
+const SEVERITY_ORDER = { low: 1, medium: 2, high: 3, critical: 4 };
+
 const SKILL_VIOLATION_COL_DEFS = [
-    { field: "severity", headerName: "Severity", width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: SevBadgeCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "severity", headerName: "Severity", width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: SevBadgeCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, comparator: (a, b) => (SEVERITY_ORDER[a] || 0) - (SEVERITY_ORDER[b] || 0) },
     { field: "title",    headerName: "Violation", flex: 1, minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "time",     headerName: "Time",      width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" } },
+    { field: "time",     headerName: "Time",      width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.timeEpoch || 0) - (nodeB?.data?.timeEpoch || 0) },
 ];
 
 const COL_DEFS = [
@@ -271,6 +273,7 @@ function SkillDetailView({ skill, device, agent, skills, onBack, onClose, onSkil
                             noOuterBorder
                             pagination={false}
                             sideBar={false}
+                            onRowClicked={() => window.open("/dashboard/protection/threat-activity", "_blank")}
                         />
                     ) : (
                         <Box padding="4">

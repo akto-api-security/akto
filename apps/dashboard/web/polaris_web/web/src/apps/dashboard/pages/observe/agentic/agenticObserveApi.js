@@ -6,11 +6,7 @@ import { mapMcpAuditInfoToFlyoutData, buildSkillsFlyoutData } from "./agenticPag
 
 function formatViolationTime(epoch) {
     if (typeof epoch !== "number" || epoch <= 0) return epoch;
-    try {
-        return new Date(epoch * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    } catch {
-        return func.prettifyEpoch(epoch);
-    }
+    return func.prettifyEpoch(epoch);
 }
 
 function toEpochSeconds(t) {
