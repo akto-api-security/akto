@@ -49,9 +49,16 @@ public class TestOptimizedTemplateToStaticMatch {
         return matched;
     }
 
+    /** Wrapper that adapts the new void signature back to a Set<String> return for test convenience. */
+    private static Set<String> callOptimized(List<String> templates, Map<String, Set<String>> statics, int apiCollectionId) {
+        MergingLogic.ApiMergerResult result = new MergingLogic.ApiMergerResult(new HashMap<>());
+        MergingLogic.optimizedTemplateToStaticMatch(templates, statics, apiCollectionId, result);
+        return result.deleteStaticUrls;
+    }
+
     private void assertMatchesBruteForce(List<String> templates, Map<String, Set<String>> statics, int expectedSize) {
         Set<String> brute = bruteForceMatch(templates, statics, 0);
-        Set<String> optimized = MergingLogic.optimizedTemplateToStaticMatch(templates, statics, 0);
+        Set<String> optimized = callOptimized(templates, statics, 0);
         assertEquals("Optimized should match brute force", brute, optimized);
         assertEquals("Expected match count", expectedSize, optimized.size());
     }
@@ -144,7 +151,7 @@ public class TestOptimizedTemplateToStaticMatch {
     public void testEmptyTemplates() {
         List<String> templates = Collections.emptyList();
         Map<String, Set<String>> statics = toStaticMap("GET /api/users/123");
-        Set<String> result = MergingLogic.optimizedTemplateToStaticMatch(templates, statics, 0);
+        Set<String> result = callOptimized(templates, statics, 0);
         assertTrue("Empty templates should match nothing", result.isEmpty());
     }
 
@@ -152,13 +159,13 @@ public class TestOptimizedTemplateToStaticMatch {
     public void testEmptyStatics() {
         List<String> templates = Arrays.asList("GET /api/users/INTEGER");
         Map<String, Set<String>> statics = new HashMap<>();
-        Set<String> result = MergingLogic.optimizedTemplateToStaticMatch(templates, statics, 0);
+        Set<String> result = callOptimized(templates, statics, 0);
         assertTrue("Empty statics should match nothing", result.isEmpty());
     }
 
     @Test
     public void testBothEmpty() {
-        Set<String> result = MergingLogic.optimizedTemplateToStaticMatch(Collections.emptyList(), new HashMap<>(), 0);
+        Set<String> result = callOptimized(Collections.emptyList(), new HashMap<>(), 0);
         assertTrue("Both empty should match nothing", result.isEmpty());
     }
 
@@ -296,7 +303,7 @@ public class TestOptimizedTemplateToStaticMatch {
         List<String> templates = Arrays.asList("GET /api/users/INTEGER");
         Map<String, Set<String>> statics = toStaticMap("GET /api//users/123");
         // Double slash should be skipped
-        Set<String> result = MergingLogic.optimizedTemplateToStaticMatch(templates, statics, 0);
+        Set<String> result = callOptimized(templates, statics, 0);
         assertTrue("Double-slash URLs should be skipped", result.isEmpty());
     }
 
@@ -305,7 +312,7 @@ public class TestOptimizedTemplateToStaticMatch {
         List<String> templates = Arrays.asList("GET /api//users/INTEGER");
         Map<String, Set<String>> statics = toStaticMap("GET /api/users/123");
         // buildTemplateIndex skips templates with //
-        Set<String> result = MergingLogic.optimizedTemplateToStaticMatch(templates, statics, 0);
+        Set<String> result = callOptimized(templates, statics, 0);
         assertMatchesBruteForce(templates, statics, 0);
     }
 
@@ -313,7 +320,7 @@ public class TestOptimizedTemplateToStaticMatch {
     public void testEmptyEndpointSkipped() {
         List<String> templates = Arrays.asList("GET /api/users/INTEGER");
         Map<String, Set<String>> statics = toStaticMap("GET ");
-        Set<String> result = MergingLogic.optimizedTemplateToStaticMatch(templates, statics, 0);
+        Set<String> result = callOptimized(templates, statics, 0);
         assertTrue("Empty endpoint should be skipped", result.isEmpty());
     }
 
@@ -325,7 +332,7 @@ public class TestOptimizedTemplateToStaticMatch {
         Map<String, Set<String>> statics = new HashMap<>();
         statics.put(null, new HashSet<>());
         statics.put("GET /api/users/123", new HashSet<>());
-        Set<String> result = MergingLogic.optimizedTemplateToStaticMatch(templates, statics, 0);
+        Set<String> result = callOptimized(templates, statics, 0);
         // Should not crash, should still match the valid one
         assertTrue("Should match valid URL", result.contains("GET /api/users/123"));
     }
@@ -336,7 +343,7 @@ public class TestOptimizedTemplateToStaticMatch {
         Map<String, Set<String>> statics = new HashMap<>();
         statics.put("", new HashSet<>());
         statics.put("GET /api/users/123", new HashSet<>());
-        Set<String> result = MergingLogic.optimizedTemplateToStaticMatch(templates, statics, 0);
+        Set<String> result = callOptimized(templates, statics, 0);
         assertTrue("Should match valid URL", result.contains("GET /api/users/123"));
         assertEquals(1, result.size());
     }
@@ -345,7 +352,7 @@ public class TestOptimizedTemplateToStaticMatch {
     public void testStaticURLWithNoSpace() {
         List<String> templates = Arrays.asList("GET /api/users/INTEGER");
         Map<String, Set<String>> statics = toStaticMap("GET/api/users/123");  // no space
-        Set<String> result = MergingLogic.optimizedTemplateToStaticMatch(templates, statics, 0);
+        Set<String> result = callOptimized(templates, statics, 0);
         // "GET/api/users/123" has no space → skipped
         assertTrue("No-space URL should be skipped", result.isEmpty());
     }
@@ -357,7 +364,7 @@ public class TestOptimizedTemplateToStaticMatch {
         templates.add("");
         templates.add("GET /api/users/INTEGER");
         Map<String, Set<String>> statics = toStaticMap("GET /api/users/123");
-        Set<String> result = MergingLogic.optimizedTemplateToStaticMatch(templates, statics, 0);
+        Set<String> result = callOptimized(templates, statics, 0);
         assertTrue("Should match despite empty template", result.contains("GET /api/users/123"));
     }
 
@@ -592,7 +599,7 @@ public class TestOptimizedTemplateToStaticMatch {
         for (int i = 0; i < 10000; i++) {
             statics.put("GET /api/users/" + i, new HashSet<>());
         }
-        Set<String> result = MergingLogic.optimizedTemplateToStaticMatch(templates, statics, 0);
+        Set<String> result = callOptimized(templates, statics, 0);
         Set<String> brute = bruteForceMatch(templates, statics, 0);
         assertEquals(brute, result);
         assertEquals(10000, result.size());
@@ -704,7 +711,7 @@ public class TestOptimizedTemplateToStaticMatch {
         }
 
         Set<String> brute = bruteForceMatch(templates, statics, 0);
-        Set<String> optimized = MergingLogic.optimizedTemplateToStaticMatch(templates, statics, 0);
+        Set<String> optimized = callOptimized(templates, statics, 0);
         assertEquals("Large scale parity", brute, optimized);
     }
 
@@ -738,8 +745,8 @@ public class TestOptimizedTemplateToStaticMatch {
         statics2.put("GET /api/users/456", new HashSet<>());
         statics2.put("GET /api/users/123", new HashSet<>());
 
-        Set<String> result1 = MergingLogic.optimizedTemplateToStaticMatch(templates, statics1, 0);
-        Set<String> result2 = MergingLogic.optimizedTemplateToStaticMatch(templates, statics2, 0);
+        Set<String> result1 = callOptimized(templates, statics1, 0);
+        Set<String> result2 = callOptimized(templates, statics2, 0);
         assertEquals("Order should not affect result", result1, result2);
     }
 
@@ -758,8 +765,8 @@ public class TestOptimizedTemplateToStaticMatch {
                 "GET /api/orders/99"
         );
 
-        Set<String> result1 = MergingLogic.optimizedTemplateToStaticMatch(templates1, statics, 0);
-        Set<String> result2 = MergingLogic.optimizedTemplateToStaticMatch(templates2, statics, 0);
+        Set<String> result1 = callOptimized(templates1, statics, 0);
+        Set<String> result2 = callOptimized(templates2, statics, 0);
         assertEquals("Template order should not affect result", result1, result2);
     }
 }

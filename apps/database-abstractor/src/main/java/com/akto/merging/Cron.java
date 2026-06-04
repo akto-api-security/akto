@@ -1,14 +1,20 @@
 package com.akto.merging;
 
+import com.akto.dao.ApiInfoDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.merging.MergeAuditLogDao;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.dependency_flow.DependencyFlow;
+import com.akto.dto.merging.MergeAuditLog;
 import com.akto.log.LoggerMaker;
 import com.akto.util.AccountTask;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Filters;
 
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -18,7 +24,7 @@ public class Cron {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Cron.class, LoggerMaker.LogDb.CYBORG);
     private static final int PRIORITY_ACCOUNT_ID = 1736798101;
-    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     public void cron(boolean isHybridSaas) {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -58,9 +64,20 @@ public class Cron {
             }
         }, 0, 10, TimeUnit.MINUTES);
 
+        String enableDeletion = System.getenv("ENABLE_MERGE_AUDIT_DELETION");
+        if ("true".equalsIgnoreCase(enableDeletion)) {
+            loggerMaker.warnAndAddToDb("Merge audit deletion cron enabled", LoggerMaker.LogDb.CYBORG);
+            scheduler.scheduleAtFixedRate(new Runnable() {
+                public void run() {
+                    Context.accountId.set(PRIORITY_ACCOUNT_ID);
+                    MergeAuditDeletion.runDeletion(PRIORITY_ACCOUNT_ID);
+                }
+            }, 5, 30, TimeUnit.MINUTES);
+        }
+
     }
 
-    public void triggerMerging(int accountId) {
+    public static void triggerMerging(int accountId) {
         if (!Lock.acquireLock(accountId)) {
             loggerMaker.infoAndAddToDb("Unable to acquire lock, merging process ignored for account " + accountId);
             return;
@@ -95,6 +112,106 @@ public class Cron {
             e.printStackTrace();
         }
         Lock.releaseLock(accountId);
+    }
+
+    /**
+     * Reads merge_audit_logs and prints verification stats:
+     * 1. Total unique static URLs that would be deleted
+     * 2. Deletion count per collection
+     * 3. Current unique endpoints (ApiInfo) vs post-merge count
+     * 4. Total STIs that would be deleted
+     * 5. Any static URL present in multiple audit docs (should be mergeable into only 1 template)
+     */
+    public static void verifyAuditLogs() {
+        System.out.println("=== Merge Audit Verification ===\n");
+
+        // Load all audit logs
+        MongoCursor<MergeAuditLog> cursor = MergeAuditLogDao.instance.getMCollection().find().cursor();
+        List<MergeAuditLog> allLogs = new ArrayList<>();
+        while (cursor.hasNext()) {
+            allLogs.add(cursor.next());
+        }
+        cursor.close();
+        System.out.println("Total audit log docs: " + allLogs.size());
+
+        // Track per-collection deletions and detect duplicates
+        Map<Integer, Set<String>> perCollectionDeletes = new HashMap<>();
+        // staticUrl → list of templateUrls it matched (for duplicate detection)
+        Map<String, List<String>> staticUrlToTemplates = new HashMap<>();
+
+        for (MergeAuditLog log : allLogs) {
+            int colId = log.getApiCollectionId();
+            Set<String> deletes = perCollectionDeletes.computeIfAbsent(colId, k -> new HashSet<>());
+            String templateInfo = log.getMergeType() + " | " + log.getMethod() + " " + log.getTemplateUrl();
+
+            for (String staticUrl : log.getMatchedStaticUrls()) {
+                deletes.add(staticUrl);
+                staticUrlToTemplates.computeIfAbsent(staticUrl, k -> new ArrayList<>()).add(templateInfo);
+            }
+        }
+
+        // 1. Total unique URLs to delete
+        int totalDeletes = 0;
+        for (Set<String> s : perCollectionDeletes.values()) totalDeletes += s.size();
+        System.out.println("\n--- 1. Total unique static URLs to delete: " + totalDeletes);
+
+        // 2. Per-collection deletion count
+        System.out.println("\n--- 2. Deletion count per collection:");
+        for (Map.Entry<Integer, Set<String>> entry : perCollectionDeletes.entrySet()) {
+            System.out.println("  Collection " + entry.getKey() + ": " + entry.getValue().size() + " URLs");
+        }
+
+        // 3. Current ApiInfo count vs post-merge
+        System.out.println("\n--- 3. ApiInfo count (current vs post-merge):");
+        for (int colId : perCollectionDeletes.keySet()) {
+            long currentCount = ApiInfoDao.instance.count(
+                    Filters.eq("_id.apiCollectionId", colId));
+            long postMerge = currentCount - perCollectionDeletes.get(colId).size();
+            System.out.println("  Collection " + colId + ": " + currentCount + " → " + postMerge
+                    + " (deleting " + perCollectionDeletes.get(colId).size() + " endpoints)");
+        }
+
+        // 4. Total STIs that would be deleted
+        System.out.println("\n--- 4. STI deletion count per collection:");
+        long totalStiDeletes = 0;
+        for (Map.Entry<Integer, Set<String>> entry : perCollectionDeletes.entrySet()) {
+            int colId = entry.getKey();
+            long stiCount = 0;
+            for (String staticUrl : entry.getValue()) {
+                // staticUrl is "METHOD /path" format
+                String[] parts = staticUrl.split(" ", 2);
+                if (parts.length < 2) continue;
+                stiCount += SingleTypeInfoDao.instance.count(
+                        Filters.and(
+                                Filters.eq("apiCollectionId", colId),
+                                Filters.eq("method", parts[0]),
+                                Filters.eq("url", parts[1])
+                        ));
+            }
+            totalStiDeletes += stiCount;
+            System.out.println("  Collection " + colId + ": " + stiCount + " STIs");
+        }
+        System.out.println("  Total STIs to delete: " + totalStiDeletes);
+
+        // 5. Static URLs present in multiple audit docs
+        System.out.println("\n--- 5. Static URLs matched by multiple templates:");
+        int dupeCount = 0;
+        for (Map.Entry<String, List<String>> entry : staticUrlToTemplates.entrySet()) {
+            if (entry.getValue().size() > 1) {
+                dupeCount++;
+                System.out.println("  " + entry.getKey());
+                for (String tmpl : entry.getValue()) {
+                    System.out.println("    → " + tmpl);
+                }
+            }
+        }
+        if (dupeCount == 0) {
+            System.out.println("  None — every static URL maps to exactly 1 template.");
+        } else {
+            System.out.println("  WARNING: " + dupeCount + " static URLs matched multiple templates!");
+        }
+
+        System.out.println("\n=== Verification Complete ===");
     }
 
 }
