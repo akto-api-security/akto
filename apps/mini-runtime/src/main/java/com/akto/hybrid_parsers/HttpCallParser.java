@@ -563,6 +563,41 @@ public class HttpCallParser {
         return Constants.AI_AGENT_SOURCE_COPILOT_STUDIO.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
     }
 
+    private boolean isCopilotTrafficRaw(HttpResponseParams httpResponseParam) {
+        try {
+            String tagsJson = httpResponseParam.getTags();
+            if (tagsJson == null || tagsJson.isEmpty()) return false;
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            return tagsMap != null && Constants.AI_AGENT_SOURCE_COPILOT_STUDIO.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+        } catch (Exception e) { return false; }
+    }
+
+    private boolean shouldStoreSnowflakeAgentTrace(HttpResponseParams httpResponseParam) {
+        try {
+            String tagsJson = httpResponseParam.getTags();
+            if (tagsJson == null || tagsJson.isEmpty()) return false;
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            String source = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_SOURCE) : null;
+            return source != null && Constants.AI_AGENT_SOURCE_SNOWFLAKE.equalsIgnoreCase(source.trim());
+        } catch (Exception e) { return false; }
+    }
+
+    private String resolveAgentNameFromTags(String tagsJson) {
+        try {
+            if (tagsJson == null || tagsJson.isEmpty()) return null;
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) return null;
+            String name = tagsMap.get(Constants.AI_AGENT_TAG_BOT_NAME);
+            if (name != null && !name.isEmpty()) return name;
+            name = tagsMap.get("agent");
+            if (name != null && !name.isEmpty()) return name;
+        } catch (Exception ignored) {}
+        return null;
+    }
+
     private void parseCopilotTrace(HttpResponseParams httpResponseParam) {
         try {
             String payload = httpResponseParam.getPayload();
@@ -576,8 +611,24 @@ public class HttpCallParser {
             }
             loggerMaker.warn("Copilot trace: attempting to parse activities");
             TraceParseResult result = CopilotActivityParser.getInstance().parse(payload);
-            if (result.getTrace() != null && httpResponseParam.getRequestParams() != null) {
-                result.getTrace().setApiCollectionId(httpResponseParam.getRequestParams().getApiCollectionId());
+            if (result.getTrace() != null) {
+                if (httpResponseParam.getRequestParams() != null) {
+                    result.getTrace().setApiCollectionId(httpResponseParam.getRequestParams().getApiCollectionId());
+                }
+                // Enrich agent name from HTTP tags if parser only found the default
+                String resolvedName = resolveAgentNameFromTags(httpResponseParam.getTags());
+                if (resolvedName != null && result.getTrace().getAiAgentName() != null
+                        && result.getTrace().getAiAgentName().equals("Copilot Agent")) {
+                    result.getTrace().setAiAgentName(resolvedName);
+                    result.getTrace().setName(resolvedName);
+                    // Also update root span name
+                    if (result.getSpans() != null) {
+                        result.getSpans().stream()
+                                .filter(s -> s.getParentSpanId() == null)
+                                .findFirst()
+                                .ifPresent(root -> root.setName(resolvedName));
+                    }
+                }
             }
             loggerMaker.warn("Copilot trace: parsed " +
                     (result.getSpans() != null ? result.getSpans().size() : 0) +
@@ -591,7 +642,7 @@ public class HttpCallParser {
             if (httpResponseParam.getRequestParams() != null) {
                 int apiCollectionId = httpResponseParam.getRequestParams().getApiCollectionId();
                 if (apiCollectionId != -1) {
-                    Map<String, ServiceGraphEdgeInfo> edges = CopilotActivityParser.getInstance().extractServiceGraph(payload);
+                    Map<String, ServiceGraphEdgeInfo> edges = buildServiceGraphFromSpans(result.getSpans());
                     if (edges != null && !edges.isEmpty()) {
                         ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
                     }
@@ -1502,7 +1553,7 @@ public class HttpCallParser {
                         + httpResponseParam.getRequestParams().getURL());
             }
 
-            if (isAtlasTraffic(httpResponseParam) || isArgusTraffic(httpResponseParam)) {
+            if (isAtlasTraffic(httpResponseParam) || isArgusTraffic(httpResponseParam) || shouldStoreSnowflakeAgentTrace(httpResponseParam) || isCopilotTrafficRaw(httpResponseParam)) {
                 if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
                     loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams skipping advanced filters for agentic traffic "
                             + httpResponseParam.getRequestParams().getURL());

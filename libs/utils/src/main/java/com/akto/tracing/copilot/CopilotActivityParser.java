@@ -342,7 +342,7 @@ public class CopilotActivityParser implements TraceParser {
                 if (execTime != null) toolSpan.getMetadata().put("executionTime", execTime);
                 if (cost >= 0) toolSpan.getMetadata().put("displayedCost", cost);
 
-                // Update parent planning span: extend end time, update completion summary in output
+                // Update parent planning span: extend end time, accumulate results and summary
                 if (planId != null) {
                     Span planSpan = lastPlanByPlanId.get(planId);
                     if (planSpan != null) {
@@ -351,11 +351,17 @@ public class CopilotActivityParser implements TraceParser {
                         if (planOutput == null) { planOutput = new LinkedHashMap<>(); planSpan.setOutput(planOutput); }
                         int completed = ((Number) planOutput.getOrDefault("completedSteps", 0)).intValue() + 1;
                         planOutput.put("completedSteps", completed);
-                        int resultsFound = 0;
-                        Object sr = toolOutput.get("search_results");
-                        if (sr instanceof List) resultsFound = ((List<?>) sr).size();
-                        int prev = ((Number) planOutput.getOrDefault("totalResultsFound", 0)).intValue();
-                        planOutput.put("totalResultsFound", prev + resultsFound);
+                        // Aggregate actual search results from each tool step
+                        @SuppressWarnings("unchecked")
+                        List<Map<String, Object>> allResults = (List<Map<String, Object>>) planOutput.get("output");
+                        if (allResults == null) { allResults = new ArrayList<>(); planOutput.put("output", allResults); }
+                        Object sr = toolOutput.get("output");
+                        if (sr instanceof List) {
+                            @SuppressWarnings("unchecked")
+                            List<Map<String, Object>> stepResults = (List<Map<String, Object>>) sr;
+                            allResults.addAll(stepResults);
+                            planOutput.put("totalResultsFound", allResults.size());
+                        }
                     }
                 }
             }
@@ -450,7 +456,7 @@ public class CopilotActivityParser implements TraceParser {
         if (observation.isMissingNode() || observation.isNull()) return output;
 
         // Search tool: observation.search_result.search_results
-        JsonNode searchResults = observation.path("search_result").path("search_results");
+        JsonNode searchResults = observation.path("search_result").path("output");
         if (searchResults.isArray() && searchResults.size() > 0) {
             List<Map<String, Object>> list = new ArrayList<>();
             searchResults.forEach(r -> {
@@ -463,7 +469,7 @@ public class CopilotActivityParser implements TraceParser {
                 if (!t.isEmpty()) item.put("snippet", truncate(t, MAX_SNIPPET_LEN));
                 if (!item.isEmpty()) list.add(item);
             });
-            if (!list.isEmpty()) output.put("search_results", list);
+            if (!list.isEmpty()) output.put("output", list);
             return output;
         }
 
