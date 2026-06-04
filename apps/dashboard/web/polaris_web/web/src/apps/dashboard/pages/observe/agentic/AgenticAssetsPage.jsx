@@ -1034,7 +1034,7 @@ function TopSection({
           {topViolations.length === 0 ? (
             <Box padding="4">
               <Text variant="bodySm" color="subdued">
-                No violations yet.
+                No violations
               </Text>
             </Box>
           ) : (
