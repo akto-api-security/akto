@@ -1221,11 +1221,11 @@ export default function AgenticAssetsPage() {
   const [agenticViolationRows, setAgenticViolationRows] = useState([]);
   const [newLayout, setNewLayout] = useState(() => {
     const stored = localStorage.getItem(LAYOUT_KEY);
-    return stored === null ? false : stored === "true";
+    return stored === "true";
   });
 
   useEffect(() => {
-    if (localStorage.getItem(LAYOUT_KEY) === "false") {
+    if (localStorage.getItem(LAYOUT_KEY) !== "true") {
       navigate("/dashboard/observe/agentic-assets-legacy", { replace: true });
     }
   }, [navigate]);
@@ -1351,7 +1351,7 @@ export default function AgenticAssetsPage() {
   const headerActions = (
     <HorizontalStack gap="3" blockAlign="center">
       <Checkbox
-        label="New UI"
+        label="New Layout"
         checked={newLayout}
         onChange={handleLayoutToggle}
       />

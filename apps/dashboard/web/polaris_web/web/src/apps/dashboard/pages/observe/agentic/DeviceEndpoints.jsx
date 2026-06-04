@@ -501,7 +501,7 @@ export default function DeviceEndpoints() {
     const [summary, setSummary] = useState({});
     const [newLayout, setNewLayout] = useState(() => {
         const stored = localStorage.getItem(LAYOUT_KEY);
-        return stored === null ? true : stored === "true";
+        return stored === "true";
     });
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
@@ -512,7 +512,7 @@ export default function DeviceEndpoints() {
     const endTimestamp = Math.floor(Date.parse(currDateRange.period.until) / 1000);
 
     useEffect(() => {
-        if (localStorage.getItem(LAYOUT_KEY) === "false") {
+        if (localStorage.getItem(LAYOUT_KEY) !== "true") {
             navigate("/dashboard/observe/users-and-devices", { replace: true });
         }
     }, [navigate]);
@@ -578,7 +578,7 @@ export default function DeviceEndpoints() {
     const headerActions = (
         <HorizontalStack gap="3" blockAlign="center">
             <Checkbox
-                label="New UI"
+                label="New Layout"
                 checked={newLayout}
                 onChange={handleLayoutToggle}
             />
