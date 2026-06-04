@@ -4,11 +4,30 @@ import observeApi from "../api";
 import settingRequests from "../../settings/api";
 import { mapMcpAuditInfoToFlyoutData, buildSkillsFlyoutData } from "./agenticPageBuilders";
 
+function formatViolationTime(epoch) {
+    if (typeof epoch !== "number" || epoch <= 0) return epoch;
+    try {
+        return new Date(epoch * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch {
+        return func.prettifyEpoch(epoch);
+    }
+}
+
+function toEpochSeconds(t) {
+    if (typeof t !== "number" || t <= 0) return 0;
+    // If value is > 1e12 it's milliseconds (13+ digits); convert to seconds
+    return t > 1e12 ? Math.floor(t / 1000) : t;
+}
+
 function normalizeViolationRows(violations = []) {
-    return violations.map((row) => ({
-        ...row,
-        time: typeof row.time === "number" && row.time > 0 ? func.prettifyEpoch(row.time) : row.time,
-    }));
+    return violations.map((row) => {
+        const epochSec = toEpochSeconds(row.time);
+        return {
+            ...row,
+            timeEpoch: epochSec,
+            time: epochSec > 0 ? formatViolationTime(epochSec) : row.time,
+        };
+    });
 }
 
 export function aggregateViolationsByCollectionId(violationRows = []) {

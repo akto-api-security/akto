@@ -157,11 +157,127 @@ function buildModuleDeviceMap(moduleInfos = []) {
     return map;
 }
 
+/**
+ * Bucket a list of items into 12 monthly slots covering the given time window.
+ * Each slot counts how many items fall in that calendar month.
+ * If startTimestamp is 0 (all-time), uses the earliest item's month as the window start.
+ *
+ * @param {Array} items - raw objects
+ * @param {function} getTs - extracts epoch-seconds timestamp from an item
+ * @param {number} windowStart - epoch seconds (0 = all-time / use data min)
+ * @param {number} windowEnd   - epoch seconds (0 = now)
+ * @returns {number[]} 12-element array, oldest month first
+ */
+const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const SECONDS_PER_DAY = 24 * 3600;
+
+/**
+ * Build monthly slots spanning the selected window [windowStart, windowEnd].
+ * - windowStart > 0: span exactly from that month to the end month (matches the date filter).
+ * - windowStart <= 0 (all-time): span from the earliest data month to now.
+ * Each slot: { boundary (epoch s, 1st of month), label ("Jun '25") }.
+ */
+function buildWindowSlots(windowStart, windowEnd, dataMinTs) {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const end = windowEnd > 0 ? windowEnd : nowSec;
+
+    let startSec;
+    if (windowStart > 0) {
+        startSec = windowStart;
+    } else {
+        // all-time → anchor at earliest data point (fallback: 12 months back)
+        startSec = dataMinTs > 0 ? dataMinTs : end - 365 * SECONDS_PER_DAY;
+    }
+
+    const startDate = new Date(startSec * 1000);
+    const snapStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const endDate = new Date(end * 1000);
+    const snapEnd = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+
+    const numMonths = Math.max(
+        (snapEnd.getFullYear() - snapStart.getFullYear()) * 12 +
+        (snapEnd.getMonth() - snapStart.getMonth()) + 1,
+        1,
+    );
+
+    return Array.from({ length: numMonths }, (_, i) => {
+        const d = new Date(snapStart.getFullYear(), snapStart.getMonth() + i, 1);
+        const yr = String(d.getFullYear()).slice(2);
+        return { boundary: Math.floor(d.getTime() / 1000), label: `${MONTH_ABBR[d.getMonth()]} '${yr}` };
+    });
+}
+
+/** Earliest timestamp across one or more {items, getTs} series (0 if none). */
+function earliestTs(seriesList) {
+    let min = Infinity;
+    seriesList.forEach(({ items, getTs }) => {
+        items.forEach((item) => {
+            const ts = getTs(item);
+            if (ts > 0 && ts < min) min = ts;
+        });
+    });
+    return Number.isFinite(min) ? min : 0;
+}
+
+/**
+ * Compute a cumulative running-total array for one series over the given slots.
+ * Items dated before the first slot seed the baseline so the line is a TRUE cumulative
+ * total (ends at the count of all items <= windowEnd), not just within-window additions.
+ */
+function cumulativeCounts(items, getTs, slots, end) {
+    const n = slots.length;
+    const firstBoundary = slots[0].boundary;
+    let baseline = 0;
+    const perMonth = new Array(n).fill(0);
+
+    items.forEach((item) => {
+        const ts = getTs(item);
+        if (!ts || ts <= 0 || ts > end) return;
+        if (ts < firstBoundary) { baseline++; return; } // existed before the window → baseline
+        let idx = -1;
+        for (let i = 0; i < n; i++) {
+            if (ts >= slots[i].boundary) idx = i;
+        }
+        if (idx >= 0) perMonth[idx]++;
+    });
+
+    const counts = new Array(n).fill(0);
+    let acc = baseline;
+    for (let i = 0; i < n; i++) { acc += perMonth[i]; counts[i] = acc; }
+    return counts;
+}
+
+/**
+ * Cumulative monthly series for a single metric over the selected window.
+ * Returns { labels, counts } — counts is a running total ending at the all-time count.
+ */
+function cumulativeByMonth(items, getTs, windowStart, windowEnd) {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const end = windowEnd > 0 ? windowEnd : nowSec;
+    const dataMin = earliestTs([{ items, getTs }]);
+    const slots = buildWindowSlots(windowStart, windowEnd, dataMin);
+    return { labels: slots.map((s) => s.label), counts: cumulativeCounts(items, getTs, slots, end) };
+}
+
+/**
+ * Cumulative monthly series for multiple aligned series (shared slots/labels).
+ * Returns { labels, data: [counts, ...] }.
+ */
+function cumulativeSeriesByMonth(seriesList, windowStart, windowEnd) {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const end = windowEnd > 0 ? windowEnd : nowSec;
+    const dataMin = earliestTs(seriesList);
+    const slots = buildWindowSlots(windowStart, windowEnd, dataMin);
+    const data = seriesList.map(({ items, getTs }) => cumulativeCounts(items, getTs, slots, end));
+    return { labels: slots.map((s) => s.label), data };
+}
+
+
 export function buildDeviceEndpointsPageData(
     collections,
     trafficMap = {},
     riskScoreMap = {},
-    { moduleInfos = [], usernameMap = {}, violationsByCollectionId = {} } = {},
+    { moduleInfos = [], usernameMap = {}, violationsByCollectionId = {}, violationRows = [], startTimestamp = 0, endTimestamp = 0 } = {},
 ) {
     const agenticCollections = collections.filter(isAgenticCollection);
     const deviceModules = buildModuleDeviceMap(moduleInfos);
@@ -204,6 +320,7 @@ export function buildDeviceEndpointsPageData(
             device.children[childKey] = {
                 pathKey: childKey,
                 endpoint: formatDisplayName(serviceName || hostName),
+                rawServiceName: serviceName || hostName,
                 type: clientType,
                 collectionIds: [],
                 skillCount: 0,
@@ -251,7 +368,8 @@ export function buildDeviceEndpointsPageData(
     Object.values(deviceMap).forEach((device) => {
         const deviceRow = {
             path: [device.deviceId],
-            endpoint: device.deviceId,
+            endpoint: device.username && device.username !== "-" ? device.username : "-",
+            deviceId: device.deviceId,
             os: device.os,
             userCount: 1,
             riskScore: Math.round(device.maxRisk * 10) / 10,
@@ -260,6 +378,7 @@ export function buildDeviceEndpointsPageData(
             role: device.role,
             violations: toViolationsObject(device.violations),
             lastTraffic: device.maxTraffic > 0 ? func.prettifyEpoch(device.maxTraffic) : "-",
+            lastTrafficEpoch: device.maxTraffic || 0,
         };
         if (device.hasPersonalAccount) deviceRow.hasPersonalAccount = true;
         deviceFlatData.push(deviceRow);
@@ -274,10 +393,12 @@ export function buildDeviceEndpointsPageData(
             deviceFlatData.push({
                 path,
                 endpoint: child.endpoint,
+                rawServiceName: child.rawServiceName || child.endpoint,
                 type: child.type,
                 collectionIds: child.collectionIds,
                 skillCount: child.skillCount > 0 ? child.skillCount : undefined,
                 lastTraffic: child.lastTraffic > 0 ? func.prettifyEpoch(child.lastTraffic) : "-",
+                lastTrafficEpoch: child.lastTraffic || 0,
             });
             const riskKey = path.join("/");
             const entry = { riskScore: Math.round(child.riskScore * 10) / 10 };
@@ -299,13 +420,99 @@ export function buildDeviceEndpointsPageData(
     });
 
     const totalViolations = Object.values(violationsBySeverity).reduce((a, b) => a + b, 0);
-    const spark = (n) => Array.from({ length: 12 }, (_, i) => Math.max(0, Math.round(n * (0.7 + 0.03 * i))));
+
+    // ── Real time-series bucketing ────────────────────────────────────────────
+    // Endpoints & OS: bucket agenticCollections by startTs (when each collection was first seen)
+    // Each unique device (first segment of hostName) is counted once per month using its
+    // earliest collection's startTs as the "first seen" date.
+    const deviceFirstSeen = {}; // deviceId → earliest startTs
+    agenticCollections.forEach((c) => {
+        const hostName = c.hostName || c.displayName || c.name;
+        const devId = extractEndpointId(hostName);
+        if (!devId) return;
+        const ts = c.startTs || 0;
+        if (!deviceFirstSeen[devId] || ts < deviceFirstSeen[devId].ts) {
+            deviceFirstSeen[devId] = { ts, os: inferOsFromDeviceId(devId) };
+        }
+    });
+    const deviceFirstSeenItems = Object.values(deviceFirstSeen);
+
+    // Unique-user first-seen: use the earliest collection startTs per username
+    const userFirstSeen = {}; // username → earliest startTs
+    agenticCollections.forEach((c) => {
+        const hostName = c.hostName || c.displayName || c.name;
+        const devId = extractEndpointId(hostName);
+        if (!devId) return;
+        const dev = deviceMap[devId];
+        const username = dev?.username;
+        if (!username || username === "-") return;
+        const ts = c.startTs || 0;
+        if (!userFirstSeen[username] || ts < userFirstSeen[username]) {
+            userFirstSeen[username] = ts;
+        }
+    });
+    const userFirstSeenItems = Object.values(userFirstSeen).map((ts) => ({ ts }));
+
+    // OS trend: count of newly-first-seen devices per OS per month.
+    // Use cumulativeSeriesByMonth so all 3 OS series share identical slot boundaries + labels.
+    const macItems     = deviceFirstSeenItems.filter((d) => d.os === "mac");
+    const windowsItems = deviceFirstSeenItems.filter((d) => d.os === "windows");
+    const linuxItems   = deviceFirstSeenItems.filter((d) => d.os === "linux");
+
+    const getTs = (d) => d.ts;
+    // OS trend: cumulative new-devices-per-OS over the selected window, shared slots/labels.
+    const { labels: monthLabels, data: osTrendData } = cumulativeSeriesByMonth(
+        [
+            { items: macItems,     getTs },
+            { items: windowsItems, getTs },
+            { items: linuxItems,   getTs },
+        ],
+        startTimestamp,
+        endTimestamp,
+    );
+    const [macCounts, windowsCounts, linuxCounts] = osTrendData;
+
+    // Sparklines — cumulative, same window as the OS trend
+    const endpointBucket  = cumulativeByMonth(deviceFirstSeenItems, getTs, startTimestamp, endTimestamp);
+    const userBucket      = cumulativeByMonth(userFirstSeenItems,   (d) => d.ts, startTimestamp, endTimestamp);
+    // Violations: per-month count over the selected window. Count ONLY rows whose
+    // apiCollectionId belongs to an agentic device collection — the SAME rows that build
+    // totalViolations (46). Counting all raw violationRows would inflate to the full feed.
+    const violationBucket = (() => {
+        const agenticCollectionIds = new Set(Object.keys(collectionIdToDevice).map(Number));
+        const relevantRows = violationRows.filter((v) => agenticCollectionIds.has(Number(v.apiCollectionId)));
+        const getViolTs = (v) => v.timeEpoch || 0;
+        const dataMin = earliestTs([{ items: relevantRows, getTs: getViolTs }]);
+        const slots = buildWindowSlots(startTimestamp, endTimestamp, dataMin);
+        const n = slots.length;
+        const counts = new Array(n).fill(0);
+        relevantRows.forEach((v) => {
+            const ts = getViolTs(v);
+            if (!ts || ts <= 0 || ts < slots[0].boundary) return;
+            let idx = -1;
+            for (let i = 0; i < n; i++) { if (ts >= slots[i].boundary) idx = i; }
+            if (idx >= 0) counts[idx]++;
+        });
+        return { counts };
+    })();
+
+    // Delta over the selected window: last cumulative point minus first cumulative point.
+    // Positive = growth, negative = (only possible if data shifts) reduction.
+    function windowDelta(counts) {
+        if (!counts || counts.length < 2) return 0;
+        return (counts[counts.length - 1] || 0) - (counts[0] || 0);
+    }
 
     const summary = {
         totalEndpoints: agentChildCount,
         totalUsers: users.size,
         totalViolations,
         deviceCount,
+        monthLabels,
+        deltaEndpoints:  windowDelta(endpointBucket.counts),
+        deltaUsers:      windowDelta(userBucket.counts),
+        // Violations delta = totalViolations itself (the number shown is already period-filtered)
+        deltaViolations: violationBucket.counts.reduce((a, b) => a + b, 0),
         violationsBySeverity: [
             { name: "Critical", y: violationsBySeverity.critical, color: "#DC2626" },
             { name: "High", y: violationsBySeverity.high, color: "#F97316" },
@@ -313,14 +520,14 @@ export function buildDeviceEndpointsPageData(
             { name: "Low", y: violationsBySeverity.low, color: "#D1D5DB" },
         ],
         osTrend: {
-            mac: spark(osCounts.mac),
-            windows: spark(osCounts.windows),
-            linux: spark(osCounts.linux),
+            mac:     macCounts,
+            windows: windowsCounts,
+            linux:   linuxCounts,
         },
         statSparklines: {
-            endpoints: spark(agentChildCount),
-            users: spark(users.size),
-            violations: spark(totalViolations),
+            endpoints:  endpointBucket.counts,
+            users:      userBucket.counts,
+            violations: violationBucket.counts,
         },
     };
 

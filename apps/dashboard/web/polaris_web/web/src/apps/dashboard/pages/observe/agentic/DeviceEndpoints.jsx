@@ -4,16 +4,14 @@ import { produce } from "immer";
 import Highcharts from "highcharts";
 import { HighchartsReact } from "highcharts-react-official";
 import { Card, Box, HorizontalStack, VerticalStack, Text, Icon, Divider, Checkbox } from "@shopify/polaris";
-import { CustomersMajor, CustomersMinor } from "@shopify/polaris-icons";
+import { CustomersMajor } from "@shopify/polaris-icons";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import AgGridRow from "@/apps/dashboard/components/tables/rows/AgGridRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
-import SkillsFlyout from "./SkillsFlyout";
 import DeviceFlyout from "./DeviceFlyout";
-import McpFlyout from "./McpFlyout";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import { TYPE_STYLES, SEVERITY_COLORS, getRiskColor } from "./agenticStyles";
 import agenticObserveApi, { aggregateViolationsByCollectionId } from "./agenticObserveApi";
@@ -33,37 +31,58 @@ LicenseManager.setLicenseKey(
 
 // ─── Chart data ──────────────────────────────────────────────────────────────
 
-const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 // ─── Chart config helpers ─────────────────────────────────────────────────────
 
-function makeSparklineConfig(data, color) {
-    const min = Math.min(...data), max = Math.max(...data);
-    const pad = (max - min) * 0.2;
+function makeSparklineConfig(data, color, monthLabels) {
+    const safeData = data && data.length ? data : [0];
+    const min = Math.min(...safeData), max = Math.max(...safeData);
+    const pad = (max - min) * 0.2 || 1;
+    const labels = monthLabels || [];
     return {
         chart: { type:"area", height:50, width:140, backgroundColor:"transparent", margin:[2,0,2,0], spacing:[0,0,0,0], animation:false },
         title:null, subtitle:{text:null}, credits:{enabled:false}, exporting:{enabled:false},
         xAxis:{visible:false}, yAxis:{visible:false, min:min-pad, max:max+pad},
-        legend:{enabled:false}, tooltip:{enabled:false},
-        plotOptions:{ area:{ fillColor:{ linearGradient:{x1:0,y1:0,x2:0,y2:1}, stops:[[0,Highcharts.color(color).setOpacity(0.25).get("rgba")],[1,Highcharts.color(color).setOpacity(0).get("rgba")]] }, lineWidth:2, marker:{enabled:false}, states:{hover:{enabled:false}}, enableMouseTracking:false } },
-        series:[{data,color}],
+        legend:{enabled:false},
+        tooltip:{
+            enabled:true, outside:true, backgroundColor:"white", borderColor:"#DFE3E8", borderRadius:6, style:{fontSize:"11px"},
+            formatter: function() {
+                const month = labels[this.point.index] || "";
+                return month ? `<b>${month}:</b> ${this.y}` : `<b>${this.y}</b>`;
+            },
+        },
+        plotOptions:{ area:{ fillColor:{ linearGradient:{x1:0,y1:0,x2:0,y2:1}, stops:[[0,Highcharts.color(color).setOpacity(0.25).get("rgba")],[1,Highcharts.color(color).setOpacity(0).get("rgba")]] }, lineWidth:2, marker:{enabled:false}, states:{hover:{enabled:true, lineWidth:2}}, enableMouseTracking:true } },
+        series:[{data:safeData,color}],
     };
 }
 
-function makeOsTrendConfig(osTrend) {
+function makeOsTrendConfig(osTrend, monthLabels) {
+    const categories = monthLabels || [];
+    const n = categories.length;
+    // Spread x labels for long windows so they don't overlap (all-time can be 12+ months)
+    const tickInterval = n > 14 ? Math.ceil(n / 12) : 1;
+    const series = [
+        {name:"Mac",     data:osTrend.mac     || new Array(n).fill(0), color:"#7C3AED"},
+        {name:"Windows", data:osTrend.windows || new Array(n).fill(0), color:"#10B981"},
+        {name:"Linux",   data:osTrend.linux   || new Array(n).fill(0), color:"#F59E0B"},
+    ];
     return {
-        chart:{type:"line",height:200,backgroundColor:"transparent",style:{fontFamily:"Inter, -apple-system, sans-serif"},margin:[8,8,64,44]},
+        chart:{
+            type:"areaspline", height:220, backgroundColor:"transparent",
+            style:{fontFamily:"Inter, -apple-system, sans-serif"},
+            margin:[8,8,72,44],
+        },
         title:null, credits:{enabled:false}, exporting:{enabled:false},
-        xAxis:{categories:MONTHS,labels:{style:{fontSize:"11px",color:"#8C9196"}},lineColor:"#DFE3E8",tickColor:"transparent"},
-        yAxis:{title:null,labels:{style:{fontSize:"11px",color:"#8C9196"}},gridLineColor:"#F1F2F3"},
-        legend:{align:"left",verticalAlign:"bottom",layout:"horizontal",itemStyle:{fontSize:"12px",fontWeight:"400",color:"#6D7175"},symbolRadius:4,margin:12},
+        xAxis:{
+            categories,
+            labels:{ style:{fontSize:"11px",color:"#8C9196"}, step: tickInterval },
+            lineColor:"#DFE3E8", tickColor:"transparent",
+        },
+        yAxis:{title:null,labels:{style:{fontSize:"11px",color:"#8C9196"}},gridLineColor:"#F1F2F3",allowDecimals:false,min:0},
+        legend:{align:"left",verticalAlign:"bottom",layout:"horizontal",itemStyle:{fontSize:"12px",fontWeight:"400",color:"#6D7175"},symbolRadius:4,margin:8,y:4},
         tooltip:{shared:true,backgroundColor:"white",borderColor:"#DFE3E8",borderRadius:8,style:{fontSize:"12px"}},
-        plotOptions:{line:{marker:{enabled:false},lineWidth:2}},
-        series:[
-            {name:"Mac",     data:osTrend.mac || [],     color:"#7C3AED"},
-            {name:"Windows", data:osTrend.windows || [], color:"#10B981"},
-            {name:"Linux",   data:osTrend.linux || [],   color:"#F59E0B"},
-        ],
+        plotOptions:{ areaspline:{ marker:{enabled:false}, lineWidth:2, fillOpacity:0.08 }, series:{ connectNulls:true } },
+        series,
     };
 }
 
@@ -80,8 +99,8 @@ function makeViolationsDonutConfig(violationsBySeverity) {
 
 // ─── Stat + chart cards ───────────────────────────────────────────────────────
 
-function StatRow({ label, value, delta, sparklineData, color }) {
-    const opts = useMemo(() => makeSparklineConfig(sparklineData, color), [sparklineData, color]);
+function StatRow({ label, value, delta, sparklineData, color, valueColor, monthLabels }) {
+    const opts = useMemo(() => makeSparklineConfig(sparklineData, color, monthLabels), [sparklineData, color, monthLabels]);
     return (
         <Box
             paddingInlineStart="5"
@@ -92,12 +111,13 @@ function StatRow({ label, value, delta, sparklineData, color }) {
             <HorizontalStack align="space-between" blockAlign="center" gap="3">
                 <VerticalStack gap="2">
                     <Text variant="headingSm" fontWeight="semibold">{label}</Text>
-                    <HorizontalStack gap="2" blockAlign="center">
-                        <Text variant="headingXl" fontWeight="bold">{value.toLocaleString()}</Text>
-                        <Text variant="bodySm" fontWeight="semibold" color="success">+{delta}</Text>
-                    </HorizontalStack>
+                    <Text variant="headingXl" fontWeight="bold" color={valueColor}>
+                        {value.toLocaleString()}
+                        {delta > 0 && <span style={{ fontSize:12, fontWeight:600, color:"#008060", marginLeft:6, verticalAlign:"middle" }}>+{delta}</span>}
+                        {delta < 0 && <span style={{ fontSize:12, fontWeight:600, color:"#D72C0D", marginLeft:6, verticalAlign:"middle" }}>{delta}</span>}
+                    </Text>
                 </VerticalStack>
-                <HighchartsReact highcharts={Highcharts} options={opts} immutable />
+                <HighchartsReact highcharts={Highcharts} options={opts} />
             </HorizontalStack>
         </Box>
     );
@@ -116,9 +136,10 @@ function ChartPanel({ title, children }) {
 
 function TopSection({ summary }) {
     const sparklines = summary?.statSparklines || {};
+    const osTrend = summary?.osTrend || {};
     const osTrendOpts = useMemo(
-        () => makeOsTrendConfig(summary?.osTrend || {}),
-        [summary?.osTrend]
+        () => makeOsTrendConfig(osTrend, summary?.monthLabels),
+        [summary?.osTrend, summary?.monthLabels]
     );
     const violationsDonutOpts = useMemo(
         () => makeViolationsDonutConfig(summary?.violationsBySeverity || []),
@@ -130,11 +151,11 @@ function TopSection({ summary }) {
             <div style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column" }}>
                 <Card padding="0">
                     <VerticalStack>
-                        <StatRow label="Total Endpoints"  value={summary?.deviceCount ?? 0} delta={0} sparklineData={sparklines.endpoints || []}  color="#7C3AED" />
+                        <StatRow label="Total Endpoints"  value={summary?.deviceCount ?? 0} delta={summary?.deltaEndpoints ?? 0} sparklineData={sparklines.endpoints || []}  color="#7C3AED" monthLabels={summary?.monthLabels} />
                         <Divider />
-                        <StatRow label="Users"            value={summary?.totalUsers ?? 0} delta={0} sparklineData={sparklines.users || []}      color="#2563EB" />
+                        <StatRow label="Users"            value={summary?.totalUsers ?? 0} delta={summary?.deltaUsers ?? 0} sparklineData={sparklines.users || []}      color="#2563EB" monthLabels={summary?.monthLabels} />
                         <Divider />
-                        <StatRow label="Total Violations" value={summary?.totalViolations ?? 0} delta={0} sparklineData={sparklines.violations || []} color="#DC2626" />
+                        <StatRow label="Total Violations" value={summary?.totalViolations ?? 0} delta={summary?.deltaViolations ?? 0} sparklineData={sparklines.violations || []} color="#DC2626" valueColor="critical" monthLabels={summary?.monthLabels} />
                     </VerticalStack>
                 </Card>
             </div>
@@ -245,7 +266,9 @@ function ViolationsCellRenderer({ value }) {
 
 // ─── Endpoint cell — uses AgGridRow as shared inner renderer ──────────────────
 
-function DeviceEndpointCellRenderer({ data, node }) {
+// Username cell renderer — used as innerRenderer of the auto-group (expand) column.
+function UsernameCellInner({ data, node }) {
+    if (!data) return null;
     const isLeaf = node.level > 0;
     if (isLeaf) {
         return (
@@ -256,57 +279,21 @@ function DeviceEndpointCellRenderer({ data, node }) {
             />
         );
     }
-    const childCount = node.childrenAfterGroup?.length ?? 0;
+    const username = data.endpoint && data.endpoint !== "-" ? data.endpoint : null;
     return (
         <AgGridRow
             icon={<OsIcon os={data.os} />}
-            label={data.endpoint}
-            isBold
-            childCount={childCount}
-            warning={data.hasPersonalAccount
-                ? <Icon source={CustomersMajor} color="critical" />
-                : null
-            }
+            label={username || "-"}
+            isBold={!!username}
+            warning={data.hasPersonalAccount ? <Icon source={CustomersMajor} color="critical" /> : null}
         />
     );
 }
 
-// ─── Username / endpoint cells ────────────────────────────────────────────────
-
-function UsernameCellRenderer({ data }) {
-    return (
-        <HorizontalStack gap="2" blockAlign="center">
-            <Text variant="bodySm" fontWeight="semibold">{data.username}</Text>
-            {data.hasPersonalAccount && <Icon source={CustomersMajor} color="critical" />}
-        </HorizontalStack>
-    );
-}
-
-function UserEndpointsCellRenderer({ data, devicesByUsername }) {
-    const devices = devicesByUsername?.[data.username];
-    if (!devices || devices.length === 0) return null;
-    const primary = devices[0];
-    const others  = devices.slice(1);
-    return (
-        <HorizontalStack gap="2" blockAlign="center">
-            <OsIcon os={primary.os} />
-            <Text variant="bodySm">{primary.endpoint}</Text>
-            {others.length > 0 && (
-                <span style={{
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
-                    minWidth: 20, height: 20, padding: "0 6px", borderRadius: 10,
-                    fontSize: 11, fontWeight: 600,
-                    background: "#F1F2F3", color: "#6D7175",
-                    cursor: "default",
-                }}>
-                    +{others.length}
-                </span>
-            )}
-        </HorizontalStack>
-    );
-}
 
 // ─── Column definitions ───────────────────────────────────────────────────────
+
+const DASH_FORMATTER = (params) => (params.value && params.value !== "-" ? params.value : "-");
 
 function buildDeviceColDefs(agentRiskData) {
     return [
@@ -324,14 +311,33 @@ function buildDeviceColDefs(agentRiskData) {
             return agentRiskData[key]?.riskScore ?? null;
         },
     },
-    { field: "username",    headerName: "Username",     flex: 1,   minWidth: 120, enableRowGroup: true },
-    { field: "group",       headerName: "Group",        flex: 1,   minWidth: 120                       },
-    { field: "role",        headerName: "Role",         flex: 1.2, minWidth: 150                       },
+    {
+        field: "deviceId",
+        headerName: "Endpoint",
+        flex: 1.6,
+        minWidth: 240,
+        sortable: true,
+        valueGetter: (params) => {
+            if (!params.data) return null;
+            return params.data.deviceId || null;
+        },
+        valueFormatter: (params) => params.value || "-",
+    },
+    {
+        field: "group", headerName: "Group", flex: 1, minWidth: 120,
+        valueGetter: (p) => p.data?.group || "",
+        valueFormatter: (p) => p.value || "-",
+    },
+    {
+        field: "role", headerName: "Role", flex: 1.2, minWidth: 150,
+        valueGetter: (p) => p.data?.role || "",
+        valueFormatter: (p) => p.value || "-",
+    },
     {
         field: "violations",
         headerName: "Violations",
         width: 160,
-        sortable: false,
+        sortable: true,
         filter: false,
         cellRenderer: ViolationsCellRenderer,
         valueGetter: (params) => {
@@ -340,43 +346,39 @@ function buildDeviceColDefs(agentRiskData) {
             const key = params.data.path.join("/");
             return agentRiskData[key]?.violations ?? null;
         },
+        comparator: (a, b) => {
+            const total = (v) => v ? (v.critical || 0) * 1000 + (v.high || 0) * 100 + (v.medium || 0) * 10 + (v.low || 0) : 0;
+            return total(a) - total(b);
+        },
     },
-    { field: "lastTraffic", headerName: "Last Traffic", width: 130 },
+    {
+        field: "lastTraffic",
+        headerName: "Last Traffic",
+        width: 130,
+        valueFormatter: DASH_FORMATTER,
+        // Sort on raw epoch so numeric ordering works correctly
+        comparator: (a, b, nodeA, nodeB) => {
+            const ea = nodeA?.data?.lastTrafficEpoch || 0;
+            const eb = nodeB?.data?.lastTrafficEpoch || 0;
+            return ea - eb;
+        },
+    },
 ];
 }
 
-const USER_COL_DEFS = [
-    {
-        field: "username",
-        headerName: "Username",
-        flex: 1.5,
-        minWidth: 180,
-        pinned: "left",
-        checkboxSelection: true,
-        headerCheckboxSelection: true,
-        cellRenderer: UsernameCellRenderer,
-    },
-    { field: "riskScore",     headerName: "Risk score", width: 110, filter: false, cellRenderer: RiskScoreCellRenderer },
-    { field: "userEndpoints", headerName: "Endpoints",  flex: 1.8, minWidth: 200, sortable: false, filter: false, cellRenderer: UserEndpointsCellRenderer },
-    { field: "violations",    headerName: "Violations", width: 160, sortable: false, filter: false, cellRenderer: ViolationsCellRenderer },
-    { field: "group",         headerName: "Group",      flex: 1,   minWidth: 130 },
-    { field: "role",          headerName: "Role",       flex: 1.2, minWidth: 150 },
-];
 
 const DEFAULT_COL_DEF = {
     sortable: true,
     resizable: true,
     filter: true,
-    cellStyle: { display: "flex", alignItems: "center" },
+    cellStyle: { display: "flex", alignItems: "center", fontSize: 13, color: "#202223" },
 };
 
 // ─── Table section ────────────────────────────────────────────────────────────
 
-function TableSection({ deviceFlatData, agentRiskData, devicesByUsername }) {
+function TableSection({ deviceFlatData, agentRiskData }) {
     const [selectedCount, setSelectedCount] = useState(0);
-    const [flyout, setFlyout] = useState(null);
     const [deviceFlyout, setDeviceFlyout] = useState(null);
-    const [mcpFlyout, setMcpFlyout] = useState(null);
     const gridRef = useRef(null);
 
     const deviceColDefs = useMemo(() => buildDeviceColDefs(agentRiskData), [agentRiskData]);
@@ -389,11 +391,7 @@ function TableSection({ deviceFlatData, agentRiskData, devicesByUsername }) {
         deviceFlatData.filter((r) => r.path?.length === 2 && r.path[0] === deviceId),
     [deviceFlatData]);
 
-    const closeAll = useCallback(() => {
-        setFlyout(null);
-        setDeviceFlyout(null);
-        setMcpFlyout(null);
-    }, []);
+    const closeAll = useCallback(() => setDeviceFlyout(null), []);
 
     useEffect(() => {
         const params   = new URLSearchParams(window.location.search);
@@ -404,27 +402,10 @@ function TableSection({ deviceFlatData, agentRiskData, devicesByUsername }) {
         setDeviceFlyout({ device, agents: findAgentsForDevice(deviceId) });
     }, [deviceFlatData, findDeviceRow, findAgentsForDevice]);
 
-    const handleAgentClickFromDevice = useCallback((agent) => {
-        if (!agent) return;
-        const device = deviceFlyout?.device;
-        if (agent.type === "MCP Server") {
-            setMcpFlyout({ agent, device });
-            setDeviceFlyout(null);
-            setFlyout(null);
-        } else if (agent.type === "AI Agent" && agent.skillCount > 0) {
-            setFlyout({ agent, device });
-            setDeviceFlyout(null);
-            setMcpFlyout(null);
-        }
-    }, [deviceFlyout]);
-
     const handleDeviceClickFromFlyout = useCallback((device) => {
         const deviceId = device?.path?.[0];
         if (!deviceId) return;
-        const agents = findAgentsForDevice(deviceId);
-        setFlyout(null);
-        setMcpFlyout(null);
-        setDeviceFlyout({ device, agents });
+        setDeviceFlyout({ device, agents: findAgentsForDevice(deviceId) });
     }, [findAgentsForDevice]);
 
     const handleRowClick = useCallback((e) => {
@@ -432,50 +413,34 @@ function TableSection({ deviceFlatData, agentRiskData, devicesByUsername }) {
         if (!data) return;
         if (node.level === 0) {
             const deviceId = data.path[0];
-            const agents = findAgentsForDevice(deviceId);
-            setDeviceFlyout({ device: data, agents });
-            setFlyout(null);
-            setMcpFlyout(null);
+            setDeviceFlyout({ device: data, agents: findAgentsForDevice(deviceId) });
             return;
         }
-        if (node.level > 0) {
-            // Agentic asset child rows → navigate to the dedicated Agentic Assets page
-            const params = new URLSearchParams({ asset: data.endpoint, type: data.type });
-            window.open(`/dashboard/observe/agentic-assets?${params}`, "_blank");
-            // Previously opened McpFlyout / SkillsFlyout inline — now handled on the Agentic Assets page
-            // if (data.type === "MCP Server") { setMcpFlyout({ agent: data, device }); ... }
-            // if (data.skillCount) { setFlyout({ agent: data, device }); ... }
-            if (data.type === "MCP Server") {
-                const deviceId = data.path[0];
-                const device = findDeviceRow(deviceId);
-                setMcpFlyout({ agent: data, device });
-                setFlyout(null);
-                setDeviceFlyout(null);
-                return;
-            }
-            if (data.skillCount) {
-                const deviceId = data.path[0];
-                const device = findDeviceRow(deviceId);
-                setFlyout({ agent: data, device });
-                setDeviceFlyout(null);
-                setMcpFlyout(null);
-            }
-        }
-    }, [findAgentsForDevice, findDeviceRow]);
+        // Child (agentic asset) rows — open on the Agentic Assets page with flyout pre-selected
+        const assetId = data.rawServiceName || data.endpoint;
+        const params = new URLSearchParams({ asset: assetId, type: data.type || "" });
+        window.open(`/dashboard/observe/agentic-assets?${params}`, "_blank");
+    }, [findAgentsForDevice]);
 
     const getDataPath = useCallback((data) => data.path, []);
 
     const autoGroupColumnDef = useMemo(() => ({
-        headerName: "Endpoint",
-        width: 460,
-        minWidth: 200,
+        headerName: "Username",
+        width: 320,
+        minWidth: 180,
         pinned: "left",
         checkboxSelection: true,
         headerCheckboxSelection: true,
         filter: "agTextColumnFilter",
+        // Sort by displayed username (endpoint field), not by the internal path key
+        comparator: (a, b, nodeA, nodeB) => {
+            const va = (nodeA?.data?.endpoint || nodeA?.data?.deviceId || "").toLowerCase();
+            const vb = (nodeB?.data?.endpoint || nodeB?.data?.deviceId || "").toLowerCase();
+            return va < vb ? -1 : va > vb ? 1 : 0;
+        },
         cellRendererParams: {
             suppressCount: true,
-            innerRenderer: DeviceEndpointCellRenderer,
+            innerRenderer: UsernameCellInner,
         },
         cellStyle: { display: "flex", alignItems: "center" },
     }), []);
@@ -503,6 +468,7 @@ function TableSection({ deviceFlatData, agentRiskData, devicesByUsername }) {
                 bulkActions={bulkActions}
                 onClearBulk={() => { gridRef.current?.api?.deselectAll(); setSelectedCount(0); }}
                 onRowClicked={handleRowClick}
+                getRowStyle={() => ({ cursor: "pointer" })}
                 onSelectionChanged={e => setSelectedCount(e.api.getSelectedRows().length)}
                 rowSelection="multiple"
                 suppressRowClickSelection
@@ -512,25 +478,13 @@ function TableSection({ deviceFlatData, agentRiskData, devicesByUsername }) {
                 sideBar={{ toolPanels: ["columns", "filters"] }}
             />
 
-            {/* SkillsFlyout removed — skills now open on the Agentic Assets page */}
-            {/* <SkillsFlyout agent={flyout?.agent} device={flyout?.device} show={flyout !== null} onClose={closeAll} onDeviceClick={handleDeviceClickFromFlyout} /> */}
             <DeviceFlyout
                 device={deviceFlyout?.device}
                 agents={deviceFlyout?.agents}
                 show={deviceFlyout !== null}
                 onClose={closeAll}
-                onAgentClick={handleAgentClickFromDevice}
                 agentRiskData={agentRiskData}
             />
-            <McpFlyout
-                agent={mcpFlyout?.agent}
-                device={mcpFlyout?.device}
-                show={mcpFlyout !== null}
-                onClose={closeAll}
-                onDeviceClick={handleDeviceClickFromFlyout}
-            />
-            {/* McpFlyout removed — MCP Servers now open on the Agentic Assets page */}
-            {/* <McpFlyout agent={mcpFlyout?.agent} device={mcpFlyout?.device} show={mcpFlyout !== null} onClose={closeAll} onDeviceClick={handleDeviceClickFromFlyout} /> */}
         </VerticalStack>
     );
 }
@@ -544,7 +498,6 @@ export default function DeviceEndpoints() {
     const [loading, setLoading] = useState(true);
     const [deviceFlatData, setDeviceFlatData] = useState([]);
     const [agentRiskData, setAgentRiskData] = useState({});
-    const [devicesByUsername, setDevicesByUsername] = useState({});
     const [summary, setSummary] = useState({});
     const [newLayout, setNewLayout] = useState(() => {
         const stored = localStorage.getItem(LAYOUT_KEY);
@@ -599,19 +552,20 @@ export default function DeviceEndpoints() {
                     {
                         usernameMap,
                         violationsByCollectionId: aggregateViolationsByCollectionId(violationRows),
+                        violationRows,
+                        startTimestamp,
+                        endTimestamp,
                     },
                 );
                 const userRows = groupCollectionsByUser(collections, trafficInfoResp || {}, {}, riskScoreResp?.riskScoreOfCollectionsMap || {}, usernameMap, userMetadataMap);
                 pageData.summary.totalUsers = userRows.length;
                 setDeviceFlatData(pageData.deviceFlatData);
                 setAgentRiskData(pageData.agentRiskData);
-                setDevicesByUsername(pageData.devicesByUsername);
                 setSummary(pageData.summary);
             } catch {
                 if (isMountedRef.current) {
                     setDeviceFlatData([]);
                     setAgentRiskData({});
-                    setDevicesByUsername({});
                     setSummary({});
                 }
             } finally {
@@ -665,7 +619,6 @@ export default function DeviceEndpoints() {
                     key="table"
                     deviceFlatData={deviceFlatData}
                     agentRiskData={agentRiskData}
-                    devicesByUsername={devicesByUsername}
                 />,
             ]}
         />

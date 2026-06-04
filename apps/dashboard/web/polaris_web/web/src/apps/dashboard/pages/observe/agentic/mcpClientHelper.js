@@ -64,6 +64,9 @@ const capitalizeWord = (w) => w.toLowerCase() === 'cli' || w.toLowerCase() === '
 
 const formatDisplayName = (tagValue) => {
     if (!tagValue) return 'Unknown';
+    // Domain-style names (contain dots) are returned as-is to avoid mangling
+    // e.g. "mcp.notion.com" stays "mcp.notion.com", "api.github.com" stays "api.github.com"
+    if (tagValue.includes('.')) return tagValue;
     const info = findClientInfo(tagValue);
     if (!info) {
         return tagValue.split(/[-_\s]+/).map(capitalizeWord).join(' ');

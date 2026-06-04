@@ -65,9 +65,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (endTimestamp == 0) {
                 endTimestamp = Context.now();
             }
-            if (startTimestamp <= 0) {
-                startTimestamp = endTimestamp - 90 * Constants.ONE_DAY_TIMESTAMP;
-            }
+            // startTimestamp <= 0 means "all time" (no lower bound) — do NOT clamp to a default window.
+            // fetchAllMaliciousEvents already omits the start bound when startTimestamp <= 0, and the
+            // issues filter below applies the lower bound only when startTimestamp > 0.
+            boolean hasStartBound = startTimestamp > 0;
             Set<Integer> demoCollections = getDemoCollections();
             Set<Integer> collectionIds = resolveCollectionIdsForViolations();
             List<BasicDBObject> rows = new ArrayList<>();
@@ -98,12 +99,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 rows.add(row);
             }
 
-            Bson issuesFilter = Filters.and(
-                    Filters.gte(TestingRunIssues.CREATION_TIME, startTimestamp),
-                    Filters.lte(TestingRunIssues.CREATION_TIME, endTimestamp),
-                    Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
-                    Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, demoCollections)
-            );
+            List<Bson> issuesFilters = new ArrayList<>();
+            if (hasStartBound) {
+                issuesFilters.add(Filters.gte(TestingRunIssues.CREATION_TIME, startTimestamp));
+            }
+            issuesFilters.add(Filters.lte(TestingRunIssues.CREATION_TIME, endTimestamp));
+            issuesFilters.add(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN));
+            issuesFilters.add(Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, demoCollections));
+            Bson issuesFilter = Filters.and(issuesFilters);
             if (!collectionIds.isEmpty()) {
                 issuesFilter = Filters.and(issuesFilter, Filters.in(TestingRunIssues.ID_API_COLLECTION_ID, collectionIds));
             }

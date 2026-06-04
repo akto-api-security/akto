@@ -530,13 +530,27 @@ function TableSection({ agenticTreeData, agenticFlatData, assetDevices, typeFilt
     }, [agenticTreeData, typeFilter]);
 
     useEffect(() => {
+        if (!flatRowData.length && !agenticFlatData.length) return;
         const params    = new URLSearchParams(window.location.search);
         const assetName = params.get("asset");
         if (!assetName) return;
-        const row  = flatRowData.find((r) => r.name === assetName || r.path[0] === assetName);
+        const decoded = decodeURIComponent(assetName.replace(/\+/g, " "));
+        const lc = decoded.toLowerCase();
+        // Slug: match raw service names that may have been slug-encoded in toChildPathKey
+        const toSlug = (s) => s ? String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") : "";
+        const decodedSlug = toSlug(decoded);
+        const nameMatch = (n) => {
+            if (!n) return false;
+            if (n === decoded || n === assetName || n.toLowerCase() === lc) return true;
+            // also match if the slug form of the stored name equals the URL value
+            if (toSlug(n) === decodedSlug || toSlug(n) === toSlug(assetName)) return true;
+            return false;
+        };
+        const idMatch = (id) => id && (id === assetName || id.includes(decodedSlug));
+        const row  = flatRowData.find((r) => nameMatch(r.name) || idMatch(r.path?.[0]));
         const flat = row
             ? (agenticFlatData.find((a) => a.id === row.path[0]) || { ...row, id: row.path[0] })
-            : agenticFlatData.find((a) => a.name === assetName || a.id === assetName);
+            : agenticFlatData.find((a) => nameMatch(a.name) || idMatch(a.id));
         if (flat) setFlyout(flat);
     }, [flatRowData, agenticFlatData, setFlyout]);
 

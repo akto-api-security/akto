@@ -8,6 +8,7 @@ import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AiChatSection from "./AiChatSection";
 import { TYPE_STYLES, SEVERITY_COLORS, getRiskColor, getRiskLabel } from "./agenticStyles";
 import agenticObserveApi, { buildAgenticObserveChatMetadata } from "./agenticObserveApi";
+import { formatDisplayName } from "./mcpClientHelper";
 import "../../../components/layouts/style.css";
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -176,10 +177,11 @@ function ViolTitleCellRenderer({ data }) {
 
 function ViolAgentCellRenderer({ data }) {
     if (!data) return null;
+    const displayAgent = data.agent ? formatDisplayName(data.agent) : null;
     return (
         <div style={{ display: "flex", alignItems: "center", height: "100%", gap: 5, overflow: "hidden" }}>
             <TypeBadge type={data.agentType} />
-            <span style={{ fontSize: 12, color: "#6D7175", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{data.agent}</span>
+            {displayAgent && <span style={{ fontSize: 12, color: "#6D7175", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayAgent}</span>}
         </div>
     );
 }
@@ -215,10 +217,10 @@ function buildAgentsColDefs(agentRiskData) {
 }
 
 const VIOLATIONS_COL_DEFS = [
-    { field: "severity", headerName: "Severity", width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "title",    headerName: "Violation", flex: 1, minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "agent",    headerName: "Agent",     width: 200, cellRenderer: ViolAgentCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "time",     headerName: "Time",      width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "time",     headerName: "Time",               width: 120, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" } },
+    { field: "severity", headerName: "Severity",           width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "title",    headerName: "Violation",          flex: 1, minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "agent",    headerName: "Agentic Component",  width: 200, cellRenderer: ViolAgentCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
 ];
 
 const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
@@ -247,12 +249,14 @@ function getRiskNarrative(device, agents, factors) {
     if (totalSkills > 100)
         parts.push(`${totalSkills.toLocaleString()} exposed skills significantly expand the attack surface`);
 
+    const displayName = device.username && device.username !== "-" ? device.username : device.endpoint;
+
     if (parts.length === 0)
-        return `${device.endpoint} shows a standard activity profile with no elevated signals. Score reflects baseline AI agent usage patterns.`;
+        return `${displayName} shows a standard activity profile with no elevated signals. Score reflects baseline AI agent usage patterns.`;
 
     const score = device.riskScore?.toFixed(1);
     const label = getRiskLabel(device.riskScore);
-    return `${device.endpoint} carries a ${label} score of ${score}/5.0 because ${parts.join(", and ")}. ${critV > 0 || device.hasPersonalAccount ? "Immediate action is recommended." : "Monitor closely and review agent permissions."}`;
+    return `${displayName} carries a ${label} score of ${score}/5.0 because ${parts.join(", and ")}. ${critV > 0 || device.hasPersonalAccount ? "Immediate action is recommended." : "Monitor closely and review agent permissions."}`;
 }
 
 // ─── Topology graph ───────────────────────────────────────────────────────────
@@ -330,10 +334,11 @@ function TopologyGraph({ device, agents }) {
         const totalH    = maxRows * NODE_H;
         const devY      = (totalH - 70) / 2;
 
+        const deviceLabel = device.username && device.username !== "-" ? device.username : device.endpoint;
         const ns = [{
             id: "device", type: "topoNode", draggable: false,
             position: { x: COL1_X, y: devY },
-            data: { component: { category: "external", type: "Device", label: device.endpoint } },
+            data: { component: { category: "external", type: "User", label: deviceLabel } },
         }];
 
         if (hasAgents) {
@@ -430,12 +435,13 @@ function OverviewTab({ device, agents, onTabChange }) {
         { label: totalV   === 1 ? "Violation"  : "Violations",  value: totalV   },
     ], [aiCount, mcpCount, llmCount, totalV]);
 
+    const safeVal = (v) => (v && v !== "-" ? v : null);
     const deviceDetails = useMemo(() => [
-        { label: "User",      value: device.username },
+        { label: "User",      value: safeVal(device.username) },
         { label: "OS",        value: osLabel },
-        { label: "Group",     value: device.group },
-        { label: "Role",      value: device.role },
-        { label: "Last Seen", value: device.lastTraffic },
+        { label: "Group",     value: safeVal(device.group) },
+        { label: "Role",      value: safeVal(device.role) },
+        { label: "Last Seen", value: safeVal(device.lastTraffic) },
         device.hasPersonalAccount
             ? { label: "Account", value: "Personal account", isWarning: true }
             : { label: "Account", value: "Corporate" },
@@ -498,7 +504,7 @@ function OverviewTab({ device, agents, onTabChange }) {
                             <VerticalStack gap="1" key={d.label}>
                                 <Text variant="bodySm" color="subdued">{d.label}</Text>
                                 <Text variant="bodySm" fontWeight="semibold" color={d.isWarning ? "warning" : "base"}>
-                                    {d.value || "—"}
+                                    {d.value || "-"}
                                 </Text>
                             </VerticalStack>
                         ))}
@@ -522,7 +528,8 @@ function AgenticsTab({ agents, onAgentClick, agentRiskData = {} }) {
     const handleRowClick = useCallback((e) => {
         if (!e.data) return;
         if (!isAgentNavigable(e.data)) return;
-        const params = new URLSearchParams({ asset: e.data.endpoint, type: e.data.type });
+        const assetId = e.data.rawServiceName || e.data.endpoint;
+        const params = new URLSearchParams({ asset: assetId, type: e.data.type });
         window.open(`/dashboard/observe/agentic-assets?${params}`, "_blank");
     }, []);
 
@@ -564,6 +571,11 @@ function ViolationsTab({ device }) {
         return () => { cancelled = true; };
     }, [device?.path?.[0]]);
 
+    const handleViolationClick = useCallback((e) => {
+        if (!e.data) return;
+        window.open("/dashboard/guardrails/policies", "_blank");
+    }, []);
+
     if (violations.length === 0) {
         return (
             <Box padding="8">
@@ -580,8 +592,11 @@ function ViolationsTab({ device }) {
             rowData={violations}
             columnDefs={VIOLATIONS_COL_DEFS}
             defaultColDef={GRID_DEFAULT_COL}
+            onRowClicked={handleViolationClick}
+            getRowStyle={() => ({ cursor: "pointer" })}
             fillHeight
             noOuterBorder
+            searchPlaceholder="Search violations..."
             pagination={false}
             sideBar={false}
         />
@@ -635,7 +650,7 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
                 }}
             >
                 <FlyoutBreadcrumb
-                    items={[{ label: device.endpoint, badge: device.riskScore }]}
+                    items={[{ label: device.username && device.username !== "-" ? device.username : device.endpoint, badge: device.riskScore }]}
                     onClose={onClose}
                 />
 
