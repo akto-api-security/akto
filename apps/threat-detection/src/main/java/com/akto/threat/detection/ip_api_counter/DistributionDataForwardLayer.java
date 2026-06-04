@@ -139,6 +139,11 @@ public class DistributionDataForwardLayer {
 
                         if (distribution.isEmpty()) continue;
 
+                        boolean hasNegative = distribution.values().stream().anyMatch(v -> v < 0);
+                        if (hasNegative) {
+                            logger.warnAndAddToDb("dist_forward_negative: windowSize=" + windowSize + " windowStart=" + ws + " apiKey=" + apiKey + " distribution=" + distribution);
+                        }
+
                         ApiDistributionDataRequestPayload.DistributionData data =
                             ApiDistributionDataRequestPayload.DistributionData.newBuilder()
                                 .setApiCollectionId(apiCollectionId)

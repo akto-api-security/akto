@@ -258,7 +258,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
 
     // Use template URL if available, otherwise fall back to static URL
     // This ensures API counts aggregate on template URLs (e.g., /api/users/INTEGER instead of /api/users/123)
-    String urlForAggregation = matchedTemplate != null ? matchedTemplate.getTemplateString() : url;
+    String urlForAggregation = matchedTemplate != null ? matchedTemplate.getTemplateString() : threatDetector.cleanUrl(url);
 
     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
 
