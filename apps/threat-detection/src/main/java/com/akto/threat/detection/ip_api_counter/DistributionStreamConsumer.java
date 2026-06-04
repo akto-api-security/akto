@@ -40,8 +40,8 @@ public class DistributionStreamConsumer implements Runnable {
     private static final int BATCH_SIZE = 500;
     private static final int CMS_TTL_SECONDS = 8 * 60 * 60; // 8 hours
     private static final int DIST_TTL_SECONDS = 8 * 60 * 60; // 8 hours
-    private static final double EPSILON = 0.01;
-    private static final double DELTA = 0.01;
+    private static final double EPSILON = 0.001;
+    private static final double DELTA = 0.001;
     private static final long TRIM_INTERVAL_MS = 5 * 60 * 1000;
     private static final long MAX_STREAM_LENGTH = 2000000;
     private static final int FIELDS_PER_MESSAGE = 8; // 6 original + apiLevelWindow + apiLevelThreshold

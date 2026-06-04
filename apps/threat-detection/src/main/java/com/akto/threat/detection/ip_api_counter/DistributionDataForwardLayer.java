@@ -54,7 +54,7 @@ public class DistributionDataForwardLayer {
     public void sendLastFiveMinuteDistributionData() {
         scheduler.scheduleAtFixedRate(() -> {
             buildPayloadAndForwardData();
-        }, 0, 1, TimeUnit.MINUTES);
+        }, 0, 5, TimeUnit.MINUTES);
     }
 
     public void buildPayloadAndForwardData() {
@@ -138,11 +138,6 @@ public class DistributionDataForwardLayer {
                         }
 
                         if (distribution.isEmpty()) continue;
-
-                        boolean hasNegative = distribution.values().stream().anyMatch(v -> v < 0);
-                        if (hasNegative) {
-                            logger.warnAndAddToDb("dist_forward_negative: windowSize=" + windowSize + " windowStart=" + ws + " apiKey=" + apiKey + " distribution=" + distribution);
-                        }
 
                         ApiDistributionDataRequestPayload.DistributionData data =
                             ApiDistributionDataRequestPayload.DistributionData.newBuilder()

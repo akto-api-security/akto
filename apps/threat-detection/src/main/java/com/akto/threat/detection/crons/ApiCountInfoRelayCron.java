@@ -13,6 +13,7 @@ import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
+import com.akto.threat.detection.constants.RedisKeyInfo;
 
 import io.lettuce.core.KeyValue;
 import io.lettuce.core.RedisClient;
@@ -33,7 +34,12 @@ public class ApiCountInfoRelayCron {
         scheduler.scheduleAtFixedRate(() -> {
             try {
                 long endBinId = (Context.now() / 60) - 5;
-                long startBinId = endBinId - (8 * 60);
+                long lastRelayedBin = cache.fetchLongDataFromRedis(RedisKeyInfo.API_COUNT_LAST_RELAYED_BIN);
+                long startBinId = lastRelayedBin > 0 ? lastRelayedBin + 1 : endBinId - (8 * 60);
+                if (startBinId > endBinId) {
+                    logger.debugAndAddToDb("No new bins to relay since lastRelayedBin=" + lastRelayedBin);
+                    return;
+                }
                 logger.debugAndAddToDb("relayApiCountInfo cron window: startBin=" + startBinId + " endBin=" + endBinId);
 
                 List<String> apiTuples = cache.fetchApiTuplesFromIndex(startBinId, endBinId);
@@ -76,6 +82,7 @@ public class ApiCountInfoRelayCron {
                     dataActor.bulkInsertApiHitCount(toInsert);
                     logger.debugAndAddToDb("Relayed " + toInsert.size() + " api hit count records to DB");
                     cache.removeIndexRange(startBinId, endBinId);
+                    cache.setLongWithExpiry(RedisKeyInfo.API_COUNT_LAST_RELAYED_BIN, endBinId, 8 * 60 * 60);
                     logger.debugAndAddToDb("Cleaned up apiCountIndex for range " + startBinId + " to " + endBinId);
                 } catch (Exception e) {
                     logger.errorAndAddToDb("Error relaying api count info: " + e.getMessage());
@@ -85,6 +92,6 @@ public class ApiCountInfoRelayCron {
                 e.printStackTrace();
                 logger.errorAndAddToDb("Error executing relayApiCountInfoCron: " + e.getMessage());
             }
-        }, 0, 1, TimeUnit.MINUTES);
+        }, 0, 5, TimeUnit.MINUTES);
     }
 }
