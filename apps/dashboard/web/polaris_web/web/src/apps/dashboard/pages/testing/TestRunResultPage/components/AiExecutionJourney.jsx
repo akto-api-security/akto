@@ -38,12 +38,15 @@ const layout = {
     line: { flex: 1, width: '2px', minHeight: '12px', marginTop: '4px', backgroundColor: TRACE_COLOR.line },
     body: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '10px' },
     phase: { fontSize: '15px', fontWeight: 600, color: TRACE_COLOR.phase },
-    bodyText: { fontSize: '14px', lineHeight: 1.6, color: TRACE_COLOR.body, margin: 0 },
+    bodyText: { fontSize: '14px', lineHeight: 1.6, color: TRACE_COLOR.body, margin: 0, overflowWrap: 'anywhere' },
     mono: {
         fontFamily: "SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace",
         fontSize: '13px',
         lineHeight: 1.55,
         margin: 0,
+        overflowWrap: 'anywhere',
+        wordBreak: 'break-all',
+        whiteSpace: 'pre-wrap',
     },
 };
 
@@ -52,7 +55,7 @@ function phaseLabel(phase) {
 }
 
 function TraceEvent({ event, isLast }) {
-    const paragraphs = event.content.split('\n\n').filter((p) => p.trim());
+    const paragraphs = event.content ? event.content.split('\n\n').filter((p) => p.trim()) : [];
 
     return (
         <Box as="div" style={isLast ? layout.eventLast : layout.event}>
@@ -85,7 +88,7 @@ function TraceEvent({ event, isLast }) {
                     </Box>
                 ) : null}
                 {paragraphs.map((paragraph, idx) => (
-                    <Text key={idx} as="p" breakWord style={layout.bodyText}>
+                    <Text key={idx} as="p" style={layout.bodyText}>
                         {paragraph}
                     </Text>
                 ))}
@@ -165,13 +168,15 @@ function AiExecutionJourney({ runAutomatedTests = false, aiSummaryTraces = null 
                     >
                         <Scrollable shadow focusable style={{ maxHeight: TRACE_SCROLL_MAX_HEIGHT }}>
                             <Box padding="4">
-                                {events.map((event, index) => (
-                                    <TraceEvent
-                                        key={event.id}
-                                        event={event}
-                                        isLast={index === events.length - 1}
-                                    />
-                                ))}
+                                <div style={{ overflow: 'hidden' }}>
+                                    {events.map((event, index) => (
+                                        <TraceEvent
+                                            key={event.id}
+                                            event={event}
+                                            isLast={index === events.length - 1}
+                                        />
+                                    ))}
+                                </div>
                             </Box>
                         </Scrollable>
                     </Box>
