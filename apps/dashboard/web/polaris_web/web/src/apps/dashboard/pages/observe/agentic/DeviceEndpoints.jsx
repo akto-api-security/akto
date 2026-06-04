@@ -147,33 +147,27 @@ function TopSection({ summary }) {
     );
 
     return (
-        <HorizontalStack gap="4" align="start" blockAlign="stretch" wrap={false}>
-            <Box style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column" }}>
-                <Card padding="0">
-                    <VerticalStack>
-                        <StatRow label="Total Endpoints"  value={summary?.deviceCount ?? 0} delta={summary?.deltaEndpoints ?? 0} sparklineData={sparklines.endpoints || []}  color="#7C3AED" monthLabels={summary?.monthLabels} />
-                        <Divider />
-                        <StatRow label="Users"            value={summary?.totalUsers ?? 0} delta={summary?.deltaUsers ?? 0} sparklineData={sparklines.users || []}      color="#2563EB" monthLabels={summary?.monthLabels} />
-                        <Divider />
-                        <StatRow label="Total Violations" value={summary?.totalViolations ?? 0} delta={summary?.deltaViolations ?? 0} sparklineData={sparklines.violations || []} color="#DC2626" valueColor="critical" monthLabels={summary?.monthLabels} />
-                    </VerticalStack>
-                </Card>
-            </Box>
-            <Box style={{ flex: 1, minWidth: 0 }}>
-                <Card padding="0">
-                    <ChartPanel title="Endpoints Over Time by OS Type">
-                        <HighchartsReact highcharts={Highcharts} options={osTrendOpts} />
-                    </ChartPanel>
-                </Card>
-            </Box>
-            <Box style={{ width: 298, flexShrink: 0 }}>
-                <Card padding="0">
-                    <ChartPanel title="Violations by Severity">
-                        <HighchartsReact highcharts={Highcharts} options={violationsDonutOpts} />
-                    </ChartPanel>
-                </Card>
-            </Box>
-        </HorizontalStack>
+        <Box style={{ display: "grid", gridTemplateColumns: "320px 1fr 298px", gap: 16, alignItems: "stretch" }}>
+            <Card padding="0">
+                <VerticalStack>
+                    <StatRow label="Total Endpoints"  value={summary?.deviceCount ?? 0} delta={summary?.deltaEndpoints ?? 0} sparklineData={sparklines.endpoints || []}  color="#7C3AED" monthLabels={summary?.monthLabels} />
+                    <Divider />
+                    <StatRow label="Users"            value={summary?.totalUsers ?? 0} delta={summary?.deltaUsers ?? 0} sparklineData={sparklines.users || []}      color="#2563EB" monthLabels={summary?.monthLabels} />
+                    <Divider />
+                    <StatRow label="Total Violations" value={summary?.totalViolations ?? 0} delta={summary?.deltaViolations ?? 0} sparklineData={sparklines.violations || []} color="#DC2626" valueColor="critical" monthLabels={summary?.monthLabels} />
+                </VerticalStack>
+            </Card>
+            <Card padding="0">
+                <ChartPanel title="Endpoints Over Time by OS Type">
+                    <HighchartsReact highcharts={Highcharts} options={osTrendOpts} />
+                </ChartPanel>
+            </Card>
+            <Card padding="0">
+                <ChartPanel title="Violations by Severity">
+                    <HighchartsReact highcharts={Highcharts} options={violationsDonutOpts} />
+                </ChartPanel>
+            </Card>
+        </Box>
     );
 }
 
@@ -322,6 +316,13 @@ function buildDeviceColDefs(agentRiskData) {
             return params.data.deviceId || null;
         },
         valueFormatter: (params) => params.value || "-",
+    },
+    {
+        field: "os",
+        headerName: "OS",
+        width: 100,
+        hide: true,
+        filter: "agSetColumnFilter",
     },
     {
         field: "group", headerName: "Group", flex: 1, minWidth: 120,

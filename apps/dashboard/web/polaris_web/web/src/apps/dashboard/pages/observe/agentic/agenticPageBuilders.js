@@ -349,21 +349,16 @@ export function buildDeviceEndpointsPageData(
         if (collViolations) mergeViolations(device.violations, collViolations);
     });
 
+    // Only enrich existing devices with module metadata — never create new deviceMap
+    // entries from moduleInfos alone, as that would inflate the count with devices
+    // that have no agentic collection traffic.
     Object.keys(deviceModules).forEach((devId) => {
-        if (!deviceMap[devId]) {
+        if (deviceMap[devId]) {
             const mod = deviceModules[devId];
-            deviceMap[devId] = {
-                deviceId: devId,
-                os: mod.os || inferOsFromDeviceId(devId),
-                username: mod.username || "-",
-                team: mod.team || "",
-                role: mod.role || "",
-                maxRisk: 0,
-                maxTraffic: 0,
-                hasPersonalAccount: false,
-                violations: emptyViolations(),
-                children: {},
-            };
+            const device = deviceMap[devId];
+            if (!device.os) device.os = mod.os || inferOsFromDeviceId(devId);
+            if (!device.team) device.team = mod.team || "";
+            if (!device.role) device.role = mod.role || "";
         }
     });
 
@@ -438,7 +433,7 @@ export function buildDeviceEndpointsPageData(
         if (!devId) return;
         const ts = c.startTs || 0;
         if (!deviceFirstSeen[devId] || ts < deviceFirstSeen[devId].ts) {
-            deviceFirstSeen[devId] = { ts, os: inferOsFromDeviceId(devId) };
+            deviceFirstSeen[devId] = { ts, os: deviceMap[devId]?.os || inferOsFromDeviceId(devId) };
         }
     });
     const deviceFirstSeenItems = Object.values(deviceFirstSeen);
