@@ -123,7 +123,7 @@ function AssetNameCellRenderer({ data }) {
   const showPersonal = data.hasPersonalAccount && !isSkill;
   const showMalicious = data.isMalicious && isSkill;
   return (
-    <div
+    <Box
       style={{
         display: "flex",
         alignItems: "center",
@@ -133,7 +133,8 @@ function AssetNameCellRenderer({ data }) {
       }}
     >
       <AgentIconImg data={data} />
-      <span
+      <Box
+        as="span"
         style={{
           fontSize: 13,
           color: "#202223",
@@ -144,10 +145,11 @@ function AssetNameCellRenderer({ data }) {
         }}
       >
         {data.name}
-      </span>
+      </Box>
       {showLocalMcp && (
         <Tooltip content="Local MCP Server" dismissOnMouseOut>
-          <span
+          <Box
+            as="span"
             style={{
               flexShrink: 0,
               display: "inline-flex",
@@ -161,12 +163,13 @@ function AssetNameCellRenderer({ data }) {
               alt="Local MCP Server"
               style={{ pointerEvents: "none" }}
             />
-          </span>
+          </Box>
         </Tooltip>
       )}
       {showPersonal && (
         <Tooltip content="Contains personal account" dismissOnMouseOut>
-          <span
+          <Box
+            as="span"
             style={{
               flexShrink: 0,
               display: "inline-flex",
@@ -180,12 +183,13 @@ function AssetNameCellRenderer({ data }) {
               alt="Contains personal account"
               style={{ pointerEvents: "none" }}
             />
-          </span>
+          </Box>
         </Tooltip>
       )}
       {showMalicious && (
         <Tooltip content="Malicious skill" dismissOnMouseOut>
-          <span
+          <Box
+            as="span"
             style={{
               flexShrink: 0,
               display: "inline-flex",
@@ -199,10 +203,10 @@ function AssetNameCellRenderer({ data }) {
               alt="Malicious skill"
               style={{ pointerEvents: "none" }}
             />
-          </span>
+          </Box>
         </Tooltip>
       )}
-    </div>
+    </Box>
   );
 }
 
@@ -215,8 +219,9 @@ function TypeBadgeCellRenderer({ value }) {
     border: "#E5E7EB",
   };
   return (
-    <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
-      <span
+    <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
+      <Box
+        as="span"
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -232,8 +237,8 @@ function TypeBadgeCellRenderer({ value }) {
         }}
       >
         {value}
-      </span>
-    </div>
+      </Box>
+    </Box>
   );
 }
 
@@ -241,8 +246,9 @@ function RiskScoreCellRenderer({ value }) {
   if (value == null) return null;
   const { bg, color } = getRiskColor(value);
   return (
-    <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
-      <span
+    <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
+      <Box
+        as="span"
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -257,21 +263,22 @@ function RiskScoreCellRenderer({ value }) {
         }}
       >
         {value.toFixed(1)}
-      </span>
-    </div>
+      </Box>
+    </Box>
   );
 }
 
 function ViolationsCellRenderer({ value }) {
-  if (!value) return <span style={{ color: "#C4C7CB" }}>—</span>;
+  if (!value) return <Box as="span" style={{ color: "#C4C7CB" }}>-</Box>;
   const parts = ["critical", "high", "medium", "low"]
     .map((k) => ({ k, c: value[k], ...SEVERITY_COLORS[k] }))
     .filter((p) => p.c > 0);
-  if (!parts.length) return <span style={{ color: "#C4C7CB" }}>—</span>;
+  if (!parts.length) return <Box as="span" style={{ color: "#C4C7CB" }}>-</Box>;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+    <Box style={{ display: "flex", alignItems: "center", gap: 3 }}>
       {parts.map((p) => (
-        <span
+        <Box
+          as="span"
           key={p.k}
           style={{
             display: "inline-flex",
@@ -288,22 +295,22 @@ function ViolationsCellRenderer({ value }) {
           }}
         >
           {p.c}
-        </span>
+        </Box>
       ))}
-    </div>
+    </Box>
   );
 }
 
 function InteractionsCellRenderer({ value, data }) {
-  if (value == null) return <span style={{ color: "#C4C7CB" }}>—</span>;
+  if (value == null) return <Box as="span" style={{ color: "#C4C7CB" }}>-</Box>;
   const detail = data?.aiInteractionsDetail;
   const title = detail
     ? `Input: ${Number(detail.totalInputTokens || 0).toLocaleString("en-US")} · Output: ${Number(detail.totalOutputTokens || 0).toLocaleString("en-US")}`
     : undefined;
   return (
-    <span style={{ fontSize: 12, color: "#202223" }} title={title}>
+    <Box as="span" style={{ fontSize: 12, color: "#202223" }} title={title}>
       {Number(value).toLocaleString("en-US")}
-    </span>
+    </Box>
   );
 }
 
@@ -315,15 +322,16 @@ function GroupCellRenderer({ data }) {
   const rest = data.groups.slice(1);
 
   return (
-    <div
+    <Box
       style={{ display: "flex", alignItems: "center", height: "100%", gap: 5 }}
     >
-      <span style={{ fontSize: 12, color: "#202223" }}>
+      <Box as="span" style={{ fontSize: 12, color: "#202223" }}>
         {primary.name} [{primary.count}]
-      </span>
+      </Box>
       {rest.length > 0 && (
         <>
-          <span
+          <Box
+            as="span"
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -345,11 +353,11 @@ function GroupCellRenderer({ data }) {
             onMouseLeave={() => setTipPos(null)}
           >
             +{rest.length}
-          </span>
+          </Box>
           {/* createPortal renders into document.body — escapes AG Grid's overflow:hidden */}
           {tipPos &&
             createPortal(
-              <div
+              <Box
                 style={{
                   position: "fixed",
                   top: tipPos.top,
@@ -365,19 +373,19 @@ function GroupCellRenderer({ data }) {
                 }}
               >
                 {rest.map((g) => (
-                  <div
+                  <Box
                     key={g.name}
                     style={{ fontSize: 12, color: "#202223", padding: "2px 0" }}
                   >
                     {g.name} [{g.count}]
-                  </div>
+                  </Box>
                 ))}
-              </div>,
+              </Box>,
               document.body,
             )}
         </>
       )}
-    </div>
+    </Box>
   );
 }
 
@@ -603,11 +611,11 @@ function TopListRow({ onClick, children }) {
 // Dynamic colour/width are data-driven and cannot use Polaris tokens, so minimal inline style is used.
 function SegmentBar({ segments }) {
   return (
-    <span className="agentic-seg-bar">
+    <Box className="agentic-seg-bar">
       {segments.map(
         (s) =>
           s.count > 0 && (
-            <span
+            <Box
               key={s.label}
               className="agentic-seg"
               title={`${s.label}: ${s.count}`}
@@ -615,14 +623,14 @@ function SegmentBar({ segments }) {
             />
           ),
       )}
-    </span>
+    </Box>
   );
 }
 
 // Small legend dot — colour is data-driven; CSS custom property bridges CSS class ↔ dynamic value.
 function LegendDot({ color, active }) {
   return (
-    <span
+    <Box
       className={active ? "agentic-dot agentic-dot--active" : "agentic-dot"}
       style={{ "--dot-color": color }}
     />

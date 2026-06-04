@@ -17,51 +17,50 @@ import "../../../components/layouts/style.css";
 function ToolNameCellRenderer({ data }) {
     if (!data) return null;
     return (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", overflow: "hidden" }}>
-            <span style={{ fontSize: 13, color: "#202223", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <Box style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", overflow: "hidden" }}>
+            <Box as="span" style={{ fontSize: 13, color: "#202223", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {data.name}
-            </span>
-        </div>
+            </Box>
+        </Box>
     );
 }
 
 function ToolViolationsCellRenderer({ data }) {
     if (!data) return null;
     const count = data.violationCount || 0;
-    if (!count) return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ color: "#C4C7CB" }}>—</span></div>;
+    if (!count) return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ color: "#C4C7CB" }}>-</Box></Box>;
     return (
-        <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            {/* SEVERITY_COLORS.critical bg — no matching Polaris Badge status for count pill */}
-            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 22, height: 20, padding: "0 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: "#DF2909", color: "#FFFBFB" }}>
+        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
+            <Box as="span" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 22, height: 20, padding: "0 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: "#DF2909", color: "#FFFBFB" }}>
                 {count}
-            </span>
-        </div>
+            </Box>
+        </Box>
     );
 }
 
 function ToolParamsCellRenderer({ data }) {
     if (!data) return null;
-    return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ fontSize: 12, color: "#6D7175" }}>{data.params?.length || 0}</span></div>;
+    return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ fontSize: 12, color: "#6D7175" }}>{data.params?.length || 0}</Box></Box>;
 }
 
 function ResourceNameCellRenderer({ data }) {
     if (!data) return null;
-    return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ fontSize: 13, fontWeight: 600, color: "#202223" }}>{data.name}</span></div>;
+    return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ fontSize: 13, fontWeight: 600, color: "#202223" }}>{data.name}</Box></Box>;
 }
 
 function ResourceUriCellRenderer({ data }) {
     if (!data) return null;
-    return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ fontSize: 12, color: "#8C9196", fontFamily: "ui-monospace, 'Cascadia Mono', Consolas, monospace" }}>{data.uri}</span></div>;
+    return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ fontSize: 12, color: "#8C9196", fontFamily: "ui-monospace, 'Cascadia Mono', Consolas, monospace" }}>{data.uri}</Box></Box>;
 }
 
 function PromptNameCellRenderer({ data }) {
     if (!data) return null;
-    return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ fontSize: 13, fontWeight: 600, color: "#202223" }}>{data.name}</span></div>;
+    return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ fontSize: 13, fontWeight: 600, color: "#202223" }}>{data.name}</Box></Box>;
 }
 
 function PromptDescCellRenderer({ data }) {
     if (!data) return null;
-    return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ fontSize: 12, color: "#6D7175" }}>{data.description}</span></div>;
+    return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ fontSize: 12, color: "#6D7175" }}>{data.description}</Box></Box>;
 }
 
 // ─── Column definitions ───────────────────────────────────────────────────────
@@ -160,8 +159,7 @@ function ToolDetailView({ tool, device, agent, allTools, onBack, onClose, onTool
     );
 
     return (
-        // flex:1, minHeight:0 needed for flyout layout — Box props insufficient
-        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <Box style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <FlyoutBreadcrumb
                 items={[
                     { label: device?.endpoint, badge: device?.riskScore, onClick: () => onDeviceClick ? onDeviceClick(device) : onBack() },
@@ -203,11 +201,9 @@ function ToolDetailView({ tool, device, agent, allTools, onBack, onClose, onTool
             </Box>
             <Divider />
 
-            {/* flex:1, minHeight:0 needed to fill remaining flyout space — Box props insufficient */}
-            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <Box style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                 {selectedTab === 0 && (
-                    // overflowY:auto on flex child requires flex:1 — Box doesn't support flex child props
-                    <div style={{ flex: 1, overflowY: "auto" }}>
+                    <Box style={{ flex: 1, overflowY: "auto" }}>
                         <Box padding="4">
                             <VerticalStack gap="4">
                                 <LegacyCard>
@@ -218,7 +214,7 @@ function ToolDetailView({ tool, device, agent, allTools, onBack, onClose, onTool
                                 </LegacyCard>
                             </VerticalStack>
                         </Box>
-                    </div>
+                    </Box>
                 )}
                 {selectedTab === 1 && (
                     tool.params && tool.params.length > 0 ? (
@@ -247,8 +243,8 @@ function ToolDetailView({ tool, device, agent, allTools, onBack, onClose, onTool
                         <Text variant="bodySm" color="subdued">No violations found.</Text>
                     </Box>
                 )}
-            </div>
-        </div>
+            </Box>
+        </Box>
     );
 }
 
@@ -258,7 +254,7 @@ function ResourceDetailView({ resource, agent, device, onBack, onClose, onDevice
     const sampleData = useMemo(() => generateResourceSample(resource), [resource.id]);
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <Box style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <FlyoutBreadcrumb
                 items={[
                     { label: device?.endpoint, badge: device?.riskScore, onClick: () => onDeviceClick ? onDeviceClick(device) : onBack() },
@@ -267,7 +263,7 @@ function ResourceDetailView({ resource, agent, device, onBack, onClose, onDevice
                 ]}
                 onClose={onClose}
             />
-            <div style={{ flex: 1, overflowY: "auto" }}>
+            <Box style={{ flex: 1, overflowY: "auto" }}>
                 <Box padding="4">
                     <VerticalStack gap="4">
                         <LegacyCard>
@@ -278,8 +274,8 @@ function ResourceDetailView({ resource, agent, device, onBack, onClose, onDevice
                         </LegacyCard>
                     </VerticalStack>
                 </Box>
-            </div>
-        </div>
+            </Box>
+        </Box>
     );
 }
 
@@ -289,7 +285,7 @@ function PromptDetailView({ prompt, agent, device, onBack, onClose, onDeviceClic
     const sampleData = useMemo(() => generatePromptSample(prompt), [prompt.id]);
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <Box style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <FlyoutBreadcrumb
                 items={[
                     { label: device?.endpoint, badge: device?.riskScore, onClick: () => onDeviceClick ? onDeviceClick(device) : onBack() },
@@ -298,7 +294,7 @@ function PromptDetailView({ prompt, agent, device, onBack, onClose, onDeviceClic
                 ]}
                 onClose={onClose}
             />
-            <div style={{ flex: 1, overflowY: "auto" }}>
+            <Box style={{ flex: 1, overflowY: "auto" }}>
                 <Box padding="4">
                     <VerticalStack gap="4">
                         <LegacyCard>
@@ -309,8 +305,8 @@ function PromptDetailView({ prompt, agent, device, onBack, onClose, onDeviceClic
                         </LegacyCard>
                     </VerticalStack>
                 </Box>
-            </div>
-        </div>
+            </Box>
+        </Box>
     );
 }
 
@@ -382,8 +378,7 @@ function ToolsListView({ agent, device, tools, resources, prompts, onToolClick, 
     const handleTabChange = useCallback((i) => { setSelectedTab(i); }, []);
 
     return (
-        // flex:1, minHeight:0 needed for flyout layout — Box props insufficient
-        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <Box style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <FlyoutBreadcrumb
                 items={[
                     { label: device?.endpoint, badge: device?.riskScore, onClick: onDeviceClick ? () => onDeviceClick(device) : undefined },
@@ -423,7 +418,7 @@ function ToolsListView({ agent, device, tools, resources, prompts, onToolClick, 
 
             {selectedTab === 1 && <ResourcesView resources={resources} onResourceClick={onResourceClick} />}
             {selectedTab === 2 && <PromptsView prompts={prompts} onPromptClick={onPromptClick} />}
-        </div>
+        </Box>
     );
 }
 
@@ -499,9 +494,8 @@ export default function McpFlyout({ agent, device, show, onClose, onDeviceClick 
     if (!agent) return null;
 
     return (
-        <div className={"flyLayout " + (show ? "show" : "")} style={{ width: 720 }}>
-            {/* onMouseEnter/onMouseLeave not available on Box; flyout positioning requires CSS not supported by Box */}
-            <div
+        <Box className={"flyLayout " + (show ? "show" : "")} style={{ width: 720 }}>
+            <Box
                 className="innerFlyLayout"
                 onMouseEnter={lockScroll}
                 onMouseLeave={unlockScroll}
@@ -566,7 +560,7 @@ export default function McpFlyout({ agent, device, show, onClose, onDeviceClick 
                     conversationType="ASK_AKTO"
                     chatMetadata={chatMetadata}
                 />
-            </div>
-        </div>
+            </Box>
+        </Box>
     );
 }

@@ -16,34 +16,33 @@ import "../../../components/layouts/style.css";
 
 function SkillNameCellRenderer({ data }) {
     return (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", overflow: "hidden" }}>
-            <span style={{ fontSize: 13, color: "#202223", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <Box style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", overflow: "hidden" }}>
+            <Box as="span" style={{ fontSize: 13, color: "#202223", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {data.name}
-            </span>
+            </Box>
             {data.isNew && (
-                <span style={{
+                <Box as="span" style={{
                     flexShrink: 0, fontSize: 11, fontWeight: 500,
                     padding: "2px 8px", borderRadius: 12,
                     background: "#F1F2F3", color: "#6D7175",
                     border: "1px solid #E1E3E5", lineHeight: "16px",
                     display: "inline-flex", alignItems: "center",
-                }}>New</span>
+                }}>New</Box>
             )}
-        </div>
+        </Box>
     );
 }
 
 function ViolationCellRenderer({ data }) {
-    if (!data.violations) return <span style={{ color: "#8C9196", fontSize: 13 }}>–</span>;
+    if (!data.violations) return <Box as="span" style={{ color: "#8C9196", fontSize: 13 }}>–</Box>;
     return (
-        // SEVERITY_COLORS.critical bg — no matching Polaris Badge status
-        <span style={{
+        <Box as="span" style={{
             display: "inline-flex", alignItems: "center", justifyContent: "center",
             minWidth: 22, height: 22, padding: "0 5px", borderRadius: 11,
             fontSize: 11, fontWeight: 700, background: "#DF2909", color: "#FFFBFB",
         }}>
             {data.violations}
-        </span>
+        </Box>
     );
 }
 
@@ -52,18 +51,18 @@ function SevBadgeCellRenderer({ data }) {
     const STATUS_MAP = { critical: "critical", high: "warning", medium: "attention", low: undefined };
     const label = data.severity.charAt(0).toUpperCase() + data.severity.slice(1);
     return (
-        <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
+        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
             <Badge status={STATUS_MAP[data.severity]}>{label}</Badge>
-        </div>
+        </Box>
     );
 }
 
 function ViolTitleCellRenderer({ data }) {
     if (!data) return null;
     return (
-        <div style={{ display: "flex", alignItems: "center", height: "100%", overflow: "hidden" }}>
-            <span style={{ fontSize: 13, color: "#202223", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{data.title}</span>
-        </div>
+        <Box style={{ display: "flex", alignItems: "center", height: "100%", overflow: "hidden" }}>
+            <Box as="span" style={{ fontSize: 13, color: "#202223", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{data.title}</Box>
+        </Box>
     );
 }
 
@@ -189,8 +188,7 @@ function SkillDetailView({ skill, device, agent, skills, onBack, onClose, onSkil
     );
 
     return (
-        // flex:1, minHeight:0 needed for flyout layout — Box props insufficient
-        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <Box style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <FlyoutBreadcrumb
                 items={[
                     { label: device?.endpoint, badge: device?.riskScore, onClick: () => onDeviceClick ? onDeviceClick(device) : onBack() },
@@ -232,11 +230,9 @@ function SkillDetailView({ skill, device, agent, skills, onBack, onClose, onSkil
             </Box>
             <Divider />
 
-            {/* flex:1, minHeight:0 needed to fill remaining flyout space — Box props insufficient */}
-            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <Box style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                 {selectedTab === 0 && (
-                    // overflowY:auto on flex child requires flex:1 — Box doesn't support flex child props
-                    <div style={{ flex: 1, overflowY: "auto" }}>
+                    <Box style={{ flex: 1, overflowY: "auto" }}>
                         <Box padding="4">
                             <VerticalStack gap="4">
                                 <LegacyCard>
@@ -247,7 +243,7 @@ function SkillDetailView({ skill, device, agent, skills, onBack, onClose, onSkil
                                 </LegacyCard>
                             </VerticalStack>
                         </Box>
-                    </div>
+                    </Box>
                 )}
                 {selectedTab === 1 && (
                     <AgGridTable
@@ -282,8 +278,8 @@ function SkillDetailView({ skill, device, agent, skills, onBack, onClose, onSkil
                         </Box>
                     )
                 )}
-            </div>
-        </div>
+            </Box>
+        </Box>
     );
 }
 
@@ -313,8 +309,7 @@ function SkillsListView({ agent, device, allSkills, onSkillClick, onClose, onDev
     ], []);
 
     return (
-        // flex:1, minHeight:0 needed for flyout layout — Box props insufficient
-        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <Box style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <FlyoutBreadcrumb
                 items={[
                     { label: device?.endpoint, badge: device?.riskScore, onClick: onDeviceClick ? () => onDeviceClick(device) : undefined },
@@ -343,7 +338,7 @@ function SkillsListView({ agent, device, allSkills, onSkillClick, onClose, onDev
                 searchPlaceholder="Search skills..."
                 sideBar={false}
             />
-        </div>
+        </Box>
     );
 }
 
@@ -389,9 +384,8 @@ export default function SkillsFlyout({ agent, device, show, onClose, onDeviceCli
     useEffect(() => { if (!show) document.body.style.overflow = ""; }, [show]);
 
     return (
-        <div className={"flyLayout " + (show ? "show" : "")} style={{ width: 720 }}>
-            {/* onMouseEnter/onMouseLeave not available on Box; flyout positioning requires CSS not supported by Box */}
-            <div
+        <Box className={"flyLayout " + (show ? "show" : "")} style={{ width: 720 }}>
+            <Box
                 className="innerFlyLayout"
                 onMouseEnter={lockScroll}
                 onMouseLeave={unlockScroll}
@@ -405,8 +399,7 @@ export default function SkillsFlyout({ agent, device, show, onClose, onDeviceCli
                     fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                 }}
             >
-                {/* flex:1, minHeight:0 needed for flyout content area — Box props insufficient */}
-                <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <Box style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                     {selectedSkill ? (
                         <SkillDetailView
                             key={selectedSkill.id}
@@ -429,7 +422,7 @@ export default function SkillsFlyout({ agent, device, show, onClose, onDeviceCli
                             onDeviceClick={onDeviceClick}
                         />
                     )}
-                </div>
+                </Box>
 
                 <AiChatSection
                     placeholder="Ask anything related to your skills..."
@@ -437,7 +430,7 @@ export default function SkillsFlyout({ agent, device, show, onClose, onDeviceCli
                     conversationType="ASK_AKTO"
                     chatMetadata={chatMetadata}
                 />
-            </div>
-        </div>
+            </Box>
+        </Box>
     );
 }

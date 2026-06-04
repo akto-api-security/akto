@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-renderer";
-import { Tabs, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Card, LegacyCard, Icon, Avatar, Badge, Link, Popover, ActionList, Button } from "@shopify/polaris";
+import { Tabs, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Card, LegacyCard, Icon, Avatar, Badge, Popover, ActionList, Button } from "@shopify/polaris";
 import { AutomationMajor, MagicMajor, CustomersMinor, ChevronRightMinor } from "@shopify/polaris-icons";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
@@ -20,13 +20,13 @@ function TypeBadge({ type }) {
     if (!type) return null;
     const s = TYPE_STYLES[type] || { bg: "#F3F4F6", color: "#374151", border: "#E5E7EB" };
     return (
-        <span style={{
+        <Box as="span" style={{
             display: "inline-flex", alignItems: "center",
             padding: "1px 7px", borderRadius: 12,
             fontSize: 11, fontWeight: 500, lineHeight: "18px",
             background: s.bg, color: s.color, border: `1px solid ${s.border}`,
             whiteSpace: "nowrap",
-        }}>{type}</span>
+        }}>{type}</Box>
     );
 }
 
@@ -64,8 +64,7 @@ function TopoNode({ data }) {
         <>
             {!isDevice && <Handle type="target" position={Position.Left} />}
             <Card padding={0}>
-                {/* Dynamic border/background from data — Box doesn't support computed border-color */}
-                <div style={{ border: `1px solid ${colors.borderColor}`, borderRadius: "8px", backgroundColor: colors.backgroundColor }}>
+                <Box style={{ border: `1px solid ${colors.borderColor}`, borderRadius: "8px", backgroundColor: colors.backgroundColor }}>
                     <Box padding={3}>
                         <VerticalStack gap={1}>
                             <Box width="150px">
@@ -82,7 +81,7 @@ function TopoNode({ data }) {
                             </HorizontalStack>
                         </VerticalStack>
                     </Box>
-                </div>
+                </Box>
             </Card>
             <Handle type="source" position={Position.Right} id="b" />
         </>
@@ -172,7 +171,7 @@ function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], ag
 
     // Fixed-size container — ReactFlow's fitView + zoom handles overflow
     return (
-        <div style={{ height: GRAPH_HEIGHT, borderRadius: 8, border: "1px solid #E1E5E9", overflow: "hidden", background: "#F8FAFC" }}>
+        <Box style={{ height: GRAPH_HEIGHT, borderRadius: 8, border: "1px solid #E1E5E9", overflow: "hidden", background: "#F8FAFC" }}>
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -193,7 +192,7 @@ function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], ag
                 <Background color="#E1E5E9" gap={16} />
                 <Controls showInteractive={false} />
             </ReactFlow>
-        </div>
+        </Box>
     );
 }
 
@@ -229,44 +228,44 @@ function computeAssetRiskFactors(asset) {
 function ToolNameCellRenderer({ data }) {
     if (!data) return null;
     return (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", overflow: "hidden" }}>
-            <span style={{ fontSize: 13, color: "#202223", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{data.name}</span>
-        </div>
+        <Box style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", overflow: "hidden" }}>
+            <Box as="span" style={{ fontSize: 13, color: "#202223", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{data.name}</Box>
+        </Box>
     );
 }
 
 function ToolRiskCellRenderer({ value }) {
-    if (!value) return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ color: "#C4C7CB" }}>—</span></div>;
+    if (!value) return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ color: "#C4C7CB" }}>-</Box></Box>;
     const COLORS = { critical: { bg: "#FEE2E2", text: "#DC2626" }, high: { bg: "#FED3D1", text: "#9A3412" }, medium: { bg: "#FFD79D", text: "#92400E" }, low: { bg: "#E4E5E7", text: "#374151" } };
     const c = COLORS[value] || COLORS.low;
     return (
-        <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: 22, padding: "0 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, lineHeight: "22px", background: c.bg, color: c.text, textTransform: "capitalize", whiteSpace: "nowrap" }}>{value}</span>
-        </div>
+        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
+            <Box as="span" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: 22, padding: "0 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, lineHeight: "22px", background: c.bg, color: c.text, textTransform: "capitalize", whiteSpace: "nowrap" }}>{value}</Box>
+        </Box>
     );
 }
 
 function ToolParamsCellRenderer({ data }) {
     if (!data) return null;
-    return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ fontSize: 12, color: "#6D7175" }}>{data.params?.length || 0}</span></div>;
+    return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ fontSize: 12, color: "#6D7175" }}>{data.params?.length || 0}</Box></Box>;
 }
 
 function ViolSeverityCellRenderer({ data }) {
     if (!data) return null;
     const s = SEVERITY_COLORS[data.severity] || SEVERITY_COLORS.low;
     return (
-        <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 600, lineHeight: "16px", background: s.bg, color: s.text, textTransform: "capitalize", whiteSpace: "nowrap" }}>{data.severity}</span>
-        </div>
+        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
+            <Box as="span" style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 600, lineHeight: "16px", background: s.bg, color: s.text, textTransform: "capitalize", whiteSpace: "nowrap" }}>{data.severity}</Box>
+        </Box>
     );
 }
 
 function ViolTitleCellRenderer({ data }) {
     if (!data) return null;
     return (
-        <div style={{ display: "flex", alignItems: "center", width: "100%", overflow: "hidden" }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "#202223", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{data.title}</span>
-        </div>
+        <Box style={{ display: "flex", alignItems: "center", width: "100%", overflow: "hidden" }}>
+            <Box as="span" style={{ fontSize: 12, fontWeight: 600, color: "#202223", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{data.title}</Box>
+        </Box>
     );
 }
 
@@ -279,42 +278,42 @@ function OsIcon({ os }) {
 function DeviceNameCellRenderer({ data }) {
     if (!data) return null;
     return (
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <Box style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <OsIcon os={data.os} />
-            <span style={{ fontSize: 13, color: "#202223", fontWeight: 500 }}>{data.endpoint}</span>
-        </div>
+            <Box as="span" style={{ fontSize: 13, color: "#202223", fontWeight: 500 }}>{data.endpoint}</Box>
+        </Box>
     );
 }
 
 function DeviceRiskCellRenderer({ value }) {
-    if (value == null) return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ color: "#C4C7CB" }}>—</span></div>;
+    if (value == null) return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ color: "#C4C7CB" }}>-</Box></Box>;
     const { bg, color } = getRiskColor(value);
     return (
-        <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, lineHeight: "16px", background: bg, color }}>{value.toFixed(1)}</span>
-        </div>
+        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
+            <Box as="span" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, lineHeight: "16px", background: bg, color }}>{value.toFixed(1)}</Box>
+        </Box>
     );
 }
 
 function ConnectedMcpCellRenderer({ data }) {
     if (!data) return null;
     return (
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 13, color: "#202223", fontWeight: 500 }}>{data.name}</span>
+        <Box style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <Box as="span" style={{ fontSize: 13, color: "#202223", fontWeight: 500 }}>{data.name}</Box>
             <TypeBadge type="MCP Server" />
-        </div>
+        </Box>
     );
 }
 
 function SkillNameCellRenderer({ data }) {
     if (!data) return null;
     return (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", overflow: "hidden" }}>
-            <span style={{ fontSize: 13, color: "#202223", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{data.name}</span>
+        <Box style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", overflow: "hidden" }}>
+            <Box as="span" style={{ fontSize: 13, color: "#202223", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{data.name}</Box>
             {data.isNew && (
-                <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 12, background: "#F1F2F3", color: "#6D7175", border: "1px solid #E1E3E5", lineHeight: "16px", display: "inline-flex", alignItems: "center" }}>New</span>
+                <Box as="span" style={{ flexShrink: 0, fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 12, background: "#F1F2F3", color: "#6D7175", border: "1px solid #E1E3E5", lineHeight: "16px", display: "inline-flex", alignItems: "center" }}>New</Box>
             )}
-        </div>
+        </Box>
     );
 }
 
@@ -333,10 +332,9 @@ const VIOLATIONS_COL_DEFS = [
 ];
 
 const DEVICES_COL_DEFS = [
-    { field: "username",  headerName: "User",      flex: 1,   minWidth: 120, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#202223" }, valueFormatter: p => p.value || "—" },
-    { field: "endpoint",  headerName: "Device ID", flex: 1.5, minWidth: 180, cellRenderer: DeviceNameCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "riskScore", headerName: "Risk",      width: 80, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: DeviceRiskCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "lastSeen",  headerName: "Last Seen", width: 130, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, valueFormatter: p => p.value || "—" },
+    { field: "username",  headerName: "User",      flex: 1,   minWidth: 120, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#202223" }, valueFormatter: p => p.value || "-" },
+
+    { field: "lastSeen",  headerName: "Last Seen", width: 130, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, valueFormatter: p => p.value || "-" },
 ];
 
 const CONNECTED_MCP_COL_DEFS = [
@@ -447,16 +445,16 @@ function OverviewTab({ asset, onTabChange, assetDevices = {}, agenticTreeData = 
                     <HorizontalStack gap="4" blockAlign="center">
                         <Box minWidth="140px"><Text variant="bodySm" color="subdued">AI Interactions</Text></Box>
                         <Text variant="bodySm" fontWeight="semibold">
-                            {asset.aiInteractions != null ? Number(asset.aiInteractions).toLocaleString("en-US") : "—"}
+                            {asset.aiInteractions != null ? Number(asset.aiInteractions).toLocaleString("en-US") : "-"}
                         </Text>
                     </HorizontalStack>
                     <HorizontalStack gap="4" blockAlign="center">
                         <Box minWidth="140px"><Text variant="bodySm" color="subdued">Last Traffic Seen</Text></Box>
-                        <Text variant="bodySm" fontWeight="semibold">{asset.lastSeen || "—"}</Text>
+                        <Text variant="bodySm" fontWeight="semibold">{asset.lastSeen || "-"}</Text>
                     </HorizontalStack>
                     <HorizontalStack gap="4" blockAlign="center">
                         <Box minWidth="140px"><Text variant="bodySm" color="subdued">Group</Text></Box>
-                        <Text variant="bodySm" fontWeight="semibold">{asset.groups?.[0]?.name || "—"}</Text>
+                        <Text variant="bodySm" fontWeight="semibold">{asset.groups?.[0]?.name || "-"}</Text>
                     </HorizontalStack>
                 </VerticalStack>
 
@@ -471,26 +469,25 @@ function OverviewTab({ asset, onTabChange, assetDevices = {}, agenticTreeData = 
                             return (
                                 <React.Fragment key={i}>
                                     {i > 0 && <Divider />}
-                                    {/* full-width interactive row — no Polaris equivalent for computed hover background */}
-                                    <div
+                                    <Box
                                         onClick={() => onTabChange?.(targetTab)}
                                         style={{ padding: "12px 8px", display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer", borderRadius: 6, transition: "background 0.15s" }}
                                         onMouseEnter={e => e.currentTarget.style.background = "#F6F6F7"}
                                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                                     >
-                                        <div style={{ flexShrink: 0, paddingTop: 1, width: 72 }}>
+                                        <Box style={{ flexShrink: 0, paddingTop: 1, width: 72 }}>
                                             <Badge status={badgeStatus}>{f.severity.charAt(0).toUpperCase() + f.severity.slice(1)}</Badge>
-                                        </div>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                        </Box>
+                                        <Box style={{ flex: 1, minWidth: 0 }}>
                                             <VerticalStack gap="0">
                                                 <Text variant="bodySm" fontWeight="semibold">{f.title}</Text>
                                                 <Text variant="bodySm" color="subdued">{f.description}</Text>
                                             </VerticalStack>
-                                        </div>
-                                        <div style={{ flexShrink: 0, paddingTop: 2 }}>
+                                        </Box>
+                                        <Box style={{ flexShrink: 0, paddingTop: 2 }}>
                                             <Icon source={ChevronRightMinor} color="subdued" />
-                                        </div>
-                                    </div>
+                                        </Box>
+                                    </Box>
                                 </React.Fragment>
                             );
                         })}
@@ -506,12 +503,12 @@ function OverviewTab({ asset, onTabChange, assetDevices = {}, agenticTreeData = 
 // Extra cell renderers for Resources / Prompts lists
 function ResourceUriCellRenderer({ data }) {
     if (!data) return null;
-    return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ fontSize: 12, color: "#8C9196", fontFamily: "ui-monospace, 'Cascadia Mono', Consolas, monospace" }}>{data.uri}</span></div>;
+    return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ fontSize: 12, color: "#8C9196", fontFamily: "ui-monospace, 'Cascadia Mono', Consolas, monospace" }}>{data.uri}</Box></Box>;
 }
 
 function PromptDescCellRenderer({ data }) {
     if (!data) return null;
-    return <div style={{ display: "flex", alignItems: "center", height: "100%", overflow: "hidden" }}><span style={{ fontSize: 12, color: "#6D7175", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{data.description}</span></div>;
+    return <Box style={{ display: "flex", alignItems: "center", height: "100%", overflow: "hidden" }}><Box as="span" style={{ fontSize: 12, color: "#6D7175", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{data.description}</Box></Box>;
 }
 
 const RESOURCES_COL_DEFS = [
@@ -528,7 +525,7 @@ const PROMPTS_COL_DEFS = [
 
 function SamplePair({ sampleData }) {
     return (
-        <div style={{ flex: 1, overflowY: "auto" }}>
+        <Box style={{ flex: 1, overflowY: "auto" }}>
             <Box padding="4">
                 <VerticalStack gap="4">
                     <LegacyCard>
@@ -539,7 +536,7 @@ function SamplePair({ sampleData }) {
                     </LegacyCard>
                 </VerticalStack>
             </Box>
-        </div>
+        </Box>
     );
 }
 
@@ -551,20 +548,20 @@ function ToolDetailPanel({ tool, parentLabel, onBack, onNavChange, extraCrumbs }
     const detailTabs    = [{ id: "value", content: "Value" }, { id: "schema", content: "Schema" }];
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <Box style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <Box paddingInlineStart="1" paddingInlineEnd="1">
                 <Tabs tabs={detailTabs} selected={tab} onSelect={setTab} />
             </Box>
             <Divider />
-            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <Box style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                 {tab === 0 && <SamplePair sampleData={sampleData} />}
                 {tab === 1 && (
                     tool.params?.length > 0
                         ? <AgGridTable rowData={tool.params} columnDefs={SCHEMA_COL_DEFS} defaultColDef={GRID_DEFAULT_COL} fillHeight noOuterBorder pagination={false} sideBar={false} />
                         : <Box padding="4"><Text variant="bodySm" color="subdued">No parameters.</Text></Box>
                 )}
-            </div>
-        </div>
+            </Box>
+        </Box>
     );
 }
 
@@ -622,22 +619,22 @@ function McpItemTypeCellRenderer({ value }) {
     };
     const s = COLORS[value] || { bg: "#F3F4F6", color: "#374151", border: "#E5E7EB" };
     return (
-        <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", height: 20, padding: "0 7px", borderRadius: 12, fontSize: 11, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: "nowrap" }}>
+        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
+            <Box as="span" style={{ display: "inline-flex", alignItems: "center", height: 20, padding: "0 7px", borderRadius: 12, fontSize: 11, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: "nowrap" }}>
                 {value}
-            </span>
-        </div>
+            </Box>
+        </Box>
     );
 }
 
 function ViolationCountCellRenderer({ value }) {
-    if (!value) return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ color: "#C4C7CB" }}>—</span></div>;
+    if (!value) return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ color: "#C4C7CB" }}>-</Box></Box>;
     return (
-        <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 22, height: 22, padding: "0 6px", borderRadius: 11, fontSize: 11, fontWeight: 700, background: "#DF2909", color: "#FFFBFB" }}>
+        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
+            <Box as="span" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 22, height: 22, padding: "0 6px", borderRadius: 11, fontSize: 11, fontWeight: 700, background: "#DF2909", color: "#FFFBFB" }}>
                 {value}
-            </span>
-        </div>
+            </Box>
+        </Box>
     );
 }
 
@@ -753,14 +750,14 @@ function McpComponentsView({ asset, onNavChange }) {
 function AgentComponentNameCellRenderer({ data }) {
     if (!data) return null;
     return (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", overflow: "hidden" }}>
-            <span style={{ fontSize: 13, color: "#202223", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <Box style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", overflow: "hidden" }}>
+            <Box as="span" style={{ fontSize: 13, color: "#202223", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {data.name}
-            </span>
+            </Box>
             {data.isNew && (
-                <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 500, padding: "1px 7px", borderRadius: 12, background: "#F1F2F3", color: "#6D7175", border: "1px solid #E1E3E5", lineHeight: "18px", display: "inline-flex", alignItems: "center" }}>New</span>
+                <Box as="span" style={{ flexShrink: 0, fontSize: 11, fontWeight: 500, padding: "1px 7px", borderRadius: 12, background: "#F1F2F3", color: "#6D7175", border: "1px solid #E1E3E5", lineHeight: "18px", display: "inline-flex", alignItems: "center" }}>New</Box>
             )}
-        </div>
+        </Box>
     );
 }
 
@@ -768,11 +765,11 @@ function AgentComponentTypeCellRenderer({ value }) {
     if (!value) return null;
     const s = TYPE_STYLES[value] || { bg: "#F3F4F6", color: "#374151", border: "#E5E7EB" };
     return (
-        <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", height: 20, padding: "0 7px", borderRadius: 12, fontSize: 11, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: "nowrap" }}>
+        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
+            <Box as="span" style={{ display: "inline-flex", alignItems: "center", height: 20, padding: "0 7px", borderRadius: 12, fontSize: 11, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: "nowrap" }}>
                 {value}
-            </span>
-        </div>
+            </Box>
+        </Box>
     );
 }
 
@@ -845,7 +842,7 @@ function AgentMcpToolsView({ asset, selectedMcp, agenticFlatData, goToList, onNa
     }, [selectedMcp?.name, agenticFlatData]);
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <Box style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             {mcpTools.length === 0 ? (
                 <Box padding="4"><Text variant="bodySm" color="subdued">No tools found.</Text></Box>
             ) : (
@@ -878,7 +875,7 @@ function AgentMcpToolsView({ asset, selectedMcp, agenticFlatData, goToList, onNa
                     sideBar={false}
                 />
             )}
-        </div>
+        </Box>
     );
 }
 
@@ -1222,9 +1219,8 @@ export default function AgenticAssetFlyout({
     if (!asset) return null;
 
     return (
-        <div className={"flyLayout " + (show ? "show" : "")} style={{ width: 720 }}>
-            {/* onMouseEnter/onMouseLeave not available on Box; flyout positioning requires flex+height CSS not supported by Box */}
-            <div
+        <Box className={"flyLayout " + (show ? "show" : "")} style={{ width: 720 }}>
+            <Box
                 className="innerFlyLayout"
                 onMouseEnter={lockScroll}
                 onMouseLeave={unlockScroll}
@@ -1264,7 +1260,7 @@ export default function AgenticAssetFlyout({
                 )}
 
                 {/* flex:1 + minHeight:0 required for AG Grid tabs to fill remaining space — Box props insufficient */}
-                <div style={{ flex: 1, minHeight: 0, overflowY: selectedTab === 0 ? "auto" : "hidden", display: "flex", flexDirection: "column" }}>
+                <Box style={{ flex: 1, minHeight: 0, overflowY: selectedTab === 0 ? "auto" : "hidden", display: "flex", flexDirection: "column" }}>
                     {selectedTab === 0 && (
                         <OverviewTab
                             asset={asset}
@@ -1284,7 +1280,7 @@ export default function AgenticAssetFlyout({
                     )}
                     {selectedTab === 2 && <ViolationsTab asset={asset} />}
                     {selectedTab === 3 && <DevicesTab asset={asset} assetDevices={assetDevices} />}
-                </div>
+                </Box>
 
                 <AiChatSection
                     placeholder="Ask anything about this agentic asset..."
@@ -1292,7 +1288,7 @@ export default function AgenticAssetFlyout({
                     conversationType="AGENTIC_OBSERVE"
                     chatMetadata={chatMetadata}
                 />
-            </div>
-        </div>
+            </Box>
+        </Box>
     );
 }

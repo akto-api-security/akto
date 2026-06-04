@@ -10,13 +10,13 @@ function RiskPill({ score }) {
     if (score == null) return null;
     const { bg, color } = getRiskColor(score);
     return (
-        <span style={{
+        <Box as="span" style={{
             display: "inline-flex", alignItems: "center", justifyContent: "center",
             padding: "2px 8px", borderRadius: 10,
             fontSize: 12, fontWeight: 600, background: bg, color,
         }}>
             {score.toFixed(1)}
-        </span>
+        </Box>
     );
 }
 

@@ -113,8 +113,8 @@ function StatRow({ label, value, delta, sparklineData, color, valueColor, monthL
                     <Text variant="headingSm" fontWeight="semibold">{label}</Text>
                     <Text variant="headingXl" fontWeight="bold" color={valueColor}>
                         {value.toLocaleString()}
-                        {delta > 0 && <span style={{ fontSize:12, fontWeight:600, color:"#008060", marginLeft:6, verticalAlign:"middle" }}>+{delta}</span>}
-                        {delta < 0 && <span style={{ fontSize:12, fontWeight:600, color:"#D72C0D", marginLeft:6, verticalAlign:"middle" }}>{delta}</span>}
+                        {delta > 0 && <Box as="span" style={{ fontSize:12, fontWeight:600, color:"#008060", marginLeft:6, verticalAlign:"middle" }}>+{delta}</Box>}
+                        {delta < 0 && <Box as="span" style={{ fontSize:12, fontWeight:600, color:"#D72C0D", marginLeft:6, verticalAlign:"middle" }}>{delta}</Box>}
                     </Text>
                 </VerticalStack>
                 <HighchartsReact highcharts={Highcharts} options={opts} />
@@ -148,7 +148,7 @@ function TopSection({ summary }) {
 
     return (
         <HorizontalStack gap="4" align="start" blockAlign="stretch" wrap={false}>
-            <div style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column" }}>
+            <Box style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column" }}>
                 <Card padding="0">
                     <VerticalStack>
                         <StatRow label="Total Endpoints"  value={summary?.deviceCount ?? 0} delta={summary?.deltaEndpoints ?? 0} sparklineData={sparklines.endpoints || []}  color="#7C3AED" monthLabels={summary?.monthLabels} />
@@ -158,21 +158,21 @@ function TopSection({ summary }) {
                         <StatRow label="Total Violations" value={summary?.totalViolations ?? 0} delta={summary?.deltaViolations ?? 0} sparklineData={sparklines.violations || []} color="#DC2626" valueColor="critical" monthLabels={summary?.monthLabels} />
                     </VerticalStack>
                 </Card>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
+            </Box>
+            <Box style={{ flex: 1, minWidth: 0 }}>
                 <Card padding="0">
                     <ChartPanel title="Endpoints Over Time by OS Type">
                         <HighchartsReact highcharts={Highcharts} options={osTrendOpts} />
                     </ChartPanel>
                 </Card>
-            </div>
-            <div style={{ width: 298, flexShrink: 0 }}>
+            </Box>
+            <Box style={{ width: 298, flexShrink: 0 }}>
                 <Card padding="0">
                     <ChartPanel title="Violations by Severity">
                         <HighchartsReact highcharts={Highcharts} options={violationsDonutOpts} />
                     </ChartPanel>
                 </Card>
-            </div>
+            </Box>
         </HorizontalStack>
     );
 }
@@ -192,7 +192,7 @@ function TypeBadge({ type }) {
     if (!type) return null;
     const s = TYPE_STYLES[type] || { bg: "#F3F4F6", color: "#374151", border: "#E5E7EB" };
     return (
-        <span style={{
+        <Box as="span" style={{
             display: "inline-flex", alignItems: "center",
             padding: "1px 7px", borderRadius: 12,
             fontSize: 11, fontWeight: 500, lineHeight: "18px",
@@ -201,14 +201,14 @@ function TypeBadge({ type }) {
             whiteSpace: "nowrap",
         }}>
             {type}
-        </span>
+        </Box>
     );
 }
 
 function SkillBadge({ count }) {
     if (!count) return null;
     return (
-        <span style={{
+        <Box as="span" style={{
             display: "inline-flex", alignItems: "center",
             padding: "1px 7px", borderRadius: 12,
             fontSize: 11, fontWeight: 500, lineHeight: "18px",
@@ -217,7 +217,7 @@ function SkillBadge({ count }) {
             whiteSpace: "nowrap",
         }}>
             {count} {count === 1 ? "skill" : "skills"}
-        </span>
+        </Box>
     );
 }
 
@@ -226,14 +226,14 @@ function RiskScoreCellRenderer({ value }) {
     const { bg, color } = getRiskColor(value);
     return (
         <HorizontalStack blockAlign="center">
-            <span style={{
+            <Box as="span" style={{
                 display: "inline-flex", alignItems: "center", justifyContent: "center",
                 width: 44, height: 24, borderRadius: 12,
                 fontSize: 12, fontWeight: 600,
                 background: bg, color,
             }}>
                 {value.toFixed(1)}
-            </span>
+            </Box>
         </HorizontalStack>
     );
 }
@@ -250,7 +250,7 @@ function ViolationsCellRenderer({ value }) {
     return (
         <HorizontalStack gap="1" blockAlign="center">
             {parts.map(p => (
-                <span key={p.key} style={{
+                <Box as="span" key={p.key} style={{
                     display: "inline-flex", alignItems: "center", justifyContent: "center",
                     minWidth: 22, height: 22, padding: "0 5px", borderRadius: 11,
                     fontSize: 11, fontWeight: 700,
@@ -258,7 +258,7 @@ function ViolationsCellRenderer({ value }) {
                     color: SEVERITY_COLORS[p.key].text,
                 }}>
                     {p.count}
-                </span>
+                </Box>
             ))}
         </HorizontalStack>
     );

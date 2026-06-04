@@ -18,13 +18,13 @@ function TypeBadge({ type }) {
     const s = TYPE_STYLES[type] || { bg: "#F3F4F6", color: "#374151", border: "#E5E7EB" };
     // TYPE_STYLES colours are outside the Polaris Badge status set — custom span justified
     return (
-        <span style={{
+        <Box as="span" style={{
             display: "inline-flex", alignItems: "center",
             padding: "1px 7px", borderRadius: 12,
             fontSize: 11, fontWeight: 500, lineHeight: "18px",
             background: s.bg, color: s.color, border: `1px solid ${s.border}`,
             whiteSpace: "nowrap",
-        }}>{type}</span>
+        }}>{type}</Box>
     );
 }
 
@@ -107,53 +107,53 @@ function computeRiskFactors(device, agents) {
 function AgentNameCellRenderer({ data }) {
     if (!data) return null;
     return (
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 13, color: "#202223", fontWeight: 500 }}>{data.endpoint}</span>
+        <Box style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <Box as="span" style={{ fontSize: 13, color: "#202223", fontWeight: 500 }}>{data.endpoint}</Box>
             <TypeBadge type={data.type} />
-        </div>
+        </Box>
     );
 }
 
 function AgentRiskCellRenderer({ value }) {
-    if (value == null) return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ color: "#C4C7CB" }}>—</span></div>;
+    if (value == null) return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ color: "#C4C7CB" }}>-</Box></Box>;
     const { bg, color } = getRiskColor(value);
     return (
-        <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, lineHeight: "16px", background: bg, color }}>
+        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
+            <Box as="span" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, lineHeight: "16px", background: bg, color }}>
                 {value.toFixed(1)}
-            </span>
-        </div>
+            </Box>
+        </Box>
     );
 }
 
 function AgentViolationsCellRenderer({ value }) {
-    if (!value) return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ color: "#C4C7CB" }}>—</span></div>;
+    if (!value) return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ color: "#C4C7CB" }}>-</Box></Box>;
     const parts = ["critical", "high", "medium", "low"]
         .map(k => ({ k, c: value[k], ...SEVERITY_COLORS[k] }))
         .filter(p => p.c > 0);
-    if (!parts.length) return <div style={{ display: "flex", alignItems: "center", height: "100%" }}><span style={{ color: "#C4C7CB" }}>—</span></div>;
+    if (!parts.length) return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ color: "#C4C7CB" }}>-</Box></Box>;
     return (
-        <div style={{ display: "flex", alignItems: "center", height: "100%", gap: 3 }}>
+        <Box style={{ display: "flex", alignItems: "center", height: "100%", gap: 3 }}>
             {parts.map(p => (
-                <span key={p.k} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 20, height: 20, padding: "0 5px", borderRadius: 10, fontSize: 10, fontWeight: 700, background: p.bg, color: p.text }}>{p.c}</span>
+                <Box as="span" key={p.k} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 20, height: 20, padding: "0 5px", borderRadius: 10, fontSize: 10, fontWeight: 700, background: p.bg, color: p.text }}>{p.c}</Box>
             ))}
-        </div>
+        </Box>
     );
 }
 
 function AgentSkillsCellRenderer({ data }) {
     if (!data) return null;
     return data.skillCount
-        ? <span style={{ fontSize: 12, color: "#202223", fontWeight: 500 }}>{data.skillCount}</span>
-        : <span style={{ color: "#C4C7CB" }}>—</span>;
+        ? <Box as="span" style={{ fontSize: 12, color: "#202223", fontWeight: 500 }}>{data.skillCount}</Box>
+        : <Box as="span" style={{ color: "#C4C7CB" }}>-</Box>;
 }
 
 function ViolSeverityCellRenderer({ data }) {
     if (!data) return null;
     const s = SEVERITY_COLORS[data.severity] || SEVERITY_COLORS.low;
     return (
-        <div style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <span style={{
+        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
+            <Box as="span" style={{
                 display: "inline-flex", alignItems: "center",
                 padding: "2px 8px", borderRadius: 20,
                 fontSize: 11, fontWeight: 600, lineHeight: "16px",
@@ -161,17 +161,17 @@ function ViolSeverityCellRenderer({ data }) {
                 textTransform: "capitalize", flexShrink: 0, whiteSpace: "nowrap",
             }}>
                 {data.severity}
-            </span>
-        </div>
+            </Box>
+        </Box>
     );
 }
 
 function ViolTitleCellRenderer({ data }) {
     if (!data) return null;
     return (
-        <div style={{ display: "flex", alignItems: "center", width: "100%", overflow: "hidden" }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "#202223", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{data.title}</span>
-        </div>
+        <Box style={{ display: "flex", alignItems: "center", width: "100%", overflow: "hidden" }}>
+            <Box as="span" style={{ fontSize: 12, fontWeight: 600, color: "#202223", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{data.title}</Box>
+        </Box>
     );
 }
 
@@ -179,10 +179,10 @@ function ViolAgentCellRenderer({ data }) {
     if (!data) return null;
     const displayAgent = data.agent ? formatDisplayName(data.agent) : null;
     return (
-        <div style={{ display: "flex", alignItems: "center", height: "100%", gap: 5, overflow: "hidden" }}>
+        <Box style={{ display: "flex", alignItems: "center", height: "100%", gap: 5, overflow: "hidden" }}>
             <TypeBadge type={data.agentType} />
-            {displayAgent && <span style={{ fontSize: 12, color: "#6D7175", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayAgent}</span>}
-        </div>
+            {displayAgent && <Box as="span" style={{ fontSize: 12, color: "#6D7175", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayAgent}</Box>}
+        </Box>
     );
 }
 
@@ -291,8 +291,7 @@ function TopoNode({ data }) {
         <>
             {!isDevice && <Handle type="target" position={Position.Left} />}
             <Card padding={0}>
-                {/* Dynamic border/background colours from data — Box doesn't support computed border-color */}
-                <div style={{ border: `1px solid ${colors.borderColor}`, borderRadius: "8px", backgroundColor: colors.backgroundColor }}>
+                <Box style={{ border: `1px solid ${colors.borderColor}`, borderRadius: "8px", backgroundColor: colors.backgroundColor }}>
                     <Box padding={3}>
                         <VerticalStack gap={1}>
                             <Box width="150px">
@@ -309,7 +308,7 @@ function TopoNode({ data }) {
                             </HorizontalStack>
                         </VerticalStack>
                     </Box>
-                </div>
+                </Box>
             </Card>
             <Handle type="source" position={Position.Right} id="b" />
         </>
@@ -380,7 +379,7 @@ function TopologyGraph({ device, agents }) {
 
     // Fixed-size container — ReactFlow's fitView + zoom handles overflow
     return (
-        <div style={{ height: 280, borderRadius: 8, border: "1px solid #e1e5e9", overflow: "hidden", background: "#f8fafc" }}>
+        <Box style={{ height: 280, borderRadius: 8, border: "1px solid #e1e5e9", overflow: "hidden", background: "#f8fafc" }}>
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -401,7 +400,7 @@ function TopologyGraph({ device, agents }) {
                 <Background color="#e1e5e9" gap={16} />
                 <Controls showInteractive={false} />
             </ReactFlow>
-        </div>
+        </Box>
     );
 }
 
@@ -471,26 +470,25 @@ function OverviewTab({ device, agents, onTabChange }) {
                             return (
                                 <React.Fragment key={i}>
                                     {i > 0 && <Divider />}
-                                    {/* clickable row — no Polaris equivalent for a full-width interactive area with hover state */}
-                                    <div
+                                    <Box
                                         onClick={() => onTabChange?.(targetTab)}
                                         style={{ padding: "12px 8px", display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer", borderRadius: 6, transition: "background 0.15s" }}
                                         onMouseEnter={e => e.currentTarget.style.background = "#F6F6F7"}
                                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                                     >
-                                        <div style={{ flexShrink: 0, paddingTop: 1, width: 72 }}>
+                                        <Box style={{ flexShrink: 0, paddingTop: 1, width: 72 }}>
                                             <Badge status={badgeStatus}>{f.severity.charAt(0).toUpperCase() + f.severity.slice(1)}</Badge>
-                                        </div>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                        </Box>
+                                        <Box style={{ flex: 1, minWidth: 0 }}>
                                             <VerticalStack gap="0">
                                                 <Text variant="bodySm" fontWeight="semibold">{f.title}</Text>
                                                 <Text variant="bodySm" color="subdued">{f.description}</Text>
                                             </VerticalStack>
-                                        </div>
-                                        <div style={{ flexShrink: 0, paddingTop: 2 }}>
+                                        </Box>
+                                        <Box style={{ flexShrink: 0, paddingTop: 2 }}>
                                             <Icon source={ChevronRightMinor} color="subdued" />
-                                        </div>
-                                    </div>
+                                        </Box>
+                                    </Box>
                                 </React.Fragment>
                             );
                         })}
@@ -633,9 +631,8 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
     if (!device) return null;
 
     return (
-        <div className={"flyLayout " + (show ? "show" : "")} style={{ width: 720 }}>
-            {/* onMouseEnter/onMouseLeave not available on Box; flyout positioning requires flex+height CSS not supported by Box */}
-            <div
+        <Box className={"flyLayout " + (show ? "show" : "")} style={{ width: 720 }}>
+            <Box
                 className="innerFlyLayout"
                 onMouseEnter={lockScroll}
                 onMouseLeave={unlockScroll}
@@ -659,12 +656,11 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
                 </Box>
                 <Divider />
 
-                {/* flex:1 + minHeight:0 required for AG Grid tabs to fill remaining space — Box props insufficient */}
-                <div style={{ flex: 1, minHeight: 0, overflowY: selectedTab === 0 ? "auto" : "hidden", display: "flex", flexDirection: "column" }}>
+                <Box style={{ flex: 1, minHeight: 0, overflowY: selectedTab === 0 ? "auto" : "hidden", display: "flex", flexDirection: "column" }}>
                     {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} onTabChange={setSelectedTab} />}
                     {selectedTab === 1 && <AgenticsTab agents={agents || []} onAgentClick={onAgentClick} agentRiskData={agentRiskData} />}
                     {selectedTab === 2 && <ViolationsTab device={device} agents={agents} />}
-                </div>
+                </Box>
 
                 <AiChatSection
                     placeholder="Ask anything about this device..."
@@ -672,7 +668,7 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
                     conversationType="AGENTIC_OBSERVE"
                     chatMetadata={chatMetadata}
                 />
-            </div>
-        </div>
+            </Box>
+        </Box>
     );
 }
