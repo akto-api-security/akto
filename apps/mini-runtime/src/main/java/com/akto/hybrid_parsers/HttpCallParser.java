@@ -42,6 +42,7 @@ import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.dto.tracing.Span;
 import com.akto.tracing.ServiceGraphBuilder;
 import com.akto.tracing.TraceParseResult;
+import com.akto.tracing.copilot.CopilotActivityParser;
 import com.akto.tracing.n8n.N8nTraceParser;
 import com.akto.tracing.snowflake.SnowflakeTraceParser;
 import com.akto.usage.OrgUtils;
@@ -555,6 +556,37 @@ public class HttpCallParser {
             return false;
         }
         return Constants.AI_AGENT_SOURCE_SNOWFLAKE.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+    }
+
+    private boolean isCopilotTraffic(Map<String, String> tagsMap) {
+        if (tagsMap == null) return false;
+        return Constants.AI_AGENT_SOURCE_COPILOT_STUDIO.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+    }
+
+    private void parseCopilotTrace(HttpResponseParams httpResponseParam) {
+        try {
+            String payload = httpResponseParam.getPayload();
+            if (payload == null || payload.isEmpty()) return;
+            if (!CopilotActivityParser.getInstance().canParse(payload)) return;
+            TraceParseResult result = CopilotActivityParser.getInstance().parse(payload);
+            dataActor.storeTrace(result.getTrace());
+            if (result.getSpans() != null && !result.getSpans().isEmpty()) {
+                dataActor.storeSpans(result.getSpans());
+            }
+            if (httpResponseParam.getRequestParams() != null) {
+                int apiCollectionId = httpResponseParam.getRequestParams().getApiCollectionId();
+                if (apiCollectionId != -1) {
+                    Map<String, ServiceGraphEdgeInfo> edges = CopilotActivityParser.getInstance().extractServiceGraph(payload);
+                    if (edges != null && !edges.isEmpty()) {
+                        ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
+                    }
+                }
+            }
+            loggerMaker.info("Stored Copilot Studio trace with " +
+                    (result.getSpans() != null ? result.getSpans().size() : 0) + " spans", LogDb.RUNTIME);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing Copilot trace: " + e.getMessage());
+        }
     }
 
     private boolean isAgenticTraffic(Map<String, String> tagsMap) {
@@ -1523,6 +1555,10 @@ public class HttpCallParser {
 
             if (isSnowflakeTraffic(tagsMap)) {
                 storeSnowflakeAgentTrace(httpResponseParam);
+            }
+
+            if (isCopilotTraffic(tagsMap)) {
+                parseCopilotTrace(httpResponseParam);
             }
 
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
