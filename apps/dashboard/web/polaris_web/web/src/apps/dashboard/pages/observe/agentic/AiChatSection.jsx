@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { HorizontalStack, Text, Button } from "@shopify/polaris";
+import { Box, HorizontalStack, Text, Button } from "@shopify/polaris";
 import { ChevronDownMinor } from "@shopify/polaris-icons";
 import AgenticSearchInput from "../../agentic/components/AgenticSearchInput";
 import AgenticStreamingResponse from "../../agentic/components/AgenticStreamingResponse";
@@ -81,7 +81,7 @@ export default function AiChatSection({
     }, [inputValue, aiLoading, conversationId, conversationType, chatMetadata]);
 
     return (
-        <div style={{
+        <Box style={{
             display: "flex",
             flexDirection: "column",
             borderTop: "1px solid #E1E3E5",
@@ -91,7 +91,7 @@ export default function AiChatSection({
             minHeight: expanded ? 0 : undefined,
         }}>
             {expanded && (
-                <div style={{ padding: "8px 12px", borderBottom: "1px solid #F1F2F3", flexShrink: 0 }}>
+                <Box style={{ padding: "8px 12px", borderBottom: "1px solid #F1F2F3", flexShrink: 0 }}>
                     <HorizontalStack align="space-between" blockAlign="center">
                         <Text variant="headingXs">Ask Akto</Text>
                         <Button
@@ -100,11 +100,11 @@ export default function AiChatSection({
                             onClick={() => setUserCollapsed(true)}
                         />
                     </HorizontalStack>
-                </div>
+                </Box>
             )}
 
             {expanded && messages.length > 0 && (
-                <div style={{
+                <Box style={{
                     flex: 1,
                     minHeight: 0,
                     overflowY: "auto",
@@ -125,17 +125,17 @@ export default function AiChatSection({
                         )
                     ))}
                     {aiLoading && <AgenticThinkingBox />}
-                    <div ref={bottomRef} />
-                </div>
+                    <Box ref={bottomRef} />
+                </Box>
             )}
 
             {expanded && messages.length === 0 && !aiLoading && (
-                <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <span style={{ fontSize: 12, color: "#C4C9D0" }}>Press Enter to ask…</span>
-                </div>
+                <Box style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Box as="span" style={{ fontSize: 12, color: "#C4C9D0" }}>Press Enter to ask…</Box>
+                </Box>
             )}
 
-            <div style={{ padding: "10px 16px 12px", flexShrink: 0 }}>
+            <Box style={{ padding: "10px 16px 12px", flexShrink: 0 }}>
                 <AgenticSearchInput
                     placeholder={placeholder || "Ask anything related to your endpoints..."}
                     isFixed={false}
@@ -146,7 +146,7 @@ export default function AiChatSection({
                     onSubmit={handleSubmit}
                     isStreaming={aiLoading}
                 />
-            </div>
-        </div>
+            </Box>
+        </Box>
     );
 }
