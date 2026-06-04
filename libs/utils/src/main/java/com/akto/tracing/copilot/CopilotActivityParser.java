@@ -236,7 +236,7 @@ public class CopilotActivityParser implements TraceParser {
 
                 Span planSpan = Span.builder()
                         .id(eventId).traceId(traceId).parentSpanId(rootSpanId)
-                        .spanKind(TracingConstants.SpanKind.PLANNING)
+                        .spanKind(TracingConstants.SpanKind.WORKFLOW)
                         .name("Planning Round " + planningRound)
                         .startTimeMillis(tsMs).endTimeMillis(tsMs)
                         .status(status)
@@ -397,7 +397,7 @@ public class CopilotActivityParser implements TraceParser {
                 currentPlanLabel = "Planning Round " + planRound;
                 // One Agent → Planning Round N edge per round
                 Map<String, Object> meta = new LinkedHashMap<>();
-                meta.put("type", TracingConstants.SpanKind.PLANNING);
+                meta.put("type", TracingConstants.SpanKind.WORKFLOW);
                 meta.put("edgeParam", edgeParam(TracingConstants.EdgeParamType.USER_INPUT, userQuestion));
                 edges.put(currentPlanLabel, new ServiceGraphEdgeInfo(DEFAULT_AGENT_NAME, currentPlanLabel, meta));
             }

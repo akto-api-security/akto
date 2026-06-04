@@ -909,16 +909,27 @@ public class HttpCallParser {
         Map<String, Span> byId = new HashMap<>();
         for (Span s : spans) byId.put(s.getId(), s);
         for (Span span : spans) {
-            if (span.getParentSpanId() == null) continue;
-            Span parent = byId.get(span.getParentSpanId());
-            String sourceService = parent != null ? parent.getName() : "AGENT";
-            String targetService = span.getName();
+            String targetService = sanitizeServiceName(span.getName());
+            String spanKind = span.getSpanKind();
             Map<String, Object> meta = new HashMap<>();
-            meta.put("type", span.getSpanKind());
-            meta.put("edgeParam", span.getSpanKind());
-            edges.put(targetService, new ServiceGraphEdgeInfo(sourceService, targetService, meta));
+            meta.put("type", spanKind);
+            meta.put("edgeParam", spanKind);
+
+            if (span.getParentSpanId() == null) {
+                // Root (agent) span — add as a target so the UI shows it as "AI Agent"
+                edges.put(targetService, new ServiceGraphEdgeInfo("User", targetService, meta));
+            } else {
+                Span parent = byId.get(span.getParentSpanId());
+                String sourceService = parent != null ? sanitizeServiceName(parent.getName()) : "User";
+                edges.put(targetService, new ServiceGraphEdgeInfo(sourceService, targetService, meta));
+            }
         }
         return edges;
+    }
+
+    private static String sanitizeServiceName(String name) {
+        if (name == null) return "unknown";
+        return name.replaceAll("[^a-zA-Z0-9_\\-]", "_");
     }
 
     private List<HttpResponseParams> filterDefaultPayloads(List<HttpResponseParams> filteredResponseParams, Map<String, DefaultPayload> defaultPayloadMap) {
