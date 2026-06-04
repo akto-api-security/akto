@@ -96,6 +96,9 @@ public class CopilotActivityParser implements TraceParser {
         String userMessageText = null;
         String botMessageText = null;
         String conversationId = null;
+        String agentName = DEFAULT_AGENT_NAME;
+        String sessionOutcome = null;      // from SessionInfo: Resolved/Escalated/Abandon
+        String intentTriggered = null;     // from IntentRecognition: topic name
         long firstMs = Long.MAX_VALUE;
         long lastMs = Long.MIN_VALUE;
         boolean hasAnyPlan = false;
@@ -110,7 +113,9 @@ public class CopilotActivityParser implements TraceParser {
             }
             String type = act.path("type").asText("");
             String name = act.path("name").asText("");
+            String valueType = act.path("valueType").asText("");
             int role = act.path("from").path("role").asInt(-1);
+            JsonNode val = act.path("value");
 
             if (TYPE_MESSAGE.equals(type) && role == ROLE_USER && userMessageId == null) {
                 userMessageId = act.path("id").asText(null);
@@ -127,15 +132,31 @@ public class CopilotActivityParser implements TraceParser {
                 endOfConvMeta.add(m);
             }
             if (name.startsWith("DynamicPlan")) hasAnyPlan = true;
-            if (TYPE_TRACE.equals(type) && convInfoMeta == null) {
+
+            // ConversationInfo trace — locale and design mode
+            if (TYPE_TRACE.equals(type) && "ConversationInfo".equals(valueType) && convInfoMeta == null) {
                 Map<String, Object> tmp = new LinkedHashMap<>();
-                JsonNode val = act.path("value");
                 val.fields().forEachRemaining(e -> tmp.put(e.getKey(), e.getValue().asText()));
                 convInfoMeta = tmp;
             }
+
+            // SessionInfo — outcome (Resolved/Escalated/Abandon) and agent name
+            if ("SessionInfo".equals(valueType)) {
+                String outcome = val.path("outcome").asText(null);
+                if (outcome != null && !outcome.isEmpty()) sessionOutcome = outcome;
+                String bot = val.path("BotName").asText(val.path("botName").asText(null));
+                if (bot != null && !bot.isEmpty()) agentName = bot;
+            }
+
+            // IntentRecognition — what triggered this agent/topic
+            if ("IntentRecognition".equals(valueType)) {
+                String topicName = val.path("topicName").asText(val.path("TopicName").asText(null));
+                if (topicName != null && !topicName.isEmpty()) intentTriggered = topicName;
+            }
+
+            // Agent name from Metadata field (transcript-level BotName)
             if (conversationId == null && name.endsWith(SUFFIX_TOOL_TRACE_DATA)) {
-                String cid = act.path("value").path("searchContextTraceInfo")
-                        .path("conversationId").asText(null);
+                String cid = val.path("searchContextTraceInfo").path("conversationId").asText(null);
                 if (cid != null && !cid.isEmpty()) conversationId = cid;
             }
         }
@@ -157,6 +178,8 @@ public class CopilotActivityParser implements TraceParser {
         rootMeta.put("sourceType", SOURCE_TYPE);
         if (convInfoMeta != null && !convInfoMeta.isEmpty()) rootMeta.put("conversationInfo", convInfoMeta);
         if (!endOfConvMeta.isEmpty()) rootMeta.put("endOfConversation", endOfConvMeta);
+        if (sessionOutcome != null) rootMeta.put("sessionOutcome", sessionOutcome);
+        if (intentTriggered != null) rootMeta.put("intentTriggered", intentTriggered);
 
         Map<String, Object> rootInput = new LinkedHashMap<>();
         if (userMessageText != null) rootInput.put("text", truncate(userMessageText, MAX_TEXT_LEN));
@@ -166,7 +189,7 @@ public class CopilotActivityParser implements TraceParser {
         Span rootSpan = Span.builder()
                 .id(rootSpanId).traceId(traceId).parentSpanId(null)
                 .spanKind(TracingConstants.SpanKind.AGENT)
-                .name(DEFAULT_AGENT_NAME)
+                .name(agentName)
                 .startTimeMillis(firstMs).endTimeMillis(lastMs)
                 .status(status)
                 .input(rootInput).output(rootOutput).metadata(rootMeta)
@@ -177,7 +200,7 @@ public class CopilotActivityParser implements TraceParser {
         spans.add(rootSpan);
 
         if ("blocked".equals(status)) {
-            return buildResult(traceId, rootSpanId, spans, firstMs, lastMs, status, userMessageText, botMessageText);
+            return buildResult(traceId, rootSpanId, spans, firstMs, lastMs, status, agentName, userMessageText, botMessageText);
         }
 
         // ── Pass 2: planning and tool spans ───────────────────────────────
@@ -307,7 +330,7 @@ public class CopilotActivityParser implements TraceParser {
                 if (toolSpan == null) continue;
 
                 // Tool output from observation
-                Map<String, Object> toolOutput = extractSearchResults(value.path("observation"));
+                Map<String, Object> toolOutput = extractToolOutput(value.path("observation"));
                 toolSpan.setOutput(toolOutput);
                 toolSpan.setEndTimeMillis(tsMs);
                 toolSpan.setStatus(status);
@@ -338,7 +361,7 @@ public class CopilotActivityParser implements TraceParser {
             }
         }
 
-        return buildResult(traceId, rootSpanId, spans, firstMs, lastMs, status, userMessageText, botMessageText);
+        return buildResult(traceId, rootSpanId, spans, firstMs, lastMs, status, agentName, userMessageText, botMessageText);
     }
 
     // ── extractServiceGraph ───────────────────────────────────────────────
@@ -350,7 +373,9 @@ public class CopilotActivityParser implements TraceParser {
         Map<String, ServiceGraphEdgeInfo> edges = new LinkedHashMap<>();
 
         String userQuestion = null;
-        boolean planSeen = false;
+        int planRound = 0;
+        String currentPlanLabel = null;
+        int toolStepSeq = 0;    // global step sequence for unique edge keys
 
         for (JsonNode act : root.path("activities")) {
             String type = act.path("type").asText("");
@@ -361,25 +386,26 @@ public class CopilotActivityParser implements TraceParser {
             if (TYPE_MESSAGE.equals(type) && role == ROLE_USER && userQuestion == null)
                 userQuestion = truncate(act.path("text").asText(null), 200);
 
-            if (EVENT_PLAN_RECEIVED.equals(name) && !planSeen) {
-                // Agent → Planning edge (add once)
+            if (EVENT_PLAN_RECEIVED.equals(name)) {
+                planRound++;
+                currentPlanLabel = "Planning Round " + planRound;
+                // One Agent → Planning Round N edge per round
                 Map<String, Object> meta = new LinkedHashMap<>();
                 meta.put("type", TracingConstants.SpanKind.PLANNING);
                 meta.put("edgeParam", edgeParam(TracingConstants.EdgeParamType.USER_INPUT, userQuestion));
-                edges.put("Planning", new ServiceGraphEdgeInfo(DEFAULT_AGENT_NAME, "Planning", meta));
-                planSeen = true;
+                edges.put(currentPlanLabel, new ServiceGraphEdgeInfo(DEFAULT_AGENT_NAME, currentPlanLabel, meta));
             }
 
-            if (EVENT_STEP_BIND_UPDATE.equals(name)) {
+            if (EVENT_STEP_BIND_UPDATE.equals(name) && currentPlanLabel != null) {
+                toolStepSeq++;
                 String toolName = value.path("taskDialogId").asText("Tool").replaceFirst("^P:", "");
                 String searchQuery = value.path("arguments").path("search_query").asText(null);
-                // Planning → Tool edge (deduplicated by tool name)
-                if (!edges.containsKey(toolName)) {
-                    Map<String, Object> meta = new LinkedHashMap<>();
-                    meta.put("type", TracingConstants.SpanKind.TOOL);
-                    meta.put("edgeParam", edgeParam(TracingConstants.EdgeParamType.TOOL_INPUT, searchQuery));
-                    edges.put(toolName, new ServiceGraphEdgeInfo("Planning", toolName, meta));
-                }
+                // One Planning Round N → Tool edge per invocation (unique key = round+seq)
+                String edgeKey = currentPlanLabel + ":" + toolName + ":" + toolStepSeq;
+                Map<String, Object> meta = new LinkedHashMap<>();
+                meta.put("type", TracingConstants.SpanKind.TOOL);
+                meta.put("edgeParam", edgeParam(TracingConstants.EdgeParamType.TOOL_INPUT, searchQuery));
+                edges.put(edgeKey, new ServiceGraphEdgeInfo(currentPlanLabel, toolName, meta));
             }
         }
         return edges;
@@ -388,7 +414,7 @@ public class CopilotActivityParser implements TraceParser {
     // ── helpers ───────────────────────────────────────────────────────────
 
     private TraceParseResult buildResult(String traceId, String rootSpanId, List<Span> spans,
-            long startMs, long endMs, String status, String userText, String botText) {
+            long startMs, long endMs, String status, String agentName, String userText, String botText) {
         Map<String, Object> rootInput = new LinkedHashMap<>();
         if (userText != null) rootInput.put("text", truncate(userText, MAX_TEXT_LEN));
         Map<String, Object> rootOutput = new LinkedHashMap<>();
@@ -398,7 +424,7 @@ public class CopilotActivityParser implements TraceParser {
 
         Trace trace = Trace.builder()
                 .id(traceId).rootSpanId(rootSpanId)
-                .aiAgentName(DEFAULT_AGENT_NAME).name(DEFAULT_AGENT_NAME)
+                .aiAgentName(agentName).name(agentName)
                 .startTimeMillis(startMs).endTimeMillis(endMs)
                 .status(status).totalSpans(spans.size())
                 .totalTokens(0).totalInputTokens(0).totalOutputTokens(0)
@@ -414,24 +440,51 @@ public class CopilotActivityParser implements TraceParser {
                 .build();
     }
 
-    /** Extracts search results from a DynamicPlanStepFinished observation node. */
-    private Map<String, Object> extractSearchResults(JsonNode observation) {
+    /**
+     * Extracts tool output from a DynamicPlanStepFinished observation node.
+     * Handles search tools (search_result.search_results), file downloads, and
+     * generic tool outputs so any tool type has a non-empty output.
+     */
+    private Map<String, Object> extractToolOutput(JsonNode observation) {
         Map<String, Object> output = new LinkedHashMap<>();
-        if (observation.isMissingNode()) return output;
-        JsonNode results = observation.path("search_result").path("search_results");
-        if (!results.isArray() || results.size() == 0) return output;
-        List<Map<String, Object>> list = new ArrayList<>();
-        results.forEach(r -> {
-            Map<String, Object> item = new LinkedHashMap<>();
-            String name = r.path("Name").asText(r.path("name").asText(""));
-            String url = r.path("Url").asText(r.path("url").asText(""));
-            String text = r.path("Text").asText(r.path("text").asText(""));
-            if (!name.isEmpty()) item.put("name", name);
-            if (!url.isEmpty()) item.put("url", url);
-            if (!text.isEmpty()) item.put("snippet", truncate(text, MAX_SNIPPET_LEN));
-            if (!item.isEmpty()) list.add(item);
+        if (observation.isMissingNode() || observation.isNull()) return output;
+
+        // Search tool: observation.search_result.search_results
+        JsonNode searchResults = observation.path("search_result").path("search_results");
+        if (searchResults.isArray() && searchResults.size() > 0) {
+            List<Map<String, Object>> list = new ArrayList<>();
+            searchResults.forEach(r -> {
+                Map<String, Object> item = new LinkedHashMap<>();
+                String n = r.path("Name").asText(r.path("name").asText(""));
+                String u = r.path("Url").asText(r.path("url").asText(""));
+                String t = r.path("Text").asText(r.path("text").asText(""));
+                if (!n.isEmpty()) item.put("name", n);
+                if (!u.isEmpty()) item.put("url", u);
+                if (!t.isEmpty()) item.put("snippet", truncate(t, MAX_SNIPPET_LEN));
+                if (!item.isEmpty()) list.add(item);
+            });
+            if (!list.isEmpty()) output.put("search_results", list);
+            return output;
+        }
+
+        // Downloaded files tool
+        JsonNode downloadedFiles = observation.path("downloaded_files");
+        if (downloadedFiles.isArray() && downloadedFiles.size() > 0) {
+            List<String> files = new ArrayList<>();
+            downloadedFiles.forEach(f -> files.add(f.asText()));
+            output.put("downloaded_files", files);
+            return output;
+        }
+
+        // Generic fallback: extract all non-null scalar/array fields from observation
+        observation.fields().forEachRemaining(e -> {
+            JsonNode v = e.getValue();
+            if (v.isNull()) return;
+            if (v.isTextual()) output.put(e.getKey(), truncate(v.asText(), MAX_SNIPPET_LEN));
+            else if (v.isNumber()) output.put(e.getKey(), v.numberValue());
+            else if (v.isBoolean()) output.put(e.getKey(), v.booleanValue());
+            else if (!v.isMissingNode()) output.put(e.getKey(), truncate(v.toString(), MAX_SNIPPET_LEN));
         });
-        if (!list.isEmpty()) output.put("search_results", list);
         return output;
     }
 
