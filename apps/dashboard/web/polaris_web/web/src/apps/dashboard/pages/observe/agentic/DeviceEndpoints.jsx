@@ -444,6 +444,10 @@ function TableSection({ deviceFlatData, agentRiskData }) {
             innerRenderer: UsernameCellInner,
         },
         cellStyle: { display: "flex", alignItems: "center" },
+        getQuickFilterText: (params) => {
+            if (!params.data) return "";
+            return params.data.endpoint || params.data.deviceId || "";
+        },
     }), []);
 
     const bulkActions = useMemo(() => [
