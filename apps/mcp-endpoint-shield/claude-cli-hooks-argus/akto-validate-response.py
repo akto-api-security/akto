@@ -10,6 +10,7 @@ import urllib.request
 from typing import Any, Dict, Set, Tuple, Union
 
 from akto_helpers import get_device_ip
+from akto_ingestion_utility import installer_headers, resolve_session_info
 
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/akto/logs"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -115,9 +116,7 @@ def build_ingestion_payload(
         "content-type": "application/json",
     }
     if session_info:
-        for key, value in session_info.items():
-            if value is not None:
-                req_headers[f"x-akto-installer-{key}"] = str(value)
+        req_headers.update(installer_headers(session_info))
 
     return {
         "path": "/v1/messages",
@@ -385,17 +384,7 @@ def main():
         logger.error(f"Invalid JSON input: {e}")
         sys.exit(0)
 
-    session_info = {}
-    for field in (
-        "session_id",
-        "transcript_path",
-        "cwd",
-        "permission_mode",
-        "hook_event_name",
-    ):
-        value = input_data.get(field)
-        if value is not None:
-            session_info[field] = value
+    session_info = resolve_session_info(input_data, logger)
 
     try:
         transcript_path = input_data.get("transcript_path")
