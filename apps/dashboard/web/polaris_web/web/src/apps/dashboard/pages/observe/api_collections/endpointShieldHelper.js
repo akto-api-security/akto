@@ -122,9 +122,9 @@ const fetchEndpointShieldUserMetadata = async () => {
             };
         });
 
-        return { usernameMap, userMetadataMap, userAnalysisKeysByDeviceId };
+        return { usernameMap, userMetadataMap, userAnalysisKeysByDeviceId, moduleInfos };
     } catch (e) {
-        return { usernameMap: {}, userMetadataMap: {}, userAnalysisKeysByDeviceId: new Map() };
+        return { usernameMap: {}, userMetadataMap: {}, userAnalysisKeysByDeviceId: new Map(), moduleInfos: [] };
     }
 };
 

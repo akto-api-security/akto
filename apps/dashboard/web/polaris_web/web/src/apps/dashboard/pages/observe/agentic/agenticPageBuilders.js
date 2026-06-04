@@ -152,6 +152,7 @@ function buildModuleDeviceMap(moduleInfos = []) {
             username: ad.username || ad.userName || ad.user || ad.email || "-",
             team: ad.team || "",
             role: ad.userRole || "",
+            os: ad.os || null,
         };
     });
     return map;
@@ -302,7 +303,7 @@ export function buildDeviceEndpointsPageData(
             const username = resolvedUsername !== DEFAULT_VALUE ? resolvedUsername : (mod.username || "-");
             deviceMap[devId] = {
                 deviceId: devId,
-                os: inferOsFromDeviceId(devId),
+                os: mod.os || inferOsFromDeviceId(devId),
                 username,
                 team: mod.team || "",
                 role: mod.role || "",
@@ -353,7 +354,7 @@ export function buildDeviceEndpointsPageData(
             const mod = deviceModules[devId];
             deviceMap[devId] = {
                 deviceId: devId,
-                os: inferOsFromDeviceId(devId),
+                os: mod.os || inferOsFromDeviceId(devId),
                 username: mod.username || "-",
                 team: mod.team || "",
                 role: mod.role || "",

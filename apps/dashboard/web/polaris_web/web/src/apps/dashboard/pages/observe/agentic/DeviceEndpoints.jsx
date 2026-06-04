@@ -543,13 +543,14 @@ export default function DeviceEndpoints() {
                     agenticObserveApi.fetchAgenticViolations({ startTimestamp, endTimestamp }),
                 ]);
                 if (!isMountedRef.current) return;
-                const { usernameMap = {}, userMetadataMap = {} } = shieldResult || {};
+                const { usernameMap = {}, userMetadataMap = {}, moduleInfos = [] } = shieldResult || {};
                 const collections = apiCollectionsResp?.apiCollections || [];
                 const pageData = buildDeviceEndpointsPageData(
                     collections,
                     trafficInfoResp || {},
                     riskScoreResp?.riskScoreOfCollectionsMap || {},
                     {
+                        moduleInfos,
                         usernameMap,
                         violationsByCollectionId: aggregateViolationsByCollectionId(violationRows),
                         violationRows,

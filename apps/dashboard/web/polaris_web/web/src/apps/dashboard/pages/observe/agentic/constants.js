@@ -18,6 +18,7 @@ import {
     getResolvedUsernameForCollection,
     DEFAULT_VALUE,
 } from "../api_collections/endpointShieldHelper";
+import { inferOsFromDeviceId } from "./agenticPageBuilders";
 
 // Table constants
 export const PAGE_LIMIT = 100;
@@ -591,7 +592,7 @@ function buildDevicesForGroup(group, usernameMap = {}) {
                 deviceId,
                 endpoint: deviceId,
                 username,
-                os: "mac",
+                os: inferOsFromDeviceId(deviceId),
                 riskScore: group.riskScore ?? group.maxRiskScore ?? null,
                 lastSeen: maxTraffic > 0 ? func.prettifyEpoch(maxTraffic) : "-",
                 lastSeenEpoch: maxTraffic,
