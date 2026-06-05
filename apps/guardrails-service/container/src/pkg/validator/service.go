@@ -481,7 +481,7 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 //   - endpoint / MCP-server traffic carries a synthetic host (deviceLabel.ai-agent.<tool>) -> match
 //     on the AI-tool token / vendor alias (matchBlockedToolRule); glob is tried first so a real MCP
 //     target host still works.
-func (s *Service) checkBlockedHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID string) *mcp.ValidationResult {
+func (s *Service) checkBlockedHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID string, policies []types.Policy) *mcp.ValidationResult {
 	isExtension := isBrowserExtensionRequest(valCtx.Tag)
 	isEndpointOrMcp := isEndpointOrMcpRequest(valCtx.Tag, params.ContextSource)
 	if !isExtension && !isEndpointOrMcp {
@@ -494,6 +494,22 @@ func (s *Service) checkBlockedHost(params *models.ValidateRequestParams, valCtx 
 	if len(blockedHostRules) == 0 {
 		return nil
 	}
+
+	// Only evaluate rules that belong to policies applicable to this server.
+	activePolicyNames := make(map[string]struct{}, len(policies))
+	for _, p := range policies {
+		activePolicyNames[p.Info.Name] = struct{}{}
+	}
+	scoped := blockedHostRules[:0:0]
+	for _, r := range blockedHostRules {
+		if _, ok := activePolicyNames[r.policyName]; ok {
+			scoped = append(scoped, r)
+		}
+	}
+	if len(scoped) == 0 {
+		return nil
+	}
+	blockedHostRules = scoped
 
 	reqHost := extractHostHeader(valCtx.RequestHeaders)
 	mode := "browser-llm"
@@ -921,16 +937,15 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Create validation context with full request metadata (matching batch flow)
 	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList)
 
-	// Host blocklist (block-only). If the request matches any active policy's blocked hosts, block
-	// immediately (independent of filter rules). Browser-extension traffic carries a real host and
-	// is glob-matched; endpoint / MCP-server traffic carries a synthetic host and is matched on the
-	// AI-tool token (see checkBlockedHost).
-	if blockResult := s.checkBlockedHost(params, valCtx, payloadToValidate, sessionID, requestID); blockResult != nil {
+	// Filter policies by MCP server name first so the blocked-host check only fires for
+	// rules that belong to policies applicable to this server.
+	policies = filterPoliciesByMcpServer(policies, valCtx.McpServerName)
+
+	// Host blocklist (block-only). Evaluated after server filtering so only rules from
+	// policies scoped to this server are considered.
+	if blockResult := s.checkBlockedHost(params, valCtx, payloadToValidate, sessionID, requestID, policies); blockResult != nil {
 		return blockResult, nil
 	}
-
-	// Filter policies by MCP server name — policies with no server configured are skipped
-	policies = filterPoliciesByMcpServer(policies, valCtx.McpServerName)
 
 	s.logger.Info("ValidateRequest - calling ProcessRequest",
 		zap.String("contextSource", contextSource),
