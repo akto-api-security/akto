@@ -521,7 +521,7 @@ function TopSection({
               Agentic Assets
             </Text>
             <HorizontalStack align="space-between" blockAlign="center" gap="3">
-              <HorizontalStack gap="2" blockAlign="center">
+              <HorizontalStack gap="2" blockAlign="baseline">
                 <Text variant="heading2xl" as="p">
                   {total}
                 </Text>
@@ -579,7 +579,7 @@ function TopSection({
               Violations
             </Text>
             <HorizontalStack align="space-between" blockAlign="center" gap="3">
-              <HorizontalStack gap="2" blockAlign="center">
+              <HorizontalStack gap="2" blockAlign="baseline">
                 <Text variant="heading2xl" as="p">
                   {totalV}
                 </Text>
@@ -772,6 +772,9 @@ function TableSection({
   setFlyout,
 }) {
   const gridRef = useRef(null);
+  // Auto-open from a ?asset= deep link must run ONCE on load — not every time the
+  // type/severity chips change the filtered rows (that re-opened the flyout on each click).
+  const didAutoOpenRef = useRef(false);
 
   const flatRowData = useMemo(() => {
     const rows = agenticTreeData.filter((r) => r.path?.length === 1);
@@ -788,10 +791,13 @@ function TableSection({
   }, [agenticTreeData, typeFilter, violSevFilter]);
 
   useEffect(() => {
-    if (!flatRowData.length && !agenticFlatData.length) return;
+    if (didAutoOpenRef.current) return;
+    const baseRows = agenticTreeData.filter((r) => r.path?.length === 1);
+    if (!baseRows.length && !agenticFlatData.length) return;
     const params = new URLSearchParams(window.location.search);
     const assetName = params.get("asset");
     if (!assetName) return;
+    didAutoOpenRef.current = true;
     const decoded = decodeURIComponent(assetName.replace(/\+/g, " "));
     const lc = decoded.toLowerCase();
     // Slug: match raw service names that may have been slug-encoded in toChildPathKey
@@ -814,7 +820,7 @@ function TableSection({
     };
     const idMatch = (id) =>
       id && (id === assetName || id.includes(decodedSlug));
-    const row = flatRowData.find(
+    const row = baseRows.find(
       (r) => nameMatch(r.name) || idMatch(r.path?.[0]),
     );
     const flat = row
@@ -824,7 +830,7 @@ function TableSection({
         }
       : agenticFlatData.find((a) => nameMatch(a.name) || idMatch(a.id));
     if (flat) setFlyout(flat);
-  }, [flatRowData, agenticFlatData, setFlyout]);
+  }, [agenticTreeData, agenticFlatData, setFlyout]);
 
   const handleRowClick = useCallback(
     (e) => {

@@ -95,10 +95,10 @@ function AgentIconImg({ data }) {
     return <img src={LaptopIcon} width={18} height={18} alt="" style={{ flexShrink: 0 }} />;
 }
 
-function MarkerIcon({ src, label, size = 20 }) {
+function MarkerIcon({ src, label, size = 24 }) {
     return (
         <Tooltip content={label} dismissOnMouseOut>
-            <Box as="span" style={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
+            <Box as="span">
                 <img src={src} width={size} height={size} alt={label} style={{ pointerEvents: "none" }} />
             </Box>
         </Tooltip>
@@ -120,7 +120,7 @@ export function AssetNameCellRenderer({ data }) {
             </Box>
             {showLocalMcp && <MarkerIcon src={McpRedIcon} label="Local MCP Server" />}
             {showPersonal && <MarkerIcon src={PersonLockIcon} label="Contains personal account" />}
-            {showMalicious && <MarkerIcon src={MaliciousSkillIcon} label="Malicious skill" size={20} />}
+            {showMalicious && <MarkerIcon src={MaliciousSkillIcon} label="Malicious skill" />}
         </HorizontalStack>
     );
 }

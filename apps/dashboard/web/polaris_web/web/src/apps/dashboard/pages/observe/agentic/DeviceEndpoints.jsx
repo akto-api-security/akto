@@ -110,13 +110,11 @@ function StatRow({ label, value, delta, sparklineData, color, valueColor, monthL
             <HorizontalStack align="space-between" blockAlign="center" gap="3">
                 <VerticalStack gap="2">
                     <Text variant="headingSm" fontWeight="semibold">{label}</Text>
-                    <HorizontalStack gap="1" blockAlign="baseline">
-                        <Text variant="headingXl" fontWeight="bold" color={valueColor}>
-                            {value.toLocaleString()}
-                        </Text>
-                        {delta > 0 && <Text as="span" variant="bodySm" fontWeight="semibold" color="success">+{delta}</Text>}
-                        {delta < 0 && <Text as="span" variant="bodySm" fontWeight="semibold" color="critical">{delta}</Text>}
-                    </HorizontalStack>
+                    <Text variant="headingXl" fontWeight="bold" color={valueColor}>
+                        {value.toLocaleString()}
+                        {delta > 0 && <Text as="span" variant="bodySm" fontWeight="semibold" color="success">&nbsp;+{delta}</Text>}
+                        {delta < 0 && <Text as="span" variant="bodySm" fontWeight="semibold" color="critical">&nbsp;{delta}</Text>}
+                    </Text>
                 </VerticalStack>
                 <HighchartsReact highcharts={Highcharts} options={opts} />
             </HorizontalStack>
@@ -176,9 +174,9 @@ function TopSection({ summary }) {
 // SVGs live in public/ per CLAUDE.md — no inline SVG in component code.
 
 function OsIcon({ os }) {
-    if (os === "mac")     return <img src="/public/os-mac.svg"     width={15} height={15} alt="macOS"   style={{ flexShrink: 0 }} />;
-    if (os === "windows") return <img src="/public/os-windows.svg" width={15} height={15} alt="Windows" style={{ flexShrink: 0 }} />;
-    return                       <img src="/public/os-linux.svg"   width={15} height={15} alt="Linux"   style={{ flexShrink: 0 }} />;
+    if (os === "mac")     return <img src="/public/os-mac.svg"     width={15} height={15} alt="macOS" />;
+    if (os === "windows") return <img src="/public/os-windows.svg" width={15} height={15} alt="Windows" />;
+    return                       <img src="/public/os-linux.svg"   width={15} height={15} alt="Linux" />;
 }
 
 // ─── Cell renderers ───────────────────────────────────────────────────────────

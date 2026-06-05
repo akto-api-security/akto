@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Box, HorizontalStack, Text, Button } from "@shopify/polaris";
+import { Box, HorizontalStack, VerticalStack, Text, Button } from "@shopify/polaris";
 import { ChevronDownMinor } from "@shopify/polaris-icons";
+import "../../../components/layouts/style.css";
 import AgenticSearchInput from "../../agentic/components/AgenticSearchInput";
 import AgenticStreamingResponse from "../../agentic/components/AgenticStreamingResponse";
 import AgenticUserMessage from "../../agentic/components/AgenticUserMessage";
@@ -81,17 +82,22 @@ export default function AiChatSection({
     }, [inputValue, aiLoading, conversationId, conversationType, chatMetadata]);
 
     return (
-        <Box style={{
-            display: "flex",
-            flexDirection: "column",
-            borderTop: "1px solid #E1E3E5",
-            background: "white",
-            flexShrink: expanded ? undefined : 0,
-            flex: expanded ? 1 : undefined,
-            minHeight: expanded ? 0 : undefined,
-        }}>
+        <Box
+            background="bg"
+            borderColor="border"
+            borderBlockStartWidth="1"
+            className={expanded ? "agentic-chat agentic-chat--expanded" : "agentic-chat"}
+        >
             {expanded && (
-                <Box style={{ padding: "8px 12px", borderBottom: "1px solid #F1F2F3", flexShrink: 0 }}>
+                <Box
+                    paddingBlockStart="2"
+                    paddingBlockEnd="2"
+                    paddingInlineStart="3"
+                    paddingInlineEnd="3"
+                    borderColor="border-subdued"
+                    borderBlockEndWidth="1"
+                    className="agentic-chat-header"
+                >
                     <HorizontalStack align="space-between" blockAlign="center">
                         <Text variant="headingXs">Ask Akto</Text>
                         <Button
@@ -104,38 +110,45 @@ export default function AiChatSection({
             )}
 
             {expanded && messages.length > 0 && (
-                <Box style={{
-                    flex: 1,
-                    minHeight: 0,
-                    overflowY: "auto",
-                    padding: "12px 16px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                }}>
-                    {messages.map((msg, i) => (
-                        msg.role === "user" ? (
-                            <AgenticUserMessage key={msg._id || i} content={msg.message} />
-                        ) : (
-                            <AgenticStreamingResponse
-                                key={msg._id || i}
-                                content={msg.message}
-                                skipStreaming={msg.isFromHistory || false}
-                            />
-                        )
-                    ))}
-                    {aiLoading && <AgenticThinkingBox />}
-                    <Box ref={bottomRef} />
+                <Box
+                    paddingBlockStart="3"
+                    paddingBlockEnd="3"
+                    paddingInlineStart="4"
+                    paddingInlineEnd="4"
+                    overflowY="scroll"
+                    className="agentic-chat-messages"
+                >
+                    <VerticalStack gap="2">
+                        {messages.map((msg, i) => (
+                            msg.role === "user" ? (
+                                <AgenticUserMessage key={msg._id || i} content={msg.message} />
+                            ) : (
+                                <AgenticStreamingResponse
+                                    key={msg._id || i}
+                                    content={msg.message}
+                                    skipStreaming={msg.isFromHistory || false}
+                                />
+                            )
+                        ))}
+                        {aiLoading && <AgenticThinkingBox />}
+                        <Box ref={bottomRef} />
+                    </VerticalStack>
                 </Box>
             )}
 
             {expanded && messages.length === 0 && !aiLoading && (
-                <Box style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="2" paddingBlockEnd="2" className="agentic-chat-empty">
                     <Text variant="bodySm" color="subdued">Press Enter to ask…</Text>
                 </Box>
             )}
 
-            <Box style={{ padding: "10px 16px 12px", flexShrink: 0 }}>
+            <Box
+                paddingBlockStart="3"
+                paddingBlockEnd="3"
+                paddingInlineStart="4"
+                paddingInlineEnd="4"
+                className="agentic-chat-input"
+            >
                 <AgenticSearchInput
                     placeholder={placeholder || "Ask anything related to your endpoints..."}
                     isFixed={false}

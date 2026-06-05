@@ -7,6 +7,14 @@
     height: 100vh;
 }
 
+/* Inner scroll container for the shared FlyLayout (components/layouts/FlyLayout.jsx). */
+.innerFlyLayout {
+    height: 100vh;
+    position: fixed;
+    overflow-y: scroll;
+    scrollbar-width: none;
+}
+
 .show {
     right: 0;
 }
@@ -55,11 +63,16 @@
     min-width: 0;
 }
 
-/* Clickable risk-factor row — only hover/cursor/transition (not Polaris-expressible)
-   live here; padding + borderRadius are Box props on the element. */
+/* Clickable risk-factor row — edge-to-edge hover with a built-in bottom divider
+   (no rounded corners, no separate <Divider> — those clashed). Hover/cursor/divider
+   are pseudo-state/CSS-only; padding stays a Box prop on the element. */
 .agentic-clickable-row {
     cursor: pointer;
     transition: background-color 0.15s ease;
+    border-bottom: 1px solid var(--p-color-border-subdued, #e1e3e5);
+}
+.agentic-clickable-row:last-child {
+    border-bottom: none;
 }
 .agentic-clickable-row:hover {
     background-color: var(--p-color-bg-hover, #f6f6f7);
@@ -111,4 +124,30 @@
 .agentic-dot--active {
     outline: 2px solid var(--dot-color);
     outline-offset: 1px;
+}
+
+/* AiChatSection — flex column with a pinned input row. The expand/collapse flex
+   behaviour and overflow can't be Box props; padding/border/background are. */
+.agentic-chat {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+.agentic-chat--expanded {
+    flex: 1;
+    min-height: 0;
+}
+.agentic-chat-header,
+.agentic-chat-input {
+    flex-shrink: 0;
+}
+.agentic-chat-messages {
+    flex: 1;
+    min-height: 0;
+}
+.agentic-chat-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }

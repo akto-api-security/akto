@@ -429,31 +429,28 @@ function OverviewTab({ device, agents, onTabChange }) {
                             const badgeStatus = f.severity === "critical" ? "critical" : f.severity === "high" ? "warning" : f.severity === "medium" ? "attention" : "info";
                             const targetTab   = (f.severity === "critical" || f.severity === "high") && f.title.toLowerCase().includes("violation") ? 2 : f.title.toLowerCase().includes("integration") || f.title.toLowerCase().includes("database") || f.title.toLowerCase().includes("cloud") ? 1 : 2;
                             return (
-                                <React.Fragment key={i}>
-                                    {i > 0 && <Divider />}
-                                    <Box
-                                        onClick={() => onTabChange?.(targetTab)}
-                                        paddingBlockStart="3"
-                                        paddingBlockEnd="3"
-                                        paddingInlineStart="2"
-                                        paddingInlineEnd="2"
-                                        borderRadius="2"
-                                        className="agentic-clickable-row"
-                                    >
-                                        <HorizontalStack gap="3" align="start" blockAlign="start" wrap={false}>
-                                            <Box width="72px">
-                                                <Badge status={badgeStatus}>{f.severity.charAt(0).toUpperCase() + f.severity.slice(1)}</Badge>
-                                            </Box>
-                                            <Box width="100%">
-                                                <VerticalStack gap="1">
-                                                    <Text variant="bodySm" fontWeight="semibold">{f.title}</Text>
-                                                    <Text variant="bodySm" color="subdued">{f.description}</Text>
-                                                </VerticalStack>
-                                            </Box>
-                                            <Icon source={ChevronRightMinor} color="subdued" />
-                                        </HorizontalStack>
-                                    </Box>
-                                </React.Fragment>
+                                <Box
+                                    key={i}
+                                    onClick={() => onTabChange?.(targetTab)}
+                                    paddingBlockStart="3"
+                                    paddingBlockEnd="3"
+                                    paddingInlineStart="3"
+                                    paddingInlineEnd="3"
+                                    className="agentic-clickable-row"
+                                >
+                                    <HorizontalStack gap="4" align="start" blockAlign="center" wrap={false}>
+                                        <Box width="72px">
+                                            <Badge status={badgeStatus}>{f.severity.charAt(0).toUpperCase() + f.severity.slice(1)}</Badge>
+                                        </Box>
+                                        <Box width="100%">
+                                            <VerticalStack gap="1">
+                                                <Text variant="bodySm" fontWeight="semibold">{f.title}</Text>
+                                                <Text variant="bodySm" color="subdued">{f.description}</Text>
+                                            </VerticalStack>
+                                        </Box>
+                                        <Icon source={ChevronRightMinor} color="subdued" />
+                                    </HorizontalStack>
+                                </Box>
                             );
                         })}
                     </VerticalStack>

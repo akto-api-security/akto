@@ -36,7 +36,7 @@ export default function AgenticFlyoutShell({ show, width = 800, header, footer, 
             >
                 {header}
                 {children}
-                {footer}
+                {footer && <Box paddingInlineStart="2" paddingInlineEnd="2" paddingBlockStart="1" paddingBlockEnd="2">{footer}</Box>}
             </Box>
         </Box>
     );
