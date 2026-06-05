@@ -87,6 +87,7 @@ export default function AiChatSection({
             borderColor="border"
             borderBlockStartWidth="1"
             className={expanded ? "agentic-chat agentic-chat--expanded" : "agentic-chat"}
+            style={expanded ? { marginInlineStart: "var(--p-space-2)", marginInlineEnd: "var(--p-space-2)", marginBlockEnd: "var(--p-space-2)" } : { marginInlineStart: "var(--p-space-2)", marginInlineEnd: "var(--p-space-2)" }}
         >
             {expanded && (
                 <Box

@@ -27,7 +27,6 @@ export default function AgenticFlyoutShell({ show, width = 800, header, footer, 
                     position: "fixed", right: 0, top: "3.5rem", zIndex: 1000,
                     width,
                     height: "calc(100vh - 3.5rem)",
-                    overflowY: "hidden",
                     display: "flex", flexDirection: "column",
                     background: "white",
                     borderLeft: "1px solid #E1E3E5",
@@ -36,7 +35,7 @@ export default function AgenticFlyoutShell({ show, width = 800, header, footer, 
             >
                 {header}
                 {children}
-                {footer && <Box paddingInlineStart="2" paddingInlineEnd="2" paddingBlockStart="1" paddingBlockEnd="2">{footer}</Box>}
+                {footer}
             </Box>
         </Box>
     );

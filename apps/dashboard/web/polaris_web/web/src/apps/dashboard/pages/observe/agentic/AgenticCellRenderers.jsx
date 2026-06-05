@@ -82,20 +82,21 @@ export function ParamDescCellRenderer({ data }) {
 
 function AgentIconImg({ data }) {
     if (!data) return null;
+    const size = 20;
     if (data.type === "MCP Server") {
-        return <img src={MCPIcon} width={20} height={20} alt="" style={{ flexShrink: 0, borderRadius: 3 }} />;
+        return <img src={MCPIcon} width={size} height={size} alt="" style={{ flexShrink: 0, borderRadius: 3 }} />;
     }
     if (data.type === "Skill") {
-        return <img src={SkillIcon} width={18} height={18} alt="" style={{ flexShrink: 0 }} />;
+        return <img src={SkillIcon} width={size} height={size} alt="" style={{ flexShrink: 0 }} />;
     }
     const domain = getDomainForFavicon(data.assetTagValue);
     if (domain) {
-        return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={18} height={18} alt="" style={{ flexShrink: 0, borderRadius: 3 }} />;
+        return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={size} height={size} alt="" style={{ flexShrink: 0, borderRadius: 3 }} />;
     }
-    return <img src={LaptopIcon} width={18} height={18} alt="" style={{ flexShrink: 0 }} />;
+    return <img src={LaptopIcon} width={size} height={size} alt="" style={{ flexShrink: 0 }} />;
 }
 
-function MarkerIcon({ src, label, size = 24 }) {
+function MarkerIcon({ src, label, size = 28 }) {
     return (
         <Tooltip content={label} dismissOnMouseOut>
             <Box as="span">

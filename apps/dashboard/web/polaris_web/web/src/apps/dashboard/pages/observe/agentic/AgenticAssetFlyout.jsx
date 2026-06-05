@@ -219,7 +219,7 @@ function OverviewTab({ asset, onTabChange, assetDevices = {}, agenticTreeData = 
                 <VerticalStack gap="3">
                     <Text variant="headingXs" color="subdued">Risk Analysis</Text>
                     <Text variant="bodySm">{narrative}</Text>
-                    <VerticalStack gap="0">
+                    <VerticalStack gap="1">
                         {factors.map((f, i) => {
                             const badgeStatus = f.severity === "critical" ? "critical" : f.severity === "high" ? "warning" : f.severity === "medium" ? "attention" : "info";
                             const targetTab = f.title.toLowerCase().includes("violation") ? 2 : 1;
@@ -227,10 +227,11 @@ function OverviewTab({ asset, onTabChange, assetDevices = {}, agenticTreeData = 
                                 <Box
                                     key={i}
                                     onClick={() => onTabChange?.(targetTab)}
-                                    paddingBlockStart="3"
-                                    paddingBlockEnd="3"
+                                    paddingBlockStart="6"
+                                    paddingBlockEnd="6"
                                     paddingInlineStart="3"
                                     paddingInlineEnd="3"
+                                    borderRadius="1"
                                     className="agentic-clickable-row"
                                 >
                                     <HorizontalStack gap="4" align="start" blockAlign="center" wrap={false}>
