@@ -6,12 +6,11 @@ import React, {
   useMemo,
   useReducer,
 } from "react";
-import { createPortal } from "react-dom";
 import { produce } from "immer";
 import { useNavigate } from "react-router-dom";
 import Highcharts from "highcharts";
 import HighchartsMore from "highcharts/highcharts-more";
-import { HighchartsReact } from "highcharts-react-official";
+import HighchartsReact from "highcharts-react-official";
 import {
   Box,
   Card,
@@ -20,22 +19,24 @@ import {
   VerticalStack,
   Text,
   Divider,
-  Tooltip,
   Checkbox,
 } from "@shopify/polaris";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import MCPIcon from "@/assets/MCP_Icon.svg";
-import McpRedIcon from "@/assets/McpRedIcon.svg";
-import PersonLockIcon from "@/assets/PersonLockIcon.svg";
 import LaptopIcon from "@/assets/Laptop.svg";
-import SkillIcon from "@/assets/Skill.svg";
-import MaliciousSkillIcon from "@/assets/MaliciousSkill.svg";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import AgenticAssetFlyout from "./AgenticAssetFlyout";
-import { TYPE_STYLES, SEVERITY_COLORS, getRiskColor } from "./agenticStyles";
+import {
+  AssetNameCellRenderer,
+  TypeBadgeCellRenderer,
+  RiskScoreCellRenderer,
+  ViolationsCellRenderer,
+  InteractionsCellRenderer,
+  GroupCellRenderer,
+} from "./AgenticCellRenderers";
 import { getDomainForFavicon } from "./mcpClientHelper";
 import { cumulativeByMonth } from "./agenticPageBuilders";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
@@ -62,332 +63,6 @@ ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 LicenseManager.setLicenseKey(
   "[TRIAL]_this_{AG_Charts_and_AG_Grid}_Enterprise_key_{AG-129492}_is_granted_for_evaluation_only___Use_in_production_is_not_permitted___Please_report_misuse_to_legal@ag-grid.com___For_help_with_purchasing_a_production_key_please_contact_info@ag-grid.com___You_are_granted_a_{Single_Application}_Developer_License_for_one_application_only___All_Front-End_JavaScript_developers_working_on_the_application_would_need_to_be_licensed___This_key_will_deactivate_on_{18 June 2026}____[v3]_[0102]_MTc4MTczNzIwMDAwMA==d27c8a4487e577f42d9980e95824f43c",
 );
-
-// ─── Icon helpers ─────────────────────────────────────────────────────────────
-
-function AgentIconImg({ data }) {
-  if (!data) return null;
-  if (data.type === "MCP Server") {
-    return (
-      <img
-        src={MCPIcon}
-        width={20}
-        height={20}
-        alt=""
-        style={{ flexShrink: 0, borderRadius: 3 }}
-      />
-    );
-  }
-  if (data.type === "Skill") {
-    return (
-      <img
-        src={SkillIcon}
-        width={18}
-        height={18}
-        alt=""
-        style={{ flexShrink: 0 }}
-      />
-    );
-  }
-  const domain = getDomainForFavicon(data.assetTagValue);
-  if (domain) {
-    return (
-      <img
-        src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
-        width={18}
-        height={18}
-        alt=""
-        style={{ flexShrink: 0, borderRadius: 3 }}
-      />
-    );
-  }
-  return (
-    <img
-      src={LaptopIcon}
-      width={18}
-      height={18}
-      alt=""
-      style={{ flexShrink: 0 }}
-    />
-  );
-}
-
-// ─── Cell renderers ───────────────────────────────────────────────────────────
-// Exception: AG Grid cell renderers use inline styles (Polaris tokens don't reach into the grid sandbox)
-
-function AssetNameCellRenderer({ data }) {
-  if (!data) return null;
-  // Match old UI: personal-account + local-MCP markers for non-Skill rows; malicious marker for Skills
-  const isSkill = data.type === "Skill";
-  const showLocalMcp = data.hasLocalMcpServer && !isSkill;
-  const showPersonal = data.hasPersonalAccount && !isSkill;
-  const showMalicious = data.isMalicious && isSkill;
-  return (
-    <Box
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        width: "100%",
-        overflow: "hidden",
-      }}
-    >
-      <AgentIconImg data={data} />
-      <Box
-        as="span"
-        style={{
-          fontSize: 13,
-          color: "#202223",
-          fontWeight: 500,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {data.name}
-      </Box>
-      {showLocalMcp && (
-        <Tooltip content="Local MCP Server" dismissOnMouseOut>
-          <Box
-            as="span"
-            style={{
-              flexShrink: 0,
-              display: "inline-flex",
-              alignItems: "center",
-            }}
-          >
-            <img
-              src={McpRedIcon}
-              width={16}
-              height={16}
-              alt="Local MCP Server"
-              style={{ pointerEvents: "none" }}
-            />
-          </Box>
-        </Tooltip>
-      )}
-      {showPersonal && (
-        <Tooltip content="Contains personal account" dismissOnMouseOut>
-          <Box
-            as="span"
-            style={{
-              flexShrink: 0,
-              display: "inline-flex",
-              alignItems: "center",
-            }}
-          >
-            <img
-              src={PersonLockIcon}
-              width={16}
-              height={16}
-              alt="Contains personal account"
-              style={{ pointerEvents: "none" }}
-            />
-          </Box>
-        </Tooltip>
-      )}
-      {showMalicious && (
-        <Tooltip content="Malicious skill" dismissOnMouseOut>
-          <Box
-            as="span"
-            style={{
-              flexShrink: 0,
-              display: "inline-flex",
-              alignItems: "center",
-            }}
-          >
-            <img
-              src={MaliciousSkillIcon}
-              width={20}
-              height={20}
-              alt="Malicious skill"
-              style={{ pointerEvents: "none" }}
-            />
-          </Box>
-        </Tooltip>
-      )}
-    </Box>
-  );
-}
-
-// type badge shown in its own column — used as both renderer and Set Filter display
-function TypeBadgeCellRenderer({ value }) {
-  if (!value) return null;
-  const s = TYPE_STYLES[value] || {
-    bg: "#F3F4F6",
-    color: "#374151",
-    border: "#E5E7EB",
-  };
-  return (
-    <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
-      <Box
-        as="span"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          height: 20,
-          padding: "0 8px",
-          borderRadius: 12,
-          fontSize: 11,
-          fontWeight: 500,
-          background: s.bg,
-          color: s.color,
-          border: `1px solid ${s.border}`,
-          whiteSpace: "nowrap",
-        }}
-      >
-        {value}
-      </Box>
-    </Box>
-  );
-}
-
-function RiskScoreCellRenderer({ value }) {
-  if (value == null) return null;
-  const { bg, color } = getRiskColor(value);
-  return (
-    <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
-      <Box
-        as="span"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 44,
-          height: 24,
-          borderRadius: 12,
-          fontSize: 12,
-          fontWeight: 600,
-          background: bg,
-          color,
-        }}
-      >
-        {value.toFixed(1)}
-      </Box>
-    </Box>
-  );
-}
-
-function ViolationsCellRenderer({ value }) {
-  if (!value) return <Box as="span" style={{ color: "#C4C7CB" }}>-</Box>;
-  const parts = ["critical", "high", "medium", "low"]
-    .map((k) => ({ k, c: value[k], ...SEVERITY_COLORS[k] }))
-    .filter((p) => p.c > 0);
-  if (!parts.length) return <Box as="span" style={{ color: "#C4C7CB" }}>-</Box>;
-  return (
-    <Box style={{ display: "flex", alignItems: "center", gap: 3 }}>
-      {parts.map((p) => (
-        <Box
-          as="span"
-          key={p.k}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            minWidth: 22,
-            height: 22,
-            padding: "0 5px",
-            borderRadius: 11,
-            fontSize: 11,
-            fontWeight: 700,
-            background: p.bg,
-            color: p.text,
-          }}
-        >
-          {p.c}
-        </Box>
-      ))}
-    </Box>
-  );
-}
-
-function InteractionsCellRenderer({ value, data }) {
-  if (value == null) return <Box as="span" style={{ color: "#C4C7CB" }}>-</Box>;
-  const detail = data?.aiInteractionsDetail;
-  const title = detail
-    ? `Input: ${Number(detail.totalInputTokens || 0).toLocaleString("en-US")} · Output: ${Number(detail.totalOutputTokens || 0).toLocaleString("en-US")}`
-    : undefined;
-  return (
-    <Box as="span" style={{ fontSize: 12, color: "#202223" }} title={title}>
-      {Number(value).toLocaleString("en-US")}
-    </Box>
-  );
-}
-
-function GroupCellRenderer({ data }) {
-  const [tipPos, setTipPos] = useState(null);
-  if (!data?.groups?.length) return null;
-
-  const primary = data.groups[0];
-  const rest = data.groups.slice(1);
-
-  return (
-    <Box
-      style={{ display: "flex", alignItems: "center", height: "100%", gap: 5 }}
-    >
-      <Box as="span" style={{ fontSize: 12, color: "#202223" }}>
-        {primary.name} [{primary.count}]
-      </Box>
-      {rest.length > 0 && (
-        <>
-          <Box
-            as="span"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              height: 20,
-              padding: "0 7px",
-              borderRadius: 10,
-              fontSize: 11,
-              fontWeight: 600,
-              background: "#F1F2F3",
-              color: "#6D7175",
-              cursor: "default",
-              userSelect: "none",
-            }}
-            onMouseEnter={(e) => {
-              const r = e.currentTarget.getBoundingClientRect();
-              setTipPos({ top: r.bottom + 6, left: r.left });
-            }}
-            onMouseLeave={() => setTipPos(null)}
-          >
-            +{rest.length}
-          </Box>
-          {/* createPortal renders into document.body — escapes AG Grid's overflow:hidden */}
-          {tipPos &&
-            createPortal(
-              <Box
-                style={{
-                  position: "fixed",
-                  top: tipPos.top,
-                  left: tipPos.left,
-                  background: "white",
-                  border: "1px solid #E1E3E5",
-                  borderRadius: 8,
-                  padding: "8px 12px",
-                  zIndex: 9999,
-                  whiteSpace: "nowrap",
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-                  pointerEvents: "none",
-                }}
-              >
-                {rest.map((g) => (
-                  <Box
-                    key={g.name}
-                    style={{ fontSize: 12, color: "#202223", padding: "2px 0" }}
-                  >
-                    {g.name} [{g.count}]
-                  </Box>
-                ))}
-              </Box>,
-              document.body,
-            )}
-        </>
-      )}
-    </Box>
-  );
-}
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
@@ -874,6 +549,7 @@ function TopSection({
                       paddingInlineEnd="2"
                       paddingBlockStart="1"
                       paddingBlockEnd="1"
+                      borderRadius="full"
                       className="agentic-chip"
                     >
                       <HorizontalStack gap="1" blockAlign="center">
@@ -931,6 +607,7 @@ function TopSection({
                       paddingInlineEnd="2"
                       paddingBlockStart="1"
                       paddingBlockEnd="1"
+                      borderRadius="full"
                       className="agentic-chip"
                     >
                       <HorizontalStack gap="1" blockAlign="center">

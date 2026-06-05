@@ -5,28 +5,12 @@ import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-re
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
+import AgenticFlyoutShell from "./AgenticFlyoutShell";
 import AiChatSection from "./AiChatSection";
-import { TYPE_STYLES, SEVERITY_COLORS, getRiskColor, getRiskLabel } from "./agenticStyles";
+import { TypeBadge, SeverityBadge, RiskPill } from "./AgenticCellRenderers";
+import { getRiskLabel } from "./agenticPageBuilders";
 import agenticObserveApi, { buildAgenticObserveChatMetadata } from "./agenticObserveApi";
-import { formatDisplayName } from "./mcpClientHelper";
 import "../../../components/layouts/style.css";
-
-// ─── Shared helpers ───────────────────────────────────────────────────────────
-
-function TypeBadge({ type }) {
-    if (!type) return null;
-    const s = TYPE_STYLES[type] || { bg: "#F3F4F6", color: "#374151", border: "#E5E7EB" };
-    // TYPE_STYLES colours are outside the Polaris Badge status set — custom span justified
-    return (
-        <Box as="span" style={{
-            display: "inline-flex", alignItems: "center",
-            padding: "1px 7px", borderRadius: 12,
-            fontSize: 11, fontWeight: 500, lineHeight: "18px",
-            background: s.bg, color: s.color, border: `1px solid ${s.border}`,
-            whiteSpace: "nowrap",
-        }}>{type}</Box>
-    );
-}
 
 // ─── Risk factor computation ───────────────────────────────────────────────────
 
@@ -107,81 +91,54 @@ function computeRiskFactors(device, agents) {
 function AgentNameCellRenderer({ data }) {
     if (!data) return null;
     return (
-        <Box style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <Box as="span" style={{ fontSize: 13, color: "#202223", fontWeight: 500 }}>{data.endpoint}</Box>
+        <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+            <Text variant="bodyMd" fontWeight="medium">{data.endpoint}</Text>
             <TypeBadge type={data.type} />
-        </Box>
+        </HorizontalStack>
     );
 }
 
 function AgentRiskCellRenderer({ value }) {
-    if (value == null) return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ color: "#C4C7CB" }}>-</Box></Box>;
-    const { bg, color } = getRiskColor(value);
-    return (
-        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <Box as="span" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, lineHeight: "16px", background: bg, color }}>
-                {value.toFixed(1)}
-            </Box>
-        </Box>
-    );
+    if (value == null) return <Text variant="bodyMd" color="subdued">-</Text>;
+    return <RiskPill score={value} />;
 }
 
 function AgentViolationsCellRenderer({ value }) {
-    if (!value) return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ color: "#C4C7CB" }}>-</Box></Box>;
-    const parts = ["critical", "high", "medium", "low"]
-        .map(k => ({ k, c: value[k], ...SEVERITY_COLORS[k] }))
-        .filter(p => p.c > 0);
-    if (!parts.length) return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ color: "#C4C7CB" }}>-</Box></Box>;
+    const dash = <Text variant="bodyMd" color="subdued">-</Text>;
+    if (!value) return dash;
+    const parts = ["critical", "high", "medium", "low"].filter(k => value[k] > 0);
+    if (!parts.length) return dash;
     return (
-        <Box style={{ display: "flex", alignItems: "center", height: "100%", gap: 3 }}>
-            {parts.map(p => (
-                <Box as="span" key={p.k} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 20, height: 20, padding: "0 5px", borderRadius: 10, fontSize: 10, fontWeight: 700, background: p.bg, color: p.text }}>{p.c}</Box>
-            ))}
-        </Box>
+        <HorizontalStack gap="1" blockAlign="center">
+            {parts.map(k => <SeverityBadge key={k} severity={k}>{value[k]}</SeverityBadge>)}
+        </HorizontalStack>
     );
 }
 
 function AgentSkillsCellRenderer({ data }) {
     if (!data) return null;
     return data.skillCount
-        ? <Box as="span" style={{ fontSize: 12, color: "#202223", fontWeight: 500 }}>{data.skillCount}</Box>
-        : <Box as="span" style={{ color: "#C4C7CB" }}>-</Box>;
+        ? <Text variant="bodySm" fontWeight="medium">{data.skillCount}</Text>
+        : <Text variant="bodyMd" color="subdued">-</Text>;
 }
 
 function ViolSeverityCellRenderer({ data }) {
     if (!data) return null;
-    const s = SEVERITY_COLORS[data.severity] || SEVERITY_COLORS.low;
-    return (
-        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <Box as="span" style={{
-                display: "inline-flex", alignItems: "center",
-                padding: "2px 8px", borderRadius: 20,
-                fontSize: 11, fontWeight: 600, lineHeight: "16px",
-                background: s.bg, color: s.text,
-                textTransform: "capitalize", flexShrink: 0, whiteSpace: "nowrap",
-            }}>
-                {data.severity}
-            </Box>
-        </Box>
-    );
+    return <SeverityBadge severity={data.severity} />;
 }
 
 function ViolTitleCellRenderer({ data }) {
     if (!data) return null;
     return (
-        <Box style={{ display: "flex", alignItems: "center", width: "100%", overflow: "hidden" }}>
-            <Box as="span" style={{ fontSize: 12, fontWeight: 600, color: "#202223", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{data.title}</Box>
+        <Box width="100%" overflowX="hidden">
+            <Text variant="bodySm" fontWeight="semibold" truncate>{data.title}</Text>
         </Box>
     );
 }
 
 function ViolAgentCellRenderer({ data }) {
     if (!data) return null;
-    return (
-        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <TypeBadge type={data.agentType} />
-        </Box>
-    );
+    return <TypeBadge type={data.agentType} />;
 }
 
 // ─── Column definitions ───────────────────────────────────────────────────────
@@ -476,22 +433,25 @@ function OverviewTab({ device, agents, onTabChange }) {
                                     {i > 0 && <Divider />}
                                     <Box
                                         onClick={() => onTabChange?.(targetTab)}
-                                        style={{ padding: "12px 8px", display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer", borderRadius: 6, transition: "background 0.15s" }}
-                                        onMouseEnter={e => e.currentTarget.style.background = "#F6F6F7"}
-                                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                                        paddingBlockStart="3"
+                                        paddingBlockEnd="3"
+                                        paddingInlineStart="2"
+                                        paddingInlineEnd="2"
+                                        borderRadius="2"
+                                        className="agentic-clickable-row"
                                     >
-                                        <Box style={{ flexShrink: 0, paddingTop: 1, width: 72 }}>
-                                            <Badge status={badgeStatus}>{f.severity.charAt(0).toUpperCase() + f.severity.slice(1)}</Badge>
-                                        </Box>
-                                        <Box style={{ flex: 1, minWidth: 0 }}>
-                                            <VerticalStack gap="0">
-                                                <Text variant="bodySm" fontWeight="semibold">{f.title}</Text>
-                                                <Text variant="bodySm" color="subdued">{f.description}</Text>
-                                            </VerticalStack>
-                                        </Box>
-                                        <Box style={{ flexShrink: 0, paddingTop: 2 }}>
+                                        <HorizontalStack gap="3" align="start" blockAlign="start" wrap={false}>
+                                            <Box width="72px">
+                                                <Badge status={badgeStatus}>{f.severity.charAt(0).toUpperCase() + f.severity.slice(1)}</Badge>
+                                            </Box>
+                                            <Box width="100%">
+                                                <VerticalStack gap="1">
+                                                    <Text variant="bodySm" fontWeight="semibold">{f.title}</Text>
+                                                    <Text variant="bodySm" color="subdued">{f.description}</Text>
+                                                </VerticalStack>
+                                            </Box>
                                             <Icon source={ChevronRightMinor} color="subdued" />
-                                        </Box>
+                                        </HorizontalStack>
                                     </Box>
                                 </React.Fragment>
                             );
@@ -617,11 +577,6 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
         deviceId: device?.path?.[0],
     }), [device]);
 
-    const lockScroll   = useCallback(() => { document.body.style.overflow = "hidden"; }, []);
-    const unlockScroll = useCallback(() => { document.body.style.overflow = "";       }, []);
-
-    useEffect(() => { if (!show) document.body.style.overflow = ""; }, [show]);
-
     const tabs = useMemo(() => {
         if (!device) return [];
         const totalV = (device.violations?.critical || 0) + (device.violations?.high || 0) + (device.violations?.medium || 0) + (device.violations?.low || 0);
@@ -635,42 +590,35 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
     if (!device) return null;
 
     return (
-        <Box className={"flyLayout " + (show ? "show" : "")} style={{ width: 800 }}>
-            <Box className={"flyOuterLayout " + (show ? "show" : "")}
-                style={{
-                    position: "fixed", right: 0, top: 0, zIndex: 1000,
-                    width: 800, top: "3.5rem",
-                    height: "calc(100vh - 3.5rem)",
-                    overflowY: "hidden",
-                    display: "flex", flexDirection: "column",
-                    background: "white",
-                    borderLeft: "1px solid #E1E3E5",
-                    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                }}
-            >
-                <FlyoutBreadcrumb
-                    items={[{ label: device.username && device.username !== "-" ? device.username : device.endpoint, badge: device.riskScore }]}
-                    onClose={onClose}
-                />
-
-                <Box paddingInlineStart="1" paddingInlineEnd="1">
-                    <Tabs tabs={tabs} selected={selectedTab} onSelect={setSelectedTab} />
-                </Box>
-                <Divider />
-
-                <Box style={{ flex: 1, minHeight: 0, overflowY: selectedTab === 0 ? "auto" : "hidden", display: "flex", flexDirection: "column" }}>
-                    {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} onTabChange={setSelectedTab} />}
-                    {selectedTab === 1 && <AgenticsTab agents={agents || []} onAgentClick={onAgentClick} agentRiskData={agentRiskData} />}
-                    {selectedTab === 2 && <ViolationsTab device={device} agents={agents} />}
-                </Box>
-
+        <AgenticFlyoutShell
+            show={show}
+            width={800}
+            header={
+                <>
+                    <FlyoutBreadcrumb
+                        items={[{ label: device.username && device.username !== "-" ? device.username : device.endpoint, badge: device.riskScore }]}
+                        onClose={onClose}
+                    />
+                    <Box paddingInlineStart="1" paddingInlineEnd="1">
+                        <Tabs tabs={tabs} selected={selectedTab} onSelect={setSelectedTab} />
+                    </Box>
+                    <Divider />
+                </>
+            }
+            footer={
                 <AiChatSection
                     placeholder="Ask anything about this device..."
                     resetKey={device?.endpoint}
                     conversationType="AGENTIC_OBSERVE"
                     chatMetadata={chatMetadata}
                 />
+            }
+        >
+            <Box style={{ flex: 1, minHeight: 0, overflowY: selectedTab === 0 ? "auto" : "hidden", display: "flex", flexDirection: "column" }}>
+                {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} onTabChange={setSelectedTab} />}
+                {selectedTab === 1 && <AgenticsTab agents={agents || []} onAgentClick={onAgentClick} agentRiskData={agentRiskData} />}
+                {selectedTab === 2 && <ViolationsTab device={device} agents={agents} />}
             </Box>
-        </Box>
+        </AgenticFlyoutShell>
     );
 }

@@ -2,9 +2,8 @@ import React, { useState, useMemo, useCallback, useRef, useEffect, useReducer } 
 import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
 import Highcharts from "highcharts";
-import { HighchartsReact } from "highcharts-react-official";
-import { Card, Box, HorizontalStack, VerticalStack, Text, Icon, Divider, Checkbox } from "@shopify/polaris";
-import { CustomersMajor } from "@shopify/polaris-icons";
+import HighchartsReact from "highcharts-react-official";
+import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Checkbox, Badge } from "@shopify/polaris";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
@@ -13,7 +12,7 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import DeviceFlyout from "./DeviceFlyout";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
-import { TYPE_STYLES, SEVERITY_COLORS, getRiskColor } from "./agenticStyles";
+import { SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import agenticObserveApi, { aggregateViolationsByCollectionId } from "./agenticObserveApi";
 import { buildDeviceEndpointsPageData } from "./agenticPageBuilders";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
@@ -111,11 +110,13 @@ function StatRow({ label, value, delta, sparklineData, color, valueColor, monthL
             <HorizontalStack align="space-between" blockAlign="center" gap="3">
                 <VerticalStack gap="2">
                     <Text variant="headingSm" fontWeight="semibold">{label}</Text>
-                    <Text variant="headingXl" fontWeight="bold" color={valueColor}>
-                        {value.toLocaleString()}
-                        {delta > 0 && <Box as="span" style={{ fontSize:12, fontWeight:600, color:"#008060", marginLeft:6, verticalAlign:"middle" }}>+{delta}</Box>}
-                        {delta < 0 && <Box as="span" style={{ fontSize:12, fontWeight:600, color:"#D72C0D", marginLeft:6, verticalAlign:"middle" }}>{delta}</Box>}
-                    </Text>
+                    <HorizontalStack gap="1" blockAlign="baseline">
+                        <Text variant="headingXl" fontWeight="bold" color={valueColor}>
+                            {value.toLocaleString()}
+                        </Text>
+                        {delta > 0 && <Text as="span" variant="bodySm" fontWeight="semibold" color="success">+{delta}</Text>}
+                        {delta < 0 && <Text as="span" variant="bodySm" fontWeight="semibold" color="critical">{delta}</Text>}
+                    </HorizontalStack>
                 </VerticalStack>
                 <HighchartsReact highcharts={Highcharts} options={opts} />
             </HorizontalStack>
@@ -147,7 +148,7 @@ function TopSection({ summary }) {
     );
 
     return (
-        <Box style={{ display: "grid", gridTemplateColumns: "320px 1fr 298px", gap: 16, alignItems: "stretch" }}>
+        <HorizontalGrid columns="320px 1fr 298px" gap="4">
             <Card padding="0">
                 <VerticalStack>
                     <StatRow label="Total Endpoints"  value={summary?.deviceCount ?? 0} delta={summary?.deltaEndpoints ?? 0} sparklineData={sparklines.endpoints || []}  color="#7C3AED" monthLabels={summary?.monthLabels} />
@@ -167,7 +168,7 @@ function TopSection({ summary }) {
                     <HighchartsReact highcharts={Highcharts} options={violationsDonutOpts} />
                 </ChartPanel>
             </Card>
-        </Box>
+        </HorizontalGrid>
     );
 }
 
@@ -182,78 +183,23 @@ function OsIcon({ os }) {
 
 // ─── Cell renderers ───────────────────────────────────────────────────────────
 
-function TypeBadge({ type }) {
-    if (!type) return null;
-    const s = TYPE_STYLES[type] || { bg: "#F3F4F6", color: "#374151", border: "#E5E7EB" };
-    return (
-        <Box as="span" style={{
-            display: "inline-flex", alignItems: "center",
-            padding: "1px 7px", borderRadius: 12,
-            fontSize: 11, fontWeight: 500, lineHeight: "18px",
-            background: s.bg, color: s.color,
-            border: `1px solid ${s.border}`,
-            whiteSpace: "nowrap",
-        }}>
-            {type}
-        </Box>
-    );
-}
-
 function SkillBadge({ count }) {
     if (!count) return null;
-    return (
-        <Box as="span" style={{
-            display: "inline-flex", alignItems: "center",
-            padding: "1px 7px", borderRadius: 12,
-            fontSize: 11, fontWeight: 500, lineHeight: "18px",
-            background: "#F3F4F6", color: "#374151",
-            border: "1px solid #E5E7EB",
-            whiteSpace: "nowrap",
-        }}>
-            {count} {count === 1 ? "skill" : "skills"}
-        </Box>
-    );
+    return <Badge>{`${count} ${count === 1 ? "skill" : "skills"}`}</Badge>;
 }
 
 function RiskScoreCellRenderer({ value }) {
     if (value == null) return null;
-    const { bg, color } = getRiskColor(value);
-    return (
-        <HorizontalStack blockAlign="center">
-            <Box as="span" style={{
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                width: 44, height: 24, borderRadius: 12,
-                fontSize: 12, fontWeight: 600,
-                background: bg, color,
-            }}>
-                {value.toFixed(1)}
-            </Box>
-        </HorizontalStack>
-    );
+    return <RiskPill score={value} />;
 }
 
 function ViolationsCellRenderer({ value }) {
     if (!value) return null;
-    const parts = [
-        { key: "critical", count: value.critical },
-        { key: "high",     count: value.high     },
-        { key: "medium",   count: value.medium   },
-        { key: "low",      count: value.low      },
-    ].filter(p => p.count > 0);
+    const parts = ["critical", "high", "medium", "low"].filter(k => value[k] > 0);
     if (!parts.length) return null;
     return (
         <HorizontalStack gap="1" blockAlign="center">
-            {parts.map(p => (
-                <Box as="span" key={p.key} style={{
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
-                    minWidth: 22, height: 22, padding: "0 5px", borderRadius: 11,
-                    fontSize: 11, fontWeight: 700,
-                    background: SEVERITY_COLORS[p.key].bg,
-                    color: SEVERITY_COLORS[p.key].text,
-                }}>
-                    {p.count}
-                </Box>
-            ))}
+            {parts.map(k => <SeverityBadge key={k} severity={k}>{value[k]}</SeverityBadge>)}
         </HorizontalStack>
     );
 }
@@ -279,7 +225,6 @@ function UsernameCellInner({ data, node }) {
             icon={<OsIcon os={data.os} />}
             label={username || "-"}
             isBold={!!username}
-            warning={data.hasPersonalAccount ? <Icon source={CustomersMajor} color="critical" /> : null}
         />
     );
 }

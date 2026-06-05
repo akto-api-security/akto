@@ -131,7 +131,7 @@ export default function AiChatSection({
 
             {expanded && messages.length === 0 && !aiLoading && (
                 <Box style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Box as="span" style={{ fontSize: 12, color: "#C4C9D0" }}>Press Enter to ask…</Box>
+                    <Text variant="bodySm" color="subdued">Press Enter to ask…</Text>
                 </Box>
             )}
 

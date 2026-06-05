@@ -1,27 +1,10 @@
 import React from "react";
 import { Box, HorizontalStack, Text, Link, Button, Divider } from "@shopify/polaris";
 import { MobileCancelMajor } from "@shopify/polaris-icons";
-import { getRiskColor } from "./agenticStyles";
-
-// ─── RiskPill ─────────────────────────────────────────────────────────────────
-// Risk badge colours (#FEE2E2, #FFEDD5, etc.) are outside the Polaris token set.
-
-function RiskPill({ score }) {
-    if (score == null) return null;
-    const { bg, color } = getRiskColor(score);
-    return (
-        <Box as="span" style={{
-            display: "inline-flex", alignItems: "center", justifyContent: "center",
-            padding: "2px 8px", borderRadius: 10,
-            fontSize: 12, fontWeight: 600, background: bg, color,
-        }}>
-            {score.toFixed(1)}
-        </Box>
-    );
-}
+import { RiskPill } from "./AgenticCellRenderers";
 
 // ─── FlyoutBreadcrumb ─────────────────────────────────────────────────────────
-// Shared breadcrumb header used across SkillsFlyout, McpFlyout, and DeviceFlyout.
+// Shared breadcrumb header used across DeviceFlyout and AgenticAssetFlyout.
 //
 // Props:
 //   items   — [{ label, badge?, onClick? }]

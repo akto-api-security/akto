@@ -1,200 +1,19 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-renderer";
-import { Tabs, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Card, LegacyCard, Icon, Avatar, Badge, Popover, ActionList, Button } from "@shopify/polaris";
-import { AutomationMajor, MagicMajor, CustomersMinor, ChevronRightMinor } from "@shopify/polaris-icons";
-import MCPIcon from "@/assets/MCP_Icon.svg";
+import { Tabs, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, LegacyCard, Icon, Badge, Popover, ActionList, Button } from "@shopify/polaris";
+import { ChevronRightMinor } from "@shopify/polaris-icons";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import SampleDataComponent from "../../../components/shared/SampleDataComponent";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
+import AgenticFlyoutShell from "./AgenticFlyoutShell";
+import AssetTopologyGraph from "./AssetTopologyGraph";
 import AiChatSection from "./AiChatSection";
-import { ParamNameCellRenderer, ParamTypeCellRenderer, ParamDescCellRenderer } from "./agenticCellRenderers";
-import { TYPE_STYLES, SEVERITY_COLORS, getRiskColor, getRiskLabel } from "./agenticStyles";
+import { ParamNameCellRenderer, ParamTypeCellRenderer, ParamDescCellRenderer, SeverityBadge, RiskPill, TypeBadge } from "./AgenticCellRenderers";
+import { getAgentLinkedComponents, getRiskLabel } from "./agenticPageBuilders";
 import { generateToolSample, generateResourceSample, generatePromptSample, generateSkillSample } from "./agenticSampleHelpers";
 import agenticObserveApi, { buildAgenticObserveChatMetadata } from "./agenticObserveApi";
-import observeApi from "../api";
 import "../../../components/layouts/style.css";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function TypeBadge({ type }) {
-    if (!type) return null;
-    const s = TYPE_STYLES[type] || { bg: "#F3F4F6", color: "#374151", border: "#E5E7EB" };
-    return (
-        <Box as="span" style={{
-            display: "inline-flex", alignItems: "center",
-            padding: "1px 7px", borderRadius: 12,
-            fontSize: 11, fontWeight: 500, lineHeight: "18px",
-            background: s.bg, color: s.color, border: `1px solid ${s.border}`,
-            whiteSpace: "nowrap",
-        }}>{type}</Box>
-    );
-}
-
-// ─── Topology graph ───────────────────────────────────────────────────────────
-
-function topoColors(category) {
-    switch (category) {
-        case "external": return { borderColor: "#3b82f6", backgroundColor: "#eff6ff" };
-        case "agent":    return { borderColor: "#f97316", backgroundColor: "#fff7ed" };
-        case "mcp":      return { borderColor: "#4cbebb", backgroundColor: "#ecfdf5" };
-        case "ai-model": return { borderColor: "#ec4899", backgroundColor: "#fdf2f8" };
-        case "skill":    return { borderColor: "#7C3AED", backgroundColor: "#F3E8FF" };
-        default:         return { borderColor: "#6b7280", backgroundColor: "#f9fafb" };
-    }
-}
-
-function topoIcon(category) {
-    switch (category) {
-        case "external": return CustomersMinor;
-        case "agent":    return AutomationMajor;
-        case "mcp":      return MCPIcon;
-        case "ai-model": return MagicMajor;
-        case "skill":    return AutomationMajor;
-        default:         return CustomersMinor;
-    }
-}
-
-function TopoNode({ data }) {
-    const { component } = data;
-    const colors = topoColors(component.category);
-    const IconComponent = topoIcon(component.category);
-    const isDevice = component.category === "external";
-
-    return (
-        <>
-            {!isDevice && <Handle type="target" position={Position.Left} />}
-            <Card padding={0}>
-                <Box style={{ border: `1px solid ${colors.borderColor}`, borderRadius: "8px", backgroundColor: colors.backgroundColor }}>
-                    <Box padding={3}>
-                        <VerticalStack gap={1}>
-                            <Box width="150px">
-                                <Text color="subdued" variant="bodySm">{component.type}</Text>
-                            </Box>
-                            <HorizontalStack gap={1} blockAlign="center">
-                                {typeof IconComponent === "string"
-                                    ? <Avatar source={IconComponent} size="extraSmall" />
-                                    : <Icon source={IconComponent} />
-                                }
-                                <Box width={component.category === "ai-model" ? "140px" : "110px"}>
-                                    <Text variant="bodySm" color="base">{component.label}</Text>
-                                </Box>
-                            </HorizontalStack>
-                        </VerticalStack>
-                    </Box>
-                </Box>
-            </Card>
-            <Handle type="source" position={Position.Right} id="b" />
-        </>
-    );
-}
-
-const TOPO_NODE_TYPES = { topoNode: TopoNode };
-
-const GRAPH_HEIGHT = 280;
-const NODE_H       = 84;
-
-/** Linked MCP/LLM rows for an AI agent (tree children when present, else flat asset data). */
-function getAgentLinkedComponents(asset, agenticTreeData = [], agenticFlatData = []) {
-    const fromTree = agenticTreeData.filter((r) => r.path?.length === 2 && r.path[0] === asset.id);
-    if (fromTree.length) return fromTree;
-
-    const seen = new Set();
-    const linked = [];
-    (asset.mcpServers || []).forEach((name) => {
-        const key = String(name).toLowerCase();
-        if (seen.has(key)) return;
-        seen.add(key);
-        const flat = agenticFlatData.find((a) => a.name === name || a.id === name);
-        linked.push({
-            name: flat?.name || name,
-            type: flat?.type || "MCP Server",
-        });
-    });
-    return linked;
-}
-
-function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [] }) {
-    const { nodes, edges } = useMemo(() => {
-        const devices = assetDevices[asset.id] || [];
-
-        if (asset.type === "AI Agent") {
-            const children = getAgentLinkedComponents(asset, agenticTreeData, agenticFlatData);
-            const mcps = children.filter(c => c.type === "MCP Server");
-            const llms = children.filter(c => c.type === "LLM");
-            const rightCount = mcps.length + llms.length;
-            const maxRows  = Math.max(devices.length, rightCount, 1);
-            const totalH   = maxRows * NODE_H;
-            const agentY   = (totalH - 44) / 2;
-            const devOffset = Math.max(0, (rightCount - devices.length) * NODE_H / 2);
-
-            return {
-                nodes: [
-                    { id: "agent", type: "topoNode", draggable: false, position: { x: 270, y: agentY }, data: { component: { category: "agent",    type: "AI Agent",    label: asset.name } } },
-                    ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: 40,  y: devOffset + i * NODE_H          }, data: { component: { category: "external",  type: "User",        label: d.username || d.endpoint } } })),
-                    ...mcps.map((m, i)    => ({ id: `mcp-${i}`, type: "topoNode", draggable: false, position: { x: 500, y: i * NODE_H                       }, data: { component: { category: "mcp",       type: "MCP Server",  label: m.name     } } })),
-                    ...llms.map((l, i)    => ({ id: `llm-${i}`, type: "topoNode", draggable: false, position: { x: 500, y: (mcps.length + i) * NODE_H       }, data: { component: { category: "ai-model",  type: "LLM",         label: l.name     } } })),
-                ],
-                edges: [
-                    ...devices.map((_, i) => ({ id: `e-d${i}-a`,  source: `dev-${i}`, target: "agent",   type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } })),
-                    ...mcps.map((_, i)    => ({ id: `e-a-m${i}`,  source: "agent",    target: `mcp-${i}`, type: "smoothstep", style: { stroke: "#4cbebb", strokeWidth: 1.5 } })),
-                    ...llms.map((_, i)    => ({ id: `e-a-l${i}`,  source: "agent",    target: `llm-${i}`, type: "smoothstep", style: { stroke: "#ec4899", strokeWidth: 1.5 } })),
-                ],
-            };
-        }
-
-        if (asset.type === "Skill") {
-            // Devices (left, sources) → Skill (right, target)
-            const totalH  = Math.max(devices.length, 1) * NODE_H;
-            const skillY  = (totalH - 44) / 2;
-            return {
-                nodes: [
-                    ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: 40,  y: i * NODE_H }, data: { component: { category: "external", type: "User", label: d.username || d.endpoint } } })),
-                    { id: "skill", type: "topoNode", draggable: false, position: { x: 380, y: skillY }, data: { component: { category: "skill", type: "Skill", label: asset.name } } },
-                ],
-                edges: devices.map((_, i) => ({ id: `e-d${i}-s`, source: `dev-${i}`, target: "skill", type: "smoothstep", style: { stroke: "#7E22CE", strokeWidth: 1.5 } })),
-            };
-        }
-
-        // MCP Server & LLM: Devices (left) → Asset (right)
-        const totalH  = Math.max(devices.length, 1) * NODE_H;
-        const assetY  = (totalH - 44) / 2;
-        const cat     = asset.type === "MCP Server" ? "mcp" : "ai-model";
-        const edgeCol = asset.type === "MCP Server" ? "#4cbebb" : "#ec4899";
-        return {
-            nodes: [
-                { id: "asset", type: "topoNode", draggable: false, position: { x: 310, y: assetY }, data: { component: { category: cat, type: asset.type, label: asset.name } } },
-                ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: 40, y: i * NODE_H }, data: { component: { category: "external", type: "User", label: d.username || d.endpoint } } })),
-            ],
-            edges: devices.map((_, i) => ({ id: `e-d${i}-a`, source: `dev-${i}`, target: "asset", type: "smoothstep", style: { stroke: edgeCol, strokeWidth: 1.5 } })),
-        };
-    }, [asset, assetDevices, agenticTreeData, agenticFlatData]);
-
-    // Fixed-size container — ReactFlow's fitView + zoom handles overflow
-    return (
-        <Box style={{ height: GRAPH_HEIGHT, borderRadius: 8, border: "1px solid #E1E5E9", overflow: "hidden", background: "#F8FAFC" }}>
-            <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                nodeTypes={TOPO_NODE_TYPES}
-                fitView
-                fitViewOptions={{ padding: 0.2 }}
-                onInit={api => api.fitView({ padding: 0.2 })}
-                minZoom={0.2}
-                maxZoom={2}
-                nodesDraggable={false}
-                nodesConnectable={false}
-                elementsSelectable={false}
-                zoomOnScroll
-                zoomOnPinch
-                panOnDrag
-                preventScrolling={false}
-            >
-                <Background color="#E1E5E9" gap={16} />
-                <Controls showInteractive={false} />
-            </ReactFlow>
-        </Box>
-    );
-}
 
 function computeAssetRiskFactors(asset) {
     const factors = [];
@@ -228,93 +47,39 @@ function computeAssetRiskFactors(asset) {
 function ToolNameCellRenderer({ data }) {
     if (!data) return null;
     return (
-        <Box style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", overflow: "hidden" }}>
-            <Box as="span" style={{ fontSize: 13, color: "#202223", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{data.name}</Box>
+        <Box width="100%" overflowX="hidden">
+            <Text variant="bodyMd" fontWeight="semibold" truncate>{data.name}</Text>
         </Box>
     );
 }
 
 function ToolRiskCellRenderer({ value }) {
-    if (!value) return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ color: "#C4C7CB" }}>-</Box></Box>;
-    const COLORS = { critical: { bg: "#FEE2E2", text: "#DC2626" }, high: { bg: "#FED3D1", text: "#9A3412" }, medium: { bg: "#FFD79D", text: "#92400E" }, low: { bg: "#E4E5E7", text: "#374151" } };
-    const c = COLORS[value] || COLORS.low;
-    return (
-        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <Box as="span" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: 22, padding: "0 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, lineHeight: "22px", background: c.bg, color: c.text, textTransform: "capitalize", whiteSpace: "nowrap" }}>{value}</Box>
-        </Box>
-    );
+    if (!value) return <Text variant="bodyMd" color="subdued">-</Text>;
+    return <SeverityBadge severity={value} />;
 }
 
 function ToolParamsCellRenderer({ data }) {
     if (!data) return null;
-    return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ fontSize: 12, color: "#6D7175" }}>{data.params?.length || 0}</Box></Box>;
+    return <Text variant="bodySm" color="subdued">{data.params?.length || 0}</Text>;
 }
 
 function ViolSeverityCellRenderer({ data }) {
     if (!data) return null;
-    const s = SEVERITY_COLORS[data.severity] || SEVERITY_COLORS.low;
-    return (
-        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <Box as="span" style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 600, lineHeight: "16px", background: s.bg, color: s.text, textTransform: "capitalize", whiteSpace: "nowrap" }}>{data.severity}</Box>
-        </Box>
-    );
+    return <SeverityBadge severity={data.severity} />;
 }
 
 function ViolTitleCellRenderer({ data }) {
     if (!data) return null;
     return (
-        <Box style={{ display: "flex", alignItems: "center", width: "100%", overflow: "hidden" }}>
-            <Box as="span" style={{ fontSize: 12, fontWeight: 600, color: "#202223", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{data.title}</Box>
-        </Box>
-    );
-}
-
-function OsIcon({ os }) {
-    if (os === "mac")     return <img src="/public/os-mac.svg"     width={15} height={15} alt="macOS"   style={{ flexShrink: 0 }} />;
-    if (os === "windows") return <img src="/public/os-windows.svg" width={15} height={15} alt="Windows" style={{ flexShrink: 0 }} />;
-    return                       <img src="/public/os-linux.svg"   width={15} height={15} alt="Linux"   style={{ flexShrink: 0 }} />;
-}
-
-function DeviceNameCellRenderer({ data }) {
-    if (!data) return null;
-    return (
-        <Box style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <OsIcon os={data.os} />
-            <Box as="span" style={{ fontSize: 13, color: "#202223", fontWeight: 500 }}>{data.endpoint}</Box>
+        <Box width="100%" overflowX="hidden">
+            <Text variant="bodySm" fontWeight="semibold" truncate>{data.title}</Text>
         </Box>
     );
 }
 
 function DeviceRiskCellRenderer({ value }) {
-    if (value == null) return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ color: "#C4C7CB" }}>-</Box></Box>;
-    const { bg, color } = getRiskColor(value);
-    return (
-        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <Box as="span" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, lineHeight: "16px", background: bg, color }}>{value.toFixed(1)}</Box>
-        </Box>
-    );
-}
-
-function ConnectedMcpCellRenderer({ data }) {
-    if (!data) return null;
-    return (
-        <Box style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <Box as="span" style={{ fontSize: 13, color: "#202223", fontWeight: 500 }}>{data.name}</Box>
-            <TypeBadge type="MCP Server" />
-        </Box>
-    );
-}
-
-function SkillNameCellRenderer({ data }) {
-    if (!data) return null;
-    return (
-        <Box style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", overflow: "hidden" }}>
-            <Box as="span" style={{ fontSize: 13, color: "#202223", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{data.name}</Box>
-            {data.isNew && (
-                <Box as="span" style={{ flexShrink: 0, fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 12, background: "#F1F2F3", color: "#6D7175", border: "1px solid #E1E3E5", lineHeight: "16px", display: "inline-flex", alignItems: "center" }}>New</Box>
-            )}
-        </Box>
-    );
+    if (value == null) return <Text variant="bodyMd" color="subdued">-</Text>;
+    return <RiskPill score={value} />;
 }
 
 // ─── Column definitions ───────────────────────────────────────────────────────
@@ -337,16 +102,6 @@ const DEVICES_COL_DEFS = [
     { field: "username",  headerName: "User",      flex: 1,   minWidth: 120, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#202223" }, valueFormatter: p => p.value || "-" },
 
     { field: "lastSeen",  headerName: "Last Seen", width: 130, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, valueFormatter: p => p.value || "-", comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.lastSeenEpoch || 0) - (nodeB?.data?.lastSeenEpoch || 0) },
-];
-
-const CONNECTED_MCP_COL_DEFS = [
-    { field: "name",     headerName: "MCP Server", flex: 1, minWidth: 160, cellRenderer: ConnectedMcpCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "toolCount", headerName: "Tools",     width: 80, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#202223" } },
-];
-
-const SKILLS_COL_DEFS = [
-    { field: "name",       headerName: "Skill",      flex: 1,   minWidth: 160, cellRenderer: SkillNameCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "violations", headerName: "Violations", width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" } },
 ];
 
 const SCHEMA_COL_DEFS = [
@@ -473,22 +228,25 @@ function OverviewTab({ asset, onTabChange, assetDevices = {}, agenticTreeData = 
                                     {i > 0 && <Divider />}
                                     <Box
                                         onClick={() => onTabChange?.(targetTab)}
-                                        style={{ padding: "12px 8px", display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer", borderRadius: 6, transition: "background 0.15s" }}
-                                        onMouseEnter={e => e.currentTarget.style.background = "#F6F6F7"}
-                                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                                        paddingBlockStart="3"
+                                        paddingBlockEnd="3"
+                                        paddingInlineStart="2"
+                                        paddingInlineEnd="2"
+                                        borderRadius="2"
+                                        className="agentic-clickable-row"
                                     >
-                                        <Box style={{ flexShrink: 0, paddingTop: 1, width: 72 }}>
-                                            <Badge status={badgeStatus}>{f.severity.charAt(0).toUpperCase() + f.severity.slice(1)}</Badge>
-                                        </Box>
-                                        <Box style={{ flex: 1, minWidth: 0 }}>
-                                            <VerticalStack gap="0">
-                                                <Text variant="bodySm" fontWeight="semibold">{f.title}</Text>
-                                                <Text variant="bodySm" color="subdued">{f.description}</Text>
-                                            </VerticalStack>
-                                        </Box>
-                                        <Box style={{ flexShrink: 0, paddingTop: 2 }}>
+                                        <HorizontalStack gap="3" align="start" blockAlign="start" wrap={false}>
+                                            <Box width="72px">
+                                                <Badge status={badgeStatus}>{f.severity.charAt(0).toUpperCase() + f.severity.slice(1)}</Badge>
+                                            </Box>
+                                            <Box width="100%">
+                                                <VerticalStack gap="1">
+                                                    <Text variant="bodySm" fontWeight="semibold">{f.title}</Text>
+                                                    <Text variant="bodySm" color="subdued">{f.description}</Text>
+                                                </VerticalStack>
+                                            </Box>
                                             <Icon source={ChevronRightMinor} color="subdued" />
-                                        </Box>
+                                        </HorizontalStack>
                                     </Box>
                                 </React.Fragment>
                             );
@@ -501,27 +259,6 @@ function OverviewTab({ asset, onTabChange, assetDevices = {}, agenticTreeData = 
 }
 
 // ─── Agentic Components tab ───────────────────────────────────────────────────
-
-// Extra cell renderers for Resources / Prompts lists
-function ResourceUriCellRenderer({ data }) {
-    if (!data) return null;
-    return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ fontSize: 12, color: "#8C9196", fontFamily: "ui-monospace, 'Cascadia Mono', Consolas, monospace" }}>{data.uri}</Box></Box>;
-}
-
-function PromptDescCellRenderer({ data }) {
-    if (!data) return null;
-    return <Box style={{ display: "flex", alignItems: "center", height: "100%", overflow: "hidden" }}><Box as="span" style={{ fontSize: 12, color: "#6D7175", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{data.description}</Box></Box>;
-}
-
-const RESOURCES_COL_DEFS = [
-    { field: "name", headerName: "Name", flex: 1, minWidth: 120, cellStyle: { display: "flex", alignItems: "center", fontSize: 13, fontWeight: 600, color: "#202223" } },
-    { field: "uri",  headerName: "URI",  flex: 1, minWidth: 160, cellRenderer: ResourceUriCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-];
-
-const PROMPTS_COL_DEFS = [
-    { field: "name",        headerName: "Session Title", flex: 1, minWidth: 140, cellStyle: { display: "flex", alignItems: "center", fontSize: 13, fontWeight: 600, color: "#202223" } },
-    { field: "description", headerName: "Prompt",        flex: 2, minWidth: 200, cellRenderer: PromptDescCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-];
 
 // ── Shared detail panels ──────────────────────────────────────────────────────
 
@@ -612,32 +349,18 @@ function McpPickerDropdown({ allRows, selected, onSelect }) {
 
 // ── MCP Server: single combined table (Tools + Resources + Prompts) → detail ──
 
+// MCP item type → Polaris Badge (Tool=info, Resource=success, Prompt=new map to the
+// blue/green/purple intent without a custom palette).
+const MCP_ITEM_BADGE_STATUS = { Tool: "info", Resource: "success", Prompt: "new" };
+
 function McpItemTypeCellRenderer({ value }) {
     if (!value) return null;
-    const COLORS = {
-        "Tool":     { bg: "#EFF6FF", color: "#1D4ED8", border: "#BFDBFE" },
-        "Resource": { bg: "#F0FDF4", color: "#166534", border: "#BBF7D0" },
-        "Prompt":   { bg: "#FDF4FF", color: "#7C3AED", border: "#E9D5FF" },
-    };
-    const s = COLORS[value] || { bg: "#F3F4F6", color: "#374151", border: "#E5E7EB" };
-    return (
-        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <Box as="span" style={{ display: "inline-flex", alignItems: "center", height: 20, padding: "0 7px", borderRadius: 12, fontSize: 11, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: "nowrap" }}>
-                {value}
-            </Box>
-        </Box>
-    );
+    return <Badge status={MCP_ITEM_BADGE_STATUS[value]}>{value}</Badge>;
 }
 
 function ViolationCountCellRenderer({ value }) {
-    if (!value) return <Box style={{ display: "flex", alignItems: "center", height: "100%" }}><Box as="span" style={{ color: "#C4C7CB" }}>-</Box></Box>;
-    return (
-        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <Box as="span" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 22, height: 22, padding: "0 6px", borderRadius: 11, fontSize: 11, fontWeight: 700, background: "#DF2909", color: "#FFFBFB" }}>
-                {value}
-            </Box>
-        </Box>
-    );
+    if (!value) return <Text variant="bodyMd" color="subdued">-</Text>;
+    return <SeverityBadge severity="critical">{value}</SeverityBadge>;
 }
 
 const COMBINED_MCP_COL_DEFS = [
@@ -752,27 +475,18 @@ function McpComponentsView({ asset, onNavChange }) {
 function AgentComponentNameCellRenderer({ data }) {
     if (!data) return null;
     return (
-        <Box style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", overflow: "hidden" }}>
-            <Box as="span" style={{ fontSize: 13, color: "#202223", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {data.name}
+        <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+            <Box width="100%" overflowX="hidden">
+                <Text variant="bodyMd" fontWeight="medium" truncate>{data.name}</Text>
             </Box>
-            {data.isNew && (
-                <Box as="span" style={{ flexShrink: 0, fontSize: 11, fontWeight: 500, padding: "1px 7px", borderRadius: 12, background: "#F1F2F3", color: "#6D7175", border: "1px solid #E1E3E5", lineHeight: "18px", display: "inline-flex", alignItems: "center" }}>New</Box>
-            )}
-        </Box>
+            {data.isNew && <Badge>New</Badge>}
+        </HorizontalStack>
     );
 }
 
 function AgentComponentTypeCellRenderer({ value }) {
     if (!value) return null;
-    const s = TYPE_STYLES[value] || { bg: "#F3F4F6", color: "#374151", border: "#E5E7EB" };
-    return (
-        <Box style={{ display: "flex", alignItems: "center", height: "100%" }}>
-            <Box as="span" style={{ display: "inline-flex", alignItems: "center", height: 20, padding: "0 7px", borderRadius: 12, fontSize: 11, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: "nowrap" }}>
-                {value}
-            </Box>
-        </Box>
-    );
+    return <TypeBadge type={value} />;
 }
 
 const COMBINED_AGENT_COL_DEFS = [
@@ -1144,19 +858,13 @@ export default function AgenticAssetFlyout({
     // topNavPicker: optional ReactNode rendered as FlyoutBreadcrumb children (dropdown on last crumb)
     const [topNavPicker, setTopNavPicker] = useState(null);
     const [mcpComponentCount, setMcpComponentCount] = useState(0);
-    const [mcpFlyoutData, setMcpFlyoutData] = useState(null);
 
-    const lockScroll   = useCallback(() => { document.body.style.overflow = "hidden"; }, []);
-    const unlockScroll = useCallback(() => { document.body.style.overflow = "";       }, []);
-
-    useEffect(() => { if (!show) document.body.style.overflow = ""; }, [show]);
     useEffect(() => { setSelectedTab(0); setTopNav(null); setTopNavPicker(null); }, [asset?.id]);
 
     useEffect(() => {
         const collectionId = asset?.collectionIds?.[0];
         if (!collectionId || asset?.type !== "MCP Server") {
             setMcpComponentCount(0);
-            setMcpFlyoutData(null);
             return;
         }
         let cancelled = false;
@@ -1167,9 +875,8 @@ export default function AgenticAssetFlyout({
                 setMcpComponentCount(
                     (data.tools?.length || 0) + (data.resources?.length || 0) + (data.prompts?.length || 0)
                 );
-                setMcpFlyoutData(data);
             } catch {
-                if (!cancelled) { setMcpComponentCount(0); setMcpFlyoutData(null); }
+                if (!cancelled) setMcpComponentCount(0);
             }
         })();
         return () => { cancelled = true; };
@@ -1221,74 +928,68 @@ export default function AgenticAssetFlyout({
     if (!asset) return null;
 
     return (
-        <Box className={"flyLayout " + (show ? "show" : "")} style={{ width: 800 }}>
-            <Box className={"flyOuterLayout " + (show ? "show" : "")}
-                style={{
-                    position: "fixed", right: 0, top: 0, zIndex: 1000,
-                    width: 800, top: "3.5rem",
-                    height: "calc(100vh - 3.5rem)",
-                    overflowY: "hidden",
-                    display: "flex", flexDirection: "column",
-                    background: "white",
-                    borderLeft: "1px solid #E1E3E5",
-                    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                }}
-            >
-                {/* Merge drill path into the single header breadcrumb — picker as children for dropdown */}
-                <FlyoutBreadcrumb
-                    items={topNav
-                        ? [{ label: asset.name, badge: asset.riskScore, onClick: topNav[0]?.onClick }, ...topNav.slice(1)]
-                        : [{ label: asset.name, badge: asset.riskScore }]
-                    }
-                    onClose={onClose}
-                >
-                    {topNavPicker && (
+        <AgenticFlyoutShell
+            show={show}
+            width={800}
+            header={
+                <>
+                    {/* Merge drill path into the single header breadcrumb — picker as children for dropdown */}
+                    <FlyoutBreadcrumb
+                        items={topNav
+                            ? [{ label: asset.name, badge: asset.riskScore, onClick: topNav[0]?.onClick }, ...topNav.slice(1)]
+                            : [{ label: asset.name, badge: asset.riskScore }]
+                        }
+                        onClose={onClose}
+                    >
+                        {topNavPicker && (
+                            <>
+                                <Text variant="bodySm" color="subdued">/</Text>
+                                {topNavPicker}
+                            </>
+                        )}
+                    </FlyoutBreadcrumb>
+
+                    {!topNav && (
                         <>
-                            <Text variant="bodySm" color="subdued">/</Text>
-                            {topNavPicker}
+                            <Box paddingInlineStart="1" paddingInlineEnd="1">
+                                <Tabs tabs={tabs} selected={selectedTab} onSelect={handleTabSelect} />
+                            </Box>
+                            <Divider />
                         </>
                     )}
-                </FlyoutBreadcrumb>
-
-                {!topNav && (
-                    <>
-                        <Box paddingInlineStart="1" paddingInlineEnd="1">
-                            <Tabs tabs={tabs} selected={selectedTab} onSelect={handleTabSelect} />
-                        </Box>
-                        <Divider />
-                    </>
-                )}
-
-                {/* flex:1 + minHeight:0 required for AG Grid tabs to fill remaining space — Box props insufficient */}
-                <Box style={{ flex: 1, minHeight: 0, overflowY: selectedTab === 0 ? "auto" : "hidden", display: "flex", flexDirection: "column" }}>
-                    {selectedTab === 0 && (
-                        <OverviewTab
-                            asset={asset}
-                            onTabChange={handleTabSelect}
-                            assetDevices={assetDevices}
-                            agenticTreeData={agenticTreeData}
-                            agenticFlatData={agenticFlatData}
-                        />
-                    )}
-                    {selectedTab === 1 && (
-                        <AgenticComponentsTab
-                            asset={asset}
-                            onNavChange={handleNavChange}
-                            onNavigateToAsset={onNavigateToAsset}
-                            agenticFlatData={agenticFlatData}
-                        />
-                    )}
-                    {selectedTab === 2 && <ViolationsTab asset={asset} />}
-                    {selectedTab === 3 && <DevicesTab asset={asset} assetDevices={assetDevices} />}
-                </Box>
-
+                </>
+            }
+            footer={
                 <AiChatSection
                     placeholder="Ask anything about this agentic asset..."
                     resetKey={asset?.id}
                     conversationType="AGENTIC_OBSERVE"
                     chatMetadata={chatMetadata}
                 />
+            }
+        >
+            {/* flex:1 + minHeight:0 required for AG Grid tabs to fill remaining space — Box props insufficient */}
+            <Box style={{ flex: 1, minHeight: 0, overflowY: selectedTab === 0 ? "auto" : "hidden", display: "flex", flexDirection: "column" }}>
+                {selectedTab === 0 && (
+                    <OverviewTab
+                        asset={asset}
+                        onTabChange={handleTabSelect}
+                        assetDevices={assetDevices}
+                        agenticTreeData={agenticTreeData}
+                        agenticFlatData={agenticFlatData}
+                    />
+                )}
+                {selectedTab === 1 && (
+                    <AgenticComponentsTab
+                        asset={asset}
+                        onNavChange={handleNavChange}
+                        onNavigateToAsset={onNavigateToAsset}
+                        agenticFlatData={agenticFlatData}
+                    />
+                )}
+                {selectedTab === 2 && <ViolationsTab asset={asset} />}
+                {selectedTab === 3 && <DevicesTab asset={asset} assetDevices={assetDevices} />}
             </Box>
-        </Box>
+        </AgenticFlyoutShell>
     );
 }

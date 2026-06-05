@@ -7,15 +7,25 @@
     height: 100vh;
 }
 
-.innerFlyLayout {
-    height: 100vh;
-    position: fixed;
-    overflow-y: scroll;
-    scrollbar-width: none;
-}
-
 .show {
     right: 0;
+}
+
+/* Asset-type badges — colour a Polaris <Badge> per type (same technique as the
+   dashboard-wide .badge-wrapper-<SEVERITY> classes). Keeps TypeBadge a plain Polaris
+   <Badge> instead of an inline-styled span. */
+.agentic-type-AGENT .Polaris-Badge   { background-color: #F3E8FF; color: #9642FC; }
+.agentic-type-MCP .Polaris-Badge     { background-color: #ECFDF5; color: #0D9488; }
+.agentic-type-LLM .Polaris-Badge     { background-color: #FEFCE8; color: #CA8A04; }
+.agentic-type-SKILL .Polaris-Badge   { background-color: #F9FAFB; color: #6B7280; }
+.agentic-type-DEFAULT .Polaris-Badge { background-color: #F3F4F6; color: #374151; }
+
+/* Risk-score pill — fixed compact width so the score column stays tight. Colour
+   comes from the .badge-wrapper-<SEVERITY> class paired alongside it. */
+.agentic-risk-pill .Polaris-Badge {
+    min-width: 40px;
+    justify-content: center;
+    font-weight: 600;
 }
 
 .agentic-top-list-row {
@@ -45,10 +55,19 @@
     min-width: 0;
 }
 
-/* Card 1 legend chips — clickable label with dot; no hover/active background */
+/* Clickable risk-factor row — only hover/cursor/transition (not Polaris-expressible)
+   live here; padding + borderRadius are Box props on the element. */
+.agentic-clickable-row {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+.agentic-clickable-row:hover {
+    background-color: var(--p-color-bg-hover, #f6f6f7);
+}
+
+/* Card 1 legend chips — cursor + non-selectable only; padding + borderRadius are Box props. */
 .agentic-chip {
     cursor: pointer;
-    border-radius: var(--p-border-radius-full, 9999px);
     user-select: none;
 }
 .agentic-chip:focus {

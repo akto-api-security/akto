@@ -2,7 +2,7 @@ import request from "@/util/request";
 import func from "@/util/func";
 import observeApi from "../api";
 import settingRequests from "../../settings/api";
-import { mapMcpAuditInfoToFlyoutData, buildSkillsFlyoutData } from "./agenticPageBuilders";
+import { mapMcpAuditInfoToFlyoutData, buildSkillsFlyoutData, normalizeSeverity } from "./agenticPageBuilders";
 
 function formatViolationTime(epoch) {
     if (typeof epoch !== "number" || epoch <= 0) return epoch;
@@ -31,14 +31,12 @@ export function aggregateViolationsByCollectionId(violationRows = []) {
     violationRows.forEach((row) => {
         const collectionId = row.apiCollectionId;
         if (collectionId == null) return;
+        const sev = normalizeSeverity(row.severity);
+        if (!sev) return;
         if (!byCollection[collectionId]) {
             byCollection[collectionId] = { critical: 0, high: 0, medium: 0, low: 0 };
         }
-        const sev = (row.severity || "").toLowerCase();
-        if (sev.includes("crit")) byCollection[collectionId].critical += 1;
-        else if (sev.includes("high")) byCollection[collectionId].high += 1;
-        else if (sev.includes("med")) byCollection[collectionId].medium += 1;
-        else if (sev.includes("low")) byCollection[collectionId].low += 1;
+        byCollection[collectionId][sev.toLowerCase()] += 1;
     });
     return byCollection;
 }

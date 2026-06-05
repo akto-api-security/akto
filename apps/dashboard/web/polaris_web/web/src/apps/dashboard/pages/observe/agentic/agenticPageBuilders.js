@@ -5,17 +5,56 @@ import {
 import {
     formatDisplayName,
     getTypeFromTags,
+    hasPersonalAccountTag,
 } from "./mcpClientHelper";
 import func from "@/util/func";
 import { getResolvedUsernameForCollection, DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
 
-const AGENTIC_ENV_KEYS = new Set([
-    "mcp-server", "gen-ai", "browser-llm", "mcp-client", "ai-agent", "browser-llm-agent", "skill",
-]);
+// ─── Severity / risk helpers ──────────────────────────────────────────────────
+
+// Normalise any incoming severity to one of the canonical Akto severities
+// (func.getAktoSeverities() → CRITICAL/HIGH/MEDIUM/LOW), same convention as testruns.
+// Callers lowercase it where a renderer needs the lowercase key.
+export function normalizeSeverity(raw) {
+    if (raw == null) return null;
+    const upper = String(raw).trim().toUpperCase();
+    return func.getAktoSeverities().find((sev) => upper.startsWith(sev.slice(0, 3))) || null;
+}
+
+// Risk score → Akto severity bucket (drives the .badge-wrapper-<SEVERITY> colour on RiskPill).
+export function getRiskLevel(score) {
+    if (score >= 4.5) return "CRITICAL";
+    if (score >= 4.0) return "HIGH";
+    if (score >= 3.5) return "MEDIUM";
+    return "LOW";
+}
+
+// Human label derived from the bucket — no duplicated thresholds.
+export function getRiskLabel(score) {
+    return `${func.toSentenceCase(getRiskLevel(score))} Risk`;
+}
 
 export function toChildPathKey(serviceName) {
     if (!serviceName) return "unknown";
     return String(serviceName).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+// Components linked to an agentic asset — prefers the two-level tree rows for the asset,
+// falling back to its declared mcpServers. Used by the asset flyout's topology + tab counts.
+export function getAgentLinkedComponents(asset, agenticTreeData = [], agenticFlatData = []) {
+    const fromTree = agenticTreeData.filter((r) => r.path?.length === 2 && r.path[0] === asset.id);
+    if (fromTree.length) return fromTree;
+
+    const seen = new Set();
+    const linked = [];
+    (asset.mcpServers || []).forEach((name) => {
+        const key = String(name).toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        const flat = agenticFlatData.find((a) => a.name === name || a.id === name);
+        linked.push({ name: flat?.name || name, type: flat?.type || "MCP Server" });
+    });
+    return linked;
 }
 
 export function inferOsFromDeviceId(deviceId) {
@@ -27,50 +66,32 @@ export function inferOsFromDeviceId(deviceId) {
     return "mac";
 }
 
+// Collections reaching this UI are already scoped to agentic context-source, so we only
+// guard against deactivated ones and confirm the agentic <endpoint>.<source>.<service>
+// hostname shape — no env-tag re-check needed.
 export function isAgenticCollection(collection) {
     if (!collection || collection.deactivated) return false;
     const hostName = collection.hostName;
-    if (hostName && hostName.split(".").length >= 3) return true;
-    const envType = collection.envType || [];
-    return envType.some((tag) => {
-        const key = typeof tag === "string" ? tag.split("=")[0] : tag?.keyName;
-        return key && AGENTIC_ENV_KEYS.has(key);
-    });
+    return !!(hostName && hostName.split(".").length >= 3);
 }
 
 function emptyViolations() {
     return { critical: 0, high: 0, medium: 0, low: 0 };
 }
 
-function normalizeSeverityKey(raw) {
-    if (raw == null) return null;
-    const s = String(raw).toLowerCase();
-    if (s.includes("crit")) return "critical";
-    if (s.includes("high")) return "high";
-    if (s.includes("med")) return "medium";
-    if (s.includes("low")) return "low";
-    return null;
-}
-
 function mergeViolations(target, source) {
     if (!source) return;
     Object.entries(source).forEach(([k, v]) => {
-        const sev = normalizeSeverityKey(k);
-        if (sev && v) target[sev] = (target[sev] || 0) + Number(v);
+        const sev = normalizeSeverity(k);
+        if (sev && v) {
+            const key = sev.toLowerCase();
+            target[key] = (target[key] || 0) + Number(v);
+        }
     });
 }
 
 function hasAnyViolation(v) {
     return v && Object.values(v).some((c) => c > 0);
-}
-
-function toViolationsObject(v) {
-    return {
-        critical: v.critical || 0,
-        high: v.high || 0,
-        medium: v.medium || 0,
-        low: v.low || 0,
-    };
 }
 
 function mapRiskLevel(row) {
@@ -315,6 +336,9 @@ export function buildDeviceEndpointsPageData(
             };
         }
         const device = deviceMap[devId];
+        // Personal-account marker is per-collection (browser-llm-account-type=personal /
+        // login-user-email-type=personal); OR it across all of a device's collections.
+        if (hasPersonalAccountTag(collection.envType)) device.hasPersonalAccount = true;
         const serviceName = extractServiceName(hostName);
         const childKey = toChildPathKey(serviceName);
         const clientType = getTypeFromTags(collection.envType);
@@ -377,7 +401,7 @@ export function buildDeviceEndpointsPageData(
             username: device.username,
             group: device.team,
             role: device.role,
-            violations: toViolationsObject(device.violations),
+            violations: { ...device.violations },
             lastTraffic: device.maxTraffic > 0 ? func.prettifyEpoch(device.maxTraffic) : "-",
             lastTrafficEpoch: device.maxTraffic || 0,
         };
@@ -403,7 +427,7 @@ export function buildDeviceEndpointsPageData(
             });
             const riskKey = path.join("/");
             const entry = { riskScore: Math.round(child.riskScore * 10) / 10 };
-            if (hasAnyViolation(child.violations)) entry.violations = toViolationsObject(child.violations);
+            if (hasAnyViolation(child.violations)) entry.violations = { ...child.violations };
             agentRiskData[riskKey] = entry;
         });
     });

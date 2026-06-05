@@ -1,23 +1,24 @@
 import React from "react";
-import { TYPE_STYLES } from "@/apps/dashboard/pages/observe/agentic/agenticStyles";
+import { Badge, Box } from "@shopify/polaris";
+import "../../layouts/style.css";
 
 // ─── TypeBadge ────────────────────────────────────────────────────────────────
+// Polaris <Badge> coloured per asset type via the .agentic-type-<KEY> classes
+// (components/layouts/style.css) — same convention as the dashboard .badge-wrapper-* classes.
 
-function TypeBadge({ type }) {
+const TYPE_CLASS = {
+    "AI Agent": "agentic-type-AGENT",
+    "MCP Server": "agentic-type-MCP",
+    "LLM": "agentic-type-LLM",
+    "Skill": "agentic-type-SKILL",
+};
+
+export function TypeBadge({ type }) {
     if (!type) return null;
-    const s = TYPE_STYLES[type] || { bg: "#F3F4F6", color: "#374151", border: "#E5E7EB" };
-    // TYPE_STYLES colours are outside the Polaris Badge status set — custom span justified
     return (
-        <span style={{
-            display: "inline-flex", alignItems: "center",
-            padding: "1px 7px", borderRadius: 12,
-            fontSize: 11, fontWeight: 500, lineHeight: "18px",
-            background: s.bg, color: s.color,
-            border: `1px solid ${s.border}`,
-            whiteSpace: "nowrap",
-        }}>
-            {type}
-        </span>
+        <Box as="span" className={TYPE_CLASS[type] || "agentic-type-DEFAULT"}>
+            <Badge size="small">{type}</Badge>
+        </Box>
     );
 }
 
