@@ -128,6 +128,7 @@ import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastP
 import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
 import UsersAndDevices from "../dashboard/pages/observe/agentic/UsersAndDevices.jsx";
+import LLMObservability from "../dashboard/pages/observe/llm/LLMObservability.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
 import IdentitiesPage from "../dashboard/pages/nhi_governance/IdentitiesPage.jsx";
@@ -223,6 +224,10 @@ const router = createBrowserRouter([
                             {
                                 path: "users-and-devices",
                                 element: <UsersAndDevices/>
+                            },
+                            {
+                                path: "llm-observability",
+                                element: <LLMObservability/>
                             },
                             {
                                 path: "query_mode",

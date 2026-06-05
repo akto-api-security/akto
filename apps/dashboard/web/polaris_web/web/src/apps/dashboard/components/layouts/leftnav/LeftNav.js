@@ -250,6 +250,14 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_users_and_devices",
+                    }, {
+                        label: "LLM Observability",
+                        onClick: () => {
+                            navigate("/dashboard/observe/llm-observability");
+                            handleSelect("dashboard_observe_llm_observability");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_observe_llm_observability",
                     }] : [{
                         label: "Collections",
                         onClick: () => {
