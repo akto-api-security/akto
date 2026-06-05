@@ -9,15 +9,9 @@ function formatViolationTime(epoch) {
     return func.prettifyEpoch(epoch);
 }
 
-function toEpochSeconds(t) {
-    if (typeof t !== "number" || t <= 0) return 0;
-    // If value is > 1e12 it's milliseconds (13+ digits); convert to seconds
-    return t > 1e12 ? Math.floor(t / 1000) : t;
-}
-
 function normalizeViolationRows(violations = []) {
     return violations.map((row) => {
-        const epochSec = toEpochSeconds(row.time);
+        const epochSec = typeof row.time === "number" && row.time > 0 ? row.time : 0;
         return {
             ...row,
             timeEpoch: epochSec,
