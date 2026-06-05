@@ -2,6 +2,7 @@ package com.akto.threat.detection.cache;
 
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.data_actor.DataActor;
+import com.akto.dto.api_protection_parse_layer.Rule;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.log.LoggerMaker;
@@ -71,6 +72,23 @@ public class FilterCache {
 
     public List<FilterConfig> getIgnoredEventFilters() {
         return ignoredEventFilters;
+    }
+
+    /**
+     * Returns the first Rule from the API_LEVEL_RATE_LIMITING filter, or null if none configured.
+     * Callers use rule.getCondition().getWindowThreshold() and getMatchCount().
+     */
+    public Rule getApiLevelRateLimitRule() {
+        if (apiFilters == null) return null;
+        for (FilterConfig f : apiFilters.values()) {
+            if (f.getInfo() != null
+                    && "API_LEVEL_RATE_LIMITING".equalsIgnoreCase(f.getInfo().getSubCategory())
+                    && f.getAggregationRules() != null
+                    && !f.getAggregationRules().getRule().isEmpty()) {
+                return f.getAggregationRules().getRule().get(0);
+            }
+        }
+        return null;
     }
 
     public String getApiSchema(int apiCollectionId) {

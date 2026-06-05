@@ -54,7 +54,7 @@ public class DistributionDataForwardLayer {
     public void sendLastFiveMinuteDistributionData() {
         scheduler.scheduleAtFixedRate(() -> {
             buildPayloadAndForwardData();
-        }, 0, 1, TimeUnit.MINUTES);
+        }, 0, 5, TimeUnit.MINUTES);
     }
 
     public void buildPayloadAndForwardData() {
