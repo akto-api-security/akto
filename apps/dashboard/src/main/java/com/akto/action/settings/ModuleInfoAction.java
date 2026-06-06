@@ -54,14 +54,6 @@ public class ModuleInfoAction extends UserAction {
     @Getter
     private List<AgenticUsers> agenticUsers;
 
-    // Optional filters for fetchAgenticUsers. Both null/empty => return all (existing behaviour).
-    // userRegex: case-insensitive regex matched against userName / userEmail / teamName.
-    // deviceIds: keep only users who own at least one of these device IDs (devices[] membership).
-    @Setter
-    private String userRegex;
-    @Setter
-    private List<String> deviceIds;
-
     @Override
     public String execute() {
         return SUCCESS;
@@ -278,23 +270,7 @@ public class ModuleInfoAction extends UserAction {
     }
 
     public String fetchAgenticUsers() {
-        // Guarded optional filters. When userRegex and deviceIds are both absent (every existing
-        // caller sends an empty body), filter == Filters.empty(), i.e. identical to the prior
-        // findAll(Filters.empty()). Filters engage only when the MCP agentic tool supplies them.
-        List<Bson> userFilters = new ArrayList<>();
-        if (userRegex != null && !userRegex.trim().isEmpty()) {
-            userFilters.add(Filters.or(
-                Filters.regex(AgenticUsers.USER_NAME, userRegex, "i"),
-                Filters.regex(AgenticUsers.USER_EMAIL, userRegex, "i"),
-                Filters.regex(AgenticUsers.TEAM_NAME, userRegex, "i")
-            ));
-        }
-        if (deviceIds != null && !deviceIds.isEmpty()) {
-            // devices[] membership — a user matches if any of their devices is in deviceIds.
-            userFilters.add(Filters.in("devices", deviceIds));
-        }
-        Bson filter = userFilters.isEmpty() ? Filters.empty() : Filters.and(userFilters);
-        agenticUsers = AgentUsersDao.instance.findAll(filter);
+        agenticUsers = AgentUsersDao.instance.findAll(Filters.empty());
         return SUCCESS.toUpperCase();
     }
 

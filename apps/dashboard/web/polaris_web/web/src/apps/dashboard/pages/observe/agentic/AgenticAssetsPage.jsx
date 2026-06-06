@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import { produce } from "immer";
 import { useNavigate } from "react-router-dom";
-import { Box, Checkbox, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
+import { Box, Card, Checkbox, Divider, HorizontalGrid, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
@@ -554,21 +554,96 @@ export default function AgenticAssetsPage() {
     [agenticFlatData, agenticCollectionViolRows, startTimestamp, endTimestamp, setFlyout],
   );
 
+  const anchorSeriesToTotal = useCallback((series, total) => {
+    const counts = series.counts || [];
+    if (!counts.length || total == null) return series;
+    const diff = total - counts[counts.length - 1];
+    if (diff === 0) return series;
+    return { ...series, counts: counts.map(c => Math.max(0, c + diff)) };
+  }, []);
+
+  const windowDelta = useCallback((counts) =>
+    counts && counts.length >= 2 ? Math.max(0, counts[counts.length - 1] - counts[0]) : 0,
+  []);
+
+  const totalAssets = agenticFlatData.length;
+
+  const assetTypeBreakdown = useMemo(() => [
+    { label: "Agents",     count: agenticFlatData.filter(r => r.type === "AI Agent").length,   color: "#9642FC",  key: "AI Agent" },
+    { label: "MCP Servers",count: agenticFlatData.filter(r => r.type === "MCP Server").length,color: "#4cbebb",  key: "MCP Server" },
+    { label: "LLMs",       count: agenticFlatData.filter(r => r.type === "LLM").length,        color: "#EAB308",  key: "LLM" },
+    { label: "Skills",     count: agenticFlatData.filter(r => r.type === "Skill").length,      color: "#D1D5DB",  key: "Skill" },
+  ], [agenticFlatData]);
+
+  const violationTotals = useMemo(() => {
+    const crit = agenticFlatData.reduce((s, r) => s + (r.violations?.critical || 0), 0);
+    const high = agenticFlatData.reduce((s, r) => s + (r.violations?.high || 0), 0);
+    const med  = agenticFlatData.reduce((s, r) => s + (r.violations?.medium || 0), 0);
+    const low  = agenticFlatData.reduce((s, r) => s + (r.violations?.low || 0), 0);
+    return { crit, high, med, low, total: crit + high + med + low };
+  }, [agenticFlatData]);
+
+  const violBreakdown = useMemo(() => [
+    { label: "Critical", key: "critical", count: violationTotals.crit, color: "#DC2626" },
+    { label: "High",     key: "high",     count: violationTotals.high, color: "#F97316" },
+    { label: "Medium",   key: "medium",   count: violationTotals.med,  color: "#EAB308" },
+    { label: "Low",      key: "low",      count: violationTotals.low,  color: "#D1D5DB" },
+  ], [violationTotals]);
+
+  const assetSeries = useMemo(() =>
+    anchorSeriesToTotal(
+      cumulativeByMonth(agenticFlatData, r => r.lastSeenEpoch || 0, startTimestamp, endTimestamp),
+      totalAssets,
+    ),
+    [agenticFlatData, startTimestamp, endTimestamp, totalAssets, anchorSeriesToTotal],
+  );
+
+  const assetDelta = useMemo(() => windowDelta(assetSeries.counts), [assetSeries.counts, windowDelta]);
+
+  const violSeries = useMemo(() =>
+    anchorSeriesToTotal(
+      cumulativeByMonth(agenticCollectionViolRows, v => v.timeEpoch || 0, startTimestamp, endTimestamp),
+      violationTotals.total,
+    ),
+    [agenticCollectionViolRows, startTimestamp, endTimestamp, violationTotals.total, anchorSeriesToTotal],
+  );
+
+  const violDelta = useMemo(() => windowDelta(violSeries.counts), [violSeries.counts, windowDelta]);
+
   const pageComponents = useMemo(
     () => {
       if (loading) return [<SpinnerCentered key="loading" />];
       return [
         <HorizontalGrid key="top-row" columns={3} gap="4">
-          <AgenticStatsCard
-            agenticFlatData={agenticFlatData}
-            violationRows={agenticViolationRows}
-            startTimestamp={startTimestamp}
-            endTimestamp={endTimestamp}
-            onTypeFilter={handleTypeFilter}
-            activeTypeFilter={typeFilter}
-            onViolSevFilter={handleViolSevFilter}
-            activeViolSevFilter={violSevFilter}
-          />
+          <Card padding="0">
+            <VerticalStack>
+              <AgenticStatsCard
+                title="Agentic Assets"
+                total={totalAssets}
+                delta={assetDelta}
+                sparklineCounts={assetSeries.counts}
+                sparklineLabels={assetSeries.labels}
+                breakdown={assetTypeBreakdown}
+                onFilterClick={handleTypeFilter}
+                activeFilter={typeFilter}
+                noCard
+              />
+              <Divider />
+              <AgenticStatsCard
+                title="Violations"
+                total={violationTotals.total}
+                totalColor="critical"
+                delta={violDelta}
+                sparklineCounts={violSeries.counts}
+                sparklineColor="#DC2626"
+                sparklineLabels={violSeries.labels}
+                breakdown={violBreakdown}
+                onFilterClick={handleViolSevFilter}
+                activeFilter={violSevFilter}
+                noCard
+              />
+            </VerticalStack>
+          </Card>
           <AgenticTopListCard
             title="Top Used Applications"
             columns={[{ label: "Agentic Asset" }, { label: "AI Interactions" }]}
@@ -596,12 +671,16 @@ export default function AgenticAssetsPage() {
     },
     [
       loading,
-      agenticFlatData,
-      agenticViolationRows,
+      totalAssets,
+      assetDelta,
+      assetSeries,
+      assetTypeBreakdown,
+      violationTotals,
+      violBreakdown,
+      violDelta,
+      violSeries,
       agenticTreeData,
       assetDevices,
-      startTimestamp,
-      endTimestamp,
       typeFilter,
       violSevFilter,
       flyout,

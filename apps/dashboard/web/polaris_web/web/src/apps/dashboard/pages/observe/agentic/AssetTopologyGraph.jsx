@@ -9,7 +9,7 @@ import { getAgentLinkedComponents } from "./agenticPageBuilders";
 // ReactFlow node colours are category-driven (outside the Polaris token set) and the
 // fixed graph canvas size is a layout constant — inline styles are justified here.
 
-function topoColors(category) {
+export function topoColors(category) {
     switch (category) {
         case "external": return { borderColor: "#3b82f6", backgroundColor: "#eff6ff" };
         case "agent":    return { borderColor: "#f97316", backgroundColor: "#fff7ed" };
@@ -20,7 +20,7 @@ function topoColors(category) {
     }
 }
 
-function topoIcon(category) {
+export function topoIcon(category) {
     switch (category) {
         case "external": return CustomersMinor;
         case "agent":    return AutomationMajor;
@@ -31,7 +31,7 @@ function topoIcon(category) {
     }
 }
 
-function TopoNode({ data }) {
+export function TopoNode({ data }) {
     const { component } = data;
     const colors = topoColors(component.category);
     const IconComponent = topoIcon(component.category);
@@ -65,7 +65,7 @@ function TopoNode({ data }) {
     );
 }
 
-const TOPO_NODE_TYPES = { topoNode: TopoNode };
+export const TOPO_NODE_TYPES = { topoNode: TopoNode };
 
 const GRAPH_HEIGHT = 280;
 const NODE_H       = 84;

@@ -3,13 +3,17 @@ package com.akto.util;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.mcp.McpRequestResponseUtils;
+import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -19,14 +23,6 @@ import java.util.Set;
 public final class AgenticObserveUtil {
 
     private AgenticObserveUtil() {}
-
-    public static final String TYPE_MCP_SERVER = "mcp-server";
-    public static final String TYPE_GEN_AI = "gen-ai";
-    public static final String TYPE_BROWSER_LLM = "browser-llm";
-    public static final String ASSET_MCP_CLIENT = "mcp-client";
-    public static final String ASSET_AI_AGENT = "ai-agent";
-    public static final String ASSET_BROWSER_LLM_AGENT = "browser-llm-agent";
-    public static final String SKILL_TAG = "skill";
 
     public static final String CLIENT_TYPE_LLM = "LLM";
     public static final String CLIENT_TYPE_AI_AGENT = "AI Agent";
@@ -61,18 +57,21 @@ public final class AgenticObserveUtil {
                 return true;
             }
         }
+        if (collection.isGenAICollection() || collection.isEndpointCollection()) {
+            return true;
+        }
         List<CollectionTags> envType = collection.getEnvType();
         if (envType == null || envType.isEmpty()) {
             return false;
         }
-        for (CollectionTags tag : envType) {
-            if (tag == null || StringUtils.isBlank(tag.getKeyName())) {
-                continue;
-            }
-            String key = tag.getKeyName();
-            if (TYPE_MCP_SERVER.equals(key) || TYPE_GEN_AI.equals(key) || TYPE_BROWSER_LLM.equals(key)
-                    || ASSET_MCP_CLIENT.equals(key) || ASSET_AI_AGENT.equals(key)
-                    || ASSET_BROWSER_LLM_AGENT.equals(key) || SKILL_TAG.equals(key)) {
+        return hasAnyTag(envType, Constants.AKTO_MCP_SERVER_TAG, Constants.AKTO_BROWSER_LLM_TAG, Constants.AKTO_MCP_CLIENT_TAG, Constants.AKTO_AI_AGENT_TAG, Constants.AKTO_BROWSER_LLM_AGENT_TAG, Constants.AKTO_SKILL_TAG);
+    }
+
+    private static boolean hasAnyTag(List<CollectionTags> tags, String... keyNames) {
+        if (tags == null || tags.isEmpty()) return false;
+        Set<String> keySet = new HashSet<>(Arrays.asList(keyNames));
+        for (CollectionTags tag : tags) {
+            if (tag != null && keySet.contains(tag.getKeyName())) {
                 return true;
             }
         }
@@ -80,31 +79,7 @@ public final class AgenticObserveUtil {
     }
 
     public static String getClientTypeFromCollection(ApiCollection collection) {
-        List<CollectionTags> envType = collection != null ? collection.getEnvType() : null;
-        if (envType == null || envType.isEmpty()) {
-            return CLIENT_TYPE_MCP_SERVER;
-        }
-        boolean hasSkillOnly = envType.stream().anyMatch(t -> SKILL_TAG.equals(t.getKeyName()))
-                && envType.stream().noneMatch(t -> ASSET_AI_AGENT.equals(t.getKeyName()))
-                && envType.stream().noneMatch(t -> TYPE_MCP_SERVER.equals(t.getKeyName()));
-        if (hasSkillOnly) {
-            return CLIENT_TYPE_MCP_SERVER;
-        }
-        for (CollectionTags tag : envType) {
-            if (tag == null) {
-                continue;
-            }
-            if (TYPE_MCP_SERVER.equals(tag.getKeyName())) {
-                return CLIENT_TYPE_MCP_SERVER;
-            }
-            if (TYPE_GEN_AI.equals(tag.getKeyName())) {
-                return CLIENT_TYPE_AI_AGENT;
-            }
-            if (TYPE_BROWSER_LLM.equals(tag.getKeyName())) {
-                return CLIENT_TYPE_LLM;
-            }
-        }
-        return CLIENT_TYPE_MCP_SERVER;
+        return getTypeFromCollection(collection);
     }
 
     public static boolean hasPersonalAccountTag(ApiCollection collection) {
@@ -206,49 +181,39 @@ public final class AgenticObserveUtil {
         return getSkillNames(collection).size();
     }
 
-    public static void mergeViolations(java.util.Map<String, Integer> target, java.util.Map<String, Integer> source) {
+    public static void mergeViolations(Map<GlobalEnums.Severity, Integer> target, Map<String, Integer> source) {
         if (source == null || source.isEmpty()) {
             return;
         }
-        for (java.util.Map.Entry<String, Integer> e : source.entrySet()) {
-            if (e.getKey() == null || e.getValue() == null) {
-                continue;
-            }
-            String sev = normalizeSeverityKey(e.getKey());
-            if (sev == null) {
-                continue;
-            }
+        for (Map.Entry<String, Integer> e : source.entrySet()) {
+            if (e.getKey() == null || e.getValue() == null) continue;
+            GlobalEnums.Severity sev = parseSeverity(e.getKey());
+            if (sev == null) continue;
             target.put(sev, target.getOrDefault(sev, 0) + e.getValue());
         }
     }
 
-    public static java.util.Map<String, Integer> emptyViolations() {
-        java.util.Map<String, Integer> v = new java.util.LinkedHashMap<>();
-        v.put("critical", 0);
-        v.put("high", 0);
-        v.put("medium", 0);
-        v.put("low", 0);
+    public static Map<GlobalEnums.Severity, Integer> emptyViolations() {
+        Map<GlobalEnums.Severity, Integer> v = new LinkedHashMap<>();
+        for (GlobalEnums.Severity s : GlobalEnums.Severity.values()) {
+            if (s == GlobalEnums.Severity.INFO) continue;
+            v.put(s, 0);
+        }
         return v;
     }
 
-    public static String normalizeSeverityKey(String raw) {
-        if (raw == null) {
+    public static GlobalEnums.Severity parseSeverity(String raw) {
+        if (raw == null) return null;
+        try {
+            return GlobalEnums.Severity.valueOf(raw.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            String s = raw.toLowerCase(Locale.ROOT);
+            if (s.contains("crit")) return GlobalEnums.Severity.CRITICAL;
+            if (s.contains("high")) return GlobalEnums.Severity.HIGH;
+            if (s.contains("med")) return GlobalEnums.Severity.MEDIUM;
+            if (s.contains("low")) return GlobalEnums.Severity.LOW;
             return null;
         }
-        String s = raw.toLowerCase(Locale.ROOT);
-        if (s.contains("crit")) {
-            return "critical";
-        }
-        if (s.contains("high")) {
-            return "high";
-        }
-        if (s.contains("med")) {
-            return "medium";
-        }
-        if (s.contains("low")) {
-            return "low";
-        }
-        return null;
     }
 
     public static double roundRiskScore(double score) {
@@ -265,7 +230,7 @@ public final class AgenticObserveUtil {
                 continue;
             }
             String key = tag.getKeyName();
-            if (ASSET_MCP_CLIENT.equals(key) || ASSET_AI_AGENT.equals(key) || ASSET_BROWSER_LLM_AGENT.equals(key)) {
+            if (Constants.AKTO_MCP_CLIENT_TAG.equals(key) || Constants.AKTO_AI_AGENT_TAG.equals(key) || Constants.AKTO_BROWSER_LLM_AGENT_TAG.equals(key)) {
                 return tag;
             }
         }
@@ -282,7 +247,7 @@ public final class AgenticObserveUtil {
                 continue;
             }
             String key = tag.getKeyName();
-            if (TYPE_MCP_SERVER.equals(key) || TYPE_GEN_AI.equals(key) || TYPE_BROWSER_LLM.equals(key)) {
+            if (Constants.AKTO_MCP_SERVER_TAG.equals(key) || Constants.AKTO_GEN_AI_TAG.equals(key) || Constants.AKTO_BROWSER_LLM_TAG.equals(key)) {
                 return tag;
             }
         }
@@ -301,13 +266,13 @@ public final class AgenticObserveUtil {
             if (tag == null) {
                 continue;
             }
-            if (SKILL_TAG.equals(tag.getKeyName())) {
+            if (Constants.AKTO_SKILL_TAG.equals(tag.getKeyName())) {
                 hasSkill = true;
             }
-            if (ASSET_AI_AGENT.equals(tag.getKeyName())) {
+            if (Constants.AKTO_AI_AGENT_TAG.equals(tag.getKeyName())) {
                 hasAiAgent = true;
             }
-            if (TYPE_MCP_SERVER.equals(tag.getKeyName())) {
+            if (Constants.AKTO_MCP_SERVER_TAG.equals(tag.getKeyName())) {
                 hasMcpServer = true;
             }
         }
@@ -318,13 +283,13 @@ public final class AgenticObserveUtil {
             if (tag == null) {
                 continue;
             }
-            if (TYPE_MCP_SERVER.equals(tag.getKeyName())) {
+            if (Constants.AKTO_MCP_SERVER_TAG.equals(tag.getKeyName())) {
                 return CLIENT_TYPE_MCP_SERVER;
             }
-            if (TYPE_GEN_AI.equals(tag.getKeyName())) {
+            if (Constants.AKTO_GEN_AI_TAG.equals(tag.getKeyName())) {
                 return CLIENT_TYPE_AI_AGENT;
             }
-            if (TYPE_BROWSER_LLM.equals(tag.getKeyName())) {
+            if (Constants.AKTO_BROWSER_LLM_TAG.equals(tag.getKeyName())) {
                 return CLIENT_TYPE_LLM;
             }
         }

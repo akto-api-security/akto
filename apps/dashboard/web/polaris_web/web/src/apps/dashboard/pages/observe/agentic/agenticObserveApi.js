@@ -2,7 +2,7 @@ import request from "@/util/request";
 import func from "@/util/func";
 import observeApi from "../api";
 import settingRequests from "../../settings/api";
-import { mapMcpAuditInfoToFlyoutData, buildSkillsFlyoutData, normalizeSeverity } from "./agenticPageBuilders";
+import { mapMcpAuditInfoToFlyoutData, buildMcpComponentsFromStis, buildSkillsFlyoutData, normalizeSeverity } from "./agenticPageBuilders";
 
 function formatViolationTime(epoch) {
     if (typeof epoch !== "number" || epoch <= 0) return epoch;
@@ -84,15 +84,36 @@ const agenticObserveApi = {
         return mapMcpAuditInfoToFlyoutData(auditRows);
     },
 
+    // Tools/resources/prompts sourced from the collection's STI endpoints (for real url+method, used
+    // to fetch sample traffic) classified by the MCP audit `type` field (the authoritative source for
+    // tool/resource/prompt/server — same as the legacy Audit Data page), joined with apiInfoList for risk.
+    async fetchMcpComponentsData(apiCollectionId) {
+        const id = typeof apiCollectionId === "string" ? parseInt(apiCollectionId, 10) : apiCollectionId;
+        const [stiResp, apiResp, auditRows] = await Promise.all([
+            observeApi.fetchApisFromStis(id),
+            observeApi.fetchApiInfosForCollection(id),
+            observeApi.fetchMcpAuditInfoByCollection(id),
+        ]);
+        const stiEndpoints = (stiResp?.list || []).map((x) => ({
+            method: x?._id?.method,
+            url: x?._id?.url,
+        }));
+        return buildMcpComponentsFromStis(stiEndpoints, apiResp?.apiInfoList || [], id, auditRows || []);
+    },
+
     async fetchSkillsFlyoutData(apiCollectionId, collection = null) {
         const id = typeof apiCollectionId === "string" ? parseInt(apiCollectionId, 10) : apiCollectionId;
         let coll = collection;
+        const [apiResp, stiResp] = await Promise.all([
+            observeApi.fetchApiInfosForCollection(id),
+            observeApi.fetchApisFromStis(id),
+        ]);
         if (!coll) {
             const resp = await observeApi.getAllCollectionsBasic();
             coll = (resp?.apiCollections || []).find((c) => c.id === id);
         }
-        const apiResp = await observeApi.fetchApiInfosForCollection(id);
-        return buildSkillsFlyoutData(coll, apiResp?.apiInfoList || []);
+        const stiEndpoints = (stiResp?.list || []).map((x) => ({ method: x?._id?.method, url: x?._id?.url }));
+        return buildSkillsFlyoutData(coll, apiResp?.apiInfoList || [], stiEndpoints, id);
     },
 
     async fetchEndpointShieldModules() {

@@ -132,22 +132,126 @@ export function mapMcpAuditInfoToFlyoutData(auditRows = []) {
     return { tools, resources, prompts, toolViolations };
 }
 
-export function buildSkillsFlyoutData(collection, apiInfoList = []) {
+// Last path segment of an MCP url — "/mcp/tools/list" → "list", "/search_company_database" →
+// "search_company_database". This is the friendly component name shown in the list.
+function mcpDisplayName(url) {
+    const trimmed = String(url || "").replace(/\/+$/, "");
+    const seg = trimmed.split("/").filter(Boolean).pop();
+    return seg || trimmed || url;
+}
+
+// Map an MCP audit `type` ("mcp-tool" / "mcp-resource" / "mcp-prompt" / "mcp-server" / "AGENT_SKILL")
+// to the component bucket — the authoritative classification, same as the legacy Audit Data page.
+function bucketFromAuditType(type) {
+    const t = String(type || "").toLowerCase();
+    if (t.includes("skill")) return "Skill";
+    if (t.includes("resource")) return "Resource";
+    if (t.includes("prompt")) return "Prompt";
+    if (t.includes("server")) return "Server";
+    if (t.includes("tool")) return "Tool";
+    return null;
+}
+
+// Fallback when no audit record matches — mirrors getMethod() in GetPrettifyEndpoint.jsx.
+// MCP protocol endpoints (/mcp/initialize, /mcp/tools/list) are Server-type infrastructure.
+function bucketFromUrl(url) {
+    const u = String(url || "").toLowerCase();
+    if (u.includes("skill")) return "Skill";
+    if (u.includes("resource")) return "Resource";
+    if (u.includes("prompt")) return "Prompt";
+    if (u.includes("server")) return "Server";
+    // MCP protocol paths (initialize, tools/list, ping) are server infrastructure, not user tools
+    if (/^\/mcp\b/.test(u) || u === "initialize" || u === "ping") return "Server";
+    return "Tool";
+}
+
+// Build flyout component rows from the collection's STI endpoints (real url+method, used to fetch sample
+// traffic), classified by the MCP audit `type` field (authoritative) with a url-based fallback. Risk +
+// violations are joined from apiInfoList. Skills are excluded — they belong under the agent's Skills.
+export function buildMcpComponentsFromStis(stiEndpoints = [], apiInfoList = [], apiCollectionId, auditRows = []) {
+    const infoByKey = {};
+    apiInfoList.forEach((info) => {
+        const m = info?.id?.method;
+        const u = info?.id?.url;
+        if (!m || !u) return;
+        const vCount = Object.values(info.violations || {}).reduce((a, b) => a + (b || 0), 0);
+        infoByKey[`${m} ${u}`] = { riskScore: info.riskScore || 0, violations: vCount };
+    });
+
+    // type lookup keyed by resourceName (tool/resource/prompt audit rows store the component name here)
+    // mcp-server rows have a hostname as resourceName — skip those, they don't map to individual endpoints
+    const typeByName = {};
+    auditRows.forEach((row) => {
+        if (!row?.type || !row?.resourceName) return;
+        const t = String(row.type).toLowerCase();
+        if (t.includes("server")) return; // hostname-keyed, no per-endpoint match possible
+        typeByName[row.resourceName] = row.type;
+    });
+
+    const tools = [], resources = [], prompts = [], skills = [];
+    const toolViolations = {};
+    let id = 0;
+
+    stiEndpoints.forEach((ep) => {
+        const method = ep?.method || ep?._id?.method;
+        const url = ep?.url || ep?._id?.url;
+        if (!method || !url) return;
+        const name = mcpDisplayName(url);
+        const type = bucketFromAuditType(typeByName[name]) || bucketFromUrl(url);
+        const info = infoByKey[`${method} ${url}`] || {};
+        const item = { id: id++, name, url, method, apiCollectionId, description: "", riskLevel: null, params: [], violations: info.violations || 0 };
+        if (type === "Skill") {
+            skills.push(item);
+        } else if (type === "Resource") {
+            resources.push({ ...item, uri: url });
+        } else if (type === "Prompt") {
+            prompts.push({ ...item, args: [] });
+        } else {
+            // Tool + Server both surface as tool-like components in the list
+            if (info.violations) toolViolations[name] = info.violations;
+            tools.push({ ...item, _serverType: type === "Server" });
+        }
+    });
+
+    return { tools, resources, prompts, skills, toolViolations };
+}
+
+export function buildSkillsFlyoutData(collection, apiInfoList = [], stiEndpoints = [], apiCollectionId) {
     const skillNames = new Set(collection?.skills || []);
     const riskBySkill = {};
     const violationsBySkill = {};
+    const urlBySkill = {};
+    const methodBySkill = {};
+    const descriptionBySkill = {};
+
+    const skillNameFromUrl = (url) => {
+        if (!url) return null;
+        const idx = url.indexOf("skills/");
+        if (idx < 0) return null;
+        const name = url.substring(idx + "skills/".length);
+        return name || null;
+    };
 
     apiInfoList.forEach((info) => {
         const url = info?.id?.url;
-        if (!url) return;
-        const idx = url.indexOf("skills/");
-        if (idx < 0) return;
-        const skillName = url.substring(idx + "skills/".length);
+        const skillName = skillNameFromUrl(url);
         if (!skillName) return;
         skillNames.add(skillName);
+        urlBySkill[skillName] = url;
+        if (info?.id?.method) methodBySkill[skillName] = info.id.method;
+        if (info?.description) descriptionBySkill[skillName] = info.description;
         riskBySkill[skillName] = Math.max(riskBySkill[skillName] || 0, info.riskScore || 0);
         const vCount = Object.values(info.violations || {}).reduce((a, b) => a + (b || 0), 0);
         if (vCount > 0) violationsBySkill[skillName] = vCount;
+    });
+
+    // Also pick up skills present as STI endpoints (SKILL /skills/<name>) that may not yet have apiInfo
+    stiEndpoints.forEach((ep) => {
+        const skillName = skillNameFromUrl(ep?.url);
+        if (!skillName) return;
+        skillNames.add(skillName);
+        if (!urlBySkill[skillName]) urlBySkill[skillName] = ep.url;
+        if (!methodBySkill[skillName] && ep.method) methodBySkill[skillName] = ep.method;
     });
 
     let i = 0;
@@ -159,6 +263,10 @@ export function buildSkillsFlyoutData(collection, apiInfoList = []) {
         violations: violationsBySkill[name] || 0,
         blocked: false,
         riskScore: riskBySkill[name] || 0,
+        url: urlBySkill[name] || `/skills/${name}`,
+        method: methodBySkill[name] || "SKILL",
+        apiCollectionId,
+        description: descriptionBySkill[name] || "",
     }));
 
     return { skills };

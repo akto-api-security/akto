@@ -1,14 +1,15 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Tabs, Icon, Avatar, Card, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Badge, Divider } from "@shopify/polaris";
-import { CustomersMinor, AutomationMajor, MagicMajor, ChevronRightMinor } from "@shopify/polaris-icons";
-import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-renderer";
-import MCPIcon from "@/assets/MCP_Icon.svg";
+import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider } from "@shopify/polaris";
+import ReactFlow, { Background, Controls } from "react-flow-renderer";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AgenticFlyoutShell from "./AgenticFlyoutShell";
 import AiChatSection from "./AiChatSection";
 import { TypeBadge, SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import { getRiskLabel } from "./agenticPageBuilders";
+import { TOPO_NODE_TYPES } from "./AssetTopologyGraph";
+import { RiskFactorRow } from "./RiskFactorRow";
+import DetailGrid from "./DetailGrid";
 import agenticObserveApi, { buildAgenticObserveChatMetadata } from "./agenticObserveApi";
 import "../../../components/layouts/style.css";
 
@@ -222,62 +223,6 @@ function getRiskNarrative(device, agents, factors) {
 
 // ─── Topology graph ───────────────────────────────────────────────────────────
 
-function topoColors(category) {
-    switch (category) {
-        case "external": return { borderColor: "#3b82f6", backgroundColor: "#eff6ff" };
-        case "agent":    return { borderColor: "#f97316", backgroundColor: "#fff7ed" };
-        case "mcp":      return { borderColor: "#4cbebb", backgroundColor: "#ecfdf5" };
-        case "ai-model": return { borderColor: "#ec4899", backgroundColor: "#fdf2f8" };
-        default:         return { borderColor: "#6b7280", backgroundColor: "#f9fafb" };
-    }
-}
-
-function topoIcon(category) {
-    switch (category) {
-        case "external": return CustomersMinor;
-        case "agent":    return AutomationMajor;
-        case "mcp":      return MCPIcon;
-        case "ai-model": return MagicMajor;
-        default:         return CustomersMinor;
-    }
-}
-
-function TopoNode({ data }) {
-    const { component } = data;
-    const colors = topoColors(component.category);
-    const IconComponent = topoIcon(component.category);
-    const isDevice = component.category === "external";
-
-    return (
-        <>
-            {!isDevice && <Handle type="target" position={Position.Left} />}
-            <Card padding={0}>
-                <Box style={{ border: `1px solid ${colors.borderColor}`, borderRadius: "8px", backgroundColor: colors.backgroundColor }}>
-                    <Box padding={3}>
-                        <VerticalStack gap={1}>
-                            <Box width="150px">
-                                <Text color="subdued" variant="bodySm">{component.type}</Text>
-                            </Box>
-                            <HorizontalStack gap={1} blockAlign="center">
-                                {typeof IconComponent === "string"
-                                    ? <Avatar source={IconComponent} size="extraSmall" />
-                                    : <Icon source={IconComponent} />
-                                }
-                                <Box width={component.category === "ai-model" ? "140px" : "110px"}>
-                                    <Text variant="bodySm" color="base">{component.label}</Text>
-                                </Box>
-                            </HorizontalStack>
-                        </VerticalStack>
-                    </Box>
-                </Box>
-            </Card>
-            <Handle type="source" position={Position.Right} id="b" />
-        </>
-    );
-}
-
-const TOPO_NODE_TYPES = { topoNode: TopoNode };
-
 function TopologyGraph({ device, agents }) {
     const { nodes, edges } = useMemo(() => {
         const aiAgents   = agents.filter(a => a.type === "AI Agent");
@@ -426,50 +371,13 @@ function OverviewTab({ device, agents, onTabChange }) {
                     <Text variant="bodySm">{narrative}</Text>
                     <VerticalStack gap="1">
                         {factors.map((f, i) => {
-                            const badgeStatus = f.severity === "critical" ? "critical" : f.severity === "high" ? "warning" : f.severity === "medium" ? "attention" : "info";
-                            const targetTab   = (f.severity === "critical" || f.severity === "high") && f.title.toLowerCase().includes("violation") ? 2 : f.title.toLowerCase().includes("integration") || f.title.toLowerCase().includes("database") || f.title.toLowerCase().includes("cloud") ? 1 : 2;
-                            return (
-                                <Box
-                                    key={i}
-                                    onClick={() => onTabChange?.(targetTab)}
-                                    paddingBlockStart="6"
-                                    paddingBlockEnd="6"
-                                    paddingInlineStart="3"
-                                    paddingInlineEnd="3"
-                                    borderRadius="1"
-                                    className="agentic-clickable-row"
-                                >
-                                    <HorizontalStack gap="4" align="start" blockAlign="center" wrap={false}>
-                                        <Box width="72px">
-                                            <Badge status={badgeStatus}>{f.severity.charAt(0).toUpperCase() + f.severity.slice(1)}</Badge>
-                                        </Box>
-                                        <Box width="100%">
-                                            <VerticalStack gap="1">
-                                                <Text variant="bodySm" fontWeight="semibold">{f.title}</Text>
-                                                <Text variant="bodySm" color="subdued">{f.description}</Text>
-                                            </VerticalStack>
-                                        </Box>
-                                        <Icon source={ChevronRightMinor} color="subdued" />
-                                    </HorizontalStack>
-                                </Box>
-                            );
+                            const targetTab = (f.severity === "critical" || f.severity === "high") && f.title.toLowerCase().includes("violation") ? 2 : f.title.toLowerCase().includes("integration") || f.title.toLowerCase().includes("database") || f.title.toLowerCase().includes("cloud") ? 1 : 2;
+                            return <RiskFactorRow key={i} factor={f} onClick={() => onTabChange?.(targetTab)} />;
                         })}
                     </VerticalStack>
                 </VerticalStack>
 
-                <VerticalStack gap="3">
-                    <Text variant="headingXs" color="subdued">Device Details</Text>
-                    <HorizontalGrid columns={3} gap="3">
-                        {deviceDetails.map(d => (
-                            <VerticalStack gap="1" key={d.label}>
-                                <Text variant="bodySm" color="subdued">{d.label}</Text>
-                                <Text variant="bodySm" fontWeight="semibold" color={d.isWarning ? "warning" : "base"}>
-                                    {d.value || "-"}
-                                </Text>
-                            </VerticalStack>
-                        ))}
-                    </HorizontalGrid>
-                </VerticalStack>
+                <DetailGrid heading="Device Details" items={deviceDetails} columns={3} />
             </VerticalStack>
         </Box>
     );

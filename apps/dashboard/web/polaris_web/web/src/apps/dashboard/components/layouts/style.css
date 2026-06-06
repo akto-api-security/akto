@@ -19,6 +19,7 @@
     right: 0;
 }
 
+
 /* Asset-type badges — colour a Polaris <Badge> per type (same technique as the
    dashboard-wide .badge-wrapper-<SEVERITY> classes). Keeps TypeBadge a plain Polaris
    <Badge> instead of an inline-styled span. */
@@ -50,6 +51,10 @@
 }
 .agentic-clickable-row:hover {
     background-color: var(--p-color-bg-hover, #f6f6f7);
+}
+
+.cursor-pointer {
+    cursor: pointer;
 }
 
 .agentic-risk-factors {
@@ -99,6 +104,15 @@
 .agentic-dot--active {
     outline: 2px solid var(--dot-color);
     outline-offset: 1px;
+}
+
+/* flex: 1 + flexDirection: column + minHeight: 0 — required for AG Grid fill-height
+   inside flyout panels. No Polaris prop equivalent for flex/flexDirection. */
+.agentic-flex-fill {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 
 /* AiChatSection — flex column with a pinned input row. The expand/collapse flex

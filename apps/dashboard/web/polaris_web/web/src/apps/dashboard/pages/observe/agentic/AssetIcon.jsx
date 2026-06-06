@@ -4,8 +4,7 @@ import LaptopIcon from "@/assets/Laptop.svg";
 import SkillIcon from "@/assets/Skill.svg";
 import { getDomainForFavicon } from "./mcpClientHelper";
 
-export default function AssetIcon({ type, assetTagValue }) {
-    const size = 20;
+export default function AssetIcon({ type, assetTagValue, size = 20 }) {
     if (type === "MCP Server")
         return <img src={MCPIcon} width={size} height={size} alt="" style={{ flexShrink: 0, borderRadius: 3 }} />;
     if (type === "Skill")

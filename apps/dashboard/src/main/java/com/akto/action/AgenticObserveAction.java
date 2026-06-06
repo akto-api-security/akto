@@ -83,13 +83,13 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 if (!collectionIds.isEmpty() && !collectionIds.contains(event.getApiCollectionId())) {
                     continue;
                 }
-                String sev = AgenticObserveUtil.normalizeSeverityKey(event.getSeverity());
+                GlobalEnums.Severity sev = AgenticObserveUtil.parseSeverity(event.getSeverity());
                 if (sev == null) {
-                    sev = "medium";
+                    sev = GlobalEnums.Severity.MEDIUM;
                 }
                 BasicDBObject row = new BasicDBObject();
                 row.put("id", id++);
-                row.put("severity", sev);
+                row.put("severity", sev.name().toLowerCase());
                 row.put("title", StringUtils.defaultIfBlank(event.getFilterId(), "Policy violation"));
                 row.put("description", StringUtils.defaultIfBlank(event.getUrl(), event.getHost()));
                 row.put("agent", StringUtils.defaultIfBlank(event.getHost(), "Unknown"));
@@ -117,17 +117,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 if (issue.getId() == null) {
                     continue;
                 }
-                GlobalEnums.Severity severity = issue.getSeverity();
-                String sev = severity != null
-                        ? AgenticObserveUtil.normalizeSeverityKey(severity.name())
-                        : "medium";
+                GlobalEnums.Severity sev = issue.getSeverity();
                 if (sev == null) {
-                    sev = "medium";
+                    sev = GlobalEnums.Severity.MEDIUM;
                 }
                 String subCategory = issue.getId().getTestSubCategory();
                 BasicDBObject row = new BasicDBObject();
                 row.put("id", id++);
-                row.put("severity", sev);
+                row.put("severity", sev.name().toLowerCase());
                 row.put("title", testNames.getOrDefault(subCategory, StringUtils.defaultString(subCategory, "Security issue")));
                 row.put("description", subCategory);
                 row.put("agent", issue.getId().getApiInfoKey() != null ? issue.getId().getApiInfoKey().getUrl() : "Unknown");

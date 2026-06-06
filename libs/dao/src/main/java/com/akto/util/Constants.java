@@ -75,6 +75,11 @@ public class Constants {
     public static final String AKTO_DAST_TAG = "dast";
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
     public static final String AKTO_GUARD_RAIL_TAG = "guard-rail";
+    public static final String AKTO_BROWSER_LLM_TAG = "browser-llm";
+    public static final String AKTO_MCP_CLIENT_TAG = "mcp-client";
+    public static final String AKTO_AI_AGENT_TAG = "ai-agent";
+    public static final String AKTO_BROWSER_LLM_AGENT_TAG = "browser-llm-agent";
+    public static final String AKTO_SKILL_TAG = "skill";
     public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";
     public static final String AKTO_MCP_RESOURCES_TAG = "mcp-resource";
     public static final String AKTO_MCP_PROMPTS_TAG = "mcp-prompt";

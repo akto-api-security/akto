@@ -13,6 +13,8 @@ import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithM
 import DeviceFlyout from "./DeviceFlyout";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import { SeverityBadge, RiskPill } from "./AgenticCellRenderers";
+import DonutChart from "../../../components/shared/DonutChart";
+import AgenticStatsCard from "./AgenticStatsCard";
 import agenticObserveApi, { aggregateViolationsByCollectionId } from "./agenticObserveApi";
 import { buildDeviceEndpointsPageData } from "./agenticPageBuilders";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
@@ -28,32 +30,7 @@ LicenseManager.setLicenseKey(
     "[TRIAL]_this_{AG_Charts_and_AG_Grid}_Enterprise_key_{AG-129492}_is_granted_for_evaluation_only___Use_in_production_is_not_permitted___Please_report_misuse_to_legal@ag-grid.com___For_help_with_purchasing_a_production_key_please_contact_info@ag-grid.com___You_are_granted_a_{Single_Application}_Developer_License_for_one_application_only___All_Front-End_JavaScript_developers_working_on_the_application_would_need_to_be_licensed___This_key_will_deactivate_on_{18 June 2026}____[v3]_[0102]_MTc4MTczNzIwMDAwMA==d27c8a4487e577f42d9980e95824f43c"
 );
 
-// ─── Chart data ──────────────────────────────────────────────────────────────
-
-
 // ─── Chart config helpers ─────────────────────────────────────────────────────
-
-function makeSparklineConfig(data, color, monthLabels) {
-    const safeData = data && data.length ? data : [0];
-    const min = Math.min(...safeData), max = Math.max(...safeData);
-    const pad = (max - min) * 0.2 || 1;
-    const labels = monthLabels || [];
-    return {
-        chart: { type:"area", height:50, width:140, backgroundColor:"transparent", margin:[2,0,2,0], spacing:[0,0,0,0], animation:false },
-        title:null, subtitle:{text:null}, credits:{enabled:false}, exporting:{enabled:false},
-        xAxis:{visible:false}, yAxis:{visible:false, min:min-pad, max:max+pad},
-        legend:{enabled:false},
-        tooltip:{
-            enabled:true, outside:true, backgroundColor:"white", borderColor:"#DFE3E8", borderRadius:6, style:{fontSize:"11px"},
-            formatter: function() {
-                const month = labels[this.point.index] || "";
-                return month ? `<b>${month}:</b> ${this.y}` : `<b>${this.y}</b>`;
-            },
-        },
-        plotOptions:{ area:{ fillColor:{ linearGradient:{x1:0,y1:0,x2:0,y2:1}, stops:[[0,Highcharts.color(color).setOpacity(0.25).get("rgba")],[1,Highcharts.color(color).setOpacity(0).get("rgba")]] }, lineWidth:2, marker:{enabled:false}, states:{hover:{enabled:true, lineWidth:2}}, enableMouseTracking:true } },
-        series:[{data:safeData,color}],
-    };
-}
 
 function makeOsTrendConfig(osTrend, monthLabels) {
     const categories = monthLabels || [];
@@ -78,60 +55,14 @@ function makeOsTrendConfig(osTrend, monthLabels) {
             lineColor:"#DFE3E8", tickColor:"transparent",
         },
         yAxis:{title:null,labels:{style:{fontSize:"11px",color:"#8C9196"}},gridLineColor:"#F1F2F3",allowDecimals:false,min:0},
-        legend:{align:"left",verticalAlign:"bottom",layout:"horizontal",itemStyle:{fontSize:"12px",fontWeight:"400",color:"#6D7175"},symbolRadius:4,margin:8,y:16},
+        legend:{enabled:true,align:"left",verticalAlign:"bottom",layout:"horizontal",itemStyle:{fontSize:"12px",fontWeight:"400",color:"#6D7175"},symbolRadius:4,margin:8,y:16},
         tooltip:{shared:true,backgroundColor:"white",borderColor:"#DFE3E8",borderRadius:8,style:{fontSize:"12px"}},
         plotOptions:{ areaspline:{ marker:{enabled:false}, lineWidth:2, fillOpacity:0.08 }, series:{ connectNulls:true } },
         series,
     };
 }
 
-function makeViolationsDonutConfig(violationsBySeverity) {
-    return {
-        chart:{type:"pie",height:200,backgroundColor:"transparent",style:{fontFamily:"Inter, -apple-system, sans-serif"},margin:[4,0,48,0]},
-        title:null, credits:{enabled:false}, exporting:{enabled:false},
-        tooltip:{pointFormat:"<b>{point.y}</b> ({point.percentage:.0f}%)",backgroundColor:"white",borderColor:"#DFE3E8",borderRadius:8,style:{fontSize:"12px"}},
-        plotOptions:{pie:{innerSize:"55%",size:"85%",center:["50%","45%"],borderWidth:2,borderColor:"white",dataLabels:{enabled:false},showInLegend:true}},
-        legend:{align:"center",verticalAlign:"bottom",itemStyle:{fontSize:"12px",fontWeight:"400",color:"#6D7175"},symbolRadius:4,margin:10},
-        series:[{name:"Violations",data:violationsBySeverity || []}],
-    };
-}
-
 // ─── Stat + chart cards ───────────────────────────────────────────────────────
-
-function StatRow({ label, value, delta, sparklineData, color, valueColor, monthLabels }) {
-    const opts = useMemo(() => makeSparklineConfig(sparklineData, color, monthLabels), [sparklineData, color, monthLabels]);
-    return (
-        <Box
-            paddingInlineStart="5"
-            paddingInlineEnd="5"
-            paddingBlockStart="4"
-            paddingBlockEnd="4"
-        >
-            <HorizontalStack align="space-between" blockAlign="center" gap="3">
-                <VerticalStack gap="2">
-                    <Text variant="headingSm" fontWeight="semibold">{label}</Text>
-                    <Text variant="headingXl" fontWeight="bold" color={valueColor}>
-                        {value.toLocaleString()}
-                        {delta > 0 && <Text as="span" variant="bodySm" fontWeight="semibold" color="success">&nbsp;+{delta}</Text>}
-                        {delta < 0 && <Text as="span" variant="bodySm" fontWeight="semibold" color="critical">&nbsp;{delta}</Text>}
-                    </Text>
-                </VerticalStack>
-                <HighchartsReact highcharts={Highcharts} options={opts} />
-            </HorizontalStack>
-        </Box>
-    );
-}
-
-function ChartPanel({ title, children }) {
-    return (
-        <Box padding="4">
-            <VerticalStack gap="2">
-                <Text variant="headingMd" fontWeight="semibold">{title}</Text>
-                {children}
-            </VerticalStack>
-        </Box>
-    );
-}
 
 function TopSection({ summary }) {
     const sparklines = summary?.statSparklines || {};
@@ -140,39 +71,100 @@ function TopSection({ summary }) {
         () => makeOsTrendConfig(osTrend, summary?.monthLabels),
         [summary?.osTrend, summary?.monthLabels]
     );
-    const violationsDonutOpts = useMemo(
-        () => makeViolationsDonutConfig(summary?.violationsBySeverity || []),
-        [summary?.violationsBySeverity]
-    );
+    const violationsChartData = useMemo(() => {
+        const arr = summary?.violationsBySeverity || [];
+        const obj = {};
+        arr.forEach(({ name, y, color }) => { obj[name] = { text: y, color }; });
+        return obj;
+    }, [summary?.violationsBySeverity]);
+
+    const violationsTitleColor = useMemo(() => {
+        const order = ["Critical", "High", "Medium", "Low"];
+        for (const sev of order) {
+            if (violationsChartData[sev]?.text > 0) return violationsChartData[sev].color;
+        }
+        return undefined;
+    }, [violationsChartData]);
 
     return (
         <HorizontalGrid columns="320px 1fr 298px" gap="4">
             <Card padding="0">
                 <VerticalStack>
-                    <StatRow label="Total Endpoints"  value={summary?.deviceCount ?? 0} delta={summary?.deltaEndpoints ?? 0} sparklineData={sparklines.endpoints || []}  color="#7C3AED" monthLabels={summary?.monthLabels} />
+                    <AgenticStatsCard
+                        title="Total Endpoints"
+                        total={summary?.deviceCount ?? 0}
+                        delta={summary?.deltaEndpoints ?? 0}
+                        sparklineCounts={sparklines.endpoints}
+                        sparklineColor="#7C3AED"
+                        sparklineLabels={summary?.monthLabels}
+                        noCard
+                    />
                     <Divider />
-                    <StatRow label="Users"            value={summary?.totalUsers ?? 0} delta={summary?.deltaUsers ?? 0} sparklineData={sparklines.users || []}      color="#2563EB" monthLabels={summary?.monthLabels} />
+                    <AgenticStatsCard
+                        title="Users"
+                        total={summary?.totalUsers ?? 0}
+                        delta={summary?.deltaUsers ?? 0}
+                        sparklineCounts={sparklines.users}
+                        sparklineColor="#2563EB"
+                        sparklineLabels={summary?.monthLabels}
+                        noCard
+                    />
                     <Divider />
-                    <StatRow label="Total Violations" value={summary?.totalViolations ?? 0} delta={summary?.deltaViolations ?? 0} sparklineData={sparklines.violations || []} color="#DC2626" valueColor="critical" monthLabels={summary?.monthLabels} />
+                    <AgenticStatsCard
+                        title="Total Violations"
+                        total={summary?.totalViolations ?? 0}
+                        totalColor="critical"
+                        delta={summary?.deltaViolations ?? 0}
+                        sparklineCounts={sparklines.violations}
+                        sparklineColor="#DC2626"
+                        sparklineLabels={summary?.monthLabels}
+                        noCard
+                    />
                 </VerticalStack>
             </Card>
             <Card padding="0">
-                <ChartPanel title="Endpoints Over Time by OS Type">
-                    <HighchartsReact highcharts={Highcharts} options={osTrendOpts} />
-                </ChartPanel>
+                <Box padding="4">
+                    <VerticalStack gap="2">
+                        <Text variant="headingMd" fontWeight="semibold">Endpoints Over Time by OS Type</Text>
+                        <HighchartsReact highcharts={Highcharts} options={osTrendOpts} />
+                    </VerticalStack>
+                </Box>
             </Card>
             <Card padding="0">
-                <ChartPanel title="Violations by Severity">
-                    <HighchartsReact highcharts={Highcharts} options={violationsDonutOpts} />
-                </ChartPanel>
+                <Box padding="4">
+                    <VerticalStack gap="2">
+                        <Text variant="headingMd" fontWeight="semibold" alignment="center">Violations by Severity</Text>
+                        <HorizontalStack align="center">
+                            <DonutChart
+                                data={violationsChartData}
+                                title={summary?.totalViolations ?? 0}
+                                subtitle="Violations"
+                                size={180}
+                                pieInnerSize="55%"
+                                titleColor={violationsTitleColor}
+                            />
+                        </HorizontalStack>
+                        {Object.keys(violationsChartData).length > 0 && (
+                            <HorizontalStack gap="3" wrap align="center">
+                                {Object.entries(violationsChartData).map(([key, { text, color }]) => (
+                                    <HorizontalStack key={key} gap="1" blockAlign="center">
+                                        <Box
+                                            className="agentic-dot"
+                                            style={{ "--dot-color": color }}
+                                        />
+                                        <Text variant="bodySm" color="subdued">{key} ({text})</Text>
+                                    </HorizontalStack>
+                                ))}
+                            </HorizontalStack>
+                        )}
+                    </VerticalStack>
+                </Box>
             </Card>
         </HorizontalGrid>
     );
 }
 
 // ─── OS icon helpers ──────────────────────────────────────────────────────────
-// SVGs live in public/ per CLAUDE.md — no inline SVG in component code.
-
 function OsIcon({ os }) {
     if (os === "mac")     return <img src="/public/os-mac.svg"     width={15} height={15} alt="macOS" />;
     if (os === "windows") return <img src="/public/os-windows.svg" width={15} height={15} alt="Windows" />;

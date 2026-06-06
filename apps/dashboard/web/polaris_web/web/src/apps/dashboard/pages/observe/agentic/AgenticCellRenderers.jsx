@@ -97,7 +97,7 @@ export function AssetNameCellRenderer({ data }) {
     const showMalicious = data.isMalicious && isSkill;
     return (
         <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-            <AssetIcon type={data.type} assetTagValue={data.assetTagValue} />
+            <Box minWidth="32px"><AssetIcon type={data.type} assetTagValue={data.assetTagValue} /></Box>
             <Box width="100%" overflowX="hidden">
                 <Text variant="bodyMd" fontWeight="medium" truncate>{data.name}</Text>
             </Box>

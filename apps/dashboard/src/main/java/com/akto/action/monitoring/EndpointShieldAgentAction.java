@@ -11,6 +11,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.Log;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 
 import lombok.Getter;
 
@@ -36,7 +37,11 @@ public class EndpointShieldAgentAction extends UserAction {
     private List<UserAnalysisData> userAnalysisList = new ArrayList<>();
 
     public String fetchUserAnalysisList() {
-        userAnalysisList = UserAnalysisDataDao.instance.findAll(Filters.empty());
+        userAnalysisList = UserAnalysisDataDao.instance.findAll(Filters.empty(),
+                Projections.include(UserAnalysisData.USER_NAME, UserAnalysisData.LAST_UPDATED_AT,
+                        UserAnalysisData.TOPIC_COUNTS, UserAnalysisData.TOTAL_INPUT_TOKENS,
+                        UserAnalysisData.TOTAL_OUTPUT_TOKENS, UserAnalysisData.AI_SUMMARY,
+                        UserAnalysisData.HARMFUL_TOPICS));
         return SUCCESS.toUpperCase();
     }
 
