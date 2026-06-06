@@ -512,6 +512,15 @@ const settingRequests = {
             }
         });
     },
+    toggleEmptyCollectionCleanup(enableEmptyCollectionCleanup) {
+        return request({
+            url: '/api/toggleEmptyCollectionCleanup',
+            method: 'post',
+            data: {
+                enableEmptyCollectionCleanup
+            }
+        });
+    },
     addFilterHeaderValueMap(filterHeaderValueMap){
         return request({
             url: '/api/addFilterHeaderValueMap',
@@ -1156,6 +1165,27 @@ const settingRequests = {
     removeNewRelicIntegration() {
         return request({
             url: '/api/removeNewRelicIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    fetchOpenTelemetryIntegration() {
+        return request({
+            url: '/api/fetchOpenTelemetryIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addOpenTelemetryIntegration(endpoint, apiKey, headerName) {
+        return request({
+            url: '/api/addOpenTelemetryIntegration',
+            method: 'post',
+            data: { endpoint, apiKey, headerName }
+        })
+    },
+    removeOpenTelemetryIntegration() {
+        return request({
+            url: '/api/removeOpenTelemetryIntegration',
             method: 'post',
             data: {}
         })

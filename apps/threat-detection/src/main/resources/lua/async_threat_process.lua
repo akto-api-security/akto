@@ -1,7 +1,7 @@
 -- Async Threat Processor (batch)
 -- Processes a batch of messages: CMS increment, sliding window query,
--- distribution update, mitigation check, threshold check.
--- Returns list of breach items as "ipApiCmsKey|count" strings.
+-- distribution update, mitigation check, threshold check, API-level hit count.
+-- Returns table: { ipRateBreaches=["idx|count",...], apiCountBreaches=["idx|count",...] }
 --
 -- ARGV layout:
 --   [1]  = number of messages in batch
@@ -11,13 +11,15 @@
 --   [5]  = distribution hash TTL in seconds
 --   [6]  = number of bucket ranges
 --   [7..7+numBuckets-1] = bucket ranges as "label,min,max"
---   Then for each message (block of 6 fields):
+--   Then for each message (block of 8 fields):
 --     [offset+0] = ipApiCmsKey
 --     [offset+1] = apiKey (e.g., "123|/api/users|GET")
 --     [offset+2] = epochMin
 --     [offset+3] = rateLimitWindow (minutes)
 --     [offset+4] = threshold (-1 means unlimited)
 --     [offset+5] = mitigationPeriod (seconds)
+--     [offset+6] = apiLevelWindow (minutes, 0 = disabled)
+--     [offset+7] = apiLevelThreshold (count, 0 = disabled)
 
 local numMessages = tonumber(ARGV[1])
 local epsilon = tonumber(ARGV[2])
@@ -55,19 +57,24 @@ end
 
 local mitigationPrefix = "ratelimit:"
 local mitigationSuffix = ":mitigation"
+local apiCountTTL = 28800  -- 8 hours
 
 local windowSizes = {5, 15, 30}
 local breaches = {}
+local apiCountBreaches = {}
 local msgOffset = 6 + numBuckets + 1
+local fieldsPerMessage = 8
 
 for m = 1, numMessages do
-    local base = msgOffset + (m - 1) * 6
+    local base = msgOffset + (m - 1) * fieldsPerMessage
     local ipApiCmsKey = ARGV[base]
     local apiKey = ARGV[base + 1]
     local currentMin = tonumber(ARGV[base + 2])
     local rateLimitWindow = tonumber(ARGV[base + 3])
     local threshold = tonumber(ARGV[base + 4])
     local mitigationPeriod = tonumber(ARGV[base + 5])
+    local apiLevelWindow = tonumber(ARGV[base + 6])
+    local apiLevelThreshold = tonumber(ARGV[base + 7])
 
     local cmsKey = "cms|" .. currentMin
 
@@ -110,8 +117,9 @@ for m = 1, numMessages do
 
         local distKey = "dist|" .. windowSize .. "|" .. windowStart .. "|" .. apiKey
         local apisKey = "distApis|" .. windowSize .. "|" .. windowStart
+        local prevBucketHashKey = "prevBuckets|" .. windowSize .. "|" .. windowStart
 
-        -- Initialize distribution hash if it doesn't exist
+        -- Initialize dist hash with all buckets at 0 if it doesn't exist
         if redis.call('EXISTS', distKey) == 0 then
             for _, b in ipairs(buckets) do
                 redis.call('HSET', distKey, b.label, 0)
@@ -120,22 +128,43 @@ for m = 1, numMessages do
         redis.call('EXPIRE', distKey, distTTL)
 
         local newBucket = getBucketLabel(count)
-        local oldBucket = getBucketLabel(count - 1)
+        local prevBucket = redis.call('HGET', prevBucketHashKey, ipApiCmsKey)
 
         -- Update bucket counts
-        if count == 1 then
+        if prevBucket == false then
+            -- First time this IP+API is seen in this window
             redis.call('HINCRBY', distKey, newBucket, 1)
-        elseif oldBucket ~= newBucket then
-            redis.call('HINCRBY', distKey, oldBucket, -1)
+        elseif prevBucket ~= newBucket then
+            redis.call('HINCRBY', distKey, prevBucket, -1)
             redis.call('HINCRBY', distKey, newBucket, 1)
         end
+
+        redis.call('HSET', prevBucketHashKey, ipApiCmsKey, newBucket)
+        redis.call('EXPIRE', prevBucketHashKey, distTTL)
 
         -- Track this API as active in this window
         redis.call('SADD', apisKey, apiKey)
         redis.call('EXPIRE', apisKey, distTTL)
     end
 
-    -- 5. Threshold check + mitigation
+    -- 5. API-level hit count: INCR per bin + index + threshold check
+    local apiCountKey = "apiCount|" .. apiKey .. "|" .. currentMin
+    redis.call('INCR', apiCountKey)
+    redis.call('EXPIRE', apiCountKey, apiCountTTL)
+    redis.call('ZADD', "apiCountIndex", currentMin, apiKey)
+
+    if apiLevelWindow > 0 and apiLevelThreshold > 0 then
+        local apiTotal = 0
+        for i = currentMin - apiLevelWindow + 1, currentMin do
+            local v = redis.call('GET', "apiCount|" .. apiKey .. "|" .. i)
+            if v then apiTotal = apiTotal + tonumber(v) end
+        end
+        if apiTotal >= apiLevelThreshold then
+            table.insert(apiCountBreaches, (m - 1) .. "|" .. apiTotal)
+        end
+    end
+
+    -- 6. IP-level threshold check + mitigation
     if threshold > 0 and slidingCount > threshold then
         local mitigationKey = mitigationPrefix .. ipApiCmsKey .. mitigationSuffix
         local inMitigation = redis.call('EXISTS', mitigationKey)
@@ -148,4 +177,4 @@ for m = 1, numMessages do
     end
 end
 
-return breaches
+return {breaches, apiCountBreaches}

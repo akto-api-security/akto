@@ -10,10 +10,12 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 
 import com.akto.threat.detection.cache.RedisBackedCounterCache.PendingCounterOp;
+import com.akto.threat.detection.constants.RedisKeyInfo;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
 import io.lettuce.core.KeyValue;
+import io.lettuce.core.Range;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 
@@ -181,5 +183,49 @@ public class ApiCountCacheLayer implements CounterCache {
             return null;
         }
     }
-    
+
+    // ---- Cron relay helpers ----
+
+    /** Returns unique API tuples active in [startBinId, endBinId] from the index sorted set. */
+    public List<String> fetchApiTuplesFromIndex(long startBinId, long endBinId) {
+        return this.redisString.sync().zrangebyscore(RedisKeyInfo.API_COUNTER_INDEX,
+                Range.create((double) startBinId, (double) endBinId));
+    }
+
+    /**
+     * For each API tuple in the window, fetches all per-bin counts via a single MGET.
+     * Returns a list of (key, value) pairs where key is the count key and value is the count string.
+     */
+    public List<KeyValue<String, String>> fetchCountsForWindow(List<String> apiTuples, long startBinId, long endBinId) {
+        List<String> countKeys = new ArrayList<>();
+        for (String tuple : apiTuples) {
+            String[] parts = tuple.split("\\|", 3);
+            if (parts.length < 3) continue;
+            try {
+                int collectionId = Integer.parseInt(parts[0]);
+                for (long bin = startBinId; bin <= endBinId; bin++) {
+                    countKeys.add(buildCountKey(collectionId, parts[1], parts[2], (int) bin));
+                }
+            } catch (NumberFormatException e) {
+                // skip malformed tuples
+            }
+        }
+        if (countKeys.isEmpty()) return new ArrayList<>();
+        return this.redisString.sync().mget(countKeys.toArray(new String[0]));
+    }
+
+    /** Removes index entries for the processed window. */
+    public void removeIndexRange(long startBinId, long endBinId) {
+        this.redisString.sync().zremrangebyscore(RedisKeyInfo.API_COUNTER_INDEX,
+                Range.create((double) startBinId, (double) endBinId));
+    }
+
+    public static String buildCountKey(int apiCollectionId, String url, String method, int binId) {
+        return RedisKeyInfo.API_COUNTER_KEY_PREFIX + "|" + apiCollectionId + "|" + url + "|" + method + "|" + binId;
+    }
+
+    public static String buildApiTuple(int apiCollectionId, String url, String method) {
+        return apiCollectionId + "|" + url + "|" + method;
+    }
+
 }

@@ -43,6 +43,8 @@ import {
     AnomalyDetectionConfig,
     ToolsGuardrailsStep,
     ToolsGuardrailsConfig,
+    BlockedHostsStep,
+    BlockedHostsConfig,
     ServerSettingsStep,
     ServerSettingsConfig
 } from './steps';
@@ -129,10 +131,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableMaliciousTools, setEnableMaliciousTools] = useState(true);
     const [enableToolNameDescriptionMismatch, setEnableToolNameDescriptionMismatch] = useState(true);
 
+    // Step 11: Blocked hosts/paths (block-only)
+    // Host + path suggestions are sourced from the browser extension configs.
+    const [blockedHosts, setBlockedHosts] = useState([]);
+    const [browserConfigs, setBrowserConfigs] = useState([]);
+
     // Step 10: Server settings
     const [applyToAllServers, setApplyToAllServers] = useState(true);
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
+    const [selectedBrowserLlms, setSelectedBrowserLlms] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
     const [applyOnRequest, setApplyOnRequest] = useState(false);
     const [policyBehaviour, setPolicyBehaviour] = useState(GUARDRAIL_BEHAVIOUR.BLOCK);
@@ -140,6 +148,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // Collections data
     const [mcpServers, setMcpServers] = useState([]);
     const [agentServers, setAgentServers] = useState([]);
+    const [browserLlmServers, setBrowserLlmServers] = useState([]);
     const [collectionsLoading, setCollectionsLoading] = useState(false);
 
     // Get collections from PersistStore
@@ -195,12 +204,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableToolMisuse,
         enableMaliciousTools,
         enableToolNameDescriptionMismatch,
+        // Step 11
+        blockedHosts,
         // Step 10
         applyToAllServers,
         selectedMcpServers,
         selectedAgentServers,
+        selectedBrowserLlms,
         mcpServers,
         agentServers,
+        browserLlmServers,
         applyOnRequest,
         applyOnResponse,
         policyBehaviour
@@ -271,6 +284,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
 
         steps.push({
+            number: BlockedHostsConfig.number,
+            title: BlockedHostsConfig.title,
+            summary: BlockedHostsConfig.getSummary(storedStateData),
+            ...BlockedHostsConfig.validate(storedStateData)
+        });
+        
+        steps.push({
             number: ServerSettingsConfig.number,
             title: ServerSettingsConfig.title,
             summary: ServerSettingsConfig.getSummary(storedStateData),
@@ -296,6 +316,23 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             setCollectionsLoading(false);
         }
     }, [allCollections]);
+
+    // Load browser extension configs - these supply host + path autosuggestions
+    // for the "Block host / path" step.
+    useEffect(() => {
+        let isActive = true;
+        (async () => {
+            try {
+                const response = await guardrailApi.fetchBrowserExtensionConfigs();
+                if (isActive && response?.browserExtensionConfigs) {
+                    setBrowserConfigs(response.browserExtensionConfigs);
+                }
+            } catch (error) {
+                console.error("Error fetching browser extension configs:", error);
+            }
+        })();
+        return () => { isActive = false; };
+    }, []);
 
     // Auto-scroll to bottom when new messages are added
     useEffect(() => {
@@ -330,7 +367,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
             .map(collection => ({
                 label: collection.displayName,
-                value: collection.id.toString()
+                value: collection.id.toString(),
+                isInline: !collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe')
             }));
 
 
@@ -343,11 +381,26 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
             .map(collection => ({
                 label: collection.displayName,
-                value: collection.id.toString()
+                value: collection.id.toString(),
+                isInline: !collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe')
+            }));
+
+            const browserLlmCollections = allCollections.filter(collection => {
+                const hasBrowserLlmEnvType = collection.envType && collection.envType.some(envType =>
+                    envType.keyName === 'browser-llm'
+                );
+                return hasBrowserLlmEnvType && !isVisibilityOnly(collection);
+            })
+            .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
+            .map(collection => ({
+                label: collection.displayName,
+                value: collection.id.toString(),
+                isInline: !collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe')
             }));
 
             setMcpServers(mcpServerCollections);
             setAgentServers(agentServerCollections);
+            setBrowserLlmServers(browserLlmCollections);
         } catch (error) {
             console.error("Error filtering collections:", error);
         } finally {
@@ -415,6 +468,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyToAllServers(true);
         setSelectedMcpServers([]);
         setSelectedAgentServers([]);
+        setSelectedBrowserLlms([]);
+        setBlockedHosts([]);
         setApplyOnResponse(false);
         setApplyOnRequest(false);
         setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
@@ -531,14 +586,34 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 ? policy.selectedMcpServersV2.map(server => server.id)
                 : policy.selectedMcpServers || []
         );
-        setSelectedAgentServers(
-            policy.selectedAgentServersV2?.length > 0
-                ? policy.selectedAgentServersV2.map(server => server.id)
-                : policy.selectedAgentServers || []
-        );
+
+        // selectedAgentServersV2 stores both gen-ai and browser-llm entries.
+        // Split them back into their respective dropdowns using allCollections envType.
+        const rawAgentServers = policy.selectedAgentServersV2?.length > 0
+            ? policy.selectedAgentServersV2.map(server => server.id)
+            : policy.selectedAgentServers || [];
+
+        const agentIds = [];
+        const browserLlmIds = [];
+        rawAgentServers.forEach(id => {
+            const col = allCollections?.find(c => c.id?.toString() === id?.toString());
+            const isBrowserLlm = col?.envType?.some(e => e.keyName === 'browser-llm');
+            if (isBrowserLlm) {
+                browserLlmIds.push(id);
+            } else {
+                agentIds.push(id);
+            }
+        });
+        setSelectedAgentServers(agentIds);
+        setSelectedBrowserLlms(browserLlmIds);
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
         setApplyToAllServers(policy.applyToAllServers ?? true);
+
+        // Blocked hosts (block-only glob patterns: { pattern })
+        setBlockedHosts((policy.blockedHosts || []).map(entry => ({
+            pattern: entry.pattern || ""
+        })));
     };
 
     const handleClose = () => {
@@ -574,15 +649,31 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     };
                 });
 
-            const transformedAgentServers = selectedAgentServers
-                .filter(serverId => serverId)
-                .map(serverId => {
-                    const server = agentServers.find(s => s.value === serverId || s.value === serverId.toString());
-                    return {
-                        id: serverId.toString(),
-                        name: server ? server.label : serverId.toString()
-                    };
-                });
+            const transformedAgentServers = [
+                ...selectedAgentServers
+                    .filter(serverId => serverId)
+                    .map(serverId => {
+                        const server = agentServers.find(s => s.value === serverId || s.value === serverId.toString());
+                        return {
+                            id: serverId.toString(),
+                            name: server ? server.label : serverId.toString()
+                        };
+                    }),
+                ...selectedBrowserLlms
+                    .filter(serverId => serverId)
+                    .map(serverId => {
+                        const server = browserLlmServers.find(s => s.value === serverId || s.value === serverId.toString());
+                        return {
+                            id: serverId.toString(),
+                            name: server ? server.label : serverId.toString()
+                        };
+                    })
+            ];
+
+            // Drop empty rows and normalize the glob patterns before persisting.
+            const cleanedBlockedHosts = (blockedHosts || [])
+                .filter(entry => entry && (entry.pattern || "").trim())
+                .map(entry => ({ pattern: entry.pattern.trim() }));
 
             const b = normalizeBehaviourValue(policyBehaviour);
             const guardrailData = {
@@ -646,9 +737,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 confidenceScore: enableExternalModel ? confidenceScore : null,
                 applyToAllServers,
                 selectedMcpServers: selectedMcpServers,
-                selectedAgentServers: selectedAgentServers,
+                selectedAgentServers: [...selectedAgentServers, ...selectedBrowserLlms],
                 selectedMcpServersV2: transformedMcpServers,
                 selectedAgentServersV2: transformedAgentServers,
+                blockedHosts: cleanedBlockedHosts,
                 applyOnResponse,
                 applyOnRequest,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
@@ -802,6 +894,21 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableToolNameDescriptionMismatch={setEnableToolNameDescriptionMismatch}
                     />
                 );
+            case 11: {
+                // Host suggestions come from the browser extension configs.
+                const hostSuggestions = Array.from(new Set(
+                    (browserConfigs || [])
+                        .map(c => (c.host || "").trim())
+                        .filter(Boolean)
+                )).sort();
+                return (
+                    <BlockedHostsStep
+                        blockedHosts={blockedHosts}
+                        setBlockedHosts={setBlockedHosts}
+                        hostSuggestions={hostSuggestions}
+                    />
+                );
+            }
             case 10:
                 return (
                     <ServerSettingsStep
@@ -811,12 +918,15 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setSelectedMcpServers={setSelectedMcpServers}
                         selectedAgentServers={selectedAgentServers}
                         setSelectedAgentServers={setSelectedAgentServers}
+                        selectedBrowserLlms={selectedBrowserLlms}
+                        setSelectedBrowserLlms={setSelectedBrowserLlms}
                         applyOnResponse={applyOnResponse}
                         setApplyOnResponse={setApplyOnResponse}
                         applyOnRequest={applyOnRequest}
                         setApplyOnRequest={setApplyOnRequest}
                         mcpServers={mcpServers}
                         agentServers={agentServers}
+                        browserLlmServers={browserLlmServers}
                         collectionsLoading={collectionsLoading}
                         policyBehaviour={policyBehaviour}
                         setPolicyBehaviour={setPolicyBehaviour}
@@ -885,6 +995,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             applyToAllServers: applyToAllServers,
             selectedMcpServers: selectedMcpServers,
             selectedAgentServers: selectedAgentServers,
+            blockedHosts: (blockedHosts || [])
+                .filter(entry => entry && (entry.pattern || "").trim())
+                .map(entry => ({ pattern: entry.pattern.trim() })),
             applyOnResponse: applyOnResponse,
             applyOnRequest: applyOnRequest
         };

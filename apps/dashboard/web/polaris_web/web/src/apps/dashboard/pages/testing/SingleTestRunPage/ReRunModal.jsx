@@ -35,7 +35,7 @@ function ReRunModal({refreshSummaries, selectedTestRun, shouldRefresh}) {
             ]}
         >
             <Modal.Section>
-                <Text variant="bodyMd">By clicking Re-run button, the previous the test run summary will be override.<br/>Are you sure you want to re-run test?</Text>
+                <Text variant="bodyMd">By clicking 'Re-run test' button, the previous test run summary will be overridden.<br/>Are you sure you want to re-run test?</Text>
           </Modal.Section>
         </Modal>
     )

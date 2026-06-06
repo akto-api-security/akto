@@ -48,7 +48,6 @@ import com.akto.threat.detection.cache.FilterCache;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.cache.SequenceCache;
 import com.akto.threat.detection.constants.KafkaTopic;
-import com.akto.threat.detection.constants.RedisKeyInfo;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
 import com.akto.threat.detection.ip_api_counter.ParamEnumerationDetector;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ParamEnumerationConfig;
@@ -75,8 +74,6 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
   private final HttpCallParser httpCallParser;
   private final WindowBasedThresholdNotifier windowBasedThresholdNotifier;
 
-  // Used for schema conformance and API level rate limiting
-  private WindowBasedThresholdNotifier apiCountWindowBasedThresholdNotifier = null;
 
   private final RawApiMetadataFactory rawApiFactory;
 
@@ -132,9 +129,6 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
     if (redisClient != null) {
         apiCache = redisClient.connect();
         this.apiCacheCountLayer = new ApiCountCacheLayer(redisClient);
-        this.apiCountWindowBasedThresholdNotifier = new WindowBasedThresholdNotifier(
-          apiCacheCountLayer,
-          new WindowBasedThresholdNotifier.Config(100, 10 * 60));
     }
 
     this.threatConfigEvaluator = new ThreatConfigurationEvaluator(null, dataActor, apiCacheCountLayer);
@@ -264,7 +258,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
 
     // Use template URL if available, otherwise fall back to static URL
     // This ensures API counts aggregate on template URLs (e.g., /api/users/INTEGER instead of /api/users/123)
-    String urlForAggregation = matchedTemplate != null ? matchedTemplate.getTemplateString() : url;
+    String urlForAggregation = matchedTemplate != null ? matchedTemplate.getTemplateString() : threatDetector.cleanUrl(url);
 
     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
 
@@ -273,14 +267,6 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
     if(isSequenceEnabled){
       checkSequenceAnomaly(actor, apiCollectionId, urlForAggregation, method, responseParam);
     }
-
-    // Increment API count using template URL for proper aggregation (skip for default collection)
-    String apiHitCountKey = Utils.buildApiHitCountKey(apiCollectionId, urlForAggregation, method.toString());
-    if (apiCollectionId != 0 && this.apiCountWindowBasedThresholdNotifier != null) {
-      this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
-    }
-
-    List<SchemaConformanceError> errors = null;
 
     boolean successfulExploit = false;
     boolean isIgnoredEvent = false;
@@ -314,11 +300,15 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
       String countryCode = metadata != null && metadata.getCountryCode() != null ? metadata.getCountryCode() : "";
       String destCountryCode = metadata != null && metadata.getDestCountryCode() != null ? metadata.getDestCountryCode() : "";
 
+      Rule apiLevelRule = filterCache.getApiLevelRateLimitRule();
+      int apiLevelWindow = apiLevelRule != null ? apiLevelRule.getCondition().getWindowThreshold() : 0;
+      int apiLevelThreshold = apiLevelRule != null ? apiLevelRule.getCondition().getMatchCount() : 0;
+
       this.distributionCalculator.processRequest(
           distributionKey, curEpochMin, ipApiCmsKey, ratelimitConfig.getPeriod(),
           ratelimit, ratelimitConfig.getMitigationPeriod(),
           actor, host, responseParam.getAccountId(), responseParam.getTime(),
-          countryCode, destCountryCode);
+          countryCode, destCountryCode, apiLevelWindow, apiLevelThreshold);
     }
 
     // Run Hyperscan if enabled
@@ -427,10 +417,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
         String aggKey = actor + "|" + groupKey;
 
 
-        SampleMaliciousRequest maliciousReq = null;
-        if (!isAggFilter || !apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
-          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, vulnerable, successfulExploit, isIgnoredEvent, redactionType);
-        }
+        SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, vulnerable, successfulExploit, isIgnoredEvent, redactionType);
 
         if (!isAggFilter) {
           generateAndPushMaliciousEventRequest(
@@ -440,18 +427,13 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
 
         // Aggregation rules
         boolean shouldNotify = false;
-        for (Rule rule : aggRules.getRule()) {
+        for (Rule rule : aggRules != null ? aggRules.getRule() : java.util.Collections.<Rule>emptyList()) {
+          // API_LEVEL_RATE_LIMITING threshold detection runs in the cron, not here
           if (apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
-              if (this.apiCountWindowBasedThresholdNotifier == null) {
-                continue;
-              }
-              shouldNotify = this.apiCountWindowBasedThresholdNotifier.calcApiCount(apiHitCountKey, responseParam.getTime(), rule);
-              if (shouldNotify) {
-                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, vulnerable, successfulExploit, isIgnoredEvent, redactionType);
-              }
-          } else {
-              shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
+              continue;
           }
+
+          shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
 
           if (shouldNotify) {
             logger.debugAndAddToDb("aggregate condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());

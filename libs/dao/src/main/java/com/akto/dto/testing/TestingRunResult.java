@@ -69,6 +69,9 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     @BsonIgnore
     private List<TestLog> testLogs = new ArrayList<>();
 
+    public static final String AI_SUMMARY_TRACES = "aiSummaryTraces";
+    private List<Map<String, Object>> aiSummaryTraces;
+
     public boolean isRerun() {
         return rerun;
     }
@@ -385,5 +388,13 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public void setIgnoredResult(boolean isIgnoredResult) {
         this.isIgnoredResult = isIgnoredResult;
+    }
+
+    public List<Map<String, Object>> getAiSummaryTraces() {
+        return aiSummaryTraces;
+    }
+
+    public void setAiSummaryTraces(List<Map<String, Object>> aiSummaryTraces) {
+        this.aiSummaryTraces = aiSummaryTraces;
     }
 }

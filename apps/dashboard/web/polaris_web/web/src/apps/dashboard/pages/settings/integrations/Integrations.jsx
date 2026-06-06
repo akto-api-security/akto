@@ -198,6 +198,12 @@ function Integrations() {
       source: '/public/new-relic-logo.svg'
     }
 
+    let openTelemetryObj = {
+      id: 'open_telemetry',
+      name: 'OpenTelemetry',
+      source: '/public/opentelemetry-logo.svg'
+    }
+
     let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, googleWorkSpaceObj]
     const [currItems , setCurrentItems] = useState(getTabItems('all'))
     const tabs = [
@@ -268,7 +274,7 @@ function Integrations() {
     const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj, wizObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];
     const siemItems = [splunkObj, datadogObj];
-    const monitoringItems = [newRelicObj]
+    const monitoringItems = [newRelicObj, openTelemetryObj]
     switch (tabId) {
       case 'traffic':
         return trafficItems;

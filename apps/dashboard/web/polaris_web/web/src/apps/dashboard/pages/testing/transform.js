@@ -387,6 +387,7 @@ const transform = {
     obj['testCategoryId'] = data.testSubType
     obj['conversationId'] = data?.conversationId
     obj['startTimestamp'] = data?.startTimestamp
+    obj['aiSummaryTraces'] = data?.aiSummaryTraces || null
 
     let testingRunResultHexId = data.hexId;
 

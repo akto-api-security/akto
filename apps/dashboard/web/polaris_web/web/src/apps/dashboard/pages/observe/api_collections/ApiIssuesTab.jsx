@@ -10,6 +10,7 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import SessionStore from "../../../../main/SessionStore";
 import threatDetectionApi from "../../threat_detection/api";
 import ShowListInBadge from "../../../components/shared/ShowListInBadge";
+import SampleDataList from "../../../components/shared/SampleDataList";
 
 const ApiIssuesTab = ({ apiDetail, collectionIssuesData, isThreatEnabled }) => {
     const [filteredIssues, setFilteredIssues] = useState([]);
@@ -19,6 +20,7 @@ const ApiIssuesTab = ({ apiDetail, collectionIssuesData, isThreatEnabled }) => {
     const hostNameMap = PersistStore.getState().hostNameMap;
     const threatFiltersMap = SessionStore.getState().threatFiltersMap;
     const [totalThreatIssues, setTotalThreatIssues] = useState(0);
+    const [skillSampleData, setSkillSampleData] = useState([]);
 
     const issuesHeaders = [
         { text: "Severity", title: "Severity", value: "severity" },
@@ -115,13 +117,22 @@ const ApiIssuesTab = ({ apiDetail, collectionIssuesData, isThreatEnabled }) => {
                 const url = new URL(endpoint);
                 finalEndpoint = url.pathname;
             }
-            const resp = await threatDetectionApi.fetchSuspectSampleData(0, [], [apiCollectionId], [finalEndpoint], [], {}, 0, func.timeNow(), [], 10, 'ACTIVE', true, 'threat', [], '', [method]);
-            let threatIssuesData = [];
-            if(resp?.maliciousEvents && resp?.maliciousEvents?.length > 0) {
-                resp?.maliciousEvents?.filter(event => event?.successfulExploit).forEach(event => {
+            const isSkill = endpoint.includes('/skills/')
+            const host = hostNameMap[apiCollectionId] || apiCollectionMap[apiCollectionId]
+            const collIds = isSkill ? [] : [apiCollectionId]
+            const hosts = isSkill && host ? [host] : []
+            const resp = await threatDetectionApi.fetchSuspectSampleData(0, [], collIds, [finalEndpoint], [], {}, 0, func.timeNow(), [], 10, 'ACTIVE', true, 'threat', hosts, '', [method]);
+            const events = (resp?.maliciousEvents || []).filter(event => event?.successfulExploit)
+            if(isSkill) {
+                const samples = events
+                    .filter(event => event?.payload)
+                    .map(event => ({ message: event.payload, highlightPaths: [] }))
+                setSkillSampleData(samples)
+            } else {
+                let threatIssuesData = [];
+                events.forEach(event => {
                     const threatFilter = threatFiltersMap[event?.filterId];
                     const severity = func.toSentenceCase(threatFilter?.severity || "HIGH");
-
                     threatIssuesData.push({
                         id: event?.actor,
                         severity: (<div className={`badge-wrapper-${severity.toUpperCase()}`}>
@@ -166,7 +177,6 @@ const ApiIssuesTab = ({ apiDetail, collectionIssuesData, isThreatEnabled }) => {
                 PersistStore.getState().setFiltersMap(filtersMap);
             }
 
-
             if(issue.url.length > 0){
                 const navigateUrl = window.location.origin + "/dashboard/protection/threat-activity?filters=url__" + issue.url;
                 window.open(navigateUrl, "_blank")
@@ -199,23 +209,34 @@ const ApiIssuesTab = ({ apiDetail, collectionIssuesData, isThreatEnabled }) => {
             {loadingIssues ? (
                 <SpinnerCentered />
             ) : (
-                <VerticalStack gap={2}>
-                    {totalThreatIssues > 10 && <Text variant="headingSm">Showing 10 issues out of {totalThreatIssues}</Text>}
-                    <GithubSimpleTable
-                        key="issues-table"
-                        data={filteredIssues}
-                        resourceName={{ singular: "issue", plural: "issues" }}
-                        headers={issuesHeaders}
-                        headings={issuesHeaders}
-                        useNewRow={true}
-                        condensedHeight={true}
-                        hideQueryField={true}
-                        loading={loadingIssues}
-                        onRowClick={handleRowClick}
-                        pageLimit={10}
-                        showFooter={false}
-                    />
-                </VerticalStack>
+                isThreatEnabled && apiDetail?.endpoint?.includes('/skills/') ? (
+                    skillSampleData.length > 0
+                        ? <SampleDataList
+                            sampleData={skillSampleData}
+                            heading={"Threat Details"}
+                            minHeight={"35vh"}
+                            vertical={true}
+                          />
+                        : <Text color="subdued">No threat data found.</Text>
+                ) : (
+                    <VerticalStack gap={2}>
+                        {totalThreatIssues > 10 && <Text variant="headingSm">Showing 10 issues out of {totalThreatIssues}</Text>}
+                        <GithubSimpleTable
+                            key="issues-table"
+                            data={filteredIssues}
+                            resourceName={{ singular: "issue", plural: "issues" }}
+                            headers={issuesHeaders}
+                            headings={issuesHeaders}
+                            useNewRow={true}
+                            condensedHeight={true}
+                            hideQueryField={true}
+                            loading={loadingIssues}
+                            onRowClick={handleRowClick}
+                            pageLimit={10}
+                            showFooter={false}
+                        />
+                    </VerticalStack>
+                )
             )}
         </Box>
     );

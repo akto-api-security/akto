@@ -23,7 +23,7 @@ public class GraphQLTrafficBenchmark {
     public static long numRecords = 10000000L;
 
     public static final String THREAT_TOPIC = "akto.api.logs2";
-    public static final String KAFKA_URL = "localhost:29092";
+    public static final String KAFKA_URL = "localhost:9092";
     private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
     private static final Random random = new Random(42);
 
