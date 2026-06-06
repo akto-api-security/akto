@@ -8,23 +8,9 @@ import React, {
 } from "react";
 import { produce } from "immer";
 import { useNavigate } from "react-router-dom";
-import Highcharts from "highcharts";
-import HighchartsMore from "highcharts/highcharts-more";
-import HighchartsReact from "highcharts-react-official";
-import {
-  Box,
-  Card,
-  HorizontalGrid,
-  HorizontalStack,
-  VerticalStack,
-  Text,
-  Divider,
-  Checkbox,
-} from "@shopify/polaris";
+import { Box, Checkbox, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
-import MCPIcon from "@/assets/MCP_Icon.svg";
-import LaptopIcon from "@/assets/Laptop.svg";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
@@ -37,8 +23,8 @@ import {
   InteractionsCellRenderer,
   GroupCellRenderer,
 } from "./AgenticCellRenderers";
-import { getDomainForFavicon } from "./mcpClientHelper";
 import { cumulativeByMonth } from "./agenticPageBuilders";
+import SmoothAreaChart from "@/apps/dashboard/pages/dashboard/new_components/SmoothChart";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import "../../../components/layouts/style.css";
 import api from "../api";
@@ -55,8 +41,8 @@ import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShie
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import values from "@/util/values";
 import func from "@/util/func";
-
-HighchartsMore(Highcharts);
+import AgenticStatsCard from "./AgenticStatsCard";
+import AgenticTopListCard from "./AgenticTopListCard";
 
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
@@ -171,594 +157,6 @@ const DEFAULT_COL_DEF = {
   cellStyle: { display: "flex", alignItems: "center" },
 };
 
-// ─── Top section helpers ──────────────────────────────────────────────────────
-
-// Areaspline sparkline config from a real numeric series. `labels` (month names) drive the
-// hover tooltip; pass `enableHover=false` to disable interaction.
-function makeAreasplineConfig(
-  data,
-  color,
-  height,
-  width,
-  labels = [],
-  enableHover = true,
-) {
-  const safe = data && data.length ? data : [0];
-  const min = Math.min(...safe),
-    max = Math.max(...safe);
-  const pad = (max - min) * 0.2 || 1;
-  return {
-    chart: {
-      type: "areaspline",
-      height,
-      ...(width ? { width } : {}),
-      backgroundColor: "transparent",
-      margin: [4, 0, 2, 0],
-      spacing: [0, 0, 0, 0],
-      animation: false,
-    },
-    title: null,
-    credits: { enabled: false },
-    exporting: { enabled: false },
-    xAxis: { visible: false },
-    yAxis: { visible: false, min: min - pad, max: max + pad },
-    legend: { enabled: false },
-    tooltip: enableHover
-      ? {
-          enabled: true,
-          outside: true,
-          backgroundColor: "white",
-          borderColor: "#DFE3E8",
-          borderRadius: 6,
-          style: { fontSize: "11px" },
-          formatter: function () {
-            const label = labels[this.point.index];
-            return label ? `<b>${label}:</b> ${this.y}` : `<b>${this.y}</b>`;
-          },
-        }
-      : { enabled: false },
-    plotOptions: {
-      areaspline: {
-        fillColor: {
-          linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
-          stops: [
-            [0, Highcharts.color(color).setOpacity(0.25).get("rgba")],
-            [1, Highcharts.color(color).setOpacity(0).get("rgba")],
-          ],
-        },
-        lineWidth: 2,
-        marker: { enabled: false },
-        states: { hover: { enabled: enableHover, lineWidth: 2 } },
-        enableMouseTracking: enableHover,
-      },
-    },
-    series: [{ data: safe, color }],
-  };
-}
-
-function TopSectionIcon({ row }) {
-  if (row.type === "MCP Server")
-    return (
-      <img
-        src={MCPIcon}
-        width={20}
-        height={20}
-        alt=""
-        style={{ flexShrink: 0, borderRadius: 3 }}
-      />
-    );
-  const domain = getDomainForFavicon(row.assetTagValue);
-  if (domain)
-    return (
-      <img
-        src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
-        width={20}
-        height={20}
-        alt=""
-        style={{ flexShrink: 0, borderRadius: 3 }}
-      />
-    );
-  return (
-    <img
-      src={LaptopIcon}
-      width={20}
-      height={20}
-      alt=""
-      style={{ flexShrink: 0, borderRadius: 3, opacity: 0.7 }}
-    />
-  );
-}
-
-// Full-width clickable list row — grows to fill an equal share of the card height (flex: 1).
-// No borderRadius so the hover highlight is a clean edge-to-edge rectangle.
-// Vertical centering and border-bottom divider are handled in CSS (.agentic-top-list-row).
-// padding-inline and padding-block are fully owned by .agentic-top-list-row CSS
-// so that hover background and content padding come from the same rule.
-function TopListRow({ onClick, children }) {
-  return (
-    <Box onClick={onClick} className="agentic-top-list-row">
-      {children}
-    </Box>
-  );
-}
-
-// Proportion bar — each segment width ∝ count.
-// Dynamic colour/width are data-driven and cannot use Polaris tokens, so minimal inline style is used.
-function SegmentBar({ segments }) {
-  return (
-    <Box className="agentic-seg-bar">
-      {segments.map(
-        (s) =>
-          s.count > 0 && (
-            <Box
-              key={s.label}
-              className="agentic-seg"
-              title={`${s.label}: ${s.count}`}
-              style={{ flexGrow: s.count, background: s.color }}
-            />
-          ),
-      )}
-    </Box>
-  );
-}
-
-// Small legend dot — colour is data-driven; CSS custom property bridges CSS class ↔ dynamic value.
-function LegendDot({ color, active }) {
-  return (
-    <Box
-      className={active ? "agentic-dot agentic-dot--active" : "agentic-dot"}
-      style={{ "--dot-color": color }}
-    />
-  );
-}
-
-// Shift a cumulative series so its final point equals `total` (the headline source of truth),
-// preserving the month-over-month shape. Guarantees hovering the latest month shows `total`.
-function anchorSeriesToTotal(series, total) {
-  const counts = series.counts || [];
-  if (!counts.length || total == null) return series;
-  const diff = total - counts[counts.length - 1];
-  if (diff === 0) return series;
-  return { ...series, counts: counts.map((c) => Math.max(0, c + diff)) };
-}
-
-// ─── Top section ──────────────────────────────────────────────────────────────
-
-function violationTotal(row) {
-  const v = row?.violations;
-  if (!v) return 0;
-  return (v.critical || 0) + (v.high || 0) + (v.medium || 0) + (v.low || 0);
-}
-
-function TopSection({
-  agenticFlatData = [],
-  violationRows = [],
-  startTimestamp = 0,
-  endTimestamp = 0,
-  onTypeFilter,
-  activeTypeFilter,
-  onAssetClick,
-  onViolSevFilter,
-  activeViolSevFilter,
-}) {
-  const aiCount = agenticFlatData.filter((r) => r.type === "AI Agent").length;
-  const mcpCount = agenticFlatData.filter(
-    (r) => r.type === "MCP Server",
-  ).length;
-  const llmCount = agenticFlatData.filter((r) => r.type === "LLM").length;
-  const skillCount = agenticFlatData.filter((r) => r.type === "Skill").length;
-  const total = agenticFlatData.length;
-
-  // Source-of-truth violation totals: summed from per-asset aggregated violation objects.
-  const critV = agenticFlatData.reduce(
-    (s, r) => s + (r.violations?.critical || 0),
-    0,
-  );
-  const highV = agenticFlatData.reduce(
-    (s, r) => s + (r.violations?.high || 0),
-    0,
-  );
-  const medV = agenticFlatData.reduce(
-    (s, r) => s + (r.violations?.medium || 0),
-    0,
-  );
-  const lowV = agenticFlatData.reduce(
-    (s, r) => s + (r.violations?.low || 0),
-    0,
-  );
-  const totalV = critV + highV + medV + lowV;
-
-  // Agentic violation events (rows whose collection belongs to an agentic asset) — drives the
-  // time-bucketed shape of the violations chart.
-  const agenticViolationRows = useMemo(() => {
-    const collectionIds = new Set();
-    agenticFlatData.forEach((r) =>
-      (r.collectionIds || []).forEach((id) => collectionIds.add(Number(id))),
-    );
-    return violationRows.filter((v) =>
-      collectionIds.has(Number(v.apiCollectionId)),
-    );
-  }, [agenticFlatData, violationRows]);
-
-  // Card 1 sparklines = cumulative monthly running totals. The LAST point of each series is
-  // anchored to the headline number so hovering the latest month shows exactly that total.
-  // Assets: cumulative count of assets by last-traffic-seen → ends at `total` (127).
-  const assetSeries = useMemo(
-    () =>
-      anchorSeriesToTotal(
-        cumulativeByMonth(
-          agenticFlatData,
-          (r) => r.lastSeenEpoch || 0,
-          startTimestamp,
-          endTimestamp,
-        ),
-        total,
-      ),
-    [agenticFlatData, startTimestamp, endTimestamp, total],
-  );
-  // Violations: cumulative violation events → ends at `totalV` (91).
-  const violSeries = useMemo(
-    () =>
-      anchorSeriesToTotal(
-        cumulativeByMonth(
-          agenticViolationRows,
-          (v) => v.timeEpoch || 0,
-          startTimestamp,
-          endTimestamp,
-        ),
-        totalV,
-      ),
-    [agenticViolationRows, startTimestamp, endTimestamp, totalV],
-  );
-
-  // +N = net growth across the selected window = last cumulative point − first.
-  const windowDelta = (counts) =>
-    counts && counts.length >= 2
-      ? Math.max(0, counts[counts.length - 1] - counts[0])
-      : 0;
-  const assetDelta = windowDelta(assetSeries.counts);
-  const violDelta = windowDelta(violSeries.counts);
-
-  const assetChartOpts = useMemo(
-    () =>
-      makeAreasplineConfig(
-        assetSeries.counts,
-        "#9642FC",
-        40,
-        160,
-        assetSeries.labels,
-      ),
-    [assetSeries],
-  );
-  const violChartOpts = useMemo(
-    () =>
-      makeAreasplineConfig(
-        violSeries.counts,
-        "#DC2626",
-        40,
-        160,
-        violSeries.labels,
-      ),
-    [violSeries],
-  );
-
-  const topApps = useMemo(
-    () =>
-      [...agenticFlatData]
-        .filter((r) => r.aiInteractions > 0)
-        .sort((a, b) => b.aiInteractions - a.aiInteractions)
-        .slice(0, 5),
-    [agenticFlatData],
-  );
-
-  const topViolations = useMemo(
-    () =>
-      [...agenticFlatData]
-        .map((r) => ({ ...r, totalV: violationTotal(r) }))
-        .filter((r) => r.totalV > 0)
-        .sort((a, b) => b.totalV - a.totalV)
-        .slice(0, 5),
-    [agenticFlatData],
-  );
-
-  // Card 3 row sparklines: per-asset cumulative violation events over months (same source as
-  // Card 1 violations — agentic violation rows filtered to each asset's collections).
-  const topViolOpts = useMemo(
-    () =>
-      topViolations.map((row) => {
-        const collectionIdSet = new Set((row.collectionIds || []).map(Number));
-        const assetViolRows = agenticViolationRows.filter((v) =>
-          collectionIdSet.has(Number(v.apiCollectionId)),
-        );
-        const series = cumulativeByMonth(
-          assetViolRows,
-          (v) => v.timeEpoch || 0,
-          startTimestamp,
-          endTimestamp,
-        );
-        return makeAreasplineConfig(
-          series.counts,
-          "#EF4444",
-          28,
-          100,
-          series.labels,
-          true,
-        );
-      }),
-    [topViolations, agenticViolationRows, startTimestamp, endTimestamp],
-  );
-
-  const typeBreakdown = [
-    { label: "Agents", count: aiCount, color: "#9642FC", typeKey: "AI Agent" },
-    {
-      label: "MCP Servers",
-      count: mcpCount,
-      color: "#4cbebb",
-      typeKey: "MCP Server",
-    },
-    { label: "LLMs", count: llmCount, color: "#EAB308", typeKey: "LLM" },
-    { label: "Skills", count: skillCount, color: "#D1D5DB", typeKey: "Skill" },
-  ];
-  const violBreakdown = [
-    { label: "Critical", key: "critical", count: critV, color: "#DC2626" },
-    { label: "High", key: "high", count: highV, color: "#F97316" },
-    { label: "Medium", key: "medium", count: medV, color: "#EAB308" },
-    { label: "Low", key: "low", count: lowV, color: "#D1D5DB" },
-  ];
-
-  return (
-    <HorizontalGrid columns={3} gap="4">
-      {/* ── Card 1: Stats ── */}
-      <Card padding="0">
-        <Box
-          paddingInlineStart="5"
-          paddingInlineEnd="5"
-          paddingBlockStart="4"
-          paddingBlockEnd="3"
-        >
-          <VerticalStack gap="2">
-            <Text variant="headingSm" fontWeight="semibold">
-              Agentic Assets
-            </Text>
-            <HorizontalStack align="space-between" blockAlign="center" gap="3">
-              <HorizontalStack gap="2" blockAlign="baseline">
-                <Text variant="heading2xl" as="p">
-                  {total}
-                </Text>
-                {assetDelta > 0 && (
-                  <Text variant="bodySm" color="success">
-                    +{assetDelta}
-                  </Text>
-                )}
-              </HorizontalStack>
-              <HighchartsReact
-                highcharts={Highcharts}
-                options={assetChartOpts}
-              />
-            </HorizontalStack>
-            <VerticalStack gap="2">
-              {total > 0 && <SegmentBar segments={typeBreakdown} />}
-              <HorizontalStack gap="3" wrap>
-                {typeBreakdown.map((b) => {
-                  const active = activeTypeFilter?.has(b.typeKey);
-                  return (
-                    <Box
-                      key={b.label}
-                      onClick={() => onTypeFilter?.(b.typeKey)}
-                      paddingInlineStart="2"
-                      paddingInlineEnd="2"
-                      paddingBlockStart="1"
-                      paddingBlockEnd="1"
-                      borderRadius="full"
-                      className="agentic-chip"
-                    >
-                      <HorizontalStack gap="1" blockAlign="center">
-                        <LegendDot color={b.color} active={active} />
-                        <Text variant="bodySm" color="subdued">
-                          {b.label} ({b.count})
-                        </Text>
-                      </HorizontalStack>
-                    </Box>
-                  );
-                })}
-              </HorizontalStack>
-            </VerticalStack>
-          </VerticalStack>
-        </Box>
-        <Box paddingBlockStart="4" paddingBlockEnd="4">
-          <Divider />
-        </Box>
-        <Box
-          paddingInlineStart="5"
-          paddingInlineEnd="5"
-          paddingBlockStart="3"
-          paddingBlockEnd="4"
-        >
-          <VerticalStack gap="2">
-            <Text variant="headingSm" fontWeight="semibold">
-              Violations
-            </Text>
-            <HorizontalStack align="space-between" blockAlign="center" gap="3">
-              <HorizontalStack gap="2" blockAlign="baseline">
-                <Text variant="heading2xl" as="p">
-                  {totalV}
-                </Text>
-                {violDelta > 0 && (
-                  <Text variant="bodySm" color="critical">
-                    +{violDelta}
-                  </Text>
-                )}
-              </HorizontalStack>
-              <HighchartsReact
-                highcharts={Highcharts}
-                options={violChartOpts}
-              />
-            </HorizontalStack>
-            <VerticalStack gap="2">
-              {totalV > 0 && <SegmentBar segments={violBreakdown} />}
-              <HorizontalStack gap="3" wrap>
-                {violBreakdown.map((b) => {
-                  const active = activeViolSevFilter?.has(b.key);
-                  return (
-                    <Box
-                      key={b.label}
-                      onClick={() => onViolSevFilter?.(b.key)}
-                      paddingInlineStart="2"
-                      paddingInlineEnd="2"
-                      paddingBlockStart="1"
-                      paddingBlockEnd="1"
-                      borderRadius="full"
-                      className="agentic-chip"
-                    >
-                      <HorizontalStack gap="1" blockAlign="center">
-                        <LegendDot color={b.color} active={active} />
-                        <Text variant="bodySm" color="subdued">
-                          {b.label}
-                        </Text>
-                      </HorizontalStack>
-                    </Box>
-                  );
-                })}
-              </HorizontalStack>
-            </VerticalStack>
-          </VerticalStack>
-        </Box>
-      </Card>
-
-      {/* ── Card 2: Top Used Applications ── */}
-      <Card padding="0">
-        <Box className="agentic-card">
-          <Box
-            paddingInlineStart="5"
-            paddingInlineEnd="5"
-            paddingBlockStart="4"
-            paddingBlockEnd="3"
-          >
-            <Text variant="headingSm">Top Used Applications</Text>
-          </Box>
-          <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockEnd="2">
-            <HorizontalStack align="space-between" blockAlign="center">
-              <Text variant="bodySm" color="subdued">
-                Agentic Asset
-              </Text>
-              <Box minWidth="80px">
-                <Text variant="bodySm" color="subdued" alignment="end">
-                  AI Interactions
-                </Text>
-              </Box>
-            </HorizontalStack>
-          </Box>
-          <Divider />
-          {topApps.length === 0 ? (
-            <Box padding="4">
-              <Text variant="bodySm" color="subdued">
-                No AI interaction data yet.
-              </Text>
-            </Box>
-          ) : (
-            <Box className="agentic-row-list">
-              {topApps.map((row) => (
-                <TopListRow key={row.id} onClick={() => onAssetClick?.(row)}>
-                  <HorizontalStack
-                    align="space-between"
-                    blockAlign="center"
-                    gap="2"
-                    wrap={false}
-                  >
-                    <HorizontalStack blockAlign="center" gap="2" wrap={false}>
-                      <TopSectionIcon row={row} />
-                      <Text variant="bodySm" as="span" truncate>
-                        {row.name}
-                      </Text>
-                    </HorizontalStack>
-                    <Box minWidth="80px">
-                      <Text variant="bodySm" color="subdued" alignment="end">
-                        {func.prettifyShort(row.aiInteractions)}
-                      </Text>
-                    </Box>
-                  </HorizontalStack>
-                </TopListRow>
-              ))}
-            </Box>
-          )}
-        </Box>
-      </Card>
-
-      {/* ── Card 3: Top Assets with Violations ── */}
-      <Card padding="0">
-        <Box className="agentic-card">
-          <Box
-            paddingInlineStart="5"
-            paddingInlineEnd="5"
-            paddingBlockStart="4"
-            paddingBlockEnd="3"
-          >
-            <Text variant="headingSm">Top Assets with Violations</Text>
-          </Box>
-          <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockEnd="2">
-            <HorizontalStack align="space-between" blockAlign="center">
-              <Text variant="bodySm" color="subdued">
-                Agentic Asset
-              </Text>
-              <Box minWidth="120px">
-                <Text variant="bodySm" color="subdued" alignment="end">
-                  Violations
-                </Text>
-              </Box>
-            </HorizontalStack>
-          </Box>
-          <Divider />
-          {topViolations.length === 0 ? (
-            <Box padding="4">
-              <Text variant="bodySm" color="subdued">
-                No violations
-              </Text>
-            </Box>
-          ) : (
-            <Box className="agentic-row-list">
-              {topViolations.map((row, i) => (
-                <TopListRow key={row.id} onClick={() => onAssetClick?.(row)}>
-                  <HorizontalStack
-                    align="space-between"
-                    blockAlign="center"
-                    gap="2"
-                    wrap={false}
-                  >
-                    <HorizontalStack blockAlign="center" gap="2" wrap={false}>
-                      <TopSectionIcon row={row} />
-                      <Text variant="bodySm" as="span" truncate>
-                        {row.name}
-                      </Text>
-                    </HorizontalStack>
-                    <Box minWidth="120px">
-                      <HorizontalStack
-                        align="end"
-                        blockAlign="center"
-                        gap="3"
-                        wrap={false}
-                      >
-                        <Text variant="bodySm" color="subdued">
-                          {row.totalV}
-                        </Text>
-                        <Box width="80px" minHeight="28px">
-                          <HighchartsReact
-                            key={`viol-chart-${row.id}`}
-                            highcharts={Highcharts}
-                            options={topViolOpts[i]}
-                          />
-                        </Box>
-                      </HorizontalStack>
-                    </Box>
-                  </HorizontalStack>
-                </TopListRow>
-              ))}
-            </Box>
-          )}
-        </Box>
-      </Card>
-    </HorizontalGrid>
-  );
-}
 
 // ─── Table section ────────────────────────────────────────────────────────────
 
@@ -1059,49 +457,131 @@ export default function AgenticAssetsPage() {
     />
   );
 
-  if (loading) {
-    return (
-      <PageWithMultipleCards
-        title={pageTitle}
-        isFirstPage={true}
-        secondaryActions={headerActions}
-        components={[<SpinnerCentered key="loading" />]}
-      />
-    );
-  }
+  const handleTypeFilter = useCallback(
+    (t) =>
+      setTypeFilter((prev) => {
+        const next = new Set(prev);
+        if (next.has(t)) next.delete(t);
+        else next.add(t);
+        return next;
+      }),
+    [],
+  );
 
-  return (
-    <PageWithMultipleCards
-      title={pageTitle}
-      isFirstPage={true}
-      secondaryActions={headerActions}
-      components={[
-        <TopSection
-          key="top"
-          agenticFlatData={agenticFlatData}
-          violationRows={agenticViolationRows}
-          startTimestamp={startTimestamp}
-          endTimestamp={endTimestamp}
-          onTypeFilter={(t) =>
-            setTypeFilter((prev) => {
-              const next = new Set(prev);
-              if (next.has(t)) next.delete(t);
-              else next.add(t);
-              return next;
-            })
-          }
-          activeTypeFilter={typeFilter}
-          onViolSevFilter={(sev) =>
-            setViolSevFilter((prev) => {
-              const next = new Set(prev);
-              if (next.has(sev)) next.delete(sev);
-              else next.add(sev);
-              return next;
-            })
-          }
-          activeViolSevFilter={violSevFilter}
-          onAssetClick={setFlyout}
-        />,
+  const handleViolSevFilter = useCallback(
+    (sev) =>
+      setViolSevFilter((prev) => {
+        const next = new Set(prev);
+        if (next.has(sev)) next.delete(sev);
+        else next.add(sev);
+        return next;
+      }),
+    [],
+  );
+
+  const topAppsRows = useMemo(
+    () =>
+      [...agenticFlatData]
+        .filter((r) => r.aiInteractions > 0)
+        .sort((a, b) => b.aiInteractions - a.aiInteractions)
+        .slice(0, 5)
+        .map((row) => ({
+          ...row,
+          onClick: setFlyout,
+          renderValue: (r) => (
+            <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
+              <Box minHeight="28px">
+                <Text variant="bodySm" color="subdued" alignment="end">
+                  {func.prettifyShort(r.aiInteractions)}
+                </Text>
+              </Box>
+            </HorizontalStack>
+          ),
+        })),
+    [agenticFlatData, setFlyout],
+  );
+
+  const agenticCollectionViolRows = useMemo(() => {
+    const ids = new Set();
+    agenticFlatData.forEach((r) =>
+      (r.collectionIds || []).forEach((id) => ids.add(Number(id))),
+    );
+    return agenticViolationRows.filter((v) => ids.has(Number(v.apiCollectionId)));
+  }, [agenticFlatData, agenticViolationRows]);
+
+  const topViolRows = useMemo(
+    () =>
+      [...agenticFlatData]
+        .map((r) => {
+          const v = r.violations;
+          const totalV = v
+            ? (v.critical || 0) + (v.high || 0) + (v.medium || 0) + (v.low || 0)
+            : 0;
+          return { ...r, totalV };
+        })
+        .filter((r) => r.totalV > 0)
+        .sort((a, b) => b.totalV - a.totalV)
+        .slice(0, 5)
+        .map((row) => {
+          const collectionIdSet = new Set((row.collectionIds || []).map(Number));
+          const assetViolRows = agenticCollectionViolRows.filter((v) =>
+            collectionIdSet.has(Number(v.apiCollectionId)),
+          );
+          const series = cumulativeByMonth(
+            assetViolRows,
+            (v) => v.timeEpoch || 0,
+            startTimestamp,
+            endTimestamp,
+          );
+          return {
+            ...row,
+            onClick: setFlyout,
+            renderValue: (r) => (
+              <HorizontalStack align="end" blockAlign="center" gap="3" wrap={false}>
+                <Text variant="bodySm" color="subdued">{r.totalV}</Text>
+                <SmoothAreaChart
+                  tickPositions={series.counts}
+                  color="#EF4444"
+                  height={28}
+                  width={100}
+                  labels={series.labels}
+                  enableHover
+                />
+              </HorizontalStack>
+            ),
+          };
+        }),
+    [agenticFlatData, agenticCollectionViolRows, startTimestamp, endTimestamp, setFlyout],
+  );
+
+  const pageComponents = useMemo(
+    () => {
+      if (loading) return [<SpinnerCentered key="loading" />];
+      return [
+        <HorizontalGrid key="top-row" columns={3} gap="4">
+          <AgenticStatsCard
+            agenticFlatData={agenticFlatData}
+            violationRows={agenticViolationRows}
+            startTimestamp={startTimestamp}
+            endTimestamp={endTimestamp}
+            onTypeFilter={handleTypeFilter}
+            activeTypeFilter={typeFilter}
+            onViolSevFilter={handleViolSevFilter}
+            activeViolSevFilter={violSevFilter}
+          />
+          <AgenticTopListCard
+            title="Top Used Applications"
+            columns={[{ label: "Agentic Asset" }, { label: "AI Interactions" }]}
+            rows={topAppsRows}
+            emptyStateText="No AI interaction data yet."
+          />
+          <AgenticTopListCard
+            title="Top Assets with Violations"
+            columns={[{ label: "Agentic Asset" }, { label: "Violations" }]}
+            rows={topViolRows}
+            emptyStateText="No violations"
+          />
+        </HorizontalGrid>,
         <TableSection
           key="table"
           agenticTreeData={agenticTreeData}
@@ -1112,7 +592,32 @@ export default function AgenticAssetsPage() {
           flyout={flyout}
           setFlyout={setFlyout}
         />,
-      ]}
+      ];
+    },
+    [
+      loading,
+      agenticFlatData,
+      agenticViolationRows,
+      agenticTreeData,
+      assetDevices,
+      startTimestamp,
+      endTimestamp,
+      typeFilter,
+      violSevFilter,
+      flyout,
+      topAppsRows,
+      topViolRows,
+      handleTypeFilter,
+      handleViolSevFilter,
+    ],
+  );
+
+  return (
+    <PageWithMultipleCards
+      title={pageTitle}
+      isFirstPage={true}
+      secondaryActions={headerActions}
+      components={pageComponents}
     />
   );
 }

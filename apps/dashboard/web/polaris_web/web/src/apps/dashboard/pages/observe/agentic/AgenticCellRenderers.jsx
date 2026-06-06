@@ -1,15 +1,12 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { Badge, Box, HorizontalStack, Text, Tooltip } from "@shopify/polaris";
-import MCPIcon from "@/assets/MCP_Icon.svg";
 import McpRedIcon from "@/assets/McpRedIcon.svg";
 import PersonLockIcon from "@/assets/PersonLockIcon.svg";
-import LaptopIcon from "@/assets/Laptop.svg";
-import SkillIcon from "@/assets/Skill.svg";
 import MaliciousSkillIcon from "@/assets/MaliciousSkill.svg";
 import observeFunc from "../transform";
 import { getRiskLevel } from "./agenticPageBuilders";
-import { getDomainForFavicon } from "./mcpClientHelper";
+import AssetIcon from "./AssetIcon";
 import { TypeBadge } from "@/apps/dashboard/components/tables/rows/AgGridRow";
 import "../../../components/layouts/style.css";
 
@@ -80,21 +77,6 @@ export function ParamDescCellRenderer({ data }) {
 // Extracted from AgenticAssetsPage to keep that page lean. Inline styles are the AG
 // Grid cell-renderer exception (grid sandbox — Polaris tokens don't reach in).
 
-function AgentIconImg({ data }) {
-    if (!data) return null;
-    const size = 20;
-    if (data.type === "MCP Server") {
-        return <img src={MCPIcon} width={size} height={size} alt="" style={{ flexShrink: 0, borderRadius: 3 }} />;
-    }
-    if (data.type === "Skill") {
-        return <img src={SkillIcon} width={size} height={size} alt="" style={{ flexShrink: 0 }} />;
-    }
-    const domain = getDomainForFavicon(data.assetTagValue);
-    if (domain) {
-        return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={size} height={size} alt="" style={{ flexShrink: 0, borderRadius: 3 }} />;
-    }
-    return <img src={LaptopIcon} width={size} height={size} alt="" style={{ flexShrink: 0 }} />;
-}
 
 function MarkerIcon({ src, label, size = 28 }) {
     return (
@@ -115,7 +97,7 @@ export function AssetNameCellRenderer({ data }) {
     const showMalicious = data.isMalicious && isSkill;
     return (
         <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-            <AgentIconImg data={data} />
+            <AssetIcon type={data.type} assetTagValue={data.assetTagValue} />
             <Box width="100%" overflowX="hidden">
                 <Text variant="bodyMd" fontWeight="medium" truncate>{data.name}</Text>
             </Box>
