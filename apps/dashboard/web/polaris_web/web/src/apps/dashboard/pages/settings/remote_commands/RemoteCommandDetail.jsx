@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
     Badge, Button, Text, LegacyCard,
     VerticalStack, HorizontalStack,
-    Spinner, Banner, Box, Tooltip, Divider
+    Spinner, Banner, Box, Tooltip
 } from '@shopify/polaris'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
@@ -134,15 +134,26 @@ function ExpandedOutput({ exec }) {
         )
     }
 
+    const stdoutHasContent = stdout && stdout.trim()
+    const stderrHasContent = stderr && stderr.trim()
+    const showBothColumns = stdoutHasContent && stderrHasContent
+
     return (
         <Box padding="4" background="bg-surface-secondary">
             <VerticalStack gap="4">
                 {explanation && <Text color="subdued">{explanation}</Text>}
                 {!(explanation && bothEmpty) && (
-                    <HorizontalStack gap="4" wrap={false} align="start">
-                        <Box width="50%"><OutputBox label="STDOUT" content={stdout} /></Box>
-                        <Box width="50%"><OutputBox label="STDERR" content={stderr} /></Box>
-                    </HorizontalStack>
+                    showBothColumns ? (
+                        <div style={{ display: 'flex', gap: '16px', width: '100%', alignItems: 'flex-start' }}>
+                            <div style={{ flex: 1, minWidth: 0 }}><OutputBox label="STDOUT" content={stdout} /></div>
+                            <div style={{ flex: 1, minWidth: 0 }}><OutputBox label="STDERR" content={stderr} /></div>
+                        </div>
+                    ) : (
+                        <VerticalStack gap="3">
+                            <OutputBox label="STDOUT" content={stdout} />
+                            <OutputBox label="STDERR" content={stderr} />
+                        </VerticalStack>
+                    )
                 )}
             </VerticalStack>
         </Box>
@@ -276,12 +287,18 @@ function RemoteCommandDetail() {
         return {
             id: exec.execId || String(Math.random()),
             name: exec.execId || String(Math.random()),  // collapsible state key
-            deviceIdText: exec.deviceId || '—',
+            deviceIdText: exec.deviceId || '--',
             statusComp: executionStatusBadge(exec),
-            exitText: exec.exitCode != null ? String(exec.exitCode) : '—',
-            durationText: exec.durationMs != null ? `${exec.durationMs}ms` : '—',
-            updatedText: exec.executedAt ? func.prettifyEpoch(Math.floor(exec.executedAt / 1000)) : '—',
-            collapsibleRow: canExpand ? <ExpandedOutput exec={exec} /> : null,
+            exitText: exec.exitCode != null && exec.exitCode !== -1 ? String(exec.exitCode) : '--',
+            durationText: exec.durationMs != null && exec.durationMs > 0 ? `${exec.durationMs}ms` : '--',
+            updatedText: exec.executedAt ? func.prettifyEpoch(exec.executedAt) : '--',
+            collapsibleRow: canExpand ? (
+                <tr>
+                    <td colSpan={EXEC_HEADERS.length} style={{ padding: 0, width: '100%' }}>
+                        <ExpandedOutput exec={exec} />
+                    </td>
+                </tr>
+            ) : null,
         }
     })
 

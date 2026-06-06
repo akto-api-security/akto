@@ -352,7 +352,7 @@ function RemoteCommands() {
         targetText: formatTarget(cmd.targetType, cmd.targetDeviceIds),
         createdAtFormatted: cmd.createdAt
             ? func.prettifyEpoch(Math.floor(cmd.createdAt / 1000))
-            : '—',
+            : '--',
         progressText: `${cmd.executionSummary?.completed || 0} / ${cmd.executionSummary?.total || 0}`,
         statusBadge: commandStatusBadge(cmd.status),
         _commandId: cmd.commandId,
