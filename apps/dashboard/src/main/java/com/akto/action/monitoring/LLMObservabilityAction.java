@@ -2,6 +2,8 @@ package com.akto.action.monitoring;
 
 import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.elasticsearch.ElasticSearchClient;
 import com.akto.utils.elasticsearch.ElasticSearchClient.SearchResult;
 import com.opensymphony.xwork2.Action;
@@ -20,6 +22,8 @@ import java.util.Map;
 
 public class LLMObservabilityAction extends UserAction {
 
+    private static final LoggerMaker logger = new LoggerMaker(LLMObservabilityAction.class, LogDb.DASHBOARD);
+
     @Setter private int    startTime;
     @Setter private int    endTime;
     @Setter private String searchString;
@@ -29,6 +33,7 @@ public class LLMObservabilityAction extends UserAction {
     @Setter private int    sortOrder   = 1;
     @Setter private String sessionId;
     @Setter private String userName;
+    @Setter private String deviceId;
     @Setter private String serviceId;
     @Setter private String traceId;
     @Setter private String searchAfterJson;
@@ -51,9 +56,12 @@ public class LLMObservabilityAction extends UserAction {
             if (!es.isConfigured()) return Action.SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
-            JSONObject filteredQuery = new JSONObject().put("bool", new JSONObject()
-                .put("must", es.buildBaseQuery(accountId, startMs(), endMs(), null, null).getJSONObject("bool").getJSONArray("must"))
-                .put("must_not", new JSONArray().put(new JSONObject().put("term", new JSONObject().put("sessionIdentifier.keyword", "")))));
+            Map<String, String> extraFilters = buildExtraFilters(true);
+            JSONObject baseQ = es.buildBaseQuery(accountId, startMs(), endMs(), extraFilters.isEmpty() ? null : extraFilters, null);
+            JSONArray mustArr = baseQ.getJSONObject("bool").getJSONArray("must");
+            mustArr.put(new JSONObject().put("exists", new JSONObject().put("field", "sessionIdentifier")));
+
+            JSONObject filteredQuery = new JSONObject().put("bool", new JSONObject().put("must", mustArr));
 
             JSONObject subAggs = new JSONObject()
                 .put("latestTimestamp", new JSONObject().put("max", new JSONObject().put("field", "timestamp")))
@@ -63,50 +71,44 @@ public class LLMObservabilityAction extends UserAction {
                 .put("firstHit", new JSONObject().put("top_hits", new JSONObject()
                     .put("size", 1)
                     .put("sort", new JSONArray().put(new JSONObject().put("timestamp", new JSONObject().put("order", "asc"))))
-                    .put("_source", new JSONArray().put("queryPayload").put("serviceId").put("userName").put("sessionIdentifier"))));
+                    .put("_source", new JSONArray().put("queryPayload").put("serviceId").put("userName").put("deviceId").put("sessionIdentifier"))));
 
             JSONObject aggs = new JSONObject().put("groups", new JSONObject()
-                .put("terms", new JSONObject().put("field", "sessionIdentifier.keyword").put("size", 200)
+                .put("terms", new JSONObject().put("field", "sessionIdentifier.keyword").put("size", 20)
                     .put("order", new JSONObject().put("latestTimestamp", "desc")))
                 .put("aggs", subAggs));
 
             JSONObject aggsResult = es.aggregate(filteredQuery, aggs);
             sessions = parseBuckets(aggsResult, "sessionIdentifier");
         } catch (Exception e) {
+            logger.error("fetchSessions error: " + e.getMessage());
             sessions = new ArrayList<>();
         }
         return Action.SUCCESS.toUpperCase();
     }
-
-    // ── Per-message view (grouped by traceId) ─────────────────────────────────
-
     public String fetchMessages() {
         try {
             ElasticSearchClient es = ElasticSearchClient.instance();
             if (!es.isConfigured()) return Action.SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
-            Map<String, String> extraFilters = null;
-            if (sessionId != null && !sessionId.trim().isEmpty()) {
-                extraFilters = new HashMap<>();
-                extraFilters.put("sessionIdentifier.keyword", sessionId.trim());
-            }
-            JSONObject baseQ = es.buildBaseQuery(accountId, startMs(), endMs(), extraFilters, null);
+            Map<String, String> extraFilters = buildExtraFilters(true);
+            JSONObject baseQ = es.buildBaseQuery(accountId, startMs(), endMs(), extraFilters.isEmpty() ? null : extraFilters, null);
+            JSONArray mustArr = baseQ.getJSONObject("bool").getJSONArray("must");
+            mustArr.put(new JSONObject().put("exists", new JSONObject().put("field", "traceId")));
 
-            JSONObject filteredQuery = new JSONObject().put("bool", new JSONObject()
-                .put("must", baseQ.getJSONObject("bool").getJSONArray("must"))
-                .put("must_not", new JSONArray().put(new JSONObject().put("term", new JSONObject().put("traceId.keyword", "")))));
+            JSONObject filteredQuery = new JSONObject().put("bool", new JSONObject().put("must", mustArr));
 
             JSONObject subAggs = new JSONObject()
                 .put("latestTimestamp", new JSONObject().put("max", new JSONObject().put("field", "timestamp")))
                 .put("inTokens",  new JSONObject().put("sum", new JSONObject().put("field", "inputTokens")))
                 .put("outTokens", new JSONObject().put("sum", new JSONObject().put("field", "outputTokens")))
-                .put("spanCount", new JSONObject().put("value_count", new JSONObject().put("field", "_id")))
+                .put("spanCount", new JSONObject().put("value_count", new JSONObject().put("field", "spanId.keyword")))
                 .put("firstHit", new JSONObject().put("top_hits", new JSONObject()
                     .put("size", 1)
                     .put("sort", new JSONArray().put(new JSONObject().put("timestamp", new JSONObject().put("order", "asc"))))
                     .put("_source", new JSONArray().put("queryPayload").put("responsePayload")
-                        .put("serviceId").put("userName").put("sessionIdentifier").put("traceId"))));
+                        .put("serviceId").put("userName").put("deviceId").put("sessionIdentifier").put("traceId"))));
 
             JSONObject aggs = new JSONObject().put("groups", new JSONObject()
                 .put("terms", new JSONObject().put("field", "traceId.keyword").put("size", 500)
@@ -116,6 +118,7 @@ public class LLMObservabilityAction extends UserAction {
             JSONObject aggsResult = es.aggregate(filteredQuery, aggs);
             messages = parseBuckets(aggsResult, "traceId");
         } catch (Exception e) {
+            logger.error("fetchMessages error: " + e.getMessage());
             messages = new ArrayList<>();
         }
         return Action.SUCCESS.toUpperCase();
@@ -172,11 +175,13 @@ public class LLMObservabilityAction extends UserAction {
             JSONObject query = es.buildBaseQuery(accountId, startMs(), endMs(), null, null);
             JSONObject aggs = new JSONObject()
                 .put("userName",  new JSONObject().put("terms", new JSONObject().put("field", "userName.keyword").put("size", 500)))
+                .put("deviceId",  new JSONObject().put("terms", new JSONObject().put("field", "deviceId.keyword").put("size", 500)))
                 .put("serviceId", new JSONObject().put("terms", new JSONObject().put("field", "serviceId.keyword").put("size", 500)));
 
             JSONObject aggsResult = es.aggregate(query, aggs);
             filterChoices = new HashMap<>();
             filterChoices.put("userName",  extractBucketKeys(aggsResult, "userName"));
+            filterChoices.put("deviceId",  extractBucketKeys(aggsResult, "deviceId"));
             filterChoices.put("serviceId", extractBucketKeys(aggsResult, "serviceId"));
         } catch (Exception e) {
             filterChoices = new HashMap<>();
@@ -248,6 +253,7 @@ public class LLMObservabilityAction extends UserAction {
                         row.put("responsePayload",   src.optString("responsePayload", ""));
                         row.put("serviceId",         src.optString("serviceId", ""));
                         row.put("userName",          src.optString("userName", ""));
+                        row.put("deviceId",          src.optString("deviceId", ""));
                         row.put("sessionIdentifier", src.optString("sessionIdentifier", ""));
                         row.put("traceId",           src.optString("traceId", ""));
                     }
@@ -288,6 +294,16 @@ public class LLMObservabilityAction extends UserAction {
             case "serviceId":  return "serviceId.keyword";
             default:           return "timestamp";
         }
+    }
+
+    private Map<String, String> buildExtraFilters(boolean includeSession) {
+        Map<String, String> f = new HashMap<>();
+        if (includeSession && sessionId != null && !sessionId.trim().isEmpty())
+            f.put("sessionIdentifier.keyword", sessionId.trim());
+        if (userName  != null && !userName.trim().isEmpty())  f.put("userName.keyword",  userName.trim());
+        if (deviceId  != null && !deviceId.trim().isEmpty())  f.put("deviceId.keyword",  deviceId.trim());
+        if (serviceId != null && !serviceId.trim().isEmpty()) f.put("serviceId.keyword", serviceId.trim());
+        return f;
     }
 
     private static String trimTrailingSlash(String s) {
