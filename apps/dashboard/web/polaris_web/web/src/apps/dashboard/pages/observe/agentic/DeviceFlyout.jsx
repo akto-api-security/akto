@@ -1,13 +1,12 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider } from "@shopify/polaris";
-import ReactFlow, { Background, Controls } from "react-flow-renderer";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AgenticFlyoutShell from "./AgenticFlyoutShell";
 import AiChatSection from "./AiChatSection";
 import { TypeBadge, SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import { getRiskLabel } from "./agenticPageBuilders";
-import { TOPO_NODE_TYPES } from "./AssetTopologyGraph";
+import AssetTopologyGraph from "./AssetTopologyGraph";
 import { RiskFactorRow } from "./RiskFactorRow";
 import DetailGrid from "./DetailGrid";
 import agenticObserveApi, { buildAgenticObserveChatMetadata } from "./agenticObserveApi";
@@ -283,31 +282,7 @@ function TopologyGraph({ device, agents }) {
         return { nodes: ns, edges: es };
     }, [agents, device.endpoint]);
 
-    // Fixed-size container — ReactFlow's fitView + zoom handles overflow
-    return (
-        <Box style={{ height: 280, borderRadius: 8, border: "1px solid #e1e5e9", overflow: "hidden", background: "#f8fafc" }}>
-            <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                nodeTypes={TOPO_NODE_TYPES}
-                fitView
-                fitViewOptions={{ padding: 0.2 }}
-                onInit={api => api.fitView({ padding: 0.2 })}
-                minZoom={0.2}
-                maxZoom={2}
-                nodesDraggable={false}
-                nodesConnectable={false}
-                elementsSelectable={false}
-                zoomOnScroll
-                zoomOnPinch
-                panOnDrag
-                preventScrolling={false}
-            >
-                <Background color="#e1e5e9" gap={16} />
-                <Controls showInteractive={false} />
-            </ReactFlow>
-        </Box>
-    );
+    return <AssetTopologyGraph nodes={nodes} edges={edges} />;
 }
 
 // ─── Overview tab ─────────────────────────────────────────────────────────────

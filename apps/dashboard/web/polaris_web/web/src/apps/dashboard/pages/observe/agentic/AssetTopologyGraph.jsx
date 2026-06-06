@@ -70,7 +70,34 @@ export const TOPO_NODE_TYPES = { topoNode: TopoNode };
 const GRAPH_HEIGHT = 280;
 const NODE_H       = 84;
 
-export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [] }) {
+export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], nodes: externalNodes, edges: externalEdges }) {
+    if (externalNodes && externalEdges) {
+        return (
+            <Box style={{ height: GRAPH_HEIGHT, borderRadius: 8, border: "1px solid #E1E5E9", overflow: "hidden", background: "#F8FAFC" }}>
+                <ReactFlow
+                    nodes={externalNodes}
+                    edges={externalEdges}
+                    nodeTypes={TOPO_NODE_TYPES}
+                    fitView
+                    fitViewOptions={{ padding: 0.2 }}
+                    onInit={api => api.fitView({ padding: 0.2 })}
+                    minZoom={0.2}
+                    maxZoom={2}
+                    nodesDraggable={false}
+                    nodesConnectable={false}
+                    elementsSelectable={false}
+                    zoomOnScroll
+                    zoomOnPinch
+                    panOnDrag
+                    preventScrolling={false}
+                >
+                    <Background color="#E1E5E9" gap={16} />
+                    <Controls showInteractive={false} />
+                </ReactFlow>
+            </Box>
+        );
+    }
+
     const { nodes, edges } = useMemo(() => {
         const devices = assetDevices[asset.id] || [];
 
