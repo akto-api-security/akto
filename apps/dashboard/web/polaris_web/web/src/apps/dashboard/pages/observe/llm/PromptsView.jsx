@@ -27,9 +27,9 @@ export default function PromptsView({ currDateRange }) {
 
     // Called by AgGridTable whenever filter/sort/page changes.
     // Must return the promise so AgGridTable can read total from the result.
-    const onServerFetch = useCallback(({ filters, sortKey, sortOrder, skip, limit, searchAfterJson }) => {
+    const onServerFetch = useCallback(({ filters, sortKey, sortOrder, skip, limit, searchAfterJson, searchString }) => {
         const { since, until } = getEpochs();
-        return api.searchPrompts({ startTime: since, endTime: until, filters, sortKey, sortOrder, skip, limit, searchAfterJson })
+        return api.searchPrompts({ startTime: since, endTime: until, filters, sortKey, sortOrder, skip, limit, searchAfterJson, searchString })
             .then(result => {
                 setRows(result?.value || []);
                 return result;
@@ -38,22 +38,19 @@ export default function PromptsView({ currDateRange }) {
 
     return (
         <>
-            <div style={{ height: "calc(100vh - 220px)", minHeight: 0, display: "flex", flexDirection: "column" }}>
-                <AgGridTable
-                    rowData={rows}
-                    columnDefs={columnDefs}
-                    fillHeight
-                    searchPlaceholder="Search by user, service, or prompt content..."
-                    rowSelection="single"
-                    pagination
-                    paginationPageSize={20}
-                    noOuterBorder
-                    onRowClicked={p => setSelectedPrompt(p.data)}
-                    onServerFetch={onServerFetch}
-                    filterStateUrl={window.location.pathname + "/llm-prompts"}
-                    defaultColDef={{ resizable: true, sortable: false, filter: false }}
-                />
-            </div>
+            <AgGridTable
+                rowData={rows}
+                columnDefs={columnDefs}
+                searchPlaceholder="Search in prompt content"
+                rowSelection="single"
+                pagination
+                paginationPageSize={20}
+                noOuterBorder
+                onRowClicked={p => setSelectedPrompt(p.data)}
+                onServerFetch={onServerFetch}
+                filterStateUrl={window.location.pathname + "/llm-prompts"}
+                defaultColDef={{ resizable: true, sortable: false, filter: false }}
+            />
             <PromptDetailModal prompt={selectedPrompt} onClose={() => setSelectedPrompt(null)} />
         </>
     );

@@ -1,23 +1,24 @@
 import React from "react";
 import { HorizontalStack, Box, Text, Badge } from "@shopify/polaris";
-import { TYPE_STYLES } from "@/apps/dashboard/pages/observe/agentic/agenticStyles";
 
-const TONE_MAP = {
-    "#F0FDF4": "success",
-    "#FFF7ED": "warning",
-    "#FEF2F2": "critical",
-    "#EFF6FF": "info",
-    "#F5F3FF": "new",
-};
-
-function TypeBadge({ type }) {
+function TypeBadge({ type, tone = "new" }) {
     if (!type) return null;
-    const s = TYPE_STYLES[type] || { bg: "#F3F4F6", color: "#374151", border: "#E5E7EB" };
-    const tone = TONE_MAP[s.bg] || "new";
     return <Badge tone={tone}>{type}</Badge>;
 }
 
-export default function AgGridRow({ icon, label, typeBadge, childCount, warning, isBold = false }) {
+export function AgGridRowRenderer(params) {
+    // AG Grid auto-merges cellRendererParams into params
+    const label      = params.getLabel      ? params.getLabel(params)      : params.value;
+    const icon       = params.getIcon       ? params.getIcon(params)       : undefined;
+    const typeBadge  = params.getTypeBadge  ? params.getTypeBadge(params)  : undefined;
+    const childCount = params.getChildCount ? params.getChildCount(params) : undefined;
+    const warning    = params.getWarning    ? params.getWarning(params)    : undefined;
+    const isBold     = params.isBold        ?? false;
+    const typeBadgeTone = params.typeBadgeTone ?? "new";
+    return <AgGridRow icon={icon} label={label} typeBadge={typeBadge} typeBadgeTone={typeBadgeTone} childCount={childCount} warning={warning} isBold={isBold} />;
+}
+
+export default function AgGridRow({ icon, label, typeBadge, typeBadgeTone = "new", childCount, warning, isBold = false }) {
     return (
         <HorizontalStack gap="2" blockAlign="center" wrap={false}>
             {icon && <Box>{icon}</Box>}
@@ -29,7 +30,7 @@ export default function AgGridRow({ icon, label, typeBadge, childCount, warning,
             >
                 {label}
             </Text>
-            {typeBadge && <TypeBadge type={typeBadge} />}
+            {typeBadge && <TypeBadge type={typeBadge} tone={typeBadgeTone} />}
             {childCount > 0 && (
                 <Badge tone="new">{String(childCount)}</Badge>
             )}
