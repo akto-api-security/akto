@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { Badge, Box, HorizontalStack, Scrollable, Spinner, Text, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, Scrollable, Spinner, Text, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import api from "./api";
 import { enrichRow } from "./utils";
-import { truncate } from "./constants";
 import PromptDetailModal from "./PromptDetailModal";
+import ChatMessage from "../../testing/TestRunResultPage/components/ChatMessage";
 
 export default function SpansPanel({ traceId }) {
     const [spans, setSpans] = useState([]);
@@ -62,9 +62,10 @@ export default function SpansPanel({ traceId }) {
 
 export function SpanFlowRow({ span, index, isLast, onExpand }) {
     const tokens = (span._inputTokens || 0) + (span._outputTokens || 0);
+    const spanTimestamp = Math.floor((span.timestamp || 0) / 1000);
 
     return (
-        <div style={{ display: "flex", gap: 0 }}>
+        <div style={{ display: "flex", gap: 0, marginBottom: isLast ? 0 : 24 }}>
             {/* Connector column */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 32, flexShrink: 0 }}>
                 <div style={{
@@ -87,50 +88,50 @@ export function SpanFlowRow({ span, index, isLast, onExpand }) {
             </div>
 
             {/* Span card */}
-            <Box
-                background="bg-surface-secondary"
-                borderRadius="2"
-                padding="4"
-                style={{ flex: 1, marginBottom: isLast ? 0 : 12, cursor: "pointer" }}
-                onClick={onExpand}
-            >
+            <Box style={{ flex: 1, minWidth: 0 }}>
                 <VerticalStack gap="2">
-                    {/* Span meta */}
+                    {/* Span meta header */}
                     <HorizontalStack align="space-between" blockAlign="center">
                         <HorizontalStack gap="2" blockAlign="center">
                             <Badge tone="info">{"Span " + (index + 1)}</Badge>
                             {span.serviceId && <Badge>{span.serviceId}</Badge>}
+                            {span._model && <Badge tone="success">{span._model}</Badge>}
                         </HorizontalStack>
                         <HorizontalStack gap="2" blockAlign="center">
                             {tokens > 0 &&
                                 <Text variant="bodySm" tone="subdued">{tokens + " tok"}</Text>}
                             <Text variant="bodySm" tone="subdued">
-                                {func.prettifyEpoch(Math.floor((span.timestamp || 0) / 1000))}
+                                {func.prettifyEpoch(spanTimestamp)}
                             </Text>
+                            <Button plain monochrome onClick={onExpand}>
+                                View full detail →
+                            </Button>
                         </HorizontalStack>
                     </HorizontalStack>
 
-                    {/* Input bubble */}
+                    {/* Input rendered as ChatMessage request */}
                     {span._promptText && (
-                        <Box background="bg-surface" borderRadius="2" padding="3" borderWidth="025" borderColor="border">
-                            <VerticalStack gap="1">
-                                <Text variant="bodySm" tone="subdued" fontWeight="semibold">INPUT</Text>
-                                <Text variant="bodySm" as="p">{truncate(span._promptText, 300)}</Text>
-                            </VerticalStack>
-                        </Box>
+                        <ChatMessage
+                            type="request"
+                            content={span._promptText}
+                            timestamp={spanTimestamp}
+                            customLabel={"Span " + (index + 1) + " Input"}
+                            isCode={false}
+                            toolsMetadata={{}}
+                        />
                     )}
 
-                    {/* Output bubble */}
+                    {/* Output rendered as ChatMessage response */}
                     {span._responseText && (
-                        <Box background="bg-surface-success-default" borderRadius="2" padding="3" borderWidth="025" borderColor="border-success">
-                            <VerticalStack gap="1">
-                                <Text variant="bodySm" tone="subdued" fontWeight="semibold">OUTPUT</Text>
-                                <Text variant="bodySm" as="p">{truncate(span._responseText, 300)}</Text>
-                            </VerticalStack>
-                        </Box>
+                        <ChatMessage
+                            type="response"
+                            content={span._responseText}
+                            timestamp={spanTimestamp}
+                            customLabel={"Span " + (index + 1) + " Output"}
+                            isCode={false}
+                            toolsMetadata={{}}
+                        />
                     )}
-
-                    <Text variant="bodySm" tone="subdued" alignment="end">Click to view full detail →</Text>
                 </VerticalStack>
             </Box>
         </div>

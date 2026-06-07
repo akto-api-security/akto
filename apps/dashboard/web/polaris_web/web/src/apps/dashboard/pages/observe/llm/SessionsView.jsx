@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { Badge, Box, Button, DataTable, HorizontalStack, Link, Text, VerticalStack } from "@shopify/polaris";
-import { ArrowLeftMinor } from "@shopify/polaris-icons";
+import { Badge, Box, DataTable, HorizontalStack, Link, Text, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import api from "./api";
 import { enrichRow } from "./utils";
-import { truncate, MESSAGE_COLUMN_DEFS } from "./constants";
-import SpansPanel from "./SpansPanel";
+import { MESSAGE_COLUMN_DEFS } from "./constants";
+import SpansPanelModal from "./SpansPanelModal";
 import GridRows from "../../../components/shared/GridRows";
 import observeFunc from "../transform";
 import LLMFilterBar from "./LLMFilterBar";
@@ -31,10 +30,12 @@ export default function SessionsView({ currDateRange }) {
 
     const [messages, setMessages] = useState([]);
     const [messagesLoading, setMessagesLoading] = useState(false);
-    const [selectedMessage, setSelectedMessage] = useState(null);
 
     const [sessionInput, setSessionInput] = useState("");
     const [enumFilters, setEnumFilters] = useState({ userName: "", deviceId: "", serviceId: "" });
+
+    const [spansModalOpen, setSpansModalOpen] = useState(false);
+    const [spansModalTraceId, setSpansModalTraceId] = useState(null);
 
     const getEpochs = useCallback(() => ({
         since: Math.floor(Date.parse(currDateRange.period.since) / 1000),
@@ -45,7 +46,6 @@ export default function SessionsView({ currDateRange }) {
         const { since, until } = getEpochs();
         setLoading(true);
         setSelectedSession(null);
-        setSelectedMessage(null);
         try {
             const rows = await api.fetchSessions(since, until, {
                 sessionId: sessionInput.trim(),
@@ -66,7 +66,6 @@ export default function SessionsView({ currDateRange }) {
         const { since, until } = getEpochs();
         let cancelled = false;
         setMessagesLoading(true);
-        setSelectedMessage(null);
         api.fetchMessages(since, until, { sessionId: selectedSession.sessionIdentifier })
             .then(rows => { if (!cancelled) setMessages((rows || []).map(enrichRow)); })
             .finally(() => { if (!cancelled) setMessagesLoading(false); });
@@ -93,6 +92,10 @@ export default function SessionsView({ currDateRange }) {
         value: func.prettifyEpoch(Math.floor((s.latestTimestamp || 0) / 1000)),
     }];
 
+    const handleRowClicked = (p) => {
+        setSpansModalTraceId(p.data.traceId);
+        setSpansModalOpen(true);
+    };
 
     const rightPanel = () => {
         if (!selectedSession) {
@@ -103,68 +106,47 @@ export default function SessionsView({ currDateRange }) {
             );
         }
 
-        if(messagesLoading) {
-            return <SpinnerCentered />
-        }
-
-        if (selectedMessage) {
-            return (
-                <VerticalStack gap="4">
-                    <Box padding="4" borderBlockEndWidth="025" borderColor="border">
-                        <VerticalStack gap="2">
-                            <Button plain icon={ArrowLeftMinor} onClick={() => setSelectedMessage(null)}>
-                                Back to messages
-                            </Button>
-                            <Text variant="headingSm">{truncate(selectedMessage._promptText || "", 120)}</Text>
-                            <HorizontalStack gap="3">
-                                <Text variant="bodySm" tone="subdued">
-                                    {func.prettifyEpoch(Math.floor((selectedMessage.latestTimestamp || 0) / 1000))}
-                                </Text>
-                                <Badge>{selectedMessage.spanCount + " span" + (selectedMessage.spanCount !== 1 ? "s" : "")}</Badge>
-                                {(selectedMessage.totalTokens > 0) &&
-                                    <Badge tone="info">{selectedMessage.totalTokens + " tokens"}</Badge>}
-                            </HorizontalStack>
-                        </VerticalStack>
-                    </Box>
-                    <SpansPanel traceId={selectedMessage.traceId} />
-                </VerticalStack>
-            );
+        if (messagesLoading) {
+            return <SpinnerCentered />;
         }
 
         return (
-            <VerticalStack gap="4">
-                <GridRows columns={3} items={getRowItemsForSessions(selectedSession)} CardComponent={RowComp} verticalGap="1" horizontalGap="2" />
-                <AgGridTable
-                    rowData={messages}
-                    columnDefs={MESSAGE_COLUMN_DEFS}
-                    defaultColDef={{ resizable: true, sortable: false, filter: false }}
-                    rowSelection="single"
-                    pagination={false}
-                    noOuterBorder
-                    onRowClicked={p => setSelectedMessage(p.data)}
-                />
-            </VerticalStack>
+            <Box padding="3">
+                <VerticalStack gap="4">
+                    <GridRows columns={3} items={getRowItemsForSessions(selectedSession)} CardComponent={RowComp} verticalGap="1" horizontalGap="2" />
+                    <AgGridTable
+                        rowData={messages}
+                        columnDefs={MESSAGE_COLUMN_DEFS}
+                        defaultColDef={{ resizable: true, sortable: false, filter: false }}
+                        rowSelection="single"
+                        pagination={true}
+                        noOuterBorder
+                        onRowClicked={handleRowClicked}
+                        sideBar={false}
+                    />
+                </VerticalStack>
+            </Box>
         );
     };
 
     const renderSessionRow = (s) => [
-        <Link 
+        <Link
             removeUnderline plain monochrome onClick={() => setSelectedSession(s)}>
             <Text variant="bodyMd" fontWeight="semibold" alignment="start">{s.queryPayload}</Text>
-        </Link>, 
+        </Link>,
         <Text variant="bodyMd" color="subdued" alignment="start">{func.prettifyEpoch(Math.floor((s.latestTimestamp || 0) / 1000)) || ""}</Text>
     ];
 
     return (
-        <div style={{ maxHeight: "calc(100vh - 220px)", minHeight: 0, display: "flex" }}>
+        <div style={{ maxHeight: "calc(100vh - 220px)", minHeight: 0, display: "flex", gap: 12 }}>
             <Box
                 minWidth="480px"
                 maxWidth="480px"
-                padding={"3"}
+                padding="3"
             >
-                <VerticalStack gap={"3"}>
-                    <HorizontalStack gap={"3"} wrap={false} align="space-between" blockAlign="start">
-                        <HorizontalStack gap={"1"} wrap={false}>
+                <VerticalStack gap="3">
+                    <HorizontalStack gap="3" wrap={false} align="space-between" blockAlign="start">
+                        <HorizontalStack gap="1" wrap={false}>
                             <Text variant="headingSm">Sessions</Text>
                             {sessions.length > 0 &&
                                 <Badge status="info">{String(sessions.length)}</Badge>}
@@ -178,7 +160,7 @@ export default function SessionsView({ currDateRange }) {
                             queryPlaceholder="Search by Session ID"
                         />
                     </HorizontalStack>
-                    <DataTable 
+                    <DataTable
                         headings={[]}
                         columnContentTypes={[
                             'text',
@@ -189,9 +171,15 @@ export default function SessionsView({ currDateRange }) {
                     />
                 </VerticalStack>
             </Box>
-            <Box minWidth="0" width="100%" style={{ display: "flex", flexDirection: "column" }}>
+            <Box style={{ flex: 1 }}>
                 {rightPanel()}
             </Box>
+
+            <SpansPanelModal
+                open={spansModalOpen}
+                onClose={() => setSpansModalOpen(false)}
+                traceId={spansModalTraceId}
+            />
         </div>
     );
 }
