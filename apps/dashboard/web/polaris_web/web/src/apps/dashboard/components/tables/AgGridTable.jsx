@@ -3,9 +3,19 @@ import { AgGridReact } from "ag-grid-react";
 import { themeQuartz } from "ag-grid-enterprise";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
-import { Box, HorizontalStack, Pagination, Text, VerticalStack, Button } from "@shopify/polaris";
-import { MobileCancelMajor } from "@shopify/polaris-icons";
+import { Box, HorizontalStack, Pagination, Text, VerticalStack, Button, TextField, Icon } from "@shopify/polaris";
+import { MobileCancelMajor, SearchMinor } from "@shopify/polaris-icons";
 import PersistStore from "@/apps/main/PersistStore";
+import "./rows/row.css";
+import { debounce } from 'lodash';
+import { AgGridRowRenderer } from "./rows/AgGridRow";
+import { CellType } from "./rows/GithubRow";
+
+const AG_GRID_COLUMN_TYPES = {
+    [CellType.TEXT]: { cellRenderer: "agGridRow" },
+    // CellType.ACTION: wire a dedicated cellRenderer per column — no grid-level preset
+    // CellType.COLLAPSIBLE: use AG Grid's built-in treeData/grouping instead
+};
 
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 LicenseManager.setLicenseKey(window.AG_GRID_LICENSE_KEY || "[TRIAL]_this_{AG_Charts_and_AG_Grid}_Enterprise_key_{AG-129492}_is_granted_for_evaluation_only___Use_in_production_is_not_permitted___Please_report_misuse_to_legal@ag-grid.com___For_help_with_purchasing_a_production_key_please_contact_info@ag-grid.com___You_are_granted_a_{Single_Application}_Developer_License_for_one_application_only___All_Front-End_JavaScript_developers_working_on_the_application_would_need_to_be_licensed___This_key_will_deactivate_on_{18 June 2026}____[v3]_[0102]_MTc4MTczNzIwMDAwMA==d27c8a4487e577f42d9980e95824f43c");
@@ -33,42 +43,19 @@ export const agTableTheme = themeQuartz.withParams({
     checkboxBorderRadius: 4,
 });
 
-export const agTableThemeInner = agTableTheme.withParams({
-    wrapperBorder: false,
-    wrapperBorderRadius: 0,
-});
 
 function SearchBar({ value, onChange, placeholder }) {
     return (
-        <div style={{
-            padding: "7px 12px",
-            borderBottom: "1px solid #E1E3E5",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            background: "white",
-            flexShrink: 0,
-        }}>
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-                <circle cx="9" cy="9" r="7" stroke="#8C9196" strokeWidth="1.75"/>
-                <path d="M14.5 14.5L19 19" stroke="#8C9196" strokeWidth="1.75" strokeLinecap="round"/>
-            </svg>
-            <input
-                type="text"
+        <Box padding={"2"} paddingInlineEnd={"3"} paddingInlineStart={"3"} className="ag-grid-search-bar">
+            <TextField
+                prefix={<Box><Icon source={SearchMinor} /></Box>}
                 placeholder={placeholder}
                 value={value}
-                onChange={e => onChange(e.target.value)}
-                style={{
-                    border: "none",
-                    outline: "none",
-                    flex: 1,
-                    fontSize: 13,
-                    color: "#202223",
-                    background: "transparent",
-                    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                }}
+                onChange={onChange}
+                borderless
+                autoComplete="off"
             />
-        </div>
+        </Box>
     );
 }
 
@@ -154,8 +141,6 @@ export default function AgGridTable({
     getDataPath,
     autoGroupColumnDef,
     groupDefaultExpanded,
-    height = 600,
-    fillHeight = false,
     noOuterBorder = false,
     searchPlaceholder,
     quickFilter: quickFilterProp,
@@ -163,7 +148,6 @@ export default function AgGridTable({
     rowHeight = 44,
     headerHeight = 40,
     rowSelection = "multiple",
-    suppressRowClickSelection = true,
     onRowClicked,
     onSelectionChanged,
     getRowStyle,
@@ -181,11 +165,21 @@ export default function AgGridTable({
     filterStateUrl,
     ...rest
 }) {
-    const [internalQuickFilter, setInternalQuickFilter] = useState("");
     const hasSearch = !!searchPlaceholder;
-    const quickFilter = quickFilterProp !== undefined ? quickFilterProp : internalQuickFilter;
-    const handleQuickFilterChange = onQuickFilterChange || setInternalQuickFilter;
-    const theme = (noOuterBorder || fillHeight || hasSearch) ? agTableThemeInner : agTableTheme;
+    const [searchValue, setSearchValue] = useState("");
+    const [debouncedSearchValue, setDebouncedSearchValue] = useState("");
+    const theme = agTableTheme;
+
+    const debouncedSetSearch = useRef(
+        debounce((val, serverMode) => {
+            setDebouncedSearchValue(val);
+            if (serverMode) dispatchQuery({ type: "SET_PAGE", page: 0 });
+        }, 400)
+    ).current;
+
+    useEffect(() => {
+        debouncedSetSearch(searchValue, isServerMode);
+    }, [searchValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const internalRef = useRef(null);
     const gridRef = gridRefProp || internalRef;
@@ -226,7 +220,7 @@ export default function AgGridTable({
         const searchAfterJson = (skip >= 9980 && lastSortValues.current)
             ? JSON.stringify(lastSortValues.current)
             : undefined;
-        const result = onServerFetch({ filters: query.filters, sortKey: query.sortKey, sortOrder: query.sortOrder, skip, limit: paginationPageSize, searchAfterJson });
+        const result = onServerFetch({ filters: query.filters, sortKey: query.sortKey, sortOrder: query.sortOrder, skip, limit: paginationPageSize, searchAfterJson, searchString: debouncedSearchValue.length > 3 ? debouncedSearchValue : "" });
         if (result && typeof result.then === "function") {
             result.then(r => {
                 if (r?.total !== undefined) dispatchQuery({ type: "SET_TOTAL", total: r.total });
@@ -238,7 +232,7 @@ export default function AgGridTable({
                 }
             });
         }
-    }, [query.filters, query.sortKey, query.sortOrder, query.page]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [query.filters, query.sortKey, query.sortOrder, query.page, debouncedSearchValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleFilterChanged = useCallback((e) => {
         if (!isServerMode) return;
@@ -253,16 +247,14 @@ export default function AgGridTable({
 
     // Custom pagination bar — only rendered in server mode; replaces AG Grid's built-in pagination.
     const serverPaginationBar = isServerMode && query.total > 0 ? (
-        <Box padding="3" borderBlockStartWidth="025" borderColor="border" background="bg-surface">
-            <HorizontalStack align="space-between" blockAlign="center">
-                <Text variant="bodySm" tone="subdued">
-                    {query.total === 0 ? "No results" : `${query.page * paginationPageSize + 1}–${Math.min((query.page + 1) * paginationPageSize, query.total)} of ${query.total}`}
-                </Text>
+        <Box padding="2">
+            <HorizontalStack align="center">    
                 <Pagination
                     hasPrevious={query.page > 0}
                     onPrevious={() => dispatchQuery({ type: "SET_PAGE", page: query.page - 1 })}
                     hasNext={(query.page + 1) * paginationPageSize < query.total}
                     onNext={() => dispatchQuery({ type: "SET_PAGE", page: query.page + 1 })}
+                    label={query.total === 0 ? "No results" : query.page * paginationPageSize + 1 + "-" + Math.min((query.page + 1) * paginationPageSize, query.total) + " of " + query.total}
                 />
             </HorizontalStack>
         </Box>
@@ -281,7 +273,6 @@ export default function AgGridTable({
             animateRows={animateRows}
             suppressCellFocus={suppressCellFocus}
             rowSelection={rowSelection}
-            suppressRowClickSelection={suppressRowClickSelection}
             onRowClicked={onRowClicked}
             onSelectionChanged={onSelectionChanged}
             getRowStyle={getRowStyle}
@@ -293,48 +284,25 @@ export default function AgGridTable({
             getDataPath={getDataPath}
             autoGroupColumnDef={autoGroupColumnDef}
             groupDefaultExpanded={groupDefaultExpanded}
-            quickFilterText={hasSearch ? quickFilter : undefined}
+            components={{ agGridRow: AgGridRowRenderer }}
+            columnTypes={AG_GRID_COLUMN_TYPES}
             onFilterChanged={isServerMode ? handleFilterChanged : undefined}
             onSortChanged={isServerMode ? handleSortChanged : undefined}
+            domLayout={"autoHeight"}
             {...rest}
         />
     );
 
-    if (fillHeight) {
-        return (
-            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} noRadius />
-                {hasSearch && <SearchBar value={quickFilter} onChange={handleQuickFilterChange} placeholder={searchPlaceholder} />}
-                <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-                    {gridNode}
-                </div>
-                {serverPaginationBar}
-            </div>
-        );
-    }
-
-    if (hasSearch) {
-        return (
-            <VerticalStack gap="0">
-                <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} />
-                <div style={{ height, border: "1px solid #E1E3E5", borderRadius: 8, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                    <SearchBar value={quickFilter} onChange={handleQuickFilterChange} placeholder={searchPlaceholder} />
-                    <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-                        {gridNode}
-                    </div>
-                    {serverPaginationBar}
-                </div>
-            </VerticalStack>
-        );
-    }
-
     return (
-        <VerticalStack gap="0">
-            <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} />
-            <div style={{ height, overflow: "hidden" }}>
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} noRadius />
+            {hasSearch && <SearchBar value={searchValue} onChange={(val) => {
+                setSearchValue(val);
+            }} placeholder={searchPlaceholder} />}
+            <div style={{ flex: 1, minHeight: 0}}>
                 {gridNode}
             </div>
             {serverPaginationBar}
-        </VerticalStack>
+        </div>
     );
 }

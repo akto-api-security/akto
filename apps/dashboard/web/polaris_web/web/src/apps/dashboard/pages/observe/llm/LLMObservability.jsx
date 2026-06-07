@@ -1,5 +1,5 @@
 import { useReducer, useState } from "react";
-import { Box, Tabs } from "@shopify/polaris";
+import { Card, Tabs, VerticalStack } from "@shopify/polaris";
 import { produce } from "immer";
 
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
@@ -37,14 +37,15 @@ export default function LLMObservability() {
                 />
             }
             components={[
-                <Box key="llm-layout" background="bg-surface" borderWidth="025" borderColor="border" borderRadius="2" overflow="hidden">
-                    <Box borderBlockEndWidth="025" borderColor="border">
+                <Card key={"llm-layout"} padding={2}>
+                    <VerticalStack gap={"2"}>
                         <Tabs tabs={TABS} selected={activeTab} onSelect={setActiveTab} />
-                    </Box>
-                    {activeTab === 0 && <SessionsView key="sessions" currDateRange={currDateRange} />}
-                    {activeTab === 1 && <MessagesView key="messages" currDateRange={currDateRange} />}
-                    {activeTab === 2 && <PromptsView key="prompts" currDateRange={currDateRange} />}
-                </Box>,
+                        
+                        {activeTab === 0 && <SessionsView key="sessions" currDateRange={currDateRange} />}
+                        {activeTab === 1 && <MessagesView key="messages" currDateRange={currDateRange} />}
+                        {activeTab === 2 && <PromptsView key="prompts" currDateRange={currDateRange} />}
+                    </VerticalStack>
+                </Card>
             ]}
         />
     );

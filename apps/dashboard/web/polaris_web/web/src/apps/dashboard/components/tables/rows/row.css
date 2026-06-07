@@ -30,3 +30,23 @@
 .Polaris-IndexTable {
     border-radius: unset !important;
 }
+
+.ag-grid-search-bar .Polaris-TextField--focus,
+.ag-grid-search-bar .Polaris-TextField__ConnectedItem--focus {
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background: transparent !important;
+}
+
+.ag-grid-search-bar .Polaris-TextField__Backdrop::after,
+.ag-grid-search-bar .Polaris-TextField__Backdrop::before {
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.ag-grid-search-bar .Polaris-TextField__Input:focus-visible ~ .Polaris-TextField__Backdrop::after,
+.ag-grid-search-bar .Polaris-TextField--focus > .Polaris-TextField__Input ~ .Polaris-TextField__Backdrop::after {
+    box-shadow: none !important;
+    outline: none !important;
+}

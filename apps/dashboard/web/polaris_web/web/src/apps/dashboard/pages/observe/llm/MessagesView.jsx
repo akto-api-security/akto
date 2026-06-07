@@ -7,6 +7,7 @@ import { truncate } from "./constants";
 import CardList from "./CardList";
 import PromptDetailModal from "./PromptDetailModal";
 import { SpanFlowRow } from "./SpansPanel";
+import LLMFilterBar from "./LLMFilterBar";
 
 export default function MessagesView({ currDateRange }) {
     const [messages, setMessages] = useState([]);
@@ -17,6 +18,10 @@ export default function MessagesView({ currDateRange }) {
     const [spansLoading, setSpansLoading] = useState(false);
     const [expandedSpan, setExpandedSpan] = useState(null);
 
+    const [sessionInput, setSessionInput] = useState("");    // raw input (instant display)
+    const [sessionSearch, setSessionSearch] = useState(""); // debounced → drives fetch
+    const [enumFilters, setEnumFilters] = useState({ userName: "", deviceId: "", serviceId: "" });
+
     const load = useCallback(async () => {
         const since = Math.floor(Date.parse(currDateRange.period.since) / 1000);
         const until = Math.floor(Date.parse(currDateRange.period.until) / 1000);
@@ -24,12 +29,17 @@ export default function MessagesView({ currDateRange }) {
         setSelected(null);
         setSpans([]);
         try {
-            const rows = await api.fetchMessages(since, until);
+            const rows = await api.fetchMessages(since, until, {
+                sessionId: sessionSearch.trim(),
+                userName:  enumFilters.userName,
+                deviceId:  enumFilters.deviceId,
+                serviceId: enumFilters.serviceId,
+            });
             setMessages((rows || []).map(enrichRow));
         } finally {
             setLoading(false);
         }
-    }, [currDateRange]);
+    }, [currDateRange, sessionSearch, enumFilters]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -79,12 +89,17 @@ export default function MessagesView({ currDateRange }) {
                 maxWidth="360px"
                 style={{ display: "flex", flexDirection: "column" }}
             >
-                <Box padding="3" borderBlockEndWidth="025" borderColor="border">
-                    <HorizontalStack align="space-between" blockAlign="center">
-                        <Text variant="headingSm">Messages</Text>
-                        {messages.length > 0 && <Badge tone="new">{String(messages.length)}</Badge>}
-                    </HorizontalStack>
-                </Box>
+                <LLMFilterBar
+                    currDateRange={currDateRange}
+                    showSessionSearch
+                    sessionValue={sessionInput}
+                    onSessionChange={setSessionInput}
+                    onSessionCommit={setSessionSearch}
+                    filters={enumFilters}
+                    onFiltersChange={setEnumFilters}
+                    count={messages.length}
+                    title="Messages"
+                />
                 <CardList
                     items={messages}
                     loading={loading}
