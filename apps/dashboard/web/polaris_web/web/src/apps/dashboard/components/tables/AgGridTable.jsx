@@ -154,7 +154,7 @@ export default function AgGridTable({
     bulkActionCount = 0,
     bulkActions = [],
     onClearBulk,
-    pagination = true,
+    pagination,
     paginationPageSize = 20,
     paginationPageSizeSelector = [20, 50, 100],
     sideBar = { toolPanels: ["columns", "filters"] },
@@ -276,7 +276,7 @@ export default function AgGridTable({
             onRowClicked={onRowClicked}
             onSelectionChanged={onSelectionChanged}
             getRowStyle={getRowStyle}
-            pagination={isServerMode ? false : pagination}
+            pagination={pagination}
             paginationPageSize={paginationPageSize}
             paginationPageSizeSelector={paginationPageSizeSelector}
             sideBar={sideBar}
@@ -286,8 +286,8 @@ export default function AgGridTable({
             groupDefaultExpanded={groupDefaultExpanded}
             components={{ agGridRow: AgGridRowRenderer }}
             columnTypes={AG_GRID_COLUMN_TYPES}
-            onFilterChanged={isServerMode ? handleFilterChanged : undefined}
-            onSortChanged={isServerMode ? handleSortChanged : undefined}
+            onFilterChanged={handleFilterChanged}
+            onSortChanged={handleSortChanged}
             domLayout={"autoHeight"}
             {...rest}
         />

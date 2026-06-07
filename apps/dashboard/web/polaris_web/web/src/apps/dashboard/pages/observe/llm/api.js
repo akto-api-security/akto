@@ -1,7 +1,12 @@
 import request from "@/util/request";
+import { enrichRow } from "./utils";
+
+function llmMessagesRequest(data) {
+    return request({ url: "/api/fetchLLMMessages", method: "post", data });
+}
 
 export default {
-    // Per-session summaries (grouped by sessionIdentifier). filters: { userName, deviceId, serviceId }
+    // Per-session summaries (grouped by sessionIdentifier).
     fetchSessions(startTime, endTime, filters) {
         return request({
             url: "/api/fetchLLMSessions",
@@ -15,23 +20,41 @@ export default {
         }).then(r => Array.isArray(r) ? r : (r?.sessions ?? []));
     },
 
-    // Per-message summaries (grouped by traceId). filters: { sessionId, userName, deviceId, serviceId }
+    // Simple (non-paginated) message fetch for session drill-down.
+    // filters: { sessionId, userName, deviceId, serviceId }
     fetchMessages(startTime, endTime, filters) {
-        return request({
-            url: "/api/fetchLLMMessages",
-            method: "post",
-            data: {
-                startTime, endTime,
-                sessionId: filters?.sessionId || "",
-                userName:  filters?.userName  || "",
-                deviceId:  filters?.deviceId  || "",
-                serviceId: filters?.serviceId || "",
-            },
+        return llmMessagesRequest({
+            startTime, endTime,
+            sessionId: filters?.sessionId || "",
+            userName:  filters?.userName  || "",
+            deviceId:  filters?.deviceId  || "",
+            serviceId: filters?.serviceId || "",
         }).then(r => Array.isArray(r) ? r : (r?.messages ?? []));
     },
 
-    // Paginated, sorted, filtered flat prompt table.
-    // filters: { userName: ["alice"], serviceId: ["svc-a"] }
+    // Paginated, sorted, filtered messages table (MessagesView).
+    // Fetches 500 per backend call; AgGrid pages within that window.
+    // Returns: { value: [...rows], total: N }
+    searchMessages({ startTime, endTime, sortKey, sortOrder, skip, filters, searchAfterJson, searchString }) {
+        return llmMessagesRequest({
+            startTime,
+            endTime,
+            sortKey:         sortKey   || "latestTimestamp",
+            sortOrder:       sortOrder === -1 ? -1 : 1,
+            skip:            skip      || 0,
+            limit:           500,
+            userName:        (filters?.userName?.[0])  || "",
+            serviceId:       (filters?.serviceId?.[0]) || "",
+            searchString:    searchString || "",
+            searchAfterJson: searchAfterJson || "",
+        }).then(r => {
+            if (r && r.messages) return { value: r.messages.map(enrichRow), total: r.total };
+            if (Array.isArray(r))  return { value: r.map(enrichRow), total: r.length };
+            return { value: [], total: 0 };
+        });
+    },
+
+    // Paginated, sorted, filtered flat prompt table (PromptsView).
     // Returns: { value: [...rows], total: N }
     searchPrompts({ startTime, endTime, sortKey, sortOrder, skip, limit, filters, searchAfterJson, searchString }) {
         return request({
@@ -51,12 +74,13 @@ export default {
             },
         }).then(r => {
             if (r && r.prompts) return { value: r.prompts.map(enrichForTable), total: r.total };
-            if (Array.isArray(r)) return { value: r.map(enrichForTable), total: r.length };
+            if (Array.isArray(r))  return { value: r.map(enrichForTable), total: r.length };
             return { value: [], total: 0 };
         });
     },
 
-    // Distinct values for filterable columns (userName, serviceId), from a backend aggregation.
+    // Distinct values for filterable columns (userName, deviceId, serviceId).
+    // Shared by PromptsView and MessagesView.
     fetchFilterChoices(startTime, endTime) {
         return request({
             url: "/api/fetchLLMPromptFilters",
@@ -69,7 +93,7 @@ export default {
         }));
     },
 
-    // Spans (docs) for a single message/trace, ordered by timestamp asc.
+    // Spans for a single trace, ordered by timestamp asc.
     fetchTraceDetail(traceId) {
         return request({
             url: "/api/fetchLLMTraceDetail",

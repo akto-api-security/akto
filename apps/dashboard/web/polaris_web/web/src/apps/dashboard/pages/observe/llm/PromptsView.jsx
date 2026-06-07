@@ -43,7 +43,7 @@ export default function PromptsView({ currDateRange }) {
                 columnDefs={columnDefs}
                 searchPlaceholder="Search in prompt content"
                 rowSelection="single"
-                pagination
+                pagination={false}
                 paginationPageSize={20}
                 noOuterBorder
                 onRowClicked={p => setSelectedPrompt(p.data)}

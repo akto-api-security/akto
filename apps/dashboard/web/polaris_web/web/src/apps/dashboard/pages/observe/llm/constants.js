@@ -58,8 +58,8 @@ export function truncate(str, len = 80) {
     return str.length > len ? str.substring(0, len) + "…" : str;
 }
 
-// Columns for the per-session "messages" table (drill-down inside a session).
-export const MESSAGE_COLUMN_DEFS = [
+// Shared base columns for all message tables (session drill-down + standalone messages view)
+const MESSAGE_BASE_COLS = [
     {
         headerName: "Time",
         field: "latestTimestamp",
@@ -78,10 +78,36 @@ export const MESSAGE_COLUMN_DEFS = [
         field: "spanCount",
         width: 90,
     },
+];
+
+// Used in SessionsView (per-session drill-down): combined token count
+export const MESSAGE_COLUMN_DEFS = [
+    ...MESSAGE_BASE_COLS,
     {
         headerName: "Tokens",
         field: "totalTokens",
         width: 110,
+    },
+];
+
+// Used in MessagesView (standalone): split token counts + filter/sort support
+export const MESSAGE_COLUMN_DEFS_DETAIL = [
+    ...MESSAGE_BASE_COLS,
+    {
+        headerName: "Tokens in",
+        field: "_inputTokens",
+        width: 110,
+        filterAllowed: true,
+        filter: "agSetColumnFilter",
+        sortable: true,
+    },
+    {
+        headerName: "Tokens out",
+        field: "_outputTokens",
+        width: 110,
+        filterAllowed: false,
+        filter: false,
+        sortable: false,
     },
 ];
 
