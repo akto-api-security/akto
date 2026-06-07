@@ -1,4 +1,4 @@
-import { Box, HorizontalStack, Scrollable, Spinner, Text } from "@shopify/polaris";
+import { Box, HorizontalStack, Scrollable, Spinner, Text, VerticalStack } from "@shopify/polaris";
 
 export default function CardList({ items, loading, emptyText, selectedKey, getKey, onSelect, renderCard }) {
     if (loading) {
@@ -19,23 +19,22 @@ export default function CardList({ items, loading, emptyText, selectedKey, getKe
 
     return (
         <Scrollable style={{ flex: 1, minHeight: 0 }}>
-            {items.map(item => {
-                const key = getKey(item);
-                const isSelected = key === selectedKey;
-                return (
-                    <Box
-                        key={key}
-                        padding="4"
-                        borderBlockEndWidth="025"
-                        borderColor="border"
-                        background={isSelected ? "bg-surface-selected" : "bg-surface"}
-                        onClick={() => onSelect(item)}
-                        style={{ cursor: "pointer" }}
-                    >
-                        {renderCard(item)}
-                    </Box>
-                );
-            })}
+            <VerticalStack gap="4">
+                {items.map(item => {
+                    const key = getKey(item);
+                    const isSelected = key === selectedKey;
+                    return (
+                        <Box
+                            key={key}
+                            background={isSelected ? "bg-surface-selected" : "bg-surface"}
+                            onClick={() => onSelect(item)}
+                            style={{ cursor: "pointer" }}
+                        >
+                            {renderCard(item)}
+                        </Box>
+                    );
+                })}
+            </VerticalStack>
         </Scrollable>
     );
 }

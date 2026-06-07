@@ -1,28 +1,39 @@
 import request from "@/util/request";
 
 export default {
-    // Per-session summaries (grouped by sessionIdentifier).
-    fetchSessions(startTime, endTime) {
+    // Per-session summaries (grouped by sessionIdentifier). filters: { userName, deviceId, serviceId }
+    fetchSessions(startTime, endTime, filters) {
         return request({
             url: "/api/fetchLLMSessions",
             method: "post",
-            data: { startTime, endTime },
+            data: {
+                startTime, endTime,
+                userName:  filters?.userName  || "",
+                deviceId:  filters?.deviceId  || "",
+                serviceId: filters?.serviceId || "",
+            },
         }).then(r => Array.isArray(r) ? r : (r?.sessions ?? []));
     },
 
-    // Per-message summaries (grouped by traceId). Optionally scoped to a session.
-    fetchMessages(startTime, endTime, sessionId) {
+    // Per-message summaries (grouped by traceId). filters: { sessionId, userName, deviceId, serviceId }
+    fetchMessages(startTime, endTime, filters) {
         return request({
             url: "/api/fetchLLMMessages",
             method: "post",
-            data: { startTime, endTime, sessionId: sessionId || "" },
+            data: {
+                startTime, endTime,
+                sessionId: filters?.sessionId || "",
+                userName:  filters?.userName  || "",
+                deviceId:  filters?.deviceId  || "",
+                serviceId: filters?.serviceId || "",
+            },
         }).then(r => Array.isArray(r) ? r : (r?.messages ?? []));
     },
 
     // Paginated, sorted, filtered flat prompt table.
     // filters: { userName: ["alice"], serviceId: ["svc-a"] }
     // Returns: { value: [...rows], total: N }
-    searchPrompts({ startTime, endTime, sortKey, sortOrder, skip, limit, filters, searchAfterJson }) {
+    searchPrompts({ startTime, endTime, sortKey, sortOrder, skip, limit, filters, searchAfterJson, searchString }) {
         return request({
             url: "/api/searchLLMPrompts",
             method: "post",
@@ -35,7 +46,7 @@ export default {
                 limit:           limit     || 20,
                 userName:        (filters?.userName?.[0])  || "",
                 serviceId:       (filters?.serviceId?.[0]) || "",
-                searchString:    filters?.searchString?.[0] || "",
+                searchString:    searchString || "",
                 searchAfterJson: searchAfterJson || "",
             },
         }).then(r => {
@@ -53,6 +64,7 @@ export default {
             data: { startTime, endTime },
         }).then(r => ({
             userName:  r?.userName  || [],
+            deviceId:  r?.deviceId  || [],
             serviceId: r?.serviceId || [],
         }));
     },
