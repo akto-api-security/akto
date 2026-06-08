@@ -224,6 +224,14 @@ export default {
         }).then((resp) => resp)
     },
 
+    getLatestReplayScreenshot(screenshotSessionId) {
+        return request({
+            url: '/api/getLatestReplayScreenshot',
+            method: 'post',
+            data: { screenshotSessionId }
+        }).then((resp) => resp)
+    },
+
     fetchRecordedLoginFlow(nodeId, testingRunPlaygroundId) {
         const data = { nodeId }
         if (testingRunPlaygroundId) {
