@@ -705,12 +705,12 @@ jobs:
           cd apps/dashboard
           if [[ "${{ github.event.inputs.threat_detection}}" == "true" ]]; then
             cd ../threat-detection
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT_2 . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT_2 . --push
           fi
 
           if [[ "${{ github.event.inputs.threat_detection_backend}}" == "true" ]]; then
             cd ../threat-detection-backend
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_THREAT_2 . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_THREAT_2 . --push
           fi
 
       - name: Configure AWS Credentials
@@ -746,12 +746,12 @@ jobs:
           cd apps/dashboard
           if [[ "${{ github.event.inputs.threat_detection}}" == "true" ]]; then
             cd ../threat-detection
-            docker buildx build --platform linux/arm64/v8,linux/amd64d -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection:$IMAGE_TAG_THREAT_2 . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection:$IMAGE_TAG_THREAT_2 . --push
           fi
 
           if [[ "${{ github.event.inputs.threat_detection_backend}}" == "true" ]]; then
             cd ../threat-detection-backend
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection-backend:$IMAGE_TAG_THREAT_2 . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection-backend:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection-backend:$IMAGE_TAG_THREAT_2 . --push
           fi
           docker buildx create --use
           
