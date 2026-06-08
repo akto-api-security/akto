@@ -149,7 +149,8 @@ public class ModuleInfoAction extends UserAction {
                 key.equals("AKTO_THREAT_ENABLED") ||
                 key.equals("AGGREGATION_RULES_ENABLED") ||
                 key.equals("SKIP_THREAT") ||
-                key.equals("APPLY_GUARDRAILS_TO_SSE")) {
+                key.equals("APPLY_GUARDRAILS_TO_SSE") ||
+                key.equals("CLAUDE_SETTINGS_CONFIG")) {
             return "boolean";
         }
         return "text";
