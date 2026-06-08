@@ -24,7 +24,7 @@ type policyCache struct {
 	auditPolicies map[string]*types.AuditPolicy
 	compiledRules map[string]*regexp.Regexp
 	hasAuditRules bool
-	blockedHosts  []blockedHostRule
+	blockedHosts  []mcp.BlockedHostRule
 	lastFetched   time.Time
 	mu            sync.RWMutex
 }
@@ -327,13 +327,15 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
-func hasBlockPersonalAccountPolicy(policies []types.Policy) bool {
+// blockPersonalAccountPolicyName returns the name of the first policy that has
+// BlockPersonalAccounts enabled, or ("", false) if none.
+func blockPersonalAccountPolicyName(policies []types.Policy) (string, bool) {
 	for _, p := range policies {
-		if p.Info.Name == "block_personal_account" {
-			return true
+		if p.BlockPersonalAccounts {
+			return p.Info.Name, true
 		}
 	}
-	return false
+	return "", false
 }
 
 // refreshCollectionTagsIfNeeded fetches all collections from the database abstractor and
@@ -433,7 +435,7 @@ func (s *Service) getLoginUserEmailType(params *models.ValidateRequestParams) st
 
 // TODO: move reportAndBlockPersonalAccount to mcp library so threat reporting
 // and validation live in one place alongside other policy enforcement.
-func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID string) *mcp.ValidationResult {
+func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID, policyName string) *mcp.ValidationResult {
 	blockReason := "Blocked: personal accounts are not permitted by guardrail policy"
 
 	if s.sessionMgr != nil && sessionID != "" {
@@ -456,7 +458,7 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 				payloadToValidate,
 				"",
 				types.ThreatMetadata{
-					PolicyName:   "block_personal_account",
+					PolicyName:   policyName,
 					RuleViolated: "personal account type",
 					Severity:     "MEDIUM",
 					Reason:       blockReason,
@@ -471,7 +473,7 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 				extractHostHeader(reqHeaders),
 				sessionID,
 			); err != nil {
-				s.logger.Warn("Failed to report threat for block_personal_account", zap.Error(err))
+				s.logger.Warn("Failed to report threat for personal account block", zap.String("policyName", policyName), zap.Error(err))
 			}
 		}()
 	}
@@ -483,83 +485,54 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 	}
 }
 
-// reportAndBlockHost tracks the blocked session, reports the threat (unless skipThreat) and
-// returns the blocked ValidationResult for a request that hit the browser-extension host blocklist.
-// checkBlockedHost evaluates the request against the cached blocked-host rules and returns a block
-// ValidationResult on a match, or nil to allow. The matcher depends on the traffic source:
-//   - browser-extension traffic carries a real host -> glob match on host+path (matchBlockedHostRule)
-//   - endpoint / MCP-server traffic carries a synthetic host (deviceLabel.ai-agent.<tool>) -> match
-//     on the AI-tool token / vendor alias (matchBlockedToolRule); glob is tried first so a real MCP
-//     target host still works.
+// checkBlockedHost evaluates the request against cached blocked-host rules via the mcp library.
+// Returns a block ValidationResult on a match, or nil to allow.
 func (s *Service) checkBlockedHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID string, policies []types.Policy) *mcp.ValidationResult {
-	isExtension := isBrowserExtensionRequest(valCtx.Tag)
-	isEndpointOrMcp := isEndpointOrMcpRequest(valCtx.Tag, params.ContextSource)
-	if !isExtension && !isEndpointOrMcp {
-		return nil
-	}
-
 	s.cache.mu.RLock()
-	blockedHostRules := s.cache.blockedHosts
+	allRules := s.cache.blockedHosts
 	s.cache.mu.RUnlock()
-	if len(blockedHostRules) == 0 {
+	if len(allRules) == 0 {
 		return nil
 	}
 
-	// Only evaluate rules that belong to policies applicable to this server.
+	// Narrow to rules from policies applicable to this server.
 	activePolicyNames := make(map[string]struct{}, len(policies))
 	for _, p := range policies {
 		activePolicyNames[p.Info.Name] = struct{}{}
 	}
-	isEndpointCtx := strings.EqualFold(params.ContextSource, string(types.ContextSourceEndpoint))
-	scoped := blockedHostRules[:0:0]
-	for _, r := range blockedHostRules {
-		if _, ok := activePolicyNames[r.policyName]; !ok {
-			continue
+	var scoped []mcp.BlockedHostRule
+	for _, r := range allRules {
+		if _, ok := activePolicyNames[r.PolicyName]; ok {
+			scoped = append(scoped, r)
 		}
-		// AGENTIC-scoped policies must not block Endpoint traffic.
-		if isEndpointCtx && r.contextSource == string(types.ContextSourceAgentic) {
-			continue
-		}
-		scoped = append(scoped, r)
 	}
 	if len(scoped) == 0 {
 		return nil
 	}
-	blockedHostRules = scoped
 
 	reqHost := extractHostHeader(valCtx.RequestHeaders)
-	mode := "browser-llm"
-	if isEndpointOrMcp {
-		mode = "endpoint-mcp"
-	}
 	s.logger.Info("[BLOCKED_HOST] running blocked-host check",
 		zap.String("feature", "blocked-host-v1"),
-		zap.String("mode", mode),
 		zap.String("host", reqHost),
 		zap.String("path", params.Path),
-		zap.Int("ruleCount", len(blockedHostRules)),
-		zap.Strings("patterns", blockedHostPatterns(blockedHostRules)))
+		zap.String("contextSource", params.ContextSource),
+		zap.Int("ruleCount", len(scoped)),
+		zap.Strings("patterns", mcp.BlockedHostPatterns(scoped)))
 
-	// Glob match on host+path (real domains) — applies to all sources.
-	rule, matchedPattern, blocked := matchBlockedHostRule(reqHost, params.Path, blockedHostRules)
-	// Token / vendor-alias match for synthetic endpoint / MCP-server hosts.
-	if !blocked && isEndpointOrMcp {
-		rule, matchedPattern, blocked = matchBlockedToolRule(valCtx.Tag, reqHost, blockedHostRules)
-	}
+	policyName, matchedPattern, blocked := mcp.CheckBlockedHosts(valCtx.Tag, reqHost, params.Path, params.ContextSource, scoped)
 	if !blocked {
 		return nil
 	}
 
 	s.logger.Warn("ValidateRequest - blocking request via blocked-host policy",
-		zap.String("mode", mode),
 		zap.String("path", params.Path),
 		zap.String("method", params.Method),
 		zap.String("host", reqHost),
 		zap.String("pattern", matchedPattern),
-		zap.String("policy", rule.policyName),
+		zap.String("policy", policyName),
 		zap.String("sessionID", sessionID),
 		zap.String("requestID", requestID))
-	return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, rule.policyName, matchedPattern)
+	return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, policyName, matchedPattern)
 }
 
 func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID, policyName, matchedPattern string) *mcp.ValidationResult {
@@ -620,18 +593,11 @@ func extractHostHeader(headers map[string]string) string {
 }
 
 // fetchAndParsePolicies fetches policies from database abstractor and parses them
-func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, []blockedHostRule, error) {
+func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, []mcp.BlockedHostRule, error) {
 	rawGuardrailPolicies, err := s.dbClient.FetchGuardrailPolicies()
 	if err != nil {
 		return nil, nil, nil, false, nil, fmt.Errorf("failed to fetch guardrail policies: %w", err)
 	}
-
-	// Blocked-host rules are parsed from the same raw response (block-only host blocklist).
-	blockedHostRules := parseBlockedHostRules(rawGuardrailPolicies)
-	s.logger.Info("[BLOCKED_HOST] parsed blocked-host rules from policies",
-		zap.String("feature", "blocked-host-v1"),
-		zap.Int("ruleCount", len(blockedHostRules)),
-		zap.Strings("patterns", blockedHostPatterns(blockedHostRules)))
 
 	s.logger.Debug("Raw guardrail policies response",
 		zap.Int("size", len(rawGuardrailPolicies)),
@@ -659,6 +625,13 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 			policies = append(policies, policy)
 		}
 	}
+
+	// Compile blocked-host rules from the converted policies (uses policy.BlockedHosts patterns).
+	blockedHostRules := mcp.CompileBlockedHostRules(policies)
+	s.logger.Info("[BLOCKED_HOST] compiled blocked-host rules from policies",
+		zap.String("feature", "blocked-host-v1"),
+		zap.Int("ruleCount", len(blockedHostRules)),
+		zap.Strings("patterns", mcp.BlockedHostPatterns(blockedHostRules)))
 
 	// Fetch MCP audit info from database abstractor
 	rawAuditPolicies, err := s.dbClient.FetchMcpAuditInfo()
@@ -931,8 +904,8 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Any("policies", policies),
 		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
 
-	// Check account-type guardrail: block if any active policy is named block_personal_account
-	if hasBlockPersonalAccountPolicy(policies) {
+	// Check account-type guardrail: block if any active policy has BlockPersonalAccounts enabled.
+	if policyName, ok := blockPersonalAccountPolicyName(policies); ok {
 		s.refreshCollectionTagsIfNeeded()
 		accountType := s.getLoginUserEmailType(params)
 		s.logger.Info("ValidateRequest - account type check",
@@ -940,13 +913,14 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.String("sessionID", sessionID),
 			zap.String("accountType", accountType))
 		if accountType != "" && accountType != "enterprise" {
-			s.logger.Warn("ValidateRequest - blocking non-enterprise account via block_personal_account policy",
+			s.logger.Warn("ValidateRequest - blocking non-enterprise account",
 				zap.String("path", params.Path),
 				zap.String("method", params.Method),
 				zap.String("account", params.AktoAccountID),
 				zap.String("accountType", accountType),
+				zap.String("policyName", policyName),
 				zap.String("sessionID", sessionID))
-			return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID), nil
+			return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName), nil
 		}
 	}
 
