@@ -250,15 +250,9 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_users_and_devices",
-                    }, {
-                        label: "LLM Observability",
-                        onClick: () => {
-                            navigate("/dashboard/observe/llm-observability");
-                            handleSelect("dashboard_observe_llm_observability");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_observe_llm_observability",
-                    }] : [{
+                    }
+                
+                ] : [{
                         label: "Collections",
                         onClick: () => {
                             navigate("/dashboard/observe/inventory");
@@ -267,6 +261,15 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_inventory",
                     }]),
+                    ...(window.STIGG_FEATURE_WISE_ALLOWED?.AGENT_LOGS?.isGranted ? [{
+                        label: "LLM Observability",
+                        onClick: () => {
+                            navigate("/dashboard/observe/llm-observability");
+                            handleSelect("dashboard_observe_llm_observability");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_observe_llm_observability",
+                    }] : []),
                     ...(!(func.isDemoAccount() && (dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security")) ? [
                     {
                         label: "Recent Changes",
