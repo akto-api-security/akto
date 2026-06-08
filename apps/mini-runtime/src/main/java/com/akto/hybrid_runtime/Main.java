@@ -46,8 +46,8 @@ import com.akto.utility.UtilityServer;
 import com.akto.util.DashboardMode;
 import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
+import com.alibaba.fastjson2.JSON;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -816,11 +816,47 @@ public class Main {
         }
     }
 
-    private static int LOG_DEBUG_RECORDS = 10; 
+    private static int LOG_DEBUG_RECORDS = 10;
+    
+    private static void addResponseParamToMap(HttpResponseParams httpResponseParams, 
+            Map<String, List<HttpResponseParams>> responseParamsToAccountMap) {
+        if (httpResponseParams != null) {
+            String accountId = httpResponseParams.getAccountId();
+            if (!responseParamsToAccountMap.containsKey(accountId)) {
+                responseParamsToAccountMap.put(accountId, new ArrayList<>());
+            }
+            responseParamsToAccountMap.get(accountId).add(httpResponseParams);
+        }
+    }
+    
+    private static List<HttpResponseParams> parseMessageToResponseParams(String messageValue) throws Exception {
+        List<HttpResponseParams> result = new ArrayList<>();
+        
+        try {
+            Map<String, Object> jsonMap = JSON.parseObject(messageValue);
+            
+            if (WebSocketMessageParser.isWebSocketMessage(jsonMap)) {
+                List<HttpResponseParams> wsParams = WebSocketEventProcessor.processWebSocketMessage(jsonMap);
+                result.addAll(wsParams);
+            } else {
+                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(messageValue);
+                if (httpResponseParams != null) {
+                    result.add(httpResponseParams);
+                }
+            }
+        } catch (Exception e) {
+            HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(messageValue);
+            if (httpResponseParams != null) {
+                result.add(httpResponseParams);
+            }
+        }
+        
+        return result;
+    }
+    
     private static long bulkParseTrafficToResponseParams(long lastSyncOffset, ConsumerRecords<String, String> records,
             Map<String, List<HttpResponseParams>> responseParamsToAccountMap) {
         for (ConsumerRecord<String,String> r: records) {
-            HttpResponseParams httpResponseParams;
             try {
                  
                 printL(r.value());
@@ -852,36 +888,34 @@ public class Main {
                     continue;
                 }
 
-                httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
-                if (httpResponseParams == null) {
-                    loggerMaker.error("HttpResponse params was skipped due to invalid json requestBody");
+                List<HttpResponseParams> responseParamsList = parseMessageToResponseParams(r.value());
+                if (responseParamsList.isEmpty()) {
+                    loggerMaker.error("No response params parsed from message");
                     continue;
                 }
 
-                if (httpResponseParams.getRequestParams().getURL().contains("api/ingestData")) {
-                    continue;
-                }
-                if(Utils.printDebugHostLog(httpResponseParams) != null){
-                    Utils.printDebugHostLog("Post processing sample message from kafka: " + httpResponseParams.getOrig());
-                }
-                if (Context.getActualAccountId() == 1759692400) {
-                    String debugHeader = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "x-debug-trace");
-                    if (debugHeader != null && !debugHeader.isEmpty()) {
-                        String host = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
-                        loggerMaker.infoAndAddToDb("HttpResponseparam received with url: "
-                                + httpResponseParams.getRequestParams().getURL() + " host: " + (host != null ? host : "null")
-                                + " statusCode: " + httpResponseParams.getStatusCode());
+                for (HttpResponseParams httpResponseParams : responseParamsList) {
+                    if (httpResponseParams.getRequestParams().getURL().contains("api/ingestData")) {
+                        continue;
                     }
+                    if(Utils.printDebugHostLog(httpResponseParams) != null){
+                        Utils.printDebugHostLog("Post processing sample message from kafka: " + httpResponseParams.getOrig());
+                    }
+                    if (Context.getActualAccountId() == 1759692400) {
+                        String debugHeader = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "x-debug-trace");
+                        if (debugHeader != null && !debugHeader.isEmpty()) {
+                            String host = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
+                            loggerMaker.infoAndAddToDb("HttpResponseparam received with url: "
+                                    + httpResponseParams.getRequestParams().getURL() + " host: " + (host != null ? host : "null")
+                                    + " statusCode: " + httpResponseParams.getStatusCode());
+                        }
+                    }
+                    addResponseParamToMap(httpResponseParams, responseParamsToAccountMap);
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message: " + r.value() + e);
                 continue;
             }
-            String accountId = httpResponseParams.getAccountId();
-            if (!responseParamsToAccountMap.containsKey(accountId)) {
-                responseParamsToAccountMap.put(accountId, new ArrayList<>());
-            }
-            responseParamsToAccountMap.get(accountId).add(httpResponseParams);
         }
     return lastSyncOffset;
     }
@@ -889,7 +923,6 @@ public class Main {
     private static long bulkParseTrafficToResponseParams(long lastSyncOffset, List<String> messages,
             Map<String, List<HttpResponseParams>> responseParamsToAccountMap) {
         for (String value : messages) {
-            HttpResponseParams httpResponseParams;
             try {
                 printL(value);
                 AllMetrics.instance.setRuntimeKafkaRecordCount(1);
@@ -904,24 +937,24 @@ public class Main {
                 }
                 if (Context.getActualAccountId() != 1759692400 && tryForCollectionName(value)) continue;
                 if (isNonApiContentTypeFilterEnabled && HttpRequestResponseUtils.isNonApiContentType(value)) continue;
-                httpResponseParams = HttpCallParser.parseKafkaMessage(value);
-                if (httpResponseParams == null) {
+                
+                List<HttpResponseParams> responseParamsList = parseMessageToResponseParams(value);
+                if (responseParamsList.isEmpty()) {
                     loggerMaker.error("HttpResponse params was skipped due to invalid json requestBody");
                     continue;
                 }
-                if (httpResponseParams.getRequestParams().getURL().contains("api/ingestData")) continue;
-                if (Utils.printDebugHostLog(httpResponseParams) != null) {
-                    Utils.printDebugHostLog("Post processing sample message: " + httpResponseParams.getOrig());
+                
+                for (HttpResponseParams httpResponseParams : responseParamsList) {
+                    if (httpResponseParams.getRequestParams().getURL().contains("api/ingestData")) continue;
+                    if (Utils.printDebugHostLog(httpResponseParams) != null) {
+                        Utils.printDebugHostLog("Post processing sample message: " + httpResponseParams.getOrig());
+                    }
+                    addResponseParamToMap(httpResponseParams, responseParamsToAccountMap);
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while parsing message: " + value + e);
                 continue;
             }
-            String accountId = httpResponseParams.getAccountId();
-            if (!responseParamsToAccountMap.containsKey(accountId)) {
-                responseParamsToAccountMap.put(accountId, new ArrayList<>());
-            }
-            responseParamsToAccountMap.get(accountId).add(httpResponseParams);
         }
         return lastSyncOffset;
     }
