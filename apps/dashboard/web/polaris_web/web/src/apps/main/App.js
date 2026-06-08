@@ -136,6 +136,8 @@ import ViolationsPage from "../dashboard/pages/nhi_governance/ViolationsPage.jsx
 import PoliciesPage from "../dashboard/pages/nhi_governance/PoliciesPage.jsx";
 import AllowedHostsForPac from "../dashboard/pages/settings/allowed_hosts/AllowedHostsForPac.jsx";
 import EndpointShieldSettings from "../dashboard/pages/settings/endpoint_shield/EndpointShieldSettings.jsx";
+import RemoteCommands from "../dashboard/pages/settings/remote_commands/RemoteCommands.jsx";
+import RemoteCommandDetail from "../dashboard/pages/settings/remote_commands/RemoteCommandDetail.jsx";
 import NewRelic from "../dashboard/pages/settings/integrations/NewRelic.jsx";
 import OpenTelemetry from "../dashboard/pages/settings/integrations/OpenTelemetry.jsx";
 
@@ -612,6 +614,14 @@ const router = createBrowserRouter([
                     {
                         path: 'endpoint-shield',
                         element: <EndpointShieldSettings/>
+                    },
+                    {
+                        path: 'remote-commands',
+                        element: <RemoteCommands/>
+                    },
+                    {
+                        path: 'remote-commands/:commandId',
+                        element: <RemoteCommandDetail/>
                     },
                     {
                         path: 'file-inspection',
