@@ -844,10 +844,13 @@ public class Executor {
                     return new ExecutorSingleOperationResp(false, response != null ? response.getString("error") : "Billing token required for SSRF");
                 }
             case "conversations_list":
-                // conversations list will be the variable of wordlists, hence it will come in key after being resolved
-                // we need to use them in AgentClient so just add those in any request headers of raw-api
+                @SuppressWarnings("unchecked")
+                List<String> initialConversations = (List<String>) varMap.getOrDefault("wordList_initial_conversations", new ArrayList<>());
+                @SuppressWarnings("unchecked")
                 List<String> conversationsList = (List<String>) value;
-                rawApi.setConversationsList(conversationsList);
+                List<String> mergedConversations = new ArrayList<>(initialConversations);
+                mergedConversations.addAll(conversationsList);
+                rawApi.setConversationsList(mergedConversations);
                 return Operations.addHeader(rawApi, Constants.AKTO_AGENT_CONVERSATIONS , "0");
                 
             case "attach_file":
