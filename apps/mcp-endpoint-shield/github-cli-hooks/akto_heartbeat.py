@@ -24,7 +24,7 @@ HEARTBEAT_INTERVAL_S = 30
 _DB_ABSTRACTOR_URL = os.getenv(
     "DATABASE_ABSTRACTOR_SERVICE_URL", "https://cyborg.akto.io"
 ).rstrip("/")
-_AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
+_AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 _HEARTBEAT_TIMEOUT = 3.0  # short timeout — must not block the hook
 
 
@@ -81,8 +81,8 @@ def _post_heartbeat(payload: dict) -> None:
     url = f"{_DB_ABSTRACTOR_URL}/api/updateModuleInfoForHeartbeat"
     data = json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
-    if _AKTO_API_TOKEN:
-        headers["Authorization"] = _AKTO_API_TOKEN
+    if _AKTO_TOKEN:
+        headers["authorization"] = _AKTO_TOKEN
 
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     ssl_ctx = ssl._create_unverified_context()

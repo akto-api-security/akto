@@ -50,6 +50,7 @@ const DATA_INGESTION_URL: string | undefined = process.env.DATA_INGESTION_URL;
 const SYNC_MODE: boolean =
     (process.env.SYNC_MODE || "true").toLowerCase() === "true";
 const TIMEOUT: number = parseFloat(process.env.TIMEOUT || "5") * 1000; // ms
+const AKTO_TOKEN: string = process.env.AKTO_TOKEN || "";
 const AKTO_CONNECTOR_NAME = "vertex-ai-adk";
 const HTTP_PROXY_PATH = "/api/http-proxy";
 
@@ -258,9 +259,13 @@ async function postHttpProxy(
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
 
     try {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (AKTO_TOKEN) {
+            headers["authorization"] = AKTO_TOKEN;
+        }
         return await fetch(endpoint, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify(payload),
             signal: controller.signal,
         });

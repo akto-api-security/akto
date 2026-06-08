@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 DATA_INGESTION_URL = os.getenv("DATA_INGESTION_URL")
 SYNC_MODE = os.getenv("SYNC_MODE", "true").lower() == "true"
 TIMEOUT = float(os.getenv("TIMEOUT", "5"))
+AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 AKTO_CONNECTOR_NAME = "vertex-ai-adk"
 HTTP_PROXY_PATH = "/api/http-proxy"
 
@@ -227,10 +228,12 @@ async def _post_http_proxy(
     payload: dict,
 ) -> httpx.Response:
     endpoint = f"{DATA_INGESTION_URL}{HTTP_PROXY_PATH}"
+    headers = {"authorization": AKTO_TOKEN} if AKTO_TOKEN else None
     return await _client.post(
         endpoint,
         params=_build_http_proxy_params(guardrails=guardrails, ingest_data=ingest_data),
         json=payload,
+        headers=headers,
     )
 
 
