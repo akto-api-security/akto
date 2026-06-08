@@ -40,7 +40,7 @@ type Config struct {
 	SessionEnabled         bool
 
 	// Async CPU-based LLM config (for Kafka consumer + WARN/ALERT policy deferral)
-	AsyncScannerBaseURL  string // ASYNC_SCANNER_BASE_URL e.g. https://jarvis.akto.io/v1
+	AsyncScannerBaseURL  string // ASYNC_SCANNER_BASE_URL e.g. http://jarvis.akto.io/v1
 	AsyncScannerModel    string // ASYNC_SCANNER_MODEL e.g. gemma4:e4b
 	KafkaProducerEnabled bool   // KAFKA_PRODUCER_ENABLED — enables async producer in HTTP mode
 
