@@ -1,64 +1,71 @@
-import { useState } from "react";
-import { Badge, Box, Button, Collapsible, HorizontalStack, Modal, Text, VerticalStack } from "@shopify/polaris";
-import { ChevronDownMinor, ChevronRightMinor } from "@shopify/polaris-icons";
+import { Badge, Box, HorizontalStack, Modal, Text, VerticalStack } from "@shopify/polaris";
+import { ClockMinor, HashtagMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
-import { formatCost } from "./constants";
+import { formatCost, truncate } from "./constants";
+import ChatMessage from "../../testing/TestRunResultPage/components/ChatMessage";
 
 export default function PromptDetailModal({ prompt, onClose }) {
-    const [rawOpen, setRawOpen] = useState(false);
-
     if (!prompt) return null;
 
+    const spanTimestamp = Math.floor((prompt.timestamp || 0) / 1000);
+
     return (
-        <Modal open onClose={onClose} title="Prompt detail" large>
+        <Modal open onClose={onClose} title="Span detail" large>
             <Modal.Section>
                 <VerticalStack gap="4">
+                    {/* Meta row */}
                     <HorizontalStack gap="2" wrap>
-                        <Text variant="bodySm" tone="subdued">
-                            {func.prettifyEpoch(Math.floor((prompt.timestamp || 0) / 1000))}
-                        </Text>
+                        <HorizontalStack gap="1" blockAlign="center">
+                            <Box style={{ color: "var(--p-color-icon-subdued)", display: "flex" }}>
+                                <ClockMinor width={16} height={16} />
+                            </Box>
+                            <Text variant="bodySm" tone="subdued">
+                                {func.prettifyEpoch(spanTimestamp)}
+                            </Text>
+                        </HorizontalStack>
+                        {prompt.traceId && (
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Box style={{ color: "var(--p-color-icon-subdued)", display: "flex" }}>
+                                    <HashtagMinor width={16} height={16} />
+                                </Box>
+                                <Text variant="bodySm" tone="subdued">
+                                    {truncate(prompt.traceId, 24)}
+                                </Text>
+                            </HorizontalStack>
+                        )}
                         {prompt.userName && <Badge>{prompt.userName}</Badge>}
                         {prompt.serviceId && <Badge tone="new">{prompt.serviceId}</Badge>}
                         {prompt._model && <Badge tone="success">{prompt._model}</Badge>}
                         <Badge tone="info">
-                            {prompt._inputTokens + " in / " + prompt._outputTokens + " out"}
+                            {(prompt._inputTokens || 0) + " in / " + (prompt._outputTokens || 0) + " out"}
                         </Badge>
-                        <Badge>{formatCost(prompt._inputTokens, prompt._outputTokens)}</Badge>
+                        <Badge>{formatCost(prompt._inputTokens || 0, prompt._outputTokens || 0)}</Badge>
                     </HorizontalStack>
 
-                    <VerticalStack gap="2">
-                        <Text variant="headingSm">Prompt</Text>
-                        <Box background="bg-surface-secondary" padding="4" borderRadius="2">
-                            <Text variant="bodySm" as="p">{prompt._promptText || ""}</Text>
-                        </Box>
-                    </VerticalStack>
-
-                    {prompt._responseText && (
-                        <VerticalStack gap="2">
-                            <Text variant="headingSm">Response</Text>
-                            <Box background="bg-surface-secondary" padding="4" borderRadius="2">
-                                <Text variant="bodySm" as="p">{prompt._responseText}</Text>
-                            </Box>
-                        </VerticalStack>
+                    {/* Prompt */}
+                    {prompt._promptText && (
+                        <ChatMessage
+                            isExternalAgentRequest={true}
+                            type="request"
+                            content={prompt._promptText}
+                            timestamp={spanTimestamp}
+                            customLabel="Prompt"
+                            isCode={false}
+                            toolsMetadata={{}}
+                        />
                     )}
 
-                    <Button
-                        plain monochrome removeUnderline textAlign="left"
-                        icon={rawOpen ? ChevronDownMinor : ChevronRightMinor}
-                        onClick={() => setRawOpen(o => !o)}
-                    >
-                        <Text variant="bodySm" fontWeight="semibold">RAW PAYLOADS</Text>
-                    </Button>
-                    <Collapsible open={rawOpen} id="raw-collapsible">
-                        <VerticalStack gap="3">
-                            <Box background="bg-surface-secondary" padding="3" borderRadius="2">
-                                <Text variant="bodySm" as="p" tone="subdued">{prompt.queryPayload || ""}</Text>
-                            </Box>
-                            <Box background="bg-surface-secondary" padding="3" borderRadius="2">
-                                <Text variant="bodySm" as="p" tone="subdued">{prompt.responsePayload || ""}</Text>
-                            </Box>
-                        </VerticalStack>
-                    </Collapsible>
+                    {/* Response */}
+                    {prompt._responseText && (
+                        <ChatMessage
+                            type="response"
+                            content={prompt._responseText}
+                            timestamp={spanTimestamp}
+                            customLabel="Response"
+                            isCode={false}
+                            toolsMetadata={{}}
+                        />
+                    )}
                 </VerticalStack>
             </Modal.Section>
         </Modal>

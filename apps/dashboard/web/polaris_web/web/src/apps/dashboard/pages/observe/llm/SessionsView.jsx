@@ -25,7 +25,6 @@ function RowComp({ cardObj }) {
 
 export default function SessionsView({ currDateRange }) {
     const [sessions, setSessions] = useState([]);
-    const [loading, setLoading] = useState(false);
     const [selectedSession, setSelectedSession] = useState(null);
 
     const [messages, setMessages] = useState([]);
@@ -44,7 +43,6 @@ export default function SessionsView({ currDateRange }) {
 
     const loadSessions = useCallback(async () => {
         const { since, until } = getEpochs();
-        setLoading(true);
         setSelectedSession(null);
         try {
             const rows = await api.fetchSessions(since, until, {
@@ -55,7 +53,6 @@ export default function SessionsView({ currDateRange }) {
             });
             setSessions((rows || []).map(enrichRow));
         } finally {
-            setLoading(false);
         }
     }, [getEpochs, sessionInput, enumFilters]);
 

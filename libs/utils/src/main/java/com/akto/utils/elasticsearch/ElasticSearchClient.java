@@ -106,10 +106,7 @@ public class ElasticSearchClient {
         }
     }
 
-    /**
-     * Paginated search with from/size (≤10k) or search_after (beyond 10k).
-     * Filters and searchString are applied in ES; returns the exact total from hits.total.value.
-     */
+    /** Single-value filter search (backward-compat for existing callers). */
     public SearchResult search(int accountId, long startTsMs, long endTsMs,
                                int skip, int limit,
                                String sortField, boolean sortAsc,
@@ -118,50 +115,72 @@ public class ElasticSearchClient {
                                String searchString) {
         if (!isConfigured()) return new SearchResult(new ArrayList<>(), 0);
         try {
-            JSONObject query = buildBaseQuery(accountId, startTsMs, endTsMs, filters, searchString);
-            String sortDir = sortAsc ? "asc" : "desc";
-            String resolvedSort = (sortField != null && !sortField.isEmpty()) ? sortField : "timestamp";
-
-            JSONObject body = new JSONObject()
-                .put("query", query)
-                .put("sort", new JSONArray().put(new JSONObject().put(resolvedSort, new JSONObject().put("order", sortDir))))
-                .put("size", limit)
-                .put("track_total_hits", true);
-
-            if (searchAfter != null && searchAfter.length() > 0) {
-                body.put("search_after", searchAfter);
-            } else if (skip > 0 && skip < 10000) {
-                body.put("from", skip);
-            }
-
-            JSONObject response = httpPost(trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_search", body.toString());
-            if (response == null) return new SearchResult(new ArrayList<>(), 0);
-
-            long total = 0;
-            JSONObject hitsWrapper = response.optJSONObject("hits");
-            if (hitsWrapper != null) {
-                JSONObject totalObj = hitsWrapper.optJSONObject("total");
-                total = totalObj != null ? totalObj.optLong("value", 0) : hitsWrapper.optLong("total", 0);
-            }
-
-            List<Map<String, Object>> results = new ArrayList<>();
-            JSONArray hits = extractHits(response);
-            if (hits != null) {
-                for (int i = 0; i < hits.length(); i++) {
-                    JSONObject hit = hits.getJSONObject(i);
-                    JSONObject source = hit.optJSONObject("_source");
-                    if (source == null) continue;
-                    Map<String, Object> row = jsonObjectToMap(source);
-                    row.put("id", hit.optString("_id", ""));
-                    row.put("_sortValues", hit.optJSONArray("sort"));
-                    results.add(row);
-                }
-            }
-            return new SearchResult(results, total);
+            return executeSearch(buildBaseQuery(accountId, startTsMs, endTsMs, filters, searchString),
+                skip, limit, sortField, sortAsc, searchAfter);
         } catch (Exception e) {
             logger.error("search error for accountId=" + accountId + ": " + e.getMessage());
             return new SearchResult(new ArrayList<>(), 0);
         }
+    }
+
+    /** Multi-value filter search — each filter field supports multiple selected values. */
+    public SearchResult searchMulti(int accountId, long startTsMs, long endTsMs,
+                                    int skip, int limit,
+                                    String sortField, boolean sortAsc,
+                                    JSONArray searchAfter,
+                                    Map<String, List<String>> filters,
+                                    String searchString) {
+        if (!isConfigured()) return new SearchResult(new ArrayList<>(), 0);
+        try {
+            return executeSearch(buildBaseQueryMulti(accountId, startTsMs, endTsMs, filters, searchString),
+                skip, limit, sortField, sortAsc, searchAfter);
+        } catch (Exception e) {
+            logger.error("searchMulti error for accountId=" + accountId + ": " + e.getMessage());
+            return new SearchResult(new ArrayList<>(), 0);
+        }
+    }
+
+    private SearchResult executeSearch(JSONObject query, int skip, int limit,
+                                       String sortField, boolean sortAsc, JSONArray searchAfter) throws JSONException {
+        String sortDir = sortAsc ? "asc" : "desc";
+        String resolvedSort = (sortField != null && !sortField.isEmpty()) ? sortField : "timestamp";
+
+        JSONObject body = new JSONObject()
+            .put("query", query)
+            .put("sort", new JSONArray().put(new JSONObject().put(resolvedSort, new JSONObject().put("order", sortDir))))
+            .put("size", limit)
+            .put("track_total_hits", true);
+
+        if (searchAfter != null && searchAfter.length() > 0) {
+            body.put("search_after", searchAfter);
+        } else if (skip > 0 && skip < 10000) {
+            body.put("from", skip);
+        }
+
+        JSONObject response = httpPost(trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_search", body.toString());
+        if (response == null) return new SearchResult(new ArrayList<>(), 0);
+
+        long total = 0;
+        JSONObject hitsWrapper = response.optJSONObject("hits");
+        if (hitsWrapper != null) {
+            JSONObject totalObj = hitsWrapper.optJSONObject("total");
+            total = totalObj != null ? totalObj.optLong("value", 0) : hitsWrapper.optLong("total", 0);
+        }
+
+        List<Map<String, Object>> results = new ArrayList<>();
+        JSONArray hits = extractHits(response);
+        if (hits != null) {
+            for (int i = 0; i < hits.length(); i++) {
+                JSONObject hit = hits.getJSONObject(i);
+                JSONObject source = hit.optJSONObject("_source");
+                if (source == null) continue;
+                Map<String, Object> row = jsonObjectToMap(source);
+                row.put("id", hit.optString("_id", ""));
+                row.put("_sortValues", hit.optJSONArray("sort"));
+                results.add(row);
+            }
+        }
+        return new SearchResult(results, total);
     }
 
     // ── Generic aggregation (used by action classes for feature-specific aggs) ─
@@ -196,6 +215,39 @@ public class ElasticSearchClient {
             for (Map.Entry<String, String> e : filters.entrySet()) {
                 if (e.getValue() != null && !e.getValue().isEmpty()) {
                     must.put(new JSONObject().put("term", new JSONObject().put(e.getKey(), e.getValue())));
+                }
+            }
+        }
+
+        if (searchString != null && !searchString.isEmpty()) {
+            must.put(new JSONObject().put("bool", new JSONObject()
+                .put("should", new JSONArray()
+                    .put(new JSONObject().put("match", new JSONObject().put("queryPayload", searchString)))
+                    .put(new JSONObject().put("match", new JSONObject().put("userName", searchString)))
+                    .put(new JSONObject().put("match", new JSONObject().put("serviceId", searchString))))
+                .put("minimum_should_match", 1)));
+        }
+
+        return new JSONObject().put("bool", new JSONObject().put("must", must));
+    }
+
+    /**
+     * Multi-value variant: each filter entry emits a {@code terms} clause (OR within a field, AND across fields).
+     */
+    public JSONObject buildBaseQueryMulti(int accountId, long startTsMs, long endTsMs,
+                                          Map<String, List<String>> multiFilters, String searchString) throws JSONException {
+        JSONArray must = new JSONArray()
+            .put(new JSONObject().put("range", new JSONObject()
+                .put("timestamp", new JSONObject().put("gte", startTsMs).put("lt", endTsMs))))
+            .put(new JSONObject().put("term", new JSONObject().put("accountId", accountId)));
+
+        if (multiFilters != null) {
+            for (Map.Entry<String, List<String>> e : multiFilters.entrySet()) {
+                List<String> vals = e.getValue();
+                if (vals != null && !vals.isEmpty()) {
+                    JSONArray arr = new JSONArray();
+                    for (String v : vals) arr.put(v);
+                    must.put(new JSONObject().put("terms", new JSONObject().put(e.getKey(), arr)));
                 }
             }
         }

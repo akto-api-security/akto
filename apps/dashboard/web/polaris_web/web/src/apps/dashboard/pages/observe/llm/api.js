@@ -1,5 +1,6 @@
 import request from "@/util/request";
 import { enrichRow } from "./utils";
+import { parseResponseText } from "./constants";
 
 function llmMessagesRequest(data) {
     return request({ url: "/api/fetchLLMMessages", method: "post", data });
@@ -43,8 +44,8 @@ export default {
             sortOrder:       sortOrder === -1 ? -1 : 1,
             skip:            skip      || 0,
             limit:           500,
-            userName:        (filters?.userName?.[0])  || "",
-            serviceId:       (filters?.serviceId?.[0]) || "",
+            userNames:       filters?.userName  || [],
+            serviceIds:      filters?.serviceId || [],
             searchString:    searchString || "",
             searchAfterJson: searchAfterJson || "",
         }).then(r => {
@@ -67,8 +68,8 @@ export default {
                 sortOrder:       sortOrder === -1 ? -1 : 1,
                 skip:            skip      || 0,
                 limit:           limit     || 20,
-                userName:        (filters?.userName?.[0])  || "",
-                serviceId:       (filters?.serviceId?.[0]) || "",
+                userNames:       filters?.userName  || [],
+                serviceIds:      filters?.serviceId || [],
                 searchString:    searchString || "",
                 searchAfterJson: searchAfterJson || "",
             },
@@ -126,6 +127,7 @@ export function enrichForTable(row) {
         ...row,
         id:            row.docId || row.id,
         _promptText:   promptText,
+        _responseText: parseResponseText(row.responsePayload),
         _model:        model,
         _inputTokens:  inputTokens,
         _outputTokens: outputTokens,
