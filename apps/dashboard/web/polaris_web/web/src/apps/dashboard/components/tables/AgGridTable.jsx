@@ -1,16 +1,28 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import { themeQuartz } from "ag-grid-enterprise";
-import { Box, HorizontalStack, VerticalStack, Text, Button } from "@shopify/polaris";
-import { MobileCancelMajor } from "@shopify/polaris-icons";
+import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
+import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
+import { Box, HorizontalStack, Pagination, Text, VerticalStack, Button, TextField, Icon } from "@shopify/polaris";
+import { MobileCancelMajor, SearchMinor } from "@shopify/polaris-icons";
+import PersistStore from "@/apps/main/PersistStore";
+import "./rows/row.css";
+import { debounce } from 'lodash';
+import { AgGridRowRenderer } from "./rows/AgGridRow";
+import { CellType } from "./rows/GithubRow";
 
-// ─── Theme ────────────────────────────────────────────────────────────────────
-// Defined once here — all AG Grid consumers import agTableTheme / agTableThemeInner.
+const AG_GRID_COLUMN_TYPES = {
+    [CellType.TEXT]: { cellRenderer: "agGridRow" },
+    // CellType.ACTION: wire a dedicated cellRenderer per column — no grid-level preset
+    // CellType.COLLAPSIBLE: use AG Grid's built-in treeData/grouping instead
+};
+
+ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
+LicenseManager.setLicenseKey(window.AG_GRID_LICENSE_KEY);
 
 export const agTableTheme = themeQuartz.withParams({
     accentColor: "#9642FC",
     borderColor: "#E1E3E5",
-    borderRadius: 4,
     browserColorScheme: "light",
     cellTextColor: "#202223",
     columnBorder: false,
@@ -30,59 +42,28 @@ export const agTableTheme = themeQuartz.withParams({
     checkboxBorderRadius: 4,
 });
 
-// Used when the grid sits inside a styled container that provides its own border
-// (SearchBar wrapper, flyout panels, etc.) — suppresses the AG Grid border/radius.
-export const agTableThemeInner = agTableTheme.withParams({
-    wrapperBorder: false,
-    wrapperBorderRadius: 0,
-});
 
-// ─── SearchBar ────────────────────────────────────────────────────────────────
-// Plain <input> (not Polaris TextField) so it blends with the grid container border.
-
-function SearchBar({ value, onChange, placeholder, offset = 0 }) {
+function SearchBar({ value, onChange, placeholder }) {
     return (
-        <div style={{
-            padding: "7px 12px",
-            paddingLeft: offset > 0 ? offset : 12,
-            borderBottom: "1px solid #E1E3E5",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            background: "white",
-            flexShrink: 0,
-        }}>
-            {/* Search icon — inline SVG required; no Polaris icon available outside cell renderers */}
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-                <circle cx="9" cy="9" r="7" stroke="#8C9196" strokeWidth="1.75"/>
-                <path d="M14.5 14.5L19 19" stroke="#8C9196" strokeWidth="1.75" strokeLinecap="round"/>
-            </svg>
-            <input
-                type="text"
+        <Box borderWidth="1" borderColor="border-subdued" borderRadiusStartStart={2} borderRadiusStartEnd={2} padding={1} borderInlineStartWidth="1" borderBlockStartWidth="1" borderInlineEndWidth="1">
+            <div className="ag-grid-search-bar">
+            <TextField
+                prefix={<Box><Icon source={SearchMinor} /></Box>}
                 placeholder={placeholder}
                 value={value}
-                onChange={e => onChange(e.target.value)}
-                style={{
-                    border: "none",
-                    outline: "none",
-                    flex: 1,
-                    fontSize: 13,
-                    color: "#202223",
-                    background: "transparent",
-                    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                }}
+                onChange={onChange}
+                borderless
+                autoComplete="off"
             />
-        </div>
+            </div>
+        </Box>
     );
 }
-
-// ─── BulkActionBar ───────────────────────────────────────────────────────────
 
 function BulkActionBar({ count, bulkActions = [], onClear, noRadius = false }) {
     if (!count) return null;
     return (
         <Box paddingBlockEnd={noRadius ? "0" : "2"}>
-            {/* Brand purple background/border (#F5F0FF, #DDD3FA) are outside the Polaris token set */}
             <div style={{
                 padding: "8px 14px",
                 background: "#F5F0FF",
@@ -94,7 +75,6 @@ function BulkActionBar({ count, bulkActions = [], onClear, noRadius = false }) {
                 <VerticalStack gap="2">
                     <HorizontalStack align="space-between" blockAlign="center">
                         <HorizontalStack gap="2" blockAlign="center">
-                            {/* Brand purple #7C3AED badge — no matching Polaris token */}
                             <span style={{
                                 display: "inline-flex", alignItems: "center", justifyContent: "center",
                                 minWidth: 24, height: 24, padding: "0 7px", borderRadius: 12,
@@ -124,18 +104,35 @@ function BulkActionBar({ count, bulkActions = [], onClear, noRadius = false }) {
     );
 }
 
-// ─── AgGridTable ─────────────────────────────────────────────────────────────
-// Drop-in wrapper standardising theme, defaults, BulkActionBar, and SearchBar.
-//
-// Key props:
-//   height                              — total height in px (default 600); ignored when fillHeight=true
-//   fillHeight                          — flex-fill mode: grid expands to fill flex parent (use inside flyouts)
-//   noOuterBorder                       — suppress AG Grid wrapper border (uses agTableThemeInner)
-//   searchPlaceholder                   — if set, shows a SearchBar above the grid; auto-enables inner theme
-//   quickFilter / onQuickFilterChange   — controlled quick-filter text; uncontrolled when omitted
-//   bulkActionCount / bulkActions / onClearBulk — BulkActionBar integration
-//   gridRef                             — forwarded to AgGridReact
-//   All standard AgGridReact props passed through via ...rest
+// ── Server-fetch query reducer ────────────────────────────────────────────────
+// Used only when onServerFetch is provided. Owns filter/sort/page state,
+// persisted to PersistStore.filtersMap keyed by filterStateUrl or pathname.
+
+function extractFilterModel(model) {
+    const out = {};
+    Object.entries(model || {}).forEach(([field, state]) => {
+        if (state.filterType === "set" && Array.isArray(state.values)) {
+            out[field] = state.values;
+        } else if (state.filterType === "text" && state.filter) {
+            out[field] = [state.filter];
+        }
+    });
+    return out;
+}
+
+const QUERY_INIT = { filters: {}, sortKey: "", sortOrder: 1, page: 0, total: 0 };
+
+function queryReducer(state, action) {
+    switch (action.type) {
+        case "SET_FILTERS": return { ...state, filters: action.filters, page: 0 };
+        case "SET_SORT":    return { ...state, sortKey: action.sortKey, sortOrder: action.sortOrder, page: 0 };
+        case "SET_PAGE":    return { ...state, page: action.page };
+        case "SET_TOTAL":   return { ...state, total: action.total };
+        default:            return state;
+    }
+}
+
+// ── AgGridTable ───────────────────────────────────────────────────────────────
 
 export default function AgGridTable({
     rowData,
@@ -145,41 +142,126 @@ export default function AgGridTable({
     getDataPath,
     autoGroupColumnDef,
     groupDefaultExpanded,
-    height = 600,
-    fillHeight = false,
     noOuterBorder = false,
     searchPlaceholder,
-    searchOffset = 0,
     quickFilter: quickFilterProp,
     onQuickFilterChange,
     rowHeight = 44,
     headerHeight = 40,
     rowSelection = "multiple",
-    suppressRowClickSelection = true,
     onRowClicked,
     onSelectionChanged,
     getRowStyle,
     bulkActionCount = 0,
     bulkActions = [],
     onClearBulk,
-    pagination = true,
+    pagination,
     paginationPageSize = 20,
     paginationPageSizeSelector = [20, 50, 100],
     sideBar = { toolPanels: ["columns", "filters"] },
-    gridRef,
+    gridRef: gridRefProp,
     animateRows = true,
     suppressCellFocus = true,
+    onServerFetch,
+    filterStateUrl,
     ...rest
 }) {
-    // Uncontrolled quick-filter state — used when the parent does not pass quickFilter/onQuickFilterChange.
-    const [internalQuickFilter, setInternalQuickFilter] = useState("");
     const hasSearch = !!searchPlaceholder;
-    const quickFilter = quickFilterProp !== undefined ? quickFilterProp : internalQuickFilter;
-    const handleQuickFilterChange = onQuickFilterChange || setInternalQuickFilter;
+    const [searchValue, setSearchValue] = useState("");
+    const [debouncedSearchValue, setDebouncedSearchValue] = useState("");
+    const theme = agTableTheme;
 
-    // Use the inner theme (no wrapper border/radius) whenever the component provides its own container.
-    const theme = (noOuterBorder || fillHeight || hasSearch) ? agTableThemeInner : agTableTheme;
+    const debouncedSetSearch = useRef(
+        debounce((val, serverMode) => {
+            setDebouncedSearchValue(val);
+            if (serverMode) dispatchQuery({ type: "SET_PAGE", page: 0 });
+        }, 400)
+    ).current;
 
+    useEffect(() => {
+        debouncedSetSearch(searchValue, isServerMode);
+    }, [searchValue]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const internalRef = useRef(null);
+    const gridRef = gridRefProp || internalRef;
+
+    // ── Server-fetch state ──────────────────────────────────────────────────
+    const isServerMode = !!onServerFetch;
+    const pageKey = filterStateUrl || (window.location.pathname + "/ag-grid");
+
+    const filtersMap    = PersistStore(s => s.filtersMap);
+    const setFiltersMap = PersistStore(s => s.setFiltersMap);
+
+    const persisted = filtersMap[pageKey] || {};
+    const [query, dispatchQuery] = useReducer(
+        queryReducer,
+        isServerMode
+            ? { ...QUERY_INIT, filters: persisted.filters || {}, sortKey: persisted.sortKey || "", sortOrder: persisted.sortOrder ?? 1 }
+            : QUERY_INIT
+    );
+
+    // Persist filter/sort to PersistStore (not page) on change
+    const prevPersistKey = useRef(null);
+    useEffect(() => {
+        if (!isServerMode) return;
+        const key = JSON.stringify({ f: query.filters, sk: query.sortKey, so: query.sortOrder });
+        if (key === prevPersistKey.current) return;
+        prevPersistKey.current = key;
+        setFiltersMap({ ...filtersMap, [pageKey]: { filters: query.filters, sortKey: query.sortKey, sortOrder: query.sortOrder } });
+    });
+
+    // Tracks the last page's final sort values for search_after deep pagination
+    const lastSortValues = useRef(null);
+
+    // Call onServerFetch whenever query changes; callback returns { value, total }
+    useEffect(() => {
+        if (!isServerMode) return;
+        const skip = query.page * paginationPageSize;
+        // Use search_after when skip >= 9980 (approaching the 10k from/size hard limit)
+        const searchAfterJson = (skip >= 9980 && lastSortValues.current)
+            ? JSON.stringify(lastSortValues.current)
+            : undefined;
+        const result = onServerFetch({ filters: query.filters, sortKey: query.sortKey, sortOrder: query.sortOrder, skip, limit: paginationPageSize, searchAfterJson, searchString: debouncedSearchValue.length > 3 ? debouncedSearchValue : "" });
+        if (result && typeof result.then === "function") {
+            result.then(r => {
+                if (r?.total !== undefined) dispatchQuery({ type: "SET_TOTAL", total: r.total });
+                // Store the sort values of the last returned row for the next deep page
+                const rows = r?.value || [];
+                if (rows.length > 0) {
+                    const last = rows[rows.length - 1];
+                    lastSortValues.current = last._sortValues || null;
+                }
+            });
+        }
+    }, [query.filters, query.sortKey, query.sortOrder, query.page, debouncedSearchValue]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const handleFilterChanged = useCallback((e) => {
+        if (!isServerMode) return;
+        dispatchQuery({ type: "SET_FILTERS", filters: extractFilterModel(e.api.getFilterModel()) });
+    }, [isServerMode]);
+
+    const handleSortChanged = useCallback((e) => {
+        if (!isServerMode) return;
+        const col = e.api.getColumnState().find(c => c.sort);
+        dispatchQuery({ type: "SET_SORT", sortKey: col?.colId || "", sortOrder: col?.sort === "asc" ? -1 : 1 });
+    }, [isServerMode]);
+
+    // Custom pagination bar — only rendered in server mode; replaces AG Grid's built-in pagination.
+    const serverPaginationBar = isServerMode && query.total > 0 ? (
+        <Box padding="2">
+            <HorizontalStack align="center">    
+                <Pagination
+                    hasPrevious={query.page > 0}
+                    onPrevious={() => dispatchQuery({ type: "SET_PAGE", page: query.page - 1 })}
+                    hasNext={(query.page + 1) * paginationPageSize < query.total}
+                    onNext={() => dispatchQuery({ type: "SET_PAGE", page: query.page + 1 })}
+                    label={query.total === 0 ? "No results" : query.page * paginationPageSize + 1 + "-" + Math.min((query.page + 1) * paginationPageSize, query.total) + " of " + query.total}
+                />
+            </HorizontalStack>
+        </Box>
+    ) : null;
+
+    // ── Grid node ───────────────────────────────────────────────────────────
     const gridNode = (
         <AgGridReact
             ref={gridRef}
@@ -190,10 +272,8 @@ export default function AgGridTable({
             rowHeight={rowHeight}
             headerHeight={headerHeight}
             animateRows={animateRows}
-            enableBrowserTooltips
             suppressCellFocus={suppressCellFocus}
             rowSelection={rowSelection}
-            suppressRowClickSelection={suppressRowClickSelection}
             onRowClicked={onRowClicked}
             onSelectionChanged={onSelectionChanged}
             getRowStyle={getRowStyle}
@@ -205,49 +285,25 @@ export default function AgGridTable({
             getDataPath={getDataPath}
             autoGroupColumnDef={autoGroupColumnDef}
             groupDefaultExpanded={groupDefaultExpanded}
-            quickFilterText={hasSearch ? quickFilter : undefined}
+            components={{ agGridRow: AgGridRowRenderer }}
+            columnTypes={AG_GRID_COLUMN_TYPES}
+            onFilterChanged={handleFilterChanged}
+            onSortChanged={handleSortChanged}
+            domLayout={"autoHeight"}
             {...rest}
         />
     );
 
-    // ── Fill-height mode: flex-expand to fill the flex parent (flyout panels) ──
-    // Optionally renders a SearchBar above the grid when searchPlaceholder is provided.
-    if (fillHeight) {
-        return (
-            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} noRadius />
-                {hasSearch && <SearchBar value={quickFilter} onChange={handleQuickFilterChange} placeholder={searchPlaceholder} offset={searchOffset} />}
-                <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-                    {gridNode}
-                </div>
-            </div>
-        );
-    }
-
-    // ── Search-bar mode: fixed-height outer container with SearchBar above grid ──
-    if (hasSearch) {
-        return (
-            <VerticalStack gap="0">
-                <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} />
-                <div style={{ height, border: "1px solid #E1E3E5", borderRadius: 8, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                    <SearchBar value={quickFilter} onChange={handleQuickFilterChange} placeholder={searchPlaceholder} />
-                    <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-                        {gridNode}
-                    </div>
-                </div>
-            </VerticalStack>
-        );
-    }
-
-    // ── Default mode: fixed-height div, AG Grid wrapper border visible ──
     return (
-        <VerticalStack gap="0">
-            <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} />
-            {/* AG Grid requires an explicit-height container with overflow:hidden
-                — Box.minHeight and overflowY are insufficient for the grid to render correctly */}
-            <div style={{ height, overflow: "hidden" }}>
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} noRadius />
+            {hasSearch && <SearchBar value={searchValue} onChange={(val) => {
+                setSearchValue(val);
+            }} placeholder={searchPlaceholder} />}
+            <div style={{ flex: 1, minHeight: 0}}>
                 {gridNode}
             </div>
-        </VerticalStack>
+            {serverPaginationBar}
+        </div>
     );
 }

@@ -1881,7 +1881,7 @@ function ApiEndpoints(props) {
         tableTabs={tableTabs}
         selectable={true}
         promotedBulkActions={promotedBulkActions}
-        hasRowActions={true}
+        hasRowActions={isAgenticSecurityCategory() && isAgentProxyCollection}
         getActions={getActions}
         loading={tableLoading || loading}
         setSelectedResourcesForPrimaryAction={setSelectedResourcesForPrimaryAction}

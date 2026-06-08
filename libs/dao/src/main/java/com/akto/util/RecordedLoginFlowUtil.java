@@ -37,6 +37,10 @@ public class RecordedLoginFlowUtil {
     }
 
     public static void triggerFlow(String tokenFetchCommand, String payload, String outputFilePath, String errorFilePath, int userId, String roleName) throws Exception {
+        triggerFlow(tokenFetchCommand, payload, outputFilePath, errorFilePath, userId, roleName, null);
+    }
+
+    public static void triggerFlow(String tokenFetchCommand, String payload, String outputFilePath, String errorFilePath, int userId, String roleName, String screenshotSessionId) throws Exception {
 
         try {
             String url = System.getenv("PUPPETEER_REPLAY_SERVICE_URL");
@@ -46,15 +50,44 @@ public class RecordedLoginFlowUtil {
             boolean captureScreenshots = roleName != null && !roleName.trim().isEmpty();
             if (captureScreenshots) {
                 requestBody.put("captureScreenshots", true);
+                if (screenshotSessionId != null && !screenshotSessionId.isEmpty()) {
+                    requestBody.put("screenshotSessionId", screenshotSessionId);
+                }
             }
 
             String reqData = requestBody.toString();
             TimeoutObject timeoutObj = new TimeoutObject(300, 300, 300);
             JsonNode node = ApiRequest.postRequestWithTimeout(new HashMap<>(), url, reqData, timeoutObj);
-
-            logger.info("getting token...: " +  outputFilePath);
-
             JsonNode inner = unwrapReplayResponseNode(node);
+
+            // Always try to fetch screenshots — even if the replay failed, puppeteer may have
+            // captured screenshots and returned the sessionId in an error-shaped JSON response.
+            if (captureScreenshots) {
+                tryFetchAndPersistScreenshots(url, inner, roleName, userId, timeoutObj);
+            }
+
+            // If puppeteer reported a replay error, propagate it now (after screenshots are saved).
+            if (inner.has("error")) {
+                String replayError = inner.get("error").asText();
+                FileUtils.writeStringToFile(new File(errorFilePath), replayError, (String) null);
+                if (userId != 0) {
+                    Bson filter = Filters.eq("userId", userId);
+                    Bson update = Updates.combine(
+                        Updates.set("content", payload),
+                        Updates.set("tokenFetchCommand", tokenFetchCommand),
+                        Updates.setOnInsert("createdAt", Context.now()),
+                        Updates.set("updatedAt", Context.now()),
+                        Updates.set("outputFilePath", outputFilePath),
+                        Updates.set("errorFilePath", errorFilePath),
+                        Updates.unset(RecordedLoginFlowInput.TOKEN_RESULT)
+                    );
+                    RecordedLoginInputDao.instance.updateOne(filter, update);
+                }
+                throw new Exception("error executing recorded login flow " + replayError);
+            }
+
+            logger.info("getting token...: " + outputFilePath);
+
             String tokenJson = inner.isObject() || inner.isArray()
                     ? OBJECT_MAPPER.writeValueAsString(inner)
                     : inner.toString();
@@ -63,14 +96,8 @@ public class RecordedLoginFlowUtil {
 
             FileUtils.writeStringToFile(new File(outputFilePath), tokenJson, (String) null);
 
-            if (captureScreenshots) {
-                tryFetchAndPersistScreenshots(url, inner, roleName, userId, timeoutObj);
-            }
-
             if (userId != 0) {
-                Bson filter = Filters.and(
-                    Filters.eq("userId", userId)
-                );
+                Bson filter = Filters.eq("userId", userId);
                 Bson update = Updates.combine(
                     Updates.set("content", payload),
                     Updates.set("tokenFetchCommand", tokenFetchCommand),
@@ -120,37 +147,23 @@ public class RecordedLoginFlowUtil {
     }
 
     private static void tryFetchAndPersistScreenshots(String replayServiceBaseUrl, JsonNode replayInner, String roleName, int userId, TimeoutObject timeoutObj) {
-        if (userId == 0 || roleName == null || roleName.trim().isEmpty()) {
-            return;
-        }
+        if (userId == 0 || roleName == null || roleName.trim().isEmpty()) return;
         JsonNode sessionIdNode = replayInner.get("screenshotSessionId");
-        if (sessionIdNode == null || sessionIdNode.isNull() || !sessionIdNode.isTextual()) {
-            return;
-        }
+        if (sessionIdNode == null || sessionIdNode.isNull() || !sessionIdNode.isTextual()) return;
         String sessionId = sessionIdNode.asText();
-        if (sessionId.isEmpty()) {
-            return;
-        }
-        String base = replayServiceBaseUrl.replaceAll("/+$", "");
-        String screenshotsUrl = base + "/getReplayScreenshots";
+        if (sessionId.isEmpty()) return;
+        String screenshotsUrl = replayServiceBaseUrl.replaceAll("/+$", "") + "/getReplayScreenshots";
         try {
             JSONObject body = new JSONObject();
             body.put("screenshotSessionId", sessionId);
             JsonNode resp = ApiRequest.postRequestWithTimeout(new HashMap<>(), screenshotsUrl, body.toString(), timeoutObj);
-            if (resp == null) {
-                logger.warn("getReplayScreenshots returned null");
-                return;
-            }
+            if (resp == null) return;
             JsonNode statusNode = resp.get("status");
             String status = statusNode != null && statusNode.isTextual() ? statusNode.asText() : "";
-            if (!"COMPLETED".equals(status) && !"FAILED".equals(status)) {
-                logger.warn("getReplayScreenshots unexpected status: " + status);
-                return;
-            }
-            List<String> shots = parseScreenshotsBase64(resp);
-            persistScreenshots(roleName.trim(), userId, shots);
+            if (!"COMPLETED".equals(status) && !"FAILED".equals(status)) return;
+            persistScreenshots(roleName.trim(), userId, parseScreenshotsBase64(resp));
         } catch (Exception e) {
-            logger.warn("failed to fetch or persist replay screenshots: " + e.getMessage());
+            logger.warn("failed to fetch or persist replay screenshots: {}", e.getMessage(), e);
         }
     }
 
@@ -177,6 +190,21 @@ public class RecordedLoginFlowUtil {
                 Updates.set("updatedAt", Context.now())
         );
         RecordedLoginScreenshotDao.instance.updateOne(filter, update);
+    }
+
+    public static String fetchLatestLiveScreenshot(String replayServiceBaseUrl, String sessionId) {
+        try {
+            String url = replayServiceBaseUrl.replaceAll("/+$", "") + "/getLatestReplayScreenshot";
+            JSONObject body = new JSONObject();
+            body.put("screenshotSessionId", sessionId);
+            JsonNode resp = ApiRequest.postRequestWithTimeout(new HashMap<>(), url, body.toString(), new TimeoutObject(5, 5, 5));
+            if (resp != null && resp.has("screenshotBase64") && !resp.get("screenshotBase64").isNull()) {
+                return resp.get("screenshotBase64").asText();
+            }
+        } catch (Exception e) {
+            // best effort — return null if puppeteer is unavailable or session expired
+        }
+        return null;
     }
 
     public static String fetchToken(RecordedLoginFlowInput recordedLoginInput) throws Exception {

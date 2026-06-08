@@ -19,6 +19,8 @@ public class DefaultTestSuites extends TestSuites {
         testSuitesPerType.put(DefaultSuitesType.DURATION.name(), 2);
         testSuitesPerType.put(DefaultSuitesType.MCP_SECURITY.name(), 8);
         testSuitesPerType.put(DefaultSuitesType.AI_AGENT_SECURITY.name(), 16);
+        testSuitesPerType.put(DefaultSuitesType.ATTACK_BASE_TECHNIQUE.name(), 14);
+        testSuitesPerType.put(DefaultSuitesType.ATTACK_STRATEGY.name(), 6);
     }
 
     public DefaultTestSuites() {}
@@ -34,7 +36,9 @@ public class DefaultTestSuites extends TestSuites {
         SEVERITY,
         DURATION,
         MCP_SECURITY,
-        AI_AGENT_SECURITY
+        AI_AGENT_SECURITY,
+        ATTACK_BASE_TECHNIQUE,
+        ATTACK_STRATEGY
     }
 
     public static final Map<String, List<String>> owaspTop10List = new HashMap<>();

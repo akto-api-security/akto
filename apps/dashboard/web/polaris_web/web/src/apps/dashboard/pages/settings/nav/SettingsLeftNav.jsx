@@ -174,10 +174,16 @@ const SettingsLeftNav = () => {
                         onClick: () => navigate("/dashboard/settings/allowed-hosts")
                     },
                     ...(window.USER_NAME?.toLowerCase()?.endsWith("@akto.io") ? [{
-                        label: 'Endpoint Shield',
+                        label: 'Installer Version Control',
                         icon: LockFilledMajor,
                         selected: page === "endpoint-shield",
                         onClick: () => navigate("/dashboard/settings/endpoint-shield")
+                    },
+                    {
+                        label: 'Remote Commands',
+                        icon: AutomationFilledMajor,
+                        selected: page === "remote-commands" || path.includes("/settings/remote-commands/"),
+                        onClick: () => navigate("/dashboard/settings/remote-commands")
                     }] : []),
                     {
                         label: 'File Inspection',

@@ -37,6 +37,8 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
     const [modalScreenshots, setModalScreenshots] = useState([])
     const [modalLoading, setModalLoading] = useState(false)
     const [hasScreenshots, setHasScreenshots] = useState(false)
+    const [liveSessionId, setLiveSessionId] = useState(null)
+    const [liveScreenshot, setLiveScreenshot] = useState(null)
 
     const [authParams, setAuthParams] = useState([{
         key: "",
@@ -85,6 +87,17 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
         }
     }, [roleName])
 
+    useEffect(() => {
+        if (!isLoading || !liveSessionId) return
+        const interval = setInterval(async () => {
+            try {
+                const resp = await api.getLatestReplayScreenshot(liveSessionId)
+                if (resp?.screenshotBase64) setLiveScreenshot(resp.screenshotBase64)
+            } catch { /* ignore */ }
+        }, 1500)
+        return () => clearInterval(interval)
+    }, [isLoading, liveSessionId])
+
     const inputRef = useRef(null);
 
     const handleClick = () => {
@@ -122,27 +135,36 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
 
             try {
                 const resp = await api.fetchRecordedLoginFlow("x1", playgroundId || undefined)
-                if (trimmedRole && resp.tokenFetchInProgress) {
-                    await refreshScreenshotsWhileActive()
-                }
                 if (!resp.tokenFetchInProgress) {
                     setExtractedToken(resp.token)
                     finishedOk = true
                     setIsLoading(false)
+                    setLiveScreenshot(null)
                     setToastConfig({ isActive: true, isError: false, message: "Verify extracted token" })
                     if (trimmedRole) {
                         await refreshScreenshotsWhileActive()
                     }
                     break
                 }
-            } catch {
-                /* continue polling */
+            } catch(e) {
+                const serverError = e?.response?.data?.actionErrors?.[0]
+                if (serverError) {
+                    finishedOk = true
+                    setIsLoading(false)
+                    setLiveScreenshot(null)
+                    setToastConfig({ isActive: true, isError: true, message: serverError })
+                    await refreshScreenshotsWhileActive()
+                    break
+                }
+                // transient network error — continue polling
             }
         }
 
         if (!finishedOk) {
             setIsLoading(false)
+            setLiveScreenshot(null)
             setToastConfig({ isActive: true, isError: true, message: "Error while extracting token using JSON recording" })
+            await refreshScreenshotsWhileActive()
         }
     }
 
@@ -176,6 +198,8 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
 
         reader.onload = () => {
             setContent(reader.result)
+            setHasScreenshots(false)
+            setLiveScreenshot(null)
             const result = api.uploadRecordedLoginFlow(
                 reader.result,
                 tokenFetchCommand,
@@ -186,10 +210,7 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
             result.then((resp) => {
                 setToastConfig({ isActive: true, isError: false, message: "JSON recording uploaded" })
                 setShowVerify(true)
-                const trimmed = roleName && String(roleName).trim()
-                if (trimmed) {
-                    setHasScreenshots(false)
-                }
+                setLiveSessionId(resp?.screenshotSessionId || null)
                 const pgId = resp && resp.testingRunPlaygroundId
                 pollExtractedToken(roleName, pgId || null)
             }).catch((err) => {
@@ -275,7 +296,13 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
                                 <TextField value={extractedToken} readonly />
                             </div>
                         }
-
+                        {liveScreenshot && (
+                            <img
+                                alt="Replay screenshot"
+                                src={`data:image/jpeg;base64,${liveScreenshot}`}
+                                style={{ maxWidth: '100%', display: 'block', borderRadius: '4px', marginTop: '12px' }}
+                            />
+                        )}
                     </Card>
                 }
 
