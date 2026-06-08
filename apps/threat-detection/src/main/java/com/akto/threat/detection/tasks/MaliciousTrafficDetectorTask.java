@@ -89,10 +89,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
   private static final HttpRequestParams requestParams = new HttpRequestParams();
   private static final HttpResponseParams responseParams = new HttpResponseParams();
   private static final FilterConfig ipApiRateLimitFilter = Utils.getipApiRateLimitFilter();
-  private static final Set<String> DEFAULT_THREAT_PROTECTION_FILTER_IDS = new HashSet<>(Arrays.asList(
-      "LocalFileInclusionLFIRFI", "NoSQLInjection", "OSCommandInjection", "SQLInjection",
-      "SSRF", "SecurityMisconfig", "WindowsCommandInjection", "XSS"
-  ));
+
   private static Supplier<String> lazyToString;
   private DistributionCalculator distributionCalculator;
   private ThreatDetectorWithStrategy threatDetector;
@@ -181,7 +178,6 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
         Context.isRedactPayload.set(config.isRedacted());
       }
 
-      logger.warnAndAddToDb(this.instanceId + ": Started Kafka polling loop");
       for (ConsumerRecord<String, byte[]> record : records) {
         if (AccountConfig.isGraphQLAccount() && record.value().length > MAX_PAYLOAD_SIZE_BYTES) {
             continue;
@@ -237,14 +233,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
     AccountConfig accountConfig = AccountConfigurationCache.getInstance().getConfig(dataActor);
     boolean isHyperscanEnabled = accountConfig != null && accountConfig.isHyperscanEnabled();
 
-    Map<String, FilterConfig> filters = this.filterCache.getFilters();
-
-    // When hyperscan is enabled, skip default threat protection filters (hyperscan handles them)
-    // Only custom YAML templates should run through the filter loop
-    if (isHyperscanEnabled && filters != null && !filters.isEmpty()) {
-      filters = new HashMap<>(filters);
-      filters.keySet().removeAll(DEFAULT_THREAT_PROTECTION_FILTER_IDS);
-    }
+    Map<String, FilterConfig> filters = this.filterCache.getFilters(isHyperscanEnabled);
 
     if (!modeLogged) {
       String mode = isHyperscanEnabled ? "HYPERSCAN" : "FILTER MODE";
