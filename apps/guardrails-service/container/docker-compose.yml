@@ -87,31 +87,6 @@ services:
     labels:
       com.centurylinklabs.watchtower.enable: "false"
 
-  redis-stack:
-    image: redis/redis-stack-server:latest
-    container_name: guardrails-redis-stack
-    restart: always
-    ports:
-      - "127.0.0.1:6379:6379"
-    command: >
-      redis-server
-      --maxmemory 256mb
-      --maxmemory-policy volatile-lru
-    volumes:
-      - ./data-redis:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "2"
-    labels:
-      com.centurylinklabs.watchtower.enable: "false"
-
   guardrails-service-http:
     build:
       context: .
@@ -121,9 +96,6 @@ services:
     restart: always
     ports:
       - "127.0.0.1:9091:8080"
-    depends_on:
-      redis-stack:
-        condition: service_healthy
     logging:
       driver: "json-file"
       options:

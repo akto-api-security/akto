@@ -17,5 +17,13 @@
 			"binding": "ANONYMIZER_WORKER",
 			"service": "akto-anonymizer-worker"
 		}
+	],
+	// Vector store for the per-scanner semantic cache (shadow mode). See
+	// wrangler.jsonc for the index + metadata-index creation commands.
+	"vectorize": [
+		{
+			"binding": "VECTORIZE",
+			"index_name": "guardrails-shadow-cache"
+		}
 	]
 }

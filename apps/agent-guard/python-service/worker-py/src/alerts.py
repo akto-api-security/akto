@@ -85,6 +85,63 @@ async def post_slack(scanner_name: str, scanner_type: str, text: str,
         logger.warning(f"[Slack] post failed: {exc}")
 
 
+def _verdict(is_valid: bool) -> str:
+    return "✅ ALLOWED" if is_valid else "🚫 BLOCKED"
+
+
+def _cache_shadow_blocks(info: Dict[str, Any]) -> List[Dict[str, Any]]:
+    outcome = info.get("outcome", "miss")
+    scanner = f"`{info.get('scanner_name')}` ({info.get('scanner_type')})"
+    key = info.get("scanner_key", "—")
+    real = _verdict(bool(info.get("real_is_valid", True)))
+    latency = _fmt_num(info.get("latency_ms"))
+    text = info.get("text", "") or ""
+    preview = text if len(text) <= _TEXT_PREVIEW_CHARS else text[:_TEXT_PREVIEW_CHARS] + "…"
+
+    if outcome == "error":
+        header = f"⚠️ SHADOW ERROR — guardrails-cache\nerror: `{info.get('error', '—')}`"
+    elif outcome == "miss":
+        header = "MISS — guardrails-cache"
+    elif outcome == "hit_match":
+        header = "HIT ✅ MATCH — guardrails-cache"
+    else:
+        header = "HIT ⚠️ MISMATCH — guardrails-cache"
+
+    line = f"*real:* {real}   *scanner_key:* `{key}`   *latency:* `{latency}ms`"
+    extra: List[str] = []
+    if outcome in ("hit_match", "hit_mismatch"):
+        extra.append(f"*cache:* {_verdict(bool(info.get('cached_is_valid', True)))}")
+    if "distance" in info:  # a nearest neighbour existed (present even on a near-miss)
+        extra.append(f"*distance:* `{_fmt_num(info['distance'])}`")
+        extra.append(f"*threshold:* `{_fmt_num(info.get('threshold'))}`")
+    if extra:
+        line += "\n" + "   ".join(extra)
+
+    blocks: List[Dict[str, Any]] = [
+        {"type": "section", "text": {"type": "mrkdwn", "text": f"*{header}* — {scanner}\n{line}"}},
+        {"type": "section", "text": {"type": "mrkdwn", "text": f"*Input:*\n```{preview}```"}},
+    ]
+    reason = info.get("real_reason") or ""
+    if reason:
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*Real reason:* {reason}"}})
+    return blocks
+
+
+async def post_cache_shadow(info: Dict[str, Any]) -> None:
+    """Post a semantic-cache shadow comparison (miss / hit match / hit mismatch)."""
+    webhook = (settings.SLACK_WEBHOOK_URL or "").strip()
+    if not webhook:
+        return
+    try:
+        payload = {"blocks": _cache_shadow_blocks(info)}
+        async with httpx.AsyncClient(timeout=_SLACK_TIMEOUT_S) as client:
+            resp = await client.post(webhook, headers=_IDENTITY, json=payload)
+        if resp.status_code >= 400:
+            logger.warning(f"[Slack] cache-shadow webhook returned {resp.status_code}")
+    except Exception as exc:
+        logger.warning(f"[Slack] cache-shadow post failed: {exc}")
+
+
 async def store_results(completed: List[Dict[str, Any]], scanner_name: str) -> None:
     base = (settings.DATABASE_ABSTRACTOR_SERVICE_URL or "").strip().rstrip("/")
     if not base:

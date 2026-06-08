@@ -17,5 +17,15 @@
 			"binding": "ANONYMIZER_WORKER",
 			"service": "akto-anonymizer-worker"
 		}
+	],
+	// Vector store for the per-scanner semantic cache (shadow mode). Create the
+	// index first (dim must match EMBEDDER_URL's model, 384 for all-MiniLM-L6-v2):
+	//   wrangler vectorize create guardrails-shadow-cache --dimensions 384 --metric cosine
+	//   wrangler vectorize create-metadata-index guardrails-shadow-cache --property-name scanner_key --type string
+	"vectorize": [
+		{
+			"binding": "VECTORIZE",
+			"index_name": "guardrails-shadow-cache"
+		}
 	]
 }

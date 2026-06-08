@@ -28,6 +28,13 @@ OPENAI_COMPATIBLE_BASE_URL=
 SLACK_WEBHOOK_URL=
 DATABASE_ABSTRACTOR_SERVICE_URL=
 
+# Per-scanner semantic cache — shadow mode (observe + Slack alert, never serves).
+# Needs the VECTORIZE binding (see wrangler.jsonc) and an embedder reachable from
+# the worker. CACHE_SHADOW_ENABLED is off unless set to true/1.
+CACHE_SHADOW_ENABLED=
+CACHE_DISTANCE_THRESHOLD=0.15
+EMBEDDER_URL=
+
 # Per-deployment cascade default modelMap as a JSON string. Empty → built-in
 # default (qwen3guard tier1 + gemma_vertexai arbiter). Set this (per worker) to
 # run a different model lineup/thresholds without changing code. Example:

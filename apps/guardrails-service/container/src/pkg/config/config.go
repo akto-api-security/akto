@@ -40,13 +40,6 @@ type Config struct {
 	SessionEnabled         bool
 
 	File FileConfig
-
-	// Semantic cache observer (observe-only shadow mode — pure Go, no Python sidecar)
-	CacheEnabled           bool    // CACHE_ENABLED
-	CacheRedisURL          string  // CACHE_REDIS_URL
-	CacheModelDir          string  // CACHE_MODEL_DIR  (hugot downloads model here on first run)
-	CacheDistanceThreshold float64 // CACHE_DISTANCE_THRESHOLD
-	CacheTTLSeconds        int     // CACHE_TTL_SECONDS
 }
 
 type FileConfig struct {
@@ -101,11 +94,6 @@ func LoadConfig() *Config {
 		SessionEnabled:           getEnvAsBool("SESSION_ENABLED", true),
 		McpAllowedListRefreshIntervalMin:  getEnvAsInt("MCP_ALLOWLIST_REFRESH_INTERVAL_MIN", 1),
 		CollectionRefreshIntervalMin: getEnvAsInt("COLLECTION_REFRESH_INTERVAL_MIN", 5),
-		CacheEnabled:           getEnvAsBool("CACHE_ENABLED", false),
-		CacheRedisURL:          getEnv("CACHE_REDIS_URL", "redis://localhost:6379"),
-		CacheModelDir:          getEnv("CACHE_MODEL_DIR", "/tmp/hugot-models"),
-		CacheDistanceThreshold: getEnvAsFloat64("CACHE_DISTANCE_THRESHOLD", 0.15),
-		CacheTTLSeconds:        getEnvAsInt("CACHE_TTL_SECONDS", 3600),
 		File: FileConfig{
 			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
 			MaxTextFileBytes: getEnvAsInt("FILE_VALIDATE_MAX_TEXT_FILE_BYTES", 5*1024*1024),
@@ -142,18 +130,6 @@ func getEnvAsInt(key string, defaultValue int) int {
 		return defaultValue
 	}
 	value, err := strconv.Atoi(valueStr)
-	if err != nil {
-		return defaultValue
-	}
-	return value
-}
-
-func getEnvAsFloat64(key string, defaultValue float64) float64 {
-	valueStr := os.Getenv(key)
-	if valueStr == "" {
-		return defaultValue
-	}
-	value, err := strconv.ParseFloat(valueStr, 64)
 	if err != nil {
 		return defaultValue
 	}

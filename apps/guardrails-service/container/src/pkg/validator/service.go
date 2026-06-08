@@ -12,7 +12,6 @@ import (
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/models"
-	"github.com/akto-api-security/guardrails-service/pkg/cache"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
@@ -59,7 +58,6 @@ type Service struct {
 	collectionTagsCache *collectionTagsCache
 	sessionMgr          *session.SessionManager // Our session manager implementation for session tracking
 	schemaFetcher       *SchemaFetcher
-	cacheObserver       *cache.Observer // observe-only semantic cache shadow
 }
 
 // NewService creates a new validator service
@@ -116,38 +114,6 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 
 	schemaFetcher := NewSchemaFetcher(dbClient, time.Duration(cfg.PolicyRefreshIntervalMin)*time.Minute, logger)
 
-	// Initialise semantic cache observer (Go-native: hugot embedder + Redis vector store).
-	// When disabled the observer is a no-op and adds zero overhead.
-	var observer *cache.Observer
-	if cfg.CacheEnabled {
-		embedder, err := cache.NewEmbedder(context.Background(), cfg.CacheModelDir, logger)
-		if err != nil {
-			logger.Warn("Failed to initialise cache embedder — cache disabled", zap.Error(err))
-		} else {
-			vs, err := cache.NewVectorStore(cfg.CacheRedisURL, cfg.CacheDistanceThreshold, logger)
-			if err != nil {
-				logger.Warn("Failed to connect to Redis for cache — cache disabled", zap.Error(err))
-				embedder.Destroy()
-			} else {
-				if err := vs.EnsureIndex(context.Background()); err != nil {
-					logger.Warn("Failed to create vector index — cache disabled", zap.Error(err))
-					embedder.Destroy()
-				} else {
-					observer = cache.NewObserver(embedder, vs, true, cfg.CacheTTLSeconds, logger)
-					logger.Info("Semantic cache observer enabled",
-						zap.String("redisURL", cfg.CacheRedisURL),
-						zap.String("modelDir", cfg.CacheModelDir),
-						zap.Float64("distanceThreshold", cfg.CacheDistanceThreshold),
-						zap.Int("ttlSeconds", cfg.CacheTTLSeconds),
-					)
-				}
-			}
-		}
-	}
-	if observer == nil {
-		observer = cache.NewObserver(nil, nil, false, cfg.CacheTTLSeconds, logger)
-	}
-
 	return &Service{
 		config:              cfg,
 		dbClient:            dbClient,
@@ -158,7 +124,6 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		collectionTagsCache: &collectionTagsCache{byHostName: make(map[string]map[string]string)},
 		sessionMgr:          sessionManager,
 		schemaFetcher:       schemaFetcher,
-		cacheObserver:       observer,
 	}, nil
 }
 
@@ -847,16 +812,6 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Filter policies by MCP server name — policies with no server configured are skipped
 	policies = filterPoliciesByMcpServer(policies, valCtx.McpServerName)
 
-	// Shadow cache check — spawns goroutine, never blocks the real validation path
-	reqRuleHash := cache.ComputeRuleHash(policies, "request")
-	s.logger.Info("ValidateRequest - cache rule hash computed",
-		zap.String("ruleHash", reqRuleHash),
-		zap.Int("activePolicies", len(policies)),
-		zap.String("sessionID", sessionID),
-		zap.String("path", params.Path),
-	)
-	cacheCh := s.cacheObserver.CheckAsync(payloadToValidate, reqRuleHash)
-
 	s.logger.Info("ValidateRequest - calling ProcessRequest",
 		zap.String("contextSource", contextSource),
 		zap.String("path", params.Path),
@@ -917,9 +872,6 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		Metadata:        types.ThreatMetadata{},
 		Behaviour:       processResult.Behaviour,
 	}
-
-	// Compare cache result with real result and send Slack alert — fire-and-forget goroutine
-	go s.cacheObserver.CompareAndAlert(cacheCh, result, payloadToValidate, reqRuleHash, "request", sessionID, params.Path)
 
 	s.logger.Info("ValidateRequest - completed",
 		zap.String("path", params.Path),
@@ -1016,16 +968,6 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("method", params.Method),
 		zap.String("payloadToValidate", responseBodyForValidation))
 
-	// Shadow cache check — spawns goroutine, never blocks the real validation path
-	respRuleHash := cache.ComputeRuleHash(policies, "response")
-	s.logger.Info("ValidateResponse - cache rule hash computed",
-		zap.String("ruleHash", respRuleHash),
-		zap.Int("activePolicies", len(policies)),
-		zap.String("sessionID", sessionID),
-		zap.String("path", params.Path),
-	)
-	respCacheCh := s.cacheObserver.CheckAsync(responseBodyForValidation, respRuleHash)
-
 	// Use processor's ProcessResponse method with external policies
 	processStart := time.Now()
 	processResult, err := s.processor.ProcessResponseParallel(ctx, responseBodyForValidation, valCtx, policies)
@@ -1060,9 +1002,6 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		Metadata:        types.ThreatMetadata{},
 		Behaviour:       processResult.Behaviour,
 	}
-
-	// Compare cache result with real result and send Slack alert — fire-and-forget goroutine
-	go s.cacheObserver.CompareAndAlert(respCacheCh, result, responseBodyForValidation, respRuleHash, "response", sessionID, params.Path)
 
 	s.logger.Info("ValidateResponse - completed",
 		zap.String("path", params.Path),
