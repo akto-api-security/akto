@@ -97,6 +97,9 @@ public class GuardrailPolicies {
     // Object-shaped so it can be extended later without a data migration.
     private List<BlockedHostEntry> blockedHosts;
 
+    // Block personal / consumer accounts (non-enterprise email-type users).
+    private boolean blockPersonalAccounts;
+
     // Modal config
     private ArrayList<ModelConfig> modelConfigs;
 
