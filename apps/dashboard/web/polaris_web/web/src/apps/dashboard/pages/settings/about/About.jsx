@@ -93,6 +93,7 @@ function About() {
     const [replaceHeaderValueRegex, setReplaceHeaderValueRegex] = useState('');
     const [replaceNewCollectionName, setReplaceNewCollectionName] = useState('');
     const [enableTelemetry, setEnableTelemetry] = useState(false)
+    const [enableEmptyCollectionCleanup, setEnableEmptyCollectionCleanup] = useState(false)
     const [privateCidrList, setPrivateCidrList] = useState([])
     const [partnerIpsList, setPartnerIpsList] = useState([])
     const [accountName, setAccountName] = useState('')
@@ -140,6 +141,7 @@ function About() {
         setTrafficThreshold(resp.trafficAlertThresholdSeconds)
         setObjectArr(arr)
         setEnableTelemetry(resp.telemetrySettings?.customerEnabled || false)
+        setEnableEmptyCollectionCleanup(resp.enableEmptyCollectionCleanup || false)
         if (resp.filterHeaderValueMap)
             setTrafficFiltersMap(resp.filterHeaderValueMap)
 
@@ -263,6 +265,11 @@ function About() {
     const toggleTelemetry = async(val) => {
         setEnableTelemetry(val);
         await settingRequests.toggleTelemetry(val);
+    }
+
+    const handleEmptyCollectionCleanup = async(val) => {
+        setEnableEmptyCollectionCleanup(val);
+        await settingRequests.toggleEmptyCollectionCleanup(val);
     }
 
     const handleSelectTraffic = async(val) => {
@@ -725,6 +732,7 @@ function About() {
                                   <ToggleComponent text={"Redact sample data"} initial={redactPayload} onToggle={handleRedactPayload} />
                                   <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} />
                                   <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
+                                  <ToggleComponent text={"Auto-delete empty collections"} initial={enableEmptyCollectionCleanup} onToggle={handleEmptyCollectionCleanup} />
                                   {redundantUrlComp}
                                   {compulsoryDescriptionComponent}
                                   {logSettingsComponent}

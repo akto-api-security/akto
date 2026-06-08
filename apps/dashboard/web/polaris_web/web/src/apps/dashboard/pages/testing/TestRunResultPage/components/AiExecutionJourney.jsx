@@ -9,7 +9,7 @@ import {
 import PropTypes from 'prop-types';
 import { MOCK_EXECUTION_TRACE } from './mockExecutionData';
 import { CHAT_ASSETS, JOURNEY_TEXT } from './chatConstants';
-import { shouldShowSmartTestingExecutionTrace } from '../smartTestingUtils';
+import { shouldShowSmartTestingExecutionTrace, transformAiSummaryToEvents, SMART_TESTING_TRACE_ACCOUNT_ID } from '../smartTestingUtils';
 
 const TRACE_SCROLL_MAX_HEIGHT = 'min(40vh, 360px)';
 
@@ -38,12 +38,15 @@ const layout = {
     line: { flex: 1, width: '2px', minHeight: '12px', marginTop: '4px', backgroundColor: TRACE_COLOR.line },
     body: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '10px' },
     phase: { fontSize: '15px', fontWeight: 600, color: TRACE_COLOR.phase },
-    bodyText: { fontSize: '14px', lineHeight: 1.6, color: TRACE_COLOR.body, margin: 0 },
+    bodyText: { fontSize: '14px', lineHeight: 1.6, color: TRACE_COLOR.body, margin: 0, overflowWrap: 'anywhere' },
     mono: {
         fontFamily: "SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace",
         fontSize: '13px',
         lineHeight: 1.55,
         margin: 0,
+        overflowWrap: 'anywhere',
+        wordBreak: 'break-all',
+        whiteSpace: 'pre-wrap',
     },
 };
 
@@ -52,7 +55,7 @@ function phaseLabel(phase) {
 }
 
 function TraceEvent({ event, isLast }) {
-    const paragraphs = event.content.split('\n\n').filter((p) => p.trim());
+    const paragraphs = event.content ? event.content.split('\n\n').filter((p) => p.trim()) : [];
 
     return (
         <Box as="div" style={isLast ? layout.eventLast : layout.event}>
@@ -85,7 +88,7 @@ function TraceEvent({ event, isLast }) {
                     </Box>
                 ) : null}
                 {paragraphs.map((paragraph, idx) => (
-                    <Text key={idx} as="p" breakWord style={layout.bodyText}>
+                    <Text key={idx} as="p" style={layout.bodyText}>
                         {paragraph}
                     </Text>
                 ))}
@@ -94,12 +97,28 @@ function TraceEvent({ event, isLast }) {
     );
 }
 
-function AiExecutionJourney({ runAutomatedTests = false }) {
+function AiExecutionJourney({ runAutomatedTests = false, aiSummaryTraces = null }) {
     if (!shouldShowSmartTestingExecutionTrace(runAutomatedTests)) {
         return null;
     }
 
-    const { agent, runMode, endpoint, objective, events } = MOCK_EXECUTION_TRACE;
+    const isSpecialAccount = Number(window.ACTIVE_ACCOUNT) === SMART_TESTING_TRACE_ACCOUNT_ID;
+
+    let aiEvents = null;
+    let isUsingRealData = false;
+
+    if (isSpecialAccount) {
+        aiEvents = MOCK_EXECUTION_TRACE.events;
+    } else if (aiSummaryTraces) {
+        aiEvents = transformAiSummaryToEvents(aiSummaryTraces);
+        isUsingRealData = true;
+    } else {
+        return null;
+    }
+
+    const { agent, runMode, endpoint, objective, events } = isUsingRealData
+        ? { agent: 'Akto Smart Test Agent', runMode: 'Smart Automated Testing', endpoint: '', objective: '', events: aiEvents }
+        : MOCK_EXECUTION_TRACE;
 
     return (
         <Box padding="3" background="bg-surface-secondary" borderRadius="2" borderWidth="1" borderColor="border">
@@ -118,19 +137,21 @@ function AiExecutionJourney({ runAutomatedTests = false }) {
                             </Text>
                         </VerticalStack>
                     </HorizontalStack>
-                    <Badge tone="attention" size="small">
-                        {JOURNEY_TEXT.MOCK_BADGE}
-                    </Badge>
+                    {!isUsingRealData && (
+                        <Badge tone="attention" size="small">
+                            {JOURNEY_TEXT.MOCK_BADGE}
+                        </Badge>
+                    )}
                 </HorizontalStack>
 
                 <Box padding="3" background="bg-surface" borderRadius="2">
                     <VerticalStack gap="2">
-                        <Text variant="bodyMd" fontWeight="semibold" breakWord style={layout.mono}>
+                        {endpoint && <Text variant="bodyMd" fontWeight="semibold" breakWord style={layout.mono}>
                             {endpoint}
-                        </Text>
-                        <Text variant="bodyMd" tone="subdued">
+                        </Text>}
+                        {objective && <Text variant="bodyMd" tone="subdued">
                             {objective}
-                        </Text>
+                        </Text>}
                     </VerticalStack>
                 </Box>
 
@@ -147,13 +168,15 @@ function AiExecutionJourney({ runAutomatedTests = false }) {
                     >
                         <Scrollable shadow focusable style={{ maxHeight: TRACE_SCROLL_MAX_HEIGHT }}>
                             <Box padding="4">
-                                {events.map((event, index) => (
-                                    <TraceEvent
-                                        key={event.id}
-                                        event={event}
-                                        isLast={index === events.length - 1}
-                                    />
-                                ))}
+                                <div style={{ overflow: 'hidden' }}>
+                                    {events.map((event, index) => (
+                                        <TraceEvent
+                                            key={event.id}
+                                            event={event}
+                                            isLast={index === events.length - 1}
+                                        />
+                                    ))}
+                                </div>
                             </Box>
                         </Scrollable>
                     </Box>
@@ -165,6 +188,7 @@ function AiExecutionJourney({ runAutomatedTests = false }) {
 
 AiExecutionJourney.propTypes = {
     runAutomatedTests: PropTypes.bool,
+    aiSummaryTraces: PropTypes.array,
 };
 
 export default AiExecutionJourney;

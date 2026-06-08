@@ -166,7 +166,7 @@ const headings = [
         textValue: "tagsString",
         title: "Tags",
         showFilter: true,
-        filterKey: "tagsString",
+        filterKey: "tagsFilterList",
     },
     {
         text: "Description",
@@ -538,6 +538,7 @@ function ApiEndpoints(props) {
                 ...obj,
                 tagsComp: endpointTagsFormatted.length > 0 ? getTagsCompactComponent(endpointTagsFormatted) : null,
                 tagsString: endpointTagsFormatted.join(" "),
+                tagsFilterList: endpointTagsFormatted,
                 isNew: transform.isNewEndpoint(obj.lastSeenTs),
                 open:  obj.auth_type === undefined || obj.auth_type.toLowerCase() === "unauthenticated" || obj.auth_type.toLowerCase() === "no auth type found",
                 componentRiskAnalysisComp: riskCompByEndpoint.get(obj.endpoint) ?? null
@@ -624,9 +625,11 @@ function ApiEndpoints(props) {
                 if (endpointTagsFormatted.length > 0) {
                     obj.tagsComp = getTagsCompactComponent(endpointTagsFormatted);
                     obj.tagsString = endpointTagsFormatted.join(" ");
+                    obj.tagsFilterList = endpointTagsFormatted;
                 } else {
                     obj.tagsComp = null;
                     obj.tagsString = "";
+                    obj.tagsFilterList = [];
                 }
             });
             return prettified;
@@ -673,9 +676,11 @@ function ApiEndpoints(props) {
                 if (endpointTagsFormatted.length > 0) {
                     obj.tagsComp = getTagsCompactComponent(endpointTagsFormatted);
                     obj.tagsString = endpointTagsFormatted.join(" ");
+                    obj.tagsFilterList = endpointTagsFormatted;
                 } else {
                     obj.tagsComp = null;
                     obj.tagsString = "";
+                    obj.tagsFilterList = [];
                 }
             });
 
@@ -1186,6 +1191,9 @@ function ApiEndpoints(props) {
 
     const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
 
+    const isAgentProxyCollection = Array.isArray(collectionsObj?.envType) &&
+        collectionsObj.envType.some(tag => tag.keyName === 'agent-proxy')
+
     const isApiGroup = collectionsObj?.type === 'API_GROUP'
     const isHostnameCollection = hostNameMap[collectionsObj?.id] !== null && hostNameMap[collectionsObj?.id] !== undefined
     const collectionTypeListComp = getCollectionTypeListComp(collectionsObj)
@@ -1523,8 +1531,8 @@ function ApiEndpoints(props) {
             onAction: () => handleBulkDeMerge(selectedResources)
         })
 
-        // Add bulk guardrail actions (only for Argus dashboard)
-        if (isAgenticSecurityCategory()) {
+        // Add bulk guardrail actions (only for agent proxy collections in Argus dashboard)
+        if (isAgenticSecurityCategory() && isAgentProxyCollection) {
             ret.push({
                 content: 'Enable guardrails',
                 onAction: () => handleBulkGuardrail(selectedResources, true)
@@ -1801,8 +1809,8 @@ function ApiEndpoints(props) {
         
         const actions = []
         
-        // Add guardrail actions (only for Argus dashboard)
-        if (isAgenticSecurityCategory()) {
+        // Add guardrail actions (only for agent proxy collections in Argus dashboard)
+        if (isAgenticSecurityCategory() && isAgentProxyCollection) {
             if (guardrailEnabled) {
                 actions.push({
                     content: 'Disable guardrails for this endpoint',
@@ -2004,9 +2012,10 @@ function ApiEndpoints(props) {
 
     const handleSaveDescription = () => {
         // Check for special characters
-        const specialChars = /[!@#$%^&*()\-_=+\[\]{}\\|;:'",.<>/?~]/;
-        if (specialChars.test(editableDescription)) {
-            func.setToast(true, true, "Description contains special characters that are not allowed.");
+        const allowedChars = /^[a-zA-Z0-9\s.,!?;:'"()\-_/&]+$/;
+
+        if (editableDescription.length > 0 && !allowedChars.test(editableDescription)) {
+            func.setToast(true, true, "Description contains invalid characters.");
             return;
         }
         

@@ -181,14 +181,24 @@ func (s *Service) filterPoliciesByContextSource(policies []types.Policy, context
 // Mirrors the logic in PolicyManager.GetPoliciesForMcpServer from the mcp-endpoint-shield library:
 // policies with an empty server map are skipped (not configured for any server).
 // YAML policies always pass through. If mcpServerName is empty, all policies are returned unchanged.
-func filterPoliciesByMcpServer(policies []types.Policy, mcpServerName string) []types.Policy {
+// For block-mode policies with applyToAllServers=true, the policy only applies if the server's
+// collection has the mode=inline tag (i.e. the connector is in the synchronous request path
+// and can actually block requests).
+func (s *Service) filterPoliciesByMcpServer(policies []types.Policy, mcpServerName string) []types.Policy {
 	if mcpServerName == "" {
 		return policies
 	}
 	mcpServerNameLower := strings.ToLower(mcpServerName)
 	filtered := make([]types.Policy, 0, len(policies))
 	for _, policy := range policies {
-		if policy.IsYamlPolicy || policy.ApplyToAllServers {
+		if policy.IsYamlPolicy {
+			filtered = append(filtered, policy)
+			continue
+		}
+		if policy.ApplyToAllServers {
+			if policy.Behaviour == "block" {
+				continue // block+applyToAll: backend resolves to explicit inline server list; skip here
+			}
 			filtered = append(filtered, policy)
 			continue
 		}
@@ -939,7 +949,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 
 	// Filter policies by MCP server name first so the blocked-host check only fires for
 	// rules that belong to policies applicable to this server.
-	policies = filterPoliciesByMcpServer(policies, valCtx.McpServerName)
+	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
 
 	// Host blocklist (block-only). Evaluated after server filtering so only rules from
 	// policies scoped to this server are considered.
@@ -1084,7 +1094,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	valCtx := s.validationContextFromParams(params, sessionID, params.RequestPayload, responseBody, "ValidateResponse", mcpAllowedHostList)
 
 	// Filter policies by MCP server name — policies with no server configured are skipped
-	policies = filterPoliciesByMcpServer(policies, valCtx.McpServerName)
+	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
 
 	s.logger.Info("ValidateResponse - calling ProcessResponse",
 		zap.String("path", params.Path),
@@ -1377,7 +1387,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			zap.String("path", data.Path))
 
 		// Filter policies by MCP server name for this specific batch item
-		itemPolicies := filterPoliciesByMcpServer(policies, mcpServerName)
+		itemPolicies := s.filterPoliciesByMcpServer(policies, mcpServerName)
 		s.logger.Debug("ValidateBatch - applicable policies for server",
 			zap.Int("index", i),
 			zap.String("mcpServerName", mcpServerName),

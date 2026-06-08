@@ -334,14 +334,19 @@ public class HttpRequestResponseUtils {
 
         return formUrlEncoded.toString();
     }
-    public static String encode(String s) throws UnsupportedEncodingException {
+    public static String encode(String s) {
+        if (s == null) return "";
 
         /*
-         * No need to reverse the encoding for application/x-www-form-urlencoded  
+         * No need to reverse the encoding for application/x-www-form-urlencoded
          * Ref: https://www.w3.org/TR/html401/interact/forms.html#h-17.13.4.1
          */
 
-        return URLEncoder.encode(s, StandardCharsets.UTF_8.name());
+        try {
+            return URLEncoder.encode(s, StandardCharsets.UTF_8.name());
+        } catch (UnsupportedEncodingException e) {
+            return s;
+        }
                 // .replaceAll("\\+", "%20")
                 // .replaceAll("\\%21", "!")
                 // .replaceAll("\\%27", "'")
