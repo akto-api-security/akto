@@ -19,7 +19,6 @@
 		{
 			"binding": "VECTORIZE",
 			"index_name": "guardrails-shadow-cache",
-			// Vectorize has no local emulator; remote binds `wrangler dev` to the real index.
 			"remote": true
 		}
 	]
