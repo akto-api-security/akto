@@ -24,19 +24,26 @@ public class LLMObservabilityAction extends UserAction {
 
     private static final LoggerMaker logger = new LoggerMaker(LLMObservabilityAction.class, LogDb.DASHBOARD);
 
-    @Setter private int    startTime;
-    @Setter private int    endTime;
-    @Setter private String searchString;
-    @Setter private int    skip        = 0;
-    @Setter private int    limit       = 20;
-    @Setter private String sortKey     = "timestamp";
-    @Setter private int    sortOrder   = 1;
-    @Setter private String sessionId;
-    @Setter private String userName;
-    @Setter private String deviceId;
-    @Setter private String serviceId;
-    @Setter private String traceId;
-    @Setter private String searchAfterJson;
+    @Setter private int          startTime;
+    @Setter private int          endTime;
+    @Setter private String       searchString;
+    @Setter private int          skip        = 0;
+    @Setter private int          limit       = 20;
+    @Setter private String       sortKey     = "timestamp";
+    @Setter private int          sortOrder   = 1;
+    @Setter private String       traceId;
+    @Setter private String       searchAfterJson;
+
+    // Single-value fields kept for backward-compat (session drill-down in SessionsView)
+    @Setter private String       sessionId;
+    @Setter private String       userName;
+    @Setter private String       deviceId;
+    @Setter private String       serviceId;
+
+    // Multi-value filter lists (used by MessagesView / PromptsView ag-grid set filters)
+    @Setter private List<String> userNames   = new ArrayList<>();
+    @Setter private List<String> serviceIds  = new ArrayList<>();
+    @Setter private List<String> sessionIds  = new ArrayList<>();
 
     @Getter private List<Map<String, Object>>  sessions      = new ArrayList<>();
     @Getter private List<Map<String, Object>>  messages      = new ArrayList<>();
@@ -56,8 +63,8 @@ public class LLMObservabilityAction extends UserAction {
             if (!es.isConfigured()) return Action.SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
-            Map<String, String> extraFilters = buildExtraFilters(true);
-            JSONObject baseQ = es.buildBaseQuery(accountId, startMs(), endMs(), extraFilters.isEmpty() ? null : extraFilters, null);
+            Map<String, List<String>> extraFilters = buildMultiFilters(true);
+            JSONObject baseQ = es.buildBaseQueryMulti(accountId, startMs(), endMs(), extraFilters.isEmpty() ? null : extraFilters, null);
             JSONArray mustArr = baseQ.getJSONObject("bool").getJSONArray("must");
             mustArr.put(new JSONObject().put("exists", new JSONObject().put("field", "sessionIdentifier")));
 
@@ -92,8 +99,8 @@ public class LLMObservabilityAction extends UserAction {
             if (!es.isConfigured()) return Action.SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
-            Map<String, String> extraFilters = buildExtraFilters(true);
-            JSONObject baseQ = es.buildBaseQuery(accountId, startMs(), endMs(), extraFilters.isEmpty() ? null : extraFilters, null);
+            Map<String, List<String>> extraFilters = buildMultiFilters(true);
+            JSONObject baseQ = es.buildBaseQueryMulti(accountId, startMs(), endMs(), extraFilters.isEmpty() ? null : extraFilters, null);
             JSONArray mustArr = baseQ.getJSONObject("bool").getJSONArray("must");
             mustArr.put(new JSONObject().put("exists", new JSONObject().put("field", "traceId")));
 
@@ -197,17 +204,14 @@ public class LLMObservabilityAction extends UserAction {
             if (!es.isConfigured()) return Action.SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
-            Map<String, String> filters = new HashMap<>();
-            if (sessionId != null && !sessionId.trim().isEmpty()) filters.put("sessionIdentifier.keyword", sessionId.trim());
-            if (userName  != null && !userName.trim().isEmpty())  filters.put("userName.keyword", userName.trim());
-            if (serviceId != null && !serviceId.trim().isEmpty()) filters.put("serviceId.keyword", serviceId.trim());
+            Map<String, List<String>> filters = buildMultiFilters(true);
 
             JSONArray searchAfter = null;
             if (searchAfterJson != null && !searchAfterJson.trim().isEmpty()) {
                 try { searchAfter = new JSONArray(searchAfterJson); } catch (Exception ignored) {}
             }
 
-            SearchResult result = es.search(
+            SearchResult result = es.searchMulti(
                 accountId, startMs(), endMs(),
                 skip, Math.min(limit, 100),
                 toEsField(sortKey), sortOrder == -1,
@@ -296,14 +300,37 @@ public class LLMObservabilityAction extends UserAction {
         }
     }
 
-    private Map<String, String> buildExtraFilters(boolean includeSession) {
-        Map<String, String> f = new HashMap<>();
-        if (includeSession && sessionId != null && !sessionId.trim().isEmpty())
-            f.put("sessionIdentifier.keyword", sessionId.trim());
-        if (userName  != null && !userName.trim().isEmpty())  f.put("userName.keyword",  userName.trim());
-        if (deviceId  != null && !deviceId.trim().isEmpty())  f.put("deviceId.keyword",  deviceId.trim());
-        if (serviceId != null && !serviceId.trim().isEmpty()) f.put("serviceId.keyword", serviceId.trim());
+    /** Merges single-value fields and multi-value lists into one Map for buildBaseQueryMulti. */
+    private Map<String, List<String>> buildMultiFilters(boolean includeSession) {
+        Map<String, List<String>> f = new HashMap<>();
+        // Session filter: prefer multi-value list, fall back to single field
+        if (includeSession) {
+            List<String> sessions = nonEmpty(sessionIds);
+            if (sessions.isEmpty() && sessionId != null && !sessionId.trim().isEmpty())
+                sessions = java.util.Collections.singletonList(sessionId.trim());
+            if (!sessions.isEmpty()) f.put("sessionIdentifier.keyword", sessions);
+        }
+        // userName
+        List<String> users = nonEmpty(userNames);
+        if (users.isEmpty() && userName != null && !userName.trim().isEmpty())
+            users = java.util.Collections.singletonList(userName.trim());
+        if (!users.isEmpty()) f.put("userName.keyword", users);
+        // serviceId
+        List<String> services = nonEmpty(serviceIds);
+        if (services.isEmpty() && serviceId != null && !serviceId.trim().isEmpty())
+            services = java.util.Collections.singletonList(serviceId.trim());
+        if (!services.isEmpty()) f.put("serviceId.keyword", services);
+        // deviceId (single-value only; no ag-grid filter for this field)
+        if (deviceId != null && !deviceId.trim().isEmpty())
+            f.put("deviceId.keyword", java.util.Collections.singletonList(deviceId.trim()));
         return f;
+    }
+
+    private static List<String> nonEmpty(List<String> list) {
+        List<String> out = new ArrayList<>();
+        if (list == null) return out;
+        for (String s : list) { if (s != null && !s.trim().isEmpty()) out.add(s.trim()); }
+        return out;
     }
 
     private static String trimTrailingSlash(String s) {

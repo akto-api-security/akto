@@ -118,12 +118,18 @@ function extractPrettyJson(content) {
     }
 }
 
-function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt, toolsMetadata }) {
+function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt, toolsMetadata, isExternalAgentRequest = false }) {
 
     const isRequest = type === MESSAGE_TYPES.REQUEST;
     // Icon
-    const iconSrc = isRequest ? CHAT_ASSETS.AKTO_LOGO : CHAT_ASSETS.BOT_LOGO;
-    const iconAlt = isRequest ? 'Akto Logo' : 'Agent Logo';
+    let iconSrc = isRequest ? CHAT_ASSETS.AKTO_LOGO : CHAT_ASSETS.BOT_LOGO;
+    if(isExternalAgentRequest) {
+        iconSrc = CHAT_ASSETS.MAGIC_ICON;
+    }
+    let iconAlt = isRequest ? 'Akto Logo' : 'Agent Logo';
+    if(isExternalAgentRequest) {
+        iconAlt = 'Magic Icon';
+    }
 
     // Label
     const label = customLabel || (isRequest ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE);

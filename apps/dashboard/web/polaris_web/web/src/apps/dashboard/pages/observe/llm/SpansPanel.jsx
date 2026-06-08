@@ -65,30 +65,34 @@ export function SpanFlowRow({ span, index, isLast, onExpand }) {
     const spanTimestamp = Math.floor((span.timestamp || 0) / 1000);
 
     return (
-        <div style={{ display: "flex", gap: 0, marginBottom: isLast ? 0 : 24 }}>
+        <HorizontalStack gap="0" wrap={false} blockAlign="stretch">
             {/* Connector column */}
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 32, flexShrink: 0 }}>
-                <div style={{
-                    width: 20, height: 20, borderRadius: "50%",
-                    background: "var(--p-color-bg-fill-info)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    flexShrink: 0, marginTop: 14,
-                }}>
+            <Box style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 32, flexShrink: 0 }}>
+                <Box
+                    style={{
+                        width: 20, height: 20, borderRadius: "50%",
+                        background: "var(--p-color-bg-fill-info)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0, marginTop: 14,
+                    }}
+                >
                     <Text variant="bodySm" fontWeight="semibold" tone="text-inverse">
                         {index + 1}
                     </Text>
-                </div>
+                </Box>
                 {!isLast && (
-                    <div style={{
-                        width: 2, flex: 1, minHeight: 16,
-                        background: "var(--p-color-border)",
-                        marginTop: 4, marginBottom: 4,
-                    }} />
+                    <Box
+                        style={{
+                            width: 2, flex: 1, minHeight: 16,
+                            background: "var(--p-color-border)",
+                            marginTop: 4, marginBottom: 4,
+                        }}
+                    />
                 )}
-            </div>
+            </Box>
 
             {/* Span card */}
-            <Box style={{ flex: 1, minWidth: 0 }}>
+            <Box paddingBlockEnd={isLast ? "0" : "6"} style={{ flex: 1, minWidth: 0 }}>
                 <VerticalStack gap="2">
                     {/* Span meta header */}
                     <HorizontalStack align="space-between" blockAlign="center">
@@ -98,8 +102,9 @@ export function SpanFlowRow({ span, index, isLast, onExpand }) {
                             {span._model && <Badge tone="success">{span._model}</Badge>}
                         </HorizontalStack>
                         <HorizontalStack gap="2" blockAlign="center">
-                            {tokens > 0 &&
-                                <Text variant="bodySm" tone="subdued">{tokens + " tok"}</Text>}
+                            {tokens > 0 && (
+                                <Text variant="bodySm" tone="subdued">{tokens + " tok"}</Text>
+                            )}
                             <Text variant="bodySm" tone="subdued">
                                 {func.prettifyEpoch(spanTimestamp)}
                             </Text>
@@ -109,7 +114,6 @@ export function SpanFlowRow({ span, index, isLast, onExpand }) {
                         </HorizontalStack>
                     </HorizontalStack>
 
-                    {/* Input rendered as ChatMessage request */}
                     {span._promptText && (
                         <ChatMessage
                             type="request"
@@ -121,7 +125,6 @@ export function SpanFlowRow({ span, index, isLast, onExpand }) {
                         />
                     )}
 
-                    {/* Output rendered as ChatMessage response */}
                     {span._responseText && (
                         <ChatMessage
                             type="response"
@@ -134,6 +137,6 @@ export function SpanFlowRow({ span, index, isLast, onExpand }) {
                     )}
                 </VerticalStack>
             </Box>
-        </div>
+        </HorizontalStack>
     );
 }
