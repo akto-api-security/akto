@@ -261,7 +261,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_inventory",
                     }]),
-                    ...(window.STIGG_FEATURE_WISE_ALLOWED?.AGENT_LOGS?.isGranted ? [{
+                    ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY && window.STIGG_FEATURE_WISE_ALLOWED?.AGENT_TRAFFIC_LOGS?.isGranted ? [{
                         label: "LLM Observability",
                         onClick: () => {
                             navigate("/dashboard/observe/llm-observability");
