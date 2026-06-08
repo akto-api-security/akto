@@ -1,7 +1,7 @@
 import React from "react";
 import { HorizontalStack, Box, Text, Badge } from "@shopify/polaris";
 
-function TypeBadge({ type, tone = "new" }) {
+export function TypeBadge({ type, tone = "new" }) {
     if (!type) return null;
     return <Badge tone={tone}>{type}</Badge>;
 }

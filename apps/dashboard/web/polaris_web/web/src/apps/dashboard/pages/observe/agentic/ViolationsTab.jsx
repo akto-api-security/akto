@@ -72,6 +72,7 @@ export default function ViolationsTab({ asset }) {
             pagination
             paginationPageSize={20}
             sideBar={false}
+            domLayout="normal"
         />
     );
 }

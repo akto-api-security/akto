@@ -46,10 +46,6 @@ import AgenticTopListCard from "./AgenticTopListCard";
 
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
-LicenseManager.setLicenseKey(
-  "[TRIAL]_this_{AG_Charts_and_AG_Grid}_Enterprise_key_{AG-129492}_is_granted_for_evaluation_only___Use_in_production_is_not_permitted___Please_report_misuse_to_legal@ag-grid.com___For_help_with_purchasing_a_production_key_please_contact_info@ag-grid.com___You_are_granted_a_{Single_Application}_Developer_License_for_one_application_only___All_Front-End_JavaScript_developers_working_on_the_application_would_need_to_be_licensed___This_key_will_deactivate_on_{18 June 2026}____[v3]_[0102]_MTc4MTczNzIwMDAwMA==d27c8a4487e577f42d9980e95824f43c",
-);
-
 // ─── Column definitions ───────────────────────────────────────────────────────
 
 const COL_DEFS = [
@@ -70,6 +66,7 @@ const COL_DEFS = [
     // agSetColumnFilter gives the checkbox list matching the 3rd screenshot
     filter: "agSetColumnFilter",
     cellRenderer: TypeBadgeCellRenderer,
+    cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL" })[p.value] || "agentic-type-DEFAULT",
     cellStyle: { display: "flex", alignItems: "center" },
   },
   {
@@ -606,57 +603,79 @@ export default function AgenticAssetsPage() {
 
   const violDelta = useMemo(() => windowDelta(violSeries.counts), [violSeries.counts, windowDelta]);
 
-  const pageComponents = useMemo(
-    () => {
-      if (loading) return [<SpinnerCentered key="loading" />];
-      return [
-        <HorizontalGrid key="top-row" columns={3} gap="4">
-          <Card padding="0">
-            <Box className="agentic-stats-card-fill">
-              <Box className="agentic-stats-card-item">
-                <AgenticStatsCard
-                  title="Agentic Assets"
-                  total={totalAssets}
-                  delta={assetDelta}
-                  sparklineCounts={assetSeries.counts}
-                  sparklineLabels={assetSeries.labels}
-                  breakdown={assetTypeBreakdown}
-                  onFilterClick={handleTypeFilter}
-                  activeFilter={typeFilter}
-                  noCard
-                />
-              </Box>
-              <Divider />
-              <Box className="agentic-stats-card-item">
-                <AgenticStatsCard
-                  title="Violations"
-                  total={violationTotals.total}
-                  totalColor="critical"
-                  delta={violDelta}
-                  sparklineCounts={violSeries.counts}
-                  sparklineColor="#DC2626"
-                  sparklineLabels={violSeries.labels}
-                  breakdown={violBreakdown}
-                  onFilterClick={handleViolSevFilter}
-                  activeFilter={violSevFilter}
-                  noCard
-                />
-              </Box>
-            </Box>
-          </Card>
-          <AgenticTopListCard
-            title="Top Used Applications"
-            columns={[{ label: "Agentic Asset" }, { label: "AI Interactions" }]}
-            rows={topAppsRows}
-            emptyStateText="No AI interaction data yet."
-          />
-          <AgenticTopListCard
-            title="Top Assets with Violations"
-            columns={[{ label: "Agentic Asset" }, { label: "Violations" }]}
-            rows={topViolRows}
-            emptyStateText="No violations"
-          />
-        </HorizontalGrid>,
+  const topCards = useMemo(() => (
+    <HorizontalGrid key="top-row" columns={3} gap="4">
+      <Card padding="0">
+        <Box className="agentic-stats-card-fill">
+          <Box className="agentic-stats-card-item">
+            <AgenticStatsCard
+              title="Agentic Assets"
+              total={totalAssets}
+              delta={assetDelta}
+              sparklineCounts={assetSeries.counts}
+              sparklineLabels={assetSeries.labels}
+              breakdown={assetTypeBreakdown}
+              onFilterClick={handleTypeFilter}
+              activeFilter={typeFilter}
+              noCard
+            />
+          </Box>
+          <Divider />
+          <Box className="agentic-stats-card-item">
+            <AgenticStatsCard
+              title="Violations"
+              total={violationTotals.total}
+              totalColor="critical"
+              delta={violDelta}
+              sparklineCounts={violSeries.counts}
+              sparklineColor="#DC2626"
+              sparklineLabels={violSeries.labels}
+              breakdown={violBreakdown}
+              onFilterClick={handleViolSevFilter}
+              activeFilter={violSevFilter}
+              noCard
+            />
+          </Box>
+        </Box>
+      </Card>
+      <AgenticTopListCard
+        title="Top Used Applications"
+        columns={[{ label: "Agentic Asset" }, { label: "AI Interactions" }]}
+        rows={topAppsRows}
+        emptyStateText="No AI interaction data yet."
+      />
+      <AgenticTopListCard
+        title="Top Assets with Violations"
+        columns={[{ label: "Agentic Asset" }, { label: "Violations" }]}
+        rows={topViolRows}
+        emptyStateText="No violations"
+      />
+    </HorizontalGrid>
+  ), [
+    totalAssets, assetDelta, assetSeries, assetTypeBreakdown,
+    violationTotals, violBreakdown, violDelta, violSeries,
+    topAppsRows, topViolRows,
+    handleTypeFilter, handleViolSevFilter,
+  ]);
+
+  if (loading) {
+    return (
+      <PageWithMultipleCards
+        title={pageTitle}
+        isFirstPage={true}
+        secondaryActions={headerActions}
+        components={[<SpinnerCentered key="loading" />]}
+      />
+    );
+  }
+
+  return (
+    <PageWithMultipleCards
+      title={pageTitle}
+      isFirstPage={true}
+      secondaryActions={headerActions}
+      components={[
+        topCards,
         <TableSection
           key="table"
           agenticTreeData={agenticTreeData}
@@ -667,36 +686,7 @@ export default function AgenticAssetsPage() {
           flyout={flyout}
           setFlyout={setFlyout}
         />,
-      ];
-    },
-    [
-      loading,
-      totalAssets,
-      assetDelta,
-      assetSeries,
-      assetTypeBreakdown,
-      violationTotals,
-      violBreakdown,
-      violDelta,
-      violSeries,
-      agenticTreeData,
-      assetDevices,
-      typeFilter,
-      violSevFilter,
-      flyout,
-      topAppsRows,
-      topViolRows,
-      handleTypeFilter,
-      handleViolSevFilter,
-    ],
-  );
-
-  return (
-    <PageWithMultipleCards
-      title={pageTitle}
-      isFirstPage={true}
-      secondaryActions={headerActions}
-      components={pageComponents}
+      ]}
     />
   );
 }

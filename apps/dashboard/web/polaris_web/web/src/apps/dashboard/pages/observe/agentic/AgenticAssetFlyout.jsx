@@ -57,6 +57,7 @@ function DevicesTab({ asset, assetDevices = {} }) {
             pagination
             paginationPageSize={20}
             sideBar={false}
+            domLayout="normal"
         />
     );
 }
@@ -204,21 +205,19 @@ export default function AgenticAssetFlyout({
                 />
             }
         >
-            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <Box padding="2" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
                 {selectedTab === 0 && (
-                    <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-                        <OverviewTab
-                            asset={asset}
-                            onTabChange={handleTabSelect}
-                            assetDevices={assetDevices}
-                            agenticTreeData={agenticTreeData}
-                            agenticFlatData={agenticFlatData}
-                            mcpComponentCount={mcpComponentCount}
-                        />
-                    </div>
+                    <OverviewTab
+                        asset={asset}
+                        onTabChange={handleTabSelect}
+                        assetDevices={assetDevices}
+                        agenticTreeData={agenticTreeData}
+                        agenticFlatData={agenticFlatData}
+                        mcpComponentCount={mcpComponentCount}
+                    />
                 )}
                 {selectedTab === 1 && (
-                    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                         <AgenticComponentsTab
                             asset={asset}
                             onNavChange={handleNavChange}
@@ -229,7 +228,7 @@ export default function AgenticAssetFlyout({
                 )}
                 {selectedTab === 2 && <ViolationsTab asset={asset} />}
                 {selectedTab === 3 && <DevicesTab asset={asset} assetDevices={assetDevices} />}
-            </div>
+            </Box>
         </AgenticFlyoutShell>
     );
 }

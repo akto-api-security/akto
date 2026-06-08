@@ -59,6 +59,11 @@
 }
 
 
+/* AG Grid auto-group column: align the cell-wrapper (checkbox + arrow + content) vertically */
+.ag-cell-wrapper {
+    align-items: center;
+}
+
 /* Cursor + hover — DataTable owns all spacing/borders */
 .agentic-list-table .Polaris-DataTable__Cell {
     cursor: pointer;

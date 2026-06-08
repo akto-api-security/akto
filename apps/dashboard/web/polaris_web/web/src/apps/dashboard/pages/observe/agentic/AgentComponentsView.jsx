@@ -55,6 +55,7 @@ const COMBINED_AGENT_COL_DEFS = [
         suppressHeaderMenuButton: true,
         suppressHeaderFilterButton: true,
         cellRenderer: AgentComponentTypeCellRenderer,
+        cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL" })[p.value] || "agentic-type-DEFAULT",
         cellStyle: { display: "flex", alignItems: "center" },
     },
     {
@@ -142,6 +143,7 @@ function AgentMcpToolsView({ asset, selectedMcp, agenticFlatData, goToList, onNa
                     searchPlaceholder="Search tools..."
                     pagination={false}
                     sideBar={false}
+                    domLayout="normal"
                 />
             )}
         </Box>
@@ -268,6 +270,7 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
             pagination
             paginationPageSize={20}
             sideBar={false}
+            domLayout="normal"
         />
     );
 }

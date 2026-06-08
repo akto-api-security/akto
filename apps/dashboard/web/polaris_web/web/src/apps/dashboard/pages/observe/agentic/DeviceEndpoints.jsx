@@ -26,10 +26,6 @@ import api from "../api";
 
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
-LicenseManager.setLicenseKey(
-    "[TRIAL]_this_{AG_Charts_and_AG_Grid}_Enterprise_key_{AG-129492}_is_granted_for_evaluation_only___Use_in_production_is_not_permitted___Please_report_misuse_to_legal@ag-grid.com___For_help_with_purchasing_a_production_key_please_contact_info@ag-grid.com___You_are_granted_a_{Single_Application}_Developer_License_for_one_application_only___All_Front-End_JavaScript_developers_working_on_the_application_would_need_to_be_licensed___This_key_will_deactivate_on_{18 June 2026}____[v3]_[0102]_MTc4MTczNzIwMDAwMA==d27c8a4487e577f42d9980e95824f43c"
-);
-
 // ─── Chart config helpers ─────────────────────────────────────────────────────
 
 function makeOsTrendConfig(osTrend, monthLabels) {
@@ -197,15 +193,34 @@ function ViolationsCellRenderer({ value }) {
 // ─── Endpoint cell — uses AgGridRow as shared inner renderer ──────────────────
 
 // Username cell renderer — used as innerRenderer of the auto-group (expand) column.
+const TYPE_CLASS_MAP = {
+    "AI Agent": "agentic-type-AGENT",
+    "MCP Server": "agentic-type-MCP",
+    "LLM": "agentic-type-LLM",
+    "Skill": "agentic-type-SKILL",
+    "Tool": "agentic-type-TOOL",
+    "Resource": "agentic-type-RESOURCE",
+    "Prompt": "agentic-type-PROMPT",
+};
+
 function UsernameCellInner({ data, node }) {
     if (!data) return null;
     const isLeaf = node.level > 0;
     if (isLeaf) {
+        const coloredBadge = data.type ? (
+            <span className={TYPE_CLASS_MAP[data.type] || "agentic-type-DEFAULT"}>
+                <Badge>{data.type}</Badge>
+            </span>
+        ) : null;
         return (
             <AgGridRow
                 label={data.endpoint}
-                typeBadge={data.type}
-                warning={data.skillCount ? <SkillBadge count={data.skillCount} /> : null}
+                warning={
+                    <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                        {coloredBadge}
+                        {data.skillCount ? <SkillBadge count={data.skillCount} /> : null}
+                    </HorizontalStack>
+                }
             />
         );
     }

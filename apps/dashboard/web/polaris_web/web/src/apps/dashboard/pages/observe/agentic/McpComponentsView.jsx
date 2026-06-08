@@ -70,7 +70,7 @@ export function ToolDetailPanel({ tool, onBack }) {
         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             {(hasSchema && tab === 0) ? (
                 <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                    <AgGridTable rowData={tool.params} columnDefs={SCHEMA_COL_DEFS} defaultColDef={GRID_DEFAULT_COL} fillHeight noOuterBorder pagination={false} sideBar={false} />
+                    <AgGridTable rowData={tool.params} columnDefs={SCHEMA_COL_DEFS} defaultColDef={GRID_DEFAULT_COL} fillHeight noOuterBorder pagination={false} sideBar={false} domLayout="normal" />
                 </div>
             ) : (
                 <TrafficView traffic={traffic} loading={loading} />
@@ -283,6 +283,7 @@ export default function McpComponentsView({ asset, onNavChange }) {
             searchPlaceholder="Search tools, resources, prompts..."
             pagination={false}
             sideBar={false}
+            domLayout="normal"
         />
     );
 }

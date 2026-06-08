@@ -92,19 +92,19 @@ function AgentNameCellRenderer({ data }) {
     if (!data) return null;
     return (
         <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-            <Text variant="bodyMd" fontWeight="medium">{data.endpoint}</Text>
+            <Text variant="bodySm" fontWeight="medium">{data.endpoint}</Text>
             <TypeBadge type={data.type} />
         </HorizontalStack>
     );
 }
 
 function AgentRiskCellRenderer({ value }) {
-    if (value == null) return <Text variant="bodyMd" color="subdued">-</Text>;
+    if (value == null) return <Text variant="bodySm" color="subdued">-</Text>;
     return <RiskPill score={value} />;
 }
 
 function AgentViolationsCellRenderer({ value }) {
-    const dash = <Text variant="bodyMd" color="subdued">-</Text>;
+    const dash = <Text variant="bodySm" color="subdued">-</Text>;
     if (!value) return dash;
     const parts = ["critical", "high", "medium", "low"].filter(k => value[k] > 0);
     if (!parts.length) return dash;
@@ -119,7 +119,7 @@ function AgentSkillsCellRenderer({ data }) {
     if (!data) return null;
     return data.skillCount
         ? <Text variant="bodySm" fontWeight="medium">{data.skillCount}</Text>
-        : <Text variant="bodyMd" color="subdued">-</Text>;
+        : <Text variant="bodySm" color="subdued">-</Text>;
 }
 
 function ViolSeverityCellRenderer({ data }) {
@@ -145,7 +145,7 @@ function ViolAgentCellRenderer({ data }) {
 
 function buildAgentsColDefs(agentRiskData) {
     return [
-    { field: "endpoint", headerName: "Agentic Asset", flex: 1, minWidth: 160, cellRenderer: AgentNameCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "endpoint", headerName: "Agentic Asset", flex: 1, minWidth: 160, cellRenderer: AgentNameCellRenderer, cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL" })[p.data?.type] || "", cellStyle: { display: "flex", alignItems: "center" } },
     {
         field: "riskScore", headerName: "Risk", width: 80,
         sort: "desc",
@@ -181,7 +181,7 @@ const VIOLATIONS_COL_DEFS = [
     { field: "time",     headerName: "Time",               width: 120, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.timeEpoch || 0) - (nodeB?.data?.timeEpoch || 0) },
     { field: "severity", headerName: "Severity",           width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, comparator: (a, b) => (SEVERITY_ORDER[a] || 0) - (SEVERITY_ORDER[b] || 0) },
     { field: "title",    headerName: "Violation",          flex: 1, minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "agent",    headerName: "Agentic Component",  width: 200, cellRenderer: ViolAgentCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "agent",    headerName: "Agentic Component",  width: 200, cellRenderer: ViolAgentCellRenderer, cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL" })[p.data?.agentType] || "", cellStyle: { display: "flex", alignItems: "center" } },
 ];
 
 const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
@@ -386,9 +386,11 @@ function AgenticsTab({ agents, onAgentClick, agentRiskData = {} }) {
             fillHeight
             noOuterBorder
             searchPlaceholder="Search assets..."
-            pagination={false}
-            sideBar={false}
-        />
+            pagination
+            paginationPageSize={20}
+            paginationPageSizeSelector={[20, 50, 100]}
+            sideBar={{ toolPanels: ["columns", "filters"] }}
+            domLayout="normal" />
     );
 }
 
@@ -440,9 +442,11 @@ function ViolationsTab({ device }) {
             fillHeight
             noOuterBorder
             searchPlaceholder="Search violations..."
-            pagination={false}
-            sideBar={false}
-        />
+            pagination
+            paginationPageSize={20}
+            paginationPageSizeSelector={[20, 50, 100]}
+            sideBar={{ toolPanels: ["columns", "filters"] }}
+            domLayout="normal" />
     );
 }
 
@@ -495,7 +499,7 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
                 />
             }
         >
-            <Box style={{ flex: 1, minHeight: 0, overflowY: selectedTab === 0 ? "auto" : "hidden", display: "flex", flexDirection: "column" }}>
+            <Box padding="2" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
                 {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} onTabChange={setSelectedTab} />}
                 {selectedTab === 1 && <AgenticsTab agents={agents || []} onAgentClick={onAgentClick} agentRiskData={agentRiskData} />}
                 {selectedTab === 2 && <ViolationsTab device={device} agents={agents} />}

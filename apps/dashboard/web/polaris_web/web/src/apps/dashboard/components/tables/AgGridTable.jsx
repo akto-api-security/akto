@@ -162,6 +162,7 @@ export default function AgGridTable({
     gridRef: gridRefProp,
     animateRows = true,
     suppressCellFocus = true,
+    domLayout = "autoHeight",
     onServerFetch,
     filterStateUrl,
     ...rest
@@ -280,6 +281,7 @@ export default function AgGridTable({
             pagination={pagination}
             paginationPageSize={paginationPageSize}
             paginationPageSizeSelector={paginationPageSizeSelector}
+            quickFilterText={isServerMode ? undefined : debouncedSearchValue}
             sideBar={sideBar}
             treeData={treeData}
             getDataPath={getDataPath}
@@ -289,7 +291,7 @@ export default function AgGridTable({
             columnTypes={AG_GRID_COLUMN_TYPES}
             onFilterChanged={handleFilterChanged}
             onSortChanged={handleSortChanged}
-            domLayout={"autoHeight"}
+            domLayout={domLayout}
             {...rest}
         />
     );
