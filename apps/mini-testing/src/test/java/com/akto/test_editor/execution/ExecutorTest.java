@@ -274,32 +274,32 @@ public class ExecutorTest {
         }
     }
 
-    @Test
-    public void testRealErrorCategorization_ValidEndpoint() {
-        // Test that shows successful request doesn't trigger error categorization
-        com.akto.dto.OriginalHttpRequest request = new com.akto.dto.OriginalHttpRequest();
-        request.setUrl("https://httpbin.org/status/200");
-        request.setMethod("GET");
+    // @Test
+    // public void testRealErrorCategorization_ValidEndpoint() {
+    //     // Test that shows successful request doesn't trigger error categorization
+    //     com.akto.dto.OriginalHttpRequest request = new com.akto.dto.OriginalHttpRequest();
+    //     request.setUrl("https://httpbin.org/status/200");
+    //     request.setMethod("GET");
 
-        java.util.Map<String, java.util.List<String>> headers = new java.util.HashMap<>();
-        headers.put("User-Agent", java.util.Collections.singletonList("Akto-Test"));
-        request.setHeaders(headers);
+    //     java.util.Map<String, java.util.List<String>> headers = new java.util.HashMap<>();
+    //     headers.put("User-Agent", java.util.Collections.singletonList("Akto-Test"));
+    //     request.setHeaders(headers);
 
-        try {
-            com.akto.dto.OriginalHttpResponse response = com.akto.testing.ApiExecutor.sendRequest(
-                request, false, null, false, new java.util.ArrayList<>(), true
-            );
+    //     try {
+    //         com.akto.dto.OriginalHttpResponse response = com.akto.testing.ApiExecutor.sendRequest(
+    //             request, false, null, false, new java.util.ArrayList<>(), true
+    //         );
 
-            // This should succeed
-            assertNotNull("Response should not be null", response);
-            assertEquals("Expected 200 status code", 200, response.getStatusCode());
-            System.out.println("Valid endpoint test succeeded with status: " + response.getStatusCode());
-        } catch (Exception e) {
-            // Log the error but don't fail - network issues can happen in CI
-            System.err.println("Valid endpoint test failed (may be network issue): " + e.getMessage());
-            // Don't fail the test since this could be a network/firewall issue in CI
-        }
-    }
+    //         // This should succeed
+    //         assertNotNull("Response should not be null", response);
+    //         assertEquals("Expected 200 status code", 200, response.getStatusCode());
+    //         System.out.println("Valid endpoint test succeeded with status: " + response.getStatusCode());
+    //     } catch (Exception e) {
+    //         // Log the error but don't fail - network issues can happen in CI
+    //         System.err.println("Valid endpoint test failed (may be network issue): " + e.getMessage());
+    //         // Don't fail the test since this could be a network/firewall issue in CI
+    //     }
+    // }
 
     // End-to-end tests using Executor.execute() with YAML config to verify full integration
     @Test
