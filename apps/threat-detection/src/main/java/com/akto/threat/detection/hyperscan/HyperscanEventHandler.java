@@ -89,8 +89,8 @@ public class HyperscanEventHandler {
                 eventPusher.push(filter, actor, responseParam, req, EventType.EVENT_TYPE_SINGLE);
             }
 
-            logger.debugAndAddToDb("Hyperscan detected " + errorsByCategory.size()
-                    + " threat categories for " + apiInfoKey.getUrl() + " actor: " + actor);
+            // logger.debugAndAddToDb("Hyperscan detected " + errorsByCategory.size()
+            //         + " threat categories for " + apiInfoKey.getUrl() + " actor: " + actor);
             return true;
 
         } catch (Exception e) {

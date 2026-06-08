@@ -63,8 +63,15 @@ public class FilterCache {
                 }
             }
         }
+
+        // Only keep aggregated filters, rest will be applied through hyperscan
+        if (AccountConfig.isGraphQLAccount()){
+            apiFilters.entrySet().removeIf(entry -> !entry.getKey().toLowerCase().contains("aggregate"));
+            logger.debugAndAddToDb("aggregated filters kept: " + apiFilters.size());
+        }
+
         return apiFilters;
-    }
+  }
 
     public List<FilterConfig> getSuccessfulExploitFilters() {
         return successfulExploitFilters;

@@ -1,9 +1,12 @@
 package com.akto.dto.api_protection_parse_layer;
 
+import com.akto.dto.test_editor.ConfigParserResult;
+
 public class Rule {
 
     String name;
     Condition condition;
+    ConfigParserResult aggregationEvaluator;
 
     public Rule() {
     }
@@ -24,5 +27,11 @@ public class Rule {
     }
     public void setCondition(Condition condition) {
         this.condition = condition;
+    }
+    public ConfigParserResult getAggregationEvaluator() {
+        return aggregationEvaluator;
+    }
+    public void setAggregationEvaluator(ConfigParserResult aggregationEvaluator) {
+        this.aggregationEvaluator = aggregationEvaluator;
     }
 }

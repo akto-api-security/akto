@@ -1257,6 +1257,7 @@ public class ClientActor extends DataActor {
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
                 BasicDBObject accountSettingsObj = (BasicDBObject) payloadObj.get("accountSettings");
+                accountSettingsObj.remove("defaultPayloads");
                 return objectMapper.readValue(accountSettingsObj.toJson(), AccountSettings.class);
             } catch(Exception e) {
                 return null;

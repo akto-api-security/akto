@@ -52,11 +52,15 @@ public class KeyTypes {
                         String userId, int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap,
                         boolean isUrlParam, int timestamp) {
 
-        String key = param.replaceAll("#", ".").replaceAll("\\.\\$", "");
-        String[] keyArr = key.split("\\.");
-        String lastField = keyArr[keyArr.length - 1].split("_queryParam")[0];
+        String lastField = extractLastField(param);
         ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, SingleTypeInfo.GENERIC, apiCollectionId, isUrlParam);
-        SubType subType = findSubType(object,lastField,paramId);
+
+        SubType subType;
+        if (rawMessage != null && rawMessage.length() > 8192) {
+            subType = getBasicSubType(object);
+        } else {
+            subType = findSubType(object, lastField, paramId);
+        }
 
         SingleTypeInfo singleTypeInfo = occurrences.get(subType);
         if (singleTypeInfo == null) {
@@ -98,6 +102,86 @@ public class KeyTypes {
         }
 
         singleTypeInfo.incr();
+    }
+
+    private static SubType getBasicSubType(Object o) {
+        if (o == null) return SingleTypeInfo.NULL;
+
+        if (o instanceof Boolean) {
+            return ((Boolean) o) ? SingleTypeInfo.TRUE : SingleTypeInfo.FALSE;
+        }
+
+        if (o instanceof Integer) {
+            return SingleTypeInfo.INTEGER_32;
+        }
+
+        if (o instanceof Long) {
+            Long l = (Long) o;
+            if (l <= Integer.MAX_VALUE && l >= Integer.MIN_VALUE) {
+                return SingleTypeInfo.INTEGER_32;
+            } else {
+                return SingleTypeInfo.INTEGER_64;
+            }
+        }
+
+        if (o instanceof Float || o instanceof Double) {
+            return SingleTypeInfo.FLOAT;
+        }
+
+        if (o instanceof String) {
+            String str = o.toString();
+            if (NumberUtils.isDigits(str)) {
+                return (str.length() < 19) ? SingleTypeInfo.INTEGER_32 : SingleTypeInfo.INTEGER_64;
+            }
+            if (NumberUtils.isParsable(str)) {
+                return SingleTypeInfo.FLOAT;
+            }
+            return SingleTypeInfo.GENERIC;
+        }
+
+        return SingleTypeInfo.OTHER;
+    }
+
+    static String extractLastField(String param) {
+        if (param == null || param.isEmpty()) return param;
+
+        int end = param.length();
+
+        if (end >= 2 && param.charAt(end - 2) == '.' && param.charAt(end - 1) == '$') {
+            end -= 2;
+        }
+
+        int lastSep = -1;
+        for (int i = end - 1; i >= 0; i--) {
+            char c = param.charAt(i);
+            if (c == '.' || c == '#') {
+                lastSep = i;
+                break;
+            }
+        }
+
+        int start = lastSep + 1;
+
+        final String suffix = "_queryParam";
+        int suffixLen = suffix.length();
+        int segLen = end - start;
+
+        if (segLen >= suffixLen) {
+            int suffixStart = end - suffixLen;
+
+            if (suffixStart >= start) {
+                boolean matches = true;
+                for (int i = 0; i < suffixLen; i++) {
+                    if (param.charAt(suffixStart + i) != suffix.charAt(i)) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (matches) end = suffixStart;
+            }
+        }
+
+        return param.substring(start, end);
     }
 
     private static boolean checkForSubtypesTest(ParamId paramId, IgnoreData ignoreData) {
@@ -254,7 +338,7 @@ public class KeyTypes {
     }
 
     public static SubType findSubType(Object o,String key, ParamId paramId) {
-        
+
         int accountId = Context.accountId.get();
         boolean checkForSubtypes = true ;
         for (String keyType : SingleTypeInfo.getCustomDataTypeMap(accountId).keySet()) {
