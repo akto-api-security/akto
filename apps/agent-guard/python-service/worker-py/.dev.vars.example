@@ -32,8 +32,11 @@ DATABASE_ABSTRACTOR_SERVICE_URL=
 # Needs the VECTORIZE binding (see wrangler.jsonc) and an embedder reachable from
 # the worker. CACHE_SHADOW_ENABLED is off unless set to true/1. Shadow alerts use
 # their own webhook (not SLACK_WEBHOOK_URL); unset → no shadow alerts.
+# CACHE_TTL_SECONDS expires entries on read (default 21600 = 6h; Vectorize has no
+# native TTL).
 CACHE_SHADOW_ENABLED=
 CACHE_DISTANCE_THRESHOLD=0.15
+CACHE_TTL_SECONDS=21600
 EMBEDDER_URL=
 CACHE_SHADOW_SLACK_WEBHOOK_URL=
 

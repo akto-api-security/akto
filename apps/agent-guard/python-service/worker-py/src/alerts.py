@@ -115,6 +115,11 @@ def _cache_shadow_blocks(info: Dict[str, Any]) -> List[Dict[str, Any]]:
     if "distance" in info:  # a nearest neighbour existed (present even on a near-miss)
         extra.append(f"*distance:* `{_fmt_num(info['distance'])}`")
         extra.append(f"*threshold:* `{_fmt_num(info.get('threshold'))}`")
+    if "age_s" in info:  # nearest neighbour's age vs TTL
+        age_line = f"*age:* `{_fmt_num(info['age_s'])}s` / TTL `{_fmt_num(info.get('ttl_s'))}s`"
+        if info.get("stale"):
+            age_line += " ⏰ expired → miss"
+        extra.append(age_line)
     if extra:
         line += "\n" + "   ".join(extra)
 

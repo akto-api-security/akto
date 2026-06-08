@@ -16,15 +16,19 @@ scan response, and fail-open so a cache/embedder/Vectorize outage is harmless):
       → Slack alert
       → Vectorize upsert(vec, real verdict)                # warm the cache
 
-When we later flip this to serve traffic, the only change is: on a hit within
-threshold, return the cached verdict instead of running the cascade.
+Entries expire after CACHE_TTL_SECONDS (6h default). Vectorize has no native TTL,
+so it's enforced on read — a match older than the TTL counts as a miss — and the
+entry id is deterministic per (scanner, text), so a re-scan overwrites and
+refreshes the same vector instead of growing the index.
+
+When we later flip this to serve traffic, the only change is: on a fresh hit
+within threshold, return the cached verdict instead of running the cascade.
 """
 
 import hashlib
 import json
 import logging
 import time
-import uuid
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -37,6 +41,7 @@ from settings import settings
 logger = logging.getLogger(__name__)
 
 _DEFAULT_DISTANCE_THRESHOLD = 0.15
+_DEFAULT_TTL_SECONDS = 6 * 3600  # 6h; Vectorize has no native TTL, enforced on read
 _EMBED_TIMEOUT_S = 10.0
 # Config keys that don't change the verdict and so must not change the cache key.
 _NON_VERDICT_CONFIG_KEYS = {"storeAllResults"}
@@ -55,6 +60,14 @@ def _threshold() -> float:
         return float(raw) if raw else _DEFAULT_DISTANCE_THRESHOLD
     except ValueError:
         return _DEFAULT_DISTANCE_THRESHOLD
+
+
+def _ttl_seconds() -> float:
+    raw = str(getattr(settings, "CACHE_TTL_SECONDS", "")).strip()
+    try:
+        return float(raw) if raw else _DEFAULT_TTL_SECONDS
+    except ValueError:
+        return _DEFAULT_TTL_SECONDS
 
 
 # --------------------------------------------------------------------------- #
@@ -110,8 +123,9 @@ def _js(obj: Any):
 async def _vector_query(env, vec: List[float], scanner_key: str) -> Optional[Dict[str, Any]]:
     """Return the nearest stored verdict for scanner_key as a dict, or None.
 
-    The dict carries {is_valid, risk_score, reason, distance}. distance is cosine
-    distance (1 - similarity); the caller applies the threshold.
+    The dict carries {is_valid, risk_score, reason, distance, inserted_at}.
+    distance is cosine distance (1 - similarity) and inserted_at is the entry's
+    epoch seconds; the caller applies the distance threshold and the TTL.
     """
     index = getattr(env, "VECTORIZE", None)
     if index is None:
@@ -136,26 +150,33 @@ async def _vector_query(env, vec: List[float], scanner_key: str) -> Optional[Dic
             "risk_score": float(meta.get("risk_score", 0.0) or 0.0),
             "reason": str(meta.get("reason", "") or ""),
             "distance": 1.0 - score,
+            "inserted_at": float(meta.get("inserted_at", 0) or 0),
         }
     except Exception as exc:
         logger.warning(f"[cache_shadow] Vectorize query failed: {exc}")
         return None
 
 
-async def _vector_upsert(env, vec: List[float], scanner_key: str, real: Dict[str, Any]) -> None:
+async def _vector_upsert(env, vec: List[float], scanner_key: str, text: str,
+                         real: Dict[str, Any]) -> None:
     index = getattr(env, "VECTORIZE", None)
     if index is None:
         return
     try:
         details = real.get("details") or {}
+        # Deterministic id (scanner + text): an identical re-scan overwrites this
+        # same vector and refreshes inserted_at, rather than accreting a new
+        # vector per scan. inserted_at drives the read-side TTL.
+        text_hash = hashlib.sha256((text or "").encode("utf-8")).hexdigest()[:16]
         entry = {
-            "id": f"{scanner_key}:{uuid.uuid4().hex}",
+            "id": f"{scanner_key}:{text_hash}",
             "values": vec,
             "metadata": {
                 "scanner_key": scanner_key,
                 "is_valid": bool(real.get("is_valid", True)),
                 "risk_score": float(real.get("risk_score", 0.0) or 0.0),
                 "reason": str(details.get("reason", "") or ""),
+                "inserted_at": int(time.time()),
             },
         }
         await index.upsert(_js([entry]))
@@ -166,8 +187,11 @@ async def _vector_upsert(env, vec: List[float], scanner_key: str, real: Dict[str
 # --------------------------------------------------------------------------- #
 # Orchestration
 # --------------------------------------------------------------------------- #
-def _classify(cached: Optional[Dict[str, Any]], threshold: float, real_valid: bool) -> str:
+def _classify(cached: Optional[Dict[str, Any]], threshold: float, ttl: float,
+              now: float, real_valid: bool) -> str:
     if cached is None or cached["distance"] > threshold:
+        return "miss"
+    if now - cached["inserted_at"] > ttl:  # expired: Vectorize has no native TTL
         return "miss"
     return "hit_match" if cached["is_valid"] == real_valid else "hit_mismatch"
 
@@ -192,6 +216,7 @@ async def observe(scanner_name: str, scanner_type: str, text: str,
         "real_reason": str(real_details.get("reason", "") or ""),
         "real_risk": real_result.get("risk_score", 0.0),
         "threshold": _threshold(),
+        "ttl_s": _ttl_seconds(),
     }
 
     t0 = time.time()
@@ -207,8 +232,9 @@ async def observe(scanner_name: str, scanner_type: str, text: str,
             await alerts.post_cache_shadow(info)
             return
 
+        now = time.time()
         cached = await _vector_query(env, vec, scanner_key)
-        outcome = _classify(cached, info["threshold"], real_valid)
+        outcome = _classify(cached, info["threshold"], info["ttl_s"], now, real_valid)
 
         info["outcome"] = outcome
         info["latency_ms"] = round((time.time() - t0) * 1000, 1)
@@ -216,10 +242,16 @@ async def observe(scanner_name: str, scanner_type: str, text: str,
             info["cached_is_valid"] = cached["is_valid"]
             info["cached_reason"] = cached["reason"]
             info["distance"] = cached["distance"]
+            age = now - cached["inserted_at"]
+            info["age_s"] = round(age, 1)
+            if age > info["ttl_s"]:  # nearest neighbour existed but expired → miss
+                info["stale"] = True
 
         await alerts.post_cache_shadow(info)
 
-        # Warm the cache for future requests (always, regardless of outcome).
-        await _vector_upsert(env, vec, scanner_key, real_result)
+        # Warm the cache for future requests (always, regardless of outcome). The
+        # deterministic id means a re-scan overwrites this entry and refreshes its
+        # TTL instead of growing the index.
+        await _vector_upsert(env, vec, scanner_key, text, real_result)
     except Exception as exc:  # absolute backstop — shadow must never surface
         logger.warning(f"[cache_shadow] observe failed for {scanner_name}: {exc}")
