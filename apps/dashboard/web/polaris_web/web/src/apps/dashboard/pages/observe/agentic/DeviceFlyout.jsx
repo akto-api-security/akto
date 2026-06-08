@@ -229,7 +229,7 @@ function TopologyGraph({ device, agents }) {
         const llms       = agents.filter(a => a.type === "LLM");
         const hasAgents  = aiAgents.length > 0;
 
-        const NODE_H = 82;
+        const NODE_H = 100;
         const COL1_X = 60, COL2_X = 310, COL3_X = 560;
 
         const col2Count = hasAgents ? aiAgents.length : 0;

@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-renderer";
-import { Box, HorizontalStack, VerticalStack, Text, Card, Icon, Avatar } from "@shopify/polaris";
+import { Box, HorizontalStack, VerticalStack, Text, Card, Icon, Avatar, Tooltip } from "@shopify/polaris";
 import { AutomationMajor, MagicMajor, CustomersMinor } from "@shopify/polaris-icons";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import { getAgentLinkedComponents } from "./agenticPageBuilders";
@@ -45,7 +45,9 @@ export function TopoNode({ data }) {
                     <Box padding={3}>
                         <VerticalStack gap={1}>
                             <Box width="150px">
-                                <Text color="subdued" variant="bodySm">{component.type}</Text>
+                                <Tooltip content={component.type} preferredWidth={300}>
+                                    <Text color="subdued" variant="bodySm" truncate>{component.type}</Text>
+                                </Tooltip>
                             </Box>
                             <HorizontalStack gap={1} blockAlign="center">
                                 {typeof IconComponent === "string"
@@ -53,7 +55,9 @@ export function TopoNode({ data }) {
                                     : <Icon source={IconComponent} />
                                 }
                                 <Box width={component.category === "ai-model" ? "140px" : "110px"}>
-                                    <Text variant="bodySm" color="base">{component.label}</Text>
+                                    <Tooltip content={component.label} preferredWidth={400}>
+                                        <Text variant="bodySm" color="base" truncate>{component.label}</Text>
+                                    </Tooltip>
                                 </Box>
                             </HorizontalStack>
                         </VerticalStack>
@@ -82,8 +86,8 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
                     fitViewOptions={{ padding: 0.2 }}
                     onInit={api => api.fitView({ padding: 0.2 })}
                     minZoom={0.2}
-                    maxZoom={2}
-                    nodesDraggable={false}
+                    maxZoom={4}
+                    nodesDraggable={true}
                     nodesConnectable={false}
                     elementsSelectable={false}
                     zoomOnScroll
@@ -164,8 +168,8 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
                 fitViewOptions={{ padding: 0.2 }}
                 onInit={api => api.fitView({ padding: 0.2 })}
                 minZoom={0.2}
-                maxZoom={2}
-                nodesDraggable={false}
+                maxZoom={4}
+                nodesDraggable={true}
                 nodesConnectable={false}
                 elementsSelectable={false}
                 zoomOnScroll

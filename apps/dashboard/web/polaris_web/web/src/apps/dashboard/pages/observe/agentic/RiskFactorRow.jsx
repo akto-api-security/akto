@@ -7,14 +7,14 @@ export function RiskFactorRow({ factor, onClick }) {
     return (
         <Box
             onClick={onClick}
-            paddingBlockStart="4"
-            paddingBlockEnd="4"
-            paddingInlineStart="4"
-            paddingInlineEnd="4"
+            paddingBlockStart="3"
+            paddingBlockEnd="3"
+            paddingInlineStart="3"
+            paddingInlineEnd="3"
             borderRadius="2"
-            className="cursor-pointer"
+            className="agentic-clickable-row"
         >
-            <HorizontalStack gap="4" align="start" blockAlign="center" wrap={false}>
+            <HorizontalStack gap="4" align="start" blockAlign="start" wrap={false}>
                 <Box width="72px">
                     <Badge status={badgeStatus}>{factor.severity.charAt(0).toUpperCase() + factor.severity.slice(1)}</Badge>
                 </Box>
@@ -24,7 +24,9 @@ export function RiskFactorRow({ factor, onClick }) {
                         <Text variant="bodySm" color="subdued">{factor.description}</Text>
                     </VerticalStack>
                 </Box>
-                <Icon source={ChevronRightMinor} color="subdued" />
+                <Box>
+                    <Icon source={ChevronRightMinor} color="subdued" />
+                </Box>
             </HorizontalStack>
         </Box>
     );

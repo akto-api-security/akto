@@ -26,21 +26,14 @@ function TrafficView({ traffic, loading }) {
     if (!traffic?.length) return TRAFFIC_EMPTY;
     const sampleData = traffic.map((s) => ({ message: typeof s === "string" ? s : JSON.stringify(s) }));
     return (
-        <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-            <Box
-                paddingBlockStart="4"
-                paddingBlockEnd="4"
-                paddingInlineStart="4"
-                paddingInlineEnd="4"
-            >
-                <SampleDataList
-                    sampleData={sampleData}
-                    heading="Sample values"
-                    minHeight="200px"
-                    vertical={true}
-                    isAPISampleData={true}
-                />
-            </Box>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "16px" }}>
+            <SampleDataList
+                sampleData={sampleData}
+                heading="Sample values"
+                minHeight="35vh"
+                vertical={true}
+                isAPISampleData={true}
+            />
         </div>
     );
 }
@@ -135,7 +128,7 @@ const COMBINED_MCP_COL_DEFS = [
         flex: 1.5,
         minWidth: 160,
         filter: "agTextColumnFilter",
-        cellStyle: { display: "flex", alignItems: "center", fontSize: 13, fontWeight: 600, color: "#202223" },
+        cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#202223" },
     },
     {
         field: "_type",

@@ -30,16 +30,10 @@
 .agentic-type-DEFAULT .Polaris-Badge { background-color: #F3F4F6; color: #374151; }
 
 
-/* Clickable risk-factor row — edge-to-edge hover with a built-in bottom divider
-   (no rounded corners, no separate <Divider> — those clashed). Hover/cursor/divider
-   are pseudo-state/CSS-only; padding stays a Box prop on the element. */
+/* Clickable risk-factor row — edge-to-edge hover, no border. */
 .agentic-clickable-row {
     cursor: pointer;
     transition: background-color 0.15s ease;
-    border-bottom: 1px solid var(--p-color-border-subdued, #e1e3e5);
-}
-.agentic-clickable-row:last-child {
-    border-bottom: none;
 }
 .agentic-clickable-row:hover {
     background-color: var(--p-color-bg-hover, #f6f6f7);
@@ -129,9 +123,35 @@
 .agentic-chat-messages--scroll {
     overflow-y: scroll;
 }
+.agentic-chat-section {
+    margin-inline-start: var(--p-space-2);
+    margin-inline-end: var(--p-space-2);
+    margin-block-end: var(--p-space-2);
+}
+.agentic-chat-fill {
+    flex: 1;
+    min-height: 0;
+}
+.agentic-chat-drag-handle {
+    cursor: ns-resize;
+}
 .agentic-chat-empty {
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* Stats card column inside HorizontalGrid — fills parent height, distributes
+   children evenly so Card 1 height matches Card 2 / Card 3. */
+.agentic-stats-card-fill {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+.agentic-stats-card-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }

@@ -577,13 +577,14 @@ function buildTeamGroupsForAsset(group, usernameMap, userMetadataMap) {
     return Object.entries(teamCounts).map(([name, count]) => ({ name, count }));
 }
 
-function buildDevicesForGroup(group, usernameMap = {}) {
+function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}) {
     const byDevice = new Map();
     (group.collections || []).forEach((c) => {
         const hostName = c.hostName || c.displayName || c.name;
         const deviceId = extractEndpointId(hostName);
         if (!deviceId) return;
         const serviceName = extractServiceName(hostName);
+        const collRisk = riskScoreMap[c.id] || 0;
         if (!byDevice.has(deviceId)) {
             const resolved = getResolvedUsernameForCollection(c, usernameMap);
             const username = (resolved && resolved !== DEFAULT_VALUE) ? resolved : "";
@@ -593,18 +594,24 @@ function buildDevicesForGroup(group, usernameMap = {}) {
                 endpoint: deviceId,
                 username,
                 os: inferOsFromDeviceId(deviceId),
-                riskScore: group.riskScore ?? group.maxRiskScore ?? null,
+                riskScore: collRisk,
                 lastSeen: maxTraffic > 0 ? func.prettifyEpoch(maxTraffic) : "-",
                 lastSeenEpoch: maxTraffic,
                 services: [],
             });
         }
         const entry = byDevice.get(deviceId);
+        // accumulate max risk across all collections this device appears in
+        if (collRisk > (entry.riskScore || 0)) entry.riskScore = collRisk;
         if (serviceName && !entry.services.includes(serviceName)) {
             entry.services.push(serviceName);
         }
     });
-    return [...byDevice.values()];
+    // round to 1 dp and null out zero scores (no data)
+    return [...byDevice.values()].map(d => ({
+        ...d,
+        riskScore: d.riskScore > 0 ? Math.round(d.riskScore * 10) / 10 : null,
+    }));
 }
 
 function uniqueSkillNamesForGroup(group) {
@@ -729,7 +736,7 @@ export function buildAgenticAssetsPageData(
         const collectionIds = (group.collections || []).map((c) => c.id);
         const violations = violationsForCollections(collectionIds, violationsByCollectionId);
         const groups = buildTeamGroupsForAsset(group, usernameMap, userMetadataMap);
-        const devices = buildDevicesForGroup(group, usernameMap);
+        const devices = buildDevicesForGroup(group, usernameMap, riskScoreMap);
         const skillNames = uniqueSkillNamesForGroup(group);
         const riskScore = group.riskScore ?? group.maxRiskScore ?? null;
         const lastSeen = group.detectedTimestamp || 0;

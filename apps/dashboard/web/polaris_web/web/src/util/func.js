@@ -150,7 +150,7 @@ const func = {
     let d = date.getDate();
     let m = strArray[date.getMonth()];
     let y = date.getFullYear();
-    return m + ' ' + d + (needYear ? ' ' + y : '');
+    return m + ' ' + d + (needYear ? ', ' + y : '');
   },
   prettifyShort(num) {
     return new Intl.NumberFormat( 'en-US', { maximumFractionDigits: 1,notation: "compact" , compactDisplay: "short" }).format(num)

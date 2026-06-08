@@ -6,7 +6,7 @@ import { mapMcpAuditInfoToFlyoutData, buildMcpComponentsFromStis, buildSkillsFly
 
 function formatViolationTime(epoch) {
     if (typeof epoch !== "number" || epoch <= 0) return epoch;
-    return func.prettifyEpoch(epoch);
+    return func.formatChatTimestamp(epoch);
 }
 
 function normalizeViolationRows(violations = []) {

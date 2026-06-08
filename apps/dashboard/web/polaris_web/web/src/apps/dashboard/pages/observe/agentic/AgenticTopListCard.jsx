@@ -11,7 +11,7 @@ export default function AgenticTopListCard({ title, columns = [], rows = [], emp
                 <HorizontalStack gap="2" blockAlign="center" wrap={false}>
                     <AssetIcon type={row.type} assetTagValue={row.assetTagValue} />
                     <Box minWidth="0" overflowX="hidden">
-                        <Text variant="bodySm" as="span" truncate>{row.name}</Text>
+                        <Text variant="bodyMd" as="span" truncate>{row.name}</Text>
                     </Box>
                 </HorizontalStack>
             </Box>,

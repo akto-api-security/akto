@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import { produce } from "immer";
 import { useNavigate } from "react-router-dom";
-import { Box, Card, Checkbox, Divider, HorizontalGrid, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import { Box, Card, Checkbox, Divider, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
@@ -612,33 +612,37 @@ export default function AgenticAssetsPage() {
       return [
         <HorizontalGrid key="top-row" columns={3} gap="4">
           <Card padding="0">
-            <VerticalStack>
-              <AgenticStatsCard
-                title="Agentic Assets"
-                total={totalAssets}
-                delta={assetDelta}
-                sparklineCounts={assetSeries.counts}
-                sparklineLabels={assetSeries.labels}
-                breakdown={assetTypeBreakdown}
-                onFilterClick={handleTypeFilter}
-                activeFilter={typeFilter}
-                noCard
-              />
+            <Box className="agentic-stats-card-fill">
+              <Box className="agentic-stats-card-item">
+                <AgenticStatsCard
+                  title="Agentic Assets"
+                  total={totalAssets}
+                  delta={assetDelta}
+                  sparklineCounts={assetSeries.counts}
+                  sparklineLabels={assetSeries.labels}
+                  breakdown={assetTypeBreakdown}
+                  onFilterClick={handleTypeFilter}
+                  activeFilter={typeFilter}
+                  noCard
+                />
+              </Box>
               <Divider />
-              <AgenticStatsCard
-                title="Violations"
-                total={violationTotals.total}
-                totalColor="critical"
-                delta={violDelta}
-                sparklineCounts={violSeries.counts}
-                sparklineColor="#DC2626"
-                sparklineLabels={violSeries.labels}
-                breakdown={violBreakdown}
-                onFilterClick={handleViolSevFilter}
-                activeFilter={violSevFilter}
-                noCard
-              />
-            </VerticalStack>
+              <Box className="agentic-stats-card-item">
+                <AgenticStatsCard
+                  title="Violations"
+                  total={violationTotals.total}
+                  totalColor="critical"
+                  delta={violDelta}
+                  sparklineCounts={violSeries.counts}
+                  sparklineColor="#DC2626"
+                  sparklineLabels={violSeries.labels}
+                  breakdown={violBreakdown}
+                  onFilterClick={handleViolSevFilter}
+                  activeFilter={violSevFilter}
+                  noCard
+                />
+              </Box>
+            </Box>
           </Card>
           <AgenticTopListCard
             title="Top Used Applications"

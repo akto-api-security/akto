@@ -12,7 +12,7 @@ function AgentComponentNameCellRenderer({ data }) {
     return (
         <HorizontalStack gap="2" blockAlign="center" wrap={false}>
             <Box width="100%" overflowX="hidden">
-                <Text variant="bodyMd" fontWeight="medium" truncate>{data.name}</Text>
+                <Text variant="bodySm" truncate>{data.name}</Text>
             </Box>
             {data.isNew && <Badge>New</Badge>}
         </HorizontalStack>
@@ -32,7 +32,7 @@ function DeviceRiskCellRenderer({ value }) {
 // ── Column definitions ────────────────────────────────────────────────────────
 
 const TOOLS_COL_DEFS = [
-    { field: "name",      headerName: "Tool",   flex: 1,   minWidth: 160, cellStyle: { display: "flex", alignItems: "center", fontSize: 13, fontWeight: 600, color: "#202223" } },
+    { field: "name",      headerName: "Tool",   flex: 1,   minWidth: 160, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#202223" } },
     { field: "riskLevel", headerName: "Risk",   width: 100, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ({ value }) => value ? <Text variant="bodyMd" color="subdued">{value}</Text> : null, cellStyle: { display: "flex", alignItems: "center" } },
     { field: "params",    headerName: "Params", width: 80,  suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center" }, valueGetter: p => p.data?.params?.length ?? 0 },
 ];

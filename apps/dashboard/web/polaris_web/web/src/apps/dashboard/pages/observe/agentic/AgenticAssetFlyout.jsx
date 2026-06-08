@@ -5,6 +5,7 @@ import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AgenticFlyoutShell from "./AgenticFlyoutShell";
 import AiChatSection from "./AiChatSection";
 import { getAgentLinkedComponents } from "./agenticPageBuilders";
+import { RiskScoreCellRenderer } from "./AgenticCellRenderers";
 import agenticObserveApi, { buildAgenticObserveChatMetadata } from "./agenticObserveApi";
 import OverviewTab from "./OverviewTab";
 import ViolationsTab from "./ViolationsTab";
@@ -16,8 +17,9 @@ import "../../../components/layouts/style.css";
 // ─── Devices tab (small, kept inline) ────────────────────────────────────────
 
 const DEVICES_COL_DEFS = [
-    { field: "username", headerName: "User",      flex: 1,   minWidth: 120, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#202223" }, valueFormatter: p => p.value || "-" },
-    { field: "lastSeen", headerName: "Last Seen", width: 130, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, valueFormatter: p => p.value || "-", comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.lastSeenEpoch || 0) - (nodeB?.data?.lastSeenEpoch || 0) },
+    { field: "username", headerName: "User",       flex: 1,  minWidth: 120, cellStyle: { display: "flex", alignItems: "center" }, valueFormatter: p => p.value || "-" },
+    { field: "riskScore", headerName: "Risk Score", width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: RiskScoreCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "lastSeen", headerName: "Last Seen",  width: 130, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", color: "#6D7175" }, valueFormatter: p => p.value || "-", comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.lastSeenEpoch || 0) - (nodeB?.data?.lastSeenEpoch || 0) },
 ];
 
 const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
@@ -216,12 +218,14 @@ export default function AgenticAssetFlyout({
                     </div>
                 )}
                 {selectedTab === 1 && (
-                    <AgenticComponentsTab
-                        asset={asset}
-                        onNavChange={handleNavChange}
-                        onNavigateToAsset={onNavigateToAsset}
-                        agenticFlatData={agenticFlatData}
-                    />
+                    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                        <AgenticComponentsTab
+                            asset={asset}
+                            onNavChange={handleNavChange}
+                            onNavigateToAsset={onNavigateToAsset}
+                            agenticFlatData={agenticFlatData}
+                        />
+                    </div>
                 )}
                 {selectedTab === 2 && <ViolationsTab asset={asset} />}
                 {selectedTab === 3 && <DevicesTab asset={asset} assetDevices={assetDevices} />}

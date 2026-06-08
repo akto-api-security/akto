@@ -26,8 +26,8 @@ function computeAssetRiskFactors(asset) {
 }
 
 function getAssetNarrative(asset) {
-    const score = asset.riskScore?.toFixed(1);
-    const label = getRiskLabel(asset.riskScore);
+    const score = asset.riskScore != null ? Math.round(asset.riskScore * 10) / 10 : null;
+    const label = getRiskLabel(asset.riskScore)?.toLowerCase();
     const parts = [];
 
     if ((asset.violations?.critical || 0) > 0)
@@ -40,7 +40,7 @@ function getAssetNarrative(asset) {
     if (parts.length === 0)
         return `${asset.name} shows a standard activity profile with no elevated signals. Score reflects baseline activity patterns.`;
 
-    return `${asset.name} carries a ${label} score of ${score}/5.0 because ${parts.join(", and ")}. ${(asset.violations?.critical || 0) > 0 ? "Immediate action is recommended." : "Monitor closely and review permissions."}`;
+    return `${asset.name} carries a risk score of ${score}/5 (${label}) because ${parts.join(", and ")}. ${(asset.violations?.critical || 0) > 0 ? "Immediate action is recommended." : "Monitor closely and review permissions."}`;
 }
 
 export default function OverviewTab({ asset, onTabChange, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], mcpComponentCount = 0 }) {
@@ -102,8 +102,6 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
 
                 <AssetTopologyGraph asset={asset} assetDevices={assetDevices} agenticTreeData={agenticTreeData} agenticFlatData={agenticFlatData} />
 
-                <DetailGrid heading="Asset Details" items={assetDetails} columns={1} />
-
                 <VerticalStack gap="3">
                     <Text variant="headingXs" color="subdued">Risk Analysis</Text>
                     <Text variant="bodySm">{narrative}</Text>
@@ -114,6 +112,8 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
                         })}
                     </VerticalStack>
                 </VerticalStack>
+
+                <DetailGrid heading="Asset Details" items={assetDetails} columns={3} />
             </VerticalStack>
         </Box>
     );
