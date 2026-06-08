@@ -171,7 +171,7 @@ public class Main {
     ApiCountInfoRelayCron apiCountInfoRelayCron = new ApiCountInfoRelayCron(localRedis);
     try {
         logger.info("Scheduling relayApiCountInfoCron at " + Context.now());
-        //apiCountInfoRelayCron.relayApiCountInfo();
+        apiCountInfoRelayCron.relayApiCountInfo();
     } catch (Exception e) {
         logger.errorAndAddToDb(e,"Error scheduling relayApiCountInfoCron : {} ");
     }

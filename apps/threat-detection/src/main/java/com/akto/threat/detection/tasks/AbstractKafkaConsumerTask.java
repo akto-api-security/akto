@@ -76,21 +76,6 @@ public abstract class AbstractKafkaConsumerTask<V> implements Task {
         logger.warnAndAddToDb(instanceId + ": WARNING - No partitions assigned! Consumer may not receive records.");
       }
 
-      // Log committed offsets and end offsets (lag) for each assigned partition
-      try {
-        Set<TopicPartition> assignedPartitions = kafkaConsumer.assignment();
-        Map<TopicPartition, Long> endOffsets = kafkaConsumer.endOffsets(assignedPartitions);
-        for (TopicPartition tp : assignedPartitions) {
-          OffsetAndMetadata committed = kafkaConsumer.committed(tp);
-          long committedOffset = committed != null ? committed.offset() : -1;
-          long endOffset = endOffsets.getOrDefault(tp, -1L);
-          long lag = (committed != null && endOffset >= 0) ? endOffset - committedOffset : -1;
-          logger.warnAndAddToDb(this.instanceId + ": Partition " + tp + " committedOffset=" + committedOffset +
-                                " endOffset=" + endOffset + " lag=" + lag);
-        }
-        } catch (Exception e) {
-            logger.errorAndAddToDb(e, this.instanceId + ": Error fetching offset info: " + e.getMessage());
-        }
       recordsReadCount = 0;
       lastRecordCountLogTime = currentTime;
     }

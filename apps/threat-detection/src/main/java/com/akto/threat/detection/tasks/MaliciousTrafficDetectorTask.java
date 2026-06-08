@@ -7,9 +7,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -21,10 +18,6 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.consumer.OffsetAndMetadata;
-import org.apache.kafka.common.TopicPartition;
-
 import com.akto.IPLookupClient;
 import com.akto.RawApiMetadataFactory;
 import com.akto.dao.context.Context;
@@ -68,7 +61,6 @@ import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.rules.TestPlugin;
-import com.akto.utils.GzipUtils;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 
@@ -410,7 +402,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
         if (applyFilterLogCount.get() < MAX_APPLY_FILTER_LOGS || isDebugRequest(responseParam)) {
           logger.warnAndAddToDb("applyFilter - apiInfoKey: " + apiInfoKey.toString() +
                                 ", filterId: " + apiFilter.getId() +
-                                ", result: " + hasPassedFilter +
+                                ", result: " + hasPassedFilter + 
                                 ", statusCode " + responseParam.getStatusCode());
           applyFilterLogCount.incrementAndGet();
         }
@@ -431,7 +423,6 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
       // and so we push it to kafka
       if (hasPassedFilter) {
         logger.debugAndAddToDb("filter condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
-
         // Capture threat positions for LFI, OS Command Injection, and SSRF filters
         String filterId = apiFilter.getId();
         if (filterId.equals(ThreatDetector.LFI_FILTER_ID) || 
@@ -497,7 +488,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
           }
 
           if (apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
-                continue;
+            continue;
           }
 
           shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule, shouldIncrement, breachFilterPassed);
