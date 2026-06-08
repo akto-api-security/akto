@@ -46,58 +46,6 @@ public final class AgenticObserveUtil {
         return McpRequestResponseUtils.extractServiceNameFromHost(hostName);
     }
 
-    public static boolean isAgenticCollection(ApiCollection collection) {
-        if (collection == null || collection.isDeactivated()) {
-            return false;
-        }
-        String hostName = collection.getHostName();
-        if (StringUtils.isNotBlank(hostName)) {
-            String[] parts = hostName.split("\\.");
-            if (parts.length >= 3) {
-                return true;
-            }
-        }
-        if (collection.isGenAICollection() || collection.isEndpointCollection()) {
-            return true;
-        }
-        List<CollectionTags> envType = collection.getEnvType();
-        if (envType == null || envType.isEmpty()) {
-            return false;
-        }
-        return hasAnyTag(envType, Constants.AKTO_MCP_SERVER_TAG, Constants.AKTO_BROWSER_LLM_TAG, Constants.AKTO_MCP_CLIENT_TAG, Constants.AKTO_AI_AGENT_TAG, Constants.AKTO_BROWSER_LLM_AGENT_TAG, Constants.AKTO_SKILL_TAG);
-    }
-
-    private static boolean hasAnyTag(List<CollectionTags> tags, String... keyNames) {
-        if (tags == null || tags.isEmpty()) return false;
-        Set<String> keySet = new HashSet<>(Arrays.asList(keyNames));
-        for (CollectionTags tag : tags) {
-            if (tag != null && keySet.contains(tag.getKeyName())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public static String getClientTypeFromCollection(ApiCollection collection) {
-        return getTypeFromCollection(collection);
-    }
-
-    public static boolean hasPersonalAccountTag(ApiCollection collection) {
-        return hasEnvTagValue(collection, "browser-llm-account-type", "personal")
-                || hasEnvTagValue(collection, "login-user-email-type", "personal");
-    }
-
-    public static boolean hasLocalMcpServerTag(ApiCollection collection) {
-        if (collection == null || collection.getEnvType() == null) {
-            return false;
-        }
-        for (CollectionTags tag : collection.getEnvType()) {
-            if (tag != null && "local-mcp-server".equals(tag.getKeyName())) {
-                return true;
-            }
-        }
-        return false;
-    }
 
     private static boolean hasEnvTagValue(ApiCollection collection, String keyName, String value) {
         if (collection == null || collection.getEnvType() == null) {
@@ -109,23 +57,6 @@ public final class AgenticObserveUtil {
             }
         }
         return false;
-    }
-
-    public static String inferOsFromDeviceId(String deviceId) {
-        if (StringUtils.isBlank(deviceId)) {
-            return "mac";
-        }
-        String upper = deviceId.toUpperCase(Locale.ROOT);
-        if (upper.contains("WIN")) {
-            return "windows";
-        }
-        if (upper.contains("LIN") || upper.contains("LINUX")) {
-            return "linux";
-        }
-        if (upper.contains("MAC")) {
-            return "mac";
-        }
-        return "mac";
     }
 
     public static String toChildPathKey(String serviceName) {
