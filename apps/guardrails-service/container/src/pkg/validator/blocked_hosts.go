@@ -35,9 +35,10 @@ type BlockedHostEntry struct {
 // match can be attributed back to the originating policy. The pattern is compiled once into an
 // anchored regex (re) so matching is robust for patterns such as "*.*/v1/chat/*".
 type blockedHostRule struct {
-	policyName string
-	pattern    string
-	re         *regexp.Regexp
+	policyName    string
+	contextSource string // policy-level contextSource ("AGENTIC", "ENDPOINT", or "")
+	pattern       string
+	re            *regexp.Regexp
 }
 
 // isBrowserExtensionRequest reports whether the request originates from the browser LLM
@@ -227,9 +228,10 @@ func matchBlockedToolRule(tag, host string, rules []blockedHostRule) (blockedHos
 func parseBlockedHostRules(raw []byte) []blockedHostRule {
 	var response struct {
 		GuardrailPolicies []struct {
-			Name         string             `json:"name"`
-			Active       bool               `json:"active"`
-			BlockedHosts []BlockedHostEntry `json:"blockedHosts"`
+			Name          string             `json:"name"`
+			Active        bool               `json:"active"`
+			ContextSource string             `json:"contextSource"`
+			BlockedHosts  []BlockedHostEntry `json:"blockedHosts"`
 		} `json:"guardrailPolicies"`
 	}
 	if err := json.Unmarshal(raw, &response); err != nil {
@@ -250,7 +252,12 @@ func parseBlockedHostRules(raw []byte) []blockedHostRule {
 			if err != nil {
 				continue // skip patterns that fail to compile rather than blocking everything
 			}
-			rules = append(rules, blockedHostRule{policyName: p.Name, pattern: pattern, re: re})
+			rules = append(rules, blockedHostRule{
+				policyName:    p.Name,
+				contextSource: strings.ToUpper(p.ContextSource),
+				pattern:       pattern,
+				re:            re,
+			})
 		}
 	}
 	return rules

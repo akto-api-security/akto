@@ -510,11 +510,17 @@ func (s *Service) checkBlockedHost(params *models.ValidateRequestParams, valCtx 
 	for _, p := range policies {
 		activePolicyNames[p.Info.Name] = struct{}{}
 	}
+	isEndpointCtx := strings.EqualFold(params.ContextSource, string(types.ContextSourceEndpoint))
 	scoped := blockedHostRules[:0:0]
 	for _, r := range blockedHostRules {
-		if _, ok := activePolicyNames[r.policyName]; ok {
-			scoped = append(scoped, r)
+		if _, ok := activePolicyNames[r.policyName]; !ok {
+			continue
 		}
+		// AGENTIC-scoped policies must not block Endpoint traffic.
+		if isEndpointCtx && r.contextSource == string(types.ContextSourceAgentic) {
+			continue
+		}
+		scoped = append(scoped, r)
 	}
 	if len(scoped) == 0 {
 		return nil
