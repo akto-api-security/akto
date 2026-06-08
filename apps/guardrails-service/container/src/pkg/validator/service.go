@@ -420,17 +420,28 @@ func (s *Service) getLoginUserEmailType(params *models.ValidateRequestParams) st
 		zap.Int("cacheSize", cacheSize),
 		zap.Any("tags", tags))
 
-	if !ok {
-		return ""
+	if ok {
+		if v := tags["login-user-email-type"]; v != "" {
+			s.logger.Info("getLoginUserEmailType - returning login-user-email-type", zap.String("value", v))
+			return v
+		}
+		if v := tags["browser-llm-account-type"]; v != "" {
+			s.logger.Info("getLoginUserEmailType - returning browser-llm-account-type (cache)", zap.String("value", v))
+			return v
+		}
 	}
 
-	if v := tags["login-user-email-type"]; v != "" {
-		s.logger.Info("getLoginUserEmailType - returning login-user-email-type", zap.String("value", v))
-		return v
+	// Cache miss or no account-type tag — fall back to browser-llm-account-type from the request tag.
+	if params.Tag != "" {
+		var tagMap map[string]string
+		if err := json.Unmarshal([]byte(params.Tag), &tagMap); err == nil {
+			if v := tagMap["browser-llm-account-type"]; v != "" {
+				s.logger.Info("getLoginUserEmailType - returning browser-llm-account-type (request tag)", zap.String("value", v))
+				return v
+			}
+		}
 	}
-	v := tags["browser-llm-account-type"]
-	s.logger.Info("getLoginUserEmailType - returning browser-llm-account-type", zap.String("value", v))
-	return v
+	return ""
 }
 
 // TODO: move reportAndBlockPersonalAccount to mcp library so threat reporting
@@ -904,7 +915,16 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Any("policies", policies),
 		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
 
-	// Check account-type guardrail: block if any active policy has BlockPersonalAccounts enabled.
+	// Create validation context with full request metadata (matching batch flow)
+	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList)
+
+	// Filter policies by MCP server name so all subsequent checks only fire for
+	// rules that belong to policies applicable to this server.
+	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
+
+	// Check account-type guardrail after server filtering so the policy's server
+	// selection is respected (a personal-account policy scoped to server A should
+	// not block requests arriving on server B).
 	if policyName, ok := blockPersonalAccountPolicyName(policies); ok {
 		s.refreshCollectionTagsIfNeeded()
 		accountType := s.getLoginUserEmailType(params)
@@ -923,13 +943,6 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName), nil
 		}
 	}
-
-	// Create validation context with full request metadata (matching batch flow)
-	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList)
-
-	// Filter policies by MCP server name first so the blocked-host check only fires for
-	// rules that belong to policies applicable to this server.
-	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
 
 	// Host blocklist (block-only). Evaluated after server filtering so only rules from
 	// policies scoped to this server are considered.
