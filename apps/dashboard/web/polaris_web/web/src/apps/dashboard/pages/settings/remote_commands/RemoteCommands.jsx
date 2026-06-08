@@ -5,6 +5,7 @@ import {
     VerticalStack, HorizontalStack, LegacyCard,
     Spinner, Tag, Checkbox, Tooltip, Banner, Box, RadioButton
 } from '@shopify/polaris'
+import { RefreshMajor } from '@shopify/polaris-icons'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
 import settingRequests from '../api'
@@ -315,6 +316,8 @@ function RemoteCommands() {
     const navigate = useNavigate()
     const [commands, setCommands] = useState([])
     const [loading, setLoading] = useState(true)
+    const [refreshing, setRefreshing] = useState(false)
+    const [tableVersion, setTableVersion] = useState(0)
     const [showModal, setShowModal] = useState(false)
     const pollRef = useRef(null)
 
@@ -322,9 +325,19 @@ function RemoteCommands() {
         try {
             const res = await settingRequests.fetchEndpointRemoteCommandList(50)
             setCommands(res?.commands || [])
+            setTableVersion(v => v + 1)
         } catch {
         } finally {
             setLoading(false)
+        }
+    }
+
+    async function handleRefresh() {
+        setRefreshing(true)
+        try {
+            await loadCommands()
+        } finally {
+            setRefreshing(false)
         }
     }
 
@@ -359,20 +372,25 @@ function RemoteCommands() {
     }))
 
     const table = (
-        <GithubSimpleTable
-            key={`rc-${commands.length}`}
-            data={tableData}
-            headers={HEADERS}
-            headings={HEADERS}
-            resourceName={resourceName}
-            selectable={false}
-            useNewRow={true}
-            condensedHeight={true}
-            loading={loading}
-            onRowClick={row => row._commandId && navigate(`/dashboard/settings/remote-commands/${row._commandId}`)}
-            rowClickable={true}
-            hideQueryField={true}
-        />
+        <VerticalStack gap="1">
+            <HorizontalStack align="end">
+                <Button icon={RefreshMajor} plain onClick={handleRefresh} loading={refreshing} accessibilityLabel="Refresh" />
+            </HorizontalStack>
+            <GithubSimpleTable
+                key={`rc-${tableVersion}`}
+                data={tableData}
+                headers={HEADERS}
+                headings={HEADERS}
+                resourceName={resourceName}
+                selectable={false}
+                useNewRow={true}
+                condensedHeight={true}
+                loading={loading}
+                onRowClick={row => row._commandId && navigate(`/dashboard/settings/remote-commands/${row._commandId}`)}
+                rowClickable={true}
+                hideQueryField={true}
+            />
+        </VerticalStack>
     )
 
     return (

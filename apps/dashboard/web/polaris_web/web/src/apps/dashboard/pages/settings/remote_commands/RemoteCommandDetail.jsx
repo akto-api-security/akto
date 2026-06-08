@@ -5,6 +5,7 @@ import {
     VerticalStack, HorizontalStack,
     Spinner, Banner, Box, Tooltip
 } from '@shopify/polaris'
+import { RefreshMajor } from '@shopify/polaris-icons'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
 import settingRequests from '../api'
@@ -168,6 +169,8 @@ function RemoteCommandDetail() {
     const [command, setCommand] = useState(null)
     const [executions, setExecutions] = useState([])
     const [loading, setLoading] = useState(true)
+    const [refreshing, setRefreshing] = useState(false)
+    const [tableVersion, setTableVersion] = useState(0)
     const [cancelling, setCancelling] = useState(false)
     const pollRef = useRef(null)
 
@@ -180,6 +183,7 @@ function RemoteCommandDetail() {
             const found = (listRes?.commands || []).find(c => c.commandId === commandId)
             if (found) setCommand(found)
             setExecutions(execRes?.executions || [])
+            setTableVersion(v => v + 1)
         } catch {
         } finally {
             setLoading(false)
@@ -197,6 +201,15 @@ function RemoteCommandDetail() {
         if (needsPoll) pollRef.current = setInterval(loadData, 5000)
         return () => clearInterval(pollRef.current)
     }, [executions])
+
+    async function handleRefresh() {
+        setRefreshing(true)
+        try {
+            await loadData()
+        } finally {
+            setRefreshing(false)
+        }
+    }
 
     async function handleCancel() {
         setCancelling(true)
@@ -303,19 +316,24 @@ function RemoteCommandDetail() {
     })
 
     const execTable = (
-        <GithubSimpleTable
-            key={`exec-${executions.length}`}
-            data={execTableData}
-            headers={EXEC_HEADERS}
-            headings={EXEC_HEADERS}
-            resourceName={EXEC_RESOURCE}
-            selectable={false}
-            useNewRow={true}
-            condensedHeight={true}
-            loading={loading}
-            hideQueryField={true}
-            rowClickable={true}
-        />
+        <VerticalStack gap="1">
+            <HorizontalStack align="end">
+                <Button icon={RefreshMajor} plain onClick={handleRefresh} loading={refreshing} accessibilityLabel="Refresh" />
+            </HorizontalStack>
+            <GithubSimpleTable
+                key={`exec-${tableVersion}`}
+                data={execTableData}
+                headers={EXEC_HEADERS}
+                headings={EXEC_HEADERS}
+                resourceName={EXEC_RESOURCE}
+                selectable={false}
+                useNewRow={true}
+                condensedHeight={true}
+                loading={loading}
+                hideQueryField={true}
+                rowClickable={true}
+            />
+        </VerticalStack>
     )
 
     return (
