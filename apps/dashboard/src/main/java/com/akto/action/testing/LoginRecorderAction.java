@@ -35,6 +35,7 @@ import lombok.Setter;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
+import java.util.UUID;
 
 public class LoginRecorderAction extends UserAction {
 
@@ -64,6 +65,13 @@ public class LoginRecorderAction extends UserAction {
 
     /** Set on hybrid {@link #uploadRecordedFlow()} response; sent on {@link #fetchRecordedFlowOutput()} polls. */
     private String testingRunPlaygroundId;
+
+    /** Live screenshot session ID — returned on upload, used by frontend to poll getLatestReplayScreenshot. */
+    @Getter @Setter
+    private String screenshotSessionId;
+
+    @Getter @Setter
+    private String screenshotBase64;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -102,13 +110,22 @@ public class LoginRecorderAction extends UserAction {
 
         this.testingRunPlaygroundId = null;
 
+        final String liveSessionId;
+        if (roleName != null && !roleName.trim().isEmpty()) {
+            liveSessionId = UUID.randomUUID().toString();
+            this.screenshotSessionId = liveSessionId;
+        } else {
+            liveSessionId = null;
+            this.screenshotSessionId = null;
+        }
+
         executorService.schedule( new Runnable() {
             public void run() {
                 try {
                     Context.accountId.set(accountId);
                     File tmpOutputFile = File.createTempFile("output", ".json");
                     File tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
-                    RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), userId, roleName);
+                    RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), userId, roleName, liveSessionId);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,"error running recorded flow " + e.toString(), LogDb.DASHBOARD);
                 }
@@ -195,6 +212,19 @@ public class LoginRecorderAction extends UserAction {
         }
 
         tokenFetchInProgress = true;
+        return SUCCESS.toUpperCase();
+    }
+
+    // Called by frontend while replay is in progress — proxies to puppeteer
+    public String getLatestReplayScreenshot() {
+        if (screenshotSessionId == null || screenshotSessionId.isEmpty()) {
+            addActionError("sessionId is required");
+            return ERROR.toUpperCase();
+        }
+        String puppeteerUrl = System.getenv("PUPPETEER_REPLAY_SERVICE_URL");
+        if (puppeteerUrl != null && !puppeteerUrl.isEmpty()) {
+            screenshotBase64 = RecordedLoginFlowUtil.fetchLatestLiveScreenshot(puppeteerUrl, screenshotSessionId);
+        }
         return SUCCESS.toUpperCase();
     }
 
