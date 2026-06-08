@@ -477,7 +477,7 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 				"",
 				types.ThreatMetadata{
 					PolicyName:   policyName,
-					RuleViolated: "personal account type",
+					RuleViolated: "BlockPersonalAccounts",
 					Severity:     "MEDIUM",
 					Reason:       blockReason,
 				},
@@ -500,6 +500,12 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 		Allowed:   false,
 		Reason:    blockReason,
 		Behaviour: "block",
+		Metadata: types.ThreatMetadata{
+			PolicyName:   policyName,
+			RuleViolated: "BlockPersonalAccounts",
+			Severity:     "MEDIUM",
+			Reason:       blockReason,
+		},
 	}
 }
 
