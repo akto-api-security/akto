@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Text, Badge, Tabs, Divider, Popover, ActionList, Button, Spinner, HorizontalStack, VerticalStack } from "@shopify/polaris";
-import { ChevronLeftMinor } from "@shopify/polaris-icons";
+import { Box, Text, Badge, Divider, ActionList, Button, Spinner, VerticalStack } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { ParamNameCellRenderer, ParamTypeCellRenderer, ParamDescCellRenderer, SeverityBadge } from "./AgenticCellRenderers";
 import agenticObserveApi from "./agenticObserveApi";
@@ -27,7 +26,7 @@ function TrafficView({ traffic, loading }) {
     if (!traffic?.length) return TRAFFIC_EMPTY;
     const sampleData = traffic.map((s) => ({ message: typeof s === "string" ? s : JSON.stringify(s) }));
     return (
-        <Box className="agentic-flex-fill" overflowY="scroll">
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
             <Box
                 paddingBlockStart="4"
                 paddingBlockEnd="4"
@@ -37,12 +36,12 @@ function TrafficView({ traffic, loading }) {
                 <SampleDataList
                     sampleData={sampleData}
                     heading="Sample values"
-                    minHeight="35vh"
+                    minHeight="200px"
                     vertical={true}
                     isAPISampleData={true}
                 />
             </Box>
-        </Box>
+        </div>
     );
 }
 
@@ -75,49 +74,41 @@ export function ToolDetailPanel({ tool, onBack }) {
     const { traffic, loading } = useEndpointTraffic(tool, tab === trafficTabIdx);
 
     return (
-        <Box className="agentic-flex-fill">
-            <Box paddingInlineStart="3" paddingInlineEnd="3" paddingBlockStart="3">
-                <HorizontalStack gap="2" blockAlign="center">
-                    {onBack && <Button plain icon={ChevronLeftMinor} onClick={onBack} />}
-                    <Text variant="headingSm" as="h3" fontWeight="semibold">{tool.name}</Text>
-                </HorizontalStack>
-            </Box>
-            
-            <Divider />
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             {(hasSchema && tab === 0) ? (
-                <Box className="agentic-flex-fill">
+                <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                     <AgGridTable rowData={tool.params} columnDefs={SCHEMA_COL_DEFS} defaultColDef={GRID_DEFAULT_COL} fillHeight noOuterBorder pagination={false} sideBar={false} />
-                </Box>
+                </div>
             ) : (
                 <TrafficView traffic={traffic} loading={loading} />
             )}
-        </Box>
+        </div>
     );
 }
 
 function ResourcePromptDetailPanel({ item }) {
     const { traffic, loading } = useEndpointTraffic(item, true);
     return (
-        <Box className="agentic-flex-fill">
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <Box paddingInlineStart="3" paddingInlineEnd="3" paddingBlockStart="3" paddingBlockEnd="2">
                 <Text variant="headingSm" as="h3" fontWeight="semibold">{item.name}</Text>
             </Box>
             <Divider />
             <TrafficView traffic={traffic} loading={loading} />
-        </Box>
+        </div>
     );
 }
 
 export function SkillDetailPanel({ skill }) {
     const { traffic, loading } = useEndpointTraffic(skill, true);
     return (
-        <Box className="agentic-flex-fill">
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <Box paddingInlineStart="3" paddingInlineEnd="3" paddingBlockStart="3" paddingBlockEnd="2">
                 <Text variant="headingSm" as="h3" fontWeight="semibold">{skill.name}</Text>
             </Box>
             <Divider />
             <TrafficView traffic={traffic} loading={loading} />
-        </Box>
+        </div>
     );
 }
 
@@ -173,30 +164,59 @@ const COMBINED_MCP_COL_DEFS = [
 
 function McpPickerDropdown({ allRows, selected, onSelect }) {
     const [open, setOpen] = useState(false);
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+        if (!open) return;
+        const close = (e) => {
+            if (containerRef.current && !containerRef.current.contains(e.target)) {
+                setOpen(false);
+            }
+        };
+        const timer = setTimeout(() => {
+            document.addEventListener("click", close);
+        }, 0);
+        return () => {
+            clearTimeout(timer);
+            document.removeEventListener("click", close);
+        };
+    }, [open]);
+
     if (!allRows || allRows.length <= 1) {
         return <Text variant="bodySm" fontWeight="semibold">{selected?.name}</Text>;
     }
     return (
-        <Popover
-            active={open}
-            onClose={() => setOpen(false)}
-            preferredAlignment="left"
-            activator={
-                <Button plain disclosure onClick={() => setOpen(s => !s)}>
-                    {selected?.name}
-                </Button>
-            }
-        >
-            <Popover.Pane>
-                <ActionList
-                    items={allRows.map(r => ({
-                        content: r.name,
-                        active: r.name === selected?.name,
-                        onAction: () => { onSelect(r); setOpen(false); },
-                    }))}
-                />
-            </Popover.Pane>
-        </Popover>
+        <Box ref={containerRef} style={{ position: "relative", display: "inline-block" }}>
+            <Button plain disclosure onClick={() => setOpen(s => !s)}>
+                {selected?.name}
+            </Button>
+            {open && (
+                <Box
+                    style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: 0,
+                        zIndex: 1001,
+                        background: "white",
+                        border: "1px solid #E1E3E5",
+                        borderRadius: 8,
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+                        minWidth: 200,
+                        maxHeight: 300,
+                        overflowY: "auto",
+                    }}
+                    padding="1"
+                >
+                    <ActionList
+                        items={allRows.map(r => ({
+                            content: r.name,
+                            active: r.name === selected?.name,
+                            onAction: () => { onSelect(r); setOpen(false); },
+                        }))}
+                    />
+                </Box>
+            )}
+        </Box>
     );
 }
 

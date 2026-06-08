@@ -34,22 +34,22 @@ export default function SkillComponentsView({ asset }) {
                 for (const collectionId of collectionIds) {
                     const infoResp = await observeApi.fetchApiInfosForCollection(collectionId);
                     const infos = infoResp?.apiInfoList || [];
-                    const match = infos.find(i =>
-                        String(i?.id?.url || "").toLowerCase().includes(`/skills/${asset.name.toLowerCase()}`)
-                    );
-                    if (!match) continue;
-
-                    // Try full URL (with hostname) then path-only — storage format varies by environment
-                    const fullUrl = match.id.url;
-                    const pathOnly = fullUrl.replace(/^https?:\/\/[^/]+/, "");
-                    for (const url of [fullUrl, pathOnly]) {
-                        const resp = await observeApi.fetchSampleData(url, collectionId, match.id.method);
-                        const samples = (resp?.sampleDataList || []).flatMap(s => s.samples || []);
-                        for (const sample of samples) {
-                            const md = buildSkillMarkdown(sample);
-                            if (md) { found = md; break; }
+                    for (const info of infos) {
+                        const url = String(info?.id?.url || "");
+                        if (!url.toLowerCase().includes("/skills/")) continue;
+                        const method = info?.id?.method || "POST";
+                        // Try full URL (with hostname) then path-only — storage format varies by environment
+                        const pathOnly = url.replace(/^https?:\/\/[^/]+/, "");
+                        for (const candidateUrl of new Set([url, pathOnly])) {
+                            const resp = await observeApi.fetchSampleData(candidateUrl, collectionId, method);
+                            const samples = (resp?.sampleDataList || []).flatMap(s => s.samples || []);
+                            for (const sample of samples) {
+                                const md = buildSkillMarkdown(sample);
+                                if (md) { found = md; break; }
+                            }
+                            if (found) break;
                         }
-                        if (found || samples.length > 0) break;
+                        if (found) break;
                     }
                     if (found) break;
                 }

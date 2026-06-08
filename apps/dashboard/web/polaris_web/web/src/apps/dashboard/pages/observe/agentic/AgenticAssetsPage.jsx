@@ -60,8 +60,6 @@ const COL_DEFS = [
     minWidth: 200,
     pinned: "left",
     filter: "agTextColumnFilter",
-    checkboxSelection: true,
-    headerCheckboxSelection: true,
     cellRenderer: AssetNameCellRenderer,
     cellStyle: { display: "flex", alignItems: "center" },
   },
@@ -265,8 +263,6 @@ function TableSection({
         getRowStyle={getRowStyle}
         animateRows
         suppressCellFocus
-        rowSelection="multiple"
-        suppressRowClickSelection
         pagination
         paginationPageSize={20}
         paginationPageSizeSelector={[20, 50, 100]}
@@ -316,9 +312,9 @@ export default function AgenticAssetsPage() {
     produce((draft, action) => func.dateRangeReducer(draft, action)),
     values.ranges[4],
   );
-  const startTimestamp = Math.floor(
-    Date.parse(currDateRange.period.since) / 1000,
-  );
+  const rawStart = Math.floor(Date.parse(currDateRange.period.since) / 1000);
+  // values.ranges "allTime" uses since=new Date(1000) → rawStart=1; treat as 0 (data-min mode)
+  const startTimestamp = rawStart <= 1 ? 0 : rawStart;
   const endTimestamp = Math.floor(
     Date.parse(currDateRange.period.until) / 1000,
   );
@@ -491,7 +487,7 @@ export default function AgenticAssetsPage() {
           renderValue: (r) => (
             <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
               <Box minHeight="28px">
-                <Text variant="bodySm" color="subdued" alignment="end">
+                <Text variant="bodyMd" alignment="end">
                   {func.prettifyShort(r.aiInteractions)}
                 </Text>
               </Box>
@@ -538,7 +534,7 @@ export default function AgenticAssetsPage() {
             onClick: setFlyout,
             renderValue: (r) => (
               <HorizontalStack align="end" blockAlign="center" gap="3" wrap={false}>
-                <Text variant="bodySm" color="subdued">{r.totalV}</Text>
+                <Text variant="bodyMd">{r.totalV}</Text>
                 <SmoothAreaChart
                   tickPositions={series.counts}
                   color="#EF4444"

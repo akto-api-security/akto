@@ -34,7 +34,9 @@ export default function AgenticFlyoutShell({ show, width = 800, header, footer, 
                 }}
             >
                 {header}
-                {children}
+                <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                    {children}
+                </div>
                 {footer}
             </Box>
         </Box>

@@ -5,7 +5,7 @@ import McpRedIcon from "@/assets/McpRedIcon.svg";
 import PersonLockIcon from "@/assets/PersonLockIcon.svg";
 import MaliciousSkillIcon from "@/assets/MaliciousSkill.svg";
 import observeFunc from "../transform";
-import { getRiskLevel } from "./agenticPageBuilders";
+import { getRiskStatus } from "./agenticPageBuilders";
 import AssetIcon from "./AssetIcon";
 import { TypeBadge } from "@/apps/dashboard/components/tables/rows/AgGridRow";
 import "../../../components/layouts/style.css";
@@ -18,15 +18,9 @@ import "../../../components/layouts/style.css";
 // TypeBadge lives in the shared AgGridRow component; re-exported here for the flyouts.
 export { TypeBadge };
 
-// Risk score pill — colour band (critical/high/medium/low) by score, via
-// .badge-wrapper-<SEVERITY> so it shares the dashboard severity palette.
 export function RiskPill({ score }) {
-    if (score == null) return null;
-    return (
-        <Box as="span" className={`badge-wrapper-${getRiskLevel(score)} agentic-risk-pill`}>
-            <Badge size="small">{score.toFixed(1)}</Badge>
-        </Box>
-    );
+    if (!score) return null;
+    return <Badge size="small" status={getRiskStatus(score)}>{score}</Badge>;
 }
 
 // Severity badge — same pattern as TestRunResultFlyout: a .badge-wrapper-<SEVERITY>
@@ -78,12 +72,10 @@ export function ParamDescCellRenderer({ data }) {
 // Grid cell-renderer exception (grid sandbox — Polaris tokens don't reach in).
 
 
-function MarkerIcon({ src, label, size = 28 }) {
+function MarkerIcon({ src, label, size = 16 }) {
     return (
-        <Tooltip content={label} dismissOnMouseOut>
-            <Box as="span">
-                <img src={src} width={size} height={size} alt={label} style={{ pointerEvents: "none" }} />
-            </Box>
+        <Tooltip content={label} dismissOnMouseOut activatorWrapper="div">
+            <img src={src} width={size} height={size} alt={label} style={{ flexShrink: 0, display: "block" }} />
         </Tooltip>
     );
 }
@@ -97,13 +89,13 @@ export function AssetNameCellRenderer({ data }) {
     const showMalicious = data.isMalicious && isSkill;
     return (
         <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-            <Box minWidth="32px"><AssetIcon type={data.type} assetTagValue={data.assetTagValue} /></Box>
+            <AssetIcon type={data.type} assetTagValue={data.assetTagValue} size={24} />
             <Box width="100%" overflowX="hidden">
-                <Text variant="bodyMd" fontWeight="medium" truncate>{data.name}</Text>
+                <Text variant="bodySm" fontWeight="medium" truncate>{data.name}</Text>
             </Box>
-            {showLocalMcp && <MarkerIcon src={McpRedIcon} label="Local MCP Server" />}
-            {showPersonal && <MarkerIcon src={PersonLockIcon} label="Contains personal account" />}
-            {showMalicious && <MarkerIcon src={MaliciousSkillIcon} label="Malicious skill" />}
+            {showLocalMcp && <MarkerIcon src={McpRedIcon} label="Local MCP Server" size={24} />}
+            {showPersonal && <MarkerIcon src={PersonLockIcon} label="Contains personal account" size={24} />}
+            {showMalicious && <MarkerIcon src={MaliciousSkillIcon} label="Malicious skill" size={24} />}
         </HorizontalStack>
     );
 }
@@ -146,7 +138,7 @@ export function InteractionsCellRenderer({ value, data }) {
 
 export function GroupCellRenderer({ data }) {
     const [tipPos, setTipPos] = useState(null);
-    if (!data?.groups?.length) return null;
+    if (!data?.groups?.length) return <Text variant="bodySm" color="subdued">-</Text>;
 
     const primary = data.groups[0];
     const rest = data.groups.slice(1);

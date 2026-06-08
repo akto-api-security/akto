@@ -19,7 +19,7 @@ export default function AiChatSection({
     const [inputValue, setInputValue] = useState("");
     const [userCollapsed, setUserCollapsed] = useState(false);
     const [aiLoading, setAiLoading] = useState(false);
-    const bottomRef = useRef(null);
+    const messagesRef = useRef(null);
 
     const hasContent = inputValue.length > 0 || messages.length > 0;
     const expanded = hasContent && !userCollapsed;
@@ -33,7 +33,9 @@ export default function AiChatSection({
     }, [resetKey]);
 
     useEffect(() => {
-        if (messages.length) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        if (messages.length && messagesRef.current) {
+            messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+        }
     }, [messages, aiLoading]);
 
     useEffect(() => {
@@ -86,8 +88,9 @@ export default function AiChatSection({
             background="bg"
             borderColor="border"
             borderBlockStartWidth="1"
-            className={expanded ? "agentic-chat agentic-chat--expanded" : "agentic-chat"}
-            style={expanded ? { marginInlineStart: "var(--p-space-2)", marginInlineEnd: "var(--p-space-2)", marginBlockEnd: "var(--p-space-2)" } : { marginInlineStart: "var(--p-space-2)", marginInlineEnd: "var(--p-space-2)" }}
+            style={expanded
+                ? { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", marginInlineStart: "var(--p-space-2)", marginInlineEnd: "var(--p-space-2)", marginBlockEnd: "var(--p-space-2)" }
+                : { flexShrink: 0, display: "flex", flexDirection: "column", marginInlineStart: "var(--p-space-2)", marginInlineEnd: "var(--p-space-2)" }}
         >
             {expanded && (
                 <Box
@@ -97,7 +100,7 @@ export default function AiChatSection({
                     paddingInlineEnd="3"
                     borderColor="border-subdued"
                     borderBlockEndWidth="1"
-                    className="agentic-chat-header"
+                    style={{ flexShrink: 0 }}
                 >
                     <HorizontalStack align="space-between" blockAlign="center">
                         <Text variant="headingXs">Ask Akto</Text>
@@ -111,14 +114,7 @@ export default function AiChatSection({
             )}
 
             {expanded && messages.length > 0 && (
-                <Box
-                    paddingBlockStart="3"
-                    paddingBlockEnd="3"
-                    paddingInlineStart="4"
-                    paddingInlineEnd="4"
-                    overflowY="scroll"
-                    className="agentic-chat-messages"
-                >
+                <div ref={messagesRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "12px 16px" }}>
                     <VerticalStack gap="2">
                         {messages.map((msg, i) => (
                             msg.role === "user" ? (
@@ -132,9 +128,8 @@ export default function AiChatSection({
                             )
                         ))}
                         {aiLoading && <AgenticThinkingBox />}
-                        <Box ref={bottomRef} />
                     </VerticalStack>
-                </Box>
+                </div>
             )}
 
             {expanded && messages.length === 0 && !aiLoading && (
@@ -148,7 +143,7 @@ export default function AiChatSection({
                 paddingBlockEnd="3"
                 paddingInlineStart="4"
                 paddingInlineEnd="4"
-                className="agentic-chat-input"
+                style={{ flexShrink: 0 }}
             >
                 <AgenticSearchInput
                     placeholder={placeholder || "Ask anything related to your endpoints..."}

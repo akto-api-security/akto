@@ -202,16 +202,18 @@ export default function AgenticAssetFlyout({
                 />
             }
         >
-            <Box minHeight="0px" overflowY={selectedTab === 0 ? "auto" : "hidden"} className="agentic-flex-fill">
+            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                 {selectedTab === 0 && (
-                    <OverviewTab
-                        asset={asset}
-                        onTabChange={handleTabSelect}
-                        assetDevices={assetDevices}
-                        agenticTreeData={agenticTreeData}
-                        agenticFlatData={agenticFlatData}
-                        mcpComponentCount={mcpComponentCount}
-                    />
+                    <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+                        <OverviewTab
+                            asset={asset}
+                            onTabChange={handleTabSelect}
+                            assetDevices={assetDevices}
+                            agenticTreeData={agenticTreeData}
+                            agenticFlatData={agenticFlatData}
+                            mcpComponentCount={mcpComponentCount}
+                        />
+                    </div>
                 )}
                 {selectedTab === 1 && (
                     <AgenticComponentsTab
@@ -223,7 +225,7 @@ export default function AgenticAssetFlyout({
                 )}
                 {selectedTab === 2 && <ViolationsTab asset={asset} />}
                 {selectedTab === 3 && <DevicesTab asset={asset} assetDevices={assetDevices} />}
-            </Box>
+            </div>
         </AgenticFlyoutShell>
     );
 }

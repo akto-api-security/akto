@@ -29,14 +29,6 @@
 .agentic-type-SKILL .Polaris-Badge   { background-color: #F9FAFB; color: #6B7280; }
 .agentic-type-DEFAULT .Polaris-Badge { background-color: #F3F4F6; color: #374151; }
 
-/* Risk-score pill — fixed compact width so the score column stays tight. Colour
-   comes from the .badge-wrapper-<SEVERITY> class paired alongside it. */
-.agentic-risk-pill .Polaris-Badge {
-    min-width: 40px;
-    justify-content: center;
-    font-weight: 600;
-}
-
 
 /* Clickable risk-factor row — edge-to-edge hover with a built-in bottom divider
    (no rounded corners, no separate <Divider> — those clashed). Hover/cursor/divider
@@ -133,6 +125,9 @@
 .agentic-chat-messages {
     flex: 1;
     min-height: 0;
+}
+.agentic-chat-messages--scroll {
+    overflow-y: scroll;
 }
 .agentic-chat-empty {
     flex: 1;

@@ -29,6 +29,15 @@ export function getRiskLevel(score) {
     return "LOW";
 }
 
+// Polaris Badge status for a risk score — matches the old Endpoints layout.
+export function getRiskStatus(score) {
+    if (score >= 4.5) return "critical";
+    if (score >= 4) return "attention";
+    if (score >= 2.5) return "warning";
+    if (score > 0) return "info";
+    return undefined;
+}
+
 // Human label derived from the bucket — no duplicated thresholds.
 export function getRiskLabel(score) {
     return `${func.toSentenceCase(getRiskLevel(score))} Risk`;
