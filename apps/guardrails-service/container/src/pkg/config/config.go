@@ -15,6 +15,10 @@ type Config struct {
 	ThreatBackendToken      string
 	LogLevel                string
 
+	// Inbound JWT authentication for the /api endpoints (mirrors data-ingestion-service).
+	AuthEnabled  bool
+	RSAPublicKey string
+
 	KafkaEnabled        bool
 	KafkaBrokerURL      string
 	KafkaTopic          string
@@ -77,6 +81,8 @@ func LoadConfig() *Config {
 		ThreatBackendURL:         getEnv("THREAT_BACKEND_URL", "https://tbs.akto.io"),
 		ThreatBackendToken:       getEnv("THREAT_BACKEND_TOKEN", dbAbstractorToken),
 		LogLevel:                 getEnv("LOG_LEVEL", "info"),
+		AuthEnabled:              getEnvAsBool("AKTO_GR_AUTHENTICATE", false),
+		RSAPublicKey:             getEnv("RSA_PUBLIC_KEY", ""),
 		KafkaEnabled:             getEnvAsBool("KAFKA_ENABLED", false),
 		KafkaBrokerURL:           getEnv("KAFKA_BROKER_URL", "localhost:29092"),
 		KafkaTopic:               getEnv("KAFKA_TOPIC", "akto.api.logs"),
