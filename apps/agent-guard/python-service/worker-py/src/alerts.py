@@ -1,8 +1,9 @@
 """Fire-and-forget alerting for cascade scans.
 
-Two async sinks, both no-ops when their target isn't configured:
-  - post_slack(...)      → Slack incoming webhook (SLACK_WEBHOOK_URL)
-  - store_results(...)   → DB abstractor /api/storeGuardrailModelResults
+Async sinks, all no-ops when their target isn't configured:
+  - post_slack(...)         → Slack incoming webhook (SLACK_WEBHOOK_URL)
+  - post_cache_shadow(...)  → separate Slack webhook (CACHE_SHADOW_SLACK_WEBHOOK_URL)
+  - store_results(...)      → DB abstractor /api/storeGuardrailModelResults
 
 Both are scheduled via ctx.waitUntil() from entry.py so they never block the
 scan response, mirroring the container's daemon-thread behaviour. Neither ever
@@ -128,8 +129,13 @@ def _cache_shadow_blocks(info: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 async def post_cache_shadow(info: Dict[str, Any]) -> None:
-    """Post a semantic-cache shadow comparison (miss / hit match / hit mismatch)."""
-    webhook = (settings.SLACK_WEBHOOK_URL or "").strip()
+    """Post a semantic-cache shadow comparison (miss / hit match / hit mismatch).
+
+    Uses its own webhook (CACHE_SHADOW_SLACK_WEBHOOK_URL), not SLACK_WEBHOOK_URL,
+    so shadow noise stays out of the production scan-alert channel. No fallback:
+    unset → no-op.
+    """
+    webhook = (settings.CACHE_SHADOW_SLACK_WEBHOOK_URL or "").strip()
     if not webhook:
         return
     try:

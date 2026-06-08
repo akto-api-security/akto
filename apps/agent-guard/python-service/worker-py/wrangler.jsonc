@@ -5,7 +5,9 @@
 	"name": "akto-agent-guard-executor-v2",
 	"main": "src/entry.py",
 	"compatibility_date": "2025-06-23",
-	"compatibility_flags": ["python_workers"],
+	"compatibility_flags": [
+		"python_workers"
+	],
 	"workers_dev": true,
 	"observability": {
 		"enabled": true
@@ -25,7 +27,9 @@
 	"vectorize": [
 		{
 			"binding": "VECTORIZE",
-			"index_name": "guardrails-shadow-cache"
+			"index_name": "guardrails-shadow-cache",
+			// Vectorize has no local emulator; remote binds `wrangler dev` to the real index.
+			"remote": true
 		}
 	]
 }

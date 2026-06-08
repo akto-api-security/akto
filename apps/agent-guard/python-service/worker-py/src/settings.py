@@ -26,6 +26,8 @@ _FIELDS = (
     # Per-scanner semantic cache (shadow mode). VECTORIZE is a binding (read off
     # env directly), not a string field. Empty CACHE_SHADOW_ENABLED → disabled.
     "CACHE_SHADOW_ENABLED", "CACHE_DISTANCE_THRESHOLD", "EMBEDDER_URL",
+    # Separate webhook for shadow alerts so they don't share SLACK_WEBHOOK_URL.
+    "CACHE_SHADOW_SLACK_WEBHOOK_URL",
 )
 
 
