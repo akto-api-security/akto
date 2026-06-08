@@ -34,3 +34,8 @@
 .add-new-buttons .Polaris-Icon{
     color: rgba(97, 106, 117, 1) !important;
 }
+
+.ag-root-wrapper{
+    border-top-right-radius: 0 !important;
+    border-top-left-radius: 0 !important;
+}

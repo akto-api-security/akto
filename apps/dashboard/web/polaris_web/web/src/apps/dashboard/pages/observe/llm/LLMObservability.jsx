@@ -12,8 +12,8 @@ import MessagesView from "./MessagesView";
 import PromptsView from "./PromptsView";
 
 const TABS = [
-    { id: "sessions", content: "Sessions", panelID: "sessions-panel" },
-    { id: "messages", content: "Messages", panelID: "messages-panel" },
+    // { id: "sessions", content: "Sessions", panelID: "sessions-panel" },
+    // { id: "messages", content: "Messages", panelID: "messages-panel" },
     { id: "prompts", content: "All messages", panelID: "prompts-panel" },
 ];
 
@@ -41,9 +41,9 @@ export default function LLMObservability() {
                     <VerticalStack gap={"2"}>
                         <Tabs tabs={TABS} selected={activeTab} onSelect={setActiveTab} />
                         
-                        {activeTab === 0 && <SessionsView key="sessions" currDateRange={currDateRange} />}
-                        {activeTab === 1 && <MessagesView key="messages" currDateRange={currDateRange} />}
-                        {activeTab === 2 && <PromptsView key="prompts" currDateRange={currDateRange} />}
+                        {/* {activeTab === 0 && <SessionsView key="sessions" currDateRange={currDateRange} />}
+                        {activeTab === 1 && <MessagesView key="messages" currDateRange={currDateRange} />} */}
+                        {activeTab === 0 && <PromptsView key="prompts" currDateRange={currDateRange} />}
                     </VerticalStack>
                 </Card>
             ]}

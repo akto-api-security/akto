@@ -123,6 +123,10 @@
 
                     window.AGENTTRIAL_MSG = '${requestScope.agentTrialMsg}'
                     window.INVITE_DISABLED_FOR_SSO = '${requestScope.inviteDisabledForSSO}' === 'true';
+                    window.AG_GRID_LICENSE_KEY = '${requestScope.AG_GRID_LICENSE_KEY}'
+                    if(!window.AG_GRID_LICENSE_KEY){
+                        window.AG_GRID_LICENSE_KEY='invalid-key'
+                    }
 
                     // Enabling the debug mode flag is useful during implementation,
                     // but it's recommended you remove it for production
