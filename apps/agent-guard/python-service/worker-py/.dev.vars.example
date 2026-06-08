@@ -33,7 +33,9 @@ DATABASE_ABSTRACTOR_SERVICE_URL=
 # the worker. CACHE_SHADOW_ENABLED is off unless set to true/1. Shadow alerts use
 # their own webhook (not SLACK_WEBHOOK_URL); unset → no shadow alerts.
 # CACHE_TTL_SECONDS expires entries on read (default 21600 = 6h; Vectorize has no
-# native TTL).
+# native TTL). EMBEDDER_URL is a LOCAL-DEV fallback only (e.g.
+# http://localhost:8094); a deployed worker reaches the embedder via the
+# ANONYMIZER_WORKER service binding, so leave EMBEDDER_URL empty in prod.
 CACHE_SHADOW_ENABLED=
 CACHE_DISTANCE_THRESHOLD=0.15
 CACHE_TTL_SECONDS=21600

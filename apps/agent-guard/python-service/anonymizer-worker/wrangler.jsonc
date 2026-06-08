@@ -1,11 +1,12 @@
 {
-	// Thin JS Worker that owns the anonymizer-container binding. worker-py reaches
-	// this worker via service binding; we forward the request to the container and
-	// return the response unchanged.
+	// Thin JS Worker that owns BOTH agent-guard containers (anonymizer + embedder)
+	// and routes by path (see src/index.ts). worker-py reaches the anonymizer via
+	// service binding and the embedder via EMBEDDER_URL pointing at this worker.
 	//
-	// We can't put this binding directly on worker-py because Cloudflare's
+	// We can't put container bindings directly on worker-py because Cloudflare's
 	// Containers SDK is JS-only today — owning a container requires defining a
 	// Durable Object class, which Cloudflare doesn't document for Python Workers.
+	// Name kept as akto-anonymizer-worker to avoid a worker-rename migration.
 	"name": "akto-anonymizer-worker",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-06-23",
@@ -19,6 +20,12 @@
 			"image": "../anonymizer-container/Dockerfile",
 			"instance_type": "standard-4",
 			"max_instances": 5
+		},
+		{
+			"class_name": "EmbedderContainer",
+			"image": "../embedder-container/Dockerfile",
+			"instance_type": "standard-4",
+			"max_instances": 5
 		}
 	],
 	"durable_objects": {
@@ -26,6 +33,10 @@
 			{
 				"name": "ANONYMIZER",
 				"class_name": "AnonymizerContainer"
+			},
+			{
+				"name": "EMBEDDER",
+				"class_name": "EmbedderContainer"
 			}
 		]
 	},
@@ -33,6 +44,10 @@
 		{
 			"tag": "v1",
 			"new_sqlite_classes": ["AnonymizerContainer"]
+		},
+		{
+			"tag": "v2",
+			"new_sqlite_classes": ["EmbedderContainer"]
 		}
 	]
 }

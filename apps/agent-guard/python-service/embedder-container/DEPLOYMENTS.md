@@ -64,24 +64,25 @@ curl -s localhost:8094/health      # {"ok": true, "model": ..., "dim": 384}
 `http://localhost:8094` is reachable only under local `wrangler dev`, never from a
 deployed worker.
 
-### Option A: Cloudflare Container (matches the repo's precedent)
+### Option A: Cloudflare Container (the deployed path)
 
-Heavy containers here run on Cloudflare, owned by a thin JS worker — see
-`../anonymizer-worker/wrangler.jsonc` (a `containers` binding pointing at the
-Dockerfile + a Durable Object class, shipped with `wrangler deploy`). Mirror it
-with an `embedder-worker` that owns this container and forwards `/embed`, then
-point `EMBEDDER_URL` at that worker's URL.
+The embedder is hosted by the existing **`../anonymizer-worker`**, which owns
+*both* containers (anonymizer + embedder) and routes `/embed*` to this one — see
+its `wrangler.jsonc` (two `containers` entries + two Durable Object classes) and
+`src/index.ts` (path routing). Deploy that one worker:
 
 ```bash
-# scaffold ../embedder-worker from ../anonymizer-worker, then:
-cd ../embedder-worker && npm install && npx wrangler deploy
-# EMBEDDER_URL=https://akto-embedder-worker.<subdomain>.workers.dev
+cd ../anonymizer-worker && npm install && npx wrangler deploy
 ```
 
-> Cleaner end state: reach the embedder via a **service binding** (like
-> `ANONYMIZER_WORKER`) instead of a URL. That's a small follow-up in
-> `worker-py/src/cache_shadow.py` (`_embed`) and would drop `EMBEDDER_URL`
-> entirely.
+`wrangler deploy` builds and pushes both container images; the two containers
+start/sleep/scale independently (separate Durable Object classes).
+
+worker-py reaches the embedder over the **`ANONYMIZER_WORKER` service binding**
+(`cache_shadow._embed`), not a public URL — a deployed Worker can't fetch another
+Worker via its `workers.dev` URL. So there's nothing else to configure for prod:
+no `EMBEDDER_URL` needed. `EMBEDDER_URL` is only the local-dev fallback (see Local
+above).
 
 ### Option B: any container host
 

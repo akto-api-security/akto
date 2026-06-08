@@ -10,7 +10,7 @@ scan response, and fail-open so a cache/embedder/Vectorize outage is harmless):
 
     text + scanner + config
       → scanner_key = config_hash(scanner, type, config)   # per-scanner partition
-      → vec = embed(text)                                  # embedder-container
+      → vec = embed(text)                                  # embedder via ANONYMIZER_WORKER binding
       → match = Vectorize KNN(vec, filter scanner_key)     # nearest prior verdict
       → outcome = miss | hit_match | hit_mismatch          # vs the real verdict
       → Slack alert
@@ -88,12 +88,40 @@ def config_hash(scanner_name: str, scanner_type: str, config: Dict[str, Any]) ->
 
 
 # --------------------------------------------------------------------------- #
-# Embedding (embedder-container over HTTP)
+# Embedding (embedder container; same worker that hosts the anonymizer)
 # --------------------------------------------------------------------------- #
-async def _embed(text: str) -> Optional[List[float]]:
+async def _embed_via_binding(text: str, env) -> Optional[List[float]]:
+    """Embed through the ANONYMIZER_WORKER service binding.
+
+    The sibling worker hosts both containers and routes `/embed` to the embedder.
+    This is the path that works on a *deployed* worker — a Worker can't fetch
+    another Worker over its public `workers.dev` URL, only via a service binding.
+    """
+    binding = getattr(env, "ANONYMIZER_WORKER", None)
+    if binding is None:
+        return None
+    init = _js({"method": "POST",
+                "headers": {"content-type": "application/json"},
+                "body": json.dumps({"text": text})})
+    try:
+        resp = await binding.fetch("https://embedder/embed", init)
+        if resp.status < 200 or resp.status >= 300:
+            logger.warning(f"[cache_shadow] embedder binding returned {resp.status}")
+            return None
+        return json.loads(await resp.text()).get("vector") or None
+    except Exception as exc:
+        logger.warning(f"[cache_shadow] embed via binding failed: {exc}")
+        return None
+
+
+async def _embed_via_http(text: str) -> Optional[List[float]]:
+    """Local-dev fallback: hit EMBEDDER_URL (e.g. http://localhost:8094) directly.
+
+    Not usable from a deployed worker (can't reach localhost, and worker ->
+    workers.dev is blocked) — that's what the service binding is for.
+    """
     base = (settings.EMBEDDER_URL or "").strip().rstrip("/")
     if not base:
-        logger.warning("[cache_shadow] EMBEDDER_URL unset; skipping embed")
         return None
     try:
         async with httpx.AsyncClient(timeout=_EMBED_TIMEOUT_S) as client:
@@ -102,14 +130,22 @@ async def _embed(text: str) -> Optional[List[float]]:
         if resp.status_code >= 400:
             logger.warning(f"[cache_shadow] embedder returned {resp.status_code}")
             return None
-        vec = resp.json().get("vector")
-        if not vec:
-            logger.warning("[cache_shadow] embedder returned empty vector")
-            return None
-        return vec
+        return resp.json().get("vector") or None
     except Exception as exc:
-        logger.warning(f"[cache_shadow] embed failed: {exc}")
+        logger.warning(f"[cache_shadow] embed via http failed: {exc}")
         return None
+
+
+async def _embed(text: str, env) -> Optional[List[float]]:
+    """Embed text → 384-dim vector, or None (fail-open).
+
+    Service binding first (works deployed), then EMBEDDER_URL over HTTP for local
+    dev. Either path returning None surfaces as outcome=error/embed_unavailable.
+    """
+    vec = await _embed_via_binding(text, env)
+    if vec is not None:
+        return vec
+    return await _embed_via_http(text)
 
 
 # --------------------------------------------------------------------------- #
@@ -224,7 +260,7 @@ async def observe(scanner_name: str, scanner_type: str, text: str,
         scanner_key = config_hash(scanner_name, scanner_type, config)
         info["scanner_key"] = scanner_key
 
-        vec = await _embed(text)
+        vec = await _embed(text, env)
         if vec is None:
             info["outcome"] = "error"
             info["error"] = "embed_unavailable"
