@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import { produce } from "immer";
 import { useNavigate } from "react-router-dom";
-import { Box, Card, Checkbox, Divider, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
+import { Box, Card, Checkbox, Divider, HorizontalGrid, HorizontalStack, Text, Tooltip } from "@shopify/polaris";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
@@ -27,6 +27,7 @@ import { cumulativeByMonth } from "./agenticPageBuilders";
 import SmoothAreaChart from "@/apps/dashboard/pages/dashboard/new_components/SmoothChart";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import "../../../components/layouts/style.css";
+import { NEW_LAYOUT_TOOLTIP } from "./constants";
 import api from "../api";
 import agenticObserveApi, {
   aggregateViolationsByCollectionId,
@@ -424,11 +425,13 @@ export default function AgenticAssetsPage() {
 
   const headerActions = (
     <HorizontalStack gap="3" blockAlign="center">
-      <Checkbox
-        label="New Layout"
-        checked={newLayout}
-        onChange={handleLayoutToggle}
-      />
+      <Tooltip content={NEW_LAYOUT_TOOLTIP} dismissOnMouseOut>
+        <Checkbox
+          label="New Layout"
+          checked={newLayout}
+          onChange={handleLayoutToggle}
+        />
+      </Tooltip>
       <DateRangeFilter
         initialDispatch={currDateRange}
         dispatch={(dateObj) =>

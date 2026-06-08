@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Badge, HorizontalStack, Text, Modal, TextField, FormLayout, Checkbox } from "@shopify/polaris";
+import { IndexFiltersMode, Badge, HorizontalStack, Text, Modal, TextField, FormLayout, Checkbox, Tooltip } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -14,6 +14,7 @@ import useTable from "@/apps/dashboard/components/tables/TableContext";
 import settingRequests from "../../settings/api";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 import {
+    NEW_LAYOUT_TOOLTIP,
     getHeaders,
     getSortOptionsWithoutIconColumn,
     INVENTORY_PATH,
@@ -341,11 +342,13 @@ function UsersAndDevices() {
     );
 
     const layoutToggle = (
-        <Checkbox
-            label="New Layout"
-            checked={false}
-            onChange={() => { localStorage.setItem("akto_agentic_new_ui", "true"); navigate("/dashboard/observe/endpoints"); }}
-        />
+        <Tooltip content={NEW_LAYOUT_TOOLTIP} dismissOnMouseOut>
+            <Checkbox
+                label="New Layout"
+                checked={false}
+                onChange={() => { localStorage.setItem("akto_agentic_new_ui", "true"); navigate("/dashboard/observe/endpoints"); }}
+            />
+        </Tooltip>
     );
 
     if (loading) {

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
-import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Checkbox, Badge } from "@shopify/polaris";
+import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Checkbox, Badge, Tooltip } from "@shopify/polaris";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
@@ -18,7 +18,7 @@ import AgenticStatsCard from "./AgenticStatsCard";
 import agenticObserveApi, { aggregateViolationsByCollectionId } from "./agenticObserveApi";
 import { buildDeviceEndpointsPageData } from "./agenticPageBuilders";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
-import { groupCollectionsByUser } from "./constants";
+import { groupCollectionsByUser, NEW_LAYOUT_TOOLTIP } from "./constants";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import values from "@/util/values";
 import func from "@/util/func";
@@ -533,11 +533,13 @@ export default function DeviceEndpoints() {
 
     const headerActions = (
         <HorizontalStack gap="3" blockAlign="center">
-            <Checkbox
-                label="New Layout"
-                checked={newLayout}
-                onChange={handleLayoutToggle}
-            />
+            <Tooltip content={NEW_LAYOUT_TOOLTIP} dismissOnMouseOut>
+                <Checkbox
+                    label="New Layout"
+                    checked={newLayout}
+                    onChange={handleLayoutToggle}
+                />
+            </Tooltip>
             <DateRangeFilter
                 initialDispatch={currDateRange}
                 dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })}

@@ -23,6 +23,8 @@ import { inferOsFromDeviceId } from "./agenticPageBuilders";
 // Table constants
 export const PAGE_LIMIT = 100;
 
+export const NEW_LAYOUT_TOOLTIP = "Switching to the new layout gives ATLAS a new experience";
+
 export const SKILL_RISK_CACHE_TTL_MS = 2 * 60 * 1000;
 
 // Route constants
