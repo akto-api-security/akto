@@ -58,72 +58,9 @@ export function truncate(str, len = 80) {
     return str.length > len ? str.substring(0, len) + "…" : str;
 }
 
-// Shared base columns for all message tables (session drill-down + standalone messages view)
-const MESSAGE_BASE_COLS = [
-    {
-        headerName: "Time",
-        field: "latestTimestamp",
-        width: 160,
-        valueFormatter: (p) => func.prettifyEpoch(Math.floor((p.value || 0) / 1000)),
-        sort: "desc",
-    },
-    {
-        headerName: "Message",
-        field: "_promptText",
-        flex: 1,
-        valueFormatter: (p) => truncate(p.value || "", 110),
-    },
-    {
-        headerName: "Spans",
-        field: "spanCount",
-        width: 90,
-    },
-];
-
-// Used in SessionsView (per-session drill-down): combined token count
-export const MESSAGE_COLUMN_DEFS = [
-    ...MESSAGE_BASE_COLS,
-    {
-        headerName: "Tokens",
-        field: "totalTokens",
-        width: 110,
-    },
-];
-
-// Used in MessagesView (standalone): split token counts + filter/sort support
-export const MESSAGE_COLUMN_DEFS_DETAIL = [
-    ...MESSAGE_BASE_COLS,
-    {
-        headerName: "Tokens in",
-        field: "_inputTokens",
-        width: 110,
-        filterAllowed: true,
-        filter: "agSetColumnFilter",
-        sortable: true,
-    },
-    {
-        headerName: "Tokens out",
-        field: "_outputTokens",
-        width: 110,
-        filterAllowed: false,
-        filter: false,
-        sortable: false,
-    },
-];
-
-// filterAllowed: true  — this column gets a set filter populated from fetchFilterChoices()
-// filterAllowed: false — no filter on this column
-export const PROMPT_COLUMN_DEFS = [
-    {
-        headerName: "Time",
-        field: "timestamp",
-        width: 155,
-        filterAllowed: false,
-        sortable: true,
-        filter: false,
-        valueFormatter: (p) => func.prettifyEpoch(Math.floor((p.value || 0) / 1000)),
-        sort: "desc",
-    },
+// Shared filterable identity columns (User + Service) used in both prompt and message tables.
+// filterAllowed: true — populated with values from fetchFilterChoices() by the view component.
+const IDENTITY_FILTER_COLS = [
     {
         headerName: "User",
         field: "userName",
@@ -140,23 +77,88 @@ export const PROMPT_COLUMN_DEFS = [
         filter: "agSetColumnFilter",
         sortable: true,
     },
+];
+
+const NO_FILTER = { filterAllowed: false, filter: false, sortable: false };
+
+const TIME_COL = (field) => ({
+    headerName: "Time",
+    field,
+    width: 160,
+    valueFormatter: (p) => func.prettifyEpoch(Math.floor((p.value || 0) / 1000)),
+    sort: "desc",
+    ...NO_FILTER,
+});
+
+// Used in PromptsView (flat span-level prompt table).
+export const PROMPT_COLUMN_DEFS = [
     {
         headerName: "Prompt",
         field: "_promptText",
         flex: 1,
-        filterAllowed: false,
-        filter: false,
-        sortable: false,
         valueFormatter: (p) => truncate(p.value || "", 100),
+        ...NO_FILTER,
     },
+    ...IDENTITY_FILTER_COLS,
     {
         headerName: "Tokens in/out",
         field: "_tokens",
         width: 115,
-        filterAllowed: false,
-        filter: false,
-        sortable: false,
+        ...NO_FILTER,
     },
+    TIME_COL("timestamp"),
+];
+
+// Used in MessagesView (trace-grouped message table).
+export const MESSAGE_COLUMN_DEFS_DETAIL = [
+    {
+        headerName: "Message",
+        field: "_promptText",
+        flex: 1,
+        valueFormatter: (p) => truncate(p.value || "", 110),
+        ...NO_FILTER,
+    },
+    ...IDENTITY_FILTER_COLS,
+    {
+        headerName: "Spans",
+        field: "spanCount",
+        width: 90,
+        ...NO_FILTER,
+    },
+    {
+        headerName: "Tokens in",
+        field: "_inputTokens",
+        width: 110,
+        ...NO_FILTER,
+    },
+    {
+        headerName: "Tokens out",
+        field: "_outputTokens",
+        width: 110,
+        ...NO_FILTER,
+    },
+    TIME_COL("latestTimestamp"),
+];
+
+// Used in SessionsView (per-session drill-down message list).
+export const MESSAGE_COLUMN_DEFS = [
+    {
+        headerName: "Message",
+        field: "_promptText",
+        flex: 1,
+        valueFormatter: (p) => truncate(p.value || "", 110),
+    },
+    {
+        headerName: "Spans",
+        field: "spanCount",
+        width: 90,
+    },
+    {
+        headerName: "Tokens",
+        field: "totalTokens",
+        width: 110,
+    },
+    TIME_COL("latestTimestamp"),
 ];
 
 export const SPAN_KIND_TONE = {
