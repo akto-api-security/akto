@@ -135,13 +135,11 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
 
             try {
                 const resp = await api.fetchRecordedLoginFlow("x1", playgroundId || undefined)
-                if (trimmedRole && resp.tokenFetchInProgress) {
-                    await refreshScreenshotsWhileActive()
-                }
                 if (!resp.tokenFetchInProgress) {
                     setExtractedToken(resp.token)
                     finishedOk = true
                     setIsLoading(false)
+                    setLiveScreenshot(null)
                     setToastConfig({ isActive: true, isError: false, message: "Verify extracted token" })
                     if (trimmedRole) {
                         await refreshScreenshotsWhileActive()
@@ -153,7 +151,9 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
                 if (serverError) {
                     finishedOk = true
                     setIsLoading(false)
+                    setLiveScreenshot(null)
                     setToastConfig({ isActive: true, isError: true, message: serverError })
+                    await refreshScreenshotsWhileActive()
                     break
                 }
                 // transient network error — continue polling
@@ -162,7 +162,9 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
 
         if (!finishedOk) {
             setIsLoading(false)
+            setLiveScreenshot(null)
             setToastConfig({ isActive: true, isError: true, message: "Error while extracting token using JSON recording" })
+            await refreshScreenshotsWhileActive()
         }
     }
 
@@ -196,6 +198,8 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
 
         reader.onload = () => {
             setContent(reader.result)
+            setHasScreenshots(false)
+            setLiveScreenshot(null)
             const result = api.uploadRecordedLoginFlow(
                 reader.result,
                 tokenFetchCommand,
@@ -206,11 +210,6 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
             result.then((resp) => {
                 setToastConfig({ isActive: true, isError: false, message: "JSON recording uploaded" })
                 setShowVerify(true)
-                const trimmed = roleName && String(roleName).trim()
-                if (trimmed) {
-                    setHasScreenshots(false)
-                }
-                setLiveScreenshot(null)
                 setLiveSessionId(resp?.screenshotSessionId || null)
                 const pgId = resp && resp.testingRunPlaygroundId
                 pollExtractedToken(roleName, pgId || null)
