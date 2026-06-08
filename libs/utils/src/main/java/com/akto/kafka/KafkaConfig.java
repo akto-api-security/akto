@@ -118,6 +118,7 @@ public class KafkaConfig {
     if (consumerConfig != null) {
       properties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, consumerConfig.getMaxPollRecords());
       if (consumerConfig.getFetchMaxBytes() > 0) {
+        //TODO: verify 100 * 1024 * 1024 is coming
         properties.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, consumerConfig.getFetchMaxBytes());
       }
     }
