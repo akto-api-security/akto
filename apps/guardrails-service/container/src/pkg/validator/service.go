@@ -431,12 +431,19 @@ func (s *Service) getLoginUserEmailType(params *models.ValidateRequestParams) st
 		}
 	}
 
-	// Cache miss or no account-type tag — fall back to browser-llm-account-type from the request tag.
+	// Cache miss or no account-type tag — fall back to the request tag.
+	// Browser extension traffic carries browser-llm-account-type; all other apps use login-user-email-type.
 	if params.Tag != "" {
 		var tagMap map[string]string
 		if err := json.Unmarshal([]byte(params.Tag), &tagMap); err == nil {
-			if v := tagMap["browser-llm-account-type"]; v != "" {
-				s.logger.Info("getLoginUserEmailType - returning browser-llm-account-type (request tag)", zap.String("value", v))
+			var tagKey string
+			if mcp.IsBrowserExtensionRequest(params.Tag) {
+				tagKey = "browser-llm-account-type"
+			} else {
+				tagKey = "login-user-email-type"
+			}
+			if v := tagMap[tagKey]; v != "" {
+				s.logger.Info("getLoginUserEmailType - returning from request tag", zap.String("key", tagKey), zap.String("value", v))
 				return v
 			}
 		}
