@@ -219,14 +219,7 @@ public class ElasticSearchClient {
             }
         }
 
-        if (searchString != null && !searchString.isEmpty()) {
-            must.put(new JSONObject().put("bool", new JSONObject()
-                .put("should", new JSONArray()
-                    .put(new JSONObject().put("match", new JSONObject().put("queryPayload", searchString)))
-                    .put(new JSONObject().put("match", new JSONObject().put("userName", searchString)))
-                    .put(new JSONObject().put("match", new JSONObject().put("serviceId", searchString))))
-                .put("minimum_should_match", 1)));
-        }
+        applySearchString(must, searchString);
 
         return new JSONObject().put("bool", new JSONObject().put("must", must));
     }
@@ -252,16 +245,21 @@ public class ElasticSearchClient {
             }
         }
 
-        if (searchString != null && !searchString.isEmpty()) {
-            must.put(new JSONObject().put("bool", new JSONObject()
-                .put("should", new JSONArray()
-                    .put(new JSONObject().put("match", new JSONObject().put("queryPayload", searchString)))
-                    .put(new JSONObject().put("match", new JSONObject().put("userName", searchString)))
-                    .put(new JSONObject().put("match", new JSONObject().put("serviceId", searchString))))
-                .put("minimum_should_match", 1)));
-        }
+        applySearchString(must, searchString);
 
         return new JSONObject().put("bool", new JSONObject().put("must", must));
+    }
+
+    // ── Query helpers ─────────────────────────────────────────────────────────
+
+    private void applySearchString(JSONArray must, String searchString) throws JSONException {
+        if (searchString == null || searchString.isEmpty()) return;
+        must.put(new JSONObject().put("bool", new JSONObject()
+            .put("should", new JSONArray()
+                .put(new JSONObject().put("match_phrase_prefix", new JSONObject().put("queryPayload", searchString)))
+                .put(new JSONObject().put("match_phrase_prefix", new JSONObject().put("userName", searchString)))
+                .put(new JSONObject().put("match_phrase_prefix", new JSONObject().put("serviceId", searchString))))
+            .put("minimum_should_match", 1)));
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
