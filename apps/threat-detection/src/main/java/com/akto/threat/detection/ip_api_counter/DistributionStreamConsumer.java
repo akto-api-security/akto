@@ -16,7 +16,6 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
-import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.constants.RedisKeyInfo;
@@ -41,16 +40,17 @@ public class DistributionStreamConsumer implements Runnable {
     private static final int BATCH_SIZE = 500;
     private static final int CMS_TTL_SECONDS = 8 * 60 * 60; // 8 hours
     private static final int DIST_TTL_SECONDS = 8 * 60 * 60; // 8 hours
-    private static final double EPSILON = 0.01;
-    private static final double DELTA = 0.01;
+    private static final double EPSILON = 0.001;
+    private static final double DELTA = 0.001;
     private static final long TRIM_INTERVAL_MS = 5 * 60 * 1000;
     private static final long MAX_STREAM_LENGTH = 2000000;
-    private static final int FIELDS_PER_MESSAGE = 6;
+    private static final int FIELDS_PER_MESSAGE = 8; // 6 original + apiLevelWindow + apiLevelThreshold
 
     private static final FilterConfig IP_API_RATE_LIMIT_FILTER = Utils.getipApiRateLimitFilter();
+    private static final FilterConfig API_LEVEL_RATE_LIMIT_FILTER = Utils.getApiLevelRateLimitFilter();
 
     private final StatefulRedisConnection<String, String> connection;
-    private final String asyncThreatProcessSha;
+    private String asyncThreatProcessSha;
     private final String consumerId;
     private final String[] bucketRangeArgs;
     private final KafkaProtoProducer internalKafka;
@@ -91,8 +91,11 @@ public class DistributionStreamConsumer implements Runnable {
     @Override
     public void run() {
         while (!Thread.currentThread().isInterrupted()) {
+            List<StreamMessage<String, String>> messages = null;
+
+            // 1. Read from stream
             try {
-                List<StreamMessage<String, String>> messages = connection.sync().xreadgroup(
+                messages = connection.sync().xreadgroup(
                     io.lettuce.core.Consumer.from(GROUP_NAME, consumerId),
                     XReadArgs.Builder.count(BATCH_SIZE).block(Duration.ofSeconds(1)),
                     XReadArgs.StreamOffset.lastConsumed(RedisKeyInfo.THREAT_INPUT_STREAM)
@@ -101,27 +104,69 @@ public class DistributionStreamConsumer implements Runnable {
                 if (messages == null || messages.isEmpty()) {
                     continue;
                 }
+            } catch (Exception e) {
+                logger.errorAndAddToDb(e, "Error reading from threat stream (xreadgroup)");
+                handleConnectionError();
+                continue;
+            }
 
+            // 2. Process batch
+            try {
                 processBatch(messages);
+            } catch (Exception e) {
+                logger.errorAndAddToDb(e, "Error processing threat batch");
+                // Continue without acknowledging - we'll retry this batch
+                handleConnectionError();
+                continue;
+            }
 
+            // 3. Acknowledge messages
+            try {
                 String[] messageIds = messages.stream()
                     .map(StreamMessage::getId)
                     .toArray(String[]::new);
                 connection.sync().xack(RedisKeyInfo.THREAT_INPUT_STREAM, GROUP_NAME, messageIds);
-
-                trimStreamIfNeeded();
-
             } catch (Exception e) {
-                logger.errorAndAddToDb(e, "Error in threat stream consumer loop");
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
+                logger.errorAndAddToDb(e, "Error acknowledging messages (xack)");
+                handleConnectionError();
+                // Don't continue - messages weren't acked, will be reprocessed
+                continue;
+            }
+
+            // 4. Trim stream
+            try {
+                trimStreamIfNeeded();
+            } catch (Exception e) {
+                logger.errorAndAddToDb(e, "Error trimming stream");
+                // Non-critical, continue
             }
         }
         logger.infoAndAddToDb("DistributionStreamConsumer stopped: " + consumerId);
+    }
+
+    private void handleConnectionError() {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Attempts to reload the Lua script if it was flushed from Redis.
+     * Handles NOSCRIPT errors by re-loading the script.
+     */
+    private void reloadLuaScriptIfNeeded(Exception e) {
+        if (e != null && e.getMessage() != null && e.getMessage().contains("NOSCRIPT")) {
+            try {
+                logger.infoAndAddToDb("Reloading Lua script due to NOSCRIPT error");
+                this.asyncThreatProcessSha = connection.sync()
+                    .scriptLoad(loadLuaScript("lua/async_threat_process.lua"));
+                logger.infoAndAddToDb("Lua script reloaded successfully");
+            } catch (Exception reloadEx) {
+                logger.errorAndAddToDb(reloadEx, "Failed to reload Lua script");
+            }
+        }
     }
 
     /**
@@ -174,49 +219,46 @@ public class DistributionStreamConsumer implements Runnable {
             argv[offset + 3] = body.getOrDefault("rateLimitWindow", "30");
             argv[offset + 4] = body.getOrDefault("threshold", "-1");
             argv[offset + 5] = body.getOrDefault("mitigationPeriod", "300");
+            argv[offset + 6] = body.getOrDefault("apiLevelWindow", "0");
+            argv[offset + 7] = body.getOrDefault("apiLevelThreshold", "0");
             offset += FIELDS_PER_MESSAGE;
         }
 
         try {
-            // EVALSHA returns list of "messageIndex|count" for breaches
-            List<String> breachResults = connection.sync().evalsha(
+            // EVALSHA returns [{ipRateBreaches}, {apiCountBreaches}], each a list of "messageIndex|count"
+            List<List<String>> results = connection.sync().evalsha(
                 asyncThreatProcessSha, ScriptOutputType.MULTI, new String[]{}, argv
             );
 
-            if (breachResults != null && !breachResults.isEmpty()) {
-                for (String breach : breachResults) {
-                    handleBreach(breach, messages);
+            if (results != null && results.size() >= 1) {
+                List<String> ipBreaches = results.get(0);
+                if (ipBreaches != null) {
+                    for (String breach : ipBreaches) {
+                        handleBreach(breach, messages);
+                    }
+                }
+            }
+            if (results != null && results.size() >= 2) {
+                List<String> apiCountBreaches = results.get(1);
+                if (apiCountBreaches != null) {
+                    for (String breach : apiCountBreaches) {
+                        handleApiCountBreach(breach, messages);
+                    }
                 }
             }
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error executing async_threat_process Lua script");
+            // Try to reload the script if it was flushed from Redis
+            reloadLuaScriptIfNeeded(e);
         }
     }
 
     private void handleBreach(String breachData, List<StreamMessage<String, String>> messages) {
         try {
-            // Format: "messageIndex|count"
-            int pipe = breachData.indexOf('|');
-            if (pipe <= 0) {
-                logger.errorAndAddToDb("Invalid breach data format: " + breachData);
-                return;
-            }
-            int msgIndex = Integer.parseInt(breachData.substring(0, pipe));
-            if (msgIndex < 0 || msgIndex >= messages.size()) {
-                logger.errorAndAddToDb("Breach message index out of bounds: " + msgIndex);
-                return;
-            }
+            Map<String, String> body = parseBreachMessage(breachData, messages);
+            if (body == null) return;
 
-            Map<String, String> body = messages.get(msgIndex).getBody();
-            String actor = body.getOrDefault("actor", "");
-            String host = body.getOrDefault("host", "");
-            String accountId = body.getOrDefault("accountId", "");
             String ipApiCmsKey = body.getOrDefault("ipApiCmsKey", "");
-            int timestamp = Integer.parseInt(body.getOrDefault("timestamp", "0"));
-            String countryCode = body.getOrDefault("countryCode", "");
-            String destCountryCode = body.getOrDefault("destCountryCode", "");
-
-            // Parse apiCollectionId, url, method from ipApiCmsKey
             // Format: ipApiCmsData|{collectionId}|{ip}|{path}|{method}
             String[] parts = ipApiCmsKey.split("\\|", 5);
             if (parts.length < 5) {
@@ -227,62 +269,96 @@ public class DistributionStreamConsumer implements Runnable {
             String url = parts[3];
             String method = parts[4];
 
-            String status = com.akto.util.ThreatDetectionConstants.ACTIVE;
-
-            Metadata metadata = Metadata.newBuilder()
-                .setCountryCode(countryCode)
-                .setDestCountryCode(destCountryCode)
-                .build();
-
-            SampleMaliciousRequest maliciousReq = SampleMaliciousRequest.newBuilder()
-                .setUrl(url)
-                .setMethod(method)
-                .setPayload("")
-                .setIp(actor)
-                .setApiCollectionId(apiCollectionId)
-                .setTimestamp(timestamp)
-                .setFilterId(IP_API_RATE_LIMIT_FILTER.getId())
-                .setSuccessfulExploit(false)
-                .setStatus(status)
-                .setMetadata(metadata)
-                .build();
-
-            MaliciousEventMessage maliciousEvent =
-                MaliciousEventMessage.newBuilder()
-                    .setFilterId(IP_API_RATE_LIMIT_FILTER.getId())
-                    .setActor(actor)
-                    .setDetectedAt(timestamp)
-                    .setEventType(EventType.EVENT_TYPE_AGGREGATED)
-                    .setLatestApiCollectionId(apiCollectionId)
-                    .setLatestApiIp(actor)
-                    .setLatestApiPayload("")
-                    .setLatestApiMethod(method)
-                    .setLatestApiEndpoint(url)
-                    .setCategory(IP_API_RATE_LIMIT_FILTER.getInfo().getCategory().getName())
-                    .setSubCategory(IP_API_RATE_LIMIT_FILTER.getInfo().getSubCategory())
-                    .setSeverity(IP_API_RATE_LIMIT_FILTER.getInfo().getSeverity())
-                    .setMetadata(maliciousReq.getMetadata())
-                    .setType("Anomaly")
-                    .setSuccessfulExploit(false)
-                    .setStatus(status)
-                    .setHost(host)
-                    .setContextSource(GlobalEnums.CONTEXT_SOURCE.API.name())
-                    .setSessionId("")
-                    .build();
-
-            MaliciousEventKafkaEnvelope envelope =
-                MaliciousEventKafkaEnvelope.newBuilder()
-                    .setActor(actor)
-                    .setAccountId(accountId)
-                    .setMaliciousEvent(maliciousEvent)
-                    .build();
-
-            internalKafka.send(KafkaTopic.ThreatDetection.ALERTS, envelope);
-            logger.debugAndAddToDb("Breach event pushed for actor: " + actor);
-
+            pushBreachEvent(body, apiCollectionId, url, method, IP_API_RATE_LIMIT_FILTER, "Anomaly");
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error handling breach: " + breachData);
         }
+    }
+
+    private void handleApiCountBreach(String breachData, List<StreamMessage<String, String>> messages) {
+        try {
+            Map<String, String> body = parseBreachMessage(breachData, messages);
+            if (body == null) return;
+
+            // apiKey format: {collectionId}|{url}|{method}
+            String apiKey = body.getOrDefault("apiKey", "");
+            String[] parts = apiKey.split("\\|", 3);
+            if (parts.length < 3) {
+                logger.errorAndAddToDb("Invalid apiKey format in api count breach: " + apiKey);
+                return;
+            }
+            int apiCollectionId = Integer.parseInt(parts[0]);
+            String url = parts[1];
+            String method = parts[2];
+
+            pushBreachEvent(body, apiCollectionId, url, method, API_LEVEL_RATE_LIMIT_FILTER, "Rule-Based");
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error handling api count breach: " + breachData);
+        }
+    }
+
+    // Returns the message body for the given breach string, or null if invalid.
+    private Map<String, String> parseBreachMessage(String breachData, List<StreamMessage<String, String>> messages) {
+        int pipe = breachData.indexOf('|');
+        if (pipe <= 0) {
+            logger.errorAndAddToDb("Invalid breach data format: " + breachData);
+            return null;
+        }
+        int msgIndex = Integer.parseInt(breachData.substring(0, pipe));
+        if (msgIndex < 0 || msgIndex >= messages.size()) {
+            logger.errorAndAddToDb("Breach message index out of bounds: " + msgIndex);
+            return null;
+        }
+        return messages.get(msgIndex).getBody();
+    }
+
+    private void pushBreachEvent(Map<String, String> body, int apiCollectionId, String url, String method,
+                                 FilterConfig filter, String detectionType) {
+        String actor = body.getOrDefault("actor", "");
+        String host = body.getOrDefault("host", "");
+        String accountId = body.getOrDefault("accountId", "");
+        int timestamp = Integer.parseInt(body.getOrDefault("timestamp", "0"));
+        String countryCode = body.getOrDefault("countryCode", "");
+        String destCountryCode = body.getOrDefault("destCountryCode", "");
+        String status = com.akto.util.ThreatDetectionConstants.ACTIVE;
+
+        Metadata metadata = Metadata.newBuilder()
+            .setCountryCode(countryCode)
+            .setDestCountryCode(destCountryCode)
+            .build();
+
+        MaliciousEventMessage maliciousEvent =
+            MaliciousEventMessage.newBuilder()
+                .setFilterId(filter.getId())
+                .setActor(actor)
+                .setDetectedAt(timestamp)
+                .setEventType(EventType.EVENT_TYPE_AGGREGATED)
+                .setLatestApiCollectionId(apiCollectionId)
+                .setLatestApiIp(actor)
+                .setLatestApiPayload("")
+                .setLatestApiMethod(method)
+                .setLatestApiEndpoint(url)
+                .setCategory(filter.getInfo().getCategory().getName())
+                .setSubCategory(filter.getInfo().getSubCategory())
+                .setSeverity(filter.getInfo().getSeverity())
+                .setMetadata(metadata)
+                .setType(detectionType)
+                .setSuccessfulExploit(false)
+                .setStatus(status)
+                .setHost(host)
+                .setContextSource(GlobalEnums.CONTEXT_SOURCE.API.name())
+                .setSessionId("")
+                .build();
+
+        MaliciousEventKafkaEnvelope envelope =
+            MaliciousEventKafkaEnvelope.newBuilder()
+                .setActor(actor)
+                .setAccountId(accountId)
+                .setMaliciousEvent(maliciousEvent)
+                .build();
+
+        internalKafka.send(KafkaTopic.ThreatDetection.ALERTS, envelope);
+        logger.debugAndAddToDb("Breach event pushed for actor: " + actor + " filter: " + filter.getId());
     }
 
     private void trimStreamIfNeeded() {

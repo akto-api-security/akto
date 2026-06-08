@@ -28,6 +28,10 @@ public class KafkaProtoProducer {
     this.producer.send(new ProducerRecord<>(topic, messageBytes));
   }
 
+  public void flush() {
+    this.producer.flush();
+  }
+
   public void close() {
     this.producerReady = false;
     producer.close(Duration.ofMillis(0)); // close immediately

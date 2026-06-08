@@ -14,14 +14,14 @@ export const ServerSettingsConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ applyToAllServers, selectedMcpServers, selectedAgentServers, mcpServers, agentServers, applyOnRequest, applyOnResponse, policyBehaviour }) => {
+    getSummary: ({ applyToAllServers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour }) => {
         const appSettings = (applyOnRequest || applyOnResponse) ?
             ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
         const behaviourSuffix = policyBehaviour ? `Rule behaviour: ${policyBehaviour}` : '';
         let summary = '';
-        if (selectedMcpServers?.length > 0 || selectedAgentServers?.length > 0) {
+        if (selectedMcpServers?.length > 0 || selectedAgentServers?.length > 0 || selectedBrowserLlms?.length > 0) {
             const serverSummary = [];
-            if (selectedMcpServers.length > 0) {
+            if (selectedMcpServers?.length > 0) {
                 const mcpNames = selectedMcpServers
                     .map(serverId => {
                         const server = mcpServers?.find(s => s.value === serverId);
@@ -31,7 +31,7 @@ export const ServerSettingsConfig = {
                 const mcpMore = selectedMcpServers.length > 2 ? ` +${selectedMcpServers.length - 2}` : '';
                 serverSummary.push(`MCP: ${mcpNames.join(", ")}${mcpMore}`);
             }
-            if (selectedAgentServers.length > 0) {
+            if (selectedAgentServers?.length > 0) {
                 const agentNames = selectedAgentServers
                     .map(serverId => {
                         const server = agentServers?.find(s => s.value === serverId);
@@ -40,6 +40,16 @@ export const ServerSettingsConfig = {
                     .slice(0, 2);
                 const agentMore = selectedAgentServers.length > 2 ? ` +${selectedAgentServers.length - 2}` : '';
                 serverSummary.push(`Agent: ${agentNames.join(", ")}${agentMore}`);
+            }
+            if (selectedBrowserLlms?.length > 0) {
+                const browserNames = selectedBrowserLlms
+                    .map(serverId => {
+                        const server = browserLlmServers?.find(s => s.value === serverId);
+                        return server ? server.label : serverId;
+                    })
+                    .slice(0, 2);
+                const browserMore = selectedBrowserLlms.length > 2 ? ` +${selectedBrowserLlms.length - 2}` : '';
+                serverSummary.push(`Browser LLM: ${browserNames.join(", ")}${browserMore}`);
             }
             summary = `${serverSummary.join(", ")}`;
         }
@@ -58,12 +68,15 @@ const ServerSettingsStep = ({
     setSelectedMcpServers,
     selectedAgentServers,
     setSelectedAgentServers,
+    selectedBrowserLlms,
+    setSelectedBrowserLlms,
     applyOnResponse,
     setApplyOnResponse,
     applyOnRequest,
     setApplyOnRequest,
     mcpServers,
     agentServers,
+    browserLlmServers,
     collectionsLoading,
     policyBehaviour,
     setPolicyBehaviour
@@ -79,7 +92,10 @@ const ServerSettingsStep = ({
     const compatibleAgentServers = isBlockMode
         ? (agentServers || []).filter(s => s.isInline)
         : (agentServers || []);
-    const totalCompatibleCount = compatibleMcpServers.length + compatibleAgentServers.length;
+    const compatibleBrowserLlmServers = isBlockMode
+        ? (browserLlmServers || []).filter(s => s.isInline)
+        : (browserLlmServers || []);
+    const totalCompatibleCount = compatibleMcpServers.length + compatibleAgentServers.length + compatibleBrowserLlmServers.length;
 
     const mcpServersWithDisabled = isBlockMode
         ? (mcpServers || []).map(s => ({ ...s, disabled: !s.isInline }))
@@ -87,10 +103,14 @@ const ServerSettingsStep = ({
     const agentServersWithDisabled = isBlockMode
         ? (agentServers || []).map(s => ({ ...s, disabled: !s.isInline }))
         : (agentServers || []);
+    const browserLlmServersWithDisabled = isBlockMode
+        ? (browserLlmServers || []).map(s => ({ ...s, disabled: !s.isInline }))
+        : (browserLlmServers || []);
 
     const hasIncompatibleServers = isBlockMode && (
         (mcpServers || []).some(s => !s.isInline) ||
-        (agentServers || []).some(s => !s.isInline)
+        (agentServers || []).some(s => !s.isInline) ||
+        (browserLlmServers || []).some(s => !s.isInline)
     );
 
     useEffect(() => {
@@ -111,6 +131,14 @@ const ServerSettingsStep = ({
                 setSelectedAgentServers(compatible);
             }
         }
+        if (selectedBrowserLlms?.length > 0) {
+            const compatible = selectedBrowserLlms.filter(val =>
+                (browserLlmServers || []).find(s => s.value === val && s.isInline)
+            );
+            if (compatible.length !== selectedBrowserLlms.length) {
+                setSelectedBrowserLlms(compatible);
+            }
+        }
     }, [policyBehaviour]);
 
     const handleClosePopover = useCallback(() => {
@@ -123,6 +151,9 @@ const ServerSettingsStep = ({
         s.label.toLowerCase().includes(searchLower)
     );
     const filteredPopoverAgent = compatibleAgentServers.filter(s =>
+        s.label.toLowerCase().includes(searchLower)
+    );
+    const filteredPopoverBrowserLlm = compatibleBrowserLlmServers.filter(s =>
         s.label.toLowerCase().includes(searchLower)
     );
 
@@ -209,7 +240,22 @@ const ServerSettingsStep = ({
                                                                         </div>
                                                                     </VerticalStack>
                                                                 )}
-                                                                {filteredPopoverMcp.length === 0 && filteredPopoverAgent.length === 0 && (
+                                                                {(filteredPopoverMcp.length > 0 || filteredPopoverAgent.length > 0) && filteredPopoverBrowserLlm.length > 0 && (
+                                                                    <Divider />
+                                                                )}
+                                                                {filteredPopoverBrowserLlm.length > 0 && (
+                                                                    <VerticalStack gap="2">
+                                                                        <Text variant="bodySm" fontWeight="semibold" tone="subdued">
+                                                                            Browser LLMs ({filteredPopoverBrowserLlm.length})
+                                                                        </Text>
+                                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                                                            {filteredPopoverBrowserLlm.map(s => (
+                                                                                <Tag key={s.value}>{s.label}</Tag>
+                                                                            ))}
+                                                                        </div>
+                                                                    </VerticalStack>
+                                                                )}
+                                                                {filteredPopoverMcp.length === 0 && filteredPopoverAgent.length === 0 && filteredPopoverBrowserLlm.length === 0 && (
                                                                     <Text variant="bodyMd" tone="subdued">No servers found</Text>
                                                                 )}
                                                             </VerticalStack>
@@ -266,6 +312,17 @@ const ServerSettingsStep = ({
                                     showSelectAllMinOptions={isBlockMode ? 99999 : 1}
                                     disabled={collectionsLoading}
                                     value={selectedAgentServers.length > 0 ? `${selectedAgentServers.length} agent server${selectedAgentServers.length === 1 ? "" : "s"} selected` : undefined}
+                                />
+                                <DropdownSearch
+                                    label="Select Browser LLMs"
+                                    placeholder="Choose browser LLMs where guardrail should be applied"
+                                    optionsList={browserLlmServersWithDisabled}
+                                    setSelected={setSelectedBrowserLlms}
+                                    preSelected={selectedBrowserLlms}
+                                    allowMultiple={true}
+                                    showSelectAllMinOptions={isBlockMode ? 99999 : 1}
+                                    disabled={collectionsLoading}
+                                    value={selectedBrowserLlms.length > 0 ? `${selectedBrowserLlms.length} browser LLM${selectedBrowserLlms.length === 1 ? "" : "s"} selected` : undefined}
                                 />
                             </VerticalStack>
                         )}

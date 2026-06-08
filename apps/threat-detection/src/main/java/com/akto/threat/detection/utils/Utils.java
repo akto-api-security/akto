@@ -85,10 +85,6 @@ public class Utils {
         return builder.build().toString();
     }
 
-    public static String buildApiHitCountKey(int apiCollectionId, String url, String method) {
-        return RedisKeyInfo.API_COUNTER_KEY_PREFIX + "|" + apiCollectionId + "|" + url + "|" + method;
-    }
-
     public static String buildIpApiCmsDataKey(String ip, String apiCollectionId, String url, String method) {
         return RedisKeyInfo.IP_API_CMS_DATA_PREFIX + "|" + apiCollectionId + "|" + ip + "|" + url + "|" + method;
     }
@@ -106,6 +102,17 @@ public class Utils {
         info.setSeverity("MEDIUM");
         ipApiRateLimitFilter.setInfo(info);
         return ipApiRateLimitFilter;
+    }
+
+    public static FilterConfig getApiLevelRateLimitFilter() {
+        FilterConfig filter = new FilterConfig("ApiLevelRateLimited", null, null, null);
+        Info info = new Info();
+        info.setName("ApiLevelRateLimited");
+        info.setCategory(new Category("ApiAbuse", "ApiAbuse", "ApiAbuse"));
+        info.setSubCategory("API_LEVEL_RATE_LIMITING");
+        info.setSeverity("MEDIUM");
+        filter.setInfo(info);
+        return filter;
     }
 
     public static FilterConfig buildSequenceAnomalyFilter() {
