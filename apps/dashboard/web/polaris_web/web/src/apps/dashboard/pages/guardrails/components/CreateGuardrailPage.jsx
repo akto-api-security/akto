@@ -283,16 +283,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             });
         }
 
-        // "Block host / path" is an internal-only step - shown for @akto.io users only.
-        if (func.isAktoUser()) {
-            steps.push({
-                number: BlockedHostsConfig.number,
-                title: BlockedHostsConfig.title,
-                summary: BlockedHostsConfig.getSummary(storedStateData),
-                ...BlockedHostsConfig.validate(storedStateData)
-            });
-        }
-
         steps.push({
             number: BlockedHostsConfig.number,
             title: BlockedHostsConfig.title,
@@ -679,11 +669,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         };
                     })
             ];
-
-            // Drop empty rows and normalize the glob patterns before persisting.
-            const cleanedBlockedHosts = (blockedHosts || [])
-                .filter(entry => entry && (entry.pattern || "").trim())
-                .map(entry => ({ pattern: entry.pattern.trim() }));
 
             // Drop empty rows and normalize the glob patterns before persisting.
             const cleanedBlockedHosts = (blockedHosts || [])
