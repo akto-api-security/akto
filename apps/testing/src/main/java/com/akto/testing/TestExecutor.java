@@ -9,6 +9,7 @@ import com.akto.dao.ActivitiesDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.DependencyNodeDao;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
@@ -18,6 +19,7 @@ import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
@@ -32,7 +34,6 @@ import com.akto.dto.dependency_flow.KVPair;
 import com.akto.dto.dependency_flow.ReplaceDetail;
 import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ExecutorNode;
-import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.SeverityParserResult;
 import com.akto.dto.test_editor.TestConfig;
@@ -69,6 +70,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.github.GithubUtils;
+import com.akto.jsonrpc.McpToolDescriptionsRegistry;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.SampleMessageStore;
@@ -90,6 +92,7 @@ import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.LoginFlowEnums;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import com.alibaba.fastjson2.JSONArray;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -189,6 +192,40 @@ public class TestExecutor {
         );
     }
 
+    private void buildMcpToolDescriptions() {
+        Map<String, String> toolDescriptions = new HashMap<>();
+        for (Map.Entry<ApiInfo.ApiInfoKey, RawApi> entry : TestingConfigurations.getInstance().getRawApiMap().entrySet()) {
+            String url = entry.getKey().getUrl();
+            if (url == null || !url.contains("tools/list")) {
+                continue;
+            }
+            RawApi rawApi = entry.getValue();
+            if (rawApi.getResponse() == null) continue;
+            String body = rawApi.getResponse().getBody();
+            if (body == null || body.isEmpty()) continue;
+            try {
+                com.alibaba.fastjson2.JSONObject jsonRpc = JSON.parseObject(body);
+                com.alibaba.fastjson2.JSONObject result = jsonRpc.getJSONObject("result");
+                if (result == null) continue;
+                JSONArray tools = result.getJSONArray("tools");
+                if (tools == null) continue;
+                for (int i = 0; i < tools.size(); i++) {
+                    com.alibaba.fastjson2.JSONObject tool = tools.getJSONObject(i);
+                    String name = tool.getString("name");
+                    String description = tool.getString("description");
+                    if (name != null && description != null) {
+                        toolDescriptions.put(name, description);
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed to parse tools/list response for MCP tool descriptions");
+            }
+            break;
+        }
+        if (!toolDescriptions.isEmpty()) {
+            McpToolDescriptionsRegistry.set(toolDescriptions);
+        }
+    }    
     public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs, SyncLimit syncLimit, boolean shouldInitOnly) {
 
         // Clear authStatus hashmap for new test runs (different accounts)
@@ -254,6 +291,16 @@ public class TestExecutor {
         TestingRunResultSummariesDao.instance.updateOne(
             Filters.eq("_id", summaryId),
             Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size()));
+
+        Set<Integer> collectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(Constants.ID, collectionIds), Projections.include(ApiCollection.ID, ApiCollection.DESCRIPTION));
+        Map<Integer, String> apiCollectionDescriptionMap = new HashMap<>();
+        for (ApiCollection col : apiCollections) {
+            if (!StringUtils.isEmpty(col.getDescription())) {
+                apiCollectionDescriptionMap.put(col.getId(), col.getDescription());
+            }
+        }
+        TestingConfigurations.getInstance().setApiCollectionDescriptionMap(apiCollectionDescriptionMap);
 
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
         TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
@@ -466,6 +513,7 @@ public class TestExecutor {
                 }
             }
     
+            buildMcpToolDescriptions();
     
             try {
                 if(!Constants.IS_NEW_TESTING_ENABLED){
@@ -1173,6 +1221,11 @@ public class TestExecutor {
         }
         for (String key: wordListsMap.keySet()) {
             varMap.put("wordList_" + key, wordListsMap.get(key));
+        }
+
+        String collectionDescription = TestingConfigurations.getInstance().getApiCollectionDescriptionMap().get(apiInfoKey.getApiCollectionId());
+        if (!StringUtils.isEmpty(collectionDescription)) {
+            varMap.put("wordList_data_context", Collections.singletonList(collectionDescription));
         }
 
         VariableResolver.resolveWordList(varMap, sampleMessageStore.getSampleDataMap(), apiInfoKey);

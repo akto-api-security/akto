@@ -1,11 +1,13 @@
 package com.akto.data_actor;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.metrics.MetricDataDao;
+import com.akto.dto.ApiSequences;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.metrics.MetricData;
 
@@ -84,6 +86,31 @@ public class DbLayer {
                 Filters.eq(ApiCollection.VXLAN_ID, vxlanId),
                 Updates.set(ApiCollection.NAME, name)
         );
+    }
+
+
+    public static void updateAccountDomainsDelta(String domainKey, List<String> toAdd, List<String> toRemove) {
+        Bson filter = AccountSettingsDao.generateFilter();
+        if (toAdd != null && !toAdd.isEmpty()) {
+            List<String> uniqueToAdd = toAdd.stream()
+                    .filter(d -> d != null && !d.trim().isEmpty())
+                    .map(d -> d.trim().toLowerCase())
+                    .distinct()
+                    .collect(Collectors.toList());
+            if (!uniqueToAdd.isEmpty()) {
+                AccountSettingsDao.instance.getMCollection().updateOne(filter, Updates.addEachToSet(domainKey, uniqueToAdd));
+            }
+        }
+        if (toRemove != null && !toRemove.isEmpty()) {
+            List<String> normalizedToRemove = toRemove.stream()
+                    .filter(d -> d != null && !d.trim().isEmpty())
+                    .map(d -> d.trim().toLowerCase())
+                    .distinct()
+                    .collect(Collectors.toList());
+            if (!normalizedToRemove.isEmpty()) {
+                AccountSettingsDao.instance.getMCollection().updateOne(filter, Updates.pullAll(domainKey, normalizedToRemove));
+            }
+        }
     }
 
     public static void updateCidrList(List<String> cidrList) {
@@ -499,6 +526,10 @@ public class DbLayer {
         DataIngestionLogsDao.instance.insertOne(log);
     }
 
+    public static void insertGuardrailsServiceLog(Log log) {
+        GuardrailsServiceLogsDao.instance.insertOne(log);
+    }
+
     public static void updateModuleInfo(ModuleInfo moduleInfo) {
         if (moduleInfo == null || moduleInfo.getId() == null) {
             return;
@@ -554,5 +585,11 @@ public class DbLayer {
 
     public static void ingestMetric(List<MetricData> metricData) {
         MetricDataDao.instance.insertMany(metricData);
+    }
+
+    private static final int API_SEQUENCES_BATCH_SIZE = 1000;
+
+    public static List<ApiSequences> fetchApiSequences(int skip) {
+        return ApiSequencesDao.instance.findAll(new BasicDBObject(), skip, API_SEQUENCES_BATCH_SIZE, null);
     }
 }

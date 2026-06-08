@@ -1,6 +1,7 @@
 package com.akto.threat.backend.service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -37,7 +38,11 @@ public class ApiDistributionDataService {
         this.apiDistributionDataDao = apiDistributionDataDao;
     }
 
+    List<String> RL_ALLOWED_ACCOUNTS = Arrays.asList("1662680463");
     public ApiDistributionDataResponsePayload saveApiDistributionData(String accountId, ApiDistributionDataRequestPayload payload) {
+        if (!RL_ALLOWED_ACCOUNTS.contains(accountId)) {
+            return ApiDistributionDataResponsePayload.newBuilder().build();
+        }
         List<WriteModel<ApiDistributionDataModel>> bulkUpdates = new ArrayList<>();
         
         

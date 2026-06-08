@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "hooks": {
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "$HOME/.vscode/copilot/hooks/akto/akto-validate-prompt-wrapper.sh",
+        "comment": "Validate prompts against Akto Guardrails",
+        "timeoutSec": 30
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "$HOME/.vscode/copilot/hooks/akto/akto-validate-pre-tool-wrapper.sh",
+        "comment": "Validate and block tool execution based on Akto Guardrails policies",
+        "timeoutSec": 30
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "$HOME/.vscode/copilot/hooks/akto/akto-validate-post-tool-wrapper.sh",
+        "comment": "Validate tool results against Akto Guardrails and ingest for monitoring",
+        "timeoutSec": 30
+      }
+    ]
+  }
+}

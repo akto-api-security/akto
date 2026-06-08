@@ -60,8 +60,9 @@ const normalizeComplianceNameForIcon = (complianceName) => {
         "CYBERSECURITY MATURITY MODEL CERTIFICATION (CMMC)": "CYBERSECURITY MATURITY MODEL CERTIFICATION (CMMC)",
         "FISMA": "FISMA",
         "CSA CCM": "CSA CCM",
-        "OWASP LLM": "OWASP LLM",
-        "OWASP Agentic": "OWASP Agentic",
+        "OWASP LLM": "OWASP",
+        "OWASP Agentic Top 10": "OWASP",
+        "EU AI Act": "EU AI Act",
         "NIST AI Risk Management Framework": "NIST AI Risk Management Framework",
         "MITRE ATLAS": "MITRE ATLAS"
     };

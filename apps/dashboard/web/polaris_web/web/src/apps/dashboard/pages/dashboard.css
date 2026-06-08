@@ -100,9 +100,11 @@
    --color-head: #9012fe ;
    --color-patch: #50e3c2 ;
    --color-tool: #49cc90;    /* green — active/action-oriented, like POST */
+   --color-skill: #fca130;   /* orange — agent skill files */
    --color-resource: #61affe; /* blue — data/info-oriented, like GET */
    --color-prompt: #bc6ff1;   /* purple — creative/conversational */
    --color-server: #f59b42;   /* red — server/infrastructure-oriented */
+   --color-ws: #7c3aed;       /* purple — WebSocket connections */
 
    --color-disabled: #ebebeb ;
    --color-options: #0d5aa7 ;
@@ -252,6 +254,12 @@ button:has(#bulk-run-test-button):hover {
 
 .badge-wrapper-LOW .Polaris-Badge {
     background-color: #E4E5E7;
+    color: #202223 !important;
+    font-weight: 550 !important;
+}
+
+.badge-wrapper-SUCCESS .Polaris-Badge {
+    background-color: #AEE9D1 !important;
     color: #202223 !important;
     font-weight: 550 !important;
 }

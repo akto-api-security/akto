@@ -23,10 +23,6 @@ const McpHoverPanel = ({ metadata }) => {
   const toolName = metadata?.toolName;
   const description = metadata?.description;
 
-  const MAX_TOOLS = 10;
-  const visibleTools = tools.slice(0, MAX_TOOLS);
-  const overflow = tools.length - MAX_TOOLS;
-
   return (
 
     <Card>
@@ -70,12 +66,9 @@ const McpHoverPanel = ({ metadata }) => {
                 Tools List({tools.length}):
               </Text>
               <HorizontalStack gap="1">
-                {visibleTools.map((tool) => (
+                {tools.map((tool) => (
                   <Text key={tool} variant="bodySm">{tool}, </Text>
                 ))}
-                {overflow > 0 && (
-                  <Text variant="bodySm" color="subdued">+{overflow} more</Text>
-                )}
               </HorizontalStack>
             </VerticalStack>
           )}
@@ -86,7 +79,7 @@ const McpHoverPanel = ({ metadata }) => {
 };
 
 // Custom Node Component following ApiDependencyNode pattern - memoized to prevent re-renders
-const AgentNode = memo(function AgentNode({ data }) {
+export const AgentNode = memo(function AgentNode({ data }) {
   const { component, onNodeClick } = data;
   const [panelPos, setPanelPos] = useState(null);
   const nodeRef = useRef(null);
@@ -150,7 +143,7 @@ const AgentNode = memo(function AgentNode({ data }) {
               >
                 <Box padding={3}>
                   <VerticalStack gap={1}>
-                    <Box width='140px'>
+                    <Box width='110px'>
                       <TooltipText
                         tooltip={component.description}
                         text={component.type}
@@ -161,19 +154,19 @@ const AgentNode = memo(function AgentNode({ data }) {
                       {typeof IconComponent === 'string' ?
                       <Avatar source={IconComponent} size={"extraSmall"} /> :
                       <Icon source={IconComponent} />}
-                      <Box width="140px">
+                      <Box width="110px">
                         <Text variant="bodySm" color="base" breakWord>
                           {component.label}
                         </Text>
                       </Box>
                     </HorizontalStack>
                     {isArcadeMcp && component.mcpServers && component.mcpServers.length > 0 && (
-                      <Box paddingBlockStart="1" width="140px">
+                      <Box paddingBlockStart="1" width="110px">
                         <ShowListInBadge
                           itemsArr={component.mcpServers}
                           maxItems={2}
                           status="info"
-                          maxWidth="140px"
+                          maxWidth="110px"
                           itemWidth="35px"
                           useTooltip={true}
                           wrap
@@ -209,7 +202,7 @@ const AgentNode = memo(function AgentNode({ data }) {
 });
 
 // Custom Edge Component following ApiDependencyEdge pattern - memoized to prevent re-renders
-const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) {
+export const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) {
   const { edgeParam } = data || {};
   let displayData = edgeParam;
   
@@ -471,60 +464,87 @@ function AgentDiscoverGraph({ apiCollectionId }) {
         incomingEdges[target].push(source);
       });
 
-      // Find central agent (not in keys, has both incoming and outgoing edges)
-      const centralAgent = Array.from(allServices).find(service =>
-        !edgeKeys.includes(service) &&
-        incomingEdges[service]?.length > 0 &&
-        outgoingEdges[service]?.length > 0
-      ) || collectionData.name || 'AI Agent';
-
-      // Organize services into three columns
-      const leftNodes = [];  // Services that feed into agent
-      const centerNodes = []; // Agent
-      const rightNodes = []; // Services agent calls
-
-      const serviceToNodeId = {};
-      let nodeIndex = 0;
-
-      // Process all services
-      Array.from(allServices).forEach((service) => {
-        const info = serviceInfo[service] || {
-          category: 'internal',
-          type: 'Internal Service',
-          description: 'Internal Service',
-          displayName: service,
-          isKey: false
-        };
-
-        const nodeData = {
-          serviceName: service,
-          displayName: info.displayName || service,
-          info,
-          isAgent: service === centralAgent
-        };
-
-        if (service === centralAgent) {
-          centerNodes.push(nodeData);
-        } else if (outgoingEdges[service]?.includes(centralAgent)) {
-          leftNodes.push(nodeData); // Feeds into agent
-        } else {
-          rightNodes.push(nodeData); // Agent calls this
+      // BFS depth assignment: root nodes (no incoming edges) start at depth 0.
+      // Each column in the graph corresponds to one depth level, so graphs with
+      // multiple nodes at the same depth (e.g. 5 planners under one orchestrator)
+      // are laid out correctly instead of being collapsed into a single right column.
+      const serviceDepth = {};
+      const bfsQueue = [];
+      Array.from(allServices).forEach(service => {
+        if (!incomingEdges[service] || incomingEdges[service].length === 0) {
+          serviceDepth[service] = 0;
+          bfsQueue.push(service);
         }
       });
+      let head = 0;
+      while (head < bfsQueue.length) {
+        const svc = bfsQueue[head++];
+        const depth = serviceDepth[svc];
+        (outgoingEdges[svc] || []).forEach(target => {
+          if (serviceDepth[target] === undefined || depth + 1 > serviceDepth[target]) {
+            serviceDepth[target] = depth + 1;
+            bfsQueue.push(target);
+          }
+        });
+      }
+      // Disconnected nodes get depth 0
+      Array.from(allServices).forEach(service => {
+        if (serviceDepth[service] === undefined) serviceDepth[service] = 0;
+      });
 
-      // Layout configuration
-      const COLUMN_WIDTH = 350;
-      const NODE_HEIGHT = 140;
-      const VERTICAL_SPACING = 40;
+      // Group services by depth level
+      const maxDepth = Math.max(0, ...Object.values(serviceDepth));
+      const depthGroups = {};
+      for (let d = 0; d <= maxDepth; d++) depthGroups[d] = [];
+      Array.from(allServices).forEach(service => depthGroups[serviceDepth[service]].push(service));
 
-      // Calculate positions for each column
-      const createNodesForColumn = (columnNodes, xPosition, startY) => {
-        columnNodes.forEach((nodeData, index) => {
-          const { serviceName, displayName, info, isAgent } = nodeData;
-          const nodeId = isAgent ? 'agent-0' : `node-${nodeIndex++}`;
-          serviceToNodeId[serviceName] = nodeId;
+      // Left-to-right layout: each depth level is a vertical column.
+      // Nodes within a column are sorted by average parent y-position to minimise crossings.
+      const COLUMN_WIDTH = 270; // horizontal distance between columns
+      const NODE_STRIDE  = 115; // compact vertical stride (~25px gap between cards)
 
-          const yPosition = startY + (index * (NODE_HEIGHT + VERTICAL_SPACING));
+      // Canvas height driven by the tallest column
+      const maxColSize   = Math.max(...Object.values(depthGroups).map(g => g.length), 1);
+      const canvasHeight = Math.max(400, maxColSize * NODE_STRIDE + 80);
+
+      const serviceToNodeId  = {};
+      const servicePositionY = {}; // y of each placed node, used to sort its children
+      let nodeIndex = 0;
+
+      for (let d = 0; d <= maxDepth; d++) {
+        const services = depthGroups[d];
+
+        // Sort by average parent y-position to reduce edge crossings between columns.
+        // Tie-break with natural sort (numeric-aware) so planner-1 < planner-2 < planner-3 …
+        const sorted = d === 0 ? [...services] : [...services].sort((a, b) => {
+          const avgY = (svc) => {
+            const parents = incomingEdges[svc] || [];
+            if (parents.length === 0) return canvasHeight / 2;
+            return parents.reduce((s, p) => s + (servicePositionY[p] ?? canvasHeight / 2), 0) / parents.length;
+          };
+          const diff = avgY(a) - avgY(b);
+          if (diff !== 0) return diff;
+          return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+        });
+
+        // Center this column vertically within the canvas
+        const colSpan   = (sorted.length - 1) * NODE_STRIDE;
+        const colStartY = Math.max(40, (canvasHeight - colSpan) / 2);
+        const xPosition = 80 + d * COLUMN_WIDTH;
+
+        sorted.forEach((service, index) => {
+          const info = serviceInfo[service] || {
+            category: 'internal',
+            type: 'Internal Service',
+            description: 'Internal Service',
+            displayName: service,
+            isKey: false
+          };
+
+          const nodeId    = `node-${nodeIndex++}`;
+          const yPosition = colStartY + index * NODE_STRIDE;
+          serviceToNodeId[service]  = nodeId;
+          servicePositionY[service] = yPosition;
 
           nodes.push({
             id: nodeId,
@@ -532,14 +552,14 @@ function AgentDiscoverGraph({ apiCollectionId }) {
             data: {
               component: {
                 id: nodeId,
-                label: displayName,
-                type: isAgent ? 'AI Agent' : info.type,
-                category: isAgent ? 'agent' : info.category,
-                description: isAgent ? 'Central AI agent processing requests' : info.description,
-                status: isAgent ? 'active' : 'connected',
+                label: info.displayName || service,
+                type: info.type,
+                category: info.category,
+                description: info.description,
+                status: 'connected',
                 requestCount: info.requestCount,
                 lastSeen: info.lastSeen,
-                showBoundary: isAgent,
+                showBoundary: info.category === 'agent',
                 boundaryColor: '#7c3aed',
                 boundaryBg: 'rgba(124, 58, 237, 0.05)',
                 metadata: info.metadata,
@@ -550,22 +570,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
             draggable: false
           });
         });
-      };
-
-      // Calculate starting Y positions to center each column
-      const containerHeight = 400;
-      const leftHeight = leftNodes.length * (NODE_HEIGHT + VERTICAL_SPACING) - VERTICAL_SPACING;
-      const centerHeight = NODE_HEIGHT;
-      const rightHeight = rightNodes.length * (NODE_HEIGHT + VERTICAL_SPACING) - VERTICAL_SPACING;
-
-      const leftStartY = Math.max(40, (containerHeight - leftHeight) / 2);
-      const centerStartY = Math.max(40, (containerHeight - centerHeight) / 2);
-      const rightStartY = Math.max(40, (containerHeight - rightHeight) / 2);
-
-      // Create nodes in three columns
-      createNodesForColumn(leftNodes, 80, leftStartY);           // Left column
-      createNodesForColumn(centerNodes, 80 + COLUMN_WIDTH, centerStartY);  // Center column (agent)
-      createNodesForColumn(rightNodes, 80 + (COLUMN_WIDTH * 2), rightStartY); // Right column
+      }
 
       // Create edges based on sourceService -> targetService relationships
       let edgeIndex = 0;
@@ -622,12 +627,14 @@ function AgentDiscoverGraph({ apiCollectionId }) {
     return null;
   }
 
-  // Calculate dynamic height (VSCode needs more vertical space for elongated edges)
+  // Compute height from actual node positions; keep the 900px ceiling.
   const dynamicHeight = arcadeGraphData
     ? 400
     : vscodeGraphData
       ? 520
-      : Math.max(500, Math.min(800, Object.keys(serviceGraphEdges).length * 120 + 200));
+      : nodes.length > 0
+        ? Math.min(900, Math.max(420, nodes.reduce((max, n) => Math.max(max, (n.position?.y || 0) + 120), 0) + 60))
+        : 420;
 
   return (
     <Card>

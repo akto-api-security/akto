@@ -1,5 +1,6 @@
-import { EmptyState, LegacyCard, Page } from '@shopify/polaris'
+import { HorizontalStack, LegacyCard, Page, Text } from '@shopify/polaris'
 import React, { useEffect, useReducer, useState } from 'react'
+import MetricChart from './components/MetricChart'
 import { useNavigate } from 'react-router-dom'
 import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
 import Dropdown from '../../../components/layouts/Dropdown'
@@ -7,12 +8,25 @@ import {produce} from "immer"
 import func from '@/util/func'
 import "../settings.css"
 import settingFunctions from '../module'
-import GraphMetric from '../../../components/GraphMetric'
 import values from '@/util/values'
 import PersistStore from '../../../../main/PersistStore'
+import { timezonesAvailable } from '../about/About'
+import DropdownSearch from '../../../components/shared/DropdownSearch'
+
+function getTimezoneOffsetMinutes(tzValue) {
+    if (!tzValue) return new Date().getTimezoneOffset() * -1;
+    try {
+        const now = new Date();
+        const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+        const tzDate = new Date(now.toLocaleString('en-US', { timeZone: tzValue }));
+        return Math.round((tzDate.getTime() - utcMs) / 60000);
+    } catch {
+        return new Date().getTimezoneOffset() * -1;
+    }
+}
 
 // Define the new MetricsSection component here
-function MetricsSection({ sectionTitle, metricsToDisplay, orderedResult, nameMap, defaultChartOptionsFn, showLegendForSection = false }) {
+function MetricsSection({ sectionTitle, metricsToDisplay, orderedResult, nameMap, defaultChartOptionsFn, showLegendForSection = false, timezoneOffsetMinutes }) {
     // Filter for elements that belong to this section AND have data
     const relevantElementsWithData = orderedResult.filter(element =>
         metricsToDisplay.includes(element.key) && element.value && element.value.length > 0
@@ -42,32 +56,15 @@ function MetricsSection({ sectionTitle, metricsToDisplay, orderedResult, nameMap
                 </LegacyCard.Section>
             )}
             {relevantElementsWithData.map((element) => (
-                element.value && element.value.length > 0 ? (
-                    <LegacyCard.Section key={element.key}>
-                        <GraphMetric 
-                            data={element.value} 
-                            type='spline' 
-                            color='#6200EA' 
-                            areaFillHex="true" 
-                            height="330"
-                            title={nameMap.get(element.key)?.descriptionName} 
-                            subtitle={nameMap.get(element.key)?.description}
-                            defaultChartOptions={defaultChartOptionsFn(showLegendForSection)}
-                            background-color="#000000"
-                            text="true"
-                            inputMetrics={[]}
-                        />
-                    </LegacyCard.Section>
-                ) : (
-                    <LegacyCard.Section key={element.key}>
-                        <EmptyState 
-                            heading={nameMap.get(element.key)?.descriptionName} 
-                            footerContent="No Graph Data exist !"
-                        >
-                            <p>{nameMap.get(element.key)?.description}</p>
-                        </EmptyState>
-                    </LegacyCard.Section>
-                )
+                <MetricChart
+                    key={element.key}
+                    metricId={element.key}
+                    data={element.value}
+                    title={nameMap.get(element.key)?.descriptionName}
+                    description={nameMap.get(element.key)?.description}
+                    chartOptions={defaultChartOptionsFn(showLegendForSection)}
+                    timezoneOffsetMinutes={timezoneOffsetMinutes}
+                />
             ))}
         </>
     );
@@ -99,6 +96,7 @@ function Metrics() {
 
     const [menuItems,setMenuItems] =  useState(initialItems)
     const [groupBy, setGroupBy] = useState("ALL")
+    const [selectedTimezone, setSelectedTimezone] = useState(null)
     const hasAccess = func.checkUserValidForIntegrations()
 
     const getMetricsList = async() =>{
@@ -283,85 +281,86 @@ function Metrics() {
     const cyborgMetricsKeys = newMetrics.slice(26, 29);
     const dataIngestionMetricsKeys = newMetrics.slice(29, 30);
 
+    const tzOffsetMinutes = getTimezoneOffsetMinutes(selectedTimezone);
+    const sharedSectionProps = { orderedResult, nameMap, defaultChartOptionsFn: defaultChartOptions, timezoneOffsetMinutes: tzOffsetMinutes };
+
     const graphContainer = (
         <>
             <MetricsSection
                 metricsToDisplay={oldMetrics}
-                orderedResult={orderedResult}
-                nameMap={nameMap}
-                defaultChartOptionsFn={defaultChartOptions}
                 showLegendForSection={true}
+                {...sharedSectionProps}
             />
             <MetricsSection
                 sectionTitle="Runtime Metrics"
                 metricsToDisplay={runtimeMetricsKeys}
-                orderedResult={orderedResult}
-                nameMap={nameMap}
-                defaultChartOptionsFn={defaultChartOptions}
+                {...sharedSectionProps}
             />
             <MetricsSection
                 sectionTitle="PostgreSQL Metrics"
                 metricsToDisplay={postgresqlMetricsKeys}
-                orderedResult={orderedResult}
-                nameMap={nameMap}
-                defaultChartOptionsFn={defaultChartOptions}
+                {...sharedSectionProps}
             />
             <MetricsSection
                 sectionTitle="Testing Metrics"
                 metricsToDisplay={testingMetricsKeys}
-                orderedResult={orderedResult}
-                nameMap={nameMap}
-                defaultChartOptionsFn={defaultChartOptions}
+                {...sharedSectionProps}
             />
             <MetricsSection
                 sectionTitle="Cyborg Metrics"
                 metricsToDisplay={cyborgMetricsKeys}
-                orderedResult={orderedResult}
-                nameMap={nameMap}
-                defaultChartOptionsFn={defaultChartOptions}
+                {...sharedSectionProps}
             />
             <MetricsSection
                 sectionTitle="Data Ingestion Metrics"
                 metricsToDisplay={dataIngestionMetricsKeys}
-                orderedResult={orderedResult}
-                nameMap={nameMap}
-                defaultChartOptionsFn={defaultChartOptions}
+                {...sharedSectionProps}
             />
         </>
     )
 
     return (
-        <Page title='Metrics' divider>
+        <Page title='Metrics' divider fullWidth>
             <LegacyCard >
                 <LegacyCard.Section>
-                    <LegacyCard.Header title="Metrics">
-                        <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
-                        <Dropdown menuItems={menuItems} initial= {groupBy} selected={handleChange}
-                                    subItems={hosts.length > 0}
-                                    subContent="Group by Id"
-                                    subClick={changeItems}
-                        />
-                        <Dropdown
-                            menuItems={[
-                                { label: "All", value: "ALL" },
-                                { label: "Traffic Collectors", value: "TRAFFIC_COLLECTORS" },
-                                { label: "Threat Detection", value: "THREAT_DETECTION" },
-                                { label: "Mini Runtime", value: "MINI_RUNTIME" }
-                            ]}
-                            initial="ALL"
-                            selected={(val) => {
-                                if (val === "TRAFFIC_COLLECTORS") {
-                                    navigate("/dashboard/settings/traffic-collectors-metrics");
-                                }
-                                if (val === "THREAT_DETECTION") {
-                                    navigate("/dashboard/settings/threat-detection-metrics");
-                                }
-                                if (val === "MINI_RUNTIME") {
-                                    navigate("/dashboard/settings/mini-runtime-metrics");
-                                }
-                            }}
-                        />
-                    </LegacyCard.Header>
+                    <HorizontalStack align="space-between" blockAlign="center">
+                        <Text variant="headingMd" as="h2">Metrics</Text>
+                        <HorizontalStack gap="3" blockAlign="center">
+                            <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
+                            <DropdownSearch
+                                placeholder="Timezone"
+                                optionsList={timezonesAvailable}
+                                setSelected={setSelectedTimezone}
+                                value={selectedTimezone}
+                                sliceMaxVal={10}
+                            />
+                            <Dropdown menuItems={menuItems} initial= {groupBy} selected={handleChange}
+                                        subItems={hosts.length > 0}
+                                        subContent="Group by Id"
+                                        subClick={changeItems}
+                            />
+                            <Dropdown
+                                menuItems={[
+                                    { label: "All", value: "ALL" },
+                                    { label: "Traffic Collectors", value: "TRAFFIC_COLLECTORS" },
+                                    { label: "Threat Detection", value: "THREAT_DETECTION" },
+                                    { label: "Mini Runtime", value: "MINI_RUNTIME" }
+                                ]}
+                                initial="ALL"
+                                selected={(val) => {
+                                    if (val === "TRAFFIC_COLLECTORS") {
+                                        navigate("/dashboard/settings/traffic-collectors-metrics");
+                                    }
+                                    if (val === "THREAT_DETECTION") {
+                                        navigate("/dashboard/settings/threat-detection-metrics");
+                                    }
+                                    if (val === "MINI_RUNTIME") {
+                                        navigate("/dashboard/settings/mini-runtime-metrics");
+                                    }
+                                }}
+                            />
+                        </HorizontalStack>
+                    </HorizontalStack>
                 </LegacyCard.Section>
                 {graphContainer}
             </LegacyCard>

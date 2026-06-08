@@ -2,7 +2,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon } from "@shopify/polaris"
 import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import api from "../api"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {useLocation, useNavigate, useParams } from "react-router-dom"
@@ -42,6 +42,7 @@ import AgentDiscoverGraphWithDummyData from "./AgentDiscoveryGraphWithDummyData"
 import AgentDiscoverGraph from "./AgentDiscoverGraph"
 import { dummyCollections } from "./AgentDiscoveryDummyData"
 import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges"
+import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent"
 
 const headings = [
     {
@@ -165,7 +166,7 @@ const headings = [
         textValue: "tagsString",
         title: "Tags",
         showFilter: true,
-        filterKey: "tagsString",
+        filterKey: "tagsFilterList",
     },
     {
         text: "Description",
@@ -183,6 +184,7 @@ if(!getDashboardCategory().includes("MCP")){
     headers.push({
         text: 'Method',
         filterKey: 'method',
+        value: 'methodComp',
         showFilter: true,
         textValue: 'method',
         sortActive: true
@@ -252,6 +254,7 @@ function ApiEndpoints(props) {
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const allCollections = PersistStore(state => state.allCollections);
     const hostNameMap = PersistStore(state => state.hostNameMap);
+
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setAllCollections = PersistStore(state => state.setAllCollections)
 
@@ -293,6 +296,15 @@ function ApiEndpoints(props) {
     const [showGuardrailSchemaModal, setShowGuardrailSchemaModal] = useState(false)
     const [selectedEndpointForSchema, setSelectedEndpointForSchema] = useState(null)
     const [savingGuardrailSchema, setSavingGuardrailSchema] = useState(false)
+    const [endpointTagsPopover, setEndpointTagsPopover] = useState(false)
+    const endpointTagsMap = useMemo(() => {
+        const map = {}
+        ;(endpointData["all"] || []).forEach(ep => {
+            const stableKey = `${ep.method}###${ep.endpoint}###${ep.apiCollectionId}`
+            map[stableKey] = ep.tagsList || []
+        })
+        return map
+    }, [endpointData])
 
     const queryParams = new URLSearchParams(location.search);
     const selectedUrl = queryParams.get('selected_url')
@@ -306,11 +318,15 @@ function ApiEndpoints(props) {
     const hasAccessToDiscoveryAgent = func.checkForFeatureSaas('STATIC_DISCOVERY_AI_AGENTS');
 
 
+    const isSkillCollection = (apiInfoList || []).some(info => info?.id?.url?.startsWith('/skills/'))
+
     // the values used here are defined at the server.
-    const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Zombie'] )
+    const baseTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Zombie'] )
+    const definedTableTabs = isSkillCollection ? [...baseTableTabs, 'Blocked Skills'] : baseTableTabs
 
     const { tabsInfo } = useTable()
-    const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
+    const blockedSkillsCount = (apiInfoList || []).filter(info => info?.id?.url?.startsWith('/skills/') && info.isSkillBlocked).length
+    const tableCountObj = { ...func.getTabsCount(definedTableTabs, endpointData), ...(isSkillCollection ? { blocked_skills: blockedSkillsCount } : {}) }
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
     async function fetchData() {
@@ -517,11 +533,12 @@ function ApiEndpoints(props) {
 
         // Step 1: Create lightweight objects for ALL endpoints (for filtering & counting only)
         const allEndpointsLight = allEndpoints.map((obj) => {
-            const t = collectionTagsMap[obj.apiCollectionId];
+            const endpointTagsFormatted = (obj.tagsList || []).map(func.formatCollectionType);
             return {
                 ...obj,
-                tagsComp: t?.comp || null,
-                tagsString: t?.str || "",
+                tagsComp: endpointTagsFormatted.length > 0 ? getTagsCompactComponent(endpointTagsFormatted) : null,
+                tagsString: endpointTagsFormatted.join(" "),
+                tagsFilterList: endpointTagsFormatted,
                 isNew: transform.isNewEndpoint(obj.lastSeenTs),
                 open:  obj.auth_type === undefined || obj.auth_type.toLowerCase() === "unauthenticated" || obj.auth_type.toLowerCase() === "no auth type found",
                 componentRiskAnalysisComp: riskCompByEndpoint.get(obj.endpoint) ?? null
@@ -604,12 +621,15 @@ function ApiEndpoints(props) {
         const prettifyPageWithTags = (pageData) => {
             const prettified = transform.prettifyEndpointsData(pageData);
             prettified.forEach((obj) => {
-                const t = collectionTagsMap[obj.apiCollectionId];
-                if (t) {
-                    obj.tagsComp = t.comp;
-                    obj.tagsString = t.str;
+                const endpointTagsFormatted = (obj.tagsList || []).map(func.formatCollectionType);
+                if (endpointTagsFormatted.length > 0) {
+                    obj.tagsComp = getTagsCompactComponent(endpointTagsFormatted);
+                    obj.tagsString = endpointTagsFormatted.join(" ");
+                    obj.tagsFilterList = endpointTagsFormatted;
                 } else {
+                    obj.tagsComp = null;
                     obj.tagsString = "";
+                    obj.tagsFilterList = [];
                 }
             });
             return prettified;
@@ -652,12 +672,15 @@ function ApiEndpoints(props) {
             // Small collection: render all normally
             const prettifyData = transform.prettifyEndpointsData(allEndpointsLight);
             prettifyData.forEach((obj) => {
-                const t = collectionTagsMap[obj.apiCollectionId];
-                if (t) {
-                    obj.tagsComp = t.comp;
-                    obj.tagsString = t.str;
+                const endpointTagsFormatted = (obj.tagsList || []).map(func.formatCollectionType);
+                if (endpointTagsFormatted.length > 0) {
+                    obj.tagsComp = getTagsCompactComponent(endpointTagsFormatted);
+                    obj.tagsString = endpointTagsFormatted.join(" ");
+                    obj.tagsFilterList = endpointTagsFormatted;
                 } else {
+                    obj.tagsComp = null;
                     obj.tagsString = "";
+                    obj.tagsFilterList = [];
                 }
             });
 
@@ -1132,7 +1155,7 @@ function ApiEndpoints(props) {
     function getTagsCompactComponent(envTypeList) {
         const list = envTypeList || []
         // Use shared badge renderer to show 1 tag and a +N badge with tooltip inline
-        return transform.getCollectionTypeList(list, 1, true)
+        return transform.getCollectionTypeList(list, 1, false)
     }
 
     function getCollectionTypeListComp(collectionsObj) {
@@ -1167,6 +1190,10 @@ function ApiEndpoints(props) {
     }
 
     const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
+
+    const isAgentProxyCollection = Array.isArray(collectionsObj?.envType) &&
+        collectionsObj.envType.some(tag => tag.keyName === 'agent-proxy')
+
     const isApiGroup = collectionsObj?.type === 'API_GROUP'
     const isHostnameCollection = hostNameMap[collectionsObj?.id] !== null && hostNameMap[collectionsObj?.id] !== undefined
     const collectionTypeListComp = getCollectionTypeListComp(collectionsObj)
@@ -1454,10 +1481,34 @@ function ApiEndpoints(props) {
 
     const promotedBulkActions = (selectedResources) => {
 
+        const stableIds = selectedResources.map(stableKeyFromResourceId)
+
+        const setEndpointTagsContent = (
+            <Popover
+                activator={<div onClick={() => setEndpointTagsPopover(!endpointTagsPopover)}>Set endpoint tags</div>}
+                onClose={() => setEndpointTagsPopover(false)}
+                active={endpointTagsPopover}
+                autofocusTarget="first-node"
+            >
+                <Popover.Pane>
+                    <SetUserEnvPopupComponent
+                        popover={endpointTagsPopover}
+                        setPopover={setEndpointTagsPopover}
+                        tags={endpointTagsMap}
+                        apiCollectionIds={stableIds}
+                        updateTags={updateEndpointTags}
+                    />
+                </Popover.Pane>
+            </Popover>
+        )
+
         let ret = [
             {
                 content: 'Export as CSV',
                 onAction: () => exportCsv(selectedResources)
+            },
+            {
+                content: setEndpointTagsContent
             }
         ]
         if (isApiGroup) {
@@ -1480,8 +1531,8 @@ function ApiEndpoints(props) {
             onAction: () => handleBulkDeMerge(selectedResources)
         })
 
-        // Add bulk guardrail actions (only for Argus dashboard)
-        if (isAgenticSecurityCategory()) {
+        // Add bulk guardrail actions (only for agent proxy collections in Argus dashboard)
+        if (isAgenticSecurityCategory() && isAgentProxyCollection) {
             ret.push({
                 content: 'Enable guardrails',
                 onAction: () => handleBulkGuardrail(selectedResources, true)
@@ -1492,6 +1543,35 @@ function ApiEndpoints(props) {
             })
         }
 
+        if (isSkillCollection) {
+            const selectedSkillEndpoints = selectedResources.map(id =>
+                (endpointData["all"] || []).find(e => e.id === id)
+            ).filter(e => e?.endpoint?.startsWith('/skills/'))
+
+            if (selectedSkillEndpoints.length > 0) {
+                const blockedUrlsSet = new Set(
+                    (apiInfoList || [])
+                        .filter(i => i?.id?.url?.startsWith('/skills/') && i.isSkillBlocked)
+                        .map(i => i.id.url)
+                )
+                const hasUnblocked = selectedSkillEndpoints.some(e => !blockedUrlsSet.has(e.endpoint))
+                const hasBlocked = selectedSkillEndpoints.some(e => blockedUrlsSet.has(e.endpoint))
+
+                if (hasUnblocked) {
+                    ret.push({
+                        content: 'Block Skills',
+                        onAction: () => handleBulkSkillBlock(selectedResources, true)
+                    })
+                }
+                if (hasBlocked) {
+                    ret.push({
+                        content: 'Unblock Skills',
+                        onAction: () => handleBulkSkillBlock(selectedResources, false)
+                    })
+                }
+            }
+        }
+
         if (window.USER_NAME && window.USER_NAME.endsWith("@akto.io")) {
             ret.push({
                 content: 'Delete ' + mapLabel('APIs', getDashboardCategory()),
@@ -1500,6 +1580,28 @@ function ApiEndpoints(props) {
         }
 
         return ret;
+    }
+
+    async function handleBulkSkillBlock(selectedResources, block) {
+        const selectedSkillEndpoints = selectedResources.map(id =>
+            (endpointData["all"] || []).find(e => e.id === id)
+        ).filter(e => e?.endpoint?.startsWith('/skills/'))
+
+        if (selectedSkillEndpoints.length === 0) return
+
+        try {
+            await Promise.all(selectedSkillEndpoints.map(endpoint => {
+                const skillName = endpoint.endpoint.replace('/skills/', '')
+                return api.updateSkillBlockStatus([Number(apiCollectionId)], skillName, block)
+            }))
+            const skillUrls = new Set(selectedSkillEndpoints.map(e => e.endpoint))
+            setApiInfoList(prev => prev.map(info =>
+                skillUrls.has(info?.id?.url) ? { ...info, isSkillBlocked: block } : info
+            ))
+            func.setToast(true, false, `Skills ${block ? 'blocked' : 'unblocked'} successfully`)
+        } catch (e) {
+            func.setToast(true, true, e.message || 'Something went wrong')
+        }
     }
 
     function handleBulkGuardrail(selectedResources, enabled) {
@@ -1550,6 +1652,35 @@ function ApiEndpoints(props) {
             }, 500)
         } catch (error) {
             func.setToast(true, true, `Error updating guardrail: ${error.message || 'Unknown error'}`)
+        }
+    }
+
+    // Stable key for an endpoint: method###url###apiCollectionId (strips the Math.random() suffix from row id)
+    function stableKeyFromResourceId(resourceId) {
+        return resourceId.split("###").slice(0, 3).join("###")
+    }
+
+    function buildEndpointTagsMap() {
+        const map = {}
+        ;(endpointData["all"] || []).forEach(ep => {
+            const stableKey = `${ep.method}###${ep.endpoint}###${ep.apiCollectionId}`
+            map[stableKey] = ep.tagsList || []
+        })
+        return map
+    }
+
+    async function updateEndpointTags(stableIds, tagObj) {
+        const apiInfoKeys = stableIds.map(stableKey => {
+            const tmp = stableKey.split("###")
+            return { method: tmp[0], url: tmp[1], apiCollectionId: parseInt(tmp[2]) }
+        })
+        try {
+            await api.updateApiInfoTags(tagObj === null ? tagObj : [tagObj], apiInfoKeys, tagObj === null)
+            func.setToast(true, false, "Endpoint tags updated successfully")
+            setEndpointTagsPopover(false)
+            setTimeout(() => { fetchData() }, 500)
+        } catch (e) {
+            func.setToast(true, true, "Error updating endpoint tags")
         }
     }
 
@@ -1678,8 +1809,8 @@ function ApiEndpoints(props) {
         
         const actions = []
         
-        // Add guardrail actions (only for Argus dashboard)
-        if (isAgenticSecurityCategory()) {
+        // Add guardrail actions (only for agent proxy collections in Argus dashboard)
+        if (isAgenticSecurityCategory() && isAgentProxyCollection) {
             if (guardrailEnabled) {
                 actions.push({
                     content: 'Disable guardrails for this endpoint',
@@ -1707,17 +1838,28 @@ function ApiEndpoints(props) {
         return actions.length > 0 ? [{ items: actions }] : []
     }
 
+    const blockedSkillsData = useMemo(() => {
+        const blockedUrls = new Set(
+            (apiInfoList || [])
+                .filter(info => info?.id?.url?.startsWith('/skills/') && info.isSkillBlocked)
+                .map(info => info.id.url)
+        )
+        return (endpointData['all'] || []).filter(e => blockedUrls.has(e.endpoint))
+    }, [endpointData, apiInfoList])
+
+    const activeTabData = selectedTab === 'blocked_skills' ? blockedSkillsData : endpointData[selectedTab]
+
     const apiEndpointTable = [<GithubSimpleTable
         key={currentKey}
         pageLimit={50}
-        data={endpointData[selectedTab]}
-        prettifyPageData={endpointData[selectedTab]?._prettifyPageData}
+        data={activeTabData}
+        prettifyPageData={activeTabData?._prettifyPageData}
         sortOptions={sortOptions}
         resourceName={resourceName}
         filters={[]}
         disambiguateLabel={disambiguateLabel}
         headers={headers.filter(x => {
-            if (!canShowTags() && (x.text === 'Collection' || x.text === 'Tags')) {
+            if (!canShowTags() && x.text === 'Collection') {
                 return false;
             }
             return true;
@@ -1729,7 +1871,7 @@ function ApiEndpoints(props) {
         getFilteredItems={getFilteredItems}
         mode={IndexFiltersMode.Default}
         headings={headings.filter(x => {
-            if (!canShowTags() && (x.text === 'Collection' || x.text === 'Tags')) {
+            if (!canShowTags() && x.text === 'Collection') {
                 return false;
             }
             return true;
@@ -1789,7 +1931,7 @@ function ApiEndpoints(props) {
                 <SchemaView key="schema-view" apiCollectionId={apiCollectionId} />
             ] : [
                 dummyAgenticGraph ? <AgentDiscoverGraphWithDummyData key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
-                (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,
+                // (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,
                 // Hide "Test your Endpoints" banner for Endpoint Security
                 (!isEndpointSecurityCategory() && (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null,
                 <div className="apiEndpointsTable" key="table">
@@ -1870,9 +2012,10 @@ function ApiEndpoints(props) {
 
     const handleSaveDescription = () => {
         // Check for special characters
-        const specialChars = /[!@#$%^&*()\-_=+\[\]{}\\|;:'",.<>/?~]/;
-        if (specialChars.test(editableDescription)) {
-            func.setToast(true, true, "Description contains special characters that are not allowed.");
+        const allowedChars = /^[a-zA-Z0-9\s.,!?;:'"()\-_/&]+$/;
+
+        if (editableDescription.length > 0 && !allowedChars.test(editableDescription)) {
+            func.setToast(true, true, "Description contains invalid characters.");
             return;
         }
         

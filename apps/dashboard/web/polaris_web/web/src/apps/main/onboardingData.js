@@ -1,13 +1,13 @@
 const HOMEDASHBOARD_VIDEO_URL = "https://www.youtube.com/watch?v=fRyusl8ppdY"
-const HOMEDASHBOARD_VIDEO_THUMBNAIL = "https://img.youtube.com/vi/fRyusl8ppdY/sddefault.jpg"
+const HOMEDASHBOARD_VIDEO_THUMBNAIL = "/public/images/youtube/fRyusl8ppdY-sddefault.jpg"
 const HOMEDASHBOARD_VIDEO_LENGTH = 195
 
 const COLLECTIONS_VIDEO_URL = "https://www.youtube.com/watch?v=fRyusl8ppdY"
-const COLLECTIONS_VIDEO_THUMBNAIL = "https://img.youtube.com/vi/fRyusl8ppdY/sddefault.jpg"
+const COLLECTIONS_VIDEO_THUMBNAIL = "/public/images/youtube/fRyusl8ppdY-sddefault.jpg"
 const COLLECTIONS_VIDEO_LENGTH = 195
 
 const TESTING_VIDEO_URL = "https://www.youtube.com/watch?v=fRyusl8ppdY"
-const TESTING_VIDEO_THUMBNAIL = "https://img.youtube.com/vi/fRyusl8ppdY/sddefault.jpg"
+const TESTING_VIDEO_THUMBNAIL = "/public/images/youtube/fRyusl8ppdY-sddefault.jpg"
 const TESTING_VIDEO_LENGTH = 195
 
 const ISSUES_PAGE_DOCS_URL = "https://docs.akto.io/readme"
@@ -1782,6 +1782,22 @@ const learnMoreObject = {
                 {
                     content: "View Audit Data",
                     value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/audit-data"
+                }
+            ]
+        }
+    },
+    dashboard_observe_users_and_devices: {
+        endpoint_security: {
+            title: "Users and devices (Atlas)",
+            description: "See which agentic assets run per user or device, then open the same inventory view as Agentic assets.",
+            docsLink: [
+                {
+                    content: "What is Akto Atlas",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/overview"
+                },
+                {
+                    content: "Endpoint Discovery",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents"
                 }
             ]
         }

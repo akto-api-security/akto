@@ -6,6 +6,8 @@ import com.akto.jobs.executors.DatadogTrafficCollectorJobExecutor;
 import com.akto.jobs.executors.JiraTicketJobExecutor;
 import com.akto.jobs.executors.PendingTestsAlertsJobExecutor;
 import com.akto.jobs.executors.TicketSyncJobExecutor;
+import com.akto.jobs.executors.WizSyncJobExecutor;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +21,7 @@ public class JobExecutorFactory {
         map.put(JobType.TICKET_SYNC, TicketSyncJobExecutor.INSTANCE);
         map.put(JobType.PENDING_TESTS_ALERTS, PendingTestsAlertsJobExecutor.INSTANCE);
         map.put(JobType.DATADOG_TRAFFIC_COLLECTOR, DatadogTrafficCollectorJobExecutor.INSTANCE);
+        map.put(JobType.WIZ_SYNC, WizSyncJobExecutor.INSTANCE);
 
         registry = Collections.unmodifiableMap(map);
     }

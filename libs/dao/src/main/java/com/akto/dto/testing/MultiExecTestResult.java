@@ -55,6 +55,7 @@ public class MultiExecTestResult extends GenericTestResult {
             List<String> errors = nodeRes.getErrors();
             List<String> messageList = Arrays.asList(nodeRes.getMessage().split("\"request\": "));
             boolean vulnerable = nodeRes.isVulnerable();
+            String validationReason = nodeRes.getValidationReason() != null ? nodeRes.getValidationReason() : "";
             double percentageMatch = 0;
             // pick from workflow
             Map<String, WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails = testingRunResult.getWorkflowTest().getMapNodeIdToWorkflowNodeDetails();
@@ -72,7 +73,9 @@ public class MultiExecTestResult extends GenericTestResult {
                      */
                     originalMessage = "";
                 }
-                runResults.add(new TestResult(null, originalMessage, error_messages, 0, false, TestResult.Confidence.HIGH, null));
+                TestResult errorResult = new TestResult(null, originalMessage, error_messages, 0, false, TestResult.Confidence.HIGH, null);
+                errorResult.setValidationReason(validationReason);
+                runResults.add(errorResult);
             }
 
             for (int j = 1; j<messageList.size(); j++) {
@@ -84,6 +87,7 @@ public class MultiExecTestResult extends GenericTestResult {
                     message = message + "}";
                 }
                 res = new TestResult(message, originalMessage, errors, percentageMatch, vulnerable, Confidence.HIGH, null);
+                res.setValidationReason(validationReason);
                 runResults.add(res);
             }
         }

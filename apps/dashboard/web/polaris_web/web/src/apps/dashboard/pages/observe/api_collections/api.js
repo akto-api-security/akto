@@ -50,6 +50,20 @@ export default {
             data: { apiCollectionIds, currentIsOutOfTestingScopeVal }
         })
     },
+    updateSkillBlockStatus(apiCollectionIds, skillName, isSkillBlocked, mcpHosts) {
+        return request({
+            url: '/api/updateSkillBlockStatus',
+            method: 'post',
+            data: { apiCollectionIds, skillName, isSkillBlocked, mcpHosts: mcpHosts || [] }
+        })
+    },
+    fetchBlockedSkillCollections() {
+        return request({
+            url: '/api/fetchBlockedSkillCollections',
+            method: 'post',
+            data: {}
+        })
+    },
     fetchAllDastScans(){
         return request({
             url: '/api/fetchAllDastScans',

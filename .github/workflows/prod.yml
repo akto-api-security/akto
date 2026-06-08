@@ -7,10 +7,6 @@ on:
     inputs:
       release_version:
         description: 'Release version for the deployment'
-        required: true
-      release_version_threat:
-        description: 'Release version for the Threat Detection deployment'
-        required: false
       skipTests:
         description: 'Do you want to skip unit tests?'
         required: true
@@ -35,14 +31,6 @@ on:
         type: boolean
         default: true
         description: Internal
-      threat_detection:
-        type: boolean
-        default: false
-        description: Threat Detection Client
-      threat_detection_backend:
-        type: boolean
-        default: false
-        description: Threat Detection Backend
       agent_traffic_analyzer:
         type: boolean
         default: false
@@ -51,10 +39,35 @@ on:
         type: boolean
         default: false
         description: Guardrails Service
+      release_version_agent_guard:
+        description: 'Release version for the Agent Guard deployment'
+        required: false
+      agent_guard:
+        type: boolean
+        default: false
+        description: Agent Guard
       account_jobs_executor:
         type: boolean
         default: false
         description: Account Jobs Executor Service
+      release_version_threat:
+        description: 'Release version for the Threat Detection deployment'
+        required: false
+      threat_detection:
+        type: boolean
+        default: false
+        description: Threat Detection Client
+      threat_detection_backend:
+        type: boolean
+        default: false
+        description: Threat Detection Backend
+      release_version_data_ingestion:
+        description: 'Release version for the Data Ingestion deployment'
+        required: false
+      data_ingestion:
+        type: boolean
+        default: false
+        description: Data Ingestion Service
 
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -93,6 +106,9 @@ jobs:
           wget -O fintech.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json
           wget -O filetypes.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json
           wget -O automated_api_groups.csv https://raw.githubusercontent.com/akto-api-security/akto/master/automated-api-groups/automated-api-groups.csv
+
+      - name: Download dashboard static assets
+        run: bash apps/dashboard/scripts/download-dashboard-vendor-assets.sh
 
       - name: Prepare Dashboard polaris UI
         working-directory: ./apps/dashboard/web/polaris_web
@@ -354,6 +370,88 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
+  build-agent-guard:
+    runs-on: ubuntu-22.04
+    if: ${{ github.event.inputs.agent_guard == 'true' }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: DockerHub login
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Configure AWS Credentials for ECR
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: "true"
+          registry-type: public
+
+      - name: Build and push to DockerHub and ECR
+        uses: docker/build-push-action@v4
+        with:
+          context: ./apps/agent-guard/python-service/container
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            aktosecurity/akto-agent-guard-executor:local
+            aktosecurity/akto-agent-guard-executor:${{ github.event.inputs.release_version_agent_guard }}
+            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-executor:local
+            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-executor:${{ github.event.inputs.release_version_agent_guard }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Push git tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: agent-guard-${{ github.event.inputs.release_version_agent_guard }}
+
+      - name: Create a GitHub release
+        uses: ncipollo/release-action@v1.12.0
+        with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          omitBody: true
+
+      - name: Send Github release notification to Slack
+        id: slack
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "🚀 Agent Guard v${{ github.event.inputs.release_version_agent_guard }} released and pushed to DockerHub & ECR!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Send failure notification to Slack
+        if: failure()
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "❌ Agent Guard build v${{ github.event.inputs.release_version_agent_guard }} failed! Check the workflow for details."
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
   build-account-jobs-executor-service:
     runs-on: ubuntu-22.04
     if: ${{ github.event.inputs.account_jobs_executor == 'true' }}
@@ -444,7 +542,105 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-    
+
+  build-data-ingestion:
+    runs-on: ubuntu-22.04
+    if: ${{ github.event.inputs.data_ingestion == 'true' }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-java@v2
+        with:
+          distribution: "adopt"
+          java-version: "8"
+          architecture: x64
+      - uses: actions/setup-node@v2
+        with:
+          node-version: "17"
+      - name: Setup Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "29.2"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+      - name: DockerHub login
+        env:
+          DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
+          DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+        run: |
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+      - name: Run mvn package
+        if: ${{github.event.inputs.skipTests == 'False' }}
+        run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version_data_ingestion }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version_data_ingestion}}
+      - name: Run mvn package dangerously
+        if: ${{github.event.inputs.skipTests== 'True' }}
+        run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version_data_ingestion }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version_data_ingestion}} -DskipTests
+      - name: Build, tag, and push the image to DockerHub
+        id: build-image-dockerhub
+        env:
+          ECR_REGISTRY: aktosecurity
+          ECR_REPOSITORY: akto-api-security
+          IMAGE_TAG_DATA_INGESTION: latest
+          IMAGE_TAG_DATA_INGESTION_2: ${{github.event.inputs.release_version_data_ingestion}}
+        run: |
+          docker buildx create --use
+          cd apps/dashboard
+          cd ../data-ingestion-service
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/data-ingestion-service:$IMAGE_TAG_DATA_INGESTION -t $ECR_REGISTRY/data-ingestion-service:$IMAGE_TAG_DATA_INGESTION_2 . --push
+      - name: Configure AWS Credentials for ECR
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-region: us-east-1
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: "true"
+          registry-type: public
+      - name: Push git tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: data-ingestion-${{ github.event.inputs.release_version_data_ingestion}}
+      - name: Create a GitHub release
+        uses: ncipollo/release-action@v1.12.0
+        with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          omitBody: true
+      - name: Send Github release notification to Slack
+        id: slack
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "Akto Open Source Data ingestion v${{ github.event.inputs.release_version_data_ingestion}} released!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+      - name: Set up JDK 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
 
   build-threat:
     # The type of runner that the job will run on

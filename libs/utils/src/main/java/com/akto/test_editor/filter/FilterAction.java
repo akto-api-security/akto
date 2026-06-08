@@ -401,24 +401,6 @@ public final class FilterAction {
         }
 
         String reqBody = response.getBody();
-        ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
-        if(TestingUtilsSingleton.getInstance().isMcpRequest(apiInfoKey, rawApi)) {
-
-            String contentType = HttpRequestResponseUtils.getHeaderValue(response.getHeaders(), "content-type");
-            String tempReqBody = McpRequestResponseUtils.parseResponse(contentType, reqBody);
-           
-            if(tempReqBody.contains("error") && filterActionRequest.isValidationContext()) {
-                // check if error comes out in parsing, call to LLM when context is not filter
-
-                MagicValidateFilter magicValidateFilter = new MagicValidateFilter();
-                DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(reqBody, filterActionRequest.getQuerySet(), "magic_validate");
-                ValidationResult validationResult = magicValidateFilter.isValid(dataOperandFilterRequest);
-                return new DataOperandsFilterResponse(validationResult.getIsValid(), null, null, null, validationResult.getValidationReason());
-            
-            }else{
-                reqBody = tempReqBody;
-            }
-        }
         // Strip BOM before processing for regex filters to avoid false positives with SOAP payloads
         if (filterActionRequest.getOperand() != null &&
             filterActionRequest.getOperand().equals(TestEditorEnums.DataOperands.REGEX.toString())) {

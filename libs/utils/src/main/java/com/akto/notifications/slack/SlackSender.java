@@ -34,12 +34,13 @@ public class SlackSender {
 
             String webhookUrl = "";
 
-            // Handle custom webhook for USER_BLOCKED_NO_PLAN_ALERT
-            if (useCustomWebhook && alertType == SlackAlertType.USER_BLOCKED_NO_PLAN_ALERT) {
+            // Handle custom webhook for USER_BLOCKED_NO_PLAN_ALERT and USER_BLOCKED_NO_SCOPE_ACCESS_ALERT
+            if (useCustomWebhook && (alertType == SlackAlertType.USER_BLOCKED_NO_PLAN_ALERT ||
+                                     alertType == SlackAlertType.USER_BLOCKED_NO_SCOPE_ACCESS_ALERT)) {
                 try {
-                    loggerMaker.infoAndAddToDb("Slack Alert Type: " + alertType + " Info: Fetching custom webhook URL");
-                    
-                    // Use the same pattern as AktoHostUrlConfig
+                    loggerMaker.infoAndAddToDb("Slack Alert Type: " + alertType + " Info: Fetching custom webhook URL from BLOCK_ACCESS_WEBHOOK config");
+
+                    // Fetch webhook URL from BLOCK_ACCESS_WEBHOOK config
                     Config.BlockAccessWebhookConfig config = (Config.BlockAccessWebhookConfig) ConfigsDao.instance.findOne(
                         Filters.eq(Constants.ID, Config.ConfigType.BLOCK_ACCESS_WEBHOOK.name())
                     );

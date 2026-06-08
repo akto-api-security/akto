@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, Modal, VerticalStack} from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, Modal, VerticalStack, Tooltip} from "@shopify/polaris"
 import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import RegistryBadge from "../../../components/shared/RegistryBadge";
 import RunTest from "./RunTest";
@@ -37,6 +37,7 @@ import ReactFlow, {
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
 import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../../main/labelHelper";
 import useAgenticFilter, { FILTER_TYPES } from "./useAgenticFilter";
+import { AGENTIC_OBSERVE_BACK_PATHS, INVENTORY_FILTER_KEY } from "../agentic/constants";
 import AgentEndpointTreeTable from "./AgentEndpointTreeTable";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "./endpointShieldHelper";
 import { sendQuery } from "../../agentic/services/agenticService";
@@ -90,6 +91,7 @@ const headers = [
             textValue: 'username',
             showFilter: true,
             isText: CellType.TEXT,
+            boxWidth: '150px'
         }
     ] : [{
         title: mapLabel("API collection name", getDashboardCategory()),
@@ -273,7 +275,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             c.rowStatus = 'critical'
             c.disableClick = true
         }
-        const tagsList = JSON.stringify(c?.tagsList || "")
+        const tagsList = JSON.stringify(c?.tagsList || c?.envType || "")
 
         // Split collection name - always extract endpointId/sourceId/serviceName for agentic collections
         // Pattern: <endpoint-id>.<source-id>.<service-name>
@@ -317,6 +319,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             nextUrl: "/dashboard/observe/inventory/"+ c.id,
             envTypeOriginal: c?.envType,
             envType: c?.envType?.map(func.formatCollectionType),
+            skills: c?.skills,
             displayNameComp: (
                 <HorizontalStack gap="2" align="start">
                     <Box maxWidth="30vw"><Text truncate fontWeight="medium">{displayText}</Text></Box>
@@ -327,10 +330,14 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             sensitiveInRespTypes: sensitiveInfoMap[c.id] || [],
             severityInfo: severityInfoMap[c.id] || {},
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
-            detectedTimestamp: c.urlsCount === 0 ? 0 : (trafficInfoMap[c.id] || 0),
+            detectedTimestamp: trafficInfoMap[c.id] || 0,
             riskScore: c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] || 0),
             discovered: func.prettifyEpoch(c.startTs || 0),
-            descriptionComp: (<Box maxWidth="350px"><Text>{c.description}</Text></Box>),
+            descriptionComp: c.description ? (
+                <Tooltip content={c.description} dismissOnMouseOut>
+                    <Box maxWidth="350px"><Text truncate>{c.description}</Text></Box>
+                </Tooltip>
+            ) : null,
             outOfTestingScopeComp: c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>),
             username: getUsernameForCollection(c, usernameMap),
         ...((tagsList.includes("mcp-server") || tagsList.includes("gen-ai") || tagsList.includes("browser-llm") || ((isApiSecurityCategory() || isDastCategory()) && c.hostName)) ? {
@@ -415,7 +422,8 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         deactivated: rawCollection.deactivated,
         urlsCount: rawCollection.urlsCount,
         startTs: rawCollection.startTs,
-        tagsList: rawCollection.tagsList,
+        tagsList: rawCollection.tagsList || rawCollection.envType || [],
+        skills: rawCollection.skills,
         registryStatus: rawCollection.registryStatus,
         description: rawCollection.description,
         isOutOfTestingScope: rawCollection.isOutOfTestingScope,
@@ -429,7 +437,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         issuesArrVal: issuesArrVal,
         severityInfoCount: Object.keys(severityInfo).reduce((sum, key) => sum + (severityInfo[key] || 0), 0),
         sensitiveInRespCount: sensitiveTypes.length,
-        detectedTimestamp: rawCollection.urlsCount === 0 ? 0 : (trafficInfoMap[rawCollection.id] || 0),
+        detectedTimestamp: trafficInfoMap[rawCollection.id] || 0,
         riskScore,
         detected,
         discovered,
@@ -495,18 +503,20 @@ function ApiCollections(props) {
 
     const navigate = useNavigate();
     
-    const checkIsFromEndpoints = () => {
-        if (!isEndpointSecurityCategory()) return false;
+    const getAgenticObserveBackUrl = () => {
+        if (!isEndpointSecurityCategory()) return undefined;
         try {
             const stack = JSON.parse(sessionStorage.getItem('pathnameStack') || '[]');
             if (stack.length >= 2) {
                 const previousPath = stack[stack.length - 2];
-                return previousPath === '/dashboard/observe/agentic-assets';
+                if (AGENTIC_OBSERVE_BACK_PATHS.includes(previousPath)) {
+                    return previousPath;
+                }
             }
         } catch (e) { /* ignore */ }
-        return false;
+        return undefined;
     };
-    const isFromEndpoints = checkIsFromEndpoints();
+    const agenticObserveBackUrl = getAgenticObserveBackUrl();
     
     const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': [], 'untracked': []})
     const [active, setActive] = useState(false);
@@ -530,6 +540,7 @@ function ApiCollections(props) {
     const [analysisConversationId, setAnalysisConversationId] = useState(null);
     const [showMultiCollectionRunTest, setShowMultiCollectionRunTest] = useState(false);
     const [selectedCollectionIdsForTest, setSelectedCollectionIdsForTest] = useState([]);
+    const [blockedSkillCollectionIds, setBlockedSkillCollectionIds] = useState(new Set());
 
     // const dummyData = dummyJson;
 
@@ -1087,7 +1098,16 @@ function ApiCollections(props) {
     }
 
     // Use custom hook for Agentic filter detection and summary calculation
-    const { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections } = useAgenticFilter(normalData);
+    const { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections, activeFilterPlainTitle } = useAgenticFilter(normalData);
+
+    const filtersMap = PersistStore(state => state.filtersMap);
+
+    useEffect(() => {
+        if (activeFilterType !== FILTER_TYPES.SKILL) return;
+        collectionApi.fetchBlockedSkillCollections()
+            .then(resp => setBlockedSkillCollectionIds(new Set(resp.blockedCollectionIds || [])))
+            .catch(() => {});
+    }, [activeFilterType]);
 
     useEffect(() => {
         const isMountedRef = { current: true };
@@ -1117,6 +1137,31 @@ function ApiCollections(props) {
         resetResourcesSelected();
         fetchData({ current: true }, true) // Force refresh after mutations
     }
+
+    const getActiveSkillName = () => {
+        const filterValue = filtersMap[INVENTORY_FILTER_KEY]?.filters?.find(f => f.key === 'envType')?.value?.values?.[0] || '';
+        const eq = filterValue.indexOf('=');
+        return eq >= 0 ? filterValue.slice(eq + 1) : '';
+    };
+
+    async function handleSkillUpdateAction(collectionIds, isSkillBlocked) {
+        const ids = collectionIds.map(id => parseInt(id));
+        const skillName = getActiveSkillName();
+        const toastContent = isSkillBlocked ? 'blocked' : 'unblocked';
+        await collectionApi.updateSkillBlockStatus(ids, skillName, isSkillBlocked)
+            .then(() => {
+                func.setToast(true, false, `Skill ${toastContent} successfully`);
+                setBlockedSkillCollectionIds(prev => {
+                    const next = new Set(prev);
+                    ids.forEach(id => isSkillBlocked ? next.add(id) : next.delete(id));
+                    return next;
+                });
+            })
+            .catch((e) => func.setToast(true, true, e.message || 'Something went wrong!'));
+        resetResourcesSelected();
+        fetchData({ current: true }, true);
+    }
+
     async function handleUntrackedDelete(apiCollectionIds) {
         await api.deleteUntrackedCollections(apiCollectionIds).then(() => {
             func.setToast(true, false, `${apiCollectionIds.length} untracked collection${func.addPlurality(apiCollectionIds.length)} deleted successfully`)
@@ -1197,6 +1242,37 @@ function ApiCollections(props) {
             });
             return actions;
         }
+
+        if (activeFilterType === FILTER_TYPES.SKILL) {
+            const selectedSet = new Set(selectedResources.map(id => parseInt(id)));
+            const selectedEndpointIds = new Set(
+                filteredCollections.filter(c => selectedSet.has(c.id)).map(c => c.endpointId)
+            );
+            const resolvedCollectionIds = filteredCollections
+                .filter(c => selectedEndpointIds.has(c.endpointId))
+                .map(c => c.id);
+
+            const allBlocked = resolvedCollectionIds.length > 0 && resolvedCollectionIds.every(id => blockedSkillCollectionIds.has(id));
+            const allUnblocked = resolvedCollectionIds.every(id => !blockedSkillCollectionIds.has(id));
+
+            if (allUnblocked) {
+                actions.push({
+                    content: `Block skill`,
+                    onAction: () => func.showConfirmationModal(
+                        "Blocking this skill will flag it as blocked. Are you sure?",
+                        "Block Skill",
+                        () => handleSkillUpdateAction(resolvedCollectionIds, true)
+                    )
+                });
+            } else if (allBlocked) {
+                actions.push({
+                    content: `Unblock skill`,
+                    onAction: () => handleSkillUpdateAction(resolvedCollectionIds, false)
+                });
+            }
+            return actions;
+        }
+
         const defaultApiGroups = allCollections.filter(x => x.type === "API_GROUP" && x.automated).map(x => x.id);
         const deactivated = deactivateCollections.map(x => x.id);
         const activated = allCollections.filter(x => { return !x.deactivated }).map(x => x.id);
@@ -1512,8 +1588,8 @@ function ApiCollections(props) {
               ]
             : []),
     
-        // For agentic filter: show Unique Endpoints and Unique Sources (except for AI Agent which uses tree view)
-        ...(activeFilterTitle && activeFilterType !== FILTER_TYPES.AI_AGENT
+        // For agentic filter: show Unique Endpoints and Unique Sources (except for AI Agent/Skill which uses tree view)
+        ...(activeFilterTitle && activeFilterType !== FILTER_TYPES.AI_AGENT && activeFilterType !== FILTER_TYPES.SKILL
             ? [
                   {
                       title: "Unique Endpoints",
@@ -1732,10 +1808,8 @@ function ApiCollections(props) {
             });
             // Move source column after Endpoint ID
             modifiedHeaders = moveSourceColumnAfterEndpointId(modifiedHeaders);
-        } else if (activeFilterType === FILTER_TYPES.AI_AGENT) {
-            // Remove "Total components" column for AI Agent
+        } else if (activeFilterType === FILTER_TYPES.AI_AGENT || activeFilterType === FILTER_TYPES.SKILL) {
             modifiedHeaders = modifiedHeaders.filter(h => h.value !== 'urlsCount');
-            // Rename column to "Agentic resource name", remove filter
             modifiedHeaders = modifiedHeaders.map(h => {
                 if (h.value === 'displayNameComp') {
                     return { ...h, title: 'Agentic resource name', text: 'Agentic resource name', textValue: 'serviceName', showFilter: false };
@@ -1773,8 +1847,7 @@ function ApiCollections(props) {
         if (activeFilterType === FILTER_TYPES.BROWSER_LLM) {
             // Remove endpoints sorting for LLM
             modifiedSortOptions = modifiedSortOptions.filter(opt => opt.sortKey !== 'urlsCount');
-        } else if (activeFilterType === FILTER_TYPES.AI_AGENT) {
-            // Remove "Components" sorting for AI Agents (column is hidden)
+        } else if (activeFilterType === FILTER_TYPES.AI_AGENT || activeFilterType === FILTER_TYPES.SKILL) {
             modifiedSortOptions = modifiedSortOptions.filter(opt => opt.sortKey !== 'urlsCount');
         } else if (activeFilterType === FILTER_TYPES.MCP_SERVER) {
             // Change "Endpoints" to "Tools" for MCP Servers
@@ -1832,7 +1905,8 @@ function ApiCollections(props) {
     const useTreeView = isEndpointSecurityCategory() && (
                         activeFilterType === FILTER_TYPES.AI_AGENT || 
                         activeFilterType === FILTER_TYPES.MCP_SERVER || 
-                        activeFilterType === FILTER_TYPES.BROWSER_LLM);
+                        activeFilterType === FILTER_TYPES.BROWSER_LLM ||
+                        activeFilterType === FILTER_TYPES.SKILL);
     
     // For agentic filters, use the tree view component grouped by endpoint ID
     const getTableComponent = () => {
@@ -1843,6 +1917,7 @@ function ApiCollections(props) {
                     collections={filteredCollections}
                     promotedBulkActions={promotedBulkActions}
                     filterType={activeFilterType}
+                    showCategoryColumn={activeFilterPlainTitle}
                 />
             );
         }
@@ -1923,7 +1998,8 @@ function ApiCollections(props) {
     // Dynamic title based on active filter and filter type
     const getFilteredPageTitle = () => {
         if (!activeFilterTitle) return mapLabel("API Collections", getDashboardCategory());
-        
+        if (activeFilterPlainTitle) return activeFilterTitle;
+
         switch (activeFilterType) {
             case FILTER_TYPES.BROWSER_LLM:
                 return `LLM - ${activeFilterTitle}`;
@@ -1931,6 +2007,8 @@ function ApiCollections(props) {
                 return `AI Agent - ${activeFilterTitle}`;
             case FILTER_TYPES.MCP_SERVER:
                 return `MCP Server - ${activeFilterTitle}`;
+            case FILTER_TYPES.SKILL:
+                return `Skill - ${activeFilterTitle}`;
             default:
                 return `${activeFilterTitle}`;
         }
@@ -1950,8 +2028,8 @@ function ApiCollections(props) {
                     />
                 }
                 primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
-                isFirstPage={!isFromEndpoints}
-                backUrl={isFromEndpoints ? "/dashboard/observe/agentic-assets" : undefined}
+                isFirstPage={!agenticObserveBackUrl}
+                backUrl={agenticObserveBackUrl}
                 components={components}
                 secondaryActions={secondaryActionsComp}
             />

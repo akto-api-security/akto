@@ -1,18 +1,19 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/akto-api-security/akto-endpoint-shield/mcp"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
+	"github.com/akto-api-security/guardrails-service/pkg/metrics"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/guardrails-service/pkg/slack"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
-	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -23,15 +24,17 @@ type ValidationHandler struct {
 	logger           *zap.Logger
 	cfg              *config.Config
 	fileRegistry     *fileprocessor.Registry
+	metrics          *metrics.Accumulator
 }
 
 // NewValidationHandler creates a new validation handler
-func NewValidationHandler(validatorService *validator.Service, logger *zap.Logger, cfg *config.Config, fileRegistry *fileprocessor.Registry) *ValidationHandler {
+func NewValidationHandler(validatorService *validator.Service, logger *zap.Logger, cfg *config.Config, fileRegistry *fileprocessor.Registry, acc *metrics.Accumulator) *ValidationHandler {
 	return &ValidationHandler{
 		validatorService: validatorService,
 		logger:           logger,
 		cfg:              cfg,
 		fileRegistry:     fileRegistry,
+		metrics:          acc,
 	}
 }
 
@@ -94,6 +97,10 @@ func (h *ValidationHandler) IngestData(c *gin.Context) {
 			zap.Bool("hasBlockedResponses", hasBlockedResponses))
 	}
 
+	h.logger.Info("IngestData - completed",
+		zap.Int("batchSize", len(req.BatchData)),
+		zap.String("contextSource", req.ContextSource))
+
 	// Return success response with validation results
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -124,16 +131,23 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 			zap.Int64("latencyMs", time.Since(start).Milliseconds()))
 		alertMsg := "[guardrails] /validate/request - missing requestPayload"
 		slack.SendAlert(h.logger, alertMsg)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "requestPayload is required",
+		c.JSON(http.StatusOK, &mcp.ValidationResult{
+			Allowed:         true,
+			Modified:        false,
+			ModifiedPayload: "",
+			Reason:          "No request body provided",
+			Metadata:        types.ThreatMetadata{},
+			Behaviour:       "",
 		})
 		return
 	}
 
-	// Extract session and request IDs from headers
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
+	// Extract session and request IDs from headers (falling back to the body's
+	// requestHeaders JSON for traffic forwarded via /api/http-proxy).
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, req.RequestHeaders)
 
-	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] /validate/request - requestPayload: %s", req.RequestPayload))
+	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Request received for guardrailing | Path: %s | Method: %s | Account: %s | Session: %s | Payload: %.300s",
+		req.Path, req.Method, req.AktoAccountID, sessionID, req.RequestPayload))
 
 	h.logger.Info("ValidateRequest - received request",
 		zap.String("path", req.Path),
@@ -173,6 +187,8 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		return
 	}
 
+	elapsed := time.Since(start)
+	latencyMs := elapsed.Milliseconds()
 	h.logger.Info("ValidateRequest - completed",
 		zap.String("path", req.Path),
 		zap.String("method", req.Method),
@@ -180,11 +196,19 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		zap.String("sessionID", sessionID),
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
-		zap.Int64("latencyMs", time.Since(start).Milliseconds()))
+		zap.String("behaviour", result.Behaviour),
+		zap.Int64("latencyMs", latencyMs))
 
-	if resultJSON, err := json.Marshal(result); err == nil {
-		go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] /validate/request - result: %s", string(resultJSON)))
+	if h.metrics != nil && req.AktoAccountID != "" {
+		h.metrics.RecordRequest(req.AktoAccountID, elapsed.Nanoseconds())
 	}
+
+	status := "ALLOWED"
+	if !result.Allowed {
+		status = "BLOCKED"
+	}
+	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Request %s | Path: %s | Method: %s | Account: %s | Session: %s | Modified: %v | Payload: %.300s",
+		status, req.Path, req.Method, req.AktoAccountID, sessionID, result.Modified, req.RequestPayload))
 
 	c.JSON(http.StatusOK, result)
 }
@@ -199,14 +223,18 @@ func (h *ValidationHandler) ValidateRequestWithPolicy(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Error("ValidateRequestWithPolicy - invalid request format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid request format",
 		})
 		return
 	}
 
-	// Extract session and request IDs from headers
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
+	h.logger.Info("ValidateRequestWithPolicy - received request",
+		zap.String("contextSource", req.ContextSource),
+		zap.String("policyName", req.Policy.Name))
+
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, "")
 
 	// Default skipThreat to false if not provided
 	skipThreat := false
@@ -224,12 +252,23 @@ func (h *ValidationHandler) ValidateRequestWithPolicy(c *gin.Context) {
 		req.Policy,
 	)
 	if err != nil {
-		h.logger.Error("Failed to validate request with policy", zap.Error(err))
+		h.logger.Error("ValidateRequestWithPolicy failed",
+			zap.String("contextSource", req.ContextSource),
+			zap.String("policyName", req.Policy.Name),
+			zap.String("sessionID", sessionID),
+			zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Validation failed",
 		})
 		return
 	}
+
+	h.logger.Info("ValidateRequestWithPolicy - completed",
+		zap.String("contextSource", req.ContextSource),
+		zap.String("policyName", req.Policy.Name),
+		zap.String("sessionID", sessionID),
+		zap.Bool("allowed", result.Allowed),
+		zap.Bool("modified", result.Modified))
 
 	c.JSON(http.StatusOK, result)
 }
@@ -261,16 +300,21 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 			zap.Int64("latencyMs", time.Since(start).Milliseconds()))
 		alertMsg := "[guardrails] /validate/response - missing responsePayload or payload"
 		slack.SendAlert(h.logger, alertMsg)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "responsePayload or payload is required",
+		c.JSON(http.StatusOK, &mcp.ValidationResult{
+			Allowed:         true,
+			Modified:        false,
+			ModifiedPayload: "",
+			Reason:          "No response body provided",
+			Metadata:        types.ThreatMetadata{},
+			Behaviour:       "",
 		})
 		return
 	}
 
-	// Extract session and request IDs from headers
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, req.RequestHeaders)
 
-	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] /validate/response - responsePayload: %s", responseBody))
+	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Response received for guardrailing | Path: %s | Method: %s | Account: %s | Session: %s | Payload: %.300s",
+		req.Path, req.Method, req.AktoAccountID, sessionID, responseBody))
 
 	h.logger.Info("ValidateResponse - received request",
 		zap.String("path", req.Path),
@@ -311,6 +355,8 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		return
 	}
 
+	elapsed := time.Since(start)
+	latencyMs := elapsed.Milliseconds()
 	h.logger.Info("ValidateResponse - completed",
 		zap.String("path", req.Path),
 		zap.String("method", req.Method),
@@ -318,11 +364,19 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		zap.String("sessionID", sessionID),
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
-		zap.Int64("latencyMs", time.Since(start).Milliseconds()))
+		zap.String("behaviour", result.Behaviour),
+		zap.Int64("latencyMs", latencyMs))
 
-	if resultJSON, err := json.Marshal(result); err == nil {
-		go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] /validate/response - result: %s", string(resultJSON)))
+	if h.metrics != nil && req.AktoAccountID != "" {
+		h.metrics.RecordResponse(req.AktoAccountID, elapsed.Nanoseconds())
 	}
+
+	responseStatus := "ALLOWED"
+	if !result.Allowed {
+		responseStatus = "BLOCKED"
+	}
+	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Response %s | Path: %s | Method: %s | Account: %s | Session: %s | Modified: %v | Payload: %.300s",
+		responseStatus, req.Path, req.Method, req.AktoAccountID, sessionID, result.Modified, responseBody))
 
 	c.JSON(http.StatusOK, result)
 }

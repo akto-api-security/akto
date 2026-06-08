@@ -1,5 +1,10 @@
 package com.akto.jobs.executors;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * Constants for AI Agent Connector operations.
  * Centralized location for all connector-related constants.
@@ -9,6 +14,42 @@ public final class AIAgentConnectorConstants {
     private AIAgentConnectorConstants() {
         // Prevent instantiation
     }
+
+    // Connectors that proxy traffic inline (sync mode) — support guardrail block mode
+    public static final Set<String> INLINE_MODE_CONNECTORS = Collections.unmodifiableSet(
+        new HashSet<>(Arrays.asList(
+            "litellm",
+            "claude_code_cli",
+            "claude_agent_sdk",
+            "cursor",
+            "langchain",
+            "hermes",
+            "gemini_cli",
+            "codex_cli",
+            "opencode",
+            "copilot_cli",
+            "vscode",
+            "vertex-ai-adk",
+            "neovim"
+        ))
+    );
+
+    // Connectors that deliver data out-of-band (webhook / async) — observe mode only
+    public static final Set<String> OBSERVE_MODE_CONNECTORS = Collections.unmodifiableSet(
+        new HashSet<>(Arrays.asList(
+            "arcade",
+            "truefoundry",
+            // Binary importers — pull data asynchronously from external systems
+            "n8n",
+            "copilot_studio",
+            "databricks",
+            "snowflake",
+            "vertex_ai_custom_deployed_model",
+            "salesforce",
+            "anthropic",
+            "openai"
+        ))
+    );
 
     // Job Types (for AccountJob.jobType)
     public static final String JOB_TYPE_AI_AGENT_CONNECTOR = "AI_AGENT_CONNECTOR";
@@ -22,6 +63,8 @@ public final class AIAgentConnectorConstants {
     public static final String CONNECTOR_TYPE_SNOWFLAKE = "SNOWFLAKE";
     public static final String CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = "VERTEX_AI_CUSTOM_DEPLOYED_MODEL";
     public static final String CONNECTOR_TYPE_SALESFORCE = "SALESFORCE";
+    public static final String CONNECTOR_TYPE_ANTHROPIC = "ANTHROPIC";
+    public static final String CONNECTOR_TYPE_OPENAI = "OPENAI";
 
     // Binary Names
     public static final String BINARY_NAME_N8N = "n8n-shield";
@@ -29,6 +72,8 @@ public final class AIAgentConnectorConstants {
     public static final String BINARY_NAME_COPILOT_STUDIO = "copilot-shield";
     public static final String BINARY_NAME_DATABRICKS = "databricks-shield";
     public static final String BINARY_NAME_SNOWFLAKE = "snowflake-shield";
+    public static final String BINARY_NAME_ANTHROPIC = "claude-shield";
+    public static final String BINARY_NAME_OPENAI = "openai-shield";
 
     // Configuration Keys - N8N
     public static final String CONFIG_N8N_BASE_URL = "N8N_BASE_URL";
@@ -43,6 +88,7 @@ public final class AIAgentConnectorConstants {
     public static final String CONFIG_DATAVERSE_TENANT_ID = "DATAVERSE_TENANT_ID";
     public static final String CONFIG_DATAVERSE_CLIENT_ID = "DATAVERSE_CLIENT_ID";
     public static final String CONFIG_DATAVERSE_CLIENT_SECRET = "DATAVERSE_CLIENT_SECRET";
+    public static final String CONFIG_DATAVERSE_BOT_IDS = "COPILOT_BOT_ID";
 
     // Configuration Keys - Snowflake
     public static final String CONFIG_SNOWFLAKE_ACCOUNT_URL = "SNOWFLAKE_ACCOUNT_URL";
@@ -55,6 +101,8 @@ public final class AIAgentConnectorConstants {
     public static final String CONFIG_SNOWFLAKE_WAREHOUSE = "SNOWFLAKE_WAREHOUSE";
     public static final String CONFIG_SNOWFLAKE_DATABASE = "SNOWFLAKE_DATABASE";
     public static final String CONFIG_SNOWFLAKE_SCHEMA = "SNOWFLAKE_SCHEMA";
+    public static final String CONFIG_SNOWFLAKE_OBS_LOOKBACK_SECONDS = "SNOWFLAKE_OBS_LOOKBACK_SECONDS";
+    public static final int DEFAULT_SNOWFLAKE_OBS_LOOKBACK_SECONDS = 300;
     
     // Snowflake Auth Types
     public static final String SNOWFLAKE_AUTH_TYPE_PASSWORD = "PASSWORD";
@@ -80,6 +128,15 @@ public final class AIAgentConnectorConstants {
     public static final String CONFIG_SALESFORCE_CONSUMER_KEY = "SALESFORCE_CONSUMER_KEY";
     public static final String CONFIG_SALESFORCE_CONSUMER_SECRET = "SALESFORCE_CONSUMER_SECRET";
     public static final String CONFIG_INGESTION_API_KEY = "INGESTION_API_KEY";
+
+    // Configuration Keys - Anthropic
+    public static final String CONFIG_ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY";
+    public static final String CONFIG_ANTHROPIC_API_BASE_URL = "ANTHROPIC_API_BASE_URL";
+
+    // Configuration Keys - OpenAI
+    public static final String CONFIG_OPENAI_API_KEY = "OPENAI_API_KEY";
+    public static final String CONFIG_OPENAI_ORG_ID = "OPENAI_ORG_ID";
+    public static final String CONFIG_OPENAI_API_BASE_URL = "OPENAI_API_BASE_URL";
 
     // Salesforce API Configuration
     public static final String SALESFORCE_API_VERSION = "v66.0";

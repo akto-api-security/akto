@@ -38,6 +38,10 @@ public class ThreatDetectorWithStrategy {
         return threatDetector.findMatchingUrlTemplate(httpResponseParams);
     }
 
+    public String cleanUrl(String url) {
+        return threatDetector.cleanUrl(url);
+    }
+
     public boolean shouldIgnoreApi(FilterConfig apiFilter, RawApi rawApi, ApiInfoKey apiInfoKey, String actor) {
         return threatDetector.shouldIgnoreApi(apiFilter, rawApi, apiInfoKey, actor);
     }

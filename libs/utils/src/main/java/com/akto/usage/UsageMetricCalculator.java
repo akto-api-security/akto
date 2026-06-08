@@ -98,6 +98,56 @@ public class UsageMetricCalculator {
         return ans;
     }
 
+
+    /**
+     * Get the list of accessible product scopes for an account based on STIGG feature grants.
+     * Mirrors the frontend's getStiggFeatureGrants() logic.
+     *
+     * @param accountId the account ID
+     * @return Set of accessible scopes (API is always included, others based on feature access)
+     */
+    public static Set<String> getAccessibleProductScopes(int accountId) {
+        Set<String> accessibleScopes = new HashSet<>();
+        accessibleScopes.add("API"); // API is always accessible
+
+        try {
+            Organization organization = OrganizationsDao.instance.findOne(Filters.in(Organization.ACCOUNTS, accountId));
+            if (organization == null || organization.getFeatureWiseAllowed() == null || organization.getFeatureWiseAllowed().isEmpty()) {
+                // Default to all scopes if no feature restrictions
+                accessibleScopes.add("AGENTIC");
+                accessibleScopes.add("ENDPOINT");
+                accessibleScopes.add("DAST");
+                return accessibleScopes;
+            }
+
+            HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+
+            // Check AGENTIC (Akto ARGUS) access
+            FeatureAccess agenticAccess = featureWiseAllowed.get("SECURITY_TYPE_AGENTIC");
+            if (agenticAccess != null && agenticAccess.getIsGranted()) {
+                accessibleScopes.add("AGENTIC");
+            }
+
+            // Check ENDPOINT (Akto ATLAS) access
+            FeatureAccess endpointAccess = featureWiseAllowed.get("ENDPOINT_SECURITY");
+            if (endpointAccess == null || endpointAccess.getIsGranted()) {
+                // Default to true if not specified
+                accessibleScopes.add("ENDPOINT");
+            }
+
+            // Check DAST access
+            FeatureAccess dastAccess = featureWiseAllowed.get("AKTO_DAST");
+            if (dastAccess != null && dastAccess.getIsGranted()) {
+                accessibleScopes.add("DAST");
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error getting accessible product scopes for accountId: " + accountId);
+        }
+
+        return accessibleScopes;
+    }
+
+
     public static Set<Integer> getDeactivatedLatest(){
         List<ApiCollection> deactivated = ApiCollectionsDao.instance
                 .findAll(Filters.eq(ApiCollection._DEACTIVATED, true));

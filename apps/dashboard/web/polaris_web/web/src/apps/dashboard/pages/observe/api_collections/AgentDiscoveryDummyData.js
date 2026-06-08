@@ -64,6 +64,8 @@ const agentDiscoveryData = {
     "-1889683798": mcpAgentLayout('mcp-server-text-editor',        'Local file system',   'File system'),
     "-797611530":  mcpAgentLayout('vulnerable-mcp-kong.akto.io',   'Akto Kong API Server'),
     "197918427":   mcpAgentLayout('mcp.explorium.ai',              'Explorium API Server'),
+    "-890278005": mcpAgentLayout('mcp-kong.akto.io',              'Akto Kong API Server'),
+    "-1065831232": mcpAgentLayout('mcpservice-bzeaa6fme3czgch8.eastus-01.azurewebsites.net','Azure default mcp server'),
 };
 
 export const dummyCollections = new Set(Object.keys(agentDiscoveryData));

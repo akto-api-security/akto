@@ -1,6 +1,9 @@
 package com.akto.kafka;
 
 import java.util.Properties;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+
+import com.akto.dao.context.Context;
 
 public class KafkaConfig {
   // Kafka authentication configuration constants
@@ -104,6 +107,24 @@ public class KafkaConfig {
     return new Builder();
   }
 
+  public Properties toConsumerProperties() {
+    Properties properties = new Properties();
+    properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+    properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, keySerializer.getDeserializer());
+    properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, valueSerializer.getDeserializer());
+    properties.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+    properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+    properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+    if (consumerConfig != null) {
+      properties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, consumerConfig.getMaxPollRecords());
+      if (consumerConfig.getFetchMaxBytes() > 0) {
+        properties.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, consumerConfig.getFetchMaxBytes());
+      }
+    }
+    addAuthenticationFromEnv(properties);
+    return properties;
+  }
+
   /**
    * If AKTO_KAFKA_USERNAME and AKTO_KAFKA_PASSWORD are set, adds SASL/SSL properties to the given Properties.
    * Defaults: SCRAM-SHA-512, SASL_SSL. Same env vars as Helm chart and data-ingestion.
@@ -116,12 +137,18 @@ public class KafkaConfig {
     }
     String saslMechanism = System.getenv().getOrDefault(
         "AKTO_KAFKA_SASL_MECHANISM",
-        SASL_MECHANISM_SCRAM_SHA_512);
+        SASL_MECHANISM_PLAIN);
     String securityProtocol = System.getenv().getOrDefault(
         "AKTO_KAFKA_SECURITY_PROTOCOL",
-        SECURITY_PROTOCOL_SASL_SSL);
+        SECURITY_PROTOCOL_SASL_PLAINTEXT);
+    
+    if(Context.accountId.get() == 1758787662){
+      saslMechanism = System.getenv().getOrDefault("AKTO_KAFKA_SASL_MECHANISM", SASL_MECHANISM_SCRAM_SHA_512);
+      securityProtocol = System.getenv().getOrDefault("AKTO_KAFKA_SECURITY_PROTOCOL",SECURITY_PROTOCOL_SASL_SSL); 
+    }
     addAuthenticationProperties(properties, username, password, saslMechanism, securityProtocol);
   }
+
 
   /**
    * Adds Kafka SASL authentication properties to the given Properties object.

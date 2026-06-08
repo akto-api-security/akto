@@ -47,6 +47,7 @@ import ReRunModal from "./ReRunModal";
 import TestingStore from "../testingStore";
 import { useSearchParams } from "react-router-dom";
 import TestRunResultPage from "../TestRunResultPage/TestRunResultPage";
+import { isRunAutomatedTestsEnabled } from "../TestRunResultPage/smartTestingUtils";
 import LocalStore from "../../../../main/LocalStorageStore";
 import { produce } from "immer"
 import GithubServerTable from "../../../components/tables/GithubServerTable";
@@ -1332,7 +1333,11 @@ function SingleTestRunPage() {
         pageType="test result"
         disabled={severityUpdateInProgress}
       />
-      {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
+      {(resultId !== null && resultId.length > 0) ? (
+        <TestRunResultPage
+          runAutomatedTests={isRunAutomatedTestsEnabled(testingRunResultSummariesObj?.testingRun?.runAutomatedTests)}
+        />
+      ) : null}
     </>
   );
 }

@@ -3,6 +3,7 @@ package com.akto.dto;
 
 import org.bson.types.ObjectId;
 
+import com.akto.dao.CustomRoleDao;
 import com.akto.dto.rbac.*;
 
 import com.akto.dto.rbac.RbacEnums.Feature;
@@ -13,7 +14,13 @@ import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
 public class RBAC {
 
@@ -30,21 +37,23 @@ public class RBAC {
 
     public static final String ALLOWED_FEATURES_FOR_USER = "allowedFeaturesForUser";
 
-    @Getter 
+    @Getter
     @Setter
     private List<String> allowedFeaturesForUser;
 
-    // special features for RBAC, we can add more features here when needed
-    public static final List<String> SPECIAL_FEATURES_FOR_RBAC = Arrays.asList(
-        "THREAT_DETECTION",
-        "AI_AGENTS"
-    );
+    public static final String SCOPE_ROLE_MAPPING = "scopeRoleMapping";
+    @Getter
+    @Setter
+    private Map<String, String> scopeRoleMapping;
 
     public enum Role {
         ADMIN("ADMIN",new AdminRoleStrategy()),
         MEMBER("SECURITY ENGINEER", new MemberRoleStrategy()),
         DEVELOPER("DEVELOPER", new DeveloperRoleStrategy()),
-        GUEST("GUEST", new GuestRoleStrategy());
+        GUEST("GUEST", new GuestRoleStrategy()),
+        THREAT_ENGINEER("THREAT ENGINEER", new ThreatEngineerRoleStrategy()),
+        THREAT_VIEWER("THREAT VIEWER", new ThreatViewerRoleStrategy()),
+        NO_ACCESS("NO_ACCESS", new NoAccessRoleStrategy());
 
         private final RoleStrategy roleStrategy;
         private String name;
@@ -86,6 +95,13 @@ public class RBAC {
         this.accountId = accountId;
         this.apiCollectionsId = new ArrayList<>();
         this.allowedFeaturesForUser = new ArrayList<>();
+    }
+
+    public RBAC(int userId, String role, int accountId, Map <String,String> scopeRoleMapping) {
+        this.userId = userId;
+        this.role = role;
+        this.accountId = accountId;
+        this.scopeRoleMapping = scopeRoleMapping;
     }
 
     public RBAC() {
@@ -130,5 +146,95 @@ public class RBAC {
 
     public void setApiCollectionsId(List<Integer> apiCollectionsId) {
         this.apiCollectionsId = apiCollectionsId;
+    }
+
+    /** Accounts for which new signups default to MEMBER on ENDPOINT (Akto ATLAS). */
+    public static final Set<Integer> ATLAS_MEMBER_DEFAULT_ACCOUNT_IDS = Collections.unmodifiableSet(
+            new HashSet<>(Arrays.asList(1779059321, 1000000)));
+
+    /** Email substrings (case-insensitive) that trigger the same ATLAS default scope behavior. */
+    public static final Set<String> ATLAS_MEMBER_DEFAULT_EMAIL_KEYWORDS = Collections.unmodifiableSet(
+            new HashSet<>(Arrays.asList( "comscore")));
+
+    public static boolean shouldUseAtlasMemberDefaultScope(int accountId, String email) {
+        if (ATLAS_MEMBER_DEFAULT_ACCOUNT_IDS.contains(accountId)) {
+            return true;
+        }
+        if (email == null || email.isEmpty()) {
+            return false;
+        }
+        String lowerEmail = email.toLowerCase();
+        for (String keyword : ATLAS_MEMBER_DEFAULT_EMAIL_KEYWORDS) {
+            if (lowerEmail.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Initializes default scope-role mapping if empty.
+     * Atlas-configured accounts or matching emails get ENDPOINT (Akto ATLAS) → defaultRole; others get API → defaultRole.
+     * Otherwise returns the existing scopeRoleMapping unchanged.
+     */
+    public static Map<String, String> initializeScopeRoleMapping(
+            Map<String, String> scopeRoleMapping, String defaultRole, int accountId, String email) {
+        if (scopeRoleMapping == null || scopeRoleMapping.isEmpty()) {
+            Map<String, String> initialized = new HashMap<>();
+            if (shouldUseAtlasMemberDefaultScope(accountId, email)) {
+                initialized.put(CONTEXT_SOURCE.ENDPOINT.name(), defaultRole);
+            } else {
+                initialized.put("API", defaultRole);
+            }
+            return initialized;
+        }
+        return scopeRoleMapping;
+    }
+
+    public Role getRoleForScope(CONTEXT_SOURCE scope) {
+        if (scope == null) {
+            return null;
+        }
+
+        String scopeStr = scope.toString();
+        if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
+            if (this.scopeRoleMapping.containsKey(scopeStr)) {
+                String roleStr = this.scopeRoleMapping.get(scopeStr);
+                return resolveRoleString(roleStr);
+            }
+            // User has scopeRoleMapping but this scope is NOT in it - NO ACCESS
+            return Role.NO_ACCESS;
+        }
+
+        // Fall back to old role field ONLY if scopeRoleMapping is null/empty (backward compatibility)
+        if (this.role != null) {
+            return resolveRoleString(this.role);
+        }
+
+        return null;
+    }
+
+    private Role resolveRoleString(String roleStr) {
+        if (roleStr == null) {
+            return null;
+        }
+
+        try {
+            return Role.valueOf(roleStr);
+        } catch (IllegalArgumentException e) {
+        }
+
+        try {
+            CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
+            if (customRole != null && customRole.getBaseRole() != null) {
+                try {
+                    return Role.valueOf(customRole.getBaseRole());
+                } catch (IllegalArgumentException e) {
+                    return Role.GUEST;
+                }
+            }
+        } catch (Exception e) {
+        }
+        return Role.GUEST;
     }
 }

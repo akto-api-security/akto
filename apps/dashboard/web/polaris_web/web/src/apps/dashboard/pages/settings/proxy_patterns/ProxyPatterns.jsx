@@ -1,160 +1,201 @@
-import { Box, Button, Text, TextField, Banner, VerticalStack, Card, Form } from '@shopify/polaris'
-import React, { useEffect, useState } from 'react'
-import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
-import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
+import React, { useState, useEffect } from 'react'
+import { Banner, Card, HorizontalGrid, HorizontalStack, VerticalStack, Text, Box, Divider, Button, TextField } from '@shopify/polaris'
+import PatternSettingsPage from '../components/PatternSettingsPage'
+import { ToggleComponent } from '../about/About'
 import settingRequests from '../api'
-import settingFunctions from '../module'
 import func from '@/util/func'
-import { CellType } from '../../../components/tables/rows/GithubRow'
+import DropdownSearch from '../../../components/shared/DropdownSearch'
 
-function validateRegex(pattern) {
-    if (!pattern || pattern.trim() === '') {
-        return 'Pattern cannot be empty'
-    }
-    return null
+const resourceName = { singular: 'pattern', plural: 'patterns' }
+
+async function fetchProxyPatterns() {
+    const response = await settingRequests.fetchAdminSettings()
+    const settings = response?.accountSettings
+    return { map: settings?.matchingPatternsForProxy, switchProxyMode: settings?.switchProxyMode || false }
 }
 
-const headers = [
-    {
-        text: 'Value',
-        title: 'Value',
-        value: 'patternValue',
-        type: CellType.TEXT,
-    },
-    {
-        text: 'Created By',
-        title: 'Created By',
-        value: 'addedBy',
-        type: CellType.TEXT,
-    },
-    {
-        text: 'Last Updated',
-        title: 'Last Updated',
-        value: 'updatedTsFormatted',
-        type: CellType.TEXT,
-    },
+const DOMAIN_KEYS = [
+    { key: 'chattyDomains', label: 'Chatty Domains', description: 'Domains with high traffic volume' },
+    { key: 'aiDomains', label: 'AI Domains', description: 'AI service domains detected by the agent' },
 ]
 
-const resourceName = {
-    singular: 'pattern',
-    plural: 'patterns',
-}
-
-function ProxyPatterns() {
-    const [pattern, setPattern] = useState('')
-    const [patternError, setPatternError] = useState('')
-    const [loading, setLoading] = useState(false)
-    const [tableData, setTableData] = useState([])
-    const [fetchingData, setFetchingData] = useState(false)
-
-    function buildTableData(matchingPatternsForProxy) {
-        if (!matchingPatternsForProxy) return []
-        const data =  Object.entries(matchingPatternsForProxy).map(([key, info]) => ({
-            patternValue: info.pattern || key,
-            addedBy: info.addedBy || '-',
-            updatedTsFormatted: info.updatedTs
-                ? func.prettifyEpoch(info.updatedTs)
-                : '-',
-            updatedTs: info.updatedTs
-        }))
-        data.sort((a, b) => b.updatedTs - a.updatedTs)
-        return data
-    }
-
-    async function fetchData() {
-        setFetchingData(true)
-        try {
-            const { resp } = await settingFunctions.fetchAdminInfo()
-            setTableData(buildTableData(resp?.matchingPatternsForProxy))
-        } catch (e) {
-            func.setToast(true, true, 'Failed to load proxy patterns')
-        } finally {
-            setFetchingData(false)
-        }
-    }
+function DomainsCard() {
+    const [domains, setDomains] = useState({ chattyDomains: [], aiDomains: [] })
+    const [selected, setSelected] = useState({ chattyDomains: [], aiDomains: [] })
+    const [inputValues, setInputValues] = useState({ chattyDomains: '', aiDomains: '' })
+    const [saving, setSaving] = useState({ chattyDomains: false, aiDomains: false })
 
     useEffect(() => {
-        fetchData()
+        settingRequests.fetchAdminSettings()
+            .then(res => {
+                const s = res?.accountSettings || {}
+                setDomains({
+                    chattyDomains: s.chattyDomains || [],
+                    aiDomains: s.aiDomains || [],
+                })
+            })
+            .catch(() => {})
     }, [])
 
-    function handlePatternChange(value) {
-        setPattern(value)
-        if (patternError) setPatternError('')
+    const applyResponse = (res) => {
+        if (res?.chattyDomains !== undefined || res?.aiDomains !== undefined) {
+            setDomains(prev => ({
+                chattyDomains: res.chattyDomains ?? prev.chattyDomains,
+                aiDomains: res.aiDomains ?? prev.aiDomains,
+            }))
+        }
     }
 
-    async function handleAdd(value) {
-        const error = validateRegex(value)
-        if (error) {
-            setPatternError(error)
-            return
-        }
-        setLoading(true)
+    const handleAdd = async (key) => {
+        const val = inputValues[key]?.trim()
+        if (!val) return
+        setSaving(prev => ({ ...prev, [key]: true }))
         try {
-            const resp = await settingRequests.addMatchingPatternForProxy(value.trim())
-            setTableData(buildTableData(resp))
-            setPattern('')
-            func.setToast(true, false, 'Pattern added successfully')
-        } catch (e) {
-            func.setToast(true, true, 'Failed to add pattern')
+            const res = await settingRequests.updateAccountDomains(key, [val], [])
+            applyResponse(res)
+            setInputValues(prev => ({ ...prev, [key]: '' }))
+            func.setToast(true, false, 'Domain added')
+        } catch {
+            func.setToast(true, true, 'Failed to add domain')
         } finally {
-            setLoading(false)
+            setSaving(prev => ({ ...prev, [key]: false }))
         }
     }
 
-    const inputCard = (
+    const handleRemove = async (key) => {
+        const toRemove = selected[key]
+        if (!toRemove.length) return
+        setSaving(prev => ({ ...prev, [key]: true }))
+        try {
+            const res = await settingRequests.updateAccountDomains(key, [], toRemove)
+            applyResponse(res)
+            setSelected(prev => ({ ...prev, [key]: [] }))
+            func.setToast(true, false, `${toRemove.length} domain${toRemove.length > 1 ? 's' : ''} removed`)
+        } catch {
+            func.setToast(true, true, 'Failed to remove domains')
+        } finally {
+            setSaving(prev => ({ ...prev, [key]: false }))
+        }
+    }
+
+    const toOptions = (list) => (list || []).map(d => ({ value: d, label: d }))
+
+    return (
         <Card>
-            <VerticalStack gap="3">
-                <Text variant="headingSm" as="h3">Add Proxy Pattern</Text>
-                <Text variant="bodyMd" color="subdued">
-                    Add patterns to match proxy traffic. These are used to identify requests routed through a proxy.
-                </Text>
-                {patternError && (
-                    <Banner status="critical">{patternError}</Banner>
-                )}
-                <Form onSubmit={() => handleAdd(pattern)}>
-                    <TextField
-                        label="Pattern"
-                        value={pattern}
-                        onChange={handlePatternChange}
-                        placeholder="e.g. .internal.example.com."
-                        error={patternError ? true : undefined}
-                        autoComplete="off"
-                        connectedRight={
-                            <Button
-                                primary
-                                onClick={() => handleAdd(pattern)}
-                                loading={loading}
-                                disabled={!pattern.trim()}
-                            >
-                                Add
-                            </Button>
-                        }
-                    />
-                </Form>
+            <VerticalStack gap="5">
+                <Text variant="headingMd" as="h2">Domains</Text>
+                {DOMAIN_KEYS.map(({ key, label, description }, idx) => {
+                    const list = domains[key]
+                    const selCount = selected[key].length
+                    return (
+                        <Box key={key}>
+                            {idx > 0 && <Box paddingBlockEnd="4"><Divider /></Box>}
+                            <HorizontalGrid columns={2} gap="4">
+                                <Box>
+                                    <Text variant="bodyMd" as="p" fontWeight="semibold">{label}</Text>
+                                    <Text variant="bodySm" tone="subdued">{description}</Text>
+                                </Box>
+                                <VerticalStack gap="2">
+                                    <DropdownSearch
+                                        id={`domain-search-${key}`}
+                                        label=""
+                                        placeholder={list.length ? `Search ${list.length} domains` : 'No domains yet'}
+                                        optionsList={toOptions(list)}
+                                        setSelected={(vals) => setSelected(prev => ({ ...prev, [key]: vals }))}
+                                        preSelected={selected[key]}
+                                        value={selCount > 0 ? `${selCount} domain${selCount > 1 ? 's' : ''} selected` : ''}
+                                        itemName="domain"
+                                        allowMultiple
+                                    />
+                                    {selCount > 0 && (
+                                        <HorizontalStack align="end">
+                                            <Button
+                                                destructive
+                                                size="slim"
+                                                loading={saving[key]}
+                                                onClick={() => handleRemove(key)}
+                                            >
+                                                {`Remove ${selCount} selected`}
+                                            </Button>
+                                        </HorizontalStack>
+                                    )}
+                                    <TextField
+                                        value={inputValues[key]}
+                                        onChange={(val) => setInputValues(prev => ({ ...prev, [key]: val }))}
+                                        placeholder="Add domain e.g. openai.com"
+                                        autoComplete="off"
+                                        connectedRight={
+                                            <Button
+                                                primary
+                                                loading={saving[key]}
+                                                disabled={!inputValues[key]?.trim()}
+                                                onClick={() => handleAdd(key)}
+                                            >
+                                                Add
+                                            </Button>
+                                        }
+                                    />
+                                </VerticalStack>
+                            </HorizontalGrid>
+                        </Box>
+                    )
+                })}
             </VerticalStack>
         </Card>
     )
+}
 
-    const tableCard = (
-        <GithubSimpleTable
-            key="proxy-patterns-table"
-            data={tableData}
-            resourceName={resourceName}
-            headers={headers}
-            loading={fetchingData}
-            hasRowActions={false}
-            useNewRow={true}
-            condensedHeight={true}
-            headings={headers}
-            pageLimit={15}
-        />
+function ProxyPatterns() {
+    const [switchProxyMode, setSwitchProxyMode] = useState(false)
+
+    async function onFetch() {
+        const { map, switchProxyMode: mode } = await fetchProxyPatterns()
+        setSwitchProxyMode(mode)
+        return map
+    }
+
+    async function handleToggle(value) {
+        setSwitchProxyMode(value)
+        try {
+            await settingRequests.addMatchingPatternForProxy('', value)
+            func.setToast(true, false, `Proxy mode ${value ? 'enabled' : 'disabled'}`)
+        } catch (e) {
+            setSwitchProxyMode(!value)
+            func.setToast(true, true, 'Failed to update proxy mode')
+        }
+    }
+
+    async function onAdd(value) {
+        return await settingRequests.addMatchingPatternForProxy(value, switchProxyMode)
+    }
+
+    async function onDelete(value) {
+        return await settingRequests.deleteProxyPattern(value, 'PROXY')
+    }
+
+    const extraContent = (
+        <>
+            <ToggleComponent text="Proxy Mode" onToggle={handleToggle} initial={switchProxyMode} />
+            {!switchProxyMode && <Banner status="warning">Enable proxy mode to add patterns.</Banner>}
+        </>
     )
 
     return (
-        <PageWithMultipleCards
+        <PatternSettingsPage
             title="Proxy Patterns"
-            isFirstPage={true}
-            components={[inputCard, tableCard]}
+            cardTitle="Add Proxy Pattern"
+            description="Add patterns to match proxy traffic. These are used to identify requests routed through a proxy."
+            extraContent={extraContent}
+            inputLabel="Pattern"
+            placeholder="e.g. .internal.example.com."
+            inputDisabled={!switchProxyMode}
+            tableKey="proxy-patterns-table"
+            resourceName={resourceName}
+            onFetch={onFetch}
+            onAdd={onAdd}
+            onDelete={onDelete}
+            patternKey="pattern"
+            additionalCards={[<DomainsCard key="domains-card" />]}
         />
     )
 }

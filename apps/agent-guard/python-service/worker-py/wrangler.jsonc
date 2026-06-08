@@ -1,0 +1,21 @@
+{
+	// Milestone 1: deploy under a STAGING name so the live URL is untouched.
+	// At cutover (Option B) this name becomes "akto-agent-guard-executor-v2"
+	// after the old worker is deleted.
+	"name": "akto-agent-guard-executor-v2",
+	"main": "src/entry.py",
+	"compatibility_date": "2025-06-23",
+	"compatibility_flags": ["python_workers"],
+	"workers_dev": true,
+	"observability": {
+		"enabled": true
+	},
+	// Service binding to the sibling JS worker that owns the Presidio container.
+	// Used by remote_scanner.py to handle scanner_name="Anonymize" requests.
+	"services": [
+		{
+			"binding": "ANONYMIZER_WORKER",
+			"service": "akto-anonymizer-worker"
+		}
+	]
+}

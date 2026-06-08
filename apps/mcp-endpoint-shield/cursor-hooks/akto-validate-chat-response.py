@@ -40,7 +40,7 @@ console_handler.setLevel(logging.ERROR)  # Only show errors in console
 logger.addHandler(console_handler)
 
 MODE = os.getenv("MODE", "argus").lower()
-AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
+AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = "cursor"
@@ -77,10 +77,12 @@ def create_ssl_context():
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
+def build_http_proxy_url(*, guardrails: bool = False, response_guardrails: bool = False, ingest_data: bool = False) -> str:
     params = []
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     params.append(f"akto_connector={AKTO_CONNECTOR}")
     if ingest_data:
         params.append("ingest_data=true")
@@ -215,9 +217,13 @@ def send_ingestion_data(response_text: str):
 
     try:
         request_body = build_ingestion_payload(response_text)
+        # response_guardrails=true asks Akto to evaluate response-side guardrails on the mirrored
+        # response. afterAgentResponse is observe-only per Cursor docs, so we cannot block here —
+        # but Akto can still alert server-side based on the verdict.
         post_payload_json(
             build_http_proxy_url(
-                guardrails=not AKTO_SYNC_MODE,
+                guardrails=False,
+                response_guardrails=True,
                 ingest_data=True,
             ),
             request_body,

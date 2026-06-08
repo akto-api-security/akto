@@ -8,7 +8,7 @@ import com.akto.action.IngestionAction;
  * Handles publishing messages to multiple Kafka topics based on configuration.
  * Encapsulates the logic for conditional multi-topic publishing.
  */
-public class TopicPublisher {
+public class TopicPublisher implements TrafficPublisher {
 
     private final Kafka kafkaProducer;
     private final GuardrailsConfig config;

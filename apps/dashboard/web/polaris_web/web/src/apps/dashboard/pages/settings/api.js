@@ -6,11 +6,11 @@ const settingRequests = {
         return request({
             url: '/api/inviteUsers',
             method: 'post',
-            data: { 
+            data: {
                 inviteeName: apiSpec.inviteeName,
                 inviteeEmail: apiSpec.inviteeEmail,
                 websiteHostName: apiSpec.websiteHostName,
-                inviteeRole: apiSpec.inviteeRole,
+                scopeRoleMapping: apiSpec.scopeRoleMapping
             }
         })
     },
@@ -30,18 +30,30 @@ const settingRequests = {
             }
         })
     },
-    makeAdmin(email, roleVal) {
+    makeAdmin(email, roleVal, productScopes) {
         return request({
             url: '/api/makeAdmin',
             method: 'post',
             data: {
                 email: email,
-                userRole: roleVal
+                userRole: roleVal,
+                productScopes: productScopes || ["API"]
             }
         })
     },
 
-    
+    updateUserScopeRoleMapping(email, scopeRoleMapping) {
+        return request({
+            url: '/api/updateUserScopeRoleMapping',
+            method: 'post',
+            data: {
+                email: email,
+                scopeRoleMapping: scopeRoleMapping
+            }
+        })
+    },
+
+
     fetchApiTokens() {
         return request({
             url: '/api/fetchApiTokens',
@@ -500,6 +512,15 @@ const settingRequests = {
             }
         });
     },
+    toggleEmptyCollectionCleanup(enableEmptyCollectionCleanup) {
+        return request({
+            url: '/api/toggleEmptyCollectionCleanup',
+            method: 'post',
+            data: {
+                enableEmptyCollectionCleanup
+            }
+        });
+    },
     addFilterHeaderValueMap(filterHeaderValueMap){
         return request({
             url: '/api/addFilterHeaderValueMap',
@@ -676,6 +697,34 @@ const settingRequests = {
             data: {}
         })
     },
+    fetchDatadogIntegration() {
+        return request({
+            url: '/api/fetchDatadogIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addDatadogIntegration(apiKey, datadogSite, enabled) {
+        return request({
+            url: '/api/addDatadogIntegration',
+            method: 'post',
+            data: { apiKey, datadogSite, enabled }
+        })
+    },
+    deleteDatadogIntegration() {
+        return request({
+            url: '/api/deleteDatadogIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    testDatadogIntegration(apiKey, datadogSite) {
+        return request({
+            url: '/api/testDatadogIntegration',
+            method: 'post',
+            data: { apiKey, datadogSite }
+        })
+    },
 
     fetchAzureBoardsIntegration() {
         return request({
@@ -797,6 +846,20 @@ const settingRequests = {
             data: {email}
         })
     },
+    async fetchAccountJobs() {
+        return await request({
+            url: '/api/fetchAccountJobs',
+            method: 'post',
+            data: {}
+        })
+    },
+    async deleteAccountJob(jobId) {
+        return await request({
+            url: '/api/deleteAccountJob',
+            method: 'post',
+            data: { jobId }
+        })
+    },
     async fetchModuleInfo(filter = {}) {
         return await request({
             url: '/api/fetchModuleInfo',
@@ -809,6 +872,20 @@ const settingRequests = {
             url: '/api/deleteModuleInfo',
             method: 'post',
             data: { moduleIds }
+        })
+    },
+    async updateUserDeviceTag(username, team, userRole) {
+        return await request({
+            url: '/api/updateUserDeviceTag',
+            method: 'post',
+            data: { username, team, userRole }
+        })
+    },
+    async fetchAgenticUsers() {
+        return await request({
+            url: '/api/fetchAgenticUsers',
+            method: 'post',
+            data: {}
         })
     },
     async fetchCloudflareWafIntegration() {
@@ -911,12 +988,11 @@ const settingRequests = {
             }
         })
     },
-    getUserAnalysis(agentId, deviceId) {
+    getUserAnalysis(deviceId) {
         return request({
             url: '/api/getUserAnalysis',
             method: 'post',
             data: {
-                agentId,
                 deviceId
             }
         })
@@ -926,6 +1002,41 @@ const settingRequests = {
             url: '/api/addMcpRegistryIntegration',
             method: 'post',
             data: {registries}
+        })
+    },
+    fetchMcpRegistries() {
+        return request({
+            url: '/api/fetchMcpRegistries',
+            method: 'post',
+            data: {}
+        })
+    },
+    addMcpRegistry(registryUrl, headers, registryType) {
+        return request({
+            url: '/api/addMcpRegistry',
+            method: 'post',
+            data: { registryUrl, headers, registryType }
+        })
+    },
+    syncMcpRegistry(registryId) {
+        return request({
+            url: '/api/syncMcpRegistry',
+            method: 'post',
+            data: { registryId }
+        })
+    },
+    fetchMcpAllowlistEntries(registryId) {
+        return request({
+            url: '/api/fetchMcpAllowlistEntries',
+            method: 'post',
+            data: { registryId }
+        })
+    },
+    deleteMcpRegistry(registryId) {
+        return request({
+            url: '/api/deleteMcpRegistry',
+            method: 'post',
+            data: { registryId }
         })
     },
     updateBlockLogs(blockLogs) {
@@ -963,11 +1074,148 @@ const settingRequests = {
             data: {}
         })
     },
-    addMatchingPatternForProxy(proxyPattern) {
+    fetchWizIntegration() {
+        return request({
+            url: '/api/fetchWizIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addWizIntegration(tenantDataCenter, clientId, clientSecret) {
+        return request({
+            url: '/api/addWizIntegration',
+            method: 'post',
+            data: {tenantDataCenter, clientId, clientSecret}
+        })
+    },
+    removeWizIntegration() {
+        return request({
+            url: '/api/removeWizIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addMatchingPatternForProxy(proxyPattern, switchProxyMode) {
         return request({
             url: '/api/addMatchingPatternForProxy',
             method: 'post',
-            data: {proxyPattern}
+            data: {proxyPattern, switchProxyMode}
+        })
+    },
+    addAllowedHostForPac(hostPattern) {
+        return request({
+            url: '/api/addAllowedHostForPac',
+            method: 'post',
+            data: {hostPattern}
+        })
+    },
+    deleteProxyPattern(patternValue, connectorType) {
+        return request({
+            url: '/api/deleteProxyPattern',
+            method: 'post',
+            data: {patternValue, connectorType}
+        })
+    },
+
+    fetchFileInspectionRules() {
+        return request({ url: '/api/fetchFileInspectionRules', method: 'post', data: {} })
+    },
+    addFileInspectionRule(path, existenceOnly, maxDepth) {
+        return request({
+            url: '/api/addFileInspectionRule',
+            method: 'post',
+            data: { path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0 }
+        })
+    },
+    deleteFileInspectionRule(path) {
+        return request({
+            url: '/api/deleteFileInspectionRule',
+            method: 'post',
+            data: { path }
+        })
+    },
+    fetchFileInspectionResults(ruleId) {
+        return request({
+            url: '/api/fetchFileInspectionResults',
+            method: 'post',
+            data: { ruleId: ruleId || '' }
+        })
+    },
+    getFileInspectionContent(sha256) {
+        return request({
+            url: '/api/getFileInspectionContent',
+            method: 'post',
+            data: { sha256 }
+        })
+    },
+    fetchNewRelicIntegration() {
+        return request({
+            url: '/api/fetchNewRelicIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addNewRelicIntegration(apiKey) {
+        return request({
+            url: '/api/addNewRelicIntegration',
+            method: 'post',
+            data: {apiKey}
+        })
+    },
+    removeNewRelicIntegration() {
+        return request({
+            url: '/api/removeNewRelicIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    fetchOpenTelemetryIntegration() {
+        return request({
+            url: '/api/fetchOpenTelemetryIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addOpenTelemetryIntegration(endpoint, apiKey, headerName) {
+        return request({
+            url: '/api/addOpenTelemetryIntegration',
+            method: 'post',
+            data: { endpoint, apiKey, headerName }
+        })
+    },
+    removeOpenTelemetryIntegration() {
+        return request({
+            url: '/api/removeOpenTelemetryIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    updateAccountDomains(domainKey, domainsToAdd, domainsToRemove) {
+        return request({
+            url: '/api/updateAccountDomains',
+            method: 'post',
+            data: { domainKey, domainsToAdd, domainsToRemove }
+        })
+    },
+    fetchEndpointShieldSettings() {
+        return request({
+            url: '/api/fetchEndpointShieldSettings',
+            method: 'post',
+            data: {}
+        })
+    },
+    saveEndpointShieldSettings(platformKey, platformConfig) {
+        return request({
+            url: '/api/saveEndpointShieldSettings',
+            method: 'post',
+            data: {platformKey, platformConfig}
+        })
+    },
+    refreshEndpointShieldLatestVersion(platformKey) {
+        return request({
+            url: '/api/refreshEndpointShieldLatestVersion',
+            method: 'post',
+            data: {platformKey}
         })
     }
 }

@@ -1,6 +1,13 @@
 package com.akto.threat.detection.utils;
 
+import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.enums.RedactionType;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.threat.detection.cache.AccountConfig;
+import com.akto.threat.detection.cache.AccountConfigurationCache;
 import com.akto.utils.RedactParser;
 
 import java.util.Collections;
@@ -78,10 +85,6 @@ public class Utils {
         return builder.build().toString();
     }
 
-    public static String buildApiHitCountKey(int apiCollectionId, String url, String method) {
-        return RedisKeyInfo.API_COUNTER_KEY_PREFIX + "|" + apiCollectionId + "|" + url + "|" + method;
-    }
-
     public static String buildIpApiCmsDataKey(String ip, String apiCollectionId, String url, String method) {
         return RedisKeyInfo.IP_API_CMS_DATA_PREFIX + "|" + apiCollectionId + "|" + ip + "|" + url + "|" + method;
     }
@@ -99,6 +102,28 @@ public class Utils {
         info.setSeverity("MEDIUM");
         ipApiRateLimitFilter.setInfo(info);
         return ipApiRateLimitFilter;
+    }
+
+    public static FilterConfig getApiLevelRateLimitFilter() {
+        FilterConfig filter = new FilterConfig("ApiLevelRateLimited", null, null, null);
+        Info info = new Info();
+        info.setName("ApiLevelRateLimited");
+        info.setCategory(new Category("ApiAbuse", "ApiAbuse", "ApiAbuse"));
+        info.setSubCategory("API_LEVEL_RATE_LIMITING");
+        info.setSeverity("MEDIUM");
+        filter.setInfo(info);
+        return filter;
+    }
+
+    public static FilterConfig buildSequenceAnomalyFilter() {
+        FilterConfig filter = new FilterConfig("SequenceAnomaly", null, null, null);
+        Info info = new Info();
+        info.setName("SequenceAnomaly");
+        info.setCategory(new Category("Behavioral", "Behavioral", "Behavioral"));
+        info.setSubCategory("ApiSequenceAnomaly");
+        info.setSeverity("HIGH");
+        filter.setInfo(info);
+        return filter;
     }
 
     /**
@@ -170,6 +195,43 @@ public class Utils {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Authorization", Collections.singletonList("Bearer " + System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN")));
         return headers;
+    }
+
+    private static final LoggerMaker logger = new LoggerMaker(Utils.class, LogDb.THREAT_DETECTION);
+
+    public static String extractHostFromHeaders(Map<String, List<String>> headers) {
+        if (headers == null || headers.isEmpty()) {
+            return null;
+        }
+        List<String> hostValues = headers.get("host");
+        if (hostValues != null && !hostValues.isEmpty()) {
+            return hostValues.get(0);
+        }
+        return null;
+    }
+
+    public static RedactionType getRedactionType(Map<String, List<String>> headers, DataActor dataActor) {
+        try {
+            if (Context.isRedactPayload.get() != null && Context.isRedactPayload.get()) {
+                return RedactionType.REDACT_ALL;
+            }
+            String host = extractHostFromHeaders(headers);
+            if (host != null && !host.isEmpty()) {
+                int hostHashCode = host.hashCode();
+                AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
+                Boolean isApiCollectionRedacted = config.isApiCollectionRedacted(hostHashCode);
+                if (isApiCollectionRedacted != null && isApiCollectionRedacted) {
+                    return RedactionType.REDACT_BY_API_COLLECTION;
+                }
+            }
+            if (SingleTypeInfo.isCustomDataTypeAvailable(Context.accountId.get())) {
+                return RedactionType.REDACT_BY_CUSTOM_FIELD;
+            }
+            return RedactionType.NONE;
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error determining redaction type, defaulting to NONE");
+            return RedactionType.NONE;
+        }
     }
 
 }

@@ -44,7 +44,10 @@ public class AgentImportAction extends UserAction{
     
     @Getter @Setter
     private String requestBody;
-    
+
+    @Getter @Setter
+    private Map<String, String> customHeaders;
+
     private int apiCollectionId;
     
     public String importFromUrl() {
@@ -165,6 +168,14 @@ public class AgentImportAction extends UserAction{
                 if (testRole != null) {
                     AuthMechanism authMechanism = testRole.findDefaultAuthMechanism();
                     authMechanism.addAuthToRequest(request, false);
+                }
+            }
+
+            if (customHeaders != null) {
+                for (Map.Entry<String, String> entry : customHeaders.entrySet()) {
+                    if (!StringUtils.isEmpty(entry.getKey())) {
+                        headers.put(entry.getKey(), Arrays.asList(entry.getValue()));
+                    }
                 }
             }
             

@@ -46,6 +46,12 @@ const SettingsLeftNav = () => {
             selected: page === "module-info",
             onClick: () => navigate("/dashboard/settings/module-info")
         }]
+    const jobInfoArr = [{
+            label: 'Job Info',
+            icon: AutomationFilledMajor,
+            selected: page === "job-info",
+            onClick: () => navigate("/dashboard/settings/job-info")
+        }]
     const metricsArr = window.DASHBOARD_MODE !== 'ON_PREM' ? [{
         label: 'Metrics',
         icon: ReportFilledMinor,
@@ -135,6 +141,7 @@ const SettingsLeftNav = () => {
                     },
                     ...logsArr,
                     ...moduleInfoArr,
+                    ...jobInfoArr,
                     ...metricsArr,
                     {
                         label: 'Auth types',
@@ -159,7 +166,26 @@ const SettingsLeftNav = () => {
                         icon: CodeMajor,
                         selected: page === "proxy-patterns",
                         onClick: () => navigate("/dashboard/settings/proxy-patterns")
+                    },
+                    {
+                        label: 'Allowed Hosts',
+                        icon: GlobeMajor,
+                        selected: page === "allowed-hosts",
+                        onClick: () => navigate("/dashboard/settings/allowed-hosts")
+                    },
+                    ...(window.USER_NAME?.toLowerCase()?.endsWith("@akto.io") ? [{
+                        label: 'Endpoint Shield',
+                        icon: LockFilledMajor,
+                        selected: page === "endpoint-shield",
+                        onClick: () => navigate("/dashboard/settings/endpoint-shield")
                     }] : []),
+                    {
+                        label: 'File Inspection',
+                        icon: CodeMajor,
+                        selected: page === "file-inspection",
+                        onClick: () => navigate("/dashboard/settings/file-inspection")
+                    }
+                ] : []),
                     {
                         label: 'Test library',
                         icon: VocabularyMajor,

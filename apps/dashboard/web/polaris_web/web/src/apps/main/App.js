@@ -28,6 +28,7 @@ import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
 import GithubAppIntegration from "../dashboard/pages/settings/integrations/GithubAppIntegration";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import ModuleInfoPage from "../dashboard/pages/settings/module_info/ModuleInfoPage";
+import JobInfoPage from "../dashboard/pages/settings/job_info/JobInfoPage";
 import About from "../dashboard/pages/settings/about/About";
 import ThreatConfiguration from "../dashboard/pages/settings/threat_configuration/ThreatConfiguration";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
@@ -84,6 +85,7 @@ import {PollingProvider} from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
 import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
 import ProxyPatterns from "../dashboard/pages/settings/proxy_patterns/ProxyPatterns";
+import FileInspection from "../dashboard/pages/settings/file_inspection/FileInspection";
 import GoogleSamlSso from "../dashboard/pages/settings/integrations/sso/GoogleSamlSso";
 import SignUpWithSSO from "../signup/components/SignUpWithSSO";
 
@@ -98,6 +100,7 @@ import ConfigureIgnoredEventsPage from "../dashboard/pages/threat_detection/Conf
 import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
+import Datadog from "../dashboard/pages/settings/integrations/Datadog";
 import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
 import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
@@ -105,6 +108,7 @@ import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
 import AzureDataExplorer from "../dashboard/pages/settings/integrations/AzureDataExplorer";
 import ServiceNow from "../dashboard/pages/settings/integrations/ServiceNow";
 import DevRev from "../dashboard/pages/settings/integrations/DevRev";
+import Wiz from "@/apps/dashboard/pages/settings/integrations/Wiz.jsx";
 import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
@@ -123,8 +127,16 @@ import DastProgress from "../dashboard/pages/observe/api_collections/DastProgres
 import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
 import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
+import UsersAndDevices from "../dashboard/pages/observe/agentic/UsersAndDevices.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
+import IdentitiesPage from "../dashboard/pages/nhi_governance/IdentitiesPage.jsx";
+import ViolationsPage from "../dashboard/pages/nhi_governance/ViolationsPage.jsx";
+import PoliciesPage from "../dashboard/pages/nhi_governance/PoliciesPage.jsx";
+import AllowedHostsForPac from "../dashboard/pages/settings/allowed_hosts/AllowedHostsForPac.jsx";
+import EndpointShieldSettings from "../dashboard/pages/settings/endpoint_shield/EndpointShieldSettings.jsx";
+import NewRelic from "../dashboard/pages/settings/integrations/NewRelic.jsx";
+import OpenTelemetry from "../dashboard/pages/settings/integrations/OpenTelemetry.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -208,6 +220,10 @@ const router = createBrowserRouter([
                             {
                                 path: "agentic-assets",
                                 element: <Endpoints/>
+                            },
+                            {
+                                path: "users-and-devices",
+                                element: <UsersAndDevices/>
                             },
                             {
                                 path: "query_mode",
@@ -352,6 +368,23 @@ const router = createBrowserRouter([
                                 element: <GuardrailPolicies/>
                             }
                         ]
+                    },
+                    {
+                        path: "nhi",
+                        children: [
+                            {
+                                path: "identities",
+                                element: <IdentitiesPage/>
+                            },
+                            {
+                                path: "violations",
+                                element: <ViolationsPage/>
+                            },
+                            {
+                                path: "policies",
+                                element: <PoliciesPage/>
+                            }
+                        ]
                     }
                 ]
             },
@@ -416,6 +449,10 @@ const router = createBrowserRouter([
                         element: <Splunk/>,
                     },
                     {
+                        path: "integrations/datadog",
+                        element: <Datadog/>,
+                    },
+                    {
                         path: "integrations/f5_waf",
                         element: <F5Waf/>,
                     },
@@ -450,6 +487,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/devrev",
                         element: <DevRev/>,
+                    },
+                    {
+                        path: "integrations/wiz",
+                        element: <Wiz/>,
                     },
                     {
                         path: "integrations/akto_apis",
@@ -524,12 +565,24 @@ const router = createBrowserRouter([
                         element: <GmailWebhookCore/>,
                     },
                     {
+                        path: "integrations/new_relic",
+                        element: <NewRelic/>,
+                    },
+                    {
+                        path: "integrations/open_telemetry",
+                        element: <OpenTelemetry/>,
+                    },
+                    {
                         path: "logs",
                         element: <HealthLogs/>,
                     },
                     {
                         path: "module-info",
                         element: <ModuleInfoPage/>,
+                    },
+                    {
+                        path: "job-info",
+                        element: <JobInfoPage/>,
                     },
                     {
                         path: "auth-types",
@@ -546,6 +599,18 @@ const router = createBrowserRouter([
                     {
                         path: 'proxy-patterns',
                         element: <ProxyPatterns/>
+                    },
+                    {
+                        path: 'allowed-hosts',
+                        element: <AllowedHostsForPac/>
+                    },
+                    {
+                        path: 'endpoint-shield',
+                        element: <EndpointShieldSettings/>
+                    },
+                    {
+                        path: 'file-inspection',
+                        element: <FileInspection/>
                     },
                     {
                         path: "auth-types/details",

@@ -34,7 +34,8 @@ public class DistributionCalculator {
     public void processRequest(String apiKey, long currentEpochMin, String ipApiCmsKey,
                                int rateLimitWindow, long threshold, int mitigationPeriod,
                                String actor, String host, String accountId, int timestamp,
-                               String countryCode, String destCountryCode) {
+                               String countryCode, String destCountryCode,
+                               int apiLevelWindow, int apiLevelThreshold) {
         try {
             Map<String, String> streamBody = new HashMap<>();
             streamBody.put("ipApiCmsKey", ipApiCmsKey);
@@ -49,6 +50,8 @@ public class DistributionCalculator {
             streamBody.put("timestamp", String.valueOf(timestamp));
             streamBody.put("countryCode", countryCode != null ? countryCode : "");
             streamBody.put("destCountryCode", destCountryCode != null ? destCountryCode : "");
+            streamBody.put("apiLevelWindow", String.valueOf(apiLevelWindow));
+            streamBody.put("apiLevelThreshold", String.valueOf(apiLevelThreshold));
             redis.async().xadd(RedisKeyInfo.THREAT_INPUT_STREAM, streamBody);
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error pushing to threat input stream");

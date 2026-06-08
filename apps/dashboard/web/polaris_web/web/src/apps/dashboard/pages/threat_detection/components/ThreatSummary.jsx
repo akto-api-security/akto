@@ -7,18 +7,22 @@ import SmoothAreaChart from '../../dashboard/new_components/SmoothChart'
 import api from "../api";
 
 export const ThreatSummary = ({ startTimestamp, endTimestamp }) => {
-    const [criticalActors, setCriticalActors] = useState([]);
-    const [activeActors, setActiveActors] = useState([]);
+    const [criticalActorsChart, setCriticalActorsChart] = useState([]);
+    const [activeActorsChart, setActiveActorsChart] = useState([]);
     const [criticalActorsDelta, setCriticalActorsDelta] = useState(0);
     const [totalActorsDelta, setTotalActorsDelta] = useState(0);
+    const [totalCritical, setTotalCritical] = useState(0);
+    const [totalActive, setTotalActive] = useState(0);
 
     const fetchThreatActorsCount = async () => {
         const response = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp);
-        const actorsCountByDay =  response.actorsCounts;
+        const actorsCountByDay = response.actorsCounts || [];
         const criticalActors = actorsCountByDay.map(item => item.criticalActors);
         const activeActors = actorsCountByDay.map(item => item.totalActors);
-        observeFunc.setIssuesState(criticalActors, setCriticalActors, setCriticalActorsDelta, true);
-        observeFunc.setIssuesState(activeActors, setActiveActors, setTotalActorsDelta, true);
+        observeFunc.setIssuesState(criticalActors, setCriticalActorsChart, setCriticalActorsDelta, true);
+        observeFunc.setIssuesState(activeActors, setActiveActorsChart, setTotalActorsDelta, true);
+        setTotalCritical(response.totalCriticalActors || 0);
+        setTotalActive(response.activeActorsCount || 0);
     }
 
     useEffect(() => {
@@ -28,18 +32,18 @@ export const ThreatSummary = ({ startTimestamp, endTimestamp }) => {
     const summaryInfo = [
         {
             title: 'Critical Actors',
-            data: observeFunc.formatNumberWithCommas(criticalActors[criticalActors.length - 1]),
+            data: observeFunc.formatNumberWithCommas(totalCritical),
             variant: 'heading2xl',
             color: 'critical',
             // byLineComponent: observeFunc.generateByLineComponent(criticalActorsDelta, func.timeDifference(startTimestamp, endTimestamp)),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={criticalActors} />)
+            smoothChartComponent: (<SmoothAreaChart tickPositions={criticalActorsChart} />)
         },
         {
             title: 'Active Actors',
-            data: observeFunc.formatNumberWithCommas(activeActors[activeActors.length - 1]),
+            data: observeFunc.formatNumberWithCommas(totalActive),
             variant: 'heading2xl',
             // byLineComponent: observeFunc.generateByLineComponent(totalActorsDelta, func.timeDifference(startTimestamp, endTimestamp)),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={activeActors} />)
+            smoothChartComponent: (<SmoothAreaChart tickPositions={activeActorsChart} />)
         }
     ]
 

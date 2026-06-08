@@ -123,7 +123,7 @@ function HomeDashboard() {
         navigate('/dashboard/observe/audit');
     }, [navigate])
 
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[4]);
 
     const getTimeEpoch = (key) => {
         return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
@@ -708,7 +708,7 @@ function HomeDashboard() {
         }
 
         if (totalAPIs && totalAPIs> 0 && apisTestedInLookBackPeriod) {
-            const testCoverage = 100 * apisTestedInLookBackPeriod / totalAPIs
+            const testCoverage = Math.min(100 * apisTestedInLookBackPeriod / totalAPIs, 100);
             setTestCoverage(parseFloat(testCoverage.toFixed(2)))
         } else {
             setTestCoverage(0)
@@ -1582,15 +1582,15 @@ function HomeDashboard() {
         />
     );
 
+    const showForAccount = func.isDemoAccount();
     const threatComponents = func.checkForFeatureSaas('THREAT_DETECTION') ? [
-        {id: 'threat-timeline', component: threatActorsTimelineComponent},
+        ...(showForAccount ? [{id: 'threat-timeline', component: threatActorsTimelineComponent}] : []),
         {id: 'threat-severity', component: threatSeverityComponent},
         {id: 'threat-categories', component: threatCategoryComponent},
     ] : [];
-
     let gridComponents = showTestingComponents ?
         [
-            {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
+            ...(showForAccount ? [{id: 'critical-apis', component: criticalUnsecuredAPIsOverTime}] : []),
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
             {id: 'critical-findings', component: criticalFindings},
             ...threatComponents,
@@ -1605,7 +1605,7 @@ function HomeDashboard() {
             {id: 'access-type', component: apisByAccessTypeComponent},
             {id: 'auth-type', component: apisByAuthTypeComponent},
             {id: 'new-domains', component: newDomainsComponent},
-            {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
+            ...(showForAccount ? [{id: 'critical-apis', component: criticalUnsecuredAPIsOverTime}] : []),
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
             {id: 'critical-findings', component: criticalFindings},
             ...threatComponents,

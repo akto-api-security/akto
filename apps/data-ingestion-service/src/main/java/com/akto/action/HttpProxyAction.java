@@ -1,9 +1,13 @@
 package com.akto.action;
 
 import com.akto.gateway.Gateway;
+import com.akto.jobs.executors.AIAgentConnectorConstants;
 import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
+import com.akto.util.Constants;
+import com.akto.utils.McpCollectionResolver;
 import com.akto.utils.SlackUtils;
+import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
@@ -23,8 +27,10 @@ public class HttpProxyAction extends ActionSupport {
     }
 
     private String guardrails;
+    private String response_guardrails;
     private String akto_connector;
     private String ingest_data;
+    private String client_hook;
 
     private String path;
     private String requestHeaders;
@@ -58,9 +64,12 @@ public class HttpProxyAction extends ActionSupport {
     public String httpProxy() {
         long start = System.currentTimeMillis();
         try {
-            loggerMaker.info("HTTP Proxy API called - path: " + path + ", method: " + method + ", account: " + akto_account_id);
+            loggerMaker.infoAndAddToDb(
+                "HTTP Proxy API called - path: {}, method: {}, account: {}, guardrails: {}, response_guardrails: {}, ingest_data: {}, contextSource: {}",
+                path, method, akto_account_id, guardrails, response_guardrails, ingest_data, contextSource);
 
             Map<String, Object> requestData = buildRequestData();
+            applyMcpHostRewrite(requestData);
             Map<String, Object> result = gateway.processHttpProxy(requestData);
 
             success = Boolean.TRUE.equals(result.get("success"));
@@ -71,11 +80,11 @@ public class HttpProxyAction extends ActionSupport {
             if (!success) {
                 String errorMsg = "[http-proxy] API failed - path: " + path + ", method: " + method
                     + ", account: " + akto_account_id + ", latencyMs: " + latencyMs + ", error: " + message;
-                loggerMaker.errorAndAddToDb(errorMsg, LoggerMaker.LogDb.DATA_INGESTION);
+                loggerMaker.errorAndAddToDb(errorMsg);
                 sendSlackAlert(errorMsg);
             } else {
-                loggerMaker.info("[http-proxy] API completed - path: " + path + ", method: " + method
-                    + ", account: " + akto_account_id + ", latencyMs: " + latencyMs);
+                loggerMaker.infoAndAddToDb("[http-proxy] API completed - path: {}, method: {}, account: {}, latencyMs: {}",
+                    path, method, akto_account_id, latencyMs);
             }
 
             return success ? Action.SUCCESS.toUpperCase() : Action.ERROR.toUpperCase();
@@ -84,7 +93,7 @@ public class HttpProxyAction extends ActionSupport {
             long latencyMs = System.currentTimeMillis() - start;
             String errorMsg = "[http-proxy] Unexpected error - path: " + path + ", method: " + method
                 + ", account: " + akto_account_id + ", latencyMs: " + latencyMs + ", error: " + e.getMessage();
-            loggerMaker.errorAndAddToDb(errorMsg, LoggerMaker.LogDb.DATA_INGESTION);
+            loggerMaker.errorAndAddToDb(errorMsg);
             sendSlackAlert(errorMsg);
             success = false;
             message = "Unexpected error: " + e.getMessage();
@@ -99,15 +108,81 @@ public class HttpProxyAction extends ActionSupport {
         SlackUtils.sendAlert(alertText);
     }
 
+    private String normalizeHostInRequestHeaders(String headers) {
+        if (headers == null || headers.isEmpty()) return headers;
+        try {
+            BasicDBObject headersObj = BasicDBObject.parse(headers);
+            String hostKey = null;
+            for (String key : headersObj.keySet()) {
+                if ("host".equalsIgnoreCase(key)) {
+                    hostKey = key;
+                    break;
+                }
+            }
+            if (hostKey != null) {
+                String hostValue = headersObj.getString(hostKey);
+                if (hostValue != null) {
+                    String normalized = hostValue.toLowerCase().replaceAll("[^a-z0-9.\\-:]", "-");
+                    headersObj.put(hostKey, normalized);
+                }
+            }
+            return headersObj.toJson();
+        } catch (Exception e) {
+            return headers;
+        }
+    }
+
+    private void applyMcpHostRewrite(Map<String, Object> requestData) {
+        Object tagObj = requestData.get("tag");
+        String tagJson = tagObj != null ? tagObj.toString() : null;
+        if (!McpCollectionResolver.isMcpTag(tagJson)) {
+            return;
+        }
+
+        Object headersObj = requestData.get("requestHeaders");
+        String headersJson = headersObj != null ? headersObj.toString() : null;
+        String host = McpCollectionResolver.extractHost(headersJson);
+        if (host == null || host.isEmpty()) {
+            return;
+        }
+
+        String tempCollectionName = host.toLowerCase().trim();
+        String realCollectionName = McpCollectionResolver.getInstance().resolve(tempCollectionName);
+        if (realCollectionName == null) {
+            loggerMaker.warnAndAddToDb("MCP host cache miss for tempCollectionName=" + tempCollectionName);
+            return;
+        }
+
+        String rewritten = McpCollectionResolver.rewriteHostInHeaders(headersJson, realCollectionName);
+        requestData.put("requestHeaders", rewritten);
+        loggerMaker.infoAndAddToDb("MCP host rewrite: " + tempCollectionName + " -> " + realCollectionName);
+    }
+
+    private String buildTagJson() {
+        if (!"true".equalsIgnoreCase(ingest_data)) return tag;
+        try {
+            BasicDBObject tagObj = (tag != null && !tag.isEmpty()) ? BasicDBObject.parse(tag) : new BasicDBObject();
+            String connector = akto_connector != null ? akto_connector.toLowerCase() : "";
+            String mode = AIAgentConnectorConstants.OBSERVE_MODE_CONNECTORS.contains(connector)
+                    ? Constants.AKTO_GUARDRAIL_MODE_OBSERVE
+                    : Constants.AKTO_GUARDRAIL_MODE_INLINE;
+            tagObj.put(Constants.AKTO_GUARDRAIL_MODE, mode);
+            return tagObj.toJson();
+        } catch (Exception e) {
+            return tag;
+        }
+    }
+
     private Map<String, Object> buildRequestData() {
         Map<String, Object> requestData = new HashMap<>();
 
         requestData.put("guardrails", guardrails);
+        requestData.put("response_guardrails", response_guardrails);
         requestData.put("akto_connector", akto_connector);
         requestData.put("ingest_data", ingest_data);
 
         requestData.put("path", path);
-        requestData.put("requestHeaders", requestHeaders);
+        requestData.put("requestHeaders", normalizeHostInRequestHeaders(requestHeaders));
         requestData.put("responseHeaders", responseHeaders);
         requestData.put("method", method);
         requestData.put("requestPayload", requestPayload);
@@ -123,13 +198,14 @@ public class HttpProxyAction extends ActionSupport {
         requestData.put("is_pending", is_pending);
         requestData.put("source", source);
         requestData.put("direction", direction);
-        requestData.put("tag", tag);
+        requestData.put("tag", buildTagJson());
         requestData.put("metadata", metadata);
         requestData.put("process_id", process_id);
         requestData.put("socket_id", socket_id);
         requestData.put("daemonset_id", daemonset_id);
         requestData.put("enabled_graph", enabled_graph);
         requestData.put("contextSource", contextSource);
+        requestData.put("client_hook", client_hook);
 
         return requestData;
     }

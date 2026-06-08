@@ -8,11 +8,13 @@ import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.TestingRunResult.TestLog;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpSchema;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.grpc.ProtoBufUtils;
@@ -966,13 +968,19 @@ public class ApiExecutor {
 
         String[] queryParam = session.endpoint.split("\\?");
         if (overrideMessageEndpoint) {
-            request.setUrl(host + session.endpoint);
+            if(session.endpoint.startsWith("https://")){
+                request.setUrl(session.endpoint);
+            }else{
+                request.setUrl(host + session.endpoint);
+            }
         } else {
             request.setUrl(url);
             if (queryParam.length > 1) {
                 request.setQueryParams(queryParam[1]);
             }
         }
+
+        sendMcpInitSequence(request, testingRunConfig, debug, testLogs, skipSSRFCheck, session);
 
         // Send actual request
         OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, true, testLogs, skipSSRFCheck);
@@ -1033,6 +1041,33 @@ public class ApiExecutor {
                 session.response.body().close();
             }
             session.response.close();
+        }
+    }
+
+    private static void sendMcpInitSequence(OriginalHttpRequest request, TestingRunConfig testingRunConfig, boolean debug,
+        List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, SseSession session) throws Exception {
+        String originalBody = request.getBody();
+        request.setBody(McpSchema.MCP_INIT_REQUEST);
+        sendInitRequestToSSEMCP(request, true, testingRunConfig, debug, true, testLogs, skipSSRFCheck, session, "111");
+        request.setBody(McpSchema.MCP_NOTIFICATIONS_INIT_REQUEST);
+        sendInitRequestToSSEMCP(request, true, testingRunConfig, debug, false, testLogs, skipSSRFCheck, session, "112");
+        request.setBody(originalBody);
+    }
+
+    private static void sendInitRequestToSSEMCP(OriginalHttpRequest request, boolean followRedirects,
+        TestingRunConfig testingRunConfig, boolean debug, boolean waitForSSE, List<TestLog> testLogs,
+        boolean skipSSRFCheck, SseSession session, String requestId) throws Exception {
+
+        OriginalHttpResponse initResponse = sendRequest(request, followRedirects, testingRunConfig, debug, true, testLogs, skipSSRFCheck);
+
+        if (initResponse.getStatusCode() >= 400) {
+            throw new Exception("Failed to send init request to SSE MCP: " + initResponse.getBody());
+        }
+
+        String resp = null;
+        if (waitForSSE) {
+            resp = waitForMatchingSseMessage(session, requestId, 10000); // 10s timeout
+            loggerMaker.debug("SSE response: {}", resp);
         }
     }
 }

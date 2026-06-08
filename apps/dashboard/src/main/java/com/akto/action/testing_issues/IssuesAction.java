@@ -39,6 +39,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
+import com.akto.util.ComplianceResolutionUtils;
 import com.akto.utils.ApiInfoKeyResult;
 import com.akto.utils.TestTemplateUtils;
 import com.mongodb.BasicDBObject;
@@ -81,6 +82,8 @@ public class IssuesAction extends UserAction {
     private int skip;
     private int limit;
     private List<TestRunIssueStatus> filterStatus;
+    @Getter
+    @Setter
     private List<Integer> filterCollectionsId;
     private List<Severity> filterSeverity;
     private List<String> filterCompliance;
@@ -430,6 +433,9 @@ public class IssuesAction extends UserAction {
                 Filters.gte(TestingRunIssues.CREATION_TIME, startEpoch),
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
         );
+        if (filterCollectionsId != null && !filterCollectionsId.isEmpty()) {
+            baseFilters = Filters.and(baseFilters, Filters.in(TestingRunIssues.ID_API_COLLECTION_ID, filterCollectionsId));
+        }
         
         // Apply dashboard filtering (handles API Security backward compatibility internally)
         Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(baseFilters);
@@ -488,6 +494,9 @@ public class IssuesAction extends UserAction {
                 Filters.gte("time", startEpoch),
                 Filters.lte("time", endTimeStamp)
         );
+        if (filterCollectionsId != null && !filterCollectionsId.isEmpty()) {
+            filter = Filters.and(filter, Filters.in(HistoricalData.API_COLLECTION_ID, filterCollectionsId));
+        }
 
         pipeline.add(Aggregates.match(filter));
 
@@ -580,16 +589,15 @@ public class IssuesAction extends UserAction {
             }
             if(!andFilters.isEmpty()){
                 Bson orFilters = Filters.or(andFilters);
-                this.testingRunResults = TestingRunResultDao.instance.findAll(orFilters);
+                this.testingRunResults = TestingRunResultDao.instance.findAllWithSummaryContext(orFilters);
             }
 
             if (!filtersForNewCollection.isEmpty()) {
                 this.testingRunResults.addAll(
-                    VulnerableTestingRunResultDao.instance.findAll(Filters.or(filtersForNewCollection))
+                    VulnerableTestingRunResultDao.instance.findAllWithSummaryContext(Filters.or(filtersForNewCollection))
                 );
             }
 
-            Map<String, String> sampleDataVsCurlMap = new HashMap<>();
             // todo: fix
             for (TestingRunResult runResult: this.testingRunResults) {
                 List<GenericTestResult> testResults = new ArrayList<>();
@@ -699,11 +707,7 @@ public class IssuesAction extends UserAction {
         BasicDBObject superCategory = new BasicDBObject();
         BasicDBObject severity = new BasicDBObject();
 
-        ComplianceMapping complianceMapping = info.getCompliance();
-
-        if (complianceMapping == null) {
-            complianceMapping = new ComplianceMapping(new HashMap<>(), "", "", 0);
-        }
+        ComplianceMapping complianceMapping = ComplianceResolutionUtils.resolveComplianceForTestConfig(testConfig);
 
         infoObj.put("issueDescription", info.getDescription());
         infoObj.put("issueDetails", info.getDetails());
@@ -1034,7 +1038,7 @@ public class IssuesAction extends UserAction {
         Bson combinedFilter = buildIssueFilter(issueIds);
 
         // Query both collections
-        List<TestingRunResult> vulnerableResults = VulnerableTestingRunResultDao.instance.findAll(
+        List<TestingRunResult> vulnerableResults = VulnerableTestingRunResultDao.instance.findAllWithSummaryContext(
             combinedFilter,
             Projections.include(
                 Constants.ID,
@@ -1045,7 +1049,7 @@ public class IssuesAction extends UserAction {
             )
         );
 
-        List<TestingRunResult> regularResults = TestingRunResultDao.instance.findAll(
+        List<TestingRunResult> regularResults = TestingRunResultDao.instance.findAllWithSummaryContext(
             combinedFilter,
             Projections.include(
                 Constants.ID,
@@ -1096,7 +1100,7 @@ public class IssuesAction extends UserAction {
     private List<TestingRunResult> fetchTestResultsByIds(List<ObjectId> testResultIds) {
         List<TestingRunResult> results = new ArrayList<>();
 
-        List<TestingRunResult> vulnerable = VulnerableTestingRunResultDao.instance.findAll(
+        List<TestingRunResult> vulnerable = VulnerableTestingRunResultDao.instance.findAllWithSummaryContext(
             Filters.in(Constants.ID, testResultIds),
             Projections.include(TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE)
         );
@@ -1104,7 +1108,7 @@ public class IssuesAction extends UserAction {
             results.addAll(vulnerable);
         }
 
-        List<TestingRunResult> regular = TestingRunResultDao.instance.findAll(
+        List<TestingRunResult> regular = TestingRunResultDao.instance.findAllWithSummaryContext(
             Filters.in(Constants.ID, testResultIds),
             Projections.include(TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE)
         );
@@ -1378,7 +1382,7 @@ public class IssuesAction extends UserAction {
         }
     }
 
-    public String getReportFilters () {
+    public String fetchReportFilters () {
         if(this.generatedReportId == null){
             addActionError("Report id cannot be null");
             return ERROR.toUpperCase();
@@ -1567,14 +1571,6 @@ public class IssuesAction extends UserAction {
 
     public void setFilterStatus(List<TestRunIssueStatus> filterStatus) {
         this.filterStatus = filterStatus;
-    }
-
-    public List<Integer> getFilterCollectionsId() {
-        return filterCollectionsId;
-    }
-
-    public void setFilterCollectionsId(List<Integer> filterCollectionsId) {
-        this.filterCollectionsId = filterCollectionsId;
     }
 
     public List<Severity> getFilterSeverity() {

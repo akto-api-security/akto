@@ -82,8 +82,10 @@ public class ArcadeWebhookAction extends ActionSupport {
                     if (allowed != null && !Boolean.TRUE.equals(allowed) && !"true".equalsIgnoreCase(String.valueOf(allowed))) {
                         code = "CHECK_FAILED";
                         Object reasonObj = guardrailsResult.get("Reason");
-                        String reason = reasonObj != null ? reasonObj.toString() : "Request blocked by guardrails policy";
-                        error_message = "Blocked by Akto Guardrails " + reason;
+                        String reason = (reasonObj != null && !reasonObj.toString().trim().isEmpty())
+                                ? reasonObj.toString()
+                                : "Request blocked by guardrails policy";
+                        error_message = "Blocked by Akto Guardrails: " + reason;
                         loggerMaker.info("Arcade webhook blocked by guardrails - hookType: " + hookType + ", reason: " + reason);
 
                         ingestBlockedRequest(requestData);
@@ -91,6 +93,27 @@ public class ArcadeWebhookAction extends ActionSupport {
                         return Action.SUCCESS.toUpperCase();
                     }
                 }
+            }
+
+            if (gatewayResponse != null && gatewayResponse.containsKey("responseGuardrailsResult")) {
+                Map<String, Object> responseGuardrailsResult = (Map<String, Object>) gatewayResponse.get("responseGuardrailsResult");
+                if (responseGuardrailsResult != null) {
+                    Object allowed = responseGuardrailsResult.get("Allowed");
+                    if (allowed != null && !Boolean.TRUE.equals(allowed) && !"true".equalsIgnoreCase(String.valueOf(allowed))) {
+                        code = "CHECK_FAILED";
+                        Object reasonObj = responseGuardrailsResult.get("Reason");
+                        String reason = (reasonObj != null && !reasonObj.toString().trim().isEmpty())
+                                ? reasonObj.toString()
+                                : "Response blocked by guardrails policy";
+                        error_message = "Blocked by Akto Guardrails: " + reason;
+                        loggerMaker.info("Arcade webhook response blocked by guardrails - hookType: " + hookType + ", reason: " + reason);
+
+                        ingestBlockedRequest(requestData);
+
+                        return Action.SUCCESS.toUpperCase();
+                    }
+                }
+                ingestAllowedResponse(requestData);
             }
 
             code = "OK";
@@ -133,6 +156,19 @@ public class ArcadeWebhookAction extends ActionSupport {
         }
     }
 
+    private void ingestAllowedResponse(Map<String, Object> requestData) {
+        try {
+            Map<String, Object> ingestData = new HashMap<>(requestData);
+            ingestData.put("ingest_data", "true");
+            ingestData.put("response_guardrails", null);
+
+            gateway.processHttpProxy(ingestData);
+            loggerMaker.info("Allowed response ingested into Kafka");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error ingesting allowed response: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
+        }
+    }
+
     private void ingestBlockedRequest(Map<String, Object> requestData) {
         try {
             Map<String, Object> blockedData = new HashMap<>(requestData);
@@ -147,6 +183,7 @@ public class ArcadeWebhookAction extends ActionSupport {
 
             blockedData.put("ingest_data", "true");
             blockedData.put("guardrails", null);
+            blockedData.put("response_guardrails", null);
 
             gateway.processHttpProxy(blockedData);
             loggerMaker.info("Blocked request ingested into Kafka");
@@ -180,7 +217,11 @@ public class ArcadeWebhookAction extends ActionSupport {
 
                 requestData.put("statusCode", String.valueOf(success != null && success ? 200 : 500));
                 requestData.put("status", success != null && success ? "SUCCESS" : "ERROR");
-                requestData.put("responsePayload", output != null ? objectMapper.writeValueAsString(output) : "{}");
+
+                String scannableText = extractScannableOutputText(output, success, execution_error);
+                Map<String, Object> responseBody = new HashMap<>();
+                responseBody.put("body", scannableText);
+                requestData.put("responsePayload", objectMapper.writeValueAsString(responseBody));
                 requestData.put("responseHeaders", "{}");
                 break;
 
@@ -216,7 +257,7 @@ public class ArcadeWebhookAction extends ActionSupport {
         if (HOOK_TYPE_PRE.equals(hookType)) {
             requestData.put("guardrails", "true");
         } else if (HOOK_TYPE_POST.equals(hookType)) {
-            requestData.put("ingest_data", "true");
+            requestData.put("response_guardrails", "true");
         }
 
         return requestData;
@@ -310,6 +351,22 @@ public class ArcadeWebhookAction extends ActionSupport {
         }
 
         return HOOK_TYPE_PRE;
+    }
+
+    private String extractScannableOutputText(Object output, Boolean success, String executionError) throws Exception {
+        if (Boolean.FALSE.equals(success) && executionError != null && !executionError.isEmpty()) {
+            return executionError;
+        }
+        if (output == null) {
+            return "";
+        }
+        if (output instanceof String) {
+            return (String) output;
+        }
+        if (output instanceof Number || output instanceof Boolean) {
+            return String.valueOf(output);
+        }
+        return objectMapper.writeValueAsString(output);
     }
 
     private String extractToolName() {

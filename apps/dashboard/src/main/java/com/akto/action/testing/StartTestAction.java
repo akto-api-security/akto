@@ -1,8 +1,10 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
+import com.akto.agent.AgentClient;
 import com.akto.audit_logs_util.Audit;
 import com.akto.billing.UsageMetricUtils;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
@@ -69,6 +71,8 @@ public class StartTestAction extends UserAction {
 
     private TestingEndpoints.Type type;
     private int apiCollectionId;
+    @Getter
+    @Setter
     private List<Integer> apiCollectionIds;
     private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
     private int testIdConfig;
@@ -99,6 +103,9 @@ public class StartTestAction extends UserAction {
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
+    @Getter
+    @Setter
+    private List<Integer> issueSummaryFilterCollectionIds;
     
     @Getter
     private List<Map<String, Object>> categoryWiseScores = new ArrayList<>();
@@ -173,6 +180,7 @@ public class StartTestAction extends UserAction {
     private boolean sendSlackAlert = false;
     private boolean sendMsTeamsAlert = false;
     private boolean doNotMarkIssuesAsFixed = false;
+    private boolean runAutomatedTests = false;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName, int selectedSlackChannelId) {
         User user = getSUser();
@@ -202,7 +210,18 @@ public class StartTestAction extends UserAction {
                 testingEndpoints = new CustomTestingEndpoints(apiInfoKeyList);
                 break;
             case COLLECTION_WISE:
-                testingEndpoints = new CollectionWiseTestingEndpoints(apiCollectionId);
+                loggerMaker.debugAndAddToDb("createTestingRun: COLLECTION_WISE apiCollectionId=" + apiCollectionId, LogDb.DASHBOARD);
+                if (AgentClient.isCopilotBotCollection(apiCollectionId)) {
+                    List<ApiInfo.ApiInfoKey> botEndpoints = SingleTypeInfoDao.instance.fetchEndpointsInCollection(apiCollectionId);
+                    loggerMaker.debugAndAddToDb("createTestingRun: Copilot bot collection detected, total endpoints=" + (botEndpoints != null ? botEndpoints.size() : 0) + ", using first only", LogDb.DASHBOARD);
+                    if (botEndpoints == null || botEndpoints.isEmpty()) {
+                        addActionError("No endpoints found in Copilot bot collection");
+                        return null;
+                    }
+                    testingEndpoints = new CustomTestingEndpoints(Collections.singletonList(botEndpoints.get(0)));
+                } else {
+                    testingEndpoints = new CollectionWiseTestingEndpoints(apiCollectionId);
+                }
                 break;
             case MULTI_COLLECTION:
                 if (this.apiCollectionIds == null || this.apiCollectionIds.isEmpty()) {
@@ -241,12 +260,13 @@ public class StartTestAction extends UserAction {
 
         // Get dashboard context from Context.contextSource (set by UserDetailsFilter from x-context-source header)
         CONTEXT_SOURCE dashboardContext = Context.contextSource.get();
-        
+
         TestingRun testingRun = new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
                 this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName,selectedSlackChannelId, dashboardContext);
         testingRun.setDoNotMarkIssuesAsFixed(this.doNotMarkIssuesAsFixed);
         testingRun.setMaxAgentTokens(this.maxAgentTokens);
+        testingRun.setRunAutomatedTests(this.runAutomatedTests);
         return testingRun;
     }
 
@@ -606,12 +626,15 @@ public class StartTestAction extends UserAction {
         if(skip < 0){
             skip *= -1;
         }
-
-        if(limit < 0){
-            limit *= -1;
+        int pageLimit = limit;
+        if(limit != -1){
+            if(limit < 0){
+                limit *= -1;
+            }
+            pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
+        }else{
+            pageLimit = 10000000;
         }
-
-        int pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
 
         testingRuns = TestingRunDao.instance.findAllWithRbacAndContext(
                 Filters.and(testingRunFilters), skip, pageLimit,
@@ -1269,7 +1292,8 @@ public class StartTestAction extends UserAction {
                 sourceType,
                 startTimestamp, 
                 endTimestamp, 
-                dashboardCategory
+                dashboardCategory,
+                this.apiCollectionIds
             );
             
         } catch (Exception e) {
@@ -1297,7 +1321,11 @@ public class StartTestAction extends UserAction {
 //        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
 //        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
 
-        Map<String,Integer> totalSubcategoriesCountMap = TestingRunIssuesDao.instance.getTotalSubcategoriesCountMap(this.startTimestamp,this.endTimestamp, demoCollections);
+        Map<String,Integer> totalSubcategoriesCountMap = TestingRunIssuesDao.instance.getTotalSubcategoriesCountMap(
+                this.startTimestamp,
+                this.endTimestamp,
+                demoCollections,
+                this.issueSummaryFilterCollectionIds);
         this.issuesSummaryInfoMap = totalSubcategoriesCountMap;
 
         return SUCCESS.toUpperCase();
@@ -1492,6 +1520,11 @@ public class StartTestAction extends UserAction {
                         updates.add(
                                 Updates.set(TestingRun.SEND_MS_TEAMS_ALERT,
                                         editableTestingRunConfig.getSendMsTeamsAlert()));
+                    }
+
+                    if (existingTestingRun.getDoNotMarkIssuesAsFixed() != editableTestingRunConfig.isDoNotMarkIssuesAsFixed()) {
+                        updates.add(Updates.set(TestingRun.DO_NOT_MARK_ISSUES_AS_FIXED,
+                                editableTestingRunConfig.isDoNotMarkIssuesAsFixed()));
                     }
 
                     int periodInSeconds = getPeriodInSeconds(editableTestingRunConfig.getRecurringDaily(), editableTestingRunConfig.getRecurringWeekly(), editableTestingRunConfig.getRecurringMonthly());
@@ -1706,6 +1739,17 @@ public class StartTestAction extends UserAction {
             pipeLine.add(
                 Aggregates.match(Filters.and(Filters.eq(TestingRunResultSummary.STATE, State.COMPLETED.toString()), Filters.gt(TestingRunResultSummary.START_TIMESTAMP, 0)))
             );
+            if (this.apiCollectionIds != null && !this.apiCollectionIds.isEmpty()) {
+                pipeLine.add(Aggregates.lookup(
+                        TestingRunDao.instance.getCollName(),
+                        TestingRunResultSummary.TESTING_RUN_ID,
+                        Constants.ID,
+                        "tr"));
+                pipeLine.add(Aggregates.match(Filters.elemMatch("tr", Filters.or(
+                        Filters.in(TestingRun._API_COLLECTION_ID, this.apiCollectionIds),
+                        Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, this.apiCollectionIds),
+                        Filters.in(TestingRun._API_COLLECTION_IDS_MULTI, this.apiCollectionIds)))));
+            }
             pipeLine.add(Aggregates.sort(
                 Sorts.descending(TestingRunResultSummary.START_TIMESTAMP)
             ));
@@ -1735,11 +1779,15 @@ public class StartTestAction extends UserAction {
     String conversationId;
 
     public String fetchConversationsFromConversationId() {
-        if(this.conversationId == null || this.conversationId.isEmpty()){
+        if (this.conversationId == null || this.conversationId.isEmpty()) {
             addActionError("Conversation id is required");
             return ERROR.toUpperCase();
         }
-        this.conversationsList = AgentConversationResultDao.instance.findAll(Filters.eq("conversationId", this.conversationId));
+        this.conversationsList = AgentConversationResultDao.instance.findAll(
+                Filters.eq(GenericAgentConversation._CONVERSATION_ID, this.conversationId),
+                0, 100,
+                // TODO: there's inconsistency in this DTO in all branches ??
+                Sorts.ascending(GenericAgentConversation._LAST_UPDATED_AT, GenericAgentConversation._TIMESTAMP));
         return SUCCESS.toUpperCase();
     }
 
@@ -1749,14 +1797,6 @@ public class StartTestAction extends UserAction {
 
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
-    }
-
-    public void setApiCollectionIds(List<Integer> apiCollectionIds) {
-        this.apiCollectionIds = apiCollectionIds;
-    }
-
-    public List<Integer> getApiCollectionIds() {
-        return apiCollectionIds;
     }
 
     public void setApiInfoKeyList(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
@@ -2143,6 +2183,14 @@ public class StartTestAction extends UserAction {
 
     public boolean getDoNotMarkIssuesAsFixed() {
         return doNotMarkIssuesAsFixed;
+    }
+
+    public void setRunAutomatedTests(boolean runAutomatedTests) {
+        this.runAutomatedTests = runAutomatedTests;
+    }
+
+    public boolean getRunAutomatedTests() {
+        return runAutomatedTests;
     }
 
     public void setRecurringWeekly(boolean recurringWeekly) {

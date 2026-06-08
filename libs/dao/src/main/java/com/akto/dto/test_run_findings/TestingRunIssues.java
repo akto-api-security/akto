@@ -5,6 +5,10 @@ import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 
 import com.akto.util.enums.GlobalEnums.TicketSource;
+
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.Arrays;
 import java.util.List;
 
@@ -50,6 +54,14 @@ public class TestingRunIssues {
     private String servicenowIssueUrl;
     public static final String DEVREV_WORK_URL = "devrevWorkUrl";
     private String devrevWorkUrl;
+
+    public static final String WIZ_FINDING_URL = "wizFindingUrl";
+    @Getter @Setter
+    private String wizFindingUrl;
+
+    public static final String WIZ_FINDING_CREATION_STATUS = "wizFindingCreationStatus";
+    @Getter @Setter
+    private String wizFindingCreationStatus;
 
     public static final String ID_API_COLLECTION_ID = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.API_COLLECTION_ID;
     public static final String ID_URL = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.URL;

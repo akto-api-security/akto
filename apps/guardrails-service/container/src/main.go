@@ -6,11 +6,17 @@ import (
 	"net/http"
 	"os"
 
+	"time"
+
+	"github.com/akto-api-security/akto-endpoint-shield/utils"
 	"github.com/akto-api-security/guardrails-service/handlers"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
+	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/kafka"
+	"github.com/akto-api-security/guardrails-service/pkg/logsink"
 	"github.com/akto-api-security/guardrails-service/pkg/mediaprovider"
+	"github.com/akto-api-security/guardrails-service/pkg/metrics"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -19,8 +25,14 @@ import (
 
 func main() {
 	cfg := config.LoadConfig()
-	logger := initLogger(cfg.LogLevel)
+
+	logSink := logsink.NewAsyncSink(dbabstractor.NewLogClient())
+	defer logSink.Close()
+
+	logger := initLogger(cfg.LogLevel, logSink)
 	defer logger.Sync()
+
+	utils.SetLogger(logger)
 
 	logger.Info("Starting guardrails-service",
 		zap.Int("port", cfg.ServerPort),
@@ -50,7 +62,26 @@ func main() {
 func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logger *zap.Logger) {
 	fileRegistry := fileprocessor.DefaultRegistry(cfg.File.MaxTextFileBytes)
 	registerMediaProcessors(fileRegistry, cfg, logger)
-	validationHandler := handlers.NewValidationHandler(validatorService, logger, cfg, fileRegistry)
+
+	acc := metrics.NewAccumulator()
+	dbClient := dbabstractor.NewClient(logger)
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			for accountId, batch := range acc.DrainAll() {
+				payload := make([]interface{}, len(batch))
+				for i, m := range batch {
+					payload[i] = m
+				}
+				if err := dbClient.IngestMetrics(payload); err != nil {
+					logger.Error("Failed to flush guardrail metrics", zap.String("account", accountId), zap.Error(err))
+				}
+			}
+		}
+	}()
+
+	validationHandler := handlers.NewValidationHandler(validatorService, logger, cfg, fileRegistry, acc)
 
 	router := setupRouter(validationHandler, logger)
 
@@ -123,28 +154,40 @@ func setupRouter(validationHandler *handlers.ValidationHandler, logger *zap.Logg
 	return router
 }
 
-func initLogger(logLevel string) *zap.Logger {
-	level := zapcore.InfoLevel
-	switch logLevel {
-	case "debug":
-		level = zapcore.DebugLevel
-	case "warn":
-		level = zapcore.WarnLevel
-	case "error":
-		level = zapcore.ErrorLevel
-	}
+func initLogger(logLevel string, logSink *logsink.AsyncSink) *zap.Logger {
+	consoleLevel := parseLogLevel(logLevel)
 
 	config := zap.NewDevelopmentConfig()
-	config.Level = zap.NewAtomicLevelAt(level)
-	config.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05")
+	config.Level = zap.NewAtomicLevelAt(consoleLevel)
+	config.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000")
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
-	logger, err := config.Build()
+	consoleLogger, err := config.Build()
 	if err != nil {
 		panic(fmt.Sprintf("Failed to initialize logger: %v", err))
 	}
 
-	return logger
+	if logSink == nil || !logSink.Enabled() {
+		return consoleLogger
+	}
+
+	// Console respects LOG_LEVEL; DB receives all levels (debug and above).
+	consoleCore := consoleLogger.Core()
+	dbCore := logSink.NewCore(zapcore.DebugLevel)
+	return zap.New(zapcore.NewTee(consoleCore, dbCore))
+}
+
+func parseLogLevel(logLevel string) zapcore.Level {
+	switch logLevel {
+	case "debug":
+		return zapcore.DebugLevel
+	case "warn":
+		return zapcore.WarnLevel
+	case "error":
+		return zapcore.ErrorLevel
+	default:
+		return zapcore.InfoLevel
+	}
 }
 
 func registerMediaProcessors(registry *fileprocessor.Registry, cfg *config.Config, logger *zap.Logger) {

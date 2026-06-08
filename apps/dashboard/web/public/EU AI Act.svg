@@ -1,0 +1,6 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="40" height="40" rx="4" fill="#003399"/>
+  <circle cx="20" cy="14" r="5.5" fill="none" stroke="#FFCC00" stroke-width="1.2"/>
+  <path d="M20 8.5v3M20 16.5v3M14.5 14h3M22.5 14h3" stroke="#FFCC00" stroke-width="1" stroke-linecap="round"/>
+  <text x="20" y="30" text-anchor="middle" fill="#FFCC00" font-family="system-ui,Segoe UI,sans-serif" font-size="6" font-weight="700">EU AI</text>
+</svg>

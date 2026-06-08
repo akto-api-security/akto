@@ -15,7 +15,14 @@ import {
 import PersistStore from '../../../../main/PersistStore';
 import AgenticSearchInput from '../../agentic/components/AgenticSearchInput';
 import guardrailApi from '../api';
-import { transformPolicyForBackend, SEVERITY } from '../utils';
+import {
+    transformPolicyForBackend,
+    SEVERITY,
+    GUARDRAIL_BEHAVIOUR,
+    normalizeBehaviourValue,
+    normalizePiiTypesFromPolicy,
+    resolveStoredPolicyBehaviour
+} from '../utils';
 import func from "@/util/func";
 import {
     PolicyDetailsStep,
@@ -36,6 +43,8 @@ import {
     AnomalyDetectionConfig,
     ToolsGuardrailsStep,
     ToolsGuardrailsConfig,
+    BlockedHostsStep,
+    BlockedHostsConfig,
     ServerSettingsStep,
     ServerSettingsConfig
 } from './steps';
@@ -122,11 +131,18 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableMaliciousTools, setEnableMaliciousTools] = useState(true);
     const [enableToolNameDescriptionMismatch, setEnableToolNameDescriptionMismatch] = useState(true);
 
+    // Step 11: Blocked hosts/paths (block-only)
+    // Host + path suggestions are sourced from the browser extension configs.
+    const [blockedHosts, setBlockedHosts] = useState([]);
+    const [browserConfigs, setBrowserConfigs] = useState([]);
+
     // Step 10: Server settings
+    const [applyToAllServers, setApplyToAllServers] = useState(true);
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
     const [applyOnRequest, setApplyOnRequest] = useState(false);
+    const [policyBehaviour, setPolicyBehaviour] = useState(GUARDRAIL_BEHAVIOUR.BLOCK);
 
     // Collections data
     const [mcpServers, setMcpServers] = useState([]);
@@ -186,13 +202,17 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableToolMisuse,
         enableMaliciousTools,
         enableToolNameDescriptionMismatch,
+        // Step 11
+        blockedHosts,
         // Step 10
+        applyToAllServers,
         selectedMcpServers,
         selectedAgentServers,
         mcpServers,
         agentServers,
         applyOnRequest,
-        applyOnResponse
+        applyOnResponse,
+        policyBehaviour
     });
 
     const getStepsWithSummary = () => {
@@ -260,6 +280,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
 
         steps.push({
+            number: BlockedHostsConfig.number,
+            title: BlockedHostsConfig.title,
+            summary: BlockedHostsConfig.getSummary(storedStateData),
+            ...BlockedHostsConfig.validate(storedStateData)
+        });
+        
+        steps.push({
             number: ServerSettingsConfig.number,
             title: ServerSettingsConfig.title,
             summary: ServerSettingsConfig.getSummary(storedStateData),
@@ -286,6 +313,23 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
     }, [allCollections]);
 
+    // Load browser extension configs - these supply host + path autosuggestions
+    // for the "Block host / path" step.
+    useEffect(() => {
+        let isActive = true;
+        (async () => {
+            try {
+                const response = await guardrailApi.fetchBrowserExtensionConfigs();
+                if (isActive && response?.browserExtensionConfigs) {
+                    setBrowserConfigs(response.browserExtensionConfigs);
+                }
+            } catch (error) {
+                console.error("Error fetching browser extension configs:", error);
+            }
+        })();
+        return () => { isActive = false; };
+    }, []);
+
     // Auto-scroll to bottom when new messages are added
     useEffect(() => {
         if (playgroundScrollRef.current && playgroundMessages.length > 0) {
@@ -302,32 +346,39 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
     }, [isEditMode, editingPolicy]);
 
+    const isVisibilityOnly = (collection) =>
+        collection.envType && collection.envType.some(tag =>
+            tag.keyName === 'visibilityOnly' && tag.value === 'true'
+        );
+
     const filterCollections = () => {
         setCollectionsLoading(true);
         try {
             const mcpServerCollections = allCollections.filter(collection => {
                 const hasMcpEnvType = collection.envType && collection.envType.some(envType =>
-                    envType.keyName === 'mcp-server' && envType.value === 'MCP Server'
+                    envType.keyName === 'mcp-server'
                 );
-                return hasMcpEnvType;
+                return hasMcpEnvType && !isVisibilityOnly(collection);
             })
             .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
             .map(collection => ({
                 label: collection.displayName,
-                value: collection.id.toString()
+                value: collection.id.toString(),
+                isInline: !collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe')
             }));
 
 
             const agentServerCollections = allCollections.filter(collection => {
                 const hasGenAiEnvType = collection.envType && collection.envType.some(envType =>
-                    envType.keyName === 'gen-ai' && envType.value === 'Gen AI'
+                    envType.keyName === 'gen-ai'
                 );
-                return hasGenAiEnvType;
+                return hasGenAiEnvType && !isVisibilityOnly(collection);
             })
             .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
             .map(collection => ({
                 label: collection.displayName,
-                value: collection.id.toString()
+                value: collection.id.toString(),
+                isInline: !collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe')
             }));
 
             setMcpServers(mcpServerCollections);
@@ -396,18 +447,24 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableToolMisuse(true);
         setEnableMaliciousTools(true);
         setEnableToolNameDescriptionMismatch(true);
+        setApplyToAllServers(true);
         setSelectedMcpServers([]);
         setSelectedAgentServers([]);
+        setBlockedHosts([]);
         setApplyOnResponse(false);
         setApplyOnRequest(false);
+        setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
     };
 
     const populateFormForEdit = (policy) => {
+        const resolvedPolicyBehaviour = resolveStoredPolicyBehaviour(policy);
         setName(policy.name || "");
         setDescription(policy.description || "");
         setBlockedMessage(policy.blockedMessage || "");
         setSeverity(policy.severity ? policy.severity.toUpperCase() : SEVERITY.MEDIUM.value);
         setApplyToResponses(policy.applyToResponses || false);
+
+        setPolicyBehaviour(resolvedPolicyBehaviour);
 
         // Content filters
         if (policy.contentFiltering) {
@@ -452,7 +509,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         // PII filters
         const hasPiiTypes = policy.piiTypes && policy.piiTypes.length > 0;
         setEnablePiiTypes(hasPiiTypes);
-        setPiiTypes(policy.piiTypes || []);
+        setPiiTypes(normalizePiiTypesFromPolicy(policy));
 
         // Regex patterns
         let hasRegexPatterns = false;
@@ -472,7 +529,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableRegexPatterns(hasRegexPatterns);
 
         // LLM prompt
-        setEnableLlmPrompt(policy.llmRule?.enabled || !!policy.llmRule?.userPrompt);
+        setEnableLlmPrompt(policy.llmRule?.enabled && !!policy.llmRule?.userPrompt);
         setLlmPrompt(policy.llmRule?.userPrompt || "");
         setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
 
@@ -517,6 +574,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         );
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
+        setApplyToAllServers(policy.applyToAllServers ?? true);
+
+        // Blocked hosts (block-only glob patterns: { pattern })
+        setBlockedHosts((policy.blockedHosts || []).map(entry => ({
+            pattern: entry.pattern || ""
+        })));
     };
 
     const handleClose = () => {
@@ -562,12 +625,19 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     };
                 });
 
+            // Drop empty rows and normalize the glob patterns before persisting.
+            const cleanedBlockedHosts = (blockedHosts || [])
+                .filter(entry => entry && (entry.pattern || "").trim())
+                .map(entry => ({ pattern: entry.pattern.trim() }));
+
+            const b = normalizeBehaviourValue(policyBehaviour);
             const guardrailData = {
                 name,
                 description,
                 blockedMessage,
                 severity,
                 applyToResponses,
+                behaviour: b,
                 contentFilters: {
                     harmfulCategories: enableHarmfulCategories ? harmfulCategoriesSettings : null,
                     promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
@@ -575,29 +645,25 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 },
                 deniedTopics,
                 wordFilters,
-                piiFilters: piiTypes,
-                regexPatterns: regexPatterns
+                piiFilters: enablePiiTypes ? piiTypes : [],
+                regexPatterns: enableRegexPatterns ? regexPatterns
                     .filter(r => r && r.pattern)
-                    .map(r => r.pattern),
-                regexPatternsV2: regexPatterns
+                    .map(r => r.pattern) : [],
+                regexPatternsV2: enableRegexPatterns ? regexPatterns
                     .filter(r => r && r.pattern && r.behavior)
                     .map(r => ({
                         pattern: r.pattern,
                         behavior: r.behavior.toLowerCase()
-                    })),
-                ...(enableLlmPrompt && llmPrompt && llmPrompt.trim() ? {
-                    llmRule: {
-                        enabled: true,
-                        userPrompt: llmPrompt.trim(),
-                        confidenceScore: llmConfidenceScore
-                    }
-                } : {}),
-                ...(enableBasePromptRule ? {
-                    basePromptRule: {
-                        enabled: true,
-                        confidenceScore: basePromptConfidenceScore
-                    }
-                } : {}),
+                    })) : [],
+                llmRule: {
+                    enabled: enableLlmPrompt && !!llmPrompt.trim(),
+                    userPrompt: llmPrompt.trim(),
+                    confidenceScore: llmConfidenceScore
+                },
+                basePromptRule: {
+                    enabled: enableBasePromptRule,
+                    confidenceScore: basePromptConfidenceScore
+                },
                 gibberishDetection: {
                     enabled: enableGibberishDetection,
                     confidenceScore: gibberishConfidenceScore
@@ -624,10 +690,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 },
                 url: enableExternalModel ? (url || null) : null,
                 confidenceScore: enableExternalModel ? confidenceScore : null,
+                applyToAllServers,
                 selectedMcpServers: selectedMcpServers,
                 selectedAgentServers: selectedAgentServers,
                 selectedMcpServersV2: transformedMcpServers,
                 selectedAgentServersV2: transformedAgentServers,
+                blockedHosts: cleanedBlockedHosts,
                 applyOnResponse,
                 applyOnRequest,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
@@ -781,9 +849,26 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableToolNameDescriptionMismatch={setEnableToolNameDescriptionMismatch}
                     />
                 );
+            case 11: {
+                // Host suggestions come from the browser extension configs.
+                const hostSuggestions = Array.from(new Set(
+                    (browserConfigs || [])
+                        .map(c => (c.host || "").trim())
+                        .filter(Boolean)
+                )).sort();
+                return (
+                    <BlockedHostsStep
+                        blockedHosts={blockedHosts}
+                        setBlockedHosts={setBlockedHosts}
+                        hostSuggestions={hostSuggestions}
+                    />
+                );
+            }
             case 10:
                 return (
                     <ServerSettingsStep
+                        applyToAllServers={applyToAllServers}
+                        setApplyToAllServers={setApplyToAllServers}
                         selectedMcpServers={selectedMcpServers}
                         setSelectedMcpServers={setSelectedMcpServers}
                         selectedAgentServers={selectedAgentServers}
@@ -795,6 +880,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         mcpServers={mcpServers}
                         agentServers={agentServers}
                         collectionsLoading={collectionsLoading}
+                        policyBehaviour={policyBehaviour}
+                        setPolicyBehaviour={setPolicyBehaviour}
                     />
                 );
             default:
@@ -810,6 +897,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     // Helper function to build policy data for playground testing
     const buildPlaygroundPolicyData = () => {
+        const b = normalizeBehaviourValue(policyBehaviour);
         const regexPatternsV2 = regexPatterns
             .filter(r => r && r.pattern && r.behavior)
             .map(r => ({
@@ -822,6 +910,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             description: description || "",
             blockedMessage: blockedMessage || "",
             applyToResponses: applyToResponses,
+            behaviour: b,
             contentFilters: {
                 harmfulCategories: enableHarmfulCategories ? harmfulCategoriesSettings : null,
                 promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
@@ -855,8 +944,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             tokenLimitDetection: buildDetectionConfig(enableTokenLimit, tokenLimitConfidenceScore),
             url: enableExternalModel ? (url || null) : null,
             confidenceScore: enableExternalModel ? confidenceScore : null,
+            applyToAllServers: applyToAllServers,
             selectedMcpServers: selectedMcpServers,
             selectedAgentServers: selectedAgentServers,
+            blockedHosts: (blockedHosts || [])
+                .filter(entry => entry && (entry.pattern || "").trim())
+                .map(entry => ({ pattern: entry.pattern.trim() })),
             applyOnResponse: applyOnResponse,
             applyOnRequest: applyOnRequest
         };

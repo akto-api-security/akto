@@ -14,6 +14,7 @@ import observeFunc from "../../observe/transform"
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import issuesApi from "../../issues/api";
 import { sendQuery } from '../../agentic/services/agenticService';
+import { isRunAutomatedTestsEnabled } from './smartTestingUtils';
 
 let headerDetails = [
   {
@@ -58,7 +59,7 @@ let headerDetails = [
 
 function TestRunResultPage(props) {
 
-  let { testingRunResult, runIssues, testSubCategoryMap } = props;
+  let { testingRunResult, runIssues, testSubCategoryMap, runAutomatedTests: runAutomatedTestsProp } = props;
 
   const location = useLocation()
   const selectedTestRunResult = TestingStore(state => state.selectedTestRunResult);
@@ -69,6 +70,7 @@ function TestRunResultPage(props) {
   const [azureBoardsWorkItemUrl, setAzureBoardsWorkItemUrl] = useState({});
   const [serviceNowTicketUrl, setServiceNowTicketUrl] = useState({});
   const [devrevWorkUrl, setDevRevWorkUrl] = useState({});
+  const [wizFindingUrl, setWizFindingUrl] = useState("");
   const subCategoryMap = LocalStore(state => state.subCategoryMap);
   const params = useParams();
   const hexId = params.hexId;
@@ -82,9 +84,15 @@ function TestRunResultPage(props) {
 
   const [conversations, setConversations] = useState([])
   const [conversationRemediationText, setConversationRemediationText] = useState(null)
-  const [validationFailed, setValidationFailed] = useState(false)
   const agenticConversationsRef = useRef([])
   const [showForbidden, setShowForbidden] = useState(false)
+
+  // store key: {mcp/agent name} -> value: {tools for that mcp/agent}
+  const [toolsCalls, setToolsCalls] = useState({})
+  const [runAutomatedTestsFetched, setRunAutomatedTestsFetched] = useState(false)
+  const runAutomatedTests =
+    isRunAutomatedTestsEnabled(runAutomatedTestsProp) ||
+    isRunAutomatedTestsEnabled(runAutomatedTestsFetched)
 
   // AI Chat state
   const [aiConversationId, setAiConversationId] = useState(null)
@@ -196,24 +204,75 @@ function TestRunResultPage(props) {
     }
   }
 
-  function buildTestResultMetadata() {
-    return {
-      type: "test_execution_result",
-      data: {
-        testName: selectedTestRunResult?.name,
-        testCategory: selectedTestRunResult?.testCategory,
-        testCategoryId: selectedTestRunResult?.testCategoryId,
-        vulnerable: selectedTestRunResult?.vulnerable,
-        severity: issueDetails?.severity,
-        url: selectedTestRunResult?.url || "",
-        originalMessage: selectedTestRunResult?.testResults?.[0]?.originalMessage || null,
-        attemptMessage: selectedTestRunResult?.testResults?.[0]?.message || null,
+  /** Keep /api/chatAndStore + MCP /chat body small; oversized payloads return 422 (Struts ERROR). */
+  const MAX_AI_HTTP_MSG_CHARS = 20000;
+  const MAX_AI_AGENTIC_CONTEXT_CHARS = 24000;
+
+  function truncateForAiContext(text, maxChars) {
+    if (text == null || text === '') return null;
+    if (text.length <= maxChars) return text;
+    return `${text.slice(0, maxChars)}\n\n[... truncated for context size ...]`;
+  }
+
+  function toPlainMetadataScalar(val) {
+    if (val == null || val === undefined) return '';
+    if (Array.isArray(val)) return val.map(String).join(', ');
+    if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') return String(val);
+    return '';
+  }
+
+  function formatHttpMessageIfPresent(raw) {
+    if (raw == null || raw === '') return null;
+    return truncateForAiContext(formatHttpMessage(raw), MAX_AI_HTTP_MSG_CHARS);
+  }
+
+  /** Same structure as Jira agentic attachment; reused for AI metadata. */
+  function buildAgenticConversationText(agenticConversations) {
+    if (!agenticConversations?.length) return '';
+    const separator = `\n\n${'='.repeat(60)}\n\n`;
+    return agenticConversations.map((conv, idx) => {
+      let turn = `Turn ${idx + 1}\n\nTested Interaction:\n${conv.finalSentPrompt}\n\nAI Agent:\n${conv.response}`;
+      if (conv.validationMessage && conv.validationMessage !== 'null') {
+        turn += `\n\nValidation Message:\n${conv.validationMessage}`;
       }
+      return turn;
+    }).join(separator);
+  }
+
+  function buildTestResultMetadata() {
+    const testResults = selectedTestRunResult?.testResults;
+    const tr0 = testResults?.[testResults.length - 1];
+    const isAgentic = Boolean(tr0?.resultTypeAgentic);
+    const rawAgentic = agenticConversationsRef.current;
+    const agenticText = isAgentic && rawAgentic?.length
+      ? truncateForAiContext(buildAgenticConversationText(rawAgentic), MAX_AI_AGENTIC_CONTEXT_CHARS)
+      : null;
+
+    const data = {
+      testName: toPlainMetadataScalar(selectedTestRunResult?.name),
+      testCategory: toPlainMetadataScalar(selectedTestRunResult?.testCategory),
+      testCategoryId: toPlainMetadataScalar(selectedTestRunResult?.testCategoryId),
+      vulnerable: Boolean(selectedTestRunResult?.vulnerable),
+      severity: toPlainMetadataScalar(issueDetails?.severity),
+      url: toPlainMetadataScalar(selectedTestRunResult?.url) || '',
+      originalMessage: formatHttpMessageIfPresent(tr0?.originalMessage),
+      attemptMessage: formatHttpMessageIfPresent(tr0?.message),
+    };
+    if (agenticText) {
+      data.agenticConversationContext = agenticText;
+    }
+    return {
+      type: 'test_execution_result',
+      data,
     };
   }
 
   async function handleGenerateAiOverview() {
     if (aiSummary || aiSummaryLoading || aiSummaryChecked) return;
+    if (!selectedTestRunResult?.id || !selectedTestRunResult?.testResults?.length) {
+      setToast(true, true, "Test result is still loading. Wait for the page to finish loading, then try again.");
+      return;
+    }
     setAiSummaryLoading(true);
     setAiSummaryChecked(true);
     try {
@@ -243,7 +302,7 @@ function TestRunResultPage(props) {
     setAiMessages(prev => [...prev, userMsg]);
     setAiLoading(true);
     try {
-      const response = await sendQuery(query, aiConversationId, "TEST_EXECUTION_RESULT", null);
+      const response = await sendQuery(query, aiConversationId, "TEST_EXECUTION_RESULT", buildTestResultMetadata());
       if (response?.conversationId && !aiConversationId) {
         setAiConversationId(response.conversationId);
       }
@@ -263,7 +322,24 @@ function TestRunResultPage(props) {
     }
   }
 
+  async function fetchTestingRunConfig() {
+    if (!hexId) {
+      setRunAutomatedTestsFetched(false)
+      return
+    }
+    try {
+      const resp = await api.fetchTestingRunResultSummaries(hexId)
+      const testingRun = resp?.testingRun
+      setRunAutomatedTestsFetched(isRunAutomatedTestsEnabled(testingRun?.runAutomatedTests))
+    } catch {
+      setRunAutomatedTestsFetched(false)
+    }
+  }
+
   async function fetchData() {
+    if (hexId) {
+      await fetchTestingRunConfig()
+    }
     if (hexId2 !== undefined) {
       try {
         if (testingRunResult === undefined) {
@@ -299,10 +375,16 @@ function TestRunResultPage(props) {
             const result = transform.prepareConversationsList(res)
             setConversations(result.conversations);
             setConversationRemediationText(result.remediationText || null)
-            setValidationFailed(result.validationFailed)
+            setToolsCalls(result.toolsCalls || {})
             agenticConversationsRef.current = res;
+          } else {
+            agenticConversationsRef.current = [];
           }
+        } else {
+          agenticConversationsRef.current = [];
         }
+      } else {
+        agenticConversationsRef.current = [];
       }
       setShowDetails(true)
     }
@@ -366,16 +448,7 @@ function TestRunResultPage(props) {
     if (sampleData.resultTypeAgentic) {
       const agenticConversations = agenticConversationsRef.current;
       if (agenticConversations && agenticConversations.length > 0) {
-        const separator = "\n\n" + "=".repeat(60) + "\n\n";
-
-        // File 1: Prompt/conversation messages
-        const conversationText = agenticConversations.map((conv, idx) => {
-          let turn = `Turn ${idx + 1}\n\nTested Interaction:\n${conv.finalSentPrompt}\n\nAI Agent:\n${conv.response}`;
-          if (conv.validationMessage && conv.validationMessage !== "null") {
-            turn += `\n\nValidation Message:\n${conv.validationMessage}`;
-          }
-          return turn;
-        }).join(separator);
+        const conversationText = buildAgenticConversationText(agenticConversations);
         attachFileToIssue(conversationText, null, jiraTicketKey, true);
 
         // File 2: HTTP request/response from testResults message
@@ -427,11 +500,13 @@ function TestRunResultPage(props) {
       let azureBoardsWorkItemUrlCopy = runIssues.azureBoardsWorkItemUrl || "";
       let serviceNowTicketUrlCopy = runIssues.servicenowIssueUrl || "";
       let devrevWorkUrlCopy = runIssues.devrevWorkUrl || "";
+      let wizFindingUrlCopy = runIssues.wizFindingUrl || "";
       const moreInfoSections = transform.getInfoSectionsHeaders()
       setJiraIssueUrl(jiraIssueCopy)
       setAzureBoardsWorkItemUrl(azureBoardsWorkItemUrlCopy)
       setServiceNowTicketUrl(serviceNowTicketUrlCopy)
       setDevRevWorkUrl(devrevWorkUrlCopy)
+      setWizFindingUrl(wizFindingUrlCopy)
       setInfoState(transform.fillMoreInformation(tmp[runIssues?.id?.testSubCategory], moreInfoSections, runIssuesArr, jiraIssueCopy, onClickButton))
       setRemediation(tmp[runIssues?.id?.testSubCategory]?.remediation)
       // setJiraIssueUrl(jiraIssueUrl)
@@ -450,8 +525,9 @@ function TestRunResultPage(props) {
     setAiSummaryLoading(false);
     setAiSummaryChecked(false);
     setSelectedTestRunResult({});
+    setRunAutomatedTestsFetched(false);
     fetchData();
-  }, [subCategoryMap, subCategoryFromSourceConfigMap, props?.testingRunResult, props?.runIssues, hexId2])
+  }, [subCategoryMap, subCategoryFromSourceConfigMap, props?.testingRunResult, props?.runIssues, hexId2, hexId, runAutomatedTestsProp])
 
   return (
     useFlyout ?
@@ -475,9 +551,9 @@ function TestRunResultPage(props) {
           azureBoardsWorkItemUrl={azureBoardsWorkItemUrl}
           serviceNowTicketUrl={serviceNowTicketUrl}
           devrevWorkUrl={devrevWorkUrl}
+          wizFindingUrl={wizFindingUrl}
           conversations={conversations}
           conversationRemediationText={conversationRemediationText}
-          validationFailed={validationFailed}
           showForbidden={showForbidden}
           aiSummary={aiSummary}
           aiSummaryLoading={aiSummaryLoading}
@@ -485,6 +561,8 @@ function TestRunResultPage(props) {
           aiLoading={aiLoading}
           onGenerateAiOverview={handleGenerateAiOverview}
           onSendFollowUp={handleSendFollowUp}
+          toolsCalls={toolsCalls}
+          runAutomatedTests={runAutomatedTests}
         />
       </>
       :
@@ -502,6 +580,7 @@ function TestRunResultPage(props) {
         conversations={conversations}
         conversationRemediationText={conversationRemediationText}
         showForbidden={showForbidden}
+        runAutomatedTests={runAutomatedTests}
       />
   )
 }

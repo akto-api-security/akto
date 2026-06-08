@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Button,
@@ -23,7 +23,7 @@ import Dropdown from '../../../components/layouts/Dropdown';
 import TlsAuth from '../user_config/TlsAuth';
 import SampleDataAuth from '../user_config/SampleDataAuth';
 import DigestAuth from '../user_config/DigestAuth';
-import { HARDCODED, LOGIN_REQUEST, SAMPLE_DATA, TLS_AUTH, DIGEST_AUTH } from "./TestRoleConstants"; 
+import { HARDCODED, LOGIN_REQUEST, SAMPLE_DATA, TLS_AUTH, DIGEST_AUTH, COPILOT_OAUTH } from "./TestRoleConstants";
 
 
 
@@ -43,6 +43,10 @@ const AuthComponent = ({
   advancedHeaderSettingsOpen,
   setAdvancedHeaderSettingsOpen,
   roleName,
+  hybridTestingEnabled = false,
+  miniTestingServiceNameOptions = [],
+  selectedMiniTestingServiceName = '',
+  setSelectedMiniTestingServiceName,
 }) => {
 
 
@@ -55,6 +59,8 @@ const AuthComponent = ({
   const [sampleDataAuthInfo, setSampleDataAuthInfo] = useState({ authParams: [] });
   const [tlsAuthInfo, setTlsAuthInfo] = useState({authParams:[]})
   const [digestAuthInfo, setDigestAuthInfo] = useState({ authParams: [] });
+  const [copilotOAuthInfo, setCopilotOAuthInfo] = useState({ tenantId: "", clientId: "", clientSecret: "" });
+  const [copilotConnecting, setCopilotConnecting] = useState(false);
 
   useEffect(() => {
     if (showAuthComponent && editableDoc >= 0 && initialItems?.authWithCondList?.[editableDoc]) {
@@ -71,6 +77,15 @@ const AuthComponent = ({
     { label: "Login Step Builder", value: "LOGIN_STEP_BUILDER" },
     { label: "JSON Recording", value: "RECORDED_FLOW" },
   ];
+
+  const runLoginFlowOnMenuItems = useMemo(
+    () => [
+      { label: "Default (dashboard)", value: "" },
+      ...miniTestingServiceNameOptions,
+    ],
+    [miniTestingServiceNameOptions]
+  );
+
 
   const setTlsInfo = (obj) => {
     setTlsAuthInfo(prev => ({
@@ -125,6 +140,7 @@ const AuthComponent = ({
     setEditableDocs(-1);
     setTlsAuthInfo({authParams:[]})
     setDigestAuthInfo({authParams:[]})
+    setCopilotOAuthInfo({ tenantId: "", clientId: "", clientSecret: "" })
     setOpenAuth(HARDCODED)
   };
 
@@ -228,6 +244,18 @@ const AuthComponent = ({
             null
           );
         }
+    } else if (openAuth === COPILOT_OAUTH) {
+        const authParamData = [{
+            type: COPILOT_OAUTH,
+            tenantId: copilotOAuthInfo.tenantId,
+            clientId: copilotOAuthInfo.clientId,
+            clientSecret: copilotOAuthInfo.clientSecret,
+        }];
+        if (editableDoc > -1) {
+          resp = await api.updateAuthInRole(initialItems.name, apiCond, urlRegexToSend, editableDoc, authParamData, COPILOT_OAUTH);
+        } else {
+          resp = await api.addAuthToRole(initialItems.name, apiCond, urlRegexToSend, authParamData, COPILOT_OAUTH, null);
+        }
     } else if (openAuth === DIGEST_AUTH) {
         const currentAutomationType = DIGEST_AUTH;
         const authParamData = digestAuthInfo.authParams;
@@ -251,9 +279,39 @@ const AuthComponent = ({
           );
         }
     }
-    handleCancel();
-    await saveAction(true, resp.selectedRole.authWithCondList);
-    func.setToast(true, false, "Auth mechanism added to role successfully.");
+    if (openAuth !== COPILOT_OAUTH) {
+      handleCancel();
+      await saveAction(true, resp.selectedRole.authWithCondList);
+      func.setToast(true, false, "Auth mechanism added to role successfully.");
+    }
+    return resp;
+  };
+
+  const handleCopilotSaveAndConnect = async () => {
+    if (!copilotOAuthInfo.tenantId || !copilotOAuthInfo.clientId || !copilotOAuthInfo.clientSecret) {
+      func.setToast(true, true, "Please fill in Tenant ID, Client ID, and Client Secret.");
+      return;
+    }
+    setCopilotConnecting(true);
+    try {
+      const resp = await handleSaveAuthMechanism();
+      if (!resp?.selectedRole) {
+        func.setToast(true, true, "Failed to save auth — no role returned.");
+        setCopilotConnecting(false);
+        return;
+      }
+      const roleId = resp.selectedRole.hexId;
+      const urlResp = await api.getCopilotOAuthAuthorizationUrl(roleId);
+      if (urlResp?.authorizationUrl) {
+        window.location.href = urlResp.authorizationUrl;
+      } else {
+        func.setToast(true, true, "Failed to get authorization URL.");
+        setCopilotConnecting(false);
+      }
+    } catch (e) {
+      func.setToast(true, true, "Error initiating OAuth flow: " + (e?.message || e));
+      setCopilotConnecting(false);
+    }
   };
 
   return showAuthComponent ? (
@@ -263,10 +321,10 @@ const AuthComponent = ({
       secondaryFooterActions={[
         { content: "Cancel", destructive: true, onAction: handleCancel },
       ]}
-      primaryFooterAction={{
+      primaryFooterAction={openAuth !== COPILOT_OAUTH ? {
         content: <div data-testid="save_token_details_button">Save</div>,
         onAction: handleSaveAuthMechanism,
-      }}
+      } : undefined}
     >
       <LegacyCard.Section title="Token details">
         <LegacyStack vertical>
@@ -333,6 +391,27 @@ const AuthComponent = ({
             transition={{ duration: "500ms", timingFunction: "ease-in-out" }}
             expandOnPrint
           >
+            {hybridTestingEnabled ? (
+              <>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "max-content max-content",
+                    gap: "10px",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text>Run login flow on:</Text>
+                  <Dropdown
+                    id="mini-testing-login-flow-target"
+                    selected={(v) => setSelectedMiniTestingServiceName(v ?? "")}
+                    menuItems={runLoginFlowOnMenuItems}
+                    initial={selectedMiniTestingServiceName ?? ""}
+                  />
+                </div>
+                <br />
+              </>
+            ) : null}
             <div
               style={{
                 display: "grid",
@@ -355,6 +434,7 @@ const AuthComponent = ({
                 extractInformation={true}
                 showOnlyApi={true}
                 setStoreData={handleLoginInfo}
+                miniTestingServiceName={selectedMiniTestingServiceName}
               />
             )}
             {automationType === "RECORDED_FLOW" && (
@@ -363,6 +443,7 @@ const AuthComponent = ({
                 showOnlyApi={true}
                 setStoreData={handleLoginInfo}
                 roleName={roleName}
+                miniTestingServiceName={selectedMiniTestingServiceName}
               />
             )}
           </Collapsible>
@@ -406,6 +487,52 @@ const AuthComponent = ({
             <DigestAuth setInformation={setDigestInfo}/>
           </Collapsible>
       </LegacyStack>
+      <LegacyStack vertical>
+          <Button
+            id={"copilot-oauth-expand-button"}
+            onClick={() => setOpenAuth(COPILOT_OAUTH)}
+            ariaExpanded={checkOpenAuth(COPILOT_OAUTH)}
+            icon={checkOpenAuth(COPILOT_OAUTH) ? ChevronDownMinor : ChevronRightMinor}
+            ariaControls="copilot-oauth"
+          >
+            Copilot Studio (Microsoft OAuth)
+          </Button>
+          <Collapsible
+            open={checkOpenAuth(COPILOT_OAUTH)}
+            id="copilot-oauth"
+            transition={{ duration: "500ms", timingFunction: "ease-in-out" }}
+            expandOnPrint
+          >
+            <VerticalStack gap="3">
+              <Text>Authenticate with Microsoft Copilot Studio using OAuth. Save your credentials and connect once — the refresh token is managed automatically.</Text>
+              <FormLayout>
+                <TextField
+                  label="Tenant ID"
+                  value={copilotOAuthInfo.tenantId}
+                  onChange={(v) => setCopilotOAuthInfo(p => ({ ...p, tenantId: v }))}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Client ID"
+                  value={copilotOAuthInfo.clientId}
+                  onChange={(v) => setCopilotOAuthInfo(p => ({ ...p, clientId: v }))}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Client Secret"
+                  type="password"
+                  value={copilotOAuthInfo.clientSecret}
+                  onChange={(v) => setCopilotOAuthInfo(p => ({ ...p, clientSecret: v }))}
+                  autoComplete="off"
+                />
+              </FormLayout>
+              <Button primary loading={copilotConnecting} onClick={handleCopilotSaveAndConnect}>
+                Save &amp; Connect with Microsoft
+              </Button>
+            </VerticalStack>
+          </Collapsible>
+      </LegacyStack>
+
       </LegacyCard.Section>
       <LegacyCard.Section>
         <VerticalStack gap={"2"}>

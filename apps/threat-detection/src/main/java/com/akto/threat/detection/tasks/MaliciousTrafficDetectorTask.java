@@ -1,13 +1,11 @@
 package com.akto.threat.detection.tasks;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.Iterator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -16,13 +14,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import com.akto.dto.*;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.enums.RedactionType;
 import com.akto.threat.detection.cache.AccountConfig;
 import com.akto.threat.detection.cache.AccountConfigurationCache;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.consumer.Consumer;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -32,7 +28,6 @@ import org.apache.kafka.common.TopicPartition;
 import com.akto.IPLookupClient;
 import com.akto.RawApiMetadataFactory;
 import com.akto.dao.context.Context;
-import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.data_actor.ClientActor;
 import com.akto.data_actor.DataActor;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
@@ -40,7 +35,6 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.api_protection_parse_layer.Rule;
 import com.akto.dto.monitoring.FilterConfig;
-import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
 import com.akto.hybrid_parsers.HttpCallParser;
@@ -57,9 +51,10 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Ra
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import com.akto.proto.http_response_param.v1.StringList;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
+import com.akto.threat.detection.cache.FilterCache;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
+import com.akto.threat.detection.cache.SequenceCache;
 import com.akto.threat.detection.constants.KafkaTopic;
-import com.akto.threat.detection.constants.RedisKeyInfo;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
 import com.akto.threat.detection.ip_api_counter.ParamEnumerationDetector;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ParamEnumerationConfig;
@@ -83,23 +78,16 @@ import io.lettuce.core.api.StatefulRedisConnection;
 Class is responsible for consuming traffic data from the Kafka topic.
 Pass data through filters and identify malicious traffic.
  */
-public class MaliciousTrafficDetectorTask implements Task {
+public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte[]> {
 
   private ThreatConfigurationEvaluator threatConfigEvaluator;
-  private final Consumer<String, byte[]> kafkaConsumer;
-  private final KafkaConfig kafkaConfig;
   private final HttpCallParser httpCallParser;
   private final WindowBasedThresholdNotifier windowBasedThresholdNotifier;
 
-  // Used for schema conformance and API level rate limiting
-  private WindowBasedThresholdNotifier apiCountWindowBasedThresholdNotifier = null;
-  private StatefulRedisConnection<String, String> apiCache = null;
 
   private final RawApiMetadataFactory rawApiFactory;
 
-  private Map<String, FilterConfig> apiFilters;
-  private int filterLastUpdatedAt = 0;
-  private int filterUpdateIntervalSec = 300;
+  private final FilterCache filterCache;
 
   private final KafkaProtoProducer internalKafka;
 
@@ -109,64 +97,37 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static final HttpRequestParams requestParams = new HttpRequestParams();
   private static final HttpResponseParams responseParams = new HttpResponseParams();
   private static final FilterConfig ipApiRateLimitFilter = Utils.getipApiRateLimitFilter();
+  private static final Set<String> DEFAULT_THREAT_PROTECTION_FILTER_IDS = new HashSet<>(Arrays.asList(
+      "LocalFileInclusionLFIRFI", "NoSQLInjection", "OSCommandInjection", "SQLInjection",
+      "SSRF", "SecurityMisconfig", "WindowsCommandInjection", "XSS"
+  ));
   private static Supplier<String> lazyToString;
   private DistributionCalculator distributionCalculator;
-  private com.akto.threat.detection.utils.ThreatDetectorWithStrategy threatDetector;
+  private ThreatDetectorWithStrategy threatDetector;
   private boolean apiDistributionEnabled;
   private ApiCountCacheLayer apiCacheCountLayer;
-  private static List<FilterConfig> successfulExploitFilters = new ArrayList<>();
-  private static List<FilterConfig> ignoredEventFilters = new ArrayList<>();
   private final AtomicInteger applyFilterLogCount = new AtomicInteger(0);
   private static final int MAX_APPLY_FILTER_LOGS = 1000;
   private static final int MAX_PAYLOAD_SIZE_BYTES = 50 * 1024; // 50 KB
 
-  // Kafka records per minute tracking
-  private int recordsReadCount = 0;
-  private long lastRecordCountLogTime = System.currentTimeMillis();
-  private String instanceId;
+  private static final FilterConfig SEQUENCE_ANOMALY_FILTER = Utils.buildSequenceAnomalyFilter();
+  private SequenceCache sequenceCache;
 
-  // Valid hostname tracking (non-IP, not localhost, no port)
-  private int validHostnameCount = 0;
-  private long lastValidHostnameLogTime = System.currentTimeMillis();
+
 
   private boolean modeLogged = false;
   private final HyperscanEventHandler hyperscanEventHandler;
 
-    public MaliciousTrafficDetectorTask(
+  public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, DistributionCalculator distributionCalculator, boolean apiDistributionEnabled, String instanceId) throws Exception {
-    this.kafkaConfig = trafficConfig;
-
-    this.instanceId = instanceId;
+    super(trafficConfig, KafkaTopic.TRAFFIC_LOGS, instanceId);
 
     Context.accountId.set(ClientActor.getAccountId());
-    Properties properties = new Properties();
-    properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, trafficConfig.getBootstrapServers());
-    properties.put(
-        ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
-        trafficConfig.getKeySerializer().getDeserializer());
-    properties.put(
-        ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-        trafficConfig.getValueSerializer().getDeserializer());
-    properties.put(
-        ConsumerConfig.MAX_POLL_RECORDS_CONFIG,
-        trafficConfig.getConsumerConfig().getMaxPollRecords());
-    properties.put(ConsumerConfig.GROUP_ID_CONFIG, trafficConfig.getGroupId());
-    properties.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, 100 * 1024 * 1024);
-    properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-    properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-
-    KafkaConfig.addAuthenticationFromEnv(properties);
 
     logger.warnAndAddToDb(instanceId + ": Creating Kafka consumer with bootstrap servers: " + trafficConfig.getBootstrapServers() +
                           ", groupId: " + trafficConfig.getGroupId() +
                           ", maxPollRecords: " + trafficConfig.getConsumerConfig().getMaxPollRecords());
-    try {
-      this.kafkaConsumer = new KafkaConsumer<>(properties);
-      logger.warnAndAddToDb(instanceId + ": Kafka consumer created successfully");
-    } catch (Exception e) {
-      logger.errorAndAddToDb(e, instanceId + ": FAILED to create Kafka consumer: " + e.getMessage());
-      throw e;
-    }
+    logger.warnAndAddToDb(instanceId + ": Kafka consumer created successfully");
 
     this.httpCallParser = new HttpCallParser(120, 1000);
     
@@ -176,15 +137,14 @@ public class MaliciousTrafficDetectorTask implements Task {
             new RedisBackedCounterCache(redisClient, "wbt"),
             new WindowBasedThresholdNotifier.Config(100, 10 * 60));
     
+    StatefulRedisConnection<String, String> apiCache = null;
     if (redisClient != null) {
-        this.apiCache = redisClient.connect();
+        apiCache = redisClient.connect();
         this.apiCacheCountLayer = new ApiCountCacheLayer(redisClient);
-        this.apiCountWindowBasedThresholdNotifier = new WindowBasedThresholdNotifier(
-          apiCacheCountLayer,
-          new WindowBasedThresholdNotifier.Config(100, 10 * 60));
     }
 
     this.threatConfigEvaluator = new ThreatConfigurationEvaluator(null, dataActor, apiCacheCountLayer);
+    this.filterCache = new FilterCache(dataActor, apiCache);
 
     // Initialize ParamEnumerationDetector with config values (or defaults)
     ParamEnumerationConfig paramEnumConfig = this.threatConfigEvaluator.getParamEnumerationConfig();
@@ -197,118 +157,63 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     this.threatDetector = new ThreatDetectorWithStrategy();
     this.hyperscanEventHandler = new HyperscanEventHandler(this::generateAndPushMaliciousEventRequest);
+    this.sequenceCache = new SequenceCache(dataActor);
   }
 
   private int MAX_KAFKA_DEBUG_MSGS = 100;
-  private static boolean kafkaPollingEnabled = System.getenv().getOrDefault("KAFKA_POLL_ENABLED", "true").equals("true");
 
   public Consumer<String, byte[]> getKafkaConsumer() {
     return kafkaConsumer;
   }
 
-  public void run() {
-    String topicName = "akto.api.logs2";
-    logger.warnAndAddToDb(this.instanceId + ": Subscribing to Kafka topic: " + topicName);
+  @Override
+  protected void beforePollLoop() {
     try {
-      this.kafkaConsumer.subscribe(Collections.singletonList(topicName));
-      logger.warnAndAddToDb(this.instanceId + ": Successfully subscribed to topic: " + topicName);
+      Context.accountId.set(ClientActor.getAccountId());
     } catch (Exception e) {
-      logger.errorAndAddToDb(e, this.instanceId + ": FAILED to subscribe to topic " + topicName + ": " + e.getMessage());
-      throw e;
+      Context.accountId.set(1000000);
+      e.printStackTrace();
     }
-
-    ExecutorService pollingExecutor = Executors.newSingleThreadExecutor();
-    pollingExecutor.execute(
-        () -> {
-          // Poll data from Kafka topic
-          try {
-            Context.accountId.set(ClientActor.getAccountId());
-          } catch (Exception e) {
-              Context.accountId.set(1000000);
-              e.printStackTrace();
-          }
-          
-          logger.warnAndAddToDb(this.instanceId + ": Starting Kafka polling loop");
-          logger.warnAndAddToDb(this.instanceId + ": Threat detection mode configured (will be determined per-account)");
-          AllMetrics.instance.collectInfraMetrics();
-
-          while (kafkaPollingEnabled) {
-            ConsumerRecords<String, byte[]> records =
-                kafkaConsumer.poll(
-                    Duration.ofMillis(kafkaConfig.getConsumerConfig().getPollDurationMilli()));
-
-            try {
-              int recordCount = records.count();
-              recordsReadCount += recordCount;
-
-              // Log records per minute
-              long currentTime = System.currentTimeMillis();
-              long timeDiff = currentTime - lastRecordCountLogTime;
-              if (timeDiff >= 60000) { // 60 seconds = 1 minute
-                logger.warnAndAddToDb(this.instanceId + ": Kafka records read in last minute: " + recordsReadCount +
-                                      " (avg " + String.format("%.2f", recordsReadCount / (timeDiff / 1000.0)) + " records/sec)");
-                logger.warnAndAddToDb(this.instanceId + ": Assigned partitions: " + kafkaConsumer.assignment());
-                logger.warnAndAddToDb(this.instanceId + ": Subscription: " + kafkaConsumer.subscription());
-                if (kafkaConsumer.assignment().isEmpty()) {
-                  logger.warnAndAddToDb(this.instanceId + ": WARNING - No partitions assigned! Consumer may not receive records.");
-                }
-                // Log committed offsets and end offsets (lag) for each assigned partition
-                try {
-                  Set<TopicPartition> assignedPartitions = kafkaConsumer.assignment();
-                  Map<TopicPartition, Long> endOffsets = kafkaConsumer.endOffsets(assignedPartitions);
-                  for (TopicPartition tp : assignedPartitions) {
-                    OffsetAndMetadata committed = kafkaConsumer.committed(tp);
-                    long committedOffset = committed != null ? committed.offset() : -1;
-                    long endOffset = endOffsets.getOrDefault(tp, -1L);
-                    long lag = (committed != null && endOffset >= 0) ? endOffset - committedOffset : -1;
-                    logger.warnAndAddToDb(this.instanceId + ": Partition " + tp + " committedOffset=" + committedOffset +
-                                          " endOffset=" + endOffset + " lag=" + lag);
-                  }
-                } catch (Exception e) {
-                  logger.errorAndAddToDb(e, this.instanceId + ": Error fetching offset info: " + e.getMessage());
-                }
-                recordsReadCount = 0;
-                lastRecordCountLogTime = currentTime;
-              }
-
-              AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
-              if (config == null) {
-                Context.isRedactPayload.set(false);
-              } else {
-                Context.isRedactPayload.set(config.isRedacted());
-              }
-
-              for (ConsumerRecord<String, byte[]> record : records) {
-                if (record.value().length > MAX_PAYLOAD_SIZE_BYTES) {
-                  continue;
-                }
-                AllMetrics.instance.setTdKafkaRecordCount(1);
-                AllMetrics.instance.setTdKafkaRecordSize(record.serializedValueSize());
-                HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
-                if(MAX_KAFKA_DEBUG_MSGS > 0){
-                  MAX_KAFKA_DEBUG_MSGS--;
-                  logger.infoAndAddToDb("Kafka record recieved " + httpResponseParam.toString());
-                }
-                if(ignoreTrafficFilter(httpResponseParam)){
-                  continue;
-                }
-                long startTime = System.currentTimeMillis();
-                processRecord(httpResponseParam);
-                AllMetrics.instance.setTdKafkaProcessLatency(System.currentTimeMillis() - startTime);
-
-              }
-
-              if (!records.isEmpty()) {
-                // Should we commit even if there are no records ?
-                kafkaConsumer.commitSync();
-              }
-            } catch (Exception e) {
-              logger.errorAndAddToDb("Error observed in processing record " + e.getMessage());
-              e.printStackTrace();
-            }
-          }
-        });
+    logger.warnAndAddToDb(this.instanceId + ": Starting Kafka polling loop");
+    AllMetrics.instance.collectInfraMetrics();
   }
+
+
+  @Override
+  void processRecords(ConsumerRecords<String, byte[]> records) {
+    try {
+      AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
+      if (config == null) {
+        Context.isRedactPayload.set(false);
+      } else {
+        Context.isRedactPayload.set(config.isRedacted());
+      }
+
+      logger.warnAndAddToDb(this.instanceId + ": Started Kafka polling loop");
+      for (ConsumerRecord<String, byte[]> record : records) {
+        if (AccountConfig.isGraphQLAccount() && record.value().length > MAX_PAYLOAD_SIZE_BYTES) {
+            continue;
+        }
+        AllMetrics.instance.setTdKafkaRecordCount(1);
+        AllMetrics.instance.setTdKafkaRecordSize(record.serializedValueSize());
+        HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
+        if (MAX_KAFKA_DEBUG_MSGS > 0) {
+          MAX_KAFKA_DEBUG_MSGS--;
+          logger.infoAndAddToDb("Kafka record recieved " + httpResponseParam.toString());
+        }
+        if (ignoreTrafficFilter(httpResponseParam)) {
+          continue;
+        }
+        long startTime = System.currentTimeMillis();
+        processRecord(httpResponseParam);
+        AllMetrics.instance.setTdKafkaProcessLatency(System.currentTimeMillis() - startTime);
+      }
+    } catch (Exception e) {
+      logger.errorAndAddToDb("Error observed in processing record " + e.getMessage());
+      e.printStackTrace();
+    }
+  }
+
 
   private boolean ignoreTrafficFilter(HttpResponseParam responseParam) {
     Map<String, StringList> headers = responseParam.getRequestHeadersMap();
@@ -330,198 +235,6 @@ public class MaliciousTrafficDetectorTask implements Task {
     return headers != null && headers.get("x-debug-trace") != null;
   }
 
-  private boolean isValidHostname(String hostname) {
-    try {
-      if (hostname == null || hostname.isEmpty()) {
-        return false;
-      }
-
-      // Remove port if present (e.g., "example.com:8080" -> "example.com")
-      String hostnameWithoutPort = hostname.split(":")[0];
-
-      // Check if it's localhost
-      if (hostnameWithoutPort.equalsIgnoreCase("localhost")) {
-        return false;
-      }
-
-      // Simple check: if lowercase != uppercase, it has letters (valid hostname)
-      // This elegantly filters out IP addresses (which are case-insensitive)
-      // Examples:
-      //   "192.168.1.1" -> toLowerCase() == toUpperCase() -> false (IP)
-      //   "example.com" -> toLowerCase() != toUpperCase() -> true (valid hostname)
-      //   "::1" -> toLowerCase() == toUpperCase() -> false (IPv6)
-      return !hostnameWithoutPort.toLowerCase().equals(hostnameWithoutPort.toUpperCase());
-    } catch (Exception e) {
-      return false;
-    }
-  }
-
-  private void trackAndLogValidHostname(HttpResponseParams responseParam) {
-    Map<String, List<String>> headers = responseParam.getRequestParams().getHeaders();
-    String hostname = null;
-    if (headers != null && headers.containsKey("host") && !headers.get("host").isEmpty()) {
-      hostname = headers.get("host").get(0);
-    }
-    if (isValidHostname(hostname)) {
-      validHostnameCount++;
-    }
-
-    // Log valid hostname count every minute
-    long currentTime = System.currentTimeMillis();
-    long validHostnameTimeDiff = currentTime - lastValidHostnameLogTime;
-    if (validHostnameTimeDiff >= 60000) { // 60 seconds = 1 minute
-      logger.warnAndAddToDb("Valid hostnames in last minute: " + validHostnameCount +
-                            " (non-IP, not localhost, no port) in " + String.format("%.2f", validHostnameTimeDiff / 1000.0) + " seconds");
-      validHostnameCount = 0;
-      lastValidHostnameLogTime = currentTime;
-    }
-  }
-
-  private Map<String, FilterConfig> getFilters() {
-    int now = (int) (System.currentTimeMillis() / 1000);
-    if (now - filterLastUpdatedAt < filterUpdateIntervalSec) {
-      return apiFilters;
-    }
-
-    List<YamlTemplate> templates = dataActor.fetchFilterYamlTemplates();
-    apiFilters = FilterYamlTemplateDao.fetchFilterConfig(false, templates, false);
-    logger.debugAndAddToDb("total filters fetched  " + apiFilters.size());
-    this.filterLastUpdatedAt = now;
-
-
-    // Extract successful exploit filters
-    successfulExploitFilters.clear();
-    // Extract ignored event filters
-    ignoredEventFilters.clear();
-
-    Iterator<Map.Entry<String, FilterConfig>> iterator = apiFilters.entrySet().iterator();
-    while (iterator.hasNext()) {
-        Map.Entry<String, FilterConfig> entry = iterator.next();
-        FilterConfig filter = entry.getValue();
-        if (filter.getInfo() != null && filter.getInfo().getCategory() != null) {
-            String categoryName = filter.getInfo().getCategory().getName();
-            if (Constants.THREAT_PROTECTION_SUCCESSFUL_EXPLOIT_CATEGORY.equalsIgnoreCase(categoryName)) {
-                successfulExploitFilters.add(filter);
-                iterator.remove();
-            } else if (Constants.THREAT_PROTECTION_IGNORED_EVENTS_CATEGORY.equalsIgnoreCase(categoryName)) {
-                ignoredEventFilters.add(filter);
-                iterator.remove();
-            }
-        }
-    }
-
-    // Only keep aggregated filters
-    apiFilters.entrySet().removeIf(entry -> !entry.getKey().toLowerCase().contains("aggregate"));
-    logger.debugAndAddToDb("aggregated filters kept: " + apiFilters.size());
-
-    return apiFilters;
-  }
-
-
-  private String getApiSchema(int apiCollectionId) {
-    String apiSchema = null;
-    try {
-      apiSchema = this.apiCache.sync().get(Constants.AKTO_THREAT_DETECTION_CACHE_PREFIX + apiCollectionId);
-
-      if (apiSchema != null && !apiSchema.isEmpty()) {
-        apiSchema = GzipUtils.unzipString(apiSchema);
-
-        return apiSchema;
-      }
-
-      apiSchema = dataActor.fetchOpenApiSchema(apiCollectionId);
-
-      if (apiSchema == null || apiSchema.isEmpty()) {
-        logger.warnAndAddToDb("No schema found for api collection id: "+ apiCollectionId);
-
-        return null;
-      }
-      this.apiCache.sync().setex(Constants.AKTO_THREAT_DETECTION_CACHE_PREFIX + apiCollectionId, Constants.ONE_DAY_TIMESTAMP, apiSchema);
-      // unzip this schema using gzip
-      apiSchema = GzipUtils.unzipString(apiSchema);
-    } catch (Exception e) {
-      logger.errorAndAddToDb(e, "Error while fetching api schema for collectionId: "+ apiCollectionId);
-    }
-    return apiSchema;
-  }
-
-  public static List<SchemaConformanceError> handleSchemaConformFilter(HttpResponseParams responseParam, ApiInfo.ApiInfoKey apiInfoKey, List<SchemaConformanceError> errors){
-    // Early return if status code not in 200-300
-    if(responseParam.getStatusCode() < 200 || responseParam.getStatusCode() >= 300){
-      return errors;
-    }
-
-    // Get API info data from cache (guaranteed non-null)
-    AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
-    Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = config.getApiInfoUrlToMethods();
-    Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = config.getApiCollectionUrlTemplates();
-
-    if(apiInfoUrlToMethods.isEmpty() && apiCollectionUrlTemplates.isEmpty()) {
-      logger.infoAndAddToDb("No api infos found for validating schema");
-      return errors;
-    }
-
-    int apiCollectionId = apiInfoKey.getApiCollectionId();
-    String url = apiInfoKey.getUrl();
-    URLMethods.Method method = apiInfoKey.getMethod();
-
-    // Normalize URL: remove query parameters, fragments, and trailing slashes
-    url = ApiInfo.getNormalizedUrl(url);
-
-    // Check if exact URL + method combination exists
-    String urlKey = apiCollectionId + ":" + url;
-    Set<URLMethods.Method> methods = apiInfoUrlToMethods.get(urlKey);
-
-    // Case 1: Both URL and method found - no error
-    if(methods != null && methods.contains(method)){
-      return errors;
-
-    }else if(methods != null && !methods.contains(method)){
-      // Case 2: URL found but method not found - new method detected
-      RequestValidator.addError("#/paths" + url, method.name(), "method",
-        String.format("Method %s not available for path %s in discovered traffic",
-          method.name(), responseParam.getRequestParams().getURL()));
-          return RequestValidator.getErrors();
-    }
-
-
-    // Case 3: URL not found in static URLs, check in template URLs
-    List<URLTemplate> urlTemplates = apiCollectionUrlTemplates.get(apiCollectionId);
-    if(urlTemplates == null || urlTemplates.isEmpty()){
-      // No templates for this collection - URL not found
-      logger.debugAndAddToDb("Schema conformance error: URL not found in discovered traffic - " +
-                             url + " " + method);
-
-      RequestValidator.addError("#/paths", url, "url",
-        "API not found in discovered traffic: " + method + " " + url);
-      return RequestValidator.getErrors();
-    }
-
-    // Single-pass template matching: check URL pattern and method together
-    for(URLTemplate urlTemplate: urlTemplates){
-      URLTemplate.MatchResult result = urlTemplate.matchTemplate(url, method);
-
-      if(result == URLTemplate.MatchResult.FULL_MATCH) {
-        return errors;  // Perfect match - both URL pattern and method
-      }
-
-      if(result == URLTemplate.MatchResult.URL_MATCH_METHOD_MISMATCH) {
-        // URL pattern matched but method doesn't match - new method detected
-        RequestValidator.addError("#/paths" + url, method.name(), "method",
-          String.format("Method %s not available for path %s template %s in discovered traffic",
-            method.name(), responseParam.getRequestParams().getURL(), urlTemplate.getTemplateString()));
-       
-        return RequestValidator.getErrors();
-      }
-    }
-
-    // No template matched at all - URL pattern not found
-    RequestValidator.addError("#/paths", url, "url",
-        "API not found in discovered traffic: " + method + " " + url);
-    return RequestValidator.getErrors();
-  }
-
-
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
     String actor = this.threatConfigEvaluator.getActorId(responseParam);
@@ -530,19 +243,26 @@ public class MaliciousTrafficDetectorTask implements Task {
       return;
     }
     AccountConfig accountConfig = AccountConfigurationCache.getInstance().getConfig(dataActor);
-    boolean isHyperscanOnly = accountConfig != null && accountConfig.isHyperscanEnabled();
+    boolean isHyperscanEnabled = accountConfig != null && accountConfig.isHyperscanEnabled();
+
+    Map<String, FilterConfig> filters = this.filterCache.getFilters();
+
+    // When hyperscan is enabled, skip default threat protection filters (hyperscan handles them)
+    // Only custom YAML templates should run through the filter loop
+    if (isHyperscanEnabled && filters != null && !filters.isEmpty()) {
+      filters = new HashMap<>(filters);
+      filters.keySet().removeAll(DEFAULT_THREAT_PROTECTION_FILTER_IDS);
+    }
 
     if (!modeLogged) {
-      String mode = isHyperscanOnly ? "HYPERSCAN" : "FILTER MODE";
+      String mode = isHyperscanEnabled ? "HYPERSCAN" : "FILTER MODE";
       logger.warnAndAddToDb(instanceId + ": Running " + mode + " detection");
       modeLogged = true;
     }
 
-    getFilters();
-
     RawApi rawApi = null;
     RawApiMetadata metadata = null;
-    if (!successfulExploitFilters.isEmpty() || !ignoredEventFilters.isEmpty()) {
+    if ((filters != null && !filters.isEmpty()) || isHyperscanEnabled) {
       rawApi = RawApi.buildFromMessageNew(responseParam);
       metadata = this.rawApiFactory.buildFromHttp(rawApi.getRequest(), rawApi.getResponse());
       rawApi.setRawApiMetdata(metadata);
@@ -564,22 +284,25 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     // Use template URL if available, otherwise fall back to static URL
     // This ensures API counts aggregate on template URLs (e.g., /api/users/INTEGER instead of /api/users/123)
-    String urlForAggregation = matchedTemplate != null ? matchedTemplate.getTemplateString() : url;
+    String urlForAggregation = matchedTemplate != null ? matchedTemplate.getTemplateString() : threatDetector.cleanUrl(url);
 
     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
 
-    // Increment API count using template URL for proper aggregation (skip for default collection)
-    String apiHitCountKey = Utils.buildApiHitCountKey(apiCollectionId, urlForAggregation, method.toString());
-    // if (apiCollectionId != 0 && this.apiCountWindowBasedThresholdNotifier != null) {
-    //   this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
-    // }
-
-    List<SchemaConformanceError> errors = null;
+    // Sequence anomaly detection — pure in-memory, no Redis, no locking (single-threaded loop)
+    boolean isSequenceEnabled = accountConfig != null && accountConfig.isBehavioralSequenceEnabled();
+    if(isSequenceEnabled){
+      checkSequenceAnomaly(actor, apiCollectionId, urlForAggregation, method, responseParam);
+    }
 
     boolean successfulExploit = false;
     boolean isIgnoredEvent = false;
-    if (!ignoredEventFilters.isEmpty()) {
-      isIgnoredEvent = threatDetector.isIgnoredEvent(ignoredEventFilters, rawApi, apiInfoKey);
+    if (rawApi != null) {
+      if (!filterCache.getIgnoredEventFilters().isEmpty()) {
+        isIgnoredEvent = threatDetector.isIgnoredEvent(filterCache.getIgnoredEventFilters(), rawApi, apiInfoKey);
+      }
+      if (!filterCache.getSuccessfulExploitFilters().isEmpty()) {
+        successfulExploit = threatDetector.isSuccessfulExploit(filterCache.getSuccessfulExploitFilters(), rawApi, apiInfoKey);
+      }
     }
 
     if (apiDistributionEnabled && apiCollectionId != 0) {
@@ -603,24 +326,28 @@ public class MaliciousTrafficDetectorTask implements Task {
       String countryCode = metadata != null && metadata.getCountryCode() != null ? metadata.getCountryCode() : "";
       String destCountryCode = metadata != null && metadata.getDestCountryCode() != null ? metadata.getDestCountryCode() : "";
 
+      Rule apiLevelRule = filterCache.getApiLevelRateLimitRule();
+      int apiLevelWindow = apiLevelRule != null ? apiLevelRule.getCondition().getWindowThreshold() : 0;
+      int apiLevelThreshold = apiLevelRule != null ? apiLevelRule.getCondition().getMatchCount() : 0;
+
       this.distributionCalculator.processRequest(
           distributionKey, curEpochMin, ipApiCmsKey, ratelimitConfig.getPeriod(),
           ratelimit, ratelimitConfig.getMitigationPeriod(),
           actor, host, responseParam.getAccountId(), responseParam.getTime(),
-          countryCode, destCountryCode);
+          countryCode, destCountryCode, apiLevelWindow, apiLevelThreshold);
     }
 
     // Run Hyperscan if enabled
-    if (isHyperscanOnly) {
-      RedactionType hsRedactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
+    if (isHyperscanEnabled) {
+      RedactionType hsRedactionType = Utils.getRedactionType(responseParam.getRequestParams().getHeaders(), dataActor);
       hyperscanEventHandler.detectAndPushEvents(
           responseParam, apiInfoKey, actor, metadata,
           successfulExploit, isIgnoredEvent, hsRedactionType);
     }
 
-    // Only run filter loop if there are aggregated filters
-    if (apiFilters.size() > 0) {
-      for (FilterConfig apiFilter : apiFilters.values()) {
+    // Run custom filter loop
+    if (filters != null && !filters.isEmpty()) {
+      for (FilterConfig apiFilter : filters.values()) {
       boolean hasPassedFilter = false;
       boolean successFilterPassed = false;
       boolean failureFilterPassed = false;
@@ -643,7 +370,7 @@ public class MaliciousTrafficDetectorTask implements Task {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
         // vulnerable = handleSchemaConformFilter(responseParam, apiInfoKey, vulnerable); 
         
-        String apiSchema = getApiSchema(apiCollectionId);
+        String apiSchema = filterCache.getApiSchema(apiCollectionId);
 
         if (apiSchema == null || apiSchema.isEmpty()) {
           continue;
@@ -703,9 +430,6 @@ public class MaliciousTrafficDetectorTask implements Task {
       // If a request passes the filter and ignore doesn't match, then it's a malicious request,
       // and so we push it to kafka
       if (hasPassedFilter) {
-        if (!successfulExploitFilters.isEmpty()) {
-          successfulExploit = threatDetector.isSuccessfulExploit(successfulExploitFilters, rawApi, apiInfoKey);
-        }
         logger.debugAndAddToDb("filter condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
 
         // Capture threat positions for LFI, OS Command Injection, and SSRF filters
@@ -726,7 +450,7 @@ public class MaliciousTrafficDetectorTask implements Task {
         }
         
         // Later we will also add aggregation support
-        RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
+        RedactionType redactionType = Utils.getRedactionType(responseParam.getRequestParams().getHeaders(), dataActor);
         // Eg: 100 4xx requests in last 10 minutes.
         // But regardless of whether request falls in aggregation or not,
         // we still push malicious requests to kafka
@@ -744,10 +468,7 @@ public class MaliciousTrafficDetectorTask implements Task {
         String aggKey = actor + "|" + groupKey;
 
 
-        SampleMaliciousRequest maliciousReq = null;
-        if (!isAggFilter || !apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
-          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, vulnerable, successfulExploit, isIgnoredEvent, redactionType);
-        }
+        SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, vulnerable, successfulExploit, isIgnoredEvent, redactionType);
 
         if (!isAggFilter) {
           generateAndPushMaliciousEventRequest(
@@ -776,16 +497,10 @@ public class MaliciousTrafficDetectorTask implements Task {
           }
 
           if (apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
-              if (this.apiCountWindowBasedThresholdNotifier == null) {
                 continue;
-              }
-              shouldNotify = this.apiCountWindowBasedThresholdNotifier.calcApiCount(apiHitCountKey, responseParam.getTime(), rule);
-              if (shouldNotify) {
-                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, vulnerable, successfulExploit, isIgnoredEvent, redactionType);
-              }
-          } else {
-              shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule, shouldIncrement, breachFilterPassed);
           }
+
+          shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule, shouldIncrement, breachFilterPassed);
 
           if (shouldNotify) {
             logger.debugAndAddToDb("aggregate condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
@@ -802,12 +517,38 @@ public class MaliciousTrafficDetectorTask implements Task {
     }
     }
 
+  private void checkSequenceAnomaly(String actor, int apiCollectionId, String urlForAggregation,
+      URLMethods.Method method, HttpResponseParams responseParam) {
+    if (apiCollectionId == 0) return;
+
+    String currentApiKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlForAggregation, method).toString();
+    boolean shouldAlert = sequenceCache.checkSequenceAnomaly(actor, currentApiKey);
+
+    if (shouldAlert) {
+      RedactionType redactionType = Utils.getRedactionType(responseParam.getRequestParams().getHeaders(), dataActor);
+      SampleMaliciousRequest seqReq = Utils.buildSampleMaliciousRequest(
+          actor, responseParam, SEQUENCE_ANOMALY_FILTER, null, null, false, false, redactionType);
+      generateAndPushMaliciousEventRequest(
+          SEQUENCE_ANOMALY_FILTER, actor, responseParam, seqReq, EventType.EVENT_TYPE_SINGLE, "Anomaly");
+    }
+  }
+
   private void generateAndPushMaliciousEventRequest(
       FilterConfig apiFilter,
       String actor,
       HttpResponseParams responseParam,
       SampleMaliciousRequest maliciousReq,
       EventType eventType) {
+    generateAndPushMaliciousEventRequest(apiFilter, actor, responseParam, maliciousReq, eventType, "Rule-Based");
+  }
+
+  private void generateAndPushMaliciousEventRequest(
+      FilterConfig apiFilter,
+      String actor,
+      HttpResponseParams responseParam,
+      SampleMaliciousRequest maliciousReq,
+      EventType eventType,
+      String detectionType) {
     
     // Extract host from request headers
     String host = null;
@@ -837,7 +578,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setSubCategory(apiFilter.getInfo().getSubCategory())
             .setSeverity(apiFilter.getInfo().getSeverity())
             .setMetadata(maliciousReq.getMetadata())
-            .setType("Rule-Based")
+            .setType(detectionType)
             .setSuccessfulExploit(maliciousReq.getSuccessfulExploit())
             .setStatus(maliciousReq.getStatus())
             .setHost(host != null ? host : "")
@@ -909,53 +650,4 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   
 
-  /**
-   * Determines the redaction type based on account settings and host information.
-   *
-   * @param headers Request headers map
-   * @return RedactionType indicating the level of redaction to apply
-   */
-  private RedactionType getRedactionType(Map<String, List<String>> headers) {
-    try {
-      if (Context.isRedactPayload.get() != null && Context.isRedactPayload.get()) {
-        return RedactionType.REDACT_ALL;
-      }
-      // Extract host from headers
-      String host = extractHostFromHeaders(headers);
-      if (host != null && !host.isEmpty()) {
-        int hostHashCode = host.hashCode();
-          AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
-          Boolean isApiCollectionRedacted = config.isApiCollectionRedacted(hostHashCode);
-          if(isApiCollectionRedacted != null && isApiCollectionRedacted){
-              return RedactionType.REDACT_BY_API_COLLECTION;
-          }
-      }
-      if(SingleTypeInfo.isCustomDataTypeAvailable(Context.accountId.get())){
-          return RedactionType.REDACT_BY_CUSTOM_FIELD;
-      }
-    return  RedactionType.NONE;
-
-    } catch (Exception e) {
-      logger.errorAndAddToDb(e, "Error determining redaction type, defaulting to ALL");
-      return RedactionType.NONE;
-    }
-  }
-
-  /**
-   * Extracts host value from request headers.
-   * Checks in order: host, :authority, authority
-   *
-   * @param headers Request headers map
-   * @return Host value or null if not found
-   */
-  private String extractHostFromHeaders(Map<String, List<String>> headers) {
-    if (headers == null || headers.isEmpty()) {
-      return null;
-    }
-    List<String> hostValues = headers.get("host");
-    if (hostValues != null && !hostValues.isEmpty()) {
-      return hostValues.get(0);
-    }
-    return null;
-  }
 }

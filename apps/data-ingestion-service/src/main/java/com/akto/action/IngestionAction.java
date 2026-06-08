@@ -1,13 +1,12 @@
 package com.akto.action;
 
-import java.util.Base64;
 import java.util.List;
 
+import com.akto.data_actor.ClientActor;
 import com.akto.dto.IngestDataBatch;
 import com.akto.log.LoggerMaker;
+import com.akto.util.Constants;
 import com.akto.utils.KafkaUtils;
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.interfaces.DecodedJWT;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -68,6 +67,7 @@ public class IngestionAction extends ActionSupport {
                     payload.setPath("/");
                 }
 
+                payload.setTag(setObserveMode(payload.getTag()));
                 KafkaUtils.insertData(payload, Boolean.TRUE.equals(payload.getPublishToGuardrails()));
             }
         } catch (Exception e) {
@@ -75,6 +75,16 @@ public class IngestionAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private static String setObserveMode(String tag) {
+        try {
+            BasicDBObject tagObj = (tag != null && !tag.isEmpty()) ? BasicDBObject.parse(tag) : new BasicDBObject();
+            tagObj.put(Constants.AKTO_GUARDRAIL_MODE, Constants.AKTO_GUARDRAIL_MODE_OBSERVE);
+            return tagObj.toJson();
+        } catch (Exception e) {
+            return tag;
+        }
     }
 
     public static void printLogs(String msg) {
@@ -89,18 +99,8 @@ public class IngestionAction extends ActionSupport {
     }
 
     public static int getAccountId() {
-        try {
-            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
-            DecodedJWT jwt = JWT.decode(token);
-            String payload = jwt.getPayload();
-            byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
-            String decodedPayload = new String(decodedBytes);
-            BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
-            return (int) basicDBObject.getInt("accountId");
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("checkaccount error" + e.getStackTrace());
-            return 0;
-        }
+        Integer id = ClientActor.getAbstractorAccountIdFromEnvOrNull();
+        return id != null ? id : 0;
     }
 
     public List<IngestDataBatch> getBatchData() {

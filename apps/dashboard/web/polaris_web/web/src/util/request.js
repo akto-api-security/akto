@@ -62,7 +62,17 @@ const err = async (error) => {
     case 403:
 
       if (message.localeCompare(standardMessage) != 0) {
-        func.setToast(true, true, message);
+        // Check if this is a NO_ACCESS error from the custom response header
+        const isNoAccessError = error.response?.headers?.['x-no-access-error'] === 'true';
+
+        if (isNoAccessError) {
+          // Set persistent alert for NO_ACCESS errors
+          window.SHOW_NO_ACCESS_ALERT = true;
+          window.NO_ACCESS_ALERT_MESSAGE = message;
+        } else {
+          func.setToast(true, true, message);
+        }
+
         if (window?.mixpanel?.track && error?.config?.url) {
           window.mixpanel.track("UNAUTHORIZED_API_BLOCKED", {
             "api": error.config.url

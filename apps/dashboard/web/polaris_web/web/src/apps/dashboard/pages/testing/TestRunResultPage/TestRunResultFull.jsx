@@ -47,7 +47,7 @@ function TestRunResultFull(props) {
     const {
         selectedTestRunResult, testingRunResult, loading, issueDetails, getDescriptionText, infoState, headerDetails,
         hexId, source,
-        remediationSrc, conversations, conversationRemediationText, showForbidden    } = props
+        remediationSrc, conversations, conversationRemediationText, showForbidden, runAutomatedTests    } = props
 
     const [fullDescription, setFullDescription] = useState(false)
     const [remediationText, setRemediationText] = useState("")
@@ -90,7 +90,7 @@ function TestRunResultFull(props) {
                 <Scrollable style={{maxHeight: '40vh'}}>
                   <VerticalStack gap={1}>
                       
-                        {testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].map((x) => <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
+                        {testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].map((x, idx) => <div key={idx} style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
                           {"[" + x["timestamp"] + "] [" + x["testLogType"] + "] " +x["message"]}
                           </div>)}
                   </VerticalStack>
@@ -112,6 +112,8 @@ function TestRunResultFull(props) {
                 conversations={conversations}
                 onSendMessage={() => {}}
                 isStreaming={false}
+                testResults={selectedTestRunResult?.testResults || []}
+                runAutomatedTests={runAutomatedTests}
             />
         </LegacyCard>
     )
@@ -120,14 +122,15 @@ function TestRunResultFull(props) {
         <SampleDataList
           key={"sampleData"}
           sampleData={selectedTestRunResult?.testResults.map((result) => {
+            const validationReason = result.validationReason || "";
             if (result.errors && result.errors.length > 0) {
               let errorList = result.errors.join(", ");
-              return { errorList: errorList }
+              return { errorList: errorList, validationReason }
             }
             if (result.originalMessage || result.message) {
-              return { originalMessage: result.originalMessage, message: result.message, highlightPaths: [] }
+              return { originalMessage: result.originalMessage, message: result.message, highlightPaths: [], validationReason }
             }
-            return { errorList: "No data found" }
+            return { errorList: "No data found", validationReason }
           })}
           isNewDiff={true}
           vertical={errorsPresent}
@@ -140,14 +143,15 @@ function TestRunResultFull(props) {
         <SampleDataList
           key={"sampleDataAgentic"}
           sampleData={selectedTestRunResult?.testResults.map((result) => {
+            const validationReason = result.validationReason || "";
             if (result.errors && result.errors.length > 0) {
               let errorList = result.errors.join(", ");
-              return { errorList: errorList }
+              return { errorList: errorList, validationReason }
             }
             if (result.message) {
-              return { originalMessage: result.message, message: result.message, highlightPaths: [] }
+              return { originalMessage: result.message, message: result.message, highlightPaths: [], validationReason }
             }
-            return { errorList: "No data found" }
+            return { errorList: "No data found", validationReason }
           })}
           isNewDiff={true}
           vertical={false}
@@ -170,7 +174,7 @@ function TestRunResultFull(props) {
           </LegacyCard>
         ,
         (testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].length > 0) ? testLogsComponent : null,
-        !hasConversations && (!func.showTestSampleData(selectedTestRunResult)) && testErrorComponent,
+        !hasConversations && (!func.showTestSampleData(selectedTestRunResult)) ? testErrorComponent : null,
         attemptCard,
         evidenceCard,
         attemptCardForConversations,

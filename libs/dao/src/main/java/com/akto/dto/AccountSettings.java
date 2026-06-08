@@ -59,6 +59,9 @@ public class AccountSettings {
     private boolean enableDebugLogs;
     public static final String ENABLE_DEBUG_LOGS = "enableDebugLogs";
 
+    private boolean enableEmptyCollectionCleanup;
+    public static final String ENABLE_EMPTY_COLLECTION_CLEANUP = "enableEmptyCollectionCleanup";
+
     public static final String INIT_STACK_TYPE = "initStackType";
 
     private Map<String, String> filterHeaderValueMap;
@@ -163,8 +166,44 @@ public class AccountSettings {
     private List<String> filterLogPolicy;
     public static final String FILTER_LOG_POLICY = "filterLogPolicy";
 
+    public static final String ENDPOINT_SHIELD_SETTINGS = "endpointShieldSettings";
+    @Getter @Setter private EndpointShieldSettings endpointShieldSettings;
+
     public static final String MATCHING_PATTERNS_FOR_PROXY = "matchingPatternsForProxy";
     private Map<String, ProxyPatternInfo> matchingPatternsForProxy;
+
+    public static final String ALLOWED_HOSTS_FOR_PAC = "allowedHostsForPac";
+    private Map<String, ProxyPatternInfo> allowedHostsForPac;
+
+    public Map<String, ProxyPatternInfo> getAllowedHostsForPac() {
+        return allowedHostsForPac;
+    }
+
+    public void setAllowedHostsForPac(Map<String, ProxyPatternInfo> allowedHostsForPac) {
+        this.allowedHostsForPac = allowedHostsForPac;
+    }
+
+    // Used by mini-runtime to send to threat topic.
+    public static final String THREAT_KAFKA_PARTITION_KEY = "threatKafkaPartitionKey";
+    private ThreatKafkaPartitionKey threatKafkaPartitionKey;
+
+    public enum ThreatKafkaPartitionKey {
+        IP
+    }
+
+    @Getter
+    @Setter
+    private boolean switchProxyMode;
+
+    public static final String CHATTY_DOMAINS = "chattyDomains";
+    @Getter
+    @Setter
+    private List<String> chattyDomains;
+
+    public static final String AI_DOMAINS = "aiDomains";
+    @Getter
+    @Setter
+    private List<String> aiDomains;
 
     public static class ProxyPatternInfo {
         private String pattern;
@@ -231,6 +270,14 @@ public class AccountSettings {
 
     public enum SetupType {
         PROD, QA, STAGING, DEV
+    }
+
+    public ThreatKafkaPartitionKey getThreatKafkaPartitionKey() {
+        return threatKafkaPartitionKey;
+    }
+
+    public void setThreatKafkaPartitionKey(ThreatKafkaPartitionKey threatKafkaPartitionKey) {
+        this.threatKafkaPartitionKey = threatKafkaPartitionKey;
     }
 
     public Map<String, Map<Pattern, String>> convertApiCollectionNameMapperToRegex() {
@@ -393,6 +440,14 @@ public class AccountSettings {
 
     public void setEnableDebugLogs(boolean enableDebugLogs) {
         this.enableDebugLogs = enableDebugLogs;
+    }
+
+    public boolean isEnableEmptyCollectionCleanup() {
+        return enableEmptyCollectionCleanup;
+    }
+
+    public void setEnableEmptyCollectionCleanup(boolean enableEmptyCollectionCleanup) {
+        this.enableEmptyCollectionCleanup = enableEmptyCollectionCleanup;
     }
 
     public Map<String, String> getFilterHeaderValueMap() {

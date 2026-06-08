@@ -386,6 +386,8 @@ const transform = {
     obj['errorsList'] = data.errorsList || []
     obj['testCategoryId'] = data.testSubType
     obj['conversationId'] = data?.conversationId
+    obj['startTimestamp'] = data?.startTimestamp
+    obj['aiSummaryTraces'] = data?.aiSummaryTraces || null
 
     let testingRunResultHexId = data.hexId;
 
@@ -959,6 +961,9 @@ const transform = {
                     <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline>
                       {transform.getUrlComp(ele.url)}
                     </Link>
+                    <HorizontalStack gap={1}>
+                      <Text color="subdued" fontWeight="semibold">Time taken: {(ele.endTimestamp - ele.startTimestamp)}ms</Text>
+                    </HorizontalStack>
                     {ele.jiraIssueUrl && <JiraTicketDisplay jiraTicketUrl={ele.jiraIssueUrl} jiraKey={jiraKey} />}
                     {ele.devrevWorkUrl && devrevKey && (
                       <Tag>
@@ -1054,7 +1059,7 @@ const transform = {
       if (testRunResultsObj.hasOwnProperty(key)) {
         let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
         let urls = testRunResultsObj[key].urls
-        urls.push({ url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl })
+        urls.push({ url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl, startTimestamp: test?.startTimestamp || 0, endTimestamp: test?.endTimestamp || 0 })
         let obj = {
           ...test,
           urls: urls,
@@ -1066,7 +1071,7 @@ const transform = {
         delete obj["errorsList"]
         testRunResultsObj[key] = obj
       } else {
-        let urls = [{ url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl }]
+        let urls = [{ url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl, startTimestamp: test?.startTimestamp || 0, endTimestamp: test?.endTimestamp || 0 }]
         let obj = {
           ...test,
           urls: urls,
@@ -1083,7 +1088,7 @@ const transform = {
       let obj = testRunResultsObj[key]
       let prettifiedObj = {
         ...obj,
-        nameComp: <div data-testid={obj.name}><Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{ fontWeight: 'medium' }} /></Box></div>,
+        nameComp: <div data-testid={obj.name}><Box><TooltipText tooltip={obj.name} text={obj.name} textProps={{ fontWeight: 'medium' }} /></Box></div>,
         severityComp: obj?.vulnerable === true ? <div className={`badge-wrapper-${obj?.severity[0].toUpperCase()}`}>
           <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge>
         </div> : <Text>-</Text>,
@@ -1120,7 +1125,7 @@ const transform = {
     return finalMethod + " " + truncatedUrl
 
   },
-  getRowInfo(severity, apiInfo, jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl, serviceNowTicketUrl, servicenowTicketId, devrevWorkUrl) {
+  getRowInfo(severity, apiInfo, jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl, serviceNowTicketUrl, servicenowTicketId, devrevWorkUrl, wizFindingUrl) {
     if (apiInfo == null || apiInfo === undefined) {
       apiInfo = {
         allAuthTypesFound: [],
@@ -1213,6 +1218,21 @@ const transform = {
       </Box>
     ) : null
 
+    const wizComp = (wizFindingUrl?.length > 0 && wizFindingUrl !== "unavailable") ? (
+      <Box>
+        <Tag>
+          <HorizontalStack gap={1}>
+            <Avatar size="extraSmall" shape='round' source="/public/wiz_logo.svg" />
+            <Link target="_blank" url={wizFindingUrl}>
+              <Text>
+                View finding
+              </Text>
+            </Link>
+          </HorizontalStack>
+        </Tag>
+      </Box>
+    ) : null
+
     const rowItems = [
       {
         title: 'Severity',
@@ -1282,6 +1302,14 @@ const transform = {
         title: "DevRev ticket",
         value: devrevComp,
         tooltipContent: "DevRev ticket attached to the testing run issue"
+      })
+    }
+
+    if (wizComp != null) {
+      rowItems.push({
+        title: "Wiz finding",
+        value: wizComp,
+        tooltipContent: "Wiz finding attached to the testing run issue"
       })
     }
 
@@ -1476,6 +1504,7 @@ const transform = {
       testSuiteIds: testSuiteIds,
       autoTicketingDetails: autoTicketingDetails,
       selectedSlackChannelId: testRun?.slackChannel || 0,
+      doNotMarkIssuesAsFixed: Boolean(testRun.doNotMarkIssuesAsFixed),
     }
   },
   prepareTestingEndpointsApisList(apiEndpoints) {
@@ -1491,6 +1520,7 @@ const transform = {
   prepareConversationsList(agentConversationResults, isGeneric = false) {
     let conversationsListCopy = []
     let extractedRemediationText = ''
+    let toolsCalls = {}
 
     agentConversationResults.forEach(conversation => {
 
@@ -1540,13 +1570,30 @@ const transform = {
         ...commonObj,
         _id: "system_" + conversation.response,
         message: systemMessage,
-        role: "system"
+        role: "system",
+        toolsMetadata: conversation.toolsMetadata || {}
       })
+
+      // toolsMetadata contains the tools calls for that conversation
+      if (conversation.toolsMetadata && Object.keys(conversation.toolsMetadata).length > 0) {
+        Object.keys(conversation.toolsMetadata).forEach(tool => {
+          // get agent name
+          let agentName = tool['agentName'];
+          if(!agentName){
+            agentName = 'agenticTools';
+          }
+          if (!toolsCalls[agentName]) {
+            toolsCalls[agentName] = []
+          }
+          toolsCalls[agentName].push(tool)
+        })
+      }
     })
 
     return {
       conversations: conversationsListCopy,
-      remediationText: extractedRemediationText
+      remediationText: extractedRemediationText,
+      toolsCalls: toolsCalls
     }
   }
 }

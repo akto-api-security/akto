@@ -83,12 +83,6 @@ const getHeaders = () => {
       maxWidth: "200px",
     },
     {
-      text: "successfulExploit",
-      value: "successfulComp",
-      title: "Successful Exploit",
-      maxWidth: "90px",
-    },
-    {
       text: "Collection",
       value: "apiCollectionName",
       title: "Collection",
@@ -126,7 +120,7 @@ const sortOptions = [
 
 let filters = [];
 
-function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT }) {
+function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, initialTab }) {
   const location = useLocation();
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
@@ -137,8 +131,10 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const [loading, setLoading] = useState(true);
   const collectionsMap = PersistStore((state) => state.collectionsMap);
   const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
-  const [currentTab, setCurrentTab] = useState('active');
-  const [selected, setSelected] = useState(0)
+  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, training: 3 };
+  const resolvedInitialTab = initialTab || 'active';
+  const [currentTab, setCurrentTab] = useState(resolvedInitialTab);
+  const [selected, setSelected] = useState(tabIndexMap[resolvedInitialTab] || 0)
   const [currentFilters, setCurrentFilters] = useState({})
   const [totalFilteredCount, setTotalFilteredCount] = useState(0)
   const [usernameMap, setUsernameMap] = useState({});
@@ -514,10 +510,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     });
     
     const sort = { [sortKey]: sortOrder };
-    const successfulFilterValue = Array.isArray(filters?.successfulExploit) ? filters?.successfulExploit?.[0] : filters?.successfulExploit;
-    const successfulBool = (successfulFilterValue === true || successfulFilterValue === 'true') ? true
-                          : (successfulFilterValue === false || successfulFilterValue === 'false') ? false
-                          : undefined;
     const res = await api.fetchSuspectSampleData(
       skip,
       sourceIpsFilter,
@@ -530,7 +522,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       latestAttack,
       limit,
       currentTab.toUpperCase(),
-      successfulBool,
+      undefined,
       label, // Use the label prop (THREAT or GUARDRAIL)
       hostFilter,
       latestApiOrigRegex
@@ -554,7 +546,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
       let nextUrl = null;
       if (x.refId && x.eventType && x.actor && x.filterId) {
-        const params = new URLSearchParams();
+        const params = new URLSearchParams(location.search);
         params.set("refId", x.refId);
         params.set("eventType", x.eventType);
         params.set("actor", x.actor);
@@ -562,7 +554,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         if (x.status) {
           params.set("eventStatus", x.status.toUpperCase());
         }
-        nextUrl = `${location.pathname}?${params.toString()}`;
+        nextUrl = `${location.pathname}?${params.toString()}${location.hash}`;
       }
       
       const rowData = {
@@ -584,9 +576,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
-        successfulComp: (
-          <Badge size="small">{x?.successfulExploit ? "True" : "False"}</Badge>
-        ),
         severityComp: (<div className={`badge-wrapper-${severity}`}>
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
@@ -701,16 +690,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         type: 'select',
         choices: attackTypeChoices,
         multiple: true
-      },
-      {
-        key: 'successfulExploit',
-        label: 'Successful Exploit',
-        title: 'Successful Exploit',
-        choices: [
-          { label: 'True', value: 'true' },
-          { label: 'False', value: 'false' }
-        ],
-        singleSelect: true
       },
     ];
   }

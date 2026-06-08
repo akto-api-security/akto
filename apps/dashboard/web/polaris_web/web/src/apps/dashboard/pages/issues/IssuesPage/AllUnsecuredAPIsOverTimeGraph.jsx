@@ -7,7 +7,7 @@ import EmptyCard from '../../dashboard/new_components/EmptyCard';
 import { Text } from '@shopify/polaris';
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
-const AllUnsecuredAPIsOverTimeGraph = () => {
+const AllUnsecuredAPIsOverTimeGraph = ({ apiCollectionIds }) => {
   const [chartData, setChartData] = useState([]);
 
   useEffect(() => {
@@ -16,7 +16,7 @@ const AllUnsecuredAPIsOverTimeGraph = () => {
         const now = func.timeNow();
         const allSevArr = func.getAktoSeverities();
 
-        const resp = await api.fetchCriticalIssuesTrend(0, now, allSevArr);
+        const resp = await api.fetchCriticalIssuesTrend(0, now, allSevArr, apiCollectionIds);
         const issuesTrend = resp.issuesTrend || {};
         
         const currentDate = new Date();
@@ -51,11 +51,10 @@ const AllUnsecuredAPIsOverTimeGraph = () => {
         setChartData(chartData);
       } catch (e) {
         setChartData([]);
-        console.error('Error fetching monthly severity counts:', e);
       }
     }
     fetchMonthlySeverityCounts();
-  }, []);
+  }, [apiCollectionIds]);
 
   const allZero = chartData.length > 0 && chartData.every(s => s.data.every(([timestamp, value]) => value === 0));
 

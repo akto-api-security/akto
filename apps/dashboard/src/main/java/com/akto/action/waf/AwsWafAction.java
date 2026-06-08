@@ -51,8 +51,8 @@ public class AwsWafAction extends UserAction {
 
         int accId = Context.accountId.get();
 
-        Wafv2Client client = ThreatActorAction.getAwsWafClient(awsAccessKey, awsSecretKey, region);
-        GetIpSetResponse resp = ThreatActorAction.getIpSet(client, ruleSetName, ruleSetId);
+        Wafv2Client client = ThreatActorAction.fetchAwsWafClient(awsAccessKey, awsSecretKey, region);
+        GetIpSetResponse resp = ThreatActorAction.fetchIpSet(client, ruleSetName, ruleSetId);
         if (resp == null) {
             addActionError("Error trying to fetch information of your rule set");
         }

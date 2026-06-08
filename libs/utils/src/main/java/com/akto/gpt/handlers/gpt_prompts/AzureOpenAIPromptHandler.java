@@ -1,5 +1,7 @@
 package com.akto.gpt.handlers.gpt_prompts;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import javax.validation.ValidationException;
@@ -18,23 +20,10 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import javax.net.ssl.X509TrustManager;
 
 public abstract class AzureOpenAIPromptHandler {
 
-    static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
-            .connectTimeout(60, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
-            .build();
-
-    static final LoggerMaker logger = new LoggerMaker(AzureOpenAIPromptHandler.class, LogDb.DASHBOARD);
-    
-    // Environment variables for Azure OpenAI configuration
-    private static final String AZURE_OPENAI_HOST = System.getenv("AZURE_OPENAI_HOST");
-    private static final String AZURE_OPENAI_DEPLOYMENT = System.getenv("AZURE_OPENAI_DEPLOYMENT");
-    private static final String AZURE_OPENAI_API_KEY = System.getenv("AZURE_OPENAI_API_KEY");
-    private static final String AZURE_OPENAI_API_VERSION = System.getenv("AZURE_OPENAI_API_VERSION");
-    
     public static String buildAzureOpenAIUrl() {
         if (AZURE_OPENAI_HOST == null || AZURE_OPENAI_HOST.isEmpty()) {
             throw new RuntimeException("AZURE_OPENAI_HOST environment variable is not set");
@@ -56,13 +45,48 @@ public abstract class AzureOpenAIPromptHandler {
         logger.debug("Azure OpenAI endpoint: " + endpoint);
         return endpoint;
     }
-    static final String AZURE_OPENAI_ENDPOINT = buildAzureOpenAIUrl();
+
+    
+
+    static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
+            .connectTimeout(60, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .sslSocketFactory(CoreHTTPClient.trustAllSslSocketFactory, (X509TrustManager)CoreHTTPClient.trustAllCerts[0])
+            .hostnameVerifier((hostname, session) -> true)
+            .build();
+
+    static final LoggerMaker logger = new LoggerMaker(AzureOpenAIPromptHandler.class, LogDb.DASHBOARD);
+    private static volatile String AZURE_OPENAI_ENDPOINT = null;
+
+    public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+    // Environment variables for Azure OpenAI configuration
+    private static final String AZURE_OPENAI_HOST = System.getenv("AZURE_OPENAI_HOST");
+    private static final String AZURE_OPENAI_DEPLOYMENT = System.getenv("AZURE_OPENAI_DEPLOYMENT");
+    private static final String AZURE_OPENAI_API_KEY = System.getenv("AZURE_OPENAI_API_KEY");
+    private static final String AZURE_OPENAI_API_VERSION = System.getenv("AZURE_OPENAI_API_VERSION");
+
+    private static String getAzureOpenAIEndpoint() {
+        
+        try {
+            AZURE_OPENAI_ENDPOINT = buildAzureOpenAIUrl();
+            return AZURE_OPENAI_ENDPOINT;
+        } catch (RuntimeException e) {
+            logger.error("Failed to build Azure OpenAI endpoint: " + e.getMessage());
+            throw e;
+        }
+    }
 
     public BasicDBObject handle(BasicDBObject queryData) {
         try {
+            logger.warn("Handling request with query data: " + queryData.toString());
             validate(queryData);
+            logger.warn("Validated query data");
             String prompt = getPrompt(queryData);
+            logger.warn("Got prompt: " + prompt);
             String rawResponse = call(prompt);
+            logger.warn("Got raw response: " + rawResponse);
             BasicDBObject resp = processResponse(rawResponse);
             return resp;
         } catch (ValidationException exception) {
@@ -103,13 +127,20 @@ public abstract class AzureOpenAIPromptHandler {
         payload.put("messages", messages);
 
         RequestBody body = RequestBody.create(payload.toString(), mediaType);
+        String apiKey = AZURE_OPENAI_API_KEY;
+        if(apiKey == null || apiKey.isEmpty()){
+            apiKey = AZURE_OPENAI_API_KEY;
+        }
         Request request = new Request.Builder()
-                .url(AZURE_OPENAI_ENDPOINT)
+                .url(getAzureOpenAIEndpoint())
                 .method("POST", body)
                 .addHeader("Content-Type", "application/json")
-                .addHeader("api-key", AZURE_OPENAI_API_KEY)
+                .addHeader("api-key", apiKey)
+                .addHeader("x-context-source", "AGENTIC")
+                .addHeader("authorization", apiKey)
                 .build();
 
+        logger.warn("Calling ai with payload: " + payload.toString());
         try (
             Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
@@ -118,6 +149,7 @@ public abstract class AzureOpenAIPromptHandler {
             }
             ResponseBody responseBody = response.body();
             String rawResponse = responseBody != null ? responseBody.string() : null;
+            logger.warn("Response from ai: " + rawResponse);
             
             if (rawResponse == null) {
                 return null;

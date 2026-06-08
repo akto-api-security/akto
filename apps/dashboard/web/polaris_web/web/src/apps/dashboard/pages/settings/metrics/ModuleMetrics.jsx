@@ -1,5 +1,5 @@
-import { Page, LegacyCard, Text, HorizontalStack, VerticalStack } from "@shopify/polaris"
-import { useEffect, useReducer, useState } from "react"
+import { Page, LegacyCard, Text, HorizontalStack, VerticalStack, Checkbox } from "@shopify/polaris"
+import { useCallback, useEffect, useReducer, useState } from "react"
 import { produce } from "immer"
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter"
 import settingFunctions from "../module"
@@ -10,6 +10,79 @@ import { useChartOptions } from './hooks/useChartOptions'
 import SystemInfoBox from './components/SystemInfoBox'
 import MetricChart from './components/MetricChart'
 import DropdownSearch from "../../../components/shared/DropdownSearch"
+import { timezonesAvailable } from '../about/About'
+
+function getTimezoneOffsetMinutes(tzValue) {
+    if (!tzValue) return new Date().getTimezoneOffset() * -1;
+    try {
+        const now = new Date();
+        const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+        const tzDate = new Date(now.toLocaleString('en-US', { timeZone: tzValue }));
+        return Math.round((tzDate.getTime() - utcMs) / 60000);
+    } catch {
+        return new Date().getTimezoneOffset() * -1;
+    }
+}
+
+const MODULE_ONLINE_THRESHOLD_SEC = 5 * 60
+
+function isModuleOnline(module, nowSec) {
+    return (nowSec - (module.lastHeartbeatReceived || 0)) < MODULE_ONLINE_THRESHOLD_SEC
+}
+
+function moduleDisplayNameKey(module) {
+    return module?.name || module?.id || ''
+}
+
+/** Value typically stored on {@code metrics_data.instanceId} (e.g. TC prod uses {@code ModuleInfo.name}; JVM paths may use id). */
+function metricsSeriesInstanceKey(module) {
+    if (!module) return null
+    const n = module.name
+    if (n != null && String(n).trim() !== '') return n
+    if (module.id != null && String(module.id).trim() !== '') return module.id
+    return null
+}
+
+/**
+ * @param {Array} modules Raw module infos from the API
+ * @param {{ nowSec: number, showLiveOnly: boolean, showLiveModulesFilter: boolean }} opts
+ */
+function buildModuleDropdownOptions(modules, opts) {
+    const { nowSec, showLiveOnly, showLiveModulesFilter } = opts
+    let list = modules
+    if (showLiveModulesFilter && showLiveOnly) {
+        list = modules.filter((m) => isModuleOnline(m, nowSec))
+    }
+    const nameCounts = list.reduce((acc, m) => {
+        const k = moduleDisplayNameKey(m)
+        acc[k] = (acc[k] || 0) + 1
+        return acc
+    }, {})
+    const sorted = [...list].sort((a, b) => {
+        const aOnline = isModuleOnline(a, nowSec)
+        const bOnline = isModuleOnline(b, nowSec)
+        if (aOnline !== bOnline) return bOnline ? 1 : -1
+        const aTime = a.lastHeartbeatReceived || a.startedTs || 0
+        const bTime = b.lastHeartbeatReceived || b.startedTs || 0
+        return bTime - aTime
+    })
+    return sorted.map((module) => {
+        const online = isModuleOnline(module, nowSec)
+        const baseName = moduleDisplayNameKey(module)
+        const moduleId = module?.id != null && String(module.id).trim() !== '' ? module.id : baseName
+        const disambiguate = nameCounts[baseName] > 1 && module?.id
+        const displayName = disambiguate ? `${baseName} (${String(module.id).slice(0, 8)})` : baseName
+        return {
+            label: (
+                <HorizontalStack gap="1" blockAlign="center">
+                    <Text as="span" variant="bodyMd" color={online ? 'success' : 'subdued'}>●</Text>
+                    <Text as="span" variant="bodyMd">{displayName}</Text>
+                </HorizontalStack>
+            ),
+            value: moduleId,
+        }
+    })
+}
 
 /**
  * Base component for displaying module metrics
@@ -18,8 +91,11 @@ import DropdownSearch from "../../../components/shared/DropdownSearch"
 function ModuleMetrics({ config }) {
     const [moduleInfoData, setModuleInfoData] = useState({})
     const [orderedResult, setOrderedResult] = useState([])
+    const [allModules, setAllModules] = useState([])
     const [instanceIds, setInstanceIds] = useState([])
     const [selectedInstanceId, setSelectedInstanceId] = useState(null)
+    const [selectedTimezone, setSelectedTimezone] = useState(null)
+    const [showLiveModulesOnly, setShowLiveModulesOnly] = useState(true)
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
@@ -35,45 +111,38 @@ function ModuleMetrics({ config }) {
 
     const getChartOptions = useChartOptions(config.enableLegends)
 
-    const fetchModuleInfo = async() => {
+    const selectedModule = allModules.find((m) => m.id === selectedInstanceId)
+        ?? allModules.find((m) => metricsSeriesInstanceKey(m) === selectedInstanceId)
+        ?? null
+    const metricsFilterKey = metricsSeriesInstanceKey(selectedModule) ?? selectedInstanceId
+
+    const fetchModuleInfo = useCallback(async () => {
         try {
             const filter = {
                 moduleType: config.moduleType,
                 lastHeartbeatReceived: { $gte: startTime, $lte: endTime }
             }
             const response = await settingRequests.fetchModuleInfo(filter)
-            const modules = response?.moduleInfos || []
-
-            const sorted = modules.sort((a, b) => {
-                const aTime = a.lastHeartbeatReceived || a.startedTs || 0
-                const bTime = b.lastHeartbeatReceived || b.startedTs || 0
-                return bTime - aTime
-            }).map(module => {
-                return {
-                    label: module?.name || module?.id,
-                    value: module?.name || module?.id,
-                }
-            })
-
-            setInstanceIds(sorted);
-            setSelectedInstanceId(sorted[0]?.value);
-
-            await fetchAndProcessMetrics(sorted[0]?.value);
-        } catch (error) {
-            console.error("Error fetching module info:", error)
+            setAllModules(response?.moduleInfos || [])
+        } catch {
+            setAllModules([])
         }
-    }
+    }, [config.moduleType, startTime, endTime])
 
-    const fetchAndProcessMetrics = async(instanceId) => {
+    const fetchAndProcessMetrics = useCallback(async (metricsInstanceKey) => {
+        if (metricsInstanceKey == null || metricsInstanceKey === '') {
+            setOrderedResult([])
+            return
+        }
         try {
             let data
             if (config.fetchStrategy === 'prefix') {
                 data = await settingFunctions.fetchAllMetricsData(
-                    startTime, endTime, config.metricPrefix, instanceId
+                    startTime, endTime, config.metricPrefix, metricsInstanceKey
                 )
             } else if (config.fetchStrategy === 'moduleType') {
                 data = await settingFunctions.fetchMetricsDataByModule(
-                    startTime, endTime, config.moduleType, instanceId
+                    startTime, endTime, config.moduleType, metricsInstanceKey
                 )
             }
 
@@ -146,25 +215,38 @@ function ModuleMetrics({ config }) {
             setTimeout(() => {
                 setOrderedResult(arr)
             }, 0)
-        } catch (error) {
-            console.error('Error fetching metrics:', error)
+        } catch {
             setOrderedResult([])
         }
-    }
+    }, [startTime, endTime, config])
 
     useEffect(() => {
-        const fetchData = async () => {
-            setInstanceIds([])
-            await fetchModuleInfo()
-        }
+        fetchModuleInfo()
+    }, [fetchModuleInfo])
 
-        fetchData()
-    }, [currDateRange])
+    useEffect(() => {
+        const nowSec = Math.floor(Date.now() / 1000)
+        const options = buildModuleDropdownOptions(allModules, {
+            nowSec,
+            showLiveOnly: showLiveModulesOnly,
+            showLiveModulesFilter: !!config.showLiveModulesFilter,
+        })
+        setInstanceIds(options)
+        setSelectedInstanceId((prev) => {
+            if (options.some((o) => o.value === prev)) return prev
+            return options[0]?.value ?? null
+        })
+    }, [allModules, showLiveModulesOnly, config.showLiveModulesFilter])
+
+    useEffect(() => {
+        fetchAndProcessMetrics(metricsFilterKey)
+    }, [metricsFilterKey, startTime, endTime, fetchAndProcessMetrics])
 
     return (
         <Page
             title={config.title}
             divider
+            fullWidth
             backAction={{
                 content: 'Back',
                 onAction: () => window.history.back()
@@ -185,23 +267,38 @@ function ModuleMetrics({ config }) {
                                         alias: dateObj.alias
                                     })}
                                 />
-                                {instanceIds.length > 1 && (
+                                <DropdownSearch
+                                    placeholder="Timezone"
+                                    optionsList={timezonesAvailable}
+                                    setSelected={setSelectedTimezone}
+                                    value={selectedTimezone}
+                                    sliceMaxVal={10}
+                                />
+                                {config.showLiveModulesFilter && (
+                                    <Checkbox
+                                        label="Live modules only"
+                                        checked={showLiveModulesOnly}
+                                        onChange={setShowLiveModulesOnly}
+                                    />
+                                )}
+                                {instanceIds.length > 0 && (
                                     <DropdownSearch
                                         placeholder="Select module"
                                         optionsList={instanceIds}
-                                        setSelected={async(val) => {setSelectedInstanceId(val); await fetchAndProcessMetrics(val)}}
+                                        setSelected={(val) => setSelectedInstanceId(val)}
                                         preSelected={[selectedInstanceId]}
                                         value={selectedInstanceId}
                                         sliceMaxVal={10}
+                                        dropdownSearchKey="value"
                                     />
                                 )}
                             </HorizontalStack>
                         </HorizontalStack>
 
-                        {selectedInstanceId && moduleInfoData[selectedInstanceId] && (
+                        {metricsFilterKey && moduleInfoData[metricsFilterKey] && (
                             <SystemInfoBox
-                                instanceId={selectedInstanceId}
-                                data={moduleInfoData[selectedInstanceId]}
+                                instanceId={metricsFilterKey}
+                                data={moduleInfoData[metricsFilterKey]}
                                 fields={config.systemInfoFields}
                             />
                         )}
@@ -216,6 +313,7 @@ function ModuleMetrics({ config }) {
                         title={config.metricNames[element.key]?.title}
                         description={config.metricNames[element.key]?.description}
                         chartOptions={getChartOptions()}
+                        timezoneOffsetMinutes={getTimezoneOffsetMinutes(selectedTimezone)}
                     />
                 ))}
             </LegacyCard>

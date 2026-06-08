@@ -149,6 +149,12 @@ function Integrations() {
       source: '/public/splunk.svg'
     }
 
+    let datadogObj = {
+      id: 'datadog',
+      name: 'Datadog',
+      source: '/public/datadog-1.svg'
+    }
+
     let agentConfigObj ={
       id: 'agents',
       name:'Agents',
@@ -158,7 +164,8 @@ function Integrations() {
     let mcpRegistryObj ={
       id: 'mcp_registry',
       name:'MCP Registry',
-      source: '/public/mcp.svg'
+      source: '/public/mcp.svg',
+      badge: 'Beta'
     }
 
     let awsWafObj ={
@@ -177,6 +184,24 @@ function Integrations() {
       id: 'cloudflare_waf',
       name:'Cloudflare WAF',
       source: '/public/cloudflareWaf.png'
+    }
+
+    let wizObj = {
+        id: 'wiz',
+        name:'Wiz',
+        source: '/public/wiz_logo.svg'
+    }
+    
+    let newRelicObj ={
+      id: 'new_relic',
+      name:'New Relic',
+      source: '/public/new-relic-logo.svg'
+    }
+
+    let openTelemetryObj = {
+      id: 'open_telemetry',
+      name: 'OpenTelemetry',
+      source: '/public/opentelemetry-logo.svg'
     }
 
     let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, googleWorkSpaceObj]
@@ -232,6 +257,11 @@ function Integrations() {
           content: <span>SIEM <Badge status='new'>{getTabItems('splunk').length}</Badge></span>,
           component: <TabsList />
         },
+        {
+          id: 'monitoring',
+          content: <span>Monitoring <Badge status='new'>{getTabItems('monitoring').length}</Badge></span>,
+          component: <TabsList />
+        },
     ]
 
   function getTabItems(tabId) {
@@ -241,9 +271,10 @@ function Integrations() {
     const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
     const aiItems = [/* aktoGptObj, */ agentConfigObj, mcpRegistryObj];
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj, gmailWebhooksObj];
-    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj];
+    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj, wizObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];
-    const siemItems = [splunkObj];
+    const siemItems = [splunkObj, datadogObj];
+    const monitoringItems = [newRelicObj, openTelemetryObj]
     switch (tabId) {
       case 'traffic':
         return trafficItems;
@@ -284,10 +315,15 @@ function Integrations() {
           return emptyItem;
         }
         return siemItems;
+      case 'monitoring':
+        if (func.checkLocal()) {
+          return emptyItem;
+        }
+        return monitoringItems;
       default:
         let allItems = [...trafficItems, ...aiItems]
         if (!func.checkLocal()){
-          allItems = [...allItems, ...alertsItems, ...automationItems, ...ssoItems,  ...cicdItems, ...wafItems, ...siemItems]
+          allItems = [...allItems, ...alertsItems, ...automationItems, ...ssoItems,  ...cicdItems, ...wafItems, ...siemItems, ...monitoringItems]
         }
         if(func.checkOnPrem()){
           allItems = [...allItems, ...reportingItems]
@@ -311,7 +347,7 @@ function Integrations() {
     }
 
     function renderItem(item) {
-        const {id, source, name, link} = item;
+        const {id, source, name, link, badge} = item;
         const media = <Avatar customer size="medium" name={name} source={source}/>;
         const sourceActions = (item) => {
             return [
@@ -321,7 +357,7 @@ function Integrations() {
               },
             ];
           };
-    
+
         return (
           <ResourceItem
             id={id}
@@ -330,9 +366,12 @@ function Integrations() {
             persistActions
             onClick={() => handleTab(id, link)}
           >
-            <Text fontWeight="bold" as="h3">
-              {name}
-            </Text>
+            <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+              <Text fontWeight="bold" as="h3">
+                {name}
+              </Text>
+              {badge && <Badge status="info">{badge}</Badge>}
+            </div>
           </ResourceItem>
         );
       }

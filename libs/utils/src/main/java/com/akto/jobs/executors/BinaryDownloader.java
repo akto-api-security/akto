@@ -9,6 +9,10 @@ import com.azure.storage.blob.BlobServiceClientBuilder;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * Utility class for downloading binaries from Azure Blob Storage.
@@ -17,6 +21,12 @@ import java.io.InputStream;
 public final class BinaryDownloader {
 
     private static final LoggerMaker logger = new LoggerMaker(BinaryDownloader.class);
+
+    private static final Set<PosixFilePermission> EXECUTABLE_PERMISSIONS = EnumSet.of(
+        PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,
+        PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_EXECUTE,
+        PosixFilePermission.OTHERS_READ, PosixFilePermission.OTHERS_EXECUTE
+    );
 
     private BinaryDownloader() {
         // Prevent instantiation
@@ -76,15 +86,13 @@ public final class BinaryDownloader {
                     }
                 }
 
-                // Make binary executable
-                if (!binaryFile.setExecutable(true, false)) {
-                    logger.warn("Failed to set executable permission on binary: {}", binaryFile.getAbsolutePath());
-                }
-
                 logger.info("Binary downloaded successfully: {}", binaryFile.getAbsolutePath());
             } else {
                 logger.info("Using cached binary: {}", binaryFile.getAbsolutePath());
             }
+
+            // Always ensure binary is executable (covers fresh downloads and cached files)
+            makeExecutable(binaryFile);
 
             // Validate binary file
             validateBinary(binaryFile);
@@ -138,11 +146,7 @@ public final class BinaryDownloader {
                 }
             }
 
-            // Make binary executable
-            if (!binaryFile.setExecutable(true, false)) {
-                logger.warn("Failed to set executable permission on binary: {}", binaryFile.getAbsolutePath());
-            }
-
+            makeExecutable(binaryFile);
             logger.info("Binary downloaded successfully from URL: {}", binaryFile.getAbsolutePath());
 
             // Validate binary file
@@ -153,6 +157,17 @@ public final class BinaryDownloader {
         } catch (Exception e) {
             logger.error("Failed to download binary from URL: {}", binaryName, e);
             throw new Exception("Failed to download binary from URL: " + e.getMessage(), e);
+        }
+    }
+
+    private static void makeExecutable(File file) {
+        try {
+            Files.setPosixFilePermissions(file.toPath(), EXECUTABLE_PERMISSIONS);
+        } catch (Exception e) {
+            // Fall back to File.setExecutable on non-POSIX filesystems (e.g. Windows)
+            if (!file.setExecutable(true, false)) {
+                logger.warn("Failed to set executable permission on binary: {}", file.getAbsolutePath());
+            }
         }
     }
 

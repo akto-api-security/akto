@@ -103,15 +103,18 @@ public class AktoJaxAction extends UserAction {
 
             URL parsedUrl = new URL(hostname);
             String host = parsedUrl.getHost();
+            loggerMaker.infoAndAddToDb("DAST initiateCrawler: hostname=" + hostname + " parsed host=" + host);
 
             // Use custom collection name if provided, otherwise use hostname
             String finalCollectionName = (collectionName != null && !collectionName.trim().isEmpty())
                 ? collectionName.trim()
                 : host;
+            loggerMaker.infoAndAddToDb("DAST initiateCrawler: finalCollectionName=" + finalCollectionName + " (customName=" + collectionName + ")");
 
             ApiCollectionsAction collectionsAction = new ApiCollectionsAction();
             collectionsAction.setCollectionName(finalCollectionName);
             String collectionStatus = collectionsAction.createCollection();
+            loggerMaker.infoAndAddToDb("DAST initiateCrawler: createCollection status=" + collectionStatus + " actionErrors=" + collectionsAction.getActionErrors());
             int collectionId = 0;
             ApiCollection apiCollection = null;
             if(collectionStatus.equalsIgnoreCase(Action.SUCCESS)) {
@@ -119,14 +122,17 @@ public class AktoJaxAction extends UserAction {
                 if (apiCollections != null && !apiCollections.isEmpty()) {
                     apiCollection = apiCollections.get(0);
                     collectionId = apiCollection.getId();
+                    loggerMaker.infoAndAddToDb("DAST initiateCrawler: new collection created id=" + collectionId + " name=" + apiCollection.getName());
                 } else {
-                    apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, finalCollectionName));
+                    loggerMaker.infoAndAddToDb("DAST initiateCrawler: createCollection SUCCESS but returned empty list, falling back to lookup");
+                    apiCollection = findCollectionByNameOrHost(finalCollectionName);
                     if (apiCollection != null) {
                         collectionId = apiCollection.getId();
                     }
                 }
             } else {
-                apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, finalCollectionName));
+                loggerMaker.infoAndAddToDb("DAST initiateCrawler: createCollection failed, falling back to lookup for name=" + finalCollectionName);
+                apiCollection = findCollectionByNameOrHost(finalCollectionName);
                 if (apiCollection != null) {
                     collectionId = apiCollection.getId();
                 }
@@ -184,7 +190,11 @@ public class AktoJaxAction extends UserAction {
                         List<AuthParam> authParamsToUse = authMechanismForRole.getAuthParamsFromAuthMechanism();
                         AuthParam authParam = authParamsToUse.get(0);
 
-                        cookies = "Bearer " + authParam.getValue();
+                        if (authParam.getValue() != null && !authParam.getValue().isEmpty() && !authParam.getValue().toLowerCase().startsWith("bearer")) {
+                            cookies = "Bearer " + authParam.getValue();
+                        } else {
+                            cookies = authParam.getValue();
+                        }
                     } catch (Exception ex) {
                         addActionError(ex.getMessage());
                         loggerMaker.errorAndAddToDb("Error while fetching cookies/token from test role using loginStepBuilder. Error: " + ex.getMessage());
@@ -305,7 +315,7 @@ public class AktoJaxAction extends UserAction {
 
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
-            loggerMaker.error("Error while initiating the Akto crawler. Error: " + e.getMessage());
+            loggerMaker.infoAndAddToDb("DAST initiateCrawler: exception " + e.getClass().getName() + ": " + e.getMessage());
             e.printStackTrace();
             addActionError("Error while initiating the Akto crawler. Error: " + e.getMessage());
             return Action.ERROR.toUpperCase();
@@ -344,6 +354,18 @@ public class AktoJaxAction extends UserAction {
             addActionError("Error stopping crawler. Please try again later.");
             return Action.ERROR.toUpperCase();
         }
+    }
+
+    private ApiCollection findCollectionByNameOrHost(String name) {
+        ApiCollection collection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, name));
+        loggerMaker.infoAndAddToDb("DAST findCollectionByNameOrHost: name lookup for '" + name + "' returned " +
+            (collection == null ? "null" : "id=" + collection.getId() + " hostName=" + collection.getHostName()));
+        if (collection == null) {
+            collection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.HOST_NAME, name));
+            loggerMaker.infoAndAddToDb("DAST findCollectionByNameOrHost: hostName lookup for '" + name + "' returned " +
+                (collection == null ? "null" : "id=" + collection.getId() + " name=" + collection.getName()));
+        }
+        return collection;
     }
 
     private void initiateInternalCrawl(String crawlId, String hostname, String username,

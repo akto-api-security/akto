@@ -322,7 +322,7 @@ function Jira() {
         actions.setIsSaving(true);
         api.addJiraIntegrationV2(data).then((res) => {
             actions.setIsAlreadyIntegrated(true);
-            updateProjectMap(res);
+            updateProjectMap(res.jiraIntegration);
 
             actions.setInitialFormData({
                 baseUrl: data.baseUrl,
@@ -332,7 +332,11 @@ function Jira() {
                 jiraType: data.jiraType
             });
 
-            func.setToast(true, false, "Jira configurations saved successfully");
+            if (res.failedProjectKeys && res.failedProjectKeys.length > 0) {
+                func.setToast(true, false, "Jira configurations saved, but the following projects could not be reached: " + res.failedProjectKeys.join(", "));
+            } else {
+                func.setToast(true, false, "Jira configurations saved successfully");
+            }
         }).catch(() => {
             func.setToast(true, true, "Failed to save Jira configurations check all required fields");
         }).finally(() => {

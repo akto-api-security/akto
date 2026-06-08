@@ -3,8 +3,6 @@ package com.akto.data_actor;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.metrics.MetricData;
 import com.akto.testing.ApiExecutor;
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.interfaces.DecodedJWT;
 import com.akto.dto.*;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.billing.Organization;
@@ -28,6 +26,8 @@ import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
@@ -60,7 +60,7 @@ public class ClientActor extends DataActor {
     private static ExecutorService logThreadPool = Executors.newFixedThreadPool(50);
     private static AccountSettings accSettings;
     private static final LoggerMaker logger = new LoggerMaker(ClientActor.class);
-    
+
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
 
     public static String buildDbAbstractorUrl() {
@@ -75,37 +75,40 @@ public class ClientActor extends DataActor {
         return dbAbsHost + "/api";
     }
 
-    public static int getAccountId() {
-        try {
-            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
-            DecodedJWT jwt = JWT.decode(token);
-            String payload = jwt.getPayload();
-            byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
-            String decodedPayload = new String(decodedBytes);
-            BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
-            int accId = (int) basicDBObject.getInt("accountId");
-            return accId;
-        } catch (Exception e) {
-            return 1000000;
+    private static int parseAccountIdFromAbstractorToken(String token) throws Exception {
+        DecodedJWT jwt = JWT.decode(token);
+        String payload = jwt.getPayload();
+        byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
+        String decodedPayload = new String(decodedBytes);
+        BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
+        return basicDBObject.getInt("accountId");
+    }
+
+    /** Parses {@code accountId} from JWT in env {@code DATABASE_ABSTRACTOR_SERVICE_TOKEN}; {@code null} if unset or invalid. */
+    public static Integer getAbstractorAccountIdFromEnvOrNull() {
+        String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+        if (token == null || token.isEmpty()) {
+            return null;
         }
-        
+        try {
+            return parseAccountIdFromAbstractorToken(token);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public static int getAccountId() {
+        Integer id = getAbstractorAccountIdFromEnvOrNull();
+        return id != null ? id : 1000000;
     }
 
     public static boolean checkAccount() {
-        try {
-            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
-            DecodedJWT jwt = JWT.decode(token);
-            String payload = jwt.getPayload();
-            byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
-            String decodedPayload = new String(decodedBytes);
-            BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
-            int accId = (int) basicDBObject.getInt("accountId");
-            System.out.println("checkaccount accountId log " + accId);
-            return accId == 1000000 || accId == 1752722331;
-        } catch (Exception e) {
-            System.out.println("checkaccount error" + e.getStackTrace());
+        Integer accId = getAbstractorAccountIdFromEnvOrNull();
+        if (accId == null) {
+            return false;
         }
-        return false;
+        System.out.println("checkAccount accountId log " + accId);
+        return accId == 1000000 || accId == 1752722331;
     }
 
     public AccountSettings fetchAccountSettings() {
@@ -1550,6 +1553,27 @@ public class ClientActor extends DataActor {
         }
     }
 
+    @Override
+    public void insertGuardrailsServiceLog(Log log) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertGuardrailsServiceLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                return;
+            }
+        } catch (Exception e) {
+            return;
+        }
+    }
+
     public List<ApiCollection> fetchAllApiCollections() {
         Map<String, List<String>> headers = buildHeaders();
         List<ApiCollection> apiCollections = new ArrayList<>();
@@ -1604,5 +1628,78 @@ public class ClientActor extends DataActor {
         }
         return;
     };
+
+    @Override
+    public List<ApiSequences> fetchApiSequences() {
+        List<ApiSequences> apiSequences = new ArrayList<>();
+        Map<String, List<String>> headers = buildHeaders();
+        int skip = 0;
+        for (int i = 0; i < 100; i++) {
+            BasicDBObject payload = new BasicDBObject();
+            payload.put("skip", skip);
+            OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchApiSequences", "", "POST", payload.toJson(), headers, "");
+            try {
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+                String responsePayload = response.getBody();
+                if (response.getStatusCode() != 200 || responsePayload == null) {
+                    loggerMaker.errorAndAddToDb(null, "invalid response in fetchApiSequences", LoggerMaker.LogDb.RUNTIME);
+                    break;
+                }
+                try {
+                    BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+                    BasicDBList objList = (BasicDBList) payloadObj.get("apiSequencesList");
+                    if (objList.isEmpty()) break;
+                    for (Object obj : objList) {
+                        BasicDBObject obj2 = (BasicDBObject) obj;
+                        apiSequences.add(objectMapper.readValue(obj2.toJson(), ApiSequences.class));
+                    }
+                    skip += objList.size();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "error extracting response in fetchApiSequences", LoggerMaker.LogDb.RUNTIME);
+                    break;
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "error in fetchApiSequences", LoggerMaker.LogDb.RUNTIME);
+                break;
+            }
+        }
+        return apiSequences;
+    }
+
+    public List<EndpointMcpConfig> fetchEndpointMcpConfigs(String tempCollectionName, int updatedDate) {
+        List<EndpointMcpConfig> configs = new ArrayList<>();
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        if (tempCollectionName != null) {
+            obj.put("tempCollectionName", tempCollectionName);
+        }
+        obj.put("updatedDate", updatedDate);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchEndpointMcpConfig", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchEndpointMcpConfigs", LoggerMaker.LogDb.RUNTIME);
+                return configs;
+            }
+            try {
+                BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList list = (BasicDBList) payloadObj.get("endpointMcpConfigs");
+                if (list == null) {
+                    return configs;
+                }
+                for (Object item : list) {
+                    BasicDBObject itemObj = (BasicDBObject) item;
+                    EndpointMcpConfig cfg = objectMapper.readValue(itemObj.toJson(), EndpointMcpConfig.class);
+                    configs.add(cfg);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchEndpointMcpConfigs " + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchEndpointMcpConfigs " + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return configs;
+    }
 
 }

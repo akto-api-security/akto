@@ -1,4 +1,7 @@
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from '../../../../main/labelHelper';
+import claudeSettingsRemediations from './claude_settings_remediations.json';
+
+export const CLAUDE_SETTINGS_RISK_MAP = claudeSettingsRemediations;
 
 /**
  * Structured guardrail content with 7 main sections for Argus/Atlas dashboards

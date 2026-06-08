@@ -191,11 +191,16 @@ const ConditionalApprovalModal = ({
         }
 
         try {
-            await onApprove(auditItem.hexId, {
-                remarks: "Conditionally Approved",
-                conditions: conditions,
-                justification: justification.trim()
-            });
+            await onApprove(
+                auditItem.hexId,
+                {
+                    remarks: "Conditionally Approved",
+                    conditions: conditions,
+                    justification: justification.trim()
+                },
+                auditItem.groupedHexIds,
+                auditItem
+            );
             onClose();
         } catch (error) {
             console.error("Error approving with conditions:", error);
