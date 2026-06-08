@@ -6,15 +6,12 @@ import com.akto.log.LoggerMaker.LogDb;
 
 import java.time.Duration;
 import java.util.Collections;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.consumer.OffsetAndMetadata;
-import org.apache.kafka.common.TopicPartition;
+
 
 public abstract class AbstractKafkaConsumerTask<V> implements Task {
 
@@ -75,7 +72,6 @@ public abstract class AbstractKafkaConsumerTask<V> implements Task {
       if (kafkaConsumer.assignment().isEmpty()) {
         logger.warnAndAddToDb(instanceId + ": WARNING - No partitions assigned! Consumer may not receive records.");
       }
-
       recordsReadCount = 0;
       lastRecordCountLogTime = currentTime;
     }
