@@ -850,6 +850,7 @@ function ApiDetails(props) {
                             useLocalSubCategoryData={useLocalSubCategoryData}
                             preActivator={false}
                             disabled={window.USER_ROLE === "GUEST"}
+                            fromApiDetails={true}
                         />
                     )}
                     {!isEndpointSecurityCategory() && (
