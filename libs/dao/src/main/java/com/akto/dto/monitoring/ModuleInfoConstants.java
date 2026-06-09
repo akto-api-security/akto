@@ -81,7 +81,7 @@ public class ModuleInfoConstants {
             put("ENABLE_PROMPT_HOOKS_GEMINI", "Prompt Hooks path for Gemini");
             put("ENABLE_PROMPT_HOOKS_CODEX", "Prompt Hooks path for Codex");
             put("ENABLE_PROMPT_HOOKS_GITHUB_CLI", "Prompt Hooks path for GitHub CLI");
-            put("CLAUDE_SETTINGS_CONFIG", "Claude Settings Config");
+            put("ENABLE_CLAUDE_SETTINGS_CONFIG_SCAN", "Claude Settings Config");
         }});
     }};
 

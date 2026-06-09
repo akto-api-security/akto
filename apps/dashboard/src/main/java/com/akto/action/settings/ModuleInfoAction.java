@@ -150,7 +150,7 @@ public class ModuleInfoAction extends UserAction {
                 key.equals("AGGREGATION_RULES_ENABLED") ||
                 key.equals("SKIP_THREAT") ||
                 key.equals("APPLY_GUARDRAILS_TO_SSE") ||
-                key.equals("CLAUDE_SETTINGS_CONFIG")) {
+                key.equals("ENABLE_CLAUDE_SETTINGS_CONFIG_SCAN")) {
             return "boolean";
         }
         return "text";
