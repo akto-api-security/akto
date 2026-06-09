@@ -53,22 +53,6 @@ function computeAssetRiskFactors(asset) {
     return factors;
 }
 
-function getAssetNarrative(asset) {
-    const parts = [];
-
-    for (const sev of ["critical", "high", "medium", "low"]) {
-        const count = asset.violations?.[sev] || 0;
-        if (count > 0) parts.push(`${count} ${sev} severity violation${count > 1 ? "s" : ""}`);
-    }
-    if (asset.hasPersonalAccount) parts.push("contains personal account");
-    if (asset.isMalicious) parts.push("contains malicious skill");
-
-    if (parts.length === 0)
-        return `${asset.name} shows a standard activity profile with no elevated signals.`;
-
-    return `${asset.name} has ${parts.join(", ")}. Review and take appropriate action.`;
-}
-
 export default function OverviewTab({ asset, onTabChange, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], mcpComponentCount = 0 }) {
     const totalV = useMemo(() =>
         (asset.violations?.critical || 0) + (asset.violations?.high || 0) + (asset.violations?.medium || 0) + (asset.violations?.low || 0),
@@ -77,7 +61,6 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
 
     const rawFactors = useMemo(() => computeAssetRiskFactors(asset), [asset]);
     const factors    = useMemo(() => [...rawFactors].sort((a, b) => (SEV_ORDER[a.severity] ?? 99) - (SEV_ORDER[b.severity] ?? 99)), [rawFactors]);
-    const narrative  = useMemo(() => getAssetNarrative(asset), [asset]);
 
     const stats = useMemo(() => {
         const devices  = assetDevices[asset.id] || [];
@@ -130,7 +113,6 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
 
                 <VerticalStack gap="3">
                     <Text variant="headingXs" color="subdued">Risk Analysis</Text>
-                    <Text variant="bodySm">{narrative}</Text>
                     <VerticalStack gap="2">
                         {factors.map((f, i) => {
                             let handleClick;
