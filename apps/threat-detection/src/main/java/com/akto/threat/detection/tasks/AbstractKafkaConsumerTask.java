@@ -12,6 +12,7 @@ import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 
+
 public abstract class AbstractKafkaConsumerTask<V> implements Task {
 
   private static final LoggerMaker logger = new LoggerMaker(AbstractKafkaConsumerTask.class, LogDb.THREAT_DETECTION);

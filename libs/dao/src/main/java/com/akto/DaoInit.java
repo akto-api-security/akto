@@ -284,6 +284,7 @@ public class DaoInit {
         ClassModel<TagsTestingEndpoints> tagsTestingEndpointsClassModel = ClassModel.builder(TagsTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<ApiTagsTestingEndpoints> apiTagsTestingEndpointsClassModel = ClassModel.builder(ApiTagsTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<AuthTypeTestingEndpoints> authTypeTestingEndpointsClassModel = ClassModel.builder(AuthTypeTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<AccessTypeTestingEndpoints> accessTypeTestingEndpointsClassModel = ClassModel.builder(AccessTypeTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<MultiCollectionTestingEndpoints> multiCollectionTestingEndpointsClassModel = ClassModel.builder(MultiCollectionTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<DependencyNode> dependencyNodeClassModel = ClassModel.builder(DependencyNode.class).enableDiscriminator(true).build();
         ClassModel<ParamInfo> paramInfoClassModel = ClassModel.builder(ParamInfo.class).enableDiscriminator(true).build();
@@ -383,7 +384,7 @@ public class DaoInit {
                 setupClassModel,
                 cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
                 methodConditionClassModel, regexTestingEndpointsClassModel, hostRegexTestingEndpointsClassModel,
-                tagsTestingEndpointsClassModel, authTypeTestingEndpointsClassModel, multiCollectionTestingEndpointsClassModel, allTestingEndpointsClassModel,
+                tagsTestingEndpointsClassModel, authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, multiCollectionTestingEndpointsClassModel, allTestingEndpointsClassModel,
                 apiTagsTestingEndpointsClassModel,
                 UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel,
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel,

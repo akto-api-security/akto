@@ -15,7 +15,10 @@ const service = axios.create({
 })
 
 const err = async (error) => {
-  if (error?.config?.url && error.config.url.includes('api/fetchTestResultsStatsCount')) {
+  if (error?.config?.url && (
+    error.config.url.includes('api/fetchTestResultsStatsCount')
+    || error.config.url.includes('api/fetchTestRunStatusSummaries')
+  )) {
     return Promise.reject(error)
   }
 

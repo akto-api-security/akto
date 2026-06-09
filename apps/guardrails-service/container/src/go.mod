@@ -5,6 +5,7 @@ go 1.24.11
 require (
 	github.com/akto-api-security/akto-endpoint-shield v0.0.0-20260608123556-3997aa716d14
 	github.com/gin-gonic/gin v1.11.0
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/segmentio/kafka-go v0.4.49
 	github.com/tsawler/tabula v1.6.6
 	go.uber.org/zap v1.27.1
