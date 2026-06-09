@@ -54,7 +54,8 @@ public class TestRunStatusAction extends UserAction {
                     Context.accountId.set(accountId);
                     try {
                         ObjectId summaryId = new ObjectId(normalizedSummaryHexId);
-                        summaries.put(normalizedSummaryHexId, TestRunStatusHelper.computeStatusCounts(summaryId));
+                        summaries.put(normalizedSummaryHexId,
+                                TestRunStatusHelper.computeStatusCountsCached(accountId, summaryId));
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e,
                                 "Error computing test run status for summary: " + normalizedSummaryHexId);

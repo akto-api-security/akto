@@ -18,6 +18,41 @@ import PersistStore from "../../../../main/PersistStore";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 import SummaryCardComponent from "./SummaryCardComponent";
+
+// Module-level cache for test run execution status counts. Counts for COMPLETED runs are
+// stable, so caching them here (instead of a component ref) keeps them across remounts and
+// avoids re-hitting the heavy backend status API when revisiting the page within the TTL.
+const RUN_STATUS_CACHE_TTL_MS = 5 * 60 * 1000;
+const runStatusCache = new Map(); // testingRunResultSummaryHexId -> { counts, ts }
+
+function getCachedRunStatusCounts(hexId) {
+  const entry = runStatusCache.get(hexId);
+  if (!entry) return undefined;
+  if (Date.now() - entry.ts > RUN_STATUS_CACHE_TTL_MS) {
+    runStatusCache.delete(hexId);
+    return undefined;
+  }
+  return entry.counts;
+}
+
+function getValidRunStatusMap() {
+  const result = {};
+  const now = Date.now();
+  runStatusCache.forEach((entry, hexId) => {
+    if (now - entry.ts > RUN_STATUS_CACHE_TTL_MS) {
+      runStatusCache.delete(hexId);
+    } else {
+      result[hexId] = entry.counts;
+    }
+  });
+  return result;
+}
+
+function setCachedRunStatusCounts(statusSummaries) {
+  Object.entries(statusSummaries || {}).forEach(([hexId, counts]) => {
+    runStatusCache.set(hexId, { counts, ts: Date.now() });
+  });
+}
 /*
   {
     text:"", // req. -> The text to be shown wherever the header is being shown
@@ -194,7 +229,6 @@ const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 const [totalNumberOfTests, setTotalNumberOfTests] = useState(0)
 const [summaryLoading, setSummaryLoading] = useState(false)
 const [runStatusUpdateKey, setRunStatusUpdateKey] = useState("")
-const runStatusSummariesRef = useRef({})
 const pendingRunStatusRequestRef = useRef(null)
 
   async function fetchTableData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) {
@@ -255,13 +289,13 @@ const pendingRunStatusRequestRef = useRef(null)
         break;
     }
 
-    ret = transform.enrichWithRunStatus(ret, runStatusSummariesRef.current);
+    ret = transform.enrichWithRunStatus(ret, getValidRunStatusMap());
 
     const summaryHexIds = [...new Set(
       ret
         .filter(shouldFetchRunStatusSummary)
         .map((item) => item.testingRunResultSummaryHexId)
-        .filter((hexId) => hexId && runStatusSummariesRef.current[hexId] === undefined)
+        .filter((hexId) => hexId && getCachedRunStatusCounts(hexId) === undefined)
     )];
 
     if (summaryHexIds.length > 0) {
@@ -281,10 +315,7 @@ const pendingRunStatusRequestRef = useRef(null)
               if (pendingRunStatusRequestRef.current !== requestKey) {
                 return;
               }
-              runStatusSummariesRef.current = {
-                ...runStatusSummariesRef.current,
-                ...statusSummaries,
-              };
+              setCachedRunStatusCounts(statusSummaries);
               setRunStatusUpdateKey(Date.now().toString());
             })
             .catch(() => {})
@@ -447,7 +478,7 @@ const coreTable = (
     promotedBulkActions={promotedBulkActions}
     selectable= {true}
     clientSideDataUpdateKey={runStatusUpdateKey}
-    clientSideDataTransformer={(rows) => transform.enrichWithRunStatus(rows, runStatusSummariesRef.current)}
+    clientSideDataTransformer={(rows) => transform.enrichWithRunStatus(rows, getValidRunStatusMap())}
     lastColumnSticky={true}
   />   
 )

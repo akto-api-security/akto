@@ -20,6 +20,8 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 public final class TestRunStatusHelper {
 
@@ -30,6 +32,15 @@ public final class TestRunStatusHelper {
     private static final String MULTI_EXEC_MESSAGE_FIELD = "testResults.nodeResultMap.x1.message";
     private static final String STATUS_MESSAGE = "statusMessage";
 
+    /*
+     * Execution status counts are derived from TestingRunResult docs, which are immutable
+     * once a run finishes. The bulk status API is only called for COMPLETED runs, so caching
+     * per (accountId, summaryId) avoids re-running these heavy aggregations on every page load.
+     */
+    private static final long CACHE_TTL_MILLIS = TimeUnit.MINUTES.toMillis(30);
+    private static final int CACHE_MAX_SIZE = 20000;
+    private static final Map<String, CacheEntry> STATUS_COUNTS_CACHE = new ConcurrentHashMap<>();
+
     private static final List<PatternDefinition> PATTERN_DEFINITIONS = Arrays.asList(
             new PatternDefinition("http401", REGEX_401),
             new PatternDefinition("http403", REGEX_403),
@@ -38,6 +49,31 @@ public final class TestRunStatusHelper {
             new PatternDefinition("cloudflare", TestResultsStatsAction.REGEX_CLOUDFLARE));
 
     private TestRunStatusHelper() {
+    }
+
+    /**
+     * Returns cached execution status counts for a summary, computing and caching them on a miss.
+     * Cache is scoped by account to avoid cross-tenant leakage.
+     */
+    public static Map<String, Integer> computeStatusCountsCached(int accountId, ObjectId testingRunResultSummaryId) {
+        String cacheKey = accountId + ":" + testingRunResultSummaryId.toHexString();
+        long now = System.currentTimeMillis();
+
+        CacheEntry entry = STATUS_COUNTS_CACHE.get(cacheKey);
+        if (entry != null && entry.expiryAt > now) {
+            return entry.counts;
+        }
+
+        Map<String, Integer> counts = computeStatusCounts(testingRunResultSummaryId);
+
+        if (STATUS_COUNTS_CACHE.size() >= CACHE_MAX_SIZE) {
+            STATUS_COUNTS_CACHE.entrySet().removeIf(e -> e.getValue().expiryAt <= now);
+            if (STATUS_COUNTS_CACHE.size() >= CACHE_MAX_SIZE) {
+                STATUS_COUNTS_CACHE.clear();
+            }
+        }
+        STATUS_COUNTS_CACHE.put(cacheKey, new CacheEntry(counts, now + CACHE_TTL_MILLIS));
+        return counts;
     }
 
     public static Map<String, Integer> computeStatusCounts(ObjectId testingRunResultSummaryId) {
@@ -172,5 +208,11 @@ public final class TestRunStatusHelper {
     private static final class PatternDefinition {
         private final String key;
         private final String regex;
+    }
+
+    @AllArgsConstructor
+    private static final class CacheEntry {
+        private final Map<String, Integer> counts;
+        private final long expiryAt;
     }
 }
