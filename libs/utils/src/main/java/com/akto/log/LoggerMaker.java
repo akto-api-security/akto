@@ -1,15 +1,5 @@
 package com.akto.log;
 
-import com.akto.dao.AgenticTestingLogsDao;
-import com.akto.dao.AnalyserLogsDao;
-import com.akto.dao.AwsApiGatewayLogsDao;
-import com.akto.dao.GuardrailsServiceLogsDao;
-import com.akto.dao.BillingLogsDao;
-import com.akto.dao.ConfigsDao;
-import com.akto.dao.DashboardLogsDao;
-import com.akto.dao.LogsDao;
-import com.akto.dao.PupeteerLogsDao;
-import com.akto.dao.RuntimeLogsDao;
 import com.akto.dao.monitoring.EndpointShieldLogsDao;
 import com.akto.dto.monitoring.EndpointShieldLog;
 import com.akto.RuntimeMode;
@@ -124,12 +114,15 @@ public class LoggerMaker  {
     private static AccountSettings accountSettings = null;
 
     private static final ScheduledExecutorService scheduler2 = Executors.newScheduledThreadPool(1);
-
+    
     static {
         scheduler2.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
-                updateAccountSettings();
+                String cliTestIds = System.getenv("TEST_IDS");
+                if(cliTestIds==null && Context.accountId.get() == 1_000_000){
+                    updateAccountSettings();
+                }
             }
         }, 0, 2, TimeUnit.MINUTES);
     }
