@@ -57,6 +57,11 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 		return
 	}
 
+	if !h.cfg.File.Enabled {
+		c.JSON(http.StatusOK, gin.H{"allowed": true})
+		return
+	}
+
 	maxBody := int64(h.fileRegistry.MaxPerFileBytes()) * int64(h.cfg.File.MaxFiles)
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBody)
 
@@ -136,7 +141,7 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 		zap.Int("fileCount", len(inputs)),
 		zap.Int("allowedCount", allowedCount),
 		zap.String("sessionID", sessionID))
-	h.writeMultiFileResponse(c, fileResults, len(inputs))
+	h.writeMultiFileResponse(c, fileResults)
 }
 
 func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileInput, meta *models.ValidateRequestParams, sessionID, requestID string) *fileResult {
@@ -443,7 +448,7 @@ func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload strin
 	return &chunkResult{Err: lastErr}
 }
 
-func (h *ValidationHandler) writeMultiFileResponse(c *gin.Context, results []*fileResult, totalFiles int) {
+func (h *ValidationHandler) writeMultiFileResponse(c *gin.Context, results []*fileResult) {
 	overallAllowed := true
 	var overallReason string
 
@@ -465,26 +470,6 @@ func (h *ValidationHandler) writeMultiFileResponse(c *gin.Context, results []*fi
 	c.JSON(http.StatusOK, resp)
 }
 
-func buildChunkDetails(results []*chunkResult) []gin.H {
-	var details []gin.H
-	for i, r := range results {
-		if r == nil {
-			continue
-		}
-		entry := gin.H{"chunkIndex": i + 1, "allowed": true}
-		if r.Err != nil {
-			entry["allowed"] = false
-			entry["error"] = r.Err.Error()
-		} else {
-			entry["allowed"] = r.Result.Allowed
-			if r.Result.Reason != "" {
-				entry["reason"] = r.Result.Reason
-			}
-		}
-		details = append(details, entry)
-	}
-	return details
-}
 
 func marshalPromptPayload(content string) string {
 	b, err := json.Marshal(map[string]string{"prompt": content})
