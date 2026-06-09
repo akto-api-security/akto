@@ -84,6 +84,9 @@ public class GuardrailPolicies {
     // (e.g. match type, per-entry behaviour) without a data migration.
     private List<BlockedHostEntry> blockedHosts;
 
+    // Block personal / consumer accounts (non-enterprise email-type users).
+    private boolean blockPersonalAccounts;
+
     /** Policy-wide rule behaviour: {@code "block"}, {@code "warn"}, or {@code "alert"}. */
     private String behaviour;
 

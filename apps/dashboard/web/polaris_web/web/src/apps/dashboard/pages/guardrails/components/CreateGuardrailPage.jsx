@@ -134,6 +134,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // Step 11: Blocked hosts/paths (block-only)
     // Host + path suggestions are sourced from the browser extension configs.
     const [blockedHosts, setBlockedHosts] = useState([]);
+    const [blockPersonalAccounts, setBlockPersonalAccounts] = useState(false);
     const [browserConfigs, setBrowserConfigs] = useState([]);
 
     // Step 10: Server settings
@@ -470,6 +471,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setSelectedAgentServers([]);
         setSelectedBrowserLlms([]);
         setBlockedHosts([]);
+        setBlockPersonalAccounts(false);
         setApplyOnResponse(false);
         setApplyOnRequest(false);
         setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
@@ -614,6 +616,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setBlockedHosts((policy.blockedHosts || []).map(entry => ({
             pattern: entry.pattern || ""
         })));
+        setBlockPersonalAccounts(policy.blockPersonalAccounts || false);
     };
 
     const handleClose = () => {
@@ -741,6 +744,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 selectedMcpServersV2: transformedMcpServers,
                 selectedAgentServersV2: transformedAgentServers,
                 blockedHosts: cleanedBlockedHosts,
+                blockPersonalAccounts,
                 applyOnResponse,
                 applyOnRequest,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
@@ -895,16 +899,17 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     />
                 );
             case 11: {
-                // Host suggestions come from the browser extension configs.
-                const hostSuggestions = Array.from(new Set(
-                    (browserConfigs || [])
-                        .map(c => (c.host || "").trim())
-                        .filter(Boolean)
-                )).sort();
+                const hostSuggestions = Array.from(new Set([
+                    ...(browserConfigs || []).map(c => (c.host || "").trim()),
+                    ...(mcpServers || []).map(s => (s.label || "").trim()),
+                    ...(agentServers || []).map(s => (s.label || "").trim()),
+                ].filter(Boolean))).sort();
                 return (
                     <BlockedHostsStep
                         blockedHosts={blockedHosts}
                         setBlockedHosts={setBlockedHosts}
+                        blockPersonalAccounts={blockPersonalAccounts}
+                        setBlockPersonalAccounts={setBlockPersonalAccounts}
                         hostSuggestions={hostSuggestions}
                     />
                 );
@@ -998,6 +1003,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             blockedHosts: (blockedHosts || [])
                 .filter(entry => entry && (entry.pattern || "").trim())
                 .map(entry => ({ pattern: entry.pattern.trim() })),
+            blockPersonalAccounts,
             applyOnResponse: applyOnResponse,
             applyOnRequest: applyOnRequest
         };
