@@ -110,7 +110,7 @@ function TopStatisticsSidebar({ startTimestamp, endTimestamp }) {
                         recentActivity.map((event, idx) => (
                             <div
                                 key={idx}
-                                onClick={() => openThreatActivityPage({ latestAttack: event.subCategory || event.filterId })}
+                                onClick={() => openThreatActivityPage({ latestAttack: event.filterId || event.subCategory, startTimestamp, endTimestamp })}
                                 className="sidebar-list-item"
                                 style={{
                                     cursor: "pointer",
@@ -148,7 +148,7 @@ function TopStatisticsSidebar({ startTimestamp, endTimestamp }) {
                                 icon={<HostFavicon host={host.host} />}
                                 label={host.host}
                                 count={host.attacks}
-                                onClick={() => openThreatActivityPage({ host: host.host })}
+                                onClick={() => openThreatActivityPage({ host: host.host, startTimestamp, endTimestamp })}
                                 isLast={idx === topHosts.length - 1}
                             />
                         ))

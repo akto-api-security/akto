@@ -141,7 +141,7 @@ function ThreatDashboardPage() {
                         barGap={0.1}
                         defaultChartOptions={{ legend: { enabled: false } }}
                         onBarClick={(_name, custom) => {
-                            if (custom?.filterKey) openThreatActivityPage({ latestAttack: custom.filterKey });
+                            if (custom?.filterKey) openThreatActivityPage({ latestAttack: custom.filterKey, startTimestamp, endTimestamp });
                         }}
                     />
                 ) : (
