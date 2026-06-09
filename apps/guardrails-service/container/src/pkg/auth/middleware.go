@@ -17,49 +17,46 @@ import (
 
 const AccountIDKey = "accountId"
 
-func NewMiddleware(rsaPublicKeyPEM string, logger *zap.Logger) (gin.HandlerFunc, error) {
-	publicKey, err := parseRSAPublicKey(rsaPublicKeyPEM)
+func NewMiddleware(rsaPublicKey string, logger *zap.Logger) (gin.HandlerFunc, error) {
+	publicKey, err := parseRSAPublicKey(rsaPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse RSA_PUBLIC_KEY: %w", err)
 	}
 
 	return func(c *gin.Context) {
-		tokenString := c.GetHeader("Authorization")
-		if tokenString == "" {
-			logger.Warn("Authentication failed: missing Authorization header")
-			c.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
-
-		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
-			if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-			}
-			return publicKey, nil
-		})
-		if err != nil || !token.Valid {
-			logger.Error("Authentication failed", zap.Error(err))
-			c.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
-
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
-			logger.Error("Authentication failed: unexpected claims type")
-			c.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
-
-		accountId, err := extractAccountID(claims)
+		accountID, err := verifyToken(c.GetHeader("Authorization"), publicKey)
 		if err != nil {
-			logger.Error("Authentication failed", zap.Error(err))
+			logger.Warn("Authentication failed", zap.Error(err))
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 
-		c.Set(AccountIDKey, accountId)
+		c.Set(AccountIDKey, accountID)
 		c.Next()
 	}, nil
+}
+
+func verifyToken(authHeader string, publicKey *rsa.PublicKey) (int, error) {
+	if authHeader == "" {
+		return 0, fmt.Errorf("missing Authorization header")
+	}
+
+	token, err := jwt.Parse(authHeader, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return publicKey, nil
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return 0, fmt.Errorf("unexpected claims type %T", token.Claims)
+	}
+
+	return extractAccountID(claims)
 }
 
 func parseRSAPublicKey(raw string) (*rsa.PublicKey, error) {
@@ -67,26 +64,26 @@ func parseRSAPublicKey(raw string) (*rsa.PublicKey, error) {
 		return nil, fmt.Errorf("key is empty")
 	}
 
-	cleaned := raw
-	cleaned = strings.ReplaceAll(cleaned, "-----BEGIN PUBLIC KEY-----", "")
-	cleaned = strings.ReplaceAll(cleaned, "-----END PUBLIC KEY-----", "")
-	cleaned = strings.ReplaceAll(cleaned, "\n", "")
+	body := raw
+	body = strings.ReplaceAll(body, "-----BEGIN PUBLIC KEY-----", "")
+	body = strings.ReplaceAll(body, "-----END PUBLIC KEY-----", "")
+	body = strings.ReplaceAll(body, "\n", "")
 
-	decoded, err := base64.StdEncoding.DecodeString(cleaned)
+	der, err := base64.StdEncoding.DecodeString(body)
 	if err != nil {
 		return nil, fmt.Errorf("base64 decode failed: %w", err)
 	}
 
-	pub, err := x509.ParsePKIXPublicKey(decoded)
+	key, err := x509.ParsePKIXPublicKey(der)
 	if err != nil {
-		return nil, fmt.Errorf("parse PKIX public key failed: %w", err)
+		return nil, fmt.Errorf("invalid PKIX public key: %w", err)
 	}
 
-	rsaPub, ok := pub.(*rsa.PublicKey)
+	rsaKey, ok := key.(*rsa.PublicKey)
 	if !ok {
-		return nil, fmt.Errorf("key is not an RSA public key (got %T)", pub)
+		return nil, fmt.Errorf("not an RSA public key (got %T)", key)
 	}
-	return rsaPub, nil
+	return rsaKey, nil
 }
 
 func extractAccountID(claims jwt.MapClaims) (int, error) {
