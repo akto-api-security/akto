@@ -41,7 +41,7 @@ AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_INGEST_NON_MCP_TOOLS = os.getenv("AKTO_INGEST_NON_MCP_TOOLS", "false").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
 AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "claudecli")
-AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
+AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_pretool_warn_pending.json")
 # Mirrored path: /mcp matches JsonRpcUtils.isMcpPath; non-MCP uses /{prefix}/{normalized-tool-name}
@@ -88,8 +88,8 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         logger.debug(f"Request payload: {json.dumps(payload)}")
 
     headers = {"Content-Type": "application/json"}
-    if AKTO_TOKEN:
-        headers["authorization"] = AKTO_TOKEN
+    if AKTO_API_TOKEN:
+        headers["Authorization"] = AKTO_API_TOKEN
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),

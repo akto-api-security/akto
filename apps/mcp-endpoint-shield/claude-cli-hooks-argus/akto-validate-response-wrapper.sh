@@ -2,7 +2,7 @@
 # Akto Guardrails — Claude CLI argus hook
 
 export AKTO_DATA_INGESTION_URL="{{AKTO_DATA_INGESTION_URL}}"
-export AKTO_TOKEN="{{AKTO_TOKEN}}"
+export AKTO_API_TOKEN="{{AKTO_API_TOKEN}}"
 export AKTO_HOST="{{AKTO_HOST}}"
 export CONTEXT_SOURCE="AGENTIC"
 export AKTO_SYNC_MODE="true"

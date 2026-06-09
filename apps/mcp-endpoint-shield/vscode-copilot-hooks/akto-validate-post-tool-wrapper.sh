@@ -12,7 +12,7 @@ export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="vscode"
 export CONTEXT_SOURCE="ENDPOINT"
-export AKTO_TOKEN="{{AKTO_API_TOKEN}}"
+export AKTO_API_TOKEN="{{AKTO_API_TOKEN}}"
 export LOG_DIR="$HOME/.vscode/copilot/hooks/akto/logs"
 
 # Execute Python hook script
