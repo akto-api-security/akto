@@ -769,7 +769,7 @@ func overrideLLMModelConfigs(policies []types.Policy, baseURL, model string) []t
 		Model:                 model,
 		BaseURL:               baseURL,
 		ModelRole:             "FINAL_ARBITER",
-		TimeoutMs:             60000,
+		TimeoutMs:             300000,
 		SafeDecisionThreshold: 0.8,
 	}}
 
@@ -1298,12 +1298,24 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
 		zap.Strings("policyNames", policyNames(policies)))
 
-	// Kafka consumer always uses the CPU-based LLM (Ollama/jarvis) instead of GPU.
+	// Kafka consumer only evaluates warn/alert policies — block policies are handled
+	// synchronously by the HTTP instance and must not be re-evaluated here.
 	if s.config.AsyncScannerBaseURL != "" {
-		policies = overrideLLMModelConfigs(policies, s.config.AsyncScannerBaseURL, s.config.AsyncScannerModel)
-		s.logger.Debug("ValidateBatch - overrode LLM model configs with CPU provider",
+		s.cache.mu.RLock()
+		behaviourByName := s.cache.behaviourByName
+		s.cache.mu.RUnlock()
+		var asyncPolicies []types.Policy
+		for _, p := range policies {
+			if b := behaviourByName[p.Info.Name]; b == "warn" || b == "alert" {
+				asyncPolicies = append(asyncPolicies, p)
+			}
+		}
+		policies = overrideLLMModelConfigs(asyncPolicies, s.config.AsyncScannerBaseURL, s.config.AsyncScannerModel)
+		s.logger.Debug("ValidateBatch - filtered to async policies only, overrode LLM model configs",
 			zap.String("baseURL", s.config.AsyncScannerBaseURL),
-			zap.String("model", s.config.AsyncScannerModel))
+			zap.String("model", s.config.AsyncScannerModel),
+			zap.Int("asyncPoliciesCount", len(policies)),
+			zap.Strings("asyncPolicyNames", policyNames(policies)))
 	}
 
 	results := make([]ValidationBatchResult, 0, len(batchData))
