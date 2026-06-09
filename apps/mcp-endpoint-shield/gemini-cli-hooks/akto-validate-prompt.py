@@ -33,6 +33,7 @@ if not logger.handlers:
     logger.addHandler(console_handler)
 
 AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
+AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 GEMINI_API_URL = os.getenv("GEMINI_API_URL", "https://generativelanguage.googleapis.com")
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
@@ -78,6 +79,8 @@ def post_to_akto(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str
         logger.debug(f"Request payload: {json.dumps(payload, default=str)[:1000]}...")
 
     headers = {"Content-Type": "application/json"}
+    if AKTO_TOKEN:
+        headers["authorization"] = AKTO_TOKEN
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),

@@ -39,6 +39,7 @@ from langgraph.runtime import Runtime
 # ---------------------------------------------------------------------------
 
 AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL", "")
+AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -75,6 +76,7 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
         self._client = httpx.AsyncClient(
             timeout=AKTO_TIMEOUT,
             limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+            headers={"authorization": AKTO_TOKEN} if AKTO_TOKEN else {},
         )
         logger.info(
             f"AktoGuardrailsMiddleware initialized | connector={connector} "

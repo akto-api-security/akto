@@ -47,6 +47,7 @@ interface GuardrailsResult {
 // ---------------------------------------------------------------------------
 
 const DATA_INGESTION_URL: string | undefined = process.env.DATA_INGESTION_URL;
+const AKTO_TOKEN: string = process.env.AKTO_TOKEN || "";
 const SYNC_MODE: boolean =
     (process.env.SYNC_MODE || "true").toLowerCase() === "true";
 const TIMEOUT: number = parseFloat(process.env.TIMEOUT || "5") * 1000; // ms
@@ -260,7 +261,10 @@ async function postHttpProxy(
     try {
         return await fetch(endpoint, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                ...(AKTO_TOKEN ? { authorization: AKTO_TOKEN } : {}),
+            },
             body: JSON.stringify(payload),
             signal: controller.signal,
         });

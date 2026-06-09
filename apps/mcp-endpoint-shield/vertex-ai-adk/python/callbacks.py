@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 DATA_INGESTION_URL = os.getenv("DATA_INGESTION_URL")
+AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 SYNC_MODE = os.getenv("SYNC_MODE", "true").lower() == "true"
 TIMEOUT = float(os.getenv("TIMEOUT", "5"))
 AKTO_CONNECTOR_NAME = "vertex-ai-adk"
@@ -54,6 +55,7 @@ _AKTO_SNAPSHOT_KEY = "__akto_request_snapshot"
 _client = httpx.AsyncClient(
     timeout=TIMEOUT,
     limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+    headers={"authorization": AKTO_TOKEN} if AKTO_TOKEN else {},
 )
 
 logger.info(f"Akto Guardrails ADK callbacks initialized | sync_mode={SYNC_MODE}")
