@@ -3,9 +3,9 @@ import {Text, IndexFiltersMode, Box} from '@shopify/polaris';
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import api from "../api";
 import testingApi from "../../testing/api";
-import { useEffect, useReducer, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { useCollectionPageScope } from '../../../hooks/useCollectionPageScope';
-import transform from "../transform";
+import transform, { getStatus } from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func"
 import { CellType } from "../../../components/tables/rows/GithubRow";
@@ -55,11 +55,10 @@ const headers = [
     text: mapLabel("Test", getDashboardCategory()) + " run status",
     title: mapLabel("Test", getDashboardCategory()) + " run status",
     value: 'run_message',
-    type: CellType.TEXT,
     maxWidth: '220px',
     tooltipContent: (
       <Text variant="bodySm">
-        Run-level status or error (e.g. stopped, auth failure). Individual test results are in Issues and inside the test run.
+        Run-level execution summary (e.g. unreachable hosts, auth errors, skipped tests). Vulnerabilities are shown in Issues.
       </Text>
     )
   },
@@ -167,7 +166,6 @@ const endTimestamp = getTimeEpoch("until") + 86400
 
 
 const [loading, setLoading] = useState(true);
-const [updateTable, setUpdateTable] = useState("");
 const [countMap, setCountMap] = useState({});
 
 const definedTableTabs = ['All', 'One time', mapLabel("Continuous Testing", getDashboardCategory()), 'Scheduled', 'CI/CD']
@@ -183,12 +181,21 @@ const [selected, setSelected] = useState(initialTabIdx)
 const tableCountObj = func.getTabsCount(definedTableTabs, {}, initialCount)
 const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setCurrentTab, currentTab, tabsInfo)
 
+function shouldFetchRunStatusSummary(item) {
+  return getStatus(item?.testRunState) === "COMPLETED"
+    && !item?.authError
+    && !item?.tokenRateLimited;
+}
+
 const [severityMap, setSeverityMap] = useState({})
 const [subCategoryInfo, setSubCategoryInfo] = useState({})
 const [collapsible, setCollapsible] = useState(true)
 const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 const [totalNumberOfTests, setTotalNumberOfTests] = useState(0)
 const [summaryLoading, setSummaryLoading] = useState(false)
+const [runStatusUpdateKey, setRunStatusUpdateKey] = useState("")
+const runStatusSummariesRef = useRef({})
+const pendingRunStatusRequestRef = useRef(null)
 
   async function fetchTableData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) {
     setLoading(true);
@@ -246,6 +253,47 @@ const [summaryLoading, setSummaryLoading] = useState(false)
           total = testingRunsCount;
         });
         break;
+    }
+
+    ret = transform.enrichWithRunStatus(ret, runStatusSummariesRef.current);
+
+    const summaryHexIds = [...new Set(
+      ret
+        .filter(shouldFetchRunStatusSummary)
+        .map((item) => item.testingRunResultSummaryHexId)
+        .filter((hexId) => hexId && runStatusSummariesRef.current[hexId] === undefined)
+    )];
+
+    if (summaryHexIds.length > 0) {
+      const requestKey = summaryHexIds.slice().sort().join(',');
+      if (pendingRunStatusRequestRef.current !== requestKey) {
+        pendingRunStatusRequestRef.current = requestKey;
+        const chunkSize = 10;
+        const chunks = [];
+        for (let i = 0; i < summaryHexIds.length; i += chunkSize) {
+          chunks.push(summaryHexIds.slice(i, i + chunkSize));
+        }
+        // Fire all chunks in parallel so rows populate as soon as each batch returns,
+        // instead of waiting for chunks to resolve one after another.
+        Promise.all(chunks.map((chunk) =>
+          api.fetchTestRunStatusSummaries(chunk)
+            .then((statusSummaries) => {
+              if (pendingRunStatusRequestRef.current !== requestKey) {
+                return;
+              }
+              runStatusSummariesRef.current = {
+                ...runStatusSummariesRef.current,
+                ...statusSummaries,
+              };
+              setRunStatusUpdateKey(Date.now().toString());
+            })
+            .catch(() => {})
+        )).finally(() => {
+          if (pendingRunStatusRequestRef.current === requestKey) {
+            pendingRunStatusRequestRef.current = null;
+          }
+        });
+      }
     }
 
     // show the running tests at the top.
@@ -398,7 +446,8 @@ const coreTable = (
     condensedHeight={true}
     promotedBulkActions={promotedBulkActions}
     selectable= {true}
-    callFromOutside={updateTable}
+    clientSideDataUpdateKey={runStatusUpdateKey}
+    clientSideDataTransformer={(rows) => transform.enrichWithRunStatus(rows, runStatusSummariesRef.current)}
     lastColumnSticky={true}
   />   
 )

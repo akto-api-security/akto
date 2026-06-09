@@ -53,6 +53,18 @@ export default {
         })
         return resp        
     },
+    async fetchTestRunStatusSummaries(testingRunResultSummaryHexIds) {
+        if (!testingRunResultSummaryHexIds?.length) {
+            return {};
+        }
+        const resp = await request({
+            url: '/api/fetchTestRunStatusSummaries',
+            method: 'post',
+            data: { testingRunResultSummaryHexIds },
+            timeout: 60000,
+        });
+        return resp || {};
+    },
     async fetchRemediationInfo(testId) {
         const resp = await request({
             url: 'api/fetchRemediationInfo',

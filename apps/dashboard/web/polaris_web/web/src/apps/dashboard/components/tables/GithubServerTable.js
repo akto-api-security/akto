@@ -258,6 +258,12 @@ function GithubServerTable(props) {
     }    
   },[props?.callFromOutside])
 
+  useEffect(() => {
+    if (props?.clientSideDataUpdateKey && props?.clientSideDataTransformer) {
+      setData((prevData) => props.clientSideDataTransformer(prevData));
+    }
+  }, [props?.clientSideDataUpdateKey])
+
   const handleSort = (col, dir) => {
     let tempSortSelected = props?.sortOptions.filter(x => x.columnIndex === (col + 1))
     let sortVal = [tempSortSelected[0].value]
