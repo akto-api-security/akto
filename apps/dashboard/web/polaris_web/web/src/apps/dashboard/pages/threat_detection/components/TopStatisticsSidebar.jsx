@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Box, Card, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import api from "../api";
 import observeFunc from "../../observe/transform";
-import { formatCategoryName, getFlagSrc, countryCodeToName, openThreatActivityPage } from "../utils/threatDashboardUtils";
+import { formatCategoryName, getFlagSrc, countryCodeToName, openThreatActivityPage, openThreatActorsPage } from "../utils/threatDashboardUtils";
 
 function timeAgo(epochSeconds) {
     if (!epochSeconds) return "";
@@ -173,6 +173,7 @@ function TopStatisticsSidebar({ startTimestamp, endTimestamp }) {
                                 }
                                 label={countryCodeToName(item.country)}
                                 count={item.count}
+                                onClick={() => openThreatActorsPage({ country: item.country, startTimestamp, endTimestamp })}
                                 isLast={idx === countries.length - 1}
                             />
                         ))

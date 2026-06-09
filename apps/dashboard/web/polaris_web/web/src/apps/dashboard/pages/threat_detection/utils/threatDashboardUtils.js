@@ -64,3 +64,15 @@ export const openThreatActivityPage = (filters = {}) => {
     const url = `${window.location.origin}/dashboard/protection/threat-activity?${params.toString()}`;
     window.open(url, "_blank");
 };
+
+export const openThreatActorsPage = (filters = {}) => {
+    const params = new URLSearchParams();
+    const filterParts = [];
+    if (filters.country) filterParts.push(`country__${filters.country}`);
+    if (filters.latestAttack) filterParts.push(`latestAttack__${filters.latestAttack}`);
+    if (filterParts.length > 0) params.set("filters", filterParts.join("&"));
+    if (filters.startTimestamp) params.set("since", filters.startTimestamp);
+    if (filters.endTimestamp) params.set("until", filters.endTimestamp);
+    const url = `${window.location.origin}/dashboard/protection/threat-actor?${params.toString()}`;
+    window.open(url, "_blank");
+};
