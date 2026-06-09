@@ -1,9 +1,15 @@
 import React from "react";
-import { Box, Text, Tooltip } from "@shopify/polaris";
+import { Box, Text, Tooltip, Checkbox } from "@shopify/polaris";
 import { NEW_LAYOUT_TOOLTIP } from "./constants";
+import func from "@/util/func";
 
-// Shared "New Layout" checkbox tooltip — renders below the target, fixed width, adaptive height.
-export default function NewLayoutTooltip({ children }) {
+export default function NewLayoutTooltip({ checked, onChange }) {
+    if (!func.isDemoAccount()) return null;
+
+    const checkbox = <Checkbox label="New Layout" checked={checked} onChange={onChange} />;
+
+    if (checked) return checkbox;
+
     return (
         <Tooltip
             preferredPosition="below"
@@ -14,7 +20,7 @@ export default function NewLayoutTooltip({ children }) {
                 </Box>
             }
         >
-            {children}
+            {checkbox}
         </Tooltip>
     );
 }

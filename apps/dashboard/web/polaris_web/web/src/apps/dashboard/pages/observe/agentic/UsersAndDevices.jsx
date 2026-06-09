@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Badge, HorizontalStack, Text, Modal, TextField, FormLayout, Checkbox } from "@shopify/polaris";
+import { IndexFiltersMode, Badge, HorizontalStack, Text, Modal, TextField, FormLayout } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -342,13 +342,7 @@ function UsersAndDevices() {
     );
 
     const layoutToggle = (
-        <NewLayoutTooltip>
-            <Checkbox
-                label="New Layout"
-                checked={false}
-                onChange={() => { localStorage.setItem("akto_agentic_new_ui", "true"); navigate("/dashboard/observe/endpoints"); }}
-            />
-        </NewLayoutTooltip>
+        <NewLayoutTooltip checked={false} onChange={() => { localStorage.setItem("akto_agentic_new_ui", "true"); navigate("/dashboard/observe/endpoints"); }} />
     );
 
     if (loading) {

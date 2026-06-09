@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import { produce } from "immer";
 import { useNavigate } from "react-router-dom";
-import { Box, Card, Checkbox, Divider, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
+import { Box, Card, Divider, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
@@ -425,13 +425,7 @@ export default function AgenticAssetsPage() {
 
   const headerActions = (
     <HorizontalStack gap="3" blockAlign="center">
-      <NewLayoutTooltip>
-        <Checkbox
-          label="New Layout"
-          checked={newLayout}
-          onChange={handleLayoutToggle}
-        />
-      </NewLayoutTooltip>
+      <NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />
       <DateRangeFilter
         initialDispatch={currDateRange}
         dispatch={(dateObj) =>

@@ -43,9 +43,9 @@ export const agTableTheme = themeQuartz.withParams({
 });
 
 
-function SearchBar({ value, onChange, placeholder }) {
+function SearchBar({ value, onChange, placeholder, topRadius = true }) {
     return (
-        <Box borderWidth="1" borderColor="border-subdued" borderRadiusStartStart={2} borderRadiusStartEnd={2} padding={1} borderInlineStartWidth="1" borderBlockStartWidth="1" borderInlineEndWidth="1">
+        <Box borderWidth="1" borderColor="border-subdued" borderRadiusStartStart={topRadius ? 2 : 0} borderRadiusStartEnd={topRadius ? 2 : 0} padding={1} borderInlineStartWidth="1" borderBlockStartWidth="1" borderInlineEndWidth="1">
             <div className="ag-grid-search-bar">
             <TextField
                 prefix={<Box><Icon source={SearchMinor} /></Box>}
@@ -303,7 +303,7 @@ export default function AgGridTable({
             <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} noRadius />
             {hasSearch && <SearchBar value={searchValue} onChange={(val) => {
                 setSearchValue(val);
-            }} placeholder={searchPlaceholder} />}
+            }} placeholder={searchPlaceholder} topRadius={!noOuterBorder} />}
             <div style={{ flex: 1, minHeight: 0}}>
                 {gridNode}
             </div>

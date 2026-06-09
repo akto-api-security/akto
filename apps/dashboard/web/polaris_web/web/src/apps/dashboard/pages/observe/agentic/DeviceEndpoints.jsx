@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
-import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Checkbox, Badge } from "@shopify/polaris";
+import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Badge } from "@shopify/polaris";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
@@ -534,13 +534,7 @@ export default function DeviceEndpoints() {
 
     const headerActions = (
         <HorizontalStack gap="3" blockAlign="center">
-            <NewLayoutTooltip>
-                <Checkbox
-                    label="New Layout"
-                    checked={newLayout}
-                    onChange={handleLayoutToggle}
-                />
-            </NewLayoutTooltip>
+            <NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />
             <DateRangeFilter
                 initialDispatch={currDateRange}
                 dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })}

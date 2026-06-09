@@ -35,6 +35,7 @@
     cursor: pointer;
     transition: background-color 0.15s ease;
     padding: 10px 12px;
+    border-radius: 8px;
 }
 .agentic-clickable-row:hover {
     background-color: var(--p-color-bg-hover, #f6f6f7);
