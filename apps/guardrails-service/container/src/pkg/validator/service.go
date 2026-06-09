@@ -20,12 +20,13 @@ import (
 
 // policyCache holds cached policies and their metadata
 type policyCache struct {
-	policies      []types.Policy
-	auditPolicies map[string]*types.AuditPolicy
-	compiledRules map[string]*regexp.Regexp
-	hasAuditRules bool
-	lastFetched   time.Time
-	mu            sync.RWMutex
+	policies         []types.Policy
+	behaviourByName  map[string]string // policy name → "block"/"warn"/"alert"
+	auditPolicies    map[string]*types.AuditPolicy
+	compiledRules    map[string]*regexp.Regexp
+	hasAuditRules    bool
+	lastFetched      time.Time
+	mu               sync.RWMutex
 }
 
 // collectionTag represents a single key-value tag on a collection
@@ -506,9 +507,13 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		zap.Int("size", len(rawGuardrailPolicies)),
 		zap.String("raw", string(rawGuardrailPolicies)))
 
-	// Parse the wrapper object containing guardrailPolicies array
+	// Single-pass parse — local struct captures the Java "behaviour" field which
+	// types.Policy doesn't have, without requiring mcp-endpoint-shield changes.
 	var response struct {
-		GuardrailPolicies []*mcp.GuardrailsPolicy `json:"guardrailPolicies"`
+		GuardrailPolicies []struct {
+			mcp.GuardrailsPolicy
+			Behaviour string `json:"behaviour"`
+		} `json:"guardrailPolicies"`
 	}
 	if err := json.Unmarshal(rawGuardrailPolicies, &response); err != nil {
 		s.logger.Error("Failed to parse guardrail policies",
@@ -520,14 +525,19 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 	s.logger.Info("Parsed guardrail policies",
 		zap.Int("count", len(response.GuardrailPolicies)))
 
-	// Convert GuardrailsPolicy to Policy using library function
+	behaviourByName := make(map[string]string)
 	var policies []types.Policy
-	for _, gp := range response.GuardrailPolicies {
-		if gp.Active { // Only include active policies
-			policy := mcp.ConvertGuardrailsToPolicy(gp)
-			policies = append(policies, policy)
+	for i := range response.GuardrailPolicies {
+		entry := &response.GuardrailPolicies[i]
+		if !entry.GuardrailsPolicy.Active {
+			continue
+		}
+		policies = append(policies, mcp.ConvertGuardrailsToPolicy(&entry.GuardrailsPolicy))
+		if entry.Behaviour != "" {
+			behaviourByName[entry.GuardrailsPolicy.Name] = entry.Behaviour
 		}
 	}
+	s.cache.behaviourByName = behaviourByName
 
 	// Fetch MCP audit info from database abstractor
 	rawAuditPolicies, err := s.dbClient.FetchMcpAuditInfo()
@@ -718,19 +728,6 @@ func (s *Service) extractPayloadForValidation(payload, method, path string, isRe
 	return finalPayload
 }
 
-// splitPoliciesByMode separates policies by behaviour:
-//   - "warn" / "alert" → async Kafka consumer (CPU-based LLM, jarvis.akto.io)
-//   - "block" or anything else → evaluated inline (GPU path, real-time blocking)
-func splitPoliciesByMode(policies []types.Policy) (sync []types.Policy, async []types.Policy) {
-	for _, p := range policies {
-		if p.Behaviour == "warn" || p.Behaviour == "alert" {
-			async = append(async, p)
-		} else {
-			sync = append(sync, p)
-		}
-	}
-	return
-}
 
 // ingestDataBatchFromParams builds an IngestDataBatch from a ValidateRequestParams
 // so the HTTP handler can enqueue async policy evaluation on the same Kafka topic
@@ -903,9 +900,18 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Filter policies by MCP server name — policies with no server configured are skipped
 	policies = filterPoliciesByMcpServer(policies, valCtx.McpServerName)
 
-	// Split: WARN/ALERT policies with LLM rules are deferred to the Kafka async consumer
-	// (CPU-based LLM). Everything else evaluates inline (GPU or local ONNX).
-	syncPolicies, asyncPolicies := splitPoliciesByMode(policies)
+	// Split by behaviour: warn/alert → Kafka async consumer; block → evaluate inline.
+	s.cache.mu.RLock()
+	behaviourByName := s.cache.behaviourByName
+	s.cache.mu.RUnlock()
+	var syncPolicies, asyncPolicies []types.Policy
+	for _, p := range policies {
+		if b := behaviourByName[p.Info.Name]; b == "warn" || b == "alert" {
+			asyncPolicies = append(asyncPolicies, p)
+		} else {
+			syncPolicies = append(syncPolicies, p)
+		}
+	}
 	if len(asyncPolicies) > 0 && s.asyncProducer != nil {
 		data := ingestDataBatchFromParams(params)
 		go func() {
@@ -914,13 +920,9 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			if err := s.asyncProducer.Produce(pCtx, data); err != nil {
 				s.logger.Warn("ValidateRequest - failed to enqueue async policy evaluation",
 					zap.Error(err),
-					zap.String("path", params.Path),
-					zap.Int("asyncPolicies", len(asyncPolicies)))
+					zap.String("path", params.Path))
 			}
 		}()
-		s.logger.Info("ValidateRequest - deferred async policies to Kafka",
-			zap.Int("asyncPolicies", len(asyncPolicies)),
-			zap.Strings("asyncPolicyNames", policyNames(asyncPolicies)))
 	}
 
 	s.logger.Info("ValidateRequest - calling ProcessRequest",
