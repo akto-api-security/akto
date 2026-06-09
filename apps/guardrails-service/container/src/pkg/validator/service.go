@@ -507,13 +507,9 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		zap.Int("size", len(rawGuardrailPolicies)),
 		zap.String("raw", string(rawGuardrailPolicies)))
 
-	// Single-pass parse — local struct captures the Java "behaviour" field which
-	// types.Policy doesn't have, without requiring mcp-endpoint-shield changes.
+	// Parse full policy objects for validation logic.
 	var response struct {
-		GuardrailPolicies []struct {
-			mcp.GuardrailsPolicy
-			Behaviour string `json:"behaviour"`
-		} `json:"guardrailPolicies"`
+		GuardrailPolicies []mcp.GuardrailsPolicy `json:"guardrailPolicies"`
 	}
 	if err := json.Unmarshal(rawGuardrailPolicies, &response); err != nil {
 		s.logger.Error("Failed to parse guardrail policies",
@@ -522,22 +518,38 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		return nil, nil, nil, false, fmt.Errorf("failed to parse guardrail policies: %w", err)
 	}
 
-	s.logger.Info("Parsed guardrail policies",
-		zap.Int("count", len(response.GuardrailPolicies)))
+	// Separate minimal unmarshal to extract name→behaviour without embedding conflicts.
+	// The deployed mcp-endpoint-shield may already have a Behaviour field on GuardrailsPolicy
+	// that would shadow an inline outer field, so we parse independently.
+	var behaviourResponse struct {
+		GuardrailPolicies []struct {
+			Name      string `json:"name"`
+			Behaviour string `json:"behaviour"`
+			Active    bool   `json:"active"`
+		} `json:"guardrailPolicies"`
+	}
+	json.Unmarshal(rawGuardrailPolicies, &behaviourResponse) // best-effort; errors are non-fatal
 
 	behaviourByName := make(map[string]string)
-	var policies []types.Policy
-	for i := range response.GuardrailPolicies {
-		entry := &response.GuardrailPolicies[i]
-		if !entry.GuardrailsPolicy.Active {
-			continue
-		}
-		policies = append(policies, mcp.ConvertGuardrailsToPolicy(&entry.GuardrailsPolicy))
-		if entry.Behaviour != "" {
-			behaviourByName[entry.GuardrailsPolicy.Name] = entry.Behaviour
+	for _, p := range behaviourResponse.GuardrailPolicies {
+		if p.Active && p.Behaviour != "" {
+			behaviourByName[p.Name] = p.Behaviour
 		}
 	}
 	s.cache.behaviourByName = behaviourByName
+
+	s.logger.Info("Parsed guardrail policies",
+		zap.Int("count", len(response.GuardrailPolicies)),
+		zap.Any("behaviourByName", behaviourByName))
+
+	var policies []types.Policy
+	for i := range response.GuardrailPolicies {
+		entry := &response.GuardrailPolicies[i]
+		if !entry.Active {
+			continue
+		}
+		policies = append(policies, mcp.ConvertGuardrailsToPolicy(entry))
+	}
 
 	// Fetch MCP audit info from database abstractor
 	rawAuditPolicies, err := s.dbClient.FetchMcpAuditInfo()
