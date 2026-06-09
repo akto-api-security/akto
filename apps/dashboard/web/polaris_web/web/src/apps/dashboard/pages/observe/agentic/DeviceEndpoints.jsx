@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
-import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Checkbox, Badge, Tooltip } from "@shopify/polaris";
+import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Checkbox, Badge } from "@shopify/polaris";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
@@ -18,7 +18,8 @@ import AgenticStatsCard from "./AgenticStatsCard";
 import agenticObserveApi, { aggregateViolationsByCollectionId } from "./agenticObserveApi";
 import { buildDeviceEndpointsPageData } from "./agenticPageBuilders";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
-import { groupCollectionsByUser, NEW_LAYOUT_TOOLTIP } from "./constants";
+import { groupCollectionsByUser } from "./constants";
+import NewLayoutTooltip from "./NewLayoutTooltip";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import values from "@/util/values";
 import func from "@/util/func";
@@ -40,9 +41,9 @@ function makeOsTrendConfig(osTrend, monthLabels) {
     ];
     return {
         chart:{
-            type:"areaspline", height:220, backgroundColor:"transparent",
+            type:"areaspline", height:240, backgroundColor:"transparent",
             style:{fontFamily:"Inter, -apple-system, sans-serif"},
-            margin:[8,8,72,44],
+            margin:[8,8,88,44],
         },
         title:null, credits:{enabled:false}, exporting:{enabled:false},
         xAxis:{
@@ -51,7 +52,7 @@ function makeOsTrendConfig(osTrend, monthLabels) {
             lineColor:"#DFE3E8", tickColor:"transparent",
         },
         yAxis:{title:null,labels:{style:{fontSize:"11px",color:"#8C9196"}},gridLineColor:"#F1F2F3",allowDecimals:false,min:0},
-        legend:{enabled:true,align:"left",verticalAlign:"bottom",layout:"horizontal",itemStyle:{fontSize:"12px",fontWeight:"400",color:"#6D7175"},symbolRadius:4,margin:8,y:16},
+        legend:{enabled:true,align:"left",verticalAlign:"bottom",layout:"horizontal",itemStyle:{fontSize:"12px",fontWeight:"400",color:"#6D7175"},symbolRadius:4,margin:8,y:8},
         tooltip:{shared:true,backgroundColor:"white",borderColor:"#DFE3E8",borderRadius:8,style:{fontSize:"12px"}},
         plotOptions:{ areaspline:{ marker:{enabled:false}, lineWidth:2, fillOpacity:0.08 }, series:{ connectNulls:true } },
         series,
@@ -533,13 +534,13 @@ export default function DeviceEndpoints() {
 
     const headerActions = (
         <HorizontalStack gap="3" blockAlign="center">
-            <Tooltip content={NEW_LAYOUT_TOOLTIP} dismissOnMouseOut>
+            <NewLayoutTooltip>
                 <Checkbox
                     label="New Layout"
                     checked={newLayout}
                     onChange={handleLayoutToggle}
                 />
-            </Tooltip>
+            </NewLayoutTooltip>
             <DateRangeFilter
                 initialDispatch={currDateRange}
                 dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })}

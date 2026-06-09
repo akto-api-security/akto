@@ -5,7 +5,7 @@ import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AgenticFlyoutShell from "./AgenticFlyoutShell";
 import AiChatSection from "./AiChatSection";
 import { TypeBadge, SeverityBadge, RiskPill } from "./AgenticCellRenderers";
-import { getRiskLabel } from "./agenticPageBuilders";
+
 import AssetTopologyGraph from "./AssetTopologyGraph";
 import { RiskFactorRow } from "./RiskFactorRow";
 import DetailGrid from "./DetailGrid";
@@ -16,70 +16,46 @@ import "../../../components/layouts/style.css";
 
 function computeRiskFactors(device, agents) {
     const factors = [];
-    if (device.violations?.critical > 0) {
-        factors.push({
-            severity: "critical",
-            title: `${device.violations.critical} Critical Violation${device.violations.critical > 1 ? "s" : ""}`,
-            description: "Active critical policy violations signal potential data exfiltration or unauthorized system access.",
-        });
+    const sevLabels = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
+
+    for (const [sev, label] of Object.entries(sevLabels)) {
+        const count = device.violations?.[sev] || 0;
+        if (count > 0) {
+            factors.push({
+                severity: sev,
+                title: `${count} ${label} Violation${count > 1 ? "s" : ""}`,
+                description: `Contains ${label.toLowerCase()} violations`,
+                type: "violation",
+            });
+        }
     }
-    if (device.violations?.high > 0) {
-        factors.push({
-            severity: "high",
-            title: `${device.violations.high} High-Severity Violation${device.violations.high > 1 ? "s" : ""}`,
-            description: "High-severity violations indicate significant policy breaches that require investigation.",
-        });
-    }
+
     if (device.hasPersonalAccount) {
         factors.push({
             severity: "high",
-            title: "Personal Account Access Detected",
-            description: "AI agents are using personal (non-corporate) accounts, creating shadow IT and data exfiltration risks outside DLP policies.",
+            title: "Personal Account",
+            description: "Contains personal account",
+            type: "personal_account",
         });
     }
-    const financialMcps = agents.filter(a =>
-        a.type === "MCP Server" && (a.endpoint.includes("razorpay") || a.endpoint.includes("quickbooks") || a.endpoint.includes("sap") || a.endpoint.includes("stripe"))
-    );
-    if (financialMcps.length > 0) {
+
+    const maliciousSkills = agents.filter(a => a.isMalicious);
+    if (maliciousSkills.length > 0) {
+        const names = maliciousSkills.map(a => a.endpoint).join(", ");
         factors.push({
             severity: "critical",
-            title: "Financial System Integration",
-            description: `${financialMcps.map(a => a.endpoint).join(", ")} grants agents direct read/write access to payment and financial systems.`,
+            title: `${maliciousSkills.length} Malicious Skill${maliciousSkills.length > 1 ? "s" : ""}`,
+            description: `Contains malicious skill: ${names}`,
+            type: "malicious_skill",
         });
     }
-    const cloudMcps = agents.filter(a =>
-        a.type === "MCP Server" && (a.endpoint.includes("aws") || a.endpoint.includes("k8s") || a.endpoint.includes("kubernetes"))
-    );
-    if (cloudMcps.length > 0) {
-        factors.push({
-            severity: "high",
-            title: "Cloud Infrastructure Control",
-            description: `${cloudMcps.map(a => a.endpoint).join(", ")} allows agents to provision or destroy cloud resources.`,
-        });
-    }
-    const dbMcps = agents.filter(a =>
-        a.type === "MCP Server" && (a.endpoint.includes("postgres") || a.endpoint.includes("mysql") || a.endpoint.includes("databricks"))
-    );
-    if (dbMcps.length > 0) {
-        factors.push({
-            severity: "high",
-            title: "Direct Database Access",
-            description: `${dbMcps.map(a => a.endpoint).join(", ")} enables agents to run arbitrary queries against production databases.`,
-        });
-    }
-    const mcpCount = agents.filter(a => a.type === "MCP Server").length;
-    if (mcpCount >= 3) {
-        factors.push({
-            severity: "medium",
-            title: `High Integration Complexity (${mcpCount} MCP servers)`,
-            description: `${mcpCount} external system integrations expand the blast radius of any compromised agent session.`,
-        });
-    }
+
     if (factors.length === 0) {
         factors.push({
             severity: "low",
             title: "Standard Risk Profile",
-            description: "No elevated risk factors detected. Score reflects baseline activity levels.",
+            description: "No elevated risk factors detected.",
+            type: "normal",
         });
     }
     return factors;
@@ -179,46 +155,12 @@ const SEVERITY_ORDER = { low: 1, medium: 2, high: 3, critical: 4 };
 
 const VIOLATIONS_COL_DEFS = [
     { field: "time",     headerName: "Time",               width: 120, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.timeEpoch || 0) - (nodeB?.data?.timeEpoch || 0) },
-    { field: "severity", headerName: "Severity",           width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, comparator: (a, b) => (SEVERITY_ORDER[a] || 0) - (SEVERITY_ORDER[b] || 0) },
     { field: "title",    headerName: "Violation",          flex: 1, minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "severity", headerName: "Severity",           width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, comparator: (a, b) => (SEVERITY_ORDER[a] || 0) - (SEVERITY_ORDER[b] || 0) },
     { field: "agent",    headerName: "Agentic Component",  width: 200, cellRenderer: ViolAgentCellRenderer, cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL" })[p.data?.agentType] || "", cellStyle: { display: "flex", alignItems: "center" } },
 ];
 
 const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
-
-// ─── Risk narrative ───────────────────────────────────────────────────────────
-
-function getRiskNarrative(device, agents, factors) {
-    const critV = device.violations?.critical || 0;
-    const highV = device.violations?.high || 0;
-    const totalSkills = agents.reduce((s, a) => s + (a.skillCount || 0), 0);
-    const mcpNames = agents.filter(a => a.type === "MCP Server").map(a => a.endpoint);
-    const parts = [];
-
-    if (critV > 0)
-        parts.push(`${critV} active critical violation${critV > 1 ? "s" : ""} indicate unauthorized data transmission or credential exposure`);
-    if (highV > 0)
-        parts.push(`${highV} high-severity violation${highV > 1 ? "s" : ""} signal significant policy breaches requiring immediate review`);
-    if (device.hasPersonalAccount)
-        parts.push("AI agents are operating under personal (non-corporate) accounts outside DLP policy coverage");
-    if (mcpNames.some(n => n.includes("razorpay") || n.includes("quickbooks") || n.includes("sap") || n.includes("stripe")))
-        parts.push("financial system integrations grant agents direct write access to payment APIs without per-call authorization");
-    if (mcpNames.some(n => n.includes("aws") || n.includes("k8s") || n.includes("kubernetes")))
-        parts.push("cloud infrastructure MCPs allow agents to provision or destroy resources autonomously");
-    if (mcpNames.some(n => n.includes("postgres") || n.includes("databricks") || n.includes("mysql")))
-        parts.push("direct database access MCPs enable arbitrary query execution against production data");
-    if (totalSkills > 100)
-        parts.push(`${totalSkills.toLocaleString()} exposed skills significantly expand the attack surface`);
-
-    const displayName = device.username && device.username !== "-" ? device.username : device.endpoint;
-
-    if (parts.length === 0)
-        return `${displayName} shows a standard activity profile with no elevated signals. Score reflects baseline AI agent usage patterns.`;
-
-    const score = device.riskScore?.toFixed(1);
-    const label = getRiskLabel(device.riskScore);
-    return `${displayName} carries a ${label} score of ${score}/5.0 because ${parts.join(", and ")}. ${critV > 0 || device.hasPersonalAccount ? "Immediate action is recommended." : "Monitor closely and review agent permissions."}`;
-}
 
 // ─── Topology graph ───────────────────────────────────────────────────────────
 
@@ -306,7 +248,6 @@ function OverviewTab({ device, agents, onTabChange }) {
 
     const rawFactors = useMemo(() => computeRiskFactors(device, agents), [device, agents]);
     const factors    = useMemo(() => [...rawFactors].sort((a, b) => (SEV_ORDER[a.severity] ?? 99) - (SEV_ORDER[b.severity] ?? 99)), [rawFactors]);
-    const narrative  = useMemo(() => getRiskNarrative(device, agents, rawFactors), [device, agents, rawFactors]);
 
     const stats = useMemo(() => [
         { label: aiCount  === 1 ? "AI Agent"   : "AI Agents",   value: aiCount  },
@@ -341,13 +282,26 @@ function OverviewTab({ device, agents, onTabChange }) {
 
                 <TopologyGraph device={device} agents={agents} />
 
-                <VerticalStack gap="3">
+                <VerticalStack gap="2">
                     <Text variant="headingXs" color="subdued">Risk Analysis</Text>
-                    <Text variant="bodySm">{narrative}</Text>
-                    <VerticalStack gap="1">
+                    <VerticalStack gap="0">
                         {factors.map((f, i) => {
-                            const targetTab = (f.severity === "critical" || f.severity === "high") && f.title.toLowerCase().includes("violation") ? 2 : f.title.toLowerCase().includes("integration") || f.title.toLowerCase().includes("database") || f.title.toLowerCase().includes("cloud") ? 1 : 2;
-                            return <RiskFactorRow key={i} factor={f} onClick={() => onTabChange?.(targetTab)} />;
+                            let handleClick;
+                            if (f.type === "violation") {
+                                handleClick = () => onTabChange?.(2);
+                            } else if (f.type === "personal_account") {
+                                handleClick = () => window.open("/dashboard/protection/threat-activity", "_blank");
+                            } else if (f.type === "malicious_skill") {
+                                handleClick = () => window.open("/dashboard/observe/agentic-assets", "_blank");
+                            } else {
+                                handleClick = undefined;
+                            }
+                            return (
+                                <React.Fragment key={i}>
+                                    {i > 0 && <Divider />}
+                                    <RiskFactorRow factor={f} onClick={handleClick} />
+                                </React.Fragment>
+                            );
                         })}
                     </VerticalStack>
                 </VerticalStack>

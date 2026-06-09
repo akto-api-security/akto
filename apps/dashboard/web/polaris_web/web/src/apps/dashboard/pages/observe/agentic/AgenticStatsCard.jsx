@@ -26,10 +26,10 @@ function SegmentBar({ segments }) {
     );
 }
 
-function LegendDot({ color, active }) {
+function LegendDot({ color }) {
     return (
-        <Box
-            className={active ? "agentic-dot agentic-dot--active" : "agentic-dot"}
+        <span
+            className="agentic-dot"
             style={{ "--dot-color": color }}
         />
     );
@@ -64,8 +64,8 @@ export default function AgenticStatsCard({
                 <HorizontalStack align="space-between" blockAlign="center" gap="3">
                     <HorizontalStack gap="2" blockAlign="baseline">
                         <Text variant="heading2xl" as="p" color={totalColor}>{total}</Text>
-                        {delta > 0 && <Text variant="bodySm" color="success">+{delta}</Text>}
-                        {delta < 0 && <Text variant="bodySm" color="critical">{delta}</Text>}
+                        {delta > 0 && <Text variant="bodySm" color="subdued">+{delta}</Text>}
+                        {delta < 0 && <Text variant="bodySm" color="subdued">{delta}</Text>}
                     </HorizontalStack>
                     {sparklineCounts && (
                         <SmoothAreaChart
@@ -81,27 +81,22 @@ export default function AgenticStatsCard({
                 <VerticalStack gap="2">
                     {total > 0 && <SegmentBar segments={breakdown} />}
                     {breakdown.length > 0 && (
-                        <HorizontalStack gap="3" wrap>
+                        <HorizontalStack gap="2" wrap={false}>
                             {breakdown.map((b) => {
                                 const active = activeFilter?.has(b.key ?? b.label);
                                 return (
-                                    <Box
+                                    <div
                                         key={b.label}
                                         onClick={() => onFilterClick?.(b.key ?? b.label)}
-                                        paddingInlineStart="2"
-                                        paddingInlineEnd="2"
-                                        paddingBlockStart="1"
-                                        paddingBlockEnd="1"
-                                        borderRadius="full"
-                                        className="agentic-chip"
+                                        className={active ? "agentic-chip agentic-chip--active" : "agentic-chip"}
                                     >
                                         <HorizontalStack gap="1" blockAlign="center">
-                                            <LegendDot color={b.color} active={active} />
+                                            <LegendDot color={b.color} />
                                             <Text variant="bodySm" color="subdued">
                                                 {b.label} ({b.count})
                                             </Text>
                                         </HorizontalStack>
-                                    </Box>
+                                    </div>
                                 );
                             })}
                         </HorizontalStack>

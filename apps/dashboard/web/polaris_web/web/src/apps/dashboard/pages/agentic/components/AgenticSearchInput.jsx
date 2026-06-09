@@ -116,7 +116,7 @@ const AgenticSearchInput = forwardRef(({
                                 placeholder={placeholder}
                                 autoComplete="off"
                                 borderless
-                                disabled={disabled || isStreaming}
+                                disabled={disabled}
                             />
                         </Box>
                     <Box

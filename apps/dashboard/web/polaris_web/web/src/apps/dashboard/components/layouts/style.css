@@ -30,10 +30,11 @@
 .agentic-type-DEFAULT .Polaris-Badge { background-color: #F3F4F6; color: #374151; }
 
 
-/* Clickable risk-factor row — edge-to-edge hover, no border. */
+/* Clickable risk-factor row — edge-to-edge hover, divider between rows. */
 .agentic-clickable-row {
     cursor: pointer;
     transition: background-color 0.15s ease;
+    padding: 10px 12px;
 }
 .agentic-clickable-row:hover {
     background-color: var(--p-color-bg-hover, #f6f6f7);
@@ -49,13 +50,34 @@
     overflow: hidden;
 }
 
-/* Card 1 legend chips — cursor + non-selectable only; padding + borderRadius are Box props. */
+/* Card 1 legend chips — pill around dot + label. Transparent border avoids layout shift when active. */
 .agentic-chip {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    white-space: nowrap;
     cursor: pointer;
     user-select: none;
+    padding: 2px 6px;
+    border-radius: 9999px;
+    border: 1px solid transparent;
 }
 .agentic-chip:focus {
     outline: none;
+}
+/* Selected chip — full border around dot + label. */
+.agentic-chip--active {
+    border-color: #8c9196;
+}
+
+/* Legend dot — colour via --dot-color custom property. */
+.agentic-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: inline-block;
+    background: var(--dot-color);
 }
 
 
@@ -68,8 +90,18 @@
 .agentic-list-table .Polaris-DataTable__Cell {
     cursor: pointer;
 }
+/* Click target fills the whole cell so clicks in empty cell space still open the flyout. */
+.agentic-list-cell-click {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
 .agentic-list-table .Polaris-DataTable__TableRow:hover .Polaris-DataTable__Cell {
     background-color: var(--p-color-bg-hover, #f6f6f7);
+}
+.agentic-list-table .Polaris-DataTable__Cell--header {
+    color: var(--p-color-text-subdued, #6D7175);
+    font-weight: 500;
 }
 
 /* Segmented proportion bar */
@@ -84,18 +116,6 @@
     min-width: 2px;
 }
 
-/* Small legend dot — colour via --dot-color; active adds outline ring */
-.agentic-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    background: var(--dot-color);
-}
-.agentic-dot--active {
-    outline: 2px solid var(--dot-color);
-    outline-offset: 1px;
-}
 
 /* flex: 1 + flexDirection: column + minHeight: 0 — required for AG Grid fill-height
    inside flyout panels. No Polaris prop equivalent for flex/flexDirection. */

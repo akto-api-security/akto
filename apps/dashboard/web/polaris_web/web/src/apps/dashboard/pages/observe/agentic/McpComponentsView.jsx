@@ -251,23 +251,30 @@ export default function McpComponentsView({ asset, onNavChange }) {
         return () => { cancelled = true; };
     }, [asset?.id, asset?.collectionIds]);
 
+    const selectItemRef = useRef(null);
     const selectItem = useCallback((row) => {
         setSelectedItem({ item: row, type: row._type.toLowerCase() });
+    }, []);
+    selectItemRef.current = selectItem;
+
+    // Re-publish nav whenever selectedItem or allRows changes so the picker JSX is always fresh
+    useEffect(() => {
+        if (!selectedItem) return;
         onNavChange(
             [{ label: asset.name, onClick: () => { setSelectedItem(null); onNavChange(null); } }],
-            <McpPickerDropdown allRows={allRows} selected={row} onSelect={selectItem} />
+            <McpPickerDropdown allRows={allRows} selected={selectedItem.item} onSelect={(r) => selectItemRef.current?.(r)} />
         );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [asset.name, onNavChange, allRows]);
+    }, [selectedItem, allRows, asset.name, onNavChange]);
 
     const handleRowClick = useCallback((e) => {
         if (!e.data) return;
         selectItem(e.data);
     }, [selectItem]);
 
-    if (selectedItem?.type === "skill") return <SkillDetailPanel skill={selectedItem.item} />;
-    if (selectedItem?.type === "tool")  return <ToolDetailPanel tool={selectedItem.item} />;
-    if (selectedItem)                   return <ResourcePromptDetailPanel item={selectedItem.item} />;
+    if (selectedItem?.type === "skill") return <SkillDetailPanel key={selectedItem.item.name} skill={selectedItem.item} />;
+    if (selectedItem?.type === "tool")  return <ToolDetailPanel key={selectedItem.item.name} tool={selectedItem.item} />;
+    if (selectedItem)                   return <ResourcePromptDetailPanel key={selectedItem.item.name} item={selectedItem.item} />;
 
     return allRows.length === 0 ? (
         <Box padding="4"><Text variant="bodySm" color="subdued">No tools, resources, prompts or skills found.</Text></Box>

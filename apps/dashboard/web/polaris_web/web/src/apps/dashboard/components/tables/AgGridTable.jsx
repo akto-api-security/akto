@@ -170,7 +170,9 @@ export default function AgGridTable({
     const hasSearch = !!searchPlaceholder;
     const [searchValue, setSearchValue] = useState("");
     const [debouncedSearchValue, setDebouncedSearchValue] = useState("");
-    const theme = agTableTheme;
+    const theme = noOuterBorder
+        ? agTableTheme.withParams({ wrapperBorder: false, wrapperBorderRadius: 0 })
+        : agTableTheme;
 
     const debouncedSetSearch = useRef(
         debounce((val, serverMode) => {

@@ -114,7 +114,7 @@ export default function AiChatSection({
 
     return (
         <>
-            {expanded && <Divider />}
+            {expanded && <Box paddingBlockStart="2" paddingBlockEnd="2"><Divider /></Box>}
             <Box
                 ref={sectionRef}
                 className={"agentic-chat agentic-chat-section" + (expanded && !resizeHeight ? " agentic-chat--expanded" : "")}

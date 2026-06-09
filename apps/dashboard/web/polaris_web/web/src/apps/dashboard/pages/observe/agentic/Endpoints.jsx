@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Box, Badge, HorizontalStack, Text, Checkbox, Tooltip } from "@shopify/polaris";
+import { IndexFiltersMode, Box, Badge, HorizontalStack, Text, Checkbox } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -12,8 +12,8 @@ import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 import { CollectionIcon } from "../../../components/shared/CollectionIcon";
 import useTable from "@/apps/dashboard/components/tables/TableContext";
+import NewLayoutTooltip from "./NewLayoutTooltip";
 import {
-    NEW_LAYOUT_TOOLTIP,
     getHeaders,
     sortOptions,
     resourceName,
@@ -318,13 +318,13 @@ function Endpoints() {
     ), []);
 
     const layoutToggle = (
-        <Tooltip content={NEW_LAYOUT_TOOLTIP} dismissOnMouseOut>
+        <NewLayoutTooltip>
             <Checkbox
                 label="New Layout"
                 checked={false}
                 onChange={() => { localStorage.setItem("akto_agentic_new_ui", "true"); navigate("/dashboard/observe/agentic-assets"); }}
             />
-        </Tooltip>
+        </NewLayoutTooltip>
     );
 
     if (loading) {

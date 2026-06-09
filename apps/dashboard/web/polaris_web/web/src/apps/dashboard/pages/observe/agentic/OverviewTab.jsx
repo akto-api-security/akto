@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { Box, HorizontalGrid, VerticalStack, Text } from "@shopify/polaris";
-import { getAgentLinkedComponents, getRiskLabel } from "./agenticPageBuilders";
+import { getAgentLinkedComponents } from "./agenticPageBuilders";
 import AssetTopologyGraph from "./AssetTopologyGraph";
 import { RiskFactorRow } from "./RiskFactorRow";
 import DetailGrid from "./DetailGrid";
@@ -10,37 +10,63 @@ const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 
 function computeAssetRiskFactors(asset) {
     const factors = [];
-    if ((asset.violations?.critical || 0) > 0) {
-        factors.push({ severity: "critical", title: `${asset.violations.critical} Critical Violation${asset.violations.critical > 1 ? "s" : ""}`, description: "Active critical policy violations indicate potential data exfiltration or unauthorized system access." });
+    const sevLabels = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
+
+    for (const [sev, label] of Object.entries(sevLabels)) {
+        const count = asset.violations?.[sev] || 0;
+        if (count > 0) {
+            factors.push({
+                severity: sev,
+                title: `${count} ${label} Violation${count > 1 ? "s" : ""}`,
+                description: `Contains ${label.toLowerCase()} violations`,
+                type: "violation",
+            });
+        }
     }
-    if ((asset.violations?.high || 0) > 0) {
-        factors.push({ severity: "high", title: `${asset.violations.high} High-Severity Violation${asset.violations.high > 1 ? "s" : ""}`, description: "High-severity violations require investigation and may indicate significant policy breaches." });
+
+    if (asset.hasPersonalAccount) {
+        factors.push({
+            severity: "high",
+            title: "Personal Account",
+            description: "Contains personal account",
+            type: "personal_account",
+        });
     }
-    if ((asset.mcpServers || []).length >= 3) {
-        factors.push({ severity: "medium", title: `High Integration Complexity (${asset.mcpServers.length} MCP servers)`, description: `${asset.mcpServers.length} external system integrations expand the blast radius of any compromised agent session.` });
+
+    if (asset.isMalicious) {
+        factors.push({
+            severity: "critical",
+            title: "Malicious Skill",
+            description: "Contains malicious skill",
+            type: "malicious_skill",
+        });
     }
+
     if (factors.length === 0) {
-        factors.push({ severity: "low", title: "Standard Risk Profile", description: "No elevated risk factors detected. Score reflects baseline activity levels." });
+        factors.push({
+            severity: "low",
+            title: "Standard Risk Profile",
+            description: "No elevated risk factors detected.",
+            type: "normal",
+        });
     }
     return factors;
 }
 
 function getAssetNarrative(asset) {
-    const score = asset.riskScore != null ? Math.round(asset.riskScore * 10) / 10 : null;
-    const label = getRiskLabel(asset.riskScore)?.toLowerCase();
     const parts = [];
 
-    if ((asset.violations?.critical || 0) > 0)
-        parts.push(`${asset.violations.critical} critical violation${asset.violations.critical > 1 ? "s" : ""} indicate unauthorized data transmission or credential exposure`);
-    if ((asset.violations?.high || 0) > 0)
-        parts.push(`${asset.violations.high} high-severity violation${asset.violations.high > 1 ? "s" : ""} require immediate investigation`);
-    if ((asset.skillCount || 0) > 80)
-        parts.push(`${asset.skillCount} exposed skills significantly expand the attack surface`);
+    for (const sev of ["critical", "high", "medium", "low"]) {
+        const count = asset.violations?.[sev] || 0;
+        if (count > 0) parts.push(`${count} ${sev} severity violation${count > 1 ? "s" : ""}`);
+    }
+    if (asset.hasPersonalAccount) parts.push("contains personal account");
+    if (asset.isMalicious) parts.push("contains malicious skill");
 
     if (parts.length === 0)
-        return `${asset.name} shows a standard activity profile with no elevated signals. Score reflects baseline activity patterns.`;
+        return `${asset.name} shows a standard activity profile with no elevated signals.`;
 
-    return `${asset.name} carries a risk score of ${score}/5 (${label}) because ${parts.join(", and ")}. ${(asset.violations?.critical || 0) > 0 ? "Immediate action is recommended." : "Monitor closely and review permissions."}`;
+    return `${asset.name} has ${parts.join(", ")}. Review and take appropriate action.`;
 }
 
 export default function OverviewTab({ asset, onTabChange, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], mcpComponentCount = 0 }) {
@@ -107,8 +133,17 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
                     <Text variant="bodySm">{narrative}</Text>
                     <VerticalStack gap="2">
                         {factors.map((f, i) => {
-                            const targetTab = f.title.toLowerCase().includes("violation") ? 2 : 1;
-                            return <RiskFactorRow key={i} factor={f} onClick={() => onTabChange?.(targetTab)} />;
+                            let handleClick;
+                            if (f.type === "violation") {
+                                handleClick = () => onTabChange?.(2);
+                            } else if (f.type === "personal_account") {
+                                handleClick = () => window.open("/dashboard/protection/threat-activity", "_blank");
+                            } else if (f.type === "malicious_skill") {
+                                handleClick = () => window.open("/dashboard/observe/agentic-assets", "_blank");
+                            } else {
+                                handleClick = undefined;
+                            }
+                            return <RiskFactorRow key={i} factor={f} onClick={handleClick} />;
                         })}
                     </VerticalStack>
                 </VerticalStack>

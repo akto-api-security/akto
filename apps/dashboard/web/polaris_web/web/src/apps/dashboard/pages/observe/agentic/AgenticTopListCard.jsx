@@ -7,17 +7,17 @@ export default function AgenticTopListCard({ title, columns = [], rows = [], emp
 
     const tableRows = rows.length > 0
         ? rows.map((row) => [
-            <Box key={`name-${row.id}`} onClick={() => row.onClick?.(row)}>
+            <div key={`name-${row.id}`} className="agentic-list-cell-click" onClick={() => row.onClick?.(row)}>
                 <HorizontalStack gap="2" blockAlign="center" wrap={false}>
                     <AssetIcon type={row.type} assetTagValue={row.assetTagValue} />
                     <Box minWidth="0" overflowX="hidden">
                         <Text variant="bodyMd" as="span" truncate>{row.name}</Text>
                     </Box>
                 </HorizontalStack>
-            </Box>,
-            <Box key={`val-${row.id}`} onClick={() => row.onClick?.(row)}>
+            </div>,
+            <div key={`val-${row.id}`} className="agentic-list-cell-click" onClick={() => row.onClick?.(row)}>
                 {row.renderValue(row)}
-            </Box>,
+            </div>,
         ])
         : [[
             <Text key="empty" variant="bodySm" color="subdued">{emptyStateText}</Text>,
