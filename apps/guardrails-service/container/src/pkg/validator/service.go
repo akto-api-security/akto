@@ -769,7 +769,7 @@ func overrideLLMModelConfigs(policies []types.Policy, baseURL, model string) []t
 		Model:                 model,
 		BaseURL:               baseURL,
 		ModelRole:             "FINAL_ARBITER",
-		TimeoutMs:             300000,
+		TimeoutMs:             360000,
 		SafeDecisionThreshold: 0.8,
 	}}
 

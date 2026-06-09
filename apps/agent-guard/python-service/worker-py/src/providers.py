@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 
-_HTTP_TIMEOUT_SECONDS = 120.0
+_HTTP_TIMEOUT_SECONDS = 300.0
 _IDENTITY = {"Accept-Encoding": "identity"}
 
 # Process-wide cache of built providers, keyed by (provider, model, base_url).
