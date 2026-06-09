@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -56,6 +57,8 @@ public class Utils {
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final JsonFactory factory = mapper.getFactory();
     private static final Gson gson = new Gson();
+    private static final ConcurrentHashMap<String, Pattern> PATTERN_CACHE = new ConcurrentHashMap<>();
+    private static final int MAX_PATTERN_CACHE_SIZE = 1000;
 
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
 
@@ -70,7 +73,12 @@ public class Utils {
     }
 
     public static Boolean checkIfContainsMatch(String text, String keyword) {
-        Pattern pattern = Pattern.compile(keyword);
+        Pattern pattern = PATTERN_CACHE.computeIfAbsent(keyword, k -> {
+            if (PATTERN_CACHE.size() >= MAX_PATTERN_CACHE_SIZE) {
+                PATTERN_CACHE.clear();
+            }
+            return Pattern.compile(k);
+        });
         return pattern.matcher(text).find();
     }
 

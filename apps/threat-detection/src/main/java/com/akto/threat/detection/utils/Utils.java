@@ -211,6 +211,11 @@ public class Utils {
     }
 
     public static RedactionType getRedactionType(Map<String, List<String>> headers, DataActor dataActor) {
+        
+        if(AccountConfig.isGraphQLAccount()){
+            return RedactionType.NONE;
+        }
+
         try {
             if (Context.isRedactPayload.get() != null && Context.isRedactPayload.get()) {
                 return RedactionType.REDACT_ALL;

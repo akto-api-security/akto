@@ -1,10 +1,13 @@
 package com.akto.threat.detection.cache;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -60,6 +63,11 @@ public class AccountConfig {
      */
     public boolean isRedacted() {
         return isRedacted;
+    }
+
+    public static boolean isGraphQLAccount(){
+        List<Integer> graphqlAccounts = new ArrayList<>(Arrays.asList(1758787662));
+        return graphqlAccounts.contains(Context.accountId.get());
     }
 
     /**
