@@ -15,17 +15,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// AccountIDKey is the gin context key under which the authenticated accountId is stored.
-// Handlers downstream of the auth middleware can read it via c.GetInt(auth.AccountIDKey).
 const AccountIDKey = "accountId"
 
-// NewMiddleware builds a gin middleware that verifies an inbound RS256 JWT in the
-// Authorization header against the supplied RSA public key (X.509/SPKI, base64 with or
-// without PEM armor). On success it stores the token's accountId claim in the gin
-// context; otherwise it aborts the request with 401.
-//
-// This mirrors the inbound authentication done by data-ingestion-service's AuthFilter
-// (RSA_PUBLIC_KEY mode). The key is parsed once, up front, so an invalid key fails fast.
 func NewMiddleware(rsaPublicKeyPEM string, logger *zap.Logger) (gin.HandlerFunc, error) {
 	publicKey, err := parseRSAPublicKey(rsaPublicKeyPEM)
 	if err != nil {
@@ -33,8 +24,6 @@ func NewMiddleware(rsaPublicKeyPEM string, logger *zap.Logger) (gin.HandlerFunc,
 	}
 
 	return func(c *gin.Context) {
-		// Akto tokens are sent as the raw JWT in the Authorization header (no "Bearer " prefix),
-		// matching how data-ingestion-service and the db-abstractor client exchange them.
 		tokenString := c.GetHeader("Authorization")
 		if tokenString == "" {
 			logger.Warn("Authentication failed: missing Authorization header")
@@ -73,18 +62,15 @@ func NewMiddleware(rsaPublicKeyPEM string, logger *zap.Logger) (gin.HandlerFunc,
 	}, nil
 }
 
-// parseRSAPublicKey accepts an RSA public key in X.509/SPKI form, either PEM-armored or as
-// bare base64, and returns the parsed key. It strips the PEM header/footer and all
-// whitespace before decoding, matching data-ingestion-service's RSA_PUBLIC_KEY handling.
 func parseRSAPublicKey(raw string) (*rsa.PublicKey, error) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, fmt.Errorf("key is empty")
+	}
+
 	cleaned := raw
 	cleaned = strings.ReplaceAll(cleaned, "-----BEGIN PUBLIC KEY-----", "")
 	cleaned = strings.ReplaceAll(cleaned, "-----END PUBLIC KEY-----", "")
-	// Remove all surrounding/embedded whitespace (newlines, spaces, tabs, CR).
-	cleaned = strings.Join(strings.Fields(cleaned), "")
-	if cleaned == "" {
-		return nil, fmt.Errorf("key is empty")
-	}
+	cleaned = strings.ReplaceAll(cleaned, "\n", "")
 
 	decoded, err := base64.StdEncoding.DecodeString(cleaned)
 	if err != nil {
@@ -103,8 +89,6 @@ func parseRSAPublicKey(raw string) (*rsa.PublicKey, error) {
 	return rsaPub, nil
 }
 
-// extractAccountID reads the integer "accountId" claim, tolerating the numeric/string
-// encodings JSON deserialization can yield.
 func extractAccountID(claims jwt.MapClaims) (int, error) {
 	v, ok := claims["accountId"]
 	if !ok {
