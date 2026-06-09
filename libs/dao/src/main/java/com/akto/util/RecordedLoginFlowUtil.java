@@ -147,7 +147,7 @@ public class RecordedLoginFlowUtil {
     }
 
     private static void tryFetchAndPersistScreenshots(String replayServiceBaseUrl, JsonNode replayInner, String roleName, int userId, TimeoutObject timeoutObj) {
-        if (userId == 0 || roleName == null || roleName.trim().isEmpty()) return;
+        if (roleName == null || roleName.trim().isEmpty()) return;
         JsonNode sessionIdNode = replayInner.get("screenshotSessionId");
         if (sessionIdNode == null || sessionIdNode.isNull() || !sessionIdNode.isTextual()) return;
         String sessionId = sessionIdNode.asText();

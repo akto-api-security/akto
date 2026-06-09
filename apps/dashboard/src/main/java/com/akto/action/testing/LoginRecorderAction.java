@@ -103,8 +103,12 @@ public class LoginRecorderAction extends UserAction {
             playground.setRecordedFlowContent(payload);
             playground.setRecordedFlowTokenFetchCommand(tokenFetchCommand);
             playground.setRecordedFlowRoleName(roleName != null ? roleName.trim() : null);
+            playground.setRecordedFlowOwnerUserId(userId);
             TestingRunPlaygroundDao.instance.insertOne(playground);
             this.testingRunPlaygroundId = playground.getId().toHexString();
+            if (roleName != null && !roleName.trim().isEmpty()) {
+                this.screenshotSessionId = roleName.trim();
+            }
             return SUCCESS.toUpperCase();
         }
 
@@ -215,15 +219,29 @@ public class LoginRecorderAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    // Called by frontend while replay is in progress — proxies to puppeteer
     public String getLatestReplayScreenshot() {
         if (screenshotSessionId == null || screenshotSessionId.isEmpty()) {
             addActionError("sessionId is required");
             return ERROR.toUpperCase();
         }
-        String puppeteerUrl = System.getenv("PUPPETEER_REPLAY_SERVICE_URL");
-        if (puppeteerUrl != null && !puppeteerUrl.isEmpty()) {
-            screenshotBase64 = RecordedLoginFlowUtil.fetchLatestLiveScreenshot(puppeteerUrl, screenshotSessionId);
+        boolean isUuid = true;
+        try {
+            UUID.fromString(screenshotSessionId);
+        } catch (IllegalArgumentException e) {
+            isUuid = false;
+        }
+        if (isUuid) {
+            String puppeteerUrl = System.getenv("PUPPETEER_REPLAY_SERVICE_URL");
+            if (puppeteerUrl != null && !puppeteerUrl.isEmpty()) {
+                screenshotBase64 = RecordedLoginFlowUtil.fetchLatestLiveScreenshot(puppeteerUrl, screenshotSessionId);
+            }
+        } else {
+            RecordedLoginFlowScreenshot doc = RecordedLoginScreenshotDao.instance.findOne(
+                    Filters.eq("roleName", screenshotSessionId));
+            if (doc != null && doc.getScreenshotsBase64() != null && !doc.getScreenshotsBase64().isEmpty()) {
+                List<String> shots = doc.getScreenshotsBase64();
+                screenshotBase64 = shots.get(shots.size() - 1);
+            }
         }
         return SUCCESS.toUpperCase();
     }
@@ -233,8 +251,7 @@ public class LoginRecorderAction extends UserAction {
             addActionError("roleName is required");
             return ERROR.toUpperCase();
         }
-        RecordedLoginFlowScreenshot doc = RecordedLoginScreenshotDao.instance.findOne(
-                Filters.and(Filters.eq("roleName", roleName.trim()), Filters.eq("userId", getSUser().getId())));
+        RecordedLoginFlowScreenshot doc = RecordedLoginScreenshotDao.instance.findOne(Filters.eq("roleName", roleName.trim()));
         if (doc == null) {
             screenshotsBase64 = new ArrayList<>();
             screenshotsUpdatedAt = 0;

@@ -47,6 +47,8 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
         showHeader: true
     }])
 
+    const pollGenRef = useRef(0)
+
     useEffect(() => {
         if (extractInformation) {
             if (authMechanism && authMechanism.type === "LOGIN_REQUEST" && authMechanism.requestData[0].type === "RECORDED_FLOW") {
@@ -109,6 +111,7 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
     }
 
     async function pollExtractedToken(screenshotRoleName, playgroundId) {
+        const gen = ++pollGenRef.current
         setIsLoading(true)
         const initialWaitPeriod = 5000
         await sleep(initialWaitPeriod)
@@ -129,6 +132,8 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
         }
 
         for (let i = 0; i < pollAttempts; i++) {
+            // Abort if a newer upload has started a fresh poll
+            if (pollGenRef.current !== gen) return
             if (i > 0) {
                 await sleep(i * pollSleepDuration)
             }
@@ -136,6 +141,7 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
             try {
                 const resp = await api.fetchRecordedLoginFlow("x1", playgroundId || undefined)
                 if (!resp.tokenFetchInProgress) {
+                    if (pollGenRef.current !== gen) return
                     setExtractedToken(resp.token)
                     finishedOk = true
                     setIsLoading(false)
@@ -149,6 +155,7 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
             } catch(e) {
                 const serverError = e?.response?.data?.actionErrors?.[0]
                 if (serverError) {
+                    if (pollGenRef.current !== gen) return
                     finishedOk = true
                     setIsLoading(false)
                     setLiveScreenshot(null)
@@ -161,6 +168,7 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
         }
 
         if (!finishedOk) {
+            if (pollGenRef.current !== gen) return
             setIsLoading(false)
             setLiveScreenshot(null)
             setToastConfig({ isActive: true, isError: true, message: "Error while extracting token using JSON recording" })
