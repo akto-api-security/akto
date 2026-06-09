@@ -34,7 +34,7 @@ const SettingsLeftNav = () => {
     }] : []
 
     const logsArr = window?.IS_SAAS !== 'true' ||
-        (window?.USER_NAME && window?.USER_NAME.includes("akto")) ? [{
+        (window?.USER_NAME && (window?.USER_NAME.includes("akto") || window?.USER_NAME.includes("mongodb"))) ? [{
             label: 'Logs',
             icon: ListFilledMajor,
             selected: page === "logs",
