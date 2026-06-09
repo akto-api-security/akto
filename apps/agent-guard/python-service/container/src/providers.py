@@ -389,7 +389,7 @@ def _build_openai_compatible(model: str, base_url: str) -> Optional[LLMProvider]
     if not api_key and not base_url:
         logger.warning("[Providers] OPENAI_API_KEY not set and no baseUrl; skipping openai")
         return None
-    return OpenAIProvider(api_key, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+    return OpenAIProvider(api_key, model or settings.OPENAI_MODEL or DEFAULT_OPENAI_MODEL, base_url=base_url)
 
 
 def _build_anthropic(model: str) -> Optional[LLMProvider]:
@@ -503,7 +503,7 @@ def build_provider_from_config(entry: Dict[str, Any]) -> Optional[LLMProvider]:
     name = (entry.get("provider") or "").strip().lower()
     model = (entry.get("model") or "").strip()
     if name in ("openai", "ollama", "openai_compatible"):
-        # Entry-level baseUrl wins, then OPENAI_COMPATIBLE_BASE_URL, then default.
+        # Entry-level baseUrl wins, then OPENAI_COMPATIBLE_BASE_URL.
         base_url = (entry.get("baseUrl") or "").strip() or settings.OPENAI_COMPATIBLE_BASE_URL
         return _dispatch("openai_compatible", model, base_url)
     return _dispatch(name, model, "")

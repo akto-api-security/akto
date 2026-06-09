@@ -48,6 +48,12 @@ type mcpListCache struct {
 	mu             sync.RWMutex
 }
 
+// AsyncProducer queues IngestDataBatch messages for async (CPU-based) policy evaluation.
+// Implemented by pkg/kafka.Producer; kept as an interface here to avoid circular imports.
+type AsyncProducer interface {
+	Produce(ctx context.Context, data models.IngestDataBatch) error
+}
+
 // Service handles payload validation using akto-gateway library
 type Service struct {
 	config              *config.Config
@@ -59,6 +65,13 @@ type Service struct {
 	collectionTagsCache *collectionTagsCache
 	sessionMgr          *session.SessionManager // Our session manager implementation for session tracking
 	schemaFetcher       *SchemaFetcher
+	asyncProducer       AsyncProducer // nil when async Kafka path is disabled
+}
+
+// SetAsyncProducer wires in a Kafka producer for WARN/ALERT policy deferral.
+// Called from main after the producer is initialised.
+func (s *Service) SetAsyncProducer(p AsyncProducer) {
+	s.asyncProducer = p
 }
 
 // NewService creates a new validator service
@@ -846,6 +859,84 @@ func (s *Service) extractPayloadForValidation(payload, method, path string, isRe
 	return finalPayload
 }
 
+// splitPoliciesByMode separates policies by behaviour:
+//   - "warn" / "alert" → async Kafka consumer (CPU-based LLM, jarvis.akto.io)
+//   - "block" or anything else → evaluated inline (GPU path, real-time blocking)
+func splitPoliciesByMode(policies []types.Policy) (sync []types.Policy, async []types.Policy) {
+	for _, p := range policies {
+		if p.Behaviour == "warn" || p.Behaviour == "alert" {
+			async = append(async, p)
+		} else {
+			sync = append(sync, p)
+		}
+	}
+	return
+}
+
+// ingestDataBatchFromParams builds an IngestDataBatch from a ValidateRequestParams
+// so the HTTP handler can enqueue async policy evaluation on the same Kafka topic
+// that the consumer already reads.
+func ingestDataBatchFromParams(params *models.ValidateRequestParams) models.IngestDataBatch {
+	return models.IngestDataBatch{
+		Path:            params.Path,
+		RequestHeaders:  params.RequestHeaders,
+		ResponseHeaders: params.ResponseHeaders,
+		Method:          params.Method,
+		RequestPayload:  params.RequestPayload,
+		ResponsePayload: params.ResponsePayload,
+		IP:              params.IP,
+		DestIP:          params.DestIP,
+		Time:            params.Time,
+		StatusCode:      params.StatusCode,
+		Type:            params.Type,
+		Status:          params.Status,
+		AktoAccountID:   params.AktoAccountID,
+		AktoVxlanID:     params.AktoVxlanID,
+		IsPending:       params.IsPending,
+		Source:          params.Source,
+		Direction:       params.Direction,
+		ProcessID:       params.ProcessID,
+		SocketID:        params.SocketID,
+		DaemonsetID:     params.DaemonsetID,
+		EnabledGraph:    params.EnabledGraph,
+		Tag:             params.Tag,
+	}
+}
+
+// overrideLLMModelConfigs returns a copy of policies with every filter rule's
+// ModelConfigs replaced by a single CPU-based openai_compatible entry
+// (e.g. Ollama/gemma4:e4b at jarvis.akto.io). Applied uniformly to all rules —
+// non-scanner rules ignore ModelConfigs so the override is harmless for them.
+func overrideLLMModelConfigs(policies []types.Policy, baseURL, model string) []types.Policy {
+	cpuConfig := []types.ModelConfig{{
+		Provider:              "openai_compatible",
+		Model:                 model,
+		BaseURL:               baseURL,
+		ModelRole:             "FINAL_ARBITER",
+		TimeoutMs:             60000,
+		SafeDecisionThreshold: 0.8,
+	}}
+
+	applyToRules := func(rules []types.FilterRule) []types.FilterRule {
+		out := make([]types.FilterRule, len(rules))
+		copy(out, rules)
+		for j := range out {
+			cfg := out[j].Config
+			cfg.ModelConfigs = cpuConfig
+			out[j].Config = cfg
+		}
+		return out
+	}
+
+	result := make([]types.Policy, len(policies))
+	for i, p := range policies {
+		p.Filters.RequestPayload = applyToRules(p.Filters.RequestPayload)
+		p.Filters.ResponsePayload = applyToRules(p.Filters.ResponsePayload)
+		result[i] = p
+	}
+	return result
+}
+
 // ValidateRequest validates a request payload against guardrail policies with session tracking
 func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRequestParams, sessionID string, requestID string) (*mcp.ValidationResult, error) {
 	start := time.Now()
@@ -963,14 +1054,34 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		return blockResult, nil
 	}
 
+	// Split: WARN/ALERT policies with LLM rules are deferred to the Kafka async consumer
+	// (CPU-based LLM). Everything else evaluates inline (GPU or local ONNX).
+	syncPolicies, asyncPolicies := splitPoliciesByMode(policies)
+	if len(asyncPolicies) > 0 && s.asyncProducer != nil {
+		data := ingestDataBatchFromParams(params)
+		go func() {
+			pCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := s.asyncProducer.Produce(pCtx, data); err != nil {
+				s.logger.Warn("ValidateRequest - failed to enqueue async policy evaluation",
+					zap.Error(err),
+					zap.String("path", params.Path),
+					zap.Int("asyncPolicies", len(asyncPolicies)))
+			}
+		}()
+		s.logger.Info("ValidateRequest - deferred async policies to Kafka",
+			zap.Int("asyncPolicies", len(asyncPolicies)),
+			zap.Strings("asyncPolicyNames", policyNames(asyncPolicies)))
+	}
+
 	s.logger.Info("ValidateRequest - calling ProcessRequest",
 		zap.String("contextSource", contextSource),
 		zap.String("path", params.Path),
 		zap.String("method", params.Method),
 		zap.String("sessionID", sessionID),
 		zap.String("mcpServerName", valCtx.McpServerName),
-		zap.Int("policiesCount", len(policies)),
-		zap.Strings("policyNames", policyNames(policies)),
+		zap.Int("policiesCount", len(syncPolicies)),
+		zap.Strings("policyNames", policyNames(syncPolicies)),
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
 		zap.Int("compiledRulesCount", len(compiledRules)),
 		zap.Bool("hasAuditRules", hasAuditRules),
@@ -980,7 +1091,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 
 	// Use the default processor - skipThreat is passed via ValidationContext
 	processStart := time.Now()
-	processResult, err := s.processor.ProcessRequestParallel(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
+	processResult, err := s.processor.ProcessRequestParallel(ctx, payloadToValidate, valCtx, syncPolicies, auditPolicies, hasAuditRules)
 	if err != nil {
 		s.logger.Error("ValidateRequest - ProcessRequestParallel failed",
 			zap.String("path", params.Path),
@@ -1335,6 +1446,14 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 		zap.Int("policiesCount", len(policies)),
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
 		zap.Strings("policyNames", policyNames(policies)))
+
+	// Kafka consumer always uses the CPU-based LLM (Ollama/jarvis) instead of GPU.
+	if s.config.AsyncScannerBaseURL != "" {
+		policies = overrideLLMModelConfigs(policies, s.config.AsyncScannerBaseURL, s.config.AsyncScannerModel)
+		s.logger.Debug("ValidateBatch - overrode LLM model configs with CPU provider",
+			zap.String("baseURL", s.config.AsyncScannerBaseURL),
+			zap.String("model", s.config.AsyncScannerModel))
+	}
 
 	results := make([]ValidationBatchResult, 0, len(batchData))
 
