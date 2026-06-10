@@ -46,11 +46,21 @@ public class GuardrailsClient {
             loggerMaker.infoAndAddToDb("Calling guardrails service at: {}", url);
 
             RequestBody body = RequestBody.create(jsonRequest, JSON);
-            Request httpRequest = new Request.Builder()
+            Request.Builder requestBuilder = new Request.Builder()
                     .url(url)
                     .post(body)
-                    .addHeader("Content-Type", "application/json")
-                    .build();
+                    .addHeader("Content-Type", "application/json");
+
+            if (isAuthEnabled()) {
+                String authToken = loadAuthToken();
+                if (authToken == null || authToken.trim().isEmpty()) {
+                    loggerMaker.warnAndAddToDb("AKTO_GR_AUTHENTICATE is enabled but DATABASE_ABSTRACTOR_SERVICE_TOKEN is not set");
+                } else {
+                    requestBuilder.addHeader("Authorization", authToken.trim());
+                }
+            }
+
+            Request httpRequest = requestBuilder.build();
 
             try (Response response = httpClient.newCall(httpRequest).execute()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
@@ -91,6 +101,19 @@ public class GuardrailsClient {
         error.put("reason", "Guardrails validation failed: " + errorMessage);
         error.put("error", errorMessage);
         return error;
+    }
+
+    private static boolean isAuthEnabled() {
+        String v = System.getenv("AKTO_GR_AUTHENTICATE");
+        return v != null && (v.equalsIgnoreCase("true") || v.trim().equals("1"));
+    }
+
+    private static String loadAuthToken() {
+        String token = System.getProperty("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+        if (token == null || token.trim().isEmpty()) {
+            token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+        }
+        return token;
     }
 
     private static String loadServiceUrlFromEnv() {
