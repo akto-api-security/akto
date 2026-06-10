@@ -51,8 +51,8 @@ public class GuardrailsClient {
                     .post(body)
                     .addHeader("Content-Type", "application/json");
 
-            if (isAuthEnabled()) {
-                String authToken = loadAuthToken();
+            if (isGuardrailsAuthEnabled()) {
+                String authToken = loadGuardrailsAuthToken();
                 if (authToken == null || authToken.trim().isEmpty()) {
                     loggerMaker.warnAndAddToDb("AKTO_GR_AUTHENTICATE is enabled but DATABASE_ABSTRACTOR_SERVICE_TOKEN is not set");
                 } else {
@@ -103,12 +103,12 @@ public class GuardrailsClient {
         return error;
     }
 
-    private static boolean isAuthEnabled() {
-        String v = System.getenv("AKTO_GR_AUTHENTICATE");
-        return v != null && (v.equalsIgnoreCase("true") || v.trim().equals("1"));
+    private static boolean isGuardrailsAuthEnabled() {
+        String envValue = System.getenv("AKTO_GR_AUTHENTICATE");
+        return "true".equalsIgnoreCase(envValue);
     }
 
-    private static String loadAuthToken() {
+    private static String loadGuardrailsAuthToken() {
         String token = System.getProperty("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
         if (token == null || token.trim().isEmpty()) {
             token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
