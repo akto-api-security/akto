@@ -50,7 +50,7 @@ function computeAssetRiskFactors(asset) {
             type: "normal",
         });
     }
-    return factors;
+    return factors.filter(f => f.type !== "normal");
 }
 
 export default function OverviewTab({ asset, onTabChange, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], mcpComponentCount = 0 }) {
@@ -111,24 +111,30 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
 
                 <AssetTopologyGraph asset={asset} assetDevices={assetDevices} agenticTreeData={agenticTreeData} agenticFlatData={agenticFlatData} />
 
-                <VerticalStack gap="3">
-                    <Text variant="headingXs" color="subdued">Risk Analysis</Text>
-                    <VerticalStack gap="2">
-                        {factors.map((f, i) => {
-                            let handleClick;
-                            if (f.type === "violation") {
-                                handleClick = () => onTabChange?.(2);
-                            } else if (f.type === "personal_account") {
-                                handleClick = () => window.open("/dashboard/protection/threat-activity", "_blank");
-                            } else if (f.type === "malicious_skill") {
-                                handleClick = () => window.open("/dashboard/observe/agentic-assets", "_blank");
-                            } else {
-                                handleClick = undefined;
-                            }
-                            return <RiskFactorRow key={i} factor={f} onClick={handleClick} />;
-                        })}
+                {factors.length > 0 && (
+                    <VerticalStack gap="3">
+                        <Text variant="headingXs" color="subdued">Risk Analysis</Text>
+                        <VerticalStack gap="2">
+                            {factors.map((f, i) => {
+                                let handleClick;
+                                if (f.type === "violation") {
+                                    handleClick = () => onTabChange?.(2);
+                                } else if (f.type === "personal_account") {
+                                    const devices = assetDevices[asset.id] || [];
+                                    const firstDevice = devices[0];
+                                    handleClick = firstDevice
+                                        ? () => window.open(`/dashboard/observe/endpoints?device=${encodeURIComponent(firstDevice.deviceId)}`, "_blank")
+                                        : () => window.open("/dashboard/observe/endpoints", "_blank");
+                                } else if (f.type === "malicious_skill") {
+                                    handleClick = () => window.open(`/dashboard/observe/agentic-assets?asset=${encodeURIComponent(asset.name || asset.id)}`, "_blank");
+                                } else {
+                                    handleClick = undefined;
+                                }
+                                return <RiskFactorRow key={i} factor={f} onClick={handleClick} />;
+                            })}
+                        </VerticalStack>
                     </VerticalStack>
-                </VerticalStack>
+                )}
 
                 <DetailGrid heading="Asset Details" items={assetDetails} columns={3} />
             </VerticalStack>

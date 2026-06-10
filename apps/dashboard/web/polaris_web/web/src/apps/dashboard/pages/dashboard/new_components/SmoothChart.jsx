@@ -83,7 +83,7 @@ function SmoothAreaChart({
             : [
                 {
                     type: 'areaspline',
-                    data: tickPositions,
+                    data: safe,
                     fillColor: {
                         linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
                         stops: [
@@ -96,7 +96,7 @@ function SmoothAreaChart({
                 },
                 {
                     type: 'areaspline',
-                    data: tickPositions,
+                    data: safe,
                     fillColor: 'transparent',
                     lineWidth: 2,
                     lineColor: 'rgba(150,150,255,1)',
