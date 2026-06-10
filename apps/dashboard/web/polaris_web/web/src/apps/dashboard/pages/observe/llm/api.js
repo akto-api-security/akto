@@ -1,6 +1,6 @@
 import request from "@/util/request";
 import { enrichRow } from "./utils";
-import { parseResponseText } from "./constants";
+import { parsePromptText, parseResponseText } from "./constants";
 
 function llmMessagesRequest(data) {
     return request({ url: "/api/fetchLLMMessages", method: "post", data });
@@ -105,12 +105,6 @@ export default {
 };
 
 export function enrichForTable(row) {
-    let promptText = row.queryPayload || "";
-    try {
-        const obj = JSON.parse(row.queryPayload);
-        promptText = obj.prompt || obj.body || obj.message || obj.text || promptText;
-    } catch (_) {}
-
     let model = row.model || "";
     let inputTokens  = row.inputTokens  || 0;
     let outputTokens = row.outputTokens || 0;
@@ -126,7 +120,7 @@ export function enrichForTable(row) {
     return {
         ...row,
         id:            row.docId || row.id,
-        _promptText:   promptText,
+        _promptText:   parsePromptText(row.queryPayload),
         _responseText: parseResponseText(row.responsePayload),
         _model:        model,
         _inputTokens:  inputTokens,

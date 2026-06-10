@@ -4,7 +4,23 @@ export function parsePromptText(queryPayload) {
     if (!queryPayload) return "";
     try {
         const obj = JSON.parse(queryPayload);
-        return obj.prompt || obj.body || obj.message || obj.text || JSON.stringify(obj);
+        // body is a plain string — use it directly
+        if (typeof obj.body === "string") return obj.body;
+        // body is an object — check for tool call shape
+        if (obj.body && typeof obj.body === "object") {
+            const toolName = obj.toolName || obj.body.toolName;
+            const toolArgs = obj.body.toolArgs || obj.body.arguments || obj.body;
+            if (toolName) {
+                return `[${toolName}] ${JSON.stringify(toolArgs)}`;
+            }
+            return JSON.stringify(obj.body);
+        }
+        // top-level toolName (toolArgs at root)
+        if (obj.toolName) {
+            const toolArgs = obj.toolArgs || obj.params || obj.arguments || {};
+            return `[${obj.toolName}] ${JSON.stringify(toolArgs)}`;
+        }
+        return obj.prompt || obj.message || obj.text || JSON.stringify(obj);
     } catch (_) {
         return queryPayload;
     }
@@ -14,11 +30,34 @@ export function parseResponseText(responsePayload) {
     if (!responsePayload) return "";
     try {
         const obj = JSON.parse(responsePayload);
+        // Empty object — nothing to show
+        if (obj && typeof obj === "object" && Object.keys(obj).length === 0) return "";
+        // body.result — tool call result
+        if (obj.body && obj.body.result) {
+            const result = obj.body.result;
+            // file read result
+            if (result.file && result.file.content) return result.file.content;
+            // bash/command stdout
+            if (result.stdout !== undefined) return result.stdout || result.stderr || "";
+            // generic text output
+            if (result.output) {
+                if (Array.isArray(result.output)) {
+                    return result.output.map(o => (typeof o === "object" ? o.text || JSON.stringify(o) : String(o))).join("\n");
+                }
+                return String(result.output);
+            }
+            return JSON.stringify(result);
+        }
+        // body is a plain string
+        if (typeof obj.body === "string") return obj.body;
+        // body is a non-result object
+        if (obj.body && typeof obj.body === "object") return JSON.stringify(obj.body);
+        // Standard shapes
         const content = obj.content;
         if (Array.isArray(content) && content.length > 0) {
             return content[0].text || "";
         }
-        return obj.body || obj.text || obj.message || "";
+        return obj.text || obj.message || "";
     } catch (_) {
         return responsePayload;
     }
