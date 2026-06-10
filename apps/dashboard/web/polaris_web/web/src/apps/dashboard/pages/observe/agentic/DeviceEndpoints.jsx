@@ -24,6 +24,7 @@ import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter
 import values from "@/util/values";
 import func from "@/util/func";
 import api from "../api";
+import LocalStore from "../../../../main/LocalStorageStore";
 
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
@@ -447,18 +448,14 @@ function TableSection({ deviceFlatData, agentRiskData }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-const LAYOUT_KEY = "akto_agentic_new_ui";
-
 export default function DeviceEndpoints() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [deviceFlatData, setDeviceFlatData] = useState([]);
     const [agentRiskData, setAgentRiskData] = useState({});
     const [summary, setSummary] = useState({});
-    const [newLayout, setNewLayout] = useState(() => {
-        const stored = localStorage.getItem(LAYOUT_KEY);
-        return stored === "true";
-    });
+    const newLayout = LocalStore((state) => state.agenticNewLayout);
+    const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
@@ -468,17 +465,16 @@ export default function DeviceEndpoints() {
     const endTimestamp = Math.floor(Date.parse(currDateRange.period.until) / 1000);
 
     useEffect(() => {
-        if (localStorage.getItem(LAYOUT_KEY) !== "true") {
+        if (!newLayout) {
             navigate("/dashboard/observe/users-and-devices", { replace: true });
         }
-    }, [navigate]);
+    }, [navigate, newLayout]);
 
     const handleLayoutToggle = useCallback((val) => {
         const checked = val === true;
-        localStorage.setItem(LAYOUT_KEY, String(checked));
-        setNewLayout(checked);
+        setAgenticNewLayout(checked);
         if (!checked) navigate("/dashboard/observe/users-and-devices");
-    }, [navigate]);
+    }, [navigate, setAgenticNewLayout]);
 
     useEffect(() => {
         const isMountedRef = { current: true };

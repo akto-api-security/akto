@@ -10,6 +10,7 @@ import api from "../api";
 import func from "@/util/func";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
+import LocalStore from "../../../../main/LocalStorageStore";
 import useTable from "@/apps/dashboard/components/tables/TableContext";
 import settingRequests from "../../settings/api";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
@@ -36,12 +37,14 @@ const usersAndDevicesCountColumnOpts = {
 function UsersAndDevices() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+    const agenticNewLayout = LocalStore((state) => state.agenticNewLayout);
+    const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
 
     useEffect(() => {
-        if (localStorage.getItem("akto_agentic_new_ui") === "true") {
+        if (agenticNewLayout) {
             navigate("/dashboard/observe/endpoints", { replace: true });
         }
-    }, [navigate]);
+    }, [navigate, agenticNewLayout]);
     const [data, setData] = useState({ users: [], devices: [] });
     const [userEnrichVersion, setUserEnrichVersion] = useState(0);
     const [summaryData, setSummaryData] = useState({ profileCount: 0, collectionCount: 0 });
@@ -342,7 +345,7 @@ function UsersAndDevices() {
     );
 
     const layoutToggle = (
-        <NewLayoutTooltip checked={false} onChange={() => { localStorage.setItem("akto_agentic_new_ui", "true"); navigate("/dashboard/observe/endpoints"); }} />
+        <NewLayoutTooltip checked={false} onChange={() => { setAgenticNewLayout(true); navigate("/dashboard/observe/endpoints"); }} />
     );
 
     if (loading) {
