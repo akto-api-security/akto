@@ -16,6 +16,7 @@ import editorSetup from "./editor_config/editorSetup";
 import SampleData from "../../../components/shared/SampleData";
 import transform from "../../../components/shared/customDiffEditor";
 import testingFunc from "../../testing/transform";
+import TestRunResultChat from "../../testing/TestRunResultPage/TestRunResultChat";
 import { mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import EmptySampleApi from "./EmptySampleApi";
 import Store from "../../../store";
@@ -605,18 +606,20 @@ const SampleApi = () => {
             >
                 
                 <Modal.Section>
-                    <VerticalStack gap={"8"}>
-                        <VerticalStack gap={"4"}>
-                            <Box padding={"4"}>
-                                <HorizontalStack gap={"2"} wrap={false}>
-                                    <Text variant="headingMd" alignment="start" breakWord>{selectedTest?.label}</Text>
-                                    {testResult?.testingRunResult?.vulnerable === true ? <Box className={`badge-wrapper-${currentSeverity}`}><Badge size="medium" status={observeFunc.getColor(currentSeverity)}>{currentSeverity}</Badge></Box> : null}
-                                </HorizontalStack>
-                                <br/>
-                                <Divider/> 
-                            </Box>
-                            
-                        </VerticalStack>
+                    <VerticalStack gap={"4"}>
+                        <Box padding={"4"}>
+                            <HorizontalStack gap={"2"} wrap={false}>
+                                <Text variant="headingMd" alignment="start" breakWord>{selectedTest?.label}</Text>
+                                {testResult?.testingRunResult?.vulnerable === true ? <Box className={`badge-wrapper-${currentSeverity}`}><Badge size="medium" status={observeFunc.getColor(currentSeverity)}>{currentSeverity}</Badge></Box> : null}
+                            </HorizontalStack>
+                            <br/>
+                            <Divider/>
+                        </Box>
+                        <TestRunResultChat
+                            conversations={conversationsList}
+                            testResults={testResult?.agentConversationResults || []}
+                            selectedTestRunResult={testResult?.testingRunResult}
+                        />
                     </VerticalStack>
                 </Modal.Section>
                 
