@@ -563,22 +563,14 @@ public class HttpCallParser {
         return Constants.AI_AGENT_SOURCE_COPILOT_STUDIO.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
     }
 
-    private boolean isCopilotTrafficRaw(HttpResponseParams httpResponseParam) {
+    private boolean isCopilotTrafficRaw(Map<String,String> tagsMap) {
         try {
-            String tagsJson = httpResponseParam.getTags();
-            if (tagsJson == null || tagsJson.isEmpty()) return false;
-            @SuppressWarnings("unchecked")
-            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
             return tagsMap != null && Constants.AI_AGENT_SOURCE_COPILOT_STUDIO.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
         } catch (Exception e) { return false; }
     }
 
-    private boolean shouldStoreSnowflakeAgentTrace(HttpResponseParams httpResponseParam) {
+    private boolean shouldStoreSnowflakeAgentTrace(Map<String,String> tagsMap) {
         try {
-            String tagsJson = httpResponseParam.getTags();
-            if (tagsJson == null || tagsJson.isEmpty()) return false;
-            @SuppressWarnings("unchecked")
-            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
             String source = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_SOURCE) : null;
             return source != null && Constants.AI_AGENT_SOURCE_SNOWFLAKE.equalsIgnoreCase(source.trim());
         } catch (Exception e) { return false; }
@@ -658,10 +650,7 @@ public class HttpCallParser {
     }
 
     private boolean isAgenticTraffic(Map<String, String> tagsMap) {
-        if (tagsMap == null) {
-            return false;
-        }
-        return Arrays.asList(Constants.AI_AGENT_SOURCE_N8N, Constants.AI_AGENT_SOURCE_LANGCHAIN, Constants.AI_AGENT_SOURCE_COPILOT_STUDIO, Constants.AI_AGENT_SOURCE_DATABRICS, Constants.AI_AGENT_SOURCE_VERTEX, Constants.AI_AGENT_SOURCE_SNOWFLAKE, Constants.AI_AGENT_SOURCE_ARCADE_DEV, Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER, Constants.AI_AGENT_SOURCE_ENDPOINT).contains(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+        return isArgusTraffic(tagsMap) || isAtlasTraffic(tagsMap);
     }
 
     /**
@@ -759,15 +748,8 @@ public class HttpCallParser {
         return Constants.AI_AGENT_SOURCE_ARCADE_DEV.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
     }
 
-    private boolean isAtlasTraffic(HttpResponseParams httpResponseParam) {
+    private boolean isAtlasTraffic(Map<String,String> tagsMap) {
         try {
-            String tagsJson = httpResponseParam.getTags();
-            if (tagsJson == null || tagsJson.isEmpty()) {
-                return false;
-            }
-
-            @SuppressWarnings("unchecked")
-            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
             if (tagsMap == null) {
                 return false;
             }
@@ -781,15 +763,8 @@ public class HttpCallParser {
         }
     }
 
-    private boolean isArgusTraffic(HttpResponseParams httpResponseParam) {
+    private boolean isArgusTraffic(Map<String,String> tagsMap) {
         try {
-            String tagsJson = httpResponseParam.getTags();
-            if (tagsJson == null || tagsJson.isEmpty()) {
-                return false;
-            }
-
-            @SuppressWarnings("unchecked")
-            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
             if (tagsMap == null) {
                 return false;
             }
@@ -1564,7 +1539,9 @@ public class HttpCallParser {
                         + httpResponseParam.getRequestParams().getURL());
             }
 
-            if (isAtlasTraffic(httpResponseParam) || isArgusTraffic(httpResponseParam) || shouldStoreSnowflakeAgentTrace(httpResponseParam) || isCopilotTrafficRaw(httpResponseParam)) {
+            Map<String, String> tagsMap = parseTagsMap(httpResponseParam.getTags());
+
+            if (isAtlasTraffic(tagsMap) || isArgusTraffic(tagsMap) || shouldStoreSnowflakeAgentTrace(tagsMap) || isCopilotTrafficRaw(tagsMap)) {
                 if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
                     loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams skipping advanced filters for agentic traffic "
                             + httpResponseParam.getRequestParams().getURL());
@@ -1604,8 +1581,6 @@ public class HttpCallParser {
                     }
                 }
             }
-
-            Map<String, String> tagsMap = parseTagsMap(httpResponseParam.getTags());
             int apiCollectionId = createApiCollectionId(httpResponseParam, tagsMap);
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
@@ -1613,7 +1588,7 @@ public class HttpCallParser {
             boolean allowAnalysis = featureAccess != null && featureAccess.getIsGranted();
 
             // if traffic is agentic, then send the data to cyborg
-            if (isAgenticTraffic(tagsMap) && allowAnalysis) {
+            if (allowAnalysis && isAgenticTraffic(tagsMap) && (!httpResponseParam.getRequestParams().getUrl().contains("skill"))) {
                 AgentQueryRecord record = AgentQueryRecord.fromHttpResponseParams(
                         httpResponseParam, tagsMap, getDeviceUserMap());
                 if (record != null) {
