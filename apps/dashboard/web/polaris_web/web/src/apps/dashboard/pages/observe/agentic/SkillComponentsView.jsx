@@ -3,12 +3,14 @@ import { Box, Spinner, VerticalStack, Text } from "@shopify/polaris";
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
 import observeApi from "../api";
 
-function buildSkillMarkdown(sampleMessage) {
+function buildSkillMarkdown(sampleMessage, skillName) {
     try {
         const parsed = JSON.parse(sampleMessage);
         const bodyStr = parsed?.request?.body || parsed?.requestPayload || "{}";
         const body = JSON.parse(bodyStr);
         if (!body.skill_name) return null;
+        // Only return content for the specific skill being viewed
+        if (skillName && body.skill_name.toLowerCase() !== skillName.toLowerCase()) return null;
         return (
             `# ${body.skill_name}\n\n` +
             (body.skill_description ? `**${body.skill_description}**\n\n` : "") +
@@ -44,7 +46,7 @@ export default function SkillComponentsView({ asset }) {
                             const resp = await observeApi.fetchSampleData(candidateUrl, collectionId, method);
                             const samples = (resp?.sampleDataList || []).flatMap(s => s.samples || []);
                             for (const sample of samples) {
-                                const md = buildSkillMarkdown(sample);
+                                const md = buildSkillMarkdown(sample, asset.name);
                                 if (md) { found = md; break; }
                             }
                             if (found) break;

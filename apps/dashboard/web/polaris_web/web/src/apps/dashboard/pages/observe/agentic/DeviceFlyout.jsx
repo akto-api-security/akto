@@ -50,14 +50,6 @@ function computeRiskFactors(device, agents) {
         });
     }
 
-    if (factors.length === 0) {
-        factors.push({
-            severity: "low",
-            title: "Standard Risk Profile",
-            description: "No elevated risk factors detected.",
-            type: "normal",
-        });
-    }
     return factors;
 }
 
@@ -290,9 +282,17 @@ function OverviewTab({ device, agents, onTabChange }) {
                             if (f.type === "violation") {
                                 handleClick = () => onTabChange?.(2);
                             } else if (f.type === "personal_account") {
-                                handleClick = () => window.open("/dashboard/protection/threat-activity", "_blank");
+                                // Open endpoints page with this specific device's flyout pre-opened
+                                const deviceId = device.path?.[0] || device.deviceId;
+                                handleClick = deviceId
+                                    ? () => window.open(`/dashboard/observe/endpoints?device=${encodeURIComponent(deviceId)}`, "_blank")
+                                    : undefined;
                             } else if (f.type === "malicious_skill") {
-                                handleClick = () => window.open("/dashboard/observe/agentic-assets", "_blank");
+                                const maliciousAgents = agents.filter(a => a.isMalicious);
+                                const firstSkill = maliciousAgents[0];
+                                handleClick = firstSkill
+                                    ? () => window.open(`/dashboard/observe/agentic-assets?asset=${encodeURIComponent(firstSkill.rawServiceName || firstSkill.endpoint)}`, "_blank")
+                                    : () => window.open("/dashboard/observe/agentic-assets", "_blank");
                             } else {
                                 handleClick = undefined;
                             }
