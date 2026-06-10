@@ -12,6 +12,7 @@ import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 import { CollectionIcon } from "../../../components/shared/CollectionIcon";
 import useTable from "@/apps/dashboard/components/tables/TableContext";
+import NewLayoutTooltip from "./NewLayoutTooltip";
 import {
     getHeaders,
     sortOptions,
@@ -33,6 +34,12 @@ const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills'];
 function Endpoints() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (localStorage.getItem("akto_agentic_new_ui") === "true") {
+            navigate("/dashboard/observe/agentic-assets", { replace: true });
+        }
+    }, [navigate]);
     const [data, setData] = useState({ all: [], 'ai_agents': [], 'mcp_servers': [], llms: [], skills: [] });
     const [skillEnrichVersion, setSkillEnrichVersion] = useState(0);
     const [summaryData, setSummaryData] = useState({ totalAssets: 0, totalEndpoints: 0 });
@@ -310,11 +317,16 @@ function Endpoints() {
         />
     ), []);
 
+    const layoutToggle = (
+        <NewLayoutTooltip checked={false} onChange={() => { localStorage.setItem("akto_agentic_new_ui", "true"); navigate("/dashboard/observe/agentic-assets"); }} />
+    );
+
     if (loading) {
         return (
             <PageWithMultipleCards
                 title={pageTitle}
                 isFirstPage={true}
+                secondaryActions={layoutToggle}
                 components={[<SpinnerCentered key="loading" />]}
             />
         );
@@ -324,6 +336,7 @@ function Endpoints() {
         <PageWithMultipleCards
             title={pageTitle}
             isFirstPage={true}
+            secondaryActions={layoutToggle}
             components={[summaryComponent, tableComponent]}
         />
     );

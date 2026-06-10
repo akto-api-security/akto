@@ -128,6 +128,8 @@ import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastP
 import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
 import UsersAndDevices from "../dashboard/pages/observe/agentic/UsersAndDevices.jsx";
+import DeviceEndpoints from "../dashboard/pages/observe/agentic/DeviceEndpoints.jsx";
+import AgenticAssetsPage from "../dashboard/pages/observe/agentic/AgenticAssetsPage.jsx";
 import LLMObservability from "../dashboard/pages/observe/llm/LLMObservability.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
@@ -221,12 +223,20 @@ const router = createBrowserRouter([
                                 element: <ApiCollections/>
                             },
                             {
-                                path: "agentic-assets",
+                                path: "agentic-assets-legacy",
                                 element: <Endpoints/>
+                            },
+                            {
+                                path: "agentic-assets",
+                                element: <AgenticAssetsPage/>
                             },
                             {
                                 path: "users-and-devices",
                                 element: <UsersAndDevices/>
+                            },
+                            {
+                                path: "endpoints",
+                                element: <DeviceEndpoints/>
                             },
                             {
                                 path: "llm-observability",

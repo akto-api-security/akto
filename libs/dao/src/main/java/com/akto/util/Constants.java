@@ -80,6 +80,11 @@ public class Constants {
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
     public static final String AKTO_AGENT_PROXY_TAG = "agent-proxy";
     public static final String AKTO_GUARD_RAIL_TAG = "guard-rail";
+    public static final String AKTO_BROWSER_LLM_TAG = "browser-llm";
+    public static final String AKTO_MCP_CLIENT_TAG = "mcp-client";
+    public static final String AKTO_AI_AGENT_TAG = "ai-agent";
+    public static final String AKTO_BROWSER_LLM_AGENT_TAG = "browser-llm-agent";
+    public static final String AKTO_SKILL_TAG = "skill";
     public static final String AKTO_GUARDRAIL_MODE = "mode";
     public static final String AKTO_GUARDRAIL_MODE_INLINE = "inline";
     public static final String AKTO_GUARDRAIL_MODE_OBSERVE = "observe";

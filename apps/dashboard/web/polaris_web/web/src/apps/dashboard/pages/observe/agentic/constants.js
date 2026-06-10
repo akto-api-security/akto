@@ -14,10 +14,16 @@ import {
     hasLocalMcpServerTag,
 } from "./mcpClientHelper";
 import func from "@/util/func";
-import { getResolvedUsernameForCollection, DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
+import {
+    getResolvedUsernameForCollection,
+    DEFAULT_VALUE,
+} from "../api_collections/endpointShieldHelper";
+import { inferOsFromDeviceId } from "./agenticPageBuilders";
 
 // Table constants
 export const PAGE_LIMIT = 100;
+
+export const NEW_LAYOUT_TOOLTIP = "Switch to the new layout for a faster, more focused experience.";
 
 export const SKILL_RISK_CACHE_TTL_MS = 2 * 60 * 1000;
 
@@ -539,6 +545,269 @@ export const buildAgenticInventoryFilterForRow = (row) => {
 };
 
 export { ROW_TYPES, SKILL_TAG_KEY } from "./mcpClientHelper";
+
+function mergeViolationCounts(target, source) {
+    if (!source) return;
+    ["critical", "high", "medium", "low"].forEach((k) => {
+        target[k] = (target[k] || 0) + (source[k] || 0);
+    });
+}
+
+function violationsForCollections(collectionIds, violationsByCollectionId) {
+    const merged = { critical: 0, high: 0, medium: 0, low: 0 };
+    (collectionIds || []).forEach((id) => {
+        mergeViolationCounts(merged, violationsByCollectionId[id]);
+    });
+    const total = merged.critical + merged.high + merged.medium + merged.low;
+    return total > 0 ? merged : null;
+}
+
+function buildTeamGroupsForAsset(group, usernameMap, userMetadataMap) {
+    const teamCounts = {};
+    const seenDevices = new Set();
+    (group.collections || []).forEach((c) => {
+        const hostName = c.hostName || c.displayName || c.name;
+        const deviceId = extractEndpointId(hostName);
+        if (!deviceId || seenDevices.has(deviceId)) return;
+        seenDevices.add(deviceId);
+        const username = getResolvedUsernameForCollection(c, usernameMap);
+        if (!username || username === DEFAULT_VALUE) return;
+        const team = userMetadataMap[username]?.team;
+        if (!team) return;
+        teamCounts[team] = (teamCounts[team] || 0) + 1;
+    });
+    return Object.entries(teamCounts).map(([name, count]) => ({ name, count }));
+}
+
+function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}) {
+    const byDevice = new Map();
+    (group.collections || []).forEach((c) => {
+        const hostName = c.hostName || c.displayName || c.name;
+        const deviceId = extractEndpointId(hostName);
+        if (!deviceId) return;
+        const serviceName = extractServiceName(hostName);
+        const collRisk = riskScoreMap[c.id] || 0;
+        if (!byDevice.has(deviceId)) {
+            const resolved = getResolvedUsernameForCollection(c, usernameMap);
+            const username = (resolved && resolved !== DEFAULT_VALUE) ? resolved : "";
+            const maxTraffic = group.detectedTimestamp || 0;
+            byDevice.set(deviceId, {
+                deviceId,
+                endpoint: deviceId,
+                username,
+                os: inferOsFromDeviceId(deviceId),
+                riskScore: collRisk,
+                lastSeen: maxTraffic > 0 ? func.prettifyEpoch(maxTraffic) : "-",
+                lastSeenEpoch: maxTraffic,
+                services: [],
+            });
+        }
+        const entry = byDevice.get(deviceId);
+        // accumulate max risk across all collections this device appears in
+        if (collRisk > (entry.riskScore || 0)) entry.riskScore = collRisk;
+        if (serviceName && !entry.services.includes(serviceName)) {
+            entry.services.push(serviceName);
+        }
+    });
+    // round to 1 dp and null out zero scores (no data)
+    return [...byDevice.values()].map(d => ({
+        ...d,
+        riskScore: d.riskScore > 0 ? Math.round(d.riskScore * 10) / 10 : null,
+    }));
+}
+
+function uniqueSkillNamesForGroup(group) {
+    const names = new Set();
+    (group.collections || []).forEach((c) => {
+        (c.skills || []).forEach((s) => { if (s) names.add(s); });
+    });
+    return names;
+}
+
+function userAnalysisCompositeKey(serviceId, deviceId) {
+    return `${serviceId}|${deviceId}`;
+}
+
+function putUserAnalysisKey(byKey, serviceId, deviceId, row) {
+    if (!serviceId || !deviceId) return;
+    byKey.set(userAnalysisCompositeKey(serviceId, deviceId), row);
+    byKey.set(userAnalysisCompositeKey(String(serviceId).toLowerCase(), String(deviceId).toLowerCase()), row);
+}
+
+export function buildUserAnalysisLookup(userAnalysisList = []) {
+    const rows = Array.isArray(userAnalysisList) ? userAnalysisList : [];
+    const byKey = new Map();
+    rows.forEach((row) => {
+        const key = row?.id ?? row?._id;
+        const serviceId = key?.serviceId ?? row?.serviceId;
+        const deviceId = key?.deviceId ?? row?.deviceId;
+        putUserAnalysisKey(byKey, serviceId, deviceId, row);
+    });
+    return byKey;
+}
+
+function analysisKeysForCollection(collection, tagValue, userAnalysisKeysByDeviceId) {
+    const hostName = collection.hostName || collection.displayName || collection.name;
+    if (!hostName) return [];
+    const parts = hostName.split(".");
+    const deviceId = parts[0];
+    if (!deviceId) return [];
+    const keys = [];
+    const seen = new Set();
+    const addPair = (serviceId, devId) => {
+        if (!serviceId || !devId) return;
+        const sk = userAnalysisCompositeKey(serviceId, devId);
+        if (seen.has(sk)) return;
+        seen.add(sk);
+        keys.push({ serviceId, deviceId: devId });
+    };
+    const add = (serviceId) => addPair(serviceId, deviceId);
+
+    const shieldEntry = userAnalysisKeysByDeviceId?.get(deviceId)
+        ?? userAnalysisKeysByDeviceId?.get(String(deviceId).toLowerCase());
+    if (shieldEntry) {
+        addPair(shieldEntry.serviceId, shieldEntry.deviceId);
+    }
+    if (parts.length >= 3) {
+        add(parts.slice(2).join("."));
+        if (parts[1]) add(parts[1]);
+    } else if (parts.length === 2) {
+        add(parts[1]);
+    }
+    const assetTag = findAssetTag(collection.envType);
+    if (assetTag?.value) add(assetTag.value);
+    if (tagValue) add(tagValue);
+    return keys;
+}
+
+function lookupUserAnalysisRow(analysisByKey, serviceId, deviceId) {
+    return analysisByKey.get(userAnalysisCompositeKey(serviceId, deviceId))
+        ?? analysisByKey.get(userAnalysisCompositeKey(String(serviceId).toLowerCase(), String(deviceId).toLowerCase()));
+}
+
+export function aggregateAiInteractionsForGroup(group, analysisByKey, userAnalysisKeysByDeviceId) {
+    const seen = new Set();
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    (group.collections || []).forEach((c) => {
+        const keys = analysisKeysForCollection(c, group.tagValue, userAnalysisKeysByDeviceId);
+        keys.forEach(({ serviceId, deviceId }) => {
+            const sk = userAnalysisCompositeKey(serviceId, deviceId);
+            if (seen.has(sk)) return;
+            seen.add(sk);
+            const row = lookupUserAnalysisRow(analysisByKey, serviceId, deviceId);
+            if (!row) return;
+            totalInputTokens += Number(row.totalInputTokens) || 0;
+            totalOutputTokens += Number(row.totalOutputTokens) || 0;
+        });
+    });
+    const total = totalInputTokens + totalOutputTokens;
+    if (total <= 0) return null;
+    return { totalInputTokens, totalOutputTokens, total };
+}
+
+/**
+ * Same grouping as {@link Endpoints} (agentic-assets), shaped for AgenticAssetsPage + flyout.
+ */
+export function buildAgenticAssetsPageData(
+    collections,
+    trafficMap = {},
+    riskScoreMap = {},
+    sensitiveMap = {},
+    {
+        usernameMap = {},
+        userMetadataMap = {},
+        violationsByCollectionId = {},
+        analysisByKey = new Map(),
+        userAnalysisKeysByDeviceId = new Map(),
+    } = {},
+) {
+    const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap, riskScoreMap);
+    const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);
+    const skillGroups = groupCollectionsBySkill(collections, trafficMap, sensitiveMap, riskScoreMap);
+
+    const agentGroupKeys = new Set(agentGroups.map((a) => a.groupKey));
+    const servicesToShow = serviceGroups.filter((s) => !agentGroupKeys.has(s.groupKey));
+    const allGroups = [...agentGroups, ...servicesToShow, ...skillGroups];
+
+    const agenticTreeData = [];
+    const agenticFlatData = [];
+    const assetDevices = {};
+
+    allGroups.forEach((group) => {
+        const collectionIds = (group.collections || []).map((c) => c.id);
+        const violations = violationsForCollections(collectionIds, violationsByCollectionId);
+        const groups = buildTeamGroupsForAsset(group, usernameMap, userMetadataMap);
+        const devices = buildDevicesForGroup(group, usernameMap, riskScoreMap);
+        const skillNames = uniqueSkillNamesForGroup(group);
+        const riskScore = group.riskScore ?? group.maxRiskScore ?? null;
+        const lastSeen = group.detectedTimestamp || 0;
+        const aiInteractions = aggregateAiInteractionsForGroup(group, analysisByKey, userAnalysisKeysByDeviceId);
+
+        const treeRow = {
+            path: [group.id],
+            name: group.groupName,
+            type: group.clientType,
+            assetTagValue: group.tagValue,
+            riskScore,
+            endpointCount: group.endpointsCount,
+            deviceCount: group.endpointsCount,
+            lastSeen: lastSeen > 0 ? func.prettifyEpoch(lastSeen) : "",
+            lastSeenEpoch: lastSeen,
+            hasPersonalAccount: group.hasPersonalAccount || false,
+            hasLocalMcpServer: group.hasLocalMcpServer || false,
+        };
+        if (aiInteractions) {
+            treeRow.aiInteractions = aiInteractions.total;
+            treeRow.aiInteractionsDetail = {
+                totalInputTokens: aiInteractions.totalInputTokens,
+                totalOutputTokens: aiInteractions.totalOutputTokens,
+            };
+        }
+        if (violations) treeRow.violations = violations;
+        if (groups.length) treeRow.groups = groups;
+        if (skillNames.size) treeRow.skillCount = skillNames.size;
+
+        const flatRow = {
+            id: group.id,
+            name: group.groupName,
+            type: group.clientType,
+            riskScore,
+            collectionIds,
+            assetTagValue: group.tagValue,
+            deviceCount: group.endpointsCount,
+            lastSeen: lastSeen > 0 ? func.prettifyEpoch(lastSeen) : "",
+            lastSeenEpoch: lastSeen,
+            skillCount: skillNames.size,
+            toolCount: 0,
+            hasPersonalAccount: group.hasPersonalAccount || false,
+            hasLocalMcpServer: group.hasLocalMcpServer || false,
+        };
+        if (violations) flatRow.violations = violations;
+        if (aiInteractions) {
+            flatRow.aiInteractions = aiInteractions.total;
+            flatRow.aiInteractionsDetail = {
+                totalInputTokens: aiInteractions.totalInputTokens,
+                totalOutputTokens: aiInteractions.totalOutputTokens,
+            };
+        }
+        if (group.rowType === ROW_TYPES.AGENT && group.clientType === CLIENT_TYPES.AI_AGENT) {
+            const mcpNames = new Set();
+            (group.collections || []).forEach((c) => {
+                const hostName = c.hostName || c.displayName || c.name;
+                const serviceName = extractServiceName(hostName);
+                if (serviceName) mcpNames.add(serviceName);
+            });
+            if (mcpNames.size) flatRow.mcpServers = [...mcpNames];
+        }
+
+        agenticTreeData.push(treeRow);
+        agenticFlatData.push(flatRow);
+        assetDevices[group.id] = devices;
+    });
+
+    return { agenticTreeData, agenticFlatData, assetDevices };
+}
 
 /**
  * Fetch apiInfos for the given collection IDs, build and cache skillScoreMap + maliciousSkills,

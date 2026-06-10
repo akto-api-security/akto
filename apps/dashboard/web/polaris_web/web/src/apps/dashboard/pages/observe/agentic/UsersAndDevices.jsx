@@ -13,6 +13,7 @@ import PersistStore from "../../../../main/PersistStore";
 import useTable from "@/apps/dashboard/components/tables/TableContext";
 import settingRequests from "../../settings/api";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
+import NewLayoutTooltip from "./NewLayoutTooltip";
 import {
     getHeaders,
     getSortOptionsWithoutIconColumn,
@@ -35,6 +36,12 @@ const usersAndDevicesCountColumnOpts = {
 function UsersAndDevices() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (localStorage.getItem("akto_agentic_new_ui") === "true") {
+            navigate("/dashboard/observe/endpoints", { replace: true });
+        }
+    }, [navigate]);
     const [data, setData] = useState({ users: [], devices: [] });
     const [userEnrichVersion, setUserEnrichVersion] = useState(0);
     const [summaryData, setSummaryData] = useState({ profileCount: 0, collectionCount: 0 });
@@ -334,11 +341,16 @@ function UsersAndDevices() {
         [],
     );
 
+    const layoutToggle = (
+        <NewLayoutTooltip checked={false} onChange={() => { localStorage.setItem("akto_agentic_new_ui", "true"); navigate("/dashboard/observe/endpoints"); }} />
+    );
+
     if (loading) {
         return (
             <PageWithMultipleCards
                 title={pageTitle}
                 isFirstPage={true}
+                secondaryActions={layoutToggle}
                 components={[<SpinnerCentered key="loading" />]}
             />
         );
@@ -378,6 +390,7 @@ function UsersAndDevices() {
             <PageWithMultipleCards
                 title={pageTitle}
                 isFirstPage={true}
+                secondaryActions={layoutToggle}
                 components={[summaryComponent, tableComponent]}
             />
             {editTagModalComp}
