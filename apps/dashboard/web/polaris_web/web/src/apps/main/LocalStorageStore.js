@@ -12,7 +12,8 @@ const initialState = {
     categoryMap: {},
     sendEventOnLogin: false,
     defaultIgnoreSummaryTime: 2 * 60 * 60,
-    lastEndpointEpoch: 0
+    lastEndpointEpoch: 0,
+    agenticNewLayout: false,
 };
 
 let localStore = (set) => ({
@@ -55,6 +56,14 @@ let localStore = (set) => ({
             set({ lastEndpointEpoch });
         } catch (error) {
             console.error("Error setting lastEndpointEpoch:", error);
+        }
+    },
+
+    setAgenticNewLayout: (agenticNewLayout) => {
+        try {
+            set({ agenticNewLayout });
+        } catch (error) {
+            console.error("Error setting agenticNewLayout:", error);
         }
     },
 

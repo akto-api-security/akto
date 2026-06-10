@@ -10,6 +10,7 @@ import api from "../api";
 import func from "@/util/func";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
+import LocalStore from "../../../../main/LocalStorageStore";
 import { CollectionIcon } from "../../../components/shared/CollectionIcon";
 import useTable from "@/apps/dashboard/components/tables/TableContext";
 import NewLayoutTooltip from "./NewLayoutTooltip";
@@ -34,12 +35,14 @@ const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills'];
 function Endpoints() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+    const agenticNewLayout = LocalStore((state) => state.agenticNewLayout);
+    const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
 
     useEffect(() => {
-        if (localStorage.getItem("akto_agentic_new_ui") === "true") {
+        if (agenticNewLayout) {
             navigate("/dashboard/observe/agentic-assets", { replace: true });
         }
-    }, [navigate]);
+    }, [navigate, agenticNewLayout]);
     const [data, setData] = useState({ all: [], 'ai_agents': [], 'mcp_servers': [], llms: [], skills: [] });
     const [skillEnrichVersion, setSkillEnrichVersion] = useState(0);
     const [summaryData, setSummaryData] = useState({ totalAssets: 0, totalEndpoints: 0 });
@@ -318,7 +321,7 @@ function Endpoints() {
     ), []);
 
     const layoutToggle = (
-        <NewLayoutTooltip checked={false} onChange={() => { localStorage.setItem("akto_agentic_new_ui", "true"); navigate("/dashboard/observe/agentic-assets"); }} />
+        <NewLayoutTooltip checked={false} onChange={() => { setAgenticNewLayout(true); navigate("/dashboard/observe/agentic-assets"); }} />
     );
 
     if (loading) {

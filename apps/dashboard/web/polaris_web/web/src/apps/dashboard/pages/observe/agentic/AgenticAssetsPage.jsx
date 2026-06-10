@@ -38,6 +38,7 @@ import {
   fetchAndCacheSkillApiData,
 } from "./constants";
 import PersistStore from "../../../../main/PersistStore";
+import LocalStore from "../../../../main/LocalStorageStore";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import values from "@/util/values";
@@ -282,8 +283,6 @@ function TableSection({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-const LAYOUT_KEY = "akto_agentic_new_ui";
-
 export default function AgenticAssetsPage() {
   const navigate = useNavigate();
   const [typeFilter, setTypeFilter] = useState(new Set());
@@ -294,13 +293,11 @@ export default function AgenticAssetsPage() {
   const [agenticFlatData, setAgenticFlatData] = useState([]);
   const [assetDevices, setAssetDevices] = useState({});
   const [agenticViolationRows, setAgenticViolationRows] = useState([]);
-  const [newLayout, setNewLayout] = useState(() => {
-    const stored = localStorage.getItem(LAYOUT_KEY);
-    return stored === "true";
-  });
+  const newLayout = LocalStore((state) => state.agenticNewLayout);
+  const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
 
   useEffect(() => {
-    if (localStorage.getItem(LAYOUT_KEY) !== "true") {
+    if (!newLayout) {
       navigate("/dashboard/observe/agentic-assets-legacy", { replace: true });
     }
   }, [navigate]);
@@ -319,11 +316,10 @@ export default function AgenticAssetsPage() {
 
   const handleLayoutToggle = useCallback(
     (checked) => {
-      localStorage.setItem(LAYOUT_KEY, String(checked));
-      setNewLayout(checked);
+      setAgenticNewLayout(checked);
       if (!checked) navigate("/dashboard/observe/agentic-assets-legacy");
     },
-    [navigate],
+    [navigate, setAgenticNewLayout],
   );
 
   useEffect(() => {
