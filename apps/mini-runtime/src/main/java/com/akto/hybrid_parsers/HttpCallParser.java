@@ -1596,9 +1596,13 @@ public class HttpCallParser {
             if (allowAnalysis && isAgenticTraffic(tagsMap) && (!httpResponseParam.getRequestParams().getUrl().contains("skill"))) {
                 AgentQueryRecord record = AgentQueryRecord.fromHttpResponseParams(
                         httpResponseParam, tagsMap, getDeviceUserMap());
-                if (record != null && record.getInputTokens() > 0) {
+                if (record != null) {
                     loggerMaker.infoAndAddToDb("Storing agent query data for account: " + Context.getActualAccountId());
-                    dataActor.storeAgentQueryData(record);
+                    String payload = httpResponseParam.getRequestParams().getPayload();
+                    if(payload.length() > 3){
+                        dataActor.storeAgentQueryData(record);
+                    }
+                    
                 }
             }
 
