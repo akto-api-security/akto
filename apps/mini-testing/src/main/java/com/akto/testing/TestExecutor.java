@@ -1251,13 +1251,22 @@ public class TestExecutor {
         String collectionDescription = TestingConfigurations.getInstance().getApiCollectionDescriptionMap().get(apiInfoKey.getApiCollectionId());
         if (!StringUtils.isEmpty(collectionDescription)) {
             @SuppressWarnings("unchecked")
-            List<String> contextList = (List<String>) varMap.getOrDefault("wordList_data_context", new ArrayList<>());
-            if (contextList.isEmpty()) {
-                contextList.add(collectionDescription);
-            } else {
-                contextList.set(0, contextList.get(0) + "\n\n" + collectionDescription + "\n");
+            List<String> existingContext = (List<String>) varMap.getOrDefault("wordList_data_context", new ArrayList<>());
+            String yamlContext = null;
+            if (existingContext != null && !existingContext.isEmpty()) {
+                yamlContext = existingContext.get(0);
             }
-            varMap.put("wordList_data_context", contextList);
+            String combinedContext;
+            if (yamlContext != null && !yamlContext.isEmpty()) {
+                combinedContext = yamlContext.contains(collectionDescription)
+                        ? yamlContext
+                        : yamlContext + "\n\n" + collectionDescription;
+            } else {
+                combinedContext = collectionDescription;
+            }
+            // Keeping only the first context entry.
+            // Rest of the entries are not used.
+            varMap.put("wordList_data_context", Collections.singletonList(combinedContext));
         }
 
         String testExecutionLogId = UUID.randomUUID().toString();
