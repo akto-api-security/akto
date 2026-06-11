@@ -1184,6 +1184,8 @@ public class TestExecutor {
         String testSubType = testConfig.getInfo().getSubCategory();
 
         ApiCollection apiCollection = TestingConfigurations.getInstance().getApiCollectionMap().get(apiInfoKey.getApiCollectionId());
+        // Copilot Studio bots expose a /copilot/conversation endpoint that is a duplicate of the
+        // actual bot endpoint we already test. Skip it to avoid redundant test results.
         if (apiCollection != null && apiCollection.isCopilotBotCollection() &&
                 apiInfoKey.getUrl().startsWith(Constants.AKTO_COPILOT_CONVERSATION_URL_PREFIX)) {
             loggerMaker.infoAndAddToDb("Skipping test for Copilot Studio endpoint already covered: " + apiInfoKey);
