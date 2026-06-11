@@ -45,31 +45,6 @@ public class ApiExecutor {
 
     private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol, TLSAuthParam authParam) throws Exception {
 
-        Integer accountId = Context.accountId.get();
-        if (accountId != null) {
-            int i = 0;
-            boolean rateLimitHit = true;
-            while (RateLimitHandler.getInstance(accountId).shouldWait(request)) {
-                if(rateLimitHit){
-                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog") || request.url().toString().contains("insertAgenticTestingLog"))) {
-                        loggerMaker.infoAndAddToDb("Rate limit hit, sleeping", LogDb.TESTING);
-                    }else {
-                       loggerMaker.info("Rate limit hit, sleeping");
-                    }
-                }
-                rateLimitHit = false;
-                Thread.sleep(1000);
-                i++;
-
-                if (i%30 == 0) {
-                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog") || request.url().toString().contains("insertAgenticTestingLog"))) {
-                        loggerMaker.infoAndAddToDb("waiting for rate limit availability", LogDb.TESTING);
-                    }else{
-                        loggerMaker.info("waiting for rate limit availability");
-                    }
-                }
-            }
-        }
 
         boolean isSaasDeployment = "true".equals(System.getenv("IS_SAAS"));
 
