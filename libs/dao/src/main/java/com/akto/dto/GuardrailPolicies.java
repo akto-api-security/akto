@@ -130,8 +130,13 @@ public class GuardrailPolicies {
                     .map(serverId -> new SelectedServer(serverId, serverId))
                     .collect(java.util.stream.Collectors.toList());
         }
-            
-        return fetchApplicableServersByTag(Constants.AKTO_MCP_SERVER_TAG);
+        if (contextSource != null && contextSource != CONTEXT_SOURCE.AGENTIC) {
+            return new ArrayList<>();
+        }
+        if (!applyToAllServers) {
+            return new ArrayList<>();
+        }
+        return fetchApplicableServersByContext();
     }
 
     public List<SelectedServer> getEffectiveSelectedAgentServers() {
@@ -143,15 +148,30 @@ public class GuardrailPolicies {
                     .map(serverId -> new SelectedServer(serverId, serverId))
                     .collect(java.util.stream.Collectors.toList());
         }
-            
-        return fetchApplicableServersByTag(Constants.AKTO_GEN_AI_TAG);
+        if (contextSource != null && contextSource != CONTEXT_SOURCE.AGENTIC) {
+            return new ArrayList<>();
+        }
+        if (!applyToAllServers) {
+            return new ArrayList<>();
+        }
+        return fetchApplicableServersByContext();
     }
 
-    // empty server lists = "apply to all"; returns inline-only when block mode, all servers otherwise
-    private List<SelectedServer> fetchApplicableServersByTag(String serverTypeTag) {
+    // filters collections by the policy's contextSource tag (key="source", value=contextSource.name())
+    // excludes Atlas/endpoint collections (source=ENDPOINT); returns inline-only when behaviour is "block"
+    private List<SelectedServer> fetchApplicableServersByContext() {
+        if (contextSource == null) return new ArrayList<>();
         boolean isBlock = "block".equals(this.behaviour);
-        Bson filter = Filters.elemMatch(ApiCollection.TAGS_STRING,
-                Filters.eq(CollectionTags.KEY_NAME, serverTypeTag));
+        Bson filter = Filters.and(
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
+                        Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_COLLECTION_CONTEXT_TAG_KEY),
+                        Filters.eq(CollectionTags.VALUE, contextSource.name())
+                )),
+                Filters.not(Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
+                        Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_COLLECTION_CONTEXT_TAG_KEY),
+                        Filters.eq(CollectionTags.VALUE, CONTEXT_SOURCE.ENDPOINT.name())
+                )))
+        );
         if (isBlock) {
             filter = Filters.and(filter, Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
                     Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GUARDRAIL_MODE),
