@@ -1,12 +1,15 @@
 import React from "react";
-import { Box, Text, Tooltip, Checkbox } from "@shopify/polaris";
+import { Box, Text, Tooltip, Checkbox, Badge, HorizontalStack } from "@shopify/polaris";
 import { NEW_LAYOUT_TOOLTIP } from "./constants";
-import func from "@/util/func";
-
 export default function NewLayoutTooltip({ checked, onChange }) {
-    if (!func.isDemoAccount()) return null;
 
-    const checkbox = <Checkbox label="New Layout" checked={checked} onChange={onChange} />;
+    const label = (
+        <HorizontalStack gap="1">
+            <Text as="span" variant="bodyMd" fontWeight="bold">New Layout</Text>
+            <Badge status="info">Beta</Badge>
+        </HorizontalStack>
+    );
+    const checkbox = <Checkbox label={label} checked={checked} onChange={onChange} />;
 
     if (checked) return checkbox;
 
