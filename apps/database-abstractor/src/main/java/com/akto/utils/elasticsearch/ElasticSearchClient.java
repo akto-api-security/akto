@@ -187,7 +187,11 @@ public class ElasticSearchClient {
             source.optString("responsePayload", ""),
             source.optLong("timestamp", 0L),
             source.optInt("inputTokens", 0),
-            source.optInt("outputTokens", 0)
+            source.optInt("outputTokens", 0),
+            source.optString("traceId", ""),
+            source.optString("spanId", ""),
+            source.optBoolean("isAtlasTraffic", false)
+
         );
     }
 
