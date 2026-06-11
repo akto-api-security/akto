@@ -1,9 +1,9 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
-import com.akto.agent.AgentClient;
 import com.akto.audit_logs_util.Audit;
 import com.akto.billing.UsageMetricUtils;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
@@ -13,6 +13,7 @@ import com.akto.dao.testing.*;
 import com.akto.utils.CategoryWiseStatsUtils;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
@@ -128,6 +129,9 @@ public class StartTestAction extends UserAction {
 
     private Map<String, String> issuesDescriptionMap;
 
+    @Getter
+    private String testScheduleWarning;
+
     private static final Gson gson = new Gson();
 
 
@@ -207,11 +211,27 @@ public class StartTestAction extends UserAction {
                     addActionError("APIs list can't be empty");
                     return null;
                 }
+                Set<Integer> customCollectionIds = this.apiInfoKeyList.stream()
+                        .map(ApiInfo.ApiInfoKey::getApiCollectionId)
+                        .collect(Collectors.toSet());
+                if (customCollectionIds.size() == 1) {
+                    int singleCollectionId = customCollectionIds.iterator().next();
+                    ApiCollection singleCol = ApiCollectionsDao.instance.getMeta(singleCollectionId);
+                    if (singleCol != null && singleCol.isCopilotBotCollection() && !singleCol.isCopilotBotPublished()) {
+                        addActionError("Bot is not published. Please publish the bot before running a scan.");
+                        return null;
+                    }
+                }
                 testingEndpoints = new CustomTestingEndpoints(apiInfoKeyList);
                 break;
             case COLLECTION_WISE:
                 loggerMaker.debugAndAddToDb("createTestingRun: COLLECTION_WISE apiCollectionId=" + apiCollectionId, LogDb.DASHBOARD);
-                if (AgentClient.isCopilotBotCollection(apiCollectionId)) {
+                ApiCollection collectionWiseCol = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+                if (collectionWiseCol != null && collectionWiseCol.isCopilotBotCollection()) {
+                    if (!collectionWiseCol.isCopilotBotPublished()) {
+                        addActionError("Bot is not published. Please publish the bot before running a scan.");
+                        return null;
+                    }
                     List<ApiInfo.ApiInfoKey> botEndpoints = SingleTypeInfoDao.instance.fetchEndpointsInCollection(apiCollectionId);
                     loggerMaker.debugAndAddToDb("createTestingRun: Copilot bot collection detected, total endpoints=" + (botEndpoints != null ? botEndpoints.size() : 0) + ", using first only", LogDb.DASHBOARD);
                     if (botEndpoints == null || botEndpoints.isEmpty()) {
@@ -228,7 +248,17 @@ public class StartTestAction extends UserAction {
                     addActionError("API Collection IDs list can't be empty");
                     return null;
                 }
-                testingEndpoints = new MultiCollectionTestingEndpoints(this.apiCollectionIds);
+                List<Integer> mutableCollectionIds = new ArrayList<>(this.apiCollectionIds);
+                List<Integer> skippedCollectionIds = Utils.filterUnpublishedCopilotCollections(mutableCollectionIds);
+                if (!skippedCollectionIds.isEmpty()) {
+                    this.testScheduleWarning = "Some tests were not scheduled because the bot is not published: collection IDs " + skippedCollectionIds;
+                    loggerMaker.debugAndAddToDb("createTestingRun: skipping unpublished copilot collections " + skippedCollectionIds, LogDb.DASHBOARD);
+                }
+                if (mutableCollectionIds.isEmpty()) {
+                    addActionError("No collections available to test. All Copilot bot collections are not published.");
+                    return null;
+                }
+                testingEndpoints = new MultiCollectionTestingEndpoints(mutableCollectionIds);
                 break;  
             case WORKFLOW:
                 WorkflowTest workflowTest = WorkflowTestsDao.instance.findOne(Filters.eq("_id", this.workflowTestId));
