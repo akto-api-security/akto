@@ -59,36 +59,31 @@ function HighlightedText({ text, highlights, mono }) {
 
 // ─── Evidence block (Blocked Prompt / Suspicious Skill / Suspicious Config) ──────
 
-export function EvidenceBlock({ evidence, trigger }) {
+export function EvidenceBlock({ evidence }) {
     if (!evidence) return null;
     const name = evidence.author || evidence.heading;
     return (
-        <Box className="violation-evidence" padding="4" borderRadius="3">
-            <VerticalStack gap="5">
-                <VerticalStack gap="3">
-                    <Text variant="headingXs" color="subdued">{evidence.title}</Text>
-                    <HorizontalStack gap="3" blockAlign="start" wrap={false}>
-                        {evidence.author
-                            ? <Avatar size="small" initials={initials(evidence.author)} />
-                            : <Box paddingBlockStart="05"><Icon source={NoteMinor} color="critical" /></Box>}
-                        <Box width="100%">
-                            <VerticalStack gap="1">
-                                {name && (
-                                    <HorizontalStack align="space-between" blockAlign="center" wrap={false}>
-                                        <Box className="violation-evidence-name">
-                                            <Text variant="bodySm" fontWeight="semibold">{name}</Text>
-                                        </Box>
-                                        {evidence.time && <Text variant="bodySm" color="subdued">{evidence.time}</Text>}
-                                    </HorizontalStack>
-                                )}
-                                <Box className="violation-evidence-quote">
-                                    <HighlightedText text={evidence.text} highlights={evidence.highlights} mono={evidence.mono} />
-                                </Box>
-                            </VerticalStack>
-                        </Box>
-                    </HorizontalStack>
-                </VerticalStack>
-                {trigger}
+        <Box borderRadius="2">
+            <VerticalStack gap="3">
+                <Text variant="headingXs" color="subdued">{evidence.title}</Text>
+                <div className="violation-evidence-author-row">
+                    {evidence.author
+                        ? <Avatar size="small" name={evidence.author} initials={initials(evidence.author)} />
+                        : <Box paddingBlockStart="05"><Icon source={NoteMinor} color="critical" /></Box>}
+                    <Box className="violation-evidence-quote" width="100%">
+                        <VerticalStack gap="1">
+                            {name && (
+                                <HorizontalStack align="space-between" blockAlign="center" wrap={false}>
+                                    <Box className="violation-evidence-name">
+                                        <Text variant="bodySm" fontWeight="semibold">{name}</Text>
+                                    </Box>
+                                    {evidence.time && <Text variant="bodySm" color="subdued">{evidence.time}</Text>}
+                                </HorizontalStack>
+                            )}
+                            <HighlightedText text={evidence.text} highlights={evidence.highlights} mono={evidence.mono} />
+                        </VerticalStack>
+                    </Box>
+                </div>
             </VerticalStack>
         </Box>
     );
@@ -145,46 +140,51 @@ export function OverviewSection({ row, detail }) {
     ];
 
     return (
-        <Box padding="4">
-            <VerticalStack gap="4">
-                <EvidenceBlock
-                    evidence={detail?.evidence}
-                    trigger={detail?.triggerReason
-                        ? <TriggerReason reason={detail.triggerReason} policyName={detail.policyName} />
-                        : null}
-                />
+        <VerticalStack gap="0">
+            {/* Box 3 — Evidence + trigger reason */}
+            <Box padding="4" background="bg-critical-subdued">
+                <VerticalStack gap="3">
+                    <EvidenceBlock evidence={detail?.evidence} />
+                    {detail?.triggerReason && (
+                        <TriggerReason reason={detail.triggerReason} policyName={detail.policyName} />
+                    )}
+                </VerticalStack>
+            </Box>
 
-                {detail?.description && (
-                    <>
-                        <Divider />
+            <Divider />
+
+            {/* Box 4 — Description, topology, impact, metadata */}
+            <Box padding="4">
+                <VerticalStack gap="4">
+                    {detail?.description && (
                         <VerticalStack gap="2">
                             <Text variant="headingXs" color="subdued">Description</Text>
                             <Text variant="bodyMd">{detail.description}</Text>
                         </VerticalStack>
-                    </>
-                )}
+                    )}
 
-                {topo && (
-                    <>
-                        <Divider />
-                        <AssetTopologyGraph nodes={topo.nodes} edges={topo.edges} />
-                    </>
-                )}
+                    {topo && (
+                        <>
+                            {detail?.description && <Divider />}
+                            <AssetTopologyGraph nodes={topo.nodes} edges={topo.edges} />
+                        </>
+                    )}
 
-                {detail?.impact && (
-                    <>
-                        <Divider />
-                        <VerticalStack gap="2">
-                            <Text variant="headingXs" color="subdued">Impact</Text>
-                            <Text variant="bodyMd">{detail.impact}</Text>
-                        </VerticalStack>
-                    </>
-                )}
+                    {detail?.impact && (
+                        <>
+                            <Divider />
+                            <VerticalStack gap="2">
+                                <Text variant="headingXs" color="subdued">Impact</Text>
+                                <Text variant="bodyMd">{detail.impact}</Text>
+                            </VerticalStack>
+                        </>
+                    )}
 
-                <Divider />
-                <DetailGrid items={gridItems} columns={3} />
-            </VerticalStack>
-        </Box>
+                    <Divider />
+                    <DetailGrid items={gridItems} columns={3} />
+                </VerticalStack>
+            </Box>
+        </VerticalStack>
     );
 }
 

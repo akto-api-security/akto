@@ -128,13 +128,17 @@
 
 /* Violation flyout evidence block — pink-tinted card (Blocked Prompt /
    Suspicious Skill / Suspicious Config). No Polaris token for this tint. */
-.violation-evidence {
-    background-color: #FEF6F5;
-}
 /* The message/code body inside the evidence block — quote-style left accent bar. */
 .violation-evidence-quote {
     border-left: 2px solid #E0431F;
     padding-left: 12px;
+}
+/* Avatar + quote row — force top-alignment regardless of content height. */
+.violation-evidence-author-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--p-space-3);
+    width: 100%;
 }
 /* Author/file name in the evidence header — subtle underline like the design. */
 .violation-evidence-name {
