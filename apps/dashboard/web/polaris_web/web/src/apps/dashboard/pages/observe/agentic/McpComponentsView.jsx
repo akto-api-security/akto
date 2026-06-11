@@ -289,7 +289,7 @@ export default function McpComponentsView({ asset, onNavChange }) {
             noOuterBorder
             searchPlaceholder="Search tools, resources, prompts..."
             pagination={false}
-            sideBar={false}
+            sideBar
             domLayout="normal"
         />
     );

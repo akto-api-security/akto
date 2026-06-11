@@ -269,7 +269,7 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
             searchPlaceholder="Search components..."
             pagination
             paginationPageSize={20}
-            sideBar={false}
+            sideBar
             domLayout="normal"
         />
     );

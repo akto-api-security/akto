@@ -64,14 +64,14 @@ export default function ViolationsTab({ asset }) {
             rowData={violations}
             columnDefs={VIOLATIONS_COL_DEFS}
             defaultColDef={GRID_DEFAULT_COL}
-            onRowClicked={() => window.open("/dashboard/protection/threat-activity", "_blank")}
+            onRowClicked={() => window.open("/dashboard/guardrails/activity", "_blank")}
             getRowStyle={() => ({ cursor: "pointer" })}
             fillHeight
             noOuterBorder
             searchPlaceholder="Search violations..."
             pagination
             paginationPageSize={20}
-            sideBar={false}
+            sideBar
             domLayout="normal"
         />
     );

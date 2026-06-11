@@ -372,7 +372,7 @@ function ViolationsTab({ device }) {
 
     const handleViolationClick = useCallback((e) => {
         if (!e.data) return;
-        window.open("/dashboard/protection/threat-activity", "_blank");
+        window.open("/dashboard/guardrails/activity", "_blank");
     }, []);
 
     if (violations.length === 0) {

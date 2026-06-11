@@ -56,7 +56,7 @@ function DevicesTab({ asset, assetDevices = {} }) {
             searchPlaceholder="Search devices..."
             pagination
             paginationPageSize={20}
-            sideBar={false}
+            sideBar
             domLayout="normal"
         />
     );

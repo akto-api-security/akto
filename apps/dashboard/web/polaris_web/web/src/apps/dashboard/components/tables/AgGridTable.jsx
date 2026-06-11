@@ -265,13 +265,22 @@ export default function AgGridTable({
     ) : null;
 
     // ── Grid node ───────────────────────────────────────────────────────────
+    const effectiveDefaultColDef = React.useMemo(() => ({
+        enableRowGroup: true,
+        enablePivot: true,
+        enableValue: true,
+        ...defaultColDef,
+    }), [defaultColDef]);
+
+    const effectiveSideBar = sideBar;
+
     const gridNode = (
         <AgGridReact
             ref={gridRef}
             theme={theme}
             rowData={rowData}
             columnDefs={columnDefs}
-            defaultColDef={defaultColDef}
+            defaultColDef={effectiveDefaultColDef}
             rowHeight={rowHeight}
             headerHeight={headerHeight}
             animateRows={animateRows}
@@ -284,7 +293,7 @@ export default function AgGridTable({
             paginationPageSize={paginationPageSize}
             paginationPageSizeSelector={paginationPageSizeSelector}
             quickFilterText={isServerMode ? undefined : debouncedSearchValue}
-            sideBar={sideBar}
+            sideBar={effectiveSideBar}
             treeData={treeData}
             getDataPath={getDataPath}
             autoGroupColumnDef={autoGroupColumnDef}
