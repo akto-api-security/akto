@@ -37,11 +37,11 @@ chmod +x ~/.claude/hooks/*.sh
 
 ```bash
 AKTO_URL="https://your-akto-instance.com"
-AKTO_TOKEN_VALUE="your-akto-token"
+AKTO_API_TOKEN_VALUE="your-akto-token"
 AKTO_HOST_VALUE="api.anthropic.com"   # or your custom host
 
 sed -i.bak "s|{{AKTO_DATA_INGESTION_URL}}|${AKTO_URL}|g" ~/.claude/hooks/*-wrapper.sh
-sed -i.bak "s|{{AKTO_TOKEN}}|${AKTO_TOKEN_VALUE}|g"      ~/.claude/hooks/*-wrapper.sh
+sed -i.bak "s|{{AKTO_API_TOKEN}}|${AKTO_API_TOKEN_VALUE}|g"      ~/.claude/hooks/*-wrapper.sh
 sed -i.bak "s|{{AKTO_HOST}}|${AKTO_HOST_VALUE}|g"        ~/.claude/hooks/*-wrapper.sh
 ```
 
@@ -63,7 +63,7 @@ claude
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `AKTO_DATA_INGESTION_URL` | yes | — | Akto ingestion base URL |
-| `AKTO_TOKEN` | yes | — | Authorization header value |
+| `AKTO_API_TOKEN` | yes | — | Authorization header value |
 | `AKTO_HOST` | no | `https://api.anthropic.com` | host header in mirrored requests |
 | `CONTEXT_SOURCE` | no | `AGENTIC` | payload `contextSource` + `source` tag |
 | `AKTO_SYNC_MODE` | no | `true` | `true` blocks on guardrail violation; `false` observe-only |
