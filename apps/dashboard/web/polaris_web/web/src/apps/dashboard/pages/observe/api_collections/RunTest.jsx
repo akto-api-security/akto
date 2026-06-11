@@ -315,6 +315,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
                     miniTestingServiceNames: testIdConfig?.allowedMiniTestingServiceNames || [],
                     slackChannel: testIdConfig?.selectedSlackChannelId || 0,
                     doNotMarkIssuesAsFixed: testIdConfig?.doNotMarkIssuesAsFixed ?? false,
+                    cleanUpTestingResources: testIdConfig?.testingRunConfig?.cleanUp ?? false,
+                    runAutomatedTests: testIdConfig?.runAutomatedTests ?? false,
                 }));
                 setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
                 setTestNameSuiteModal(testIdConfig?.name||"")

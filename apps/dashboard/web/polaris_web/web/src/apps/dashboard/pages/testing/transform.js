@@ -1569,6 +1569,8 @@ const transform = {
       autoTicketingDetails: autoTicketingDetails,
       selectedSlackChannelId: testRun?.slackChannel || 0,
       doNotMarkIssuesAsFixed: Boolean(testRun.doNotMarkIssuesAsFixed),
+      cleanUp: Boolean(testRun.cleanUpTestingResources),
+      runAutomatedTests: Boolean(testRun.runAutomatedTests),
     }
   },
   prepareTestingEndpointsApisList(apiEndpoints) {
