@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.RawApi;
@@ -32,7 +33,7 @@ public class TestingConfigurations {
     private int maxAgentTokens = -1;
     private final AtomicLong runningAgentTokenCount = new AtomicLong(0);
     private Map<String, String> mcpToolDescriptions = new HashMap<>();
-    private Map<Integer, String> apiCollectionDescriptionMap = new HashMap<>();
+    private Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
 
     private TestingConfigurations() {
     }
@@ -138,11 +139,11 @@ public class TestingConfigurations {
         this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
     }
 
-    public Map<Integer, String> getApiCollectionDescriptionMap() {
-        return apiCollectionDescriptionMap;
+    public Map<Integer, ApiCollection> getApiCollectionMap() {
+        return apiCollectionMap;
     }
 
-    public void setApiCollectionDescriptionMap(Map<Integer, String> apiCollectionDescriptionMap) {
-        this.apiCollectionDescriptionMap = apiCollectionDescriptionMap;
+    public void setApiCollectionMap(Map<Integer, ApiCollection> apiCollectionMap) {
+        this.apiCollectionMap = apiCollectionMap;
     }
 }

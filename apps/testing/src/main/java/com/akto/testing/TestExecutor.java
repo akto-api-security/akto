@@ -293,14 +293,10 @@ public class TestExecutor {
             Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size()));
 
         Set<Integer> collectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(Constants.ID, collectionIds), Projections.include(ApiCollection.ID, ApiCollection.DESCRIPTION));
-        Map<Integer, String> apiCollectionDescriptionMap = new HashMap<>();
-        for (ApiCollection col : apiCollections) {
-            if (!StringUtils.isEmpty(col.getDescription())) {
-                apiCollectionDescriptionMap.put(col.getId(), col.getDescription());
-            }
-        }
-        TestingConfigurations.getInstance().setApiCollectionDescriptionMap(apiCollectionDescriptionMap);
+        Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
+        ApiCollectionsDao.instance.findAll(Filters.in(Constants.ID, collectionIds), Projections.include(ApiCollection.ID, ApiCollection.DESCRIPTION, ApiCollection.TAGS_STRING))
+                .forEach(col -> apiCollectionMap.put(col.getId(), col));
+        TestingConfigurations.getInstance().setApiCollectionMap(apiCollectionMap);
 
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
         TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
@@ -1184,9 +1180,16 @@ public class TestExecutor {
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, SampleMessageStore sampleMessageStore, AuthMechanism attackerAuthMechanism, List<CustomAuthType> customAuthTypes,
                                        ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, RawApi rawApi) {
 
-
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
+
+        ApiCollection apiCollection = TestingConfigurations.getInstance().getApiCollectionMap().get(apiInfoKey.getApiCollectionId());
+        if (apiCollection != null && apiCollection.isCopilotBotCollection() &&
+                apiInfoKey.getUrl().startsWith(Constants.AKTO_COPILOT_CONVERSATION_URL_PREFIX)) {
+            return Utils.generateFailedRunResultForMessage(testRunId, apiInfoKey, testSuperType, testSubType,
+                    testRunResultSummaryId, Collections.singletonList(rawApi.getOriginalMessage()),
+                    TestResult.TestError.SKIPPING_COPILOT_INTERNAL_ENDPOINT.getMessage());
+        }
 
         int startTime = Context.now();
 
@@ -1223,7 +1226,8 @@ public class TestExecutor {
             varMap.put("wordList_" + key, wordListsMap.get(key));
         }
 
-        String collectionDescription = TestingConfigurations.getInstance().getApiCollectionDescriptionMap().get(apiInfoKey.getApiCollectionId());
+        ApiCollection descCollection = TestingConfigurations.getInstance().getApiCollectionMap().get(apiInfoKey.getApiCollectionId());
+        String collectionDescription = descCollection != null ? descCollection.getDescription() : null;
         if (!StringUtils.isEmpty(collectionDescription)) {
             varMap.put("wordList_data_context", Collections.singletonList(collectionDescription));
         }
