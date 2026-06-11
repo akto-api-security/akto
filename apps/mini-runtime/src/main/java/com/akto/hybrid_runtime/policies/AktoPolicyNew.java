@@ -29,7 +29,7 @@ import static com.akto.hybrid_runtime.APICatalogSync.createUrlTemplate;
 public class AktoPolicyNew {
 
     private List<RuntimeFilter> filters = new ArrayList<>();
-    Map<Integer, ApiInfoCatalog> apiInfoCatalogMap = new HashMap<>();
+    private Map<Integer, ApiInfoCatalog> apiInfoCatalogMap = new HashMap<>();
     boolean processCalledAtLeastOnce = false;
     ApiAccessTypePolicy apiAccessTypePolicy = new ApiAccessTypePolicy(null, null);
     boolean redact = false;
@@ -284,22 +284,12 @@ public class AktoPolicyNew {
         return newPolicyCatalog;
     }
 
-    public void markSkipped(int apiCollectionId, String url, URLMethods.Method method) {
+    public void removeApiInfo(int apiCollectionId, String url, URLMethods.Method method) {
         ApiInfoCatalog catalog = apiInfoCatalogMap.get(apiCollectionId);
         if (catalog == null) return;
-
         URLStatic urlStatic = new URLStatic(url, method);
-        PolicyCatalog pc = catalog.getStrictURLToMethods().get(urlStatic);
-        if (pc != null) {
-            pc.setSeenEarlier(false);
-            return;
-        }
-        for (Map.Entry<URLTemplate, PolicyCatalog> e : catalog.getTemplateURLToMethods().entrySet()) {
-            if (e.getKey().match(urlStatic)) {
-                e.getValue().setSeenEarlier(false);
-                return;
-            }
-        }
+        if (catalog.getStrictURLToMethods().remove(urlStatic) != null) return;
+        catalog.getTemplateURLToMethods().keySet().removeIf(t -> t.match(urlStatic));
     }
 
     public static List<ApiInfo> getUpdates(Map<Integer, ApiInfoCatalog> apiInfoCatalogMap) {

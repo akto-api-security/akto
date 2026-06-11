@@ -11,6 +11,7 @@ import com.akto.dto.type.URLTemplate;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,7 +21,7 @@ public class UsageBillingLimitTest {
 
     private static final int COLLECTION_ID = 42;
 
-    private AktoPolicyNew buildPolicyWithStrictUrl(String url, URLMethods.Method method) {
+    private AktoPolicyNew buildPolicyWithStrictUrl(String url, URLMethods.Method method) throws Exception {
         AktoPolicyNew policy = new AktoPolicyNew();
         ApiInfo apiInfo = new ApiInfo(COLLECTION_ID, url, method);
         PolicyCatalog pc = new PolicyCatalog(apiInfo, new HashMap<>());
@@ -32,46 +33,46 @@ public class UsageBillingLimitTest {
 
         Map<Integer, ApiInfoCatalog> catalogMap = new HashMap<>();
         catalogMap.put(COLLECTION_ID, catalog);
-        policy.apiInfoCatalogMap = catalogMap;
+        setApiInfoCatalogMap(policy, catalogMap);
         return policy;
     }
 
-    /**
-     * When usageLimit=5 and currentUsage=5, usageLeft=0.
-     * The first new URL decrements usageLeft to -1 → updateUsageLeftAndCheckSkip returns true (skip).
-     * markSkipped() is called → api_info write is suppressed.
-     */
+    private static void setApiInfoCatalogMap(AktoPolicyNew policy, Map<Integer, ApiInfoCatalog> map) throws Exception {
+        Field f = AktoPolicyNew.class.getDeclaredField("apiInfoCatalogMap");
+        f.setAccessible(true);
+        f.set(policy, map);
+    }
+
+    private static Map<Integer, ApiInfoCatalog> getApiInfoCatalogMap(AktoPolicyNew policy) throws Exception {
+        Field f = AktoPolicyNew.class.getDeclaredField("apiInfoCatalogMap");
+        f.setAccessible(true);
+        return (Map<Integer, ApiInfoCatalog>) f.get(policy);
+    }
+
     @Test
-    public void testApiInfoNotWrittenWhenLimitExhausted() {
-        // usageLimit=5, currentUsage=5 → usageLeft=0, checkLimit=true
+    public void testApiInfoNotWrittenWhenLimitExhausted() throws Exception {
         SyncLimit syncLimit = new SyncLimit(true, 0);
 
         String url = "/api/users";
         URLMethods.Method method = URLMethods.Method.GET;
         AktoPolicyNew policy = buildPolicyWithStrictUrl(url, method);
 
-        Assertions.assertEquals(1, AktoPolicyNew.getUpdates(policy.apiInfoCatalogMap).size(),
+        Assertions.assertEquals(1, AktoPolicyNew.getUpdates(getApiInfoCatalogMap(policy)).size(),
             "URL seen this cycle should be pending write before limit check");
 
-        // Mirrors APICatalogSync limit-gate logic
         boolean shouldSkip = syncLimit.updateUsageLeftAndCheckSkip();
-        Assertions.assertTrue(shouldSkip, "SyncLimit(checkLimit=true, usageLeft=0) must signal skip on first new URL");
+        Assertions.assertTrue(shouldSkip);
 
         if (shouldSkip) {
-            policy.markSkipped(COLLECTION_ID, url, method);
+            policy.removeApiInfo(COLLECTION_ID, url, method);
         }
 
-        List<ApiInfo> updates = AktoPolicyNew.getUpdates(policy.apiInfoCatalogMap);
-        Assertions.assertEquals(0, updates.size(), "api_info must not be written when STI write is blocked by limit");
+        Assertions.assertEquals(0, AktoPolicyNew.getUpdates(getApiInfoCatalogMap(policy)).size(),
+            "api_info must not be written when STI write is blocked by limit");
     }
 
-    /**
-     * When usageLimit=100 and currentUsage=0, usageLeft=100, checkLimit=true.
-     * updateUsageLeftAndCheckSkip returns false → markSkipped is NOT called → api_info write proceeds.
-     */
     @Test
-    public void testApiInfoWrittenWhenLimitNotExhausted() {
-        // usageLimit=100, currentUsage=0 → usageLeft=100, checkLimit=true
+    public void testApiInfoWrittenWhenLimitNotExhausted() throws Exception {
         SyncLimit syncLimit = new SyncLimit(true, 100);
 
         String url = "/api/products";
@@ -79,23 +80,19 @@ public class UsageBillingLimitTest {
         AktoPolicyNew policy = buildPolicyWithStrictUrl(url, method);
 
         boolean shouldSkip = syncLimit.updateUsageLeftAndCheckSkip();
-        Assertions.assertFalse(shouldSkip, "SyncLimit with 100 usage left must not signal skip");
+        Assertions.assertFalse(shouldSkip);
 
         if (shouldSkip) {
-            policy.markSkipped(COLLECTION_ID, url, method);
+            policy.removeApiInfo(COLLECTION_ID, url, method);
         }
 
-        List<ApiInfo> updates = AktoPolicyNew.getUpdates(policy.apiInfoCatalogMap);
+        List<ApiInfo> updates = AktoPolicyNew.getUpdates(getApiInfoCatalogMap(policy));
         Assertions.assertEquals(1, updates.size(), "api_info must be written when limit is not exhausted");
         Assertions.assertEquals(url, updates.get(0).getId().getUrl());
     }
 
-    /**
-     * checkLimit=false (unlimited plan) → updateUsageLeftAndCheckSkip always returns false.
-     * markSkipped is never called → api_info write proceeds normally.
-     */
     @Test
-    public void testApiInfoWrittenWhenCheckLimitFalse() {
+    public void testApiInfoWrittenWhenCheckLimitFalse() throws Exception {
         SyncLimit syncLimit = new SyncLimit(false, 0);
 
         String url = "/api/orders";
@@ -103,31 +100,24 @@ public class UsageBillingLimitTest {
         AktoPolicyNew policy = buildPolicyWithStrictUrl(url, method);
 
         boolean shouldSkip = syncLimit.updateUsageLeftAndCheckSkip();
-        Assertions.assertFalse(shouldSkip, "checkLimit=false must never signal skip regardless of usageLeft");
+        Assertions.assertFalse(shouldSkip);
 
-        List<ApiInfo> updates = AktoPolicyNew.getUpdates(policy.apiInfoCatalogMap);
-        Assertions.assertEquals(1, updates.size(), "api_info must be written on unlimited plan");
+        Assertions.assertEquals(1, AktoPolicyNew.getUpdates(getApiInfoCatalogMap(policy)).size(),
+            "api_info must be written on unlimited plan");
     }
 
-    /**
-     * markSkipped on a URL that was never registered in apiInfoCatalogMap must not throw.
-     */
     @Test
-    public void testMarkSkippedOnMissingCollectionDoesNotThrow() {
+    public void testMarkSkippedOnMissingCollectionDoesNotThrow() throws Exception {
         SyncLimit syncLimit = new SyncLimit(true, 0);
         AktoPolicyNew policy = new AktoPolicyNew();
-        policy.apiInfoCatalogMap = new HashMap<>();
+        setApiInfoCatalogMap(policy, new HashMap<>());
 
         syncLimit.updateUsageLeftAndCheckSkip();
-        policy.markSkipped(999, "/no/collection", URLMethods.Method.GET);
+        policy.removeApiInfo(999, "/no/collection", URLMethods.Method.GET);
     }
 
-    /**
-     * markSkipped for URL-A must not affect URL-B in the same collection.
-     */
     @Test
-    public void testMarkSkippedDoesNotAffectOtherUrls() {
-        // Only 1 usage left → first new URL is allowed, second is skipped
+    public void testMarkSkippedDoesNotAffectOtherUrls() throws Exception {
         SyncLimit syncLimit = new SyncLimit(true, 1);
 
         AktoPolicyNew policy = new AktoPolicyNew();
@@ -143,28 +133,23 @@ public class UsageBillingLimitTest {
         ApiInfoCatalog catalog = new ApiInfoCatalog(strict, new HashMap<>(), new ArrayList<>());
         Map<Integer, ApiInfoCatalog> catalogMap = new HashMap<>();
         catalogMap.put(COLLECTION_ID, catalog);
-        policy.apiInfoCatalogMap = catalogMap;
+        setApiInfoCatalogMap(policy, catalogMap);
 
-        // /api/a → usageLeft goes 1→0, returns false (keep)
         boolean skipA = syncLimit.updateUsageLeftAndCheckSkip();
         Assertions.assertFalse(skipA);
-        if (skipA) policy.markSkipped(COLLECTION_ID, "/api/a", URLMethods.Method.GET);
+        if (skipA) policy.removeApiInfo(COLLECTION_ID, "/api/a", URLMethods.Method.GET);
 
-        // /api/b → usageLeft goes 0→-1, returns true (skip)
         boolean skipB = syncLimit.updateUsageLeftAndCheckSkip();
         Assertions.assertTrue(skipB);
-        if (skipB) policy.markSkipped(COLLECTION_ID, "/api/b", URLMethods.Method.GET);
+        if (skipB) policy.removeApiInfo(COLLECTION_ID, "/api/b", URLMethods.Method.GET);
 
-        List<ApiInfo> updates = AktoPolicyNew.getUpdates(policy.apiInfoCatalogMap);
+        List<ApiInfo> updates = AktoPolicyNew.getUpdates(getApiInfoCatalogMap(policy));
         Assertions.assertEquals(1, updates.size(), "only the URL within limit should have api_info written");
         Assertions.assertEquals("/api/a", updates.get(0).getId().getUrl());
     }
 
-    /**
-     * Template URL: limit exhausted → markSkipped via concrete URL match → api_info suppressed.
-     */
     @Test
-    public void testApiInfoNotWrittenForTemplateUrlWhenLimitExhausted() {
+    public void testApiInfoNotWrittenForTemplateUrlWhenLimitExhausted() throws Exception {
         SyncLimit syncLimit = new SyncLimit(true, 0);
 
         AktoPolicyNew policy = new AktoPolicyNew();
@@ -186,19 +171,18 @@ public class UsageBillingLimitTest {
 
         Map<Integer, ApiInfoCatalog> catalogMap = new HashMap<>();
         catalogMap.put(COLLECTION_ID, catalog);
-        policy.apiInfoCatalogMap = catalogMap;
+        setApiInfoCatalogMap(policy, catalogMap);
 
-        Assertions.assertEquals(1, AktoPolicyNew.getUpdates(policy.apiInfoCatalogMap).size());
+        Assertions.assertEquals(1, AktoPolicyNew.getUpdates(getApiInfoCatalogMap(policy)).size());
 
         boolean shouldSkip = syncLimit.updateUsageLeftAndCheckSkip();
         Assertions.assertTrue(shouldSkip);
 
         if (shouldSkip) {
-            // APICatalogSync passes getTemplateString() when removing template URLs
-            policy.markSkipped(COLLECTION_ID, urlTemplate.getTemplateString(), method);
+            policy.removeApiInfo(COLLECTION_ID, urlTemplate.getTemplateString(), method);
         }
 
-        Assertions.assertEquals(0, AktoPolicyNew.getUpdates(policy.apiInfoCatalogMap).size(),
+        Assertions.assertEquals(0, AktoPolicyNew.getUpdates(getApiInfoCatalogMap(policy)).size(),
             "template URL api_info must be suppressed when limit is exhausted");
     }
 }
