@@ -8,11 +8,8 @@ import com.akto.util.Constants;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
-/**
- * In-memory transport object for an agentic query record read from Elasticsearch.
- * Not a Mongo entity. No codec registration.
- */
 public class AgentQueryRecord {
 
     private final String docId;
@@ -31,11 +28,10 @@ public class AgentQueryRecord {
     private final boolean isAtlasTraffic;
 
     private static final String HEADER_PREFIX    = "x-akto-installer-";
-    private static final String HEADER_DEVICE_ID = "device_id";      // if applicable
-    private static final String HEADER_USER_EMAIL= "user_email";     // if applicable
-    private static final String HEADER_SESSION_ID= "session_id";
-    private static final String HEADER_TRACE_ID  = "trace_id";
-    private static final String HEADER_SPAN_ID   = "span_id";
+    private static final String HEADER_DEVICE_ID = "device_id";
+    private static final String HEADER_USER_EMAIL = "user_email";
+    private static final String HEADER_SESSION_ID = "akto_session_id";
+    private static final String HEADER_TRACE_ID   = "akto_message_id";
 
     public AgentQueryRecord(String docId, int accountId, String serviceId, String deviceId,
                             String userName, String sessionIdentifier,
@@ -58,21 +54,20 @@ public class AgentQueryRecord {
         this.isAtlasTraffic = isAtlasTraffic;
     }
 
-
-    public String getDocId() { return docId; }
-    public int getAccountId() { return accountId; }
-    public String getServiceId() { return serviceId; }
-    public String getDeviceId() { return deviceId; }
-    public String getUserName() { return userName; }
+    public String getDocId()             { return docId; }
+    public int getAccountId()            { return accountId; }
+    public String getServiceId()         { return serviceId; }
+    public String getDeviceId()          { return deviceId; }
+    public String getUserName()          { return userName; }
     public String getSessionIdentifier() { return sessionIdentifier; }
-    public String getQueryPayload() { return queryPayload; }
-    public String getResponsePayload() { return responsePayload; }
-    public long getTimeStampMs() { return timeStampMs; }
-    public int getInputTokens() { return inputTokens; }
-    public int getOutputTokens() { return outputTokens; }
-    public String getTraceId() { return traceId; }
-    public String getSpanId() { return spanId; }
-    public boolean getIsAtlasTraffic() { return isAtlasTraffic; }
+    public String getQueryPayload()      { return queryPayload; }
+    public String getResponsePayload()   { return responsePayload; }
+    public long getTimeStampMs()         { return timeStampMs; }
+    public int getInputTokens()          { return inputTokens; }
+    public int getOutputTokens()         { return outputTokens; }
+    public String getTraceId()           { return traceId; }
+    public String getSpanId()            { return spanId; }
+    public boolean getIsAtlasTraffic()   { return isAtlasTraffic; }
 
     public static AgentQueryRecord fromHttpResponseParams(
             HttpResponseParams p,
@@ -85,13 +80,11 @@ public class AgentQueryRecord {
 
         Map<String, List<String>> headers = p.getRequestParams().getHeaders();
         String source = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_SOURCE) : null;
-
         boolean isAtlasTraffic = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(source);
 
         String serviceId, deviceId, userName;
 
         if (isAtlasTraffic) {
-            // Atlas traffic: hostname = {device-name}.{agent-name}.{rest-of-host}
             String host = getFirstHeader(headers, "host");
             String[] parts = host != null ? host.split("\\.", 3) : new String[0];
             deviceId  = parts.length >= 1 ? parts[0] : null;
@@ -102,14 +95,12 @@ public class AgentQueryRecord {
             userName = deviceUserMap.get(deviceId);
 
         } else if (tagsMap != null && tagsMap.containsKey(Constants.AKTO_GEN_AI_TAG)) {
-            // Argus traffic: no device concept
             deviceId  = null;
             serviceId = getFirstHeader(headers, "host");
             Organization org = OrgUtils.getOrganizationCached(Context.getActualAccountId());
             userName  = org != null ? org.getAdminEmail() : null;
 
         } else {
-            // All other agentic traffic: header-based extraction
             serviceId = getFirstHeader(headers, "host");
             deviceId  = getFirstHeader(headers, HEADER_PREFIX + HEADER_DEVICE_ID);
             userName  = getFirstHeader(headers, HEADER_PREFIX + HEADER_USER_EMAIL);
@@ -117,10 +108,12 @@ public class AgentQueryRecord {
 
         String sessionIdentifier = getFirstHeader(headers, HEADER_PREFIX + HEADER_SESSION_ID);
         String traceId           = getFirstHeader(headers, HEADER_PREFIX + HEADER_TRACE_ID);
-        String spanId            = getFirstHeader(headers, HEADER_PREFIX + HEADER_SPAN_ID);
+        String spanId = "span_" + UUID.randomUUID().toString();
 
-        int consumedSize = p.getPayload() != null ? p.getPayload().length() : 0;
-        int inputTokens = p.getRequestParams().getPayload() != null ?  p.getRequestParams().getPayload().length() : 0;
+        String requestPayload  = p.getRequestParams().getPayload();
+        String responsePayload = p.getPayload() != null ? p.getPayload() : "";
+        int inputTokens  = requestPayload  != null ? requestPayload.length()  : 0;
+        int outputTokens = responsePayload.length();
 
         return new AgentQueryRecord(
                 null,
@@ -129,18 +122,16 @@ public class AgentQueryRecord {
                 deviceId,
                 userName,
                 sessionIdentifier,
-                p.getRequestParams().getPayload(),
-                p.getPayload() != null ? p.getPayload() : "",
+                requestPayload,
+                responsePayload,
                 Context.now() * 1000L,
                 inputTokens,
-                consumedSize,
+                outputTokens,
                 traceId,
                 spanId,
                 isAtlasTraffic
         );
     }
-
-
 
     private static String getFirstHeader(Map<String, List<String>> headers, String name) {
         if (headers == null) return null;
