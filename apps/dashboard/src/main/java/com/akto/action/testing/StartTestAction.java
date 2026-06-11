@@ -210,16 +210,22 @@ public class StartTestAction extends UserAction {
                     addActionError("APIs list can't be empty");
                     return null;
                 }
-                Set<Integer> customCollectionIds = this.apiInfoKeyList.stream()
+                List<Integer> customCollectionIds = this.apiInfoKeyList.stream()
                         .map(ApiInfo.ApiInfoKey::getApiCollectionId)
-                        .collect(Collectors.toSet());
-                if (customCollectionIds.size() == 1) {
-                    int singleCollectionId = customCollectionIds.iterator().next();
-                    ApiCollection singleCol = ApiCollectionsDao.instance.getMeta(singleCollectionId);
-                    if (singleCol != null && singleCol.isCopilotBotCollection() && !singleCol.isCopilotBotPublished()) {
-                        addActionError("Bot is not published. Please publish the bot before running a scan.");
-                        return null;
+                        .distinct().collect(Collectors.toList());
+                // Copilot bot collections that are not published should not be tested,
+                // since the bot endpoints are not active and tests would be meaningless.
+                List<Integer> unpublishedCopilotCollectionIds = Utils.filterUnpublishedCopilotCollections(customCollectionIds);
+                if (!unpublishedCopilotCollectionIds.isEmpty()) {
+                    this.apiInfoKeyList.removeIf(k -> unpublishedCopilotCollectionIds.contains(k.getApiCollectionId()));
+                }
+                if (this.apiInfoKeyList.isEmpty()) {
+                    if (!unpublishedCopilotCollectionIds.isEmpty()) {
+                        addActionError("No APIs available to test. Please publish the Copilot bot before running a scan.");
+                    } else {
+                        addActionError("APIs list can't be empty");
                     }
+                    return null;
                 }
                 testingEndpoints = new CustomTestingEndpoints(apiInfoKeyList);
                 break;
