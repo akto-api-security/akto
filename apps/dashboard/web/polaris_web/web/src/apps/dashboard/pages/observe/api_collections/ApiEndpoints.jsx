@@ -1194,6 +1194,10 @@ function ApiEndpoints(props) {
     const isAgentProxyCollection = Array.isArray(collectionsObj?.envType) &&
         collectionsObj.envType.some(tag => tag.keyName === 'agent-proxy')
 
+    const _tags = collectionsObj?.envType || []
+    const isCopilotCollection = _tags.some(t => t.keyName === 'source' && t.value === 'COPILOT_STUDIO') && _tags.some(t => t.keyName === 'bot-name')
+    const isCopilotUnpublished = isCopilotCollection && !_tags.some(t => t.keyName === 'bot-published-state')
+
     const isApiGroup = collectionsObj?.type === 'API_GROUP'
     const isHostnameCollection = hostNameMap[collectionsObj?.id] !== null && hostNameMap[collectionsObj?.id] !== undefined
     const collectionTypeListComp = getCollectionTypeListComp(collectionsObj)
@@ -1400,6 +1404,7 @@ function ApiEndpoints(props) {
                     disabled={showEmptyScreen || window.USER_ROLE === "GUEST" || (collectionsObj?.isOutOfTestingScope || false)}
                     selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
                     preActivator={false}
+                    warningMessage={isCopilotUnpublished ? "Bot is not published. Please publish the bot in Copilot Studio before running a scan." : null}
                 />
             )}
             <SelectSource
