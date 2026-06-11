@@ -1,5 +1,3 @@
-import func from "@/util/func";
-
 export function parsePromptText(queryPayload) {
     if (!queryPayload) return "";
     try {
@@ -97,108 +95,70 @@ export function truncate(str, len = 80) {
     return str.length > len ? str.substring(0, len) + "…" : str;
 }
 
-// Shared filterable identity columns (User + Service) used in both prompt and message tables.
-// filterAllowed: true — populated with values from fetchFilterChoices() by the view component.
-const IDENTITY_FILTER_COLS = [
-    {
-        headerName: "User",
-        field: "userName",
-        width: 120,
-        filterAllowed: true,
-        filter: "agSetColumnFilter",
-        sortable: true,
-    },
-    {
-        headerName: "Service",
-        field: "serviceId",
-        width: 140,
-        filterAllowed: true,
-        filter: "agSetColumnFilter",
-        sortable: true,
-    },
-];
+// Human-readable duration from a millisecond span.
+export function formatDurationMs(ms) {
+    const n = Number(ms) || 0;
+    if (n <= 0) return "-";
+    if (n >= 3600000) return (n / 3600000).toFixed(1).replace(/\.0$/, "") + " h";
+    if (n >= 60000) return (n / 60000).toFixed(1).replace(/\.0$/, "") + " m";
+    if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + " s";
+    return n + " ms";
+}
 
-const NO_FILTER = { filterAllowed: false, filter: false, sortable: false };
+// Compact token / count formatting (e.g. 356678 → 356.7k).
+export function formatCompact(n) {
+    const v = Number(n) || 0;
+    if (v >= 1e9) return (v / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+    if (v >= 1e6) return (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+    if (v >= 1e3) return (v / 1e3).toFixed(1).replace(/\.0$/, "") + "k";
+    return String(v);
+}
 
-const TIME_COL = (field) => ({
-    headerName: "Time",
-    field,
-    width: 160,
-    valueFormatter: (p) => func.prettifyEpoch(Math.floor((p.value || 0) / 1000)),
-    sort: "desc",
-    ...NO_FILTER,
-});
+// Polaris Text `color` token for a latency/duration magnitude.
+export function latencyColor(ms) {
+    const n = Number(ms) || 0;
+    if (n >= 60000) return "critical";
+    if (n >= 20000) return "warning";
+    return undefined; // default text color
+}
 
-// Used in PromptsView (flat span-level prompt table).
-export const PROMPT_COLUMN_DEFS = [
-    {
-        headerName: "Prompt",
-        field: "_promptText",
-        flex: 1,
-        valueFormatter: (p) => truncate(p.value || "", 100),
-        ...NO_FILTER,
-    },
-    ...IDENTITY_FILTER_COLS,
-    {
-        headerName: "Tokens in/out",
-        field: "_tokens",
-        width: 115,
-        ...NO_FILTER,
-    },
-    TIME_COL("timestamp"),
-];
 
-// Used in MessagesView (trace-grouped message table).
-export const MESSAGE_COLUMN_DEFS_DETAIL = [
-    {
-        headerName: "Message",
-        field: "_promptText",
-        flex: 1,
-        valueFormatter: (p) => truncate(p.value || "", 110),
-        ...NO_FILTER,
-    },
-    ...IDENTITY_FILTER_COLS,
-    {
-        headerName: "Spans",
-        field: "spanCount",
-        width: 90,
-        ...NO_FILTER,
-    },
-    {
-        headerName: "Tokens in",
-        field: "_inputTokens",
-        width: 110,
-        ...NO_FILTER,
-    },
-    {
-        headerName: "Tokens out",
-        field: "_outputTokens",
-        width: 110,
-        ...NO_FILTER,
-    },
-    TIME_COL("latestTimestamp"),
-];
+// AG Grid column definitions for the LLM tables live in columns.jsx (they reference
+// React cell renderers). This file keeps only payload parsing + formatting helpers
+// and the span-kind maps used by SpansPanel.
 
-// Used in SessionsView (per-session drill-down message list).
-export const MESSAGE_COLUMN_DEFS = [
-    {
-        headerName: "Message",
-        field: "_promptText",
-        flex: 1,
-        valueFormatter: (p) => truncate(p.value || "", 110),
-    },
-    {
-        headerName: "Spans",
-        field: "spanCount",
-        width: 90,
-    },
-    {
-        headerName: "Tokens",
-        field: "totalTokens",
-        width: 110,
-    },
-    TIME_COL("latestTimestamp"),
-];
+// Span type → short label for the message-preview badge.
+export const SPAN_TYPE_LABEL = {
+    llm: "LLM", tool: "Tool", bash: "Bash", read: "Read", edit: "Edit",
+    search: "Search", mcp: "MCP", retrieval: "Retrieval", guardrail: "Guardrail", default: "Span",
+};
+
+// Classify a span (enriched row) into one of the SPAN_TYPE_* keys from its parsed text.
+export function classifySpan(span) {
+    const text = (span && (span._promptText || "")) + "";
+    const m = text.match(/^\[(\w+)\]/); // tool spans render as "[Bash] {...}"
+    if (m) {
+        const tool = m[1].toLowerCase();
+        if (tool.includes("bash")) return "bash";
+        if (tool.includes("read")) return "read";
+        if (tool.includes("edit") || tool.includes("write")) return "edit";
+        if (tool.includes("glob") || tool.includes("grep") || tool.includes("search")) return "search";
+        if (tool.includes("mcp")) return "mcp";
+        return "tool";
+    }
+    if (span && (span._inputTokens || span._outputTokens)) return "llm";
+    return "default";
+}
+
+// Duration → colour ramp (fast → slow). Green for quick spans, through amber, to red
+// for the slowest. `maxMs` is the slowest span in the trace, so the ramp is relative.
+const DURATION_RAMP = ["#3BAFA4", "#5FB85B", "#EAB308", "#F59E0B", "#F97316", "#DC2626"];
+export function durationColor(ms, maxMs) {
+    const max = Number(maxMs) || 1;
+    const frac = Math.min(1, Math.max(0, (Number(ms) || 0) / max));
+    const idx = Math.min(DURATION_RAMP.length - 1, Math.floor(frac * DURATION_RAMP.length));
+    return DURATION_RAMP[idx];
+}
 
 export const SPAN_KIND_TONE = {
     agent: "info",

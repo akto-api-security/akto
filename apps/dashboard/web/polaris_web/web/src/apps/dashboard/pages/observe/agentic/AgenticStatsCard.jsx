@@ -79,9 +79,9 @@ export default function AgenticStatsCard({
                     )}
                 </HorizontalStack>
                 <VerticalStack gap="2">
-                    {total > 0 && <SegmentBar segments={breakdown} />}
+                    {breakdown.length > 0 && <SegmentBar segments={breakdown} />}
                     {breakdown.length > 0 && (
-                        <HorizontalStack gap="2" wrap={false}>
+                        <HorizontalStack gap="2" wrap>
                             {breakdown.map((b) => {
                                 const active = activeFilter?.has(b.key ?? b.label);
                                 return (
