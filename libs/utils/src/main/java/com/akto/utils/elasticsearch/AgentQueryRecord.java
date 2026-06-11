@@ -15,11 +15,6 @@ import java.util.Map;
  */
 public class AgentQueryRecord {
 
-    private static final String HEADER_PREFIX    = "x-akto-installer-";
-    private static final String HEADER_USER_EMAIL  = "user_email";
-    private static final String HEADER_SESSION_ID  = "session_id";
-    private static final String HEADER_DEVICE_ID   = "device_id";
-
     private final String docId;
     private final int accountId;
     private final String serviceId;
@@ -31,11 +26,22 @@ public class AgentQueryRecord {
     private final long timeStampMs;
     private final int inputTokens;
     private final int outputTokens;
+    private final String traceId;
+    private final String spanId;
+    private final boolean isAtlasTraffic;
+
+    private static final String HEADER_PREFIX    = "x-akto-installer-";
+    private static final String HEADER_DEVICE_ID = "device_id";      // if applicable
+    private static final String HEADER_USER_EMAIL= "user_email";     // if applicable
+    private static final String HEADER_SESSION_ID= "session_id";
+    private static final String HEADER_TRACE_ID  = "trace_id";
+    private static final String HEADER_SPAN_ID   = "span_id";
 
     public AgentQueryRecord(String docId, int accountId, String serviceId, String deviceId,
                             String userName, String sessionIdentifier,
                             String queryPayload, String responsePayload,
-                            long timeStampMs, int inputTokens, int outputTokens) {
+                            long timeStampMs, int inputTokens, int outputTokens,
+                            String traceId, String spanId, boolean isAtlasTraffic) {
         this.docId = docId;
         this.accountId = accountId;
         this.serviceId = serviceId;
@@ -47,7 +53,11 @@ public class AgentQueryRecord {
         this.timeStampMs = timeStampMs;
         this.inputTokens = inputTokens;
         this.outputTokens = outputTokens;
+        this.traceId = traceId;
+        this.spanId = spanId;
+        this.isAtlasTraffic = isAtlasTraffic;
     }
+
 
     public String getDocId() { return docId; }
     public int getAccountId() { return accountId; }
@@ -60,22 +70,27 @@ public class AgentQueryRecord {
     public long getTimeStampMs() { return timeStampMs; }
     public int getInputTokens() { return inputTokens; }
     public int getOutputTokens() { return outputTokens; }
+    public String getTraceId() { return traceId; }
+    public String getSpanId() { return spanId; }
+    public boolean getIsAtlasTraffic() { return isAtlasTraffic; }
 
-    /**
-     * Returns null for Atlas traffic when the device name is absent from deviceUserMap,
-     * signalling the caller to skip persisting the record.
-     */
     public static AgentQueryRecord fromHttpResponseParams(
             HttpResponseParams p,
             Map<String, String> tagsMap,
             Map<String, String> deviceUserMap) {
 
+        if (p == null || p.getRequestParams() == null) {
+            return null;
+        }
+
         Map<String, List<String>> headers = p.getRequestParams().getHeaders();
         String source = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_SOURCE) : null;
 
+        boolean isAtlasTraffic = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(source);
+
         String serviceId, deviceId, userName;
 
-        if (Constants.AI_AGENT_SOURCE_ENDPOINT.equals(source)) {
+        if (isAtlasTraffic) {
             // Atlas traffic: hostname = {device-name}.{agent-name}.{rest-of-host}
             String host = getFirstHeader(headers, "host");
             String[] parts = host != null ? host.split("\\.", 3) : new String[0];
@@ -101,6 +116,11 @@ public class AgentQueryRecord {
         }
 
         String sessionIdentifier = getFirstHeader(headers, HEADER_PREFIX + HEADER_SESSION_ID);
+        String traceId           = getFirstHeader(headers, HEADER_PREFIX + HEADER_TRACE_ID);
+        String spanId            = getFirstHeader(headers, HEADER_PREFIX + HEADER_SPAN_ID);
+
+        int consumedSize = p.getPayload() != null ? p.getPayload().length() : 0;
+        int inputTokens = p.getRequestParams().getPayload() != null ?  p.getRequestParams().getPayload().length() : 0;
 
         return new AgentQueryRecord(
                 null,
@@ -112,10 +132,15 @@ public class AgentQueryRecord {
                 p.getRequestParams().getPayload(),
                 p.getPayload() != null ? p.getPayload() : "",
                 Context.now() * 1000L,
-                0,
-                0
+                inputTokens,
+                consumedSize,
+                traceId,
+                spanId,
+                isAtlasTraffic
         );
     }
+
+
 
     private static String getFirstHeader(Map<String, List<String>> headers, String name) {
         if (headers == null) return null;
