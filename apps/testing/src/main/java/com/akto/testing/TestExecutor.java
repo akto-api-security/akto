@@ -1186,6 +1186,7 @@ public class TestExecutor {
         ApiCollection apiCollection = TestingConfigurations.getInstance().getApiCollectionMap().get(apiInfoKey.getApiCollectionId());
         if (apiCollection != null && apiCollection.isCopilotBotCollection() &&
                 apiInfoKey.getUrl().startsWith(Constants.AKTO_COPILOT_CONVERSATION_URL_PREFIX)) {
+            loggerMaker.infoAndAddToDb("Skipping test for Copilot Studio endpoint already covered: " + apiInfoKey);
             return Utils.generateFailedRunResultForMessage(testRunId, apiInfoKey, testSuperType, testSubType,
                     testRunResultSummaryId, Collections.singletonList(rawApi.getOriginalMessage()),
                     TestResult.TestError.SKIPPING_COPILOT_INTERNAL_ENDPOINT.getMessage());
