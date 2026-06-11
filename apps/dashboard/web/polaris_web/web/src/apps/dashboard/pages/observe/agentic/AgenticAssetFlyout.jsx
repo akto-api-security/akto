@@ -56,7 +56,7 @@ function DevicesTab({ asset, assetDevices = {} }) {
             searchPlaceholder="Search devices..."
             pagination
             paginationPageSize={20}
-            sideBar
+            sideBar={{ toolPanels: ["columns", "filters"], defaultToolPanel: null }}
             domLayout="normal"
         />
     );
@@ -84,6 +84,7 @@ export default function AgenticAssetFlyout({
     agenticTreeData = [],
     agenticFlatData = [],
     assetDevices = {},
+    collections = [],
 }) {
     const [selectedTab,    setSelectedTab]    = useState(0);
     const [topNav,         setTopNav]         = useState(null);
@@ -226,7 +227,7 @@ export default function AgenticAssetFlyout({
                         />
                     </div>
                 )}
-                {selectedTab === 2 && <ViolationsTab asset={asset} />}
+                {selectedTab === 2 && <ViolationsTab asset={asset} collections={collections} />}
                 {selectedTab === 3 && <DevicesTab asset={asset} assetDevices={assetDevices} />}
             </Box>
         </AgenticFlyoutShell>

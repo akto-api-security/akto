@@ -38,6 +38,13 @@ export function getRiskStatus(score) {
     return undefined;
 }
 
+function deviceServiceKey(hostName) {
+    if (!hostName) return null;
+    const parts = hostName.split(".");
+    if (parts.length < 2) return null;
+    return parts[0] + "\0" + parts[parts.length - 1];
+}
+
 // Human label derived from the bucket — no duplicated thresholds.
 export function getRiskLabel(score) {
     return `${func.toSentenceCase(getRiskLevel(score))} Risk`;
@@ -617,32 +624,35 @@ export function buildDeviceEndpointsPageData(
     // Sparklines — cumulative, same window as the OS trend
     const endpointBucket  = cumulativeByMonth(deviceFirstSeenItems, getTs, startTimestamp, endTimestamp);
     const userBucket      = cumulativeByMonth(userFirstSeenItems,   (d) => d.ts, startTimestamp, endTimestamp);
-    // Violations: per-month count over the selected window. Count ONLY rows whose
-    // apiCollectionId belongs to an agentic device collection — the SAME rows that build
-    // totalViolations (46). Counting all raw violationRows would inflate to the full feed.
     const violationBucket = (() => {
-        const agenticCollectionIds = new Set(Object.keys(collectionIdToDevice).map(Number));
-        const relevantRows = violationRows.filter((v) => agenticCollectionIds.has(Number(v.apiCollectionId)));
-        const getViolTs = (v) => v.timeEpoch || 0;
-        const dataMin = earliestTs([{ items: relevantRows, getTs: getViolTs }]);
-        const slots = buildWindowSlots(startTimestamp, endTimestamp, dataMin);
-        const n = slots.length;
-        const counts = new Array(n).fill(0);
-        relevantRows.forEach((v) => {
-            const ts = getViolTs(v);
-            if (!ts || ts <= 0 || ts < slots[0].boundary) return;
-            let idx = -1;
-            for (let i = 0; i < n; i++) { if (ts >= slots[i].boundary) idx = i; }
-            if (idx >= 0) counts[idx]++;
+        const agenticHosts = new Set();
+        const looseAgenticHosts = new Set();
+        Object.keys(violationsByCollectionId).forEach((collId) => {
+            const coll = agenticCollections.find((c) => String(c.id) === String(collId));
+            if (coll && coll.hostName) {
+                agenticHosts.add(coll.hostName);
+                const lk = deviceServiceKey(coll.hostName);
+                if (lk) looseAgenticHosts.add(lk);
+            }
         });
-        return { counts };
+
+        const filtered = violationRows.filter(
+            (v) => v.host && v.timeEpoch && (agenticHosts.has(v.host) || looseAgenticHosts.has(deviceServiceKey(v.host)))
+        );
+        return cumulativeByMonth(filtered, (v) => v.timeEpoch, startTimestamp, endTimestamp);
     })();
 
-    // Delta over the selected window: last cumulative point minus first cumulative point.
-    // Positive = growth, negative = (only possible if data shifts) reduction.
+    const violCounts = (() => {
+        const c = violationBucket.counts;
+        if (!c.length || totalViolations == null) return c;
+        const diff = totalViolations - (c[c.length - 1] || 0);
+        if (diff === 0) return c;
+        return c.map(v => Math.max(0, v + diff));
+    })();
+
     function windowDelta(counts) {
         if (!counts || counts.length < 2) return 0;
-        return (counts[counts.length - 1] || 0) - (counts[0] || 0);
+        return Math.max(0, (counts[counts.length - 1] || 0) - (counts[0] || 0));
     }
 
     const summary = {
@@ -651,10 +661,9 @@ export function buildDeviceEndpointsPageData(
         totalViolations,
         deviceCount,
         monthLabels,
-        deltaEndpoints:  windowDelta(endpointBucket.counts),
-        deltaUsers:      windowDelta(userBucket.counts),
-        // Violations delta = totalViolations itself (the number shown is already period-filtered)
-        deltaViolations: violationBucket.counts.reduce((a, b) => a + b, 0),
+        deltaEndpoints:  Math.max(0, windowDelta(endpointBucket.counts)),
+        deltaUsers:      Math.max(0, windowDelta(userBucket.counts)),
+        deltaViolations: windowDelta(violCounts),
         violationsBySeverity: [
             { name: "Critical", y: violationsBySeverity.critical, color: "#DC2626" },
             { name: "High", y: violationsBySeverity.high, color: "#F97316" },
@@ -669,7 +678,7 @@ export function buildDeviceEndpointsPageData(
         statSparklines: {
             endpoints:  endpointBucket.counts,
             users:      userBucket.counts,
-            violations: violationBucket.counts,
+            violations: violCounts,
         },
     };
 

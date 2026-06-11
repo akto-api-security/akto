@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider } from "@shopify/polaris";
+import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider, Badge } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AgenticFlyoutShell from "./AgenticFlyoutShell";
@@ -9,7 +9,8 @@ import { TypeBadge, SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import AssetTopologyGraph from "./AssetTopologyGraph";
 import { RiskFactorRow } from "./RiskFactorRow";
 import DetailGrid from "./DetailGrid";
-import agenticObserveApi, { buildAgenticObserveChatMetadata } from "./agenticObserveApi";
+import { buildAgenticObserveChatMetadata, fetchAgenticViolations, openViolationInThreatActivity, deviceServiceKey } from "./agenticObserveApi";
+import func from "@/util/func";
 import "../../../components/layouts/style.css";
 
 // ─── Risk factor computation ───────────────────────────────────────────────────
@@ -104,9 +105,11 @@ function ViolTitleCellRenderer({ data }) {
     );
 }
 
-function ViolAgentCellRenderer({ data }) {
-    if (!data) return null;
-    return <TypeBadge type={data.agentType} />;
+function ViolStatusCellRenderer({ data }) {
+    if (!data?.status) return null;
+    const s = data.status.toUpperCase();
+    const statusMap = { ACTIVE: "success", UNDER_REVIEW: "warning", IGNORED: "subdued", TRAINING: "info" };
+    return <Badge status={statusMap[s] || "default"} size="small">{func.toSentenceCase(s)}</Badge>;
 }
 
 // ─── Column definitions ───────────────────────────────────────────────────────
@@ -146,10 +149,11 @@ function buildAgentsColDefs(agentRiskData) {
 const SEVERITY_ORDER = { low: 1, medium: 2, high: 3, critical: 4 };
 
 const VIOLATIONS_COL_DEFS = [
-    { field: "time",     headerName: "Time",               width: 120, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.timeEpoch || 0) - (nodeB?.data?.timeEpoch || 0) },
-    { field: "title",    headerName: "Violation",          flex: 1, minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "severity", headerName: "Severity",           width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, comparator: (a, b) => (SEVERITY_ORDER[a] || 0) - (SEVERITY_ORDER[b] || 0) },
-    { field: "agent",    headerName: "Agentic Component",  width: 200, cellRenderer: ViolAgentCellRenderer, cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL" })[p.data?.agentType] || "", cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "time",     headerName: "Time",      width: 120, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.timeEpoch || 0) - (nodeB?.data?.timeEpoch || 0) },
+    { field: "title",    headerName: "Violation", flex: 1, minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "severity", headerName: "Severity",  width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, comparator: (a, b) => (SEVERITY_ORDER[a] || 0) - (SEVERITY_ORDER[b] || 0) },
+    { field: "actor",    headerName: "Actor",     width: 130, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, valueFormatter: p => p.value || "-", cellStyle: { display: "flex", alignItems: "center", fontSize: 12 } },
+    { field: "status",   headerName: "Status",    width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolStatusCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
 ];
 
 const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
@@ -343,36 +347,39 @@ function AgenticsTab({ agents, onAgentClick, agentRiskData = {} }) {
             pagination
             paginationPageSize={20}
             paginationPageSizeSelector={[20, 50, 100]}
-            sideBar={{ toolPanels: ["columns", "filters"] }}
+            sideBar={{ toolPanels: ["columns", "filters"], defaultToolPanel: null }}
             domLayout="normal" />
     );
 }
 
 // ─── Violations tab ───────────────────────────────────────────────────────────
 
-function ViolationsTab({ device }) {
+function ViolationsTab({ hostNames = [] }) {
     const [violations, setViolations] = useState([]);
 
     useEffect(() => {
-        if (!device?.path?.[0]) {
-            setViolations([]);
-            return;
-        }
+        if (!hostNames.length) { setViolations([]); return; }
         let cancelled = false;
-        (async () => {
-            try {
-                const rows = await agenticObserveApi.fetchAgenticViolations({ deviceId: device.path[0] });
-                if (!cancelled) setViolations(rows);
-            } catch {
+        const hostSet = new Set(hostNames);
+        const looseHostSet = new Set(hostNames.map(h => deviceServiceKey(h)).filter(Boolean));
+        fetchAgenticViolations({})
+            .then((rows) => {
+                if (cancelled) return;
+                const filtered = rows.filter(r => hostSet.has(r.host) || looseHostSet.has(deviceServiceKey(r.host)));
+                setViolations(filtered.map((r) => ({
+                    ...r,
+                    time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
+                })));
+            })
+            .catch(() => {
                 if (!cancelled) setViolations([]);
-            }
-        })();
+            });
         return () => { cancelled = true; };
-    }, [device?.path?.[0]]);
+    }, [hostNames.join(",")]);
 
     const handleViolationClick = useCallback((e) => {
         if (!e.data) return;
-        window.open("/dashboard/guardrails/activity", "_blank");
+        openViolationInThreatActivity(e.data);
     }, []);
 
     if (violations.length === 0) {
@@ -399,14 +406,14 @@ function ViolationsTab({ device }) {
             pagination
             paginationPageSize={20}
             paginationPageSizeSelector={[20, 50, 100]}
-            sideBar={{ toolPanels: ["columns", "filters"] }}
+            sideBar={{ toolPanels: ["columns", "filters"], defaultToolPanel: null }}
             domLayout="normal" />
     );
 }
 
 // ─── Main DeviceFlyout ────────────────────────────────────────────────────────
 
-export default function DeviceFlyout({ device, agents, show, onClose, onAgentClick, agentRiskData = {} }) {
+export default function DeviceFlyout({ device, agents, show, onClose, onAgentClick, agentRiskData = {}, deviceHostNames = [] }) {
     const [selectedTab, setSelectedTab] = useState(0);
 
     // Minimal identity only — the MCP agent resolves this device's collections and fetches
@@ -456,7 +463,7 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
             <Box padding="2" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
                 {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} onTabChange={setSelectedTab} />}
                 {selectedTab === 1 && <AgenticsTab agents={agents || []} onAgentClick={onAgentClick} agentRiskData={agentRiskData} />}
-                {selectedTab === 2 && <ViolationsTab device={device} agents={agents} />}
+                {selectedTab === 2 && <ViolationsTab hostNames={deviceHostNames} />}
             </Box>
         </AgenticFlyoutShell>
     );
