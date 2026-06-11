@@ -344,6 +344,7 @@ public class HttpCallParser {
                     && !source.equals(Constants.AI_AGENT_SOURCE_SNOWFLAKE)
                     && !source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)
                     && !source.equals(Constants.AI_AGENT_SOURCE_ENDPOINT)
+                    && !source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK)
                     )) {
                 // Not AI agent traffic, return base hostname
                 return baseHostname;
@@ -376,6 +377,10 @@ public class HttpCallParser {
                 if(Constants.AI_AGENT_CONNECTOR_SENTINEL.equals(connector)) {
                     return botName + "." + appName;
                 }
+            }
+
+            if (source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK)){
+                return botName;
             }
             // Reconstruct full hostname: bot-name.base-hostname
             return botName + "." + baseHostname;
