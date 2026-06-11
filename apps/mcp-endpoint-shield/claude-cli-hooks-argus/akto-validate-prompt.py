@@ -30,7 +30,7 @@ console_handler.setLevel(logging.ERROR)
 logger.addHandler(console_handler)
 
 AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
-AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
+AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
 AKTO_HOST = os.getenv("AKTO_HOST", "https://api.anthropic.com")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
@@ -72,8 +72,8 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         logger.debug(f"Request payload: {json.dumps(payload)}")
 
     headers = {"Content-Type": "application/json"}
-    if AKTO_TOKEN:
-        headers["authorization"] = AKTO_TOKEN
+    if AKTO_API_TOKEN:
+        headers["Authorization"] = AKTO_API_TOKEN
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),

@@ -40,7 +40,7 @@ AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "codex_cli")
-AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
+AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_prompt_warn_pending.json")
 
@@ -94,8 +94,8 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
 
     headers = {"Content-Type": "application/json"}
-    if AKTO_TOKEN:
-        headers["authorization"] = AKTO_TOKEN
+    if AKTO_API_TOKEN:
+        headers["Authorization"] = AKTO_API_TOKEN
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
