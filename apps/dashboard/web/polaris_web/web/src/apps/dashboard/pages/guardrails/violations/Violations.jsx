@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useReducer, useState } from "react";
 import { produce } from "immer";
 import {
-    Avatar,
     Badge,
     Box,
     Card,
@@ -18,8 +17,8 @@ import DonutChart from "@/apps/dashboard/components/shared/DonutChart";
 import SmoothAreaChart from "@/apps/dashboard/pages/dashboard/new_components/SmoothChart";
 import AgenticStatsCard from "@/apps/dashboard/pages/observe/agentic/AgenticStatsCard";
 import AgenticTopListCard from "@/apps/dashboard/pages/observe/agentic/AgenticTopListCard";
-import { SeverityBadge } from "@/apps/dashboard/pages/observe/agentic/AgenticCellRenderers";
 import AssetIcon from "@/apps/dashboard/pages/observe/agentic/AssetIcon";
+import observeFunc from "@/apps/dashboard/pages/observe/transform";
 import func from "@/util/func";
 import values from "@/util/values";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
@@ -27,6 +26,7 @@ import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter
 import ViolationFlyout from "./ViolationFlyout";
 import {
     OPEN_VIOLATIONS_SUMMARY,
+    SPARKLINE_LABELS,
     TOP_POLICIES,
     TOP_USERS,
     TOTAL_VIOLATIONS_SUMMARY,
@@ -41,7 +41,7 @@ const TYPE_CLASS_MAP = {
     Skill: "agentic-type-SKILL",
     Config: "agentic-type-CONFIG",
     "Tool Call": "agentic-type-TOOL",
-    LLMs: "agentic-type-LLMS",
+    LLM: "agentic-type-LLMS",
 };
 
 // ─── Cell renderers ─────────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ function DetectedCellRenderer({ value }) {
 
 function ViolationCellRenderer({ value }) {
     if (!value) return null;
-    return <Text variant="bodyMd" fontWeight="medium" truncate>{value}</Text>;
+    return <Text variant="bodySm" fontWeight="medium" truncate>{value}</Text>;
 }
 
 function TypeCellRenderer({ value }) {
@@ -85,9 +85,16 @@ function AssetCellRenderer({ value, data }) {
     );
 }
 
+function PolicyCellRenderer({ value }) {
+    if (!value) return null;
+    return <Text variant="bodySm" truncate>{value}</Text>;
+}
+
 function SeverityCellRenderer({ value }) {
     if (!value) return null;
-    return <SeverityBadge severity={value} />;
+    const sev = String(value).toUpperCase();
+    const label = sev.charAt(0) + sev.slice(1).toLowerCase();
+    return <Badge size="small" status={observeFunc.getColor(sev)}>{label}</Badge>;
 }
 
 function UserCellRenderer({ value, data }) {
@@ -170,6 +177,13 @@ const COL_DEFS = [
         filter: "agSetColumnFilter",
         cellRenderer: ActionCellRenderer,
     },
+    {
+        field: "policyName",
+        headerName: "Policy Triggered",
+        minWidth: 160,
+        filter: "agSetColumnFilter",
+        cellRenderer: PolicyCellRenderer,
+    },
 ];
 
 const AUTO_SIZE_STRATEGY = { type: "fitCellContents" };
@@ -181,10 +195,11 @@ function buildTopListRows(items) {
         id: item.id,
         name: item.name,
         type: item.type,
+        os: item.os,
         renderValue: () => (
             <HorizontalStack gap="3" blockAlign="center" align="end" wrap={false}>
                 <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>
-                <SmoothAreaChart tickPositions={item.sparkline} color="#EF4444" height={28} width={90} enableHover />
+                <SmoothAreaChart tickPositions={item.sparkline} color="#EF4444" height={28} width={90} labels={SPARKLINE_LABELS} enableHover />
             </HorizontalStack>
         ),
     }));
@@ -192,7 +207,17 @@ function buildTopListRows(items) {
 
 // ─── Dashboard summary section ──────────────────────────────────────────────────
 
-function ViolationsDashboard({ severityFilter, onSeverityFilter }) {
+function ViolationsDashboard({ severityFilter, onSeverityFilter, policyFilter, onPolicyFilter, userFilter, onUserFilter }) {
+    const policyRows = buildTopListRows(TOP_POLICIES).map((row) => ({
+        ...row,
+        onClick: (r) => onPolicyFilter?.(r.name),
+    }));
+
+    const userRows = buildTopListRows(TOP_USERS).map((row) => ({
+        ...row,
+        onClick: (r) => onUserFilter?.(r.name),
+    }));
+
     return (
         <VerticalStack gap="4">
             <HorizontalGrid columns={2} gap="4">
@@ -222,31 +247,43 @@ function ViolationsDashboard({ severityFilter, onSeverityFilter }) {
                 <AgenticTopListCard
                     title="Violations by Top Users"
                     columns={[{ label: "User" }, { label: "Violations" }]}
-                    rows={buildTopListRows(TOP_USERS)}
-                    renderIcon={() => <Avatar customer size="extraSmall" />}
+                    rows={userRows}
+                    renderIcon={(row) => <OsIcon os={row.os} size={20} />}
+                    activeRows={userFilter}
                 />
                 <AgenticTopListCard
                     title="Top Policies Triggered"
                     columns={[{ label: "Policy" }, { label: "Count" }]}
-                    rows={buildTopListRows(TOP_POLICIES)}
+                    rows={policyRows}
                     renderIcon={() => null}
+                    activeRows={policyFilter}
                 />
                 <Card padding="0">
                     <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="4" paddingBlockEnd="3">
                         <Text variant="headingSm">Violations by Type</Text>
                     </Box>
-                    <Box padding="4">
-                        <HorizontalStack gap="4" blockAlign="center" align="center" wrap={false}>
-                            <DonutChart data={VIOLATIONS_BY_TYPE} size={160} pieInnerSize="65%" />
-                            <VerticalStack gap="2">
-                                {Object.entries(VIOLATIONS_BY_TYPE).map(([label, seg]) => (
-                                    <HorizontalStack key={label} gap="2" blockAlign="center" wrap={false}>
-                                        <Box className="agentic-dot" style={{ "--dot-color": seg.color }} />
-                                        <Text variant="bodySm" color="subdued">{label}</Text>
-                                    </HorizontalStack>
-                                ))}
-                            </VerticalStack>
-                        </HorizontalStack>
+                    <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockEnd="4">
+                        <VerticalStack gap="2">
+                            <HorizontalStack align="center">
+                                <DonutChart
+                                    data={VIOLATIONS_BY_TYPE}
+                                    title={TOTAL_VIOLATIONS_SUMMARY.total}
+                                    subtitle="Violations"
+                                    size={180}
+                                    pieInnerSize="55%"
+                                />
+                            </HorizontalStack>
+                            {Object.keys(VIOLATIONS_BY_TYPE).length > 0 && (
+                                <HorizontalStack gap="3" wrap align="center">
+                                    {Object.entries(VIOLATIONS_BY_TYPE).map(([label, seg]) => (
+                                        <HorizontalStack key={label} gap="1" blockAlign="center">
+                                            <Box className="agentic-dot" style={{ "--dot-color": seg.color }} />
+                                            <Text variant="bodySm" color="subdued">{label} ({seg.text})</Text>
+                                        </HorizontalStack>
+                                    ))}
+                                </HorizontalStack>
+                            )}
+                        </VerticalStack>
                     </Box>
                 </Card>
             </HorizontalGrid>
@@ -261,6 +298,8 @@ function Violations() {
     const [loading, setLoading] = useState(false);
     const [selectedViolation, setSelectedViolation] = useState(null);
     const [severityFilter, setSeverityFilter] = useState(new Set());
+    const [policyFilter, setPolicyFilter] = useState(new Set());
+    const [userFilter, setUserFilter] = useState(new Set());
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
@@ -284,9 +323,28 @@ function Violations() {
         });
     }, []);
 
-    const filteredRows = severityFilter.size > 0
-        ? rows.filter((r) => severityFilter.has(r.severity))
-        : rows;
+    const handlePolicyFilter = useCallback((name) => {
+        setPolicyFilter((prev) => {
+            const next = new Set(prev);
+            next.has(name) ? next.delete(name) : next.add(name);
+            return next;
+        });
+    }, []);
+
+    const handleUserFilter = useCallback((name) => {
+        setUserFilter((prev) => {
+            const next = new Set(prev);
+            next.has(name) ? next.delete(name) : next.add(name);
+            return next;
+        });
+    }, []);
+
+    const filteredRows = rows.filter((r) => {
+        if (severityFilter.size > 0 && !severityFilter.has(r.severity)) return false;
+        if (policyFilter.size > 0 && !policyFilter.has(r.policyName)) return false;
+        if (userFilter.size > 0 && !userFilter.has(r.user)) return false;
+        return true;
+    });
 
     const handleRowClick = (e) => {
         if (e?.data) setSelectedViolation(e.data);
@@ -314,7 +372,7 @@ function Violations() {
     const components = loading
         ? [<SpinnerCentered key="loading" />]
         : [
-            <ViolationsDashboard key="dashboard" severityFilter={severityFilter} onSeverityFilter={handleSeverityFilter} />,
+            <ViolationsDashboard key="dashboard" severityFilter={severityFilter} onSeverityFilter={handleSeverityFilter} policyFilter={policyFilter} onPolicyFilter={handlePolicyFilter} userFilter={userFilter} onUserFilter={handleUserFilter} />,
             tableComponent,
             <ViolationFlyout
                 key="flyout"

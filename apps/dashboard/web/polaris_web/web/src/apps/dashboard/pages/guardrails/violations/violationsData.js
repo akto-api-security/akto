@@ -3,6 +3,14 @@
 // replace these exports with an api.js + transform.js pair; Violations.jsx already
 // loads them through a fetch-style lifecycle so the swap is local.
 
+// Last 7 months ending today — matches the 7-point sparkline arrays below.
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const _now = new Date();
+export const SPARKLINE_LABELS = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(_now.getFullYear(), _now.getMonth() - (6 - i), 1);
+    return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+});
+
 // Severity palette — reuses the dashboard severity colours (dashboard.css badge-wrapper-*).
 const SEVERITY_COLORS = {
     CRITICAL: "#DF2909",
@@ -24,7 +32,7 @@ const TYPE_COLORS = {
     Skill: "#C4CDD5",
     Config: "#F5C451",
     "Tool Call": "#A4E8C4",
-    LLMs: "#F4A09C",
+    LLM: "#F4A09C",
 };
 
 export const TOTAL_VIOLATIONS_SUMMARY = {
@@ -51,19 +59,19 @@ export const OPEN_VIOLATIONS_SUMMARY = {
 };
 
 export const TOP_USERS = [
-    { id: "u1", name: "John Doe", type: "MCP Server", count: 1200, sparkline: [200, 450, 380, 700, 620, 900, 1200] },
-    { id: "u2", name: "Traun Smith", type: "Skill", count: 2304, sparkline: [400, 900, 1100, 1600, 1400, 2000, 2304] },
-    { id: "u3", name: "Mark Wilson", type: "MCP Server", count: 800, sparkline: [120, 300, 280, 500, 460, 650, 800] },
-    { id: "u4", name: "Jennifer Lewis", type: "MCP Server", count: 910, sparkline: [150, 320, 300, 540, 600, 780, 910] },
-    { id: "u5", name: "Sarah Taylor", type: "Skill", count: 120, sparkline: [20, 45, 38, 70, 62, 95, 120] },
+    { id: "u1", name: "John Doe",      os: "mac",     count: 2, sparkline: [0, 0, 0, 1, 1, 1, 2] },
+    { id: "u2", name: "Traun Smith",   os: "windows", count: 2, sparkline: [0, 0, 1, 0, 1, 1, 2] },
+    { id: "u3", name: "Mark Wilson",   os: "mac",     count: 2, sparkline: [0, 0, 0, 1, 0, 1, 2] },
+    { id: "u4", name: "Linda Thomas",  os: "mac",     count: 2, sparkline: [0, 1, 0, 0, 1, 1, 2] },
+    { id: "u5", name: "Sarah Taylor",  os: "windows", count: 2, sparkline: [0, 0, 1, 0, 0, 1, 2] },
 ];
 
 export const TOP_POLICIES = [
-    { id: "p1", name: "PII_Policy", count: 40, sparkline: [8, 14, 12, 22, 28, 34, 40] },
-    { id: "p2", name: "Malicious_Skill", count: 24, sparkline: [18, 16, 20, 14, 12, 18, 24] },
-    { id: "p3", name: "LLM_test", count: 23, sparkline: [4, 9, 8, 15, 18, 21, 23] },
-    { id: "p4", name: "PII_Tools", count: 20, sparkline: [3, 7, 6, 12, 15, 18, 20] },
-    { id: "p5", name: "claude_settings_risk", count: 12, sparkline: [16, 14, 12, 10, 9, 11, 12] },
+    { id: "p1", name: "Malicious_Skill",     count: 5, sparkline: [0, 1, 1, 2, 3, 4, 5] },
+    { id: "p2", name: "PII_Policy",           count: 4, sparkline: [0, 0, 1, 2, 2, 3, 4] },
+    { id: "p3", name: "LLM_test",             count: 2, sparkline: [0, 0, 0, 1, 1, 1, 2] },
+    { id: "p4", name: "PII_Tools",            count: 2, sparkline: [0, 0, 1, 1, 1, 1, 2] },
+    { id: "p5", name: "claude_settings_risk", count: 2, sparkline: [0, 0, 0, 0, 1, 1, 2] },
 ];
 
 export const VIOLATIONS_BY_TYPE = {
@@ -71,27 +79,27 @@ export const VIOLATIONS_BY_TYPE = {
     Skill: { text: 300, color: TYPE_COLORS.Skill, filterKey: "Skill" },
     Config: { text: 270, color: TYPE_COLORS.Config, filterKey: "Config" },
     "Tool Call": { text: 140, color: TYPE_COLORS["Tool Call"], filterKey: "Tool Call" },
-    LLMs: { text: 113, color: TYPE_COLORS.LLMs, filterKey: "LLMs" },
+    LLM: { text: 113, color: TYPE_COLORS.LLM, filterKey: "LLM" },
 };
 
 // Individual violation rows for the AG Grid table. `detected` is epoch seconds
 // (the unit func.epochToDateTime expects).
 export const VIOLATION_ROWS = [
-    { id: "v1", detected: 1757001660, violation: "Email exposure attempt blocked", type: "Prompt", agenticAsset: "Cursor Prod", assetType: "MCP Server", assetDomain: "cursor.com", severity: "CRITICAL", user: "John Doe", os: "mac", action: "Blocked" },
-    { id: "v2", detected: 1757001600, violation: "Claude file access enabled", type: "Skill", agenticAsset: "Generate Snapshot", assetType: "Skill", severity: "CRITICAL", user: "Traun Smith", os: "windows", action: "Flagged" },
-    { id: "v3", detected: 1757001540, violation: "Address leaked to DeepSeek", type: "Skill", agenticAsset: "Export CRM contacts", assetType: "Skill", severity: "CRITICAL", user: "Mark Wilson", os: "mac", action: "Flagged" },
-    { id: "v4", detected: 1757001420, violation: "Claude permissions changed", type: "Config", agenticAsset: "permissions.allow", assetType: "Config", severity: "HIGH", user: "David Wilson", os: "mac", action: "Flagged" },
-    { id: "v5", detected: 1757001360, violation: "Unauthorized snapshot generated", type: "Skill", agenticAsset: "Workspace snapshot", assetType: "Skill", severity: "HIGH", user: "Sarah Taylor", os: "windows", action: "Flagged" },
-    { id: "v6", detected: 1757001120, violation: "Customer data exposed by agent", type: "Skill", agenticAsset: "Summarize support tickets", assetType: "Skill", severity: "HIGH", user: "Linda Thomas", os: "mac", action: "Flagged" },
-    { id: "v7", detected: 1757000940, violation: "User lookup prompt blocked", type: "Prompt", agenticAsset: "Entra Bot", assetType: "MCP Server", assetDomain: "microsoft.com", severity: "HIGH", user: "Robert Clark", os: "windows", action: "Blocked" },
-    { id: "v8", detected: 1757000580, violation: "Email extraction prompt blocked", type: "Prompt", agenticAsset: "Agent Studio", assetType: "MCP Server", severity: "MEDIUM", user: "Jennifer Lewis", os: "mac", action: "Blocked" },
-    { id: "v9", detected: 1757000400, violation: "Tool call to unverified endpoint", type: "Tool Call", agenticAsset: "HTTP Fetch Tool", assetType: "Tool", severity: "MEDIUM", user: "Mark Wilson", os: "mac", action: "Flagged" },
-    { id: "v10", detected: 1757000220, violation: "Model downgraded to unsafe LLM", type: "LLMs", agenticAsset: "Router Agent", assetType: "LLM", severity: "MEDIUM", user: "John Doe", os: "mac", action: "Flagged" },
-    { id: "v11", detected: 1756999980, violation: "Secret token printed in trace", type: "Config", agenticAsset: "debug.verbose", assetType: "Config", severity: "HIGH", user: "Traun Smith", os: "windows", action: "Blocked" },
-    { id: "v12", detected: 1756999800, violation: "Prompt injection via attachment", type: "Prompt", agenticAsset: "Doc Reader", assetType: "MCP Server", severity: "CRITICAL", user: "Linda Thomas", os: "mac", action: "Blocked" },
-    { id: "v13", detected: 1756999560, violation: "Skill requested elevated scope", type: "Skill", agenticAsset: "Calendar Sync", assetType: "Skill", severity: "LOW", user: "Sarah Taylor", os: "windows", action: "Flagged" },
-    { id: "v14", detected: 1756999320, violation: "Bulk export rate exceeded", type: "Tool Call", agenticAsset: "CRM Exporter", assetType: "Tool", severity: "LOW", user: "Robert Clark", os: "windows", action: "Flagged" },
-    { id: "v15", detected: 1756999080, violation: "LLM response contained PII", type: "LLMs", agenticAsset: "Support Copilot", assetType: "LLM", assetDomain: "microsoft.com", severity: "HIGH", user: "Jennifer Lewis", os: "mac", action: "Blocked" },
+    { id: "v1",  detected: 1757001660, violation: "Email exposure attempt blocked",    type: "Prompt",    agenticAsset: "Cursor Prod",               assetType: "MCP Server", assetDomain: "cursor.com",    severity: "CRITICAL", user: "John Doe",      os: "mac",     action: "Blocked", policyName: "PII_Policy" },
+    { id: "v2",  detected: 1757001600, violation: "Claude file access enabled",         type: "Skill",     agenticAsset: "Generate Snapshot",         assetType: "Skill",                                    severity: "CRITICAL", user: "Traun Smith",   os: "windows", action: "Flagged", policyName: "Malicious_Skill" },
+    { id: "v3",  detected: 1757001540, violation: "Address leaked to DeepSeek",         type: "Skill",     agenticAsset: "Export CRM contacts",        assetType: "Skill",                                    severity: "CRITICAL", user: "Mark Wilson",   os: "mac",     action: "Flagged", policyName: "Malicious_Skill" },
+    { id: "v4",  detected: 1757001420, violation: "Claude permissions changed",         type: "Config",    agenticAsset: "permissions.allow",         assetType: "Config",                                   severity: "HIGH",     user: "David Wilson",  os: "mac",     action: "Flagged", policyName: "claude_settings_risk" },
+    { id: "v5",  detected: 1757001360, violation: "Unauthorized snapshot generated",    type: "Skill",     agenticAsset: "Workspace snapshot",        assetType: "Skill",                                    severity: "HIGH",     user: "Sarah Taylor",  os: "windows", action: "Flagged", policyName: "Malicious_Skill" },
+    { id: "v6",  detected: 1757001120, violation: "Customer data exposed by agent",     type: "Skill",     agenticAsset: "Summarize support tickets", assetType: "Skill",                                    severity: "HIGH",     user: "Linda Thomas",  os: "mac",     action: "Flagged", policyName: "Malicious_Skill" },
+    { id: "v7",  detected: 1757000940, violation: "User lookup prompt blocked",         type: "Prompt",    agenticAsset: "Entra Bot",                 assetType: "MCP Server", assetDomain: "microsoft.com", severity: "HIGH",     user: "Robert Clark",  os: "windows", action: "Blocked", policyName: "PII_Policy" },
+    { id: "v8",  detected: 1757000580, violation: "Email extraction prompt blocked",    type: "Prompt",    agenticAsset: "Agent Studio",              assetType: "MCP Server",                               severity: "MEDIUM",   user: "Jennifer Lewis",os: "mac",     action: "Blocked", policyName: "PII_Policy" },
+    { id: "v9",  detected: 1757000400, violation: "Tool call to unverified endpoint",   type: "Tool Call", agenticAsset: "HTTP Fetch Tool",           assetType: "Tool",                                     severity: "MEDIUM",   user: "Mark Wilson",   os: "mac",     action: "Flagged", policyName: "PII_Tools" },
+    { id: "v10", detected: 1757000220, violation: "Model downgraded to unsafe LLM",     type: "LLM",      agenticAsset: "Router Agent",              assetType: "LLM",                                      severity: "MEDIUM",   user: "John Doe",      os: "mac",     action: "Flagged", policyName: "LLM_test" },
+    { id: "v11", detected: 1756999980, violation: "Secret token printed in trace",      type: "Config",    agenticAsset: "debug.verbose",             assetType: "Config",                                   severity: "HIGH",     user: "Traun Smith",   os: "windows", action: "Blocked", policyName: "claude_settings_risk" },
+    { id: "v12", detected: 1756999800, violation: "Prompt injection via attachment",    type: "Prompt",    agenticAsset: "Doc Reader",                assetType: "MCP Server",                               severity: "CRITICAL", user: "Linda Thomas",  os: "mac",     action: "Blocked", policyName: "PII_Policy" },
+    { id: "v13", detected: 1756999560, violation: "Skill requested elevated scope",     type: "Skill",     agenticAsset: "Calendar Sync",             assetType: "Skill",                                    severity: "LOW",      user: "Sarah Taylor",  os: "windows", action: "Flagged", policyName: "Malicious_Skill" },
+    { id: "v14", detected: 1756999320, violation: "Bulk export rate exceeded",          type: "Tool Call", agenticAsset: "CRM Exporter",              assetType: "Tool",                                     severity: "LOW",      user: "Robert Clark",  os: "windows", action: "Flagged", policyName: "PII_Tools" },
+    { id: "v15", detected: 1756999080, violation: "LLM response contained PII",         type: "LLM",      agenticAsset: "Support Copilot",           assetType: "LLM",        assetDomain: "microsoft.com", severity: "HIGH",     user: "Jennifer Lewis",os: "mac",     action: "Blocked", policyName: "LLM_test" },
 ];
 
 // ─── Per-violation detail (flyout) ──────────────────────────────────────────────

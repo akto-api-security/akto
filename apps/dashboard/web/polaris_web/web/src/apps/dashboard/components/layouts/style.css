@@ -104,6 +104,10 @@
 .agentic-list-table .Polaris-DataTable__TableRow:hover .Polaris-DataTable__Cell {
     background-color: var(--p-color-bg-hover, #f6f6f7);
 }
+/* Selected row — applied via data-active="true" on the inner cell div. */
+.agentic-list-table .Polaris-DataTable__TableRow:has([data-active="true"]) .Polaris-DataTable__Cell {
+    background-color: var(--p-color-bg-surface-selected, #f3f0ff);
+}
 .agentic-list-table .Polaris-DataTable__Cell--header {
     color: var(--p-color-text-subdued, #6D7175);
     font-weight: 500;
