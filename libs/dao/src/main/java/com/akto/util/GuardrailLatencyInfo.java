@@ -69,6 +69,78 @@ public class GuardrailLatencyInfo {
                     "1726615470",
                     GuardrailProbeType.VALIDATE),
             new GuardrailServiceTarget(
+                    "https://ingest.akto.io",
+                    "1768175789",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://ingest-demo.akto.io",
+                    "xxxxx",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://1737683011-guardrails.akto.io",
+                    "1737683011",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://1728622642-guardrails.akto.io",
+                    "1728622642",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://data-ingestion.akto.io",
+                    "1760499072",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://1767812031-guardrails.akto.io",
+                    "1767812031",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://1767812031-proxy-guardrails.akto.io ",
+                    "1767812031",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://1767812031-proxy-guardrails-3.akto.io/ ",
+                    "1767812031",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://1729478227-guardrails.akto.io",
+                    "1729478227",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://1710118493-guardrails.akto.io",
+                    "1710118493",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://1745303931-guardrails.akto.io",
+                    "1745303931",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://1764882677-guardrails.akto.io ",
+                    "1764882677",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://1775456934-guardrails.akto.io",
+                    "1775456934",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://1776654502-guardrails.akto.io",
+                    "1776654502",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://1703087742-guardrails.akto.io",
+                    "1703087742",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://1703087742-guardrails.akto.io",
+                    "1703087742",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://1779059321-guardrails.akto.io",
+                    "1779059321",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
+                    "https://1779231193-guardrails.akto.io",
+                    "1779231193",
+                    GuardrailProbeType.VALIDATE),
+            new GuardrailServiceTarget(
                     "https://akto-agent-guard-executor.billing-53a.workers.dev",
                     null,
                     GuardrailProbeType.SCAN)
