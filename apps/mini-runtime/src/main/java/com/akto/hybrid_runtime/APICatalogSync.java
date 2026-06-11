@@ -1491,6 +1491,8 @@ public class APICatalogSync {
                                 urlStatic.getUrl()
                             );
                             staticUrlIterator.remove();
+                            aktoPolicyNew.markSkipped(apiCollectionId, urlStatic.getUrl(), urlStatic.getMethod());
+                            loggerMaker.infoAndAddToDb("DEBUG: Pruned from deltaCatalog (limit): " + urlStatic.getUrl());
                             if (Utils.printDebugUrlLog(checkString)) {
                                 loggerMaker.infoAndAddToDb("Found debug url in updateUsageLeftAndCheckSkip skip " + checkString);
                             }
@@ -1517,6 +1519,7 @@ public class APICatalogSync {
                                 urlTemplate.getTemplateString()
                             );
                             templateUrlIterator.remove();
+                            aktoPolicyNew.markSkipped(apiCollectionId, urlTemplate.getTemplateString(), urlTemplate.getMethod());
                             if (Utils.printDebugUrlLog(checkString)) {
                                 loggerMaker.infoAndAddToDb("Found debug url in updateUsageLeftAndCheckSkip skip " + checkString);
                             }
