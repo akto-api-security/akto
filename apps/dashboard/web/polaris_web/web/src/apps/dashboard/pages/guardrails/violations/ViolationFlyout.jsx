@@ -135,7 +135,7 @@ export default function ViolationFlyout({ violation, show, onClose }) {
         >
             <Box style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
                 {activeId === "overview" && <OverviewSection row={violation} detail={detail} />}
-                {activeId === "chat" && <ChatSessionSection messages={detail?.chatSession} />}
+                {activeId === "chat" && <ChatSessionSection messages={detail?.chatSession} highlights={detail?.evidence?.highlights || []} />}
                 {activeId === "file" && <FileSection detail={detail} />}
                 {activeId === "remediation" && <RemediationSection markdown={detail?.remediation} />}
             </Box>

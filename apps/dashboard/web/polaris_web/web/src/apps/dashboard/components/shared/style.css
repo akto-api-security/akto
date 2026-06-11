@@ -22,17 +22,15 @@
 }
 
 .vulnerability-highlight{
-    background-color: rgba(139, 69, 255, 0.2) !important;
-    color: #6B46C1 !important;
+    background-color: #FCE4E2 !important;
+    color: #B42318 !important;
     font-weight: 600 !important;
     border-radius: 2px !important;
     padding: 1px 2px !important;
-    transition: all 0.2s ease !important;
 }
 
 .vulnerability-highlight:hover{
-    background-color: rgba(139, 69, 255, 0.35) !important;
-    box-shadow: 0 0 8px rgba(139, 69, 255, 0.5) !important;
+    background-color: #FAD4D1 !important;
 }
 
 .deleted-block{

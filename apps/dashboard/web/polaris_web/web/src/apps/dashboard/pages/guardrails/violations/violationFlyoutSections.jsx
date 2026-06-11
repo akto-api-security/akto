@@ -120,14 +120,43 @@ function TriggerReason({ reason, policyName }) {
 export function OverviewSection({ row, detail }) {
     const topo = useMemo(() => {
         if (!detail?.topology) return null;
-        const { user, agent, model } = detail.topology;
+        const { user, agent, model, skill, tool } = detail.topology;
+        if (skill) {
+            // Skill violation: User → Agent → Skill → Model (4 nodes)
+            const nodes = [
+                { id: "user",  type: "topoNode", draggable: false, position: { x: 0,   y: 0 }, data: { component: { category: "external",  type: "User",     label: user  } } },
+                { id: "agent", type: "topoNode", draggable: false, position: { x: 200, y: 0 }, data: { component: { category: "agent",     type: "AI Agent", label: agent } } },
+                { id: "skill", type: "topoNode", draggable: false, position: { x: 400, y: 0 }, data: { component: { category: "skill",     type: "Skill",    label: skill } } },
+                { id: "model", type: "topoNode", draggable: false, position: { x: 600, y: 0 }, data: { component: { category: "ai-model",  type: "AI Model", label: model } } },
+            ];
+            const edges = [
+                { id: "e1", source: "user",  target: "agent", type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } },
+                { id: "e2", source: "agent", target: "skill", type: "smoothstep", style: { stroke: "#7C3AED", strokeWidth: 1.5 } },
+                { id: "e3", source: "skill", target: "model", type: "smoothstep", style: { stroke: "#ec4899", strokeWidth: 1.5 } },
+            ];
+            return { nodes, edges };
+        }
+        if (tool) {
+            // Tool Call violation: User → Agent → Tool (3 nodes)
+            const nodes = [
+                { id: "user",  type: "topoNode", draggable: false, position: { x: 0,   y: 0 }, data: { component: { category: "external", type: "User",      label: user  } } },
+                { id: "agent", type: "topoNode", draggable: false, position: { x: 260, y: 0 }, data: { component: { category: "agent",    type: "AI Agent",  label: agent } } },
+                { id: "tool",  type: "topoNode", draggable: false, position: { x: 520, y: 0 }, data: { component: { category: "mcp",      type: "Tool Call", label: tool  } } },
+            ];
+            const edges = [
+                { id: "e1", source: "user",  target: "agent", type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } },
+                { id: "e2", source: "agent", target: "tool",  type: "smoothstep", style: { stroke: "#4cbebb", strokeWidth: 1.5 } },
+            ];
+            return { nodes, edges };
+        }
+        // Default: User → Agent → Model (3 nodes)
         const nodes = [
-            { id: "user", type: "topoNode", draggable: false, position: { x: 0, y: 0 }, data: { component: { category: "external", type: "User", label: user } } },
-            { id: "agent", type: "topoNode", draggable: false, position: { x: 260, y: 0 }, data: { component: { category: "agent", type: "AI Agent", label: agent } } },
-            { id: "model", type: "topoNode", draggable: false, position: { x: 520, y: 0 }, data: { component: { category: "ai-model", type: "AI Model", label: model } } },
+            { id: "user",  type: "topoNode", draggable: false, position: { x: 0,   y: 0 }, data: { component: { category: "external",  type: "User",     label: user  } } },
+            { id: "agent", type: "topoNode", draggable: false, position: { x: 260, y: 0 }, data: { component: { category: "agent",     type: "AI Agent", label: agent } } },
+            { id: "model", type: "topoNode", draggable: false, position: { x: 520, y: 0 }, data: { component: { category: "ai-model",  type: "AI Model", label: model } } },
         ];
         const edges = [
-            { id: "e1", source: "user", target: "agent", type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } },
+            { id: "e1", source: "user",  target: "agent", type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } },
             { id: "e2", source: "agent", target: "model", type: "smoothstep", style: { stroke: "#ec4899", strokeWidth: 1.5 } },
         ];
         return { nodes, edges };
@@ -136,7 +165,7 @@ export function OverviewSection({ row, detail }) {
     const gridItems = [
         { label: "Detected", value: func.epochToDateTime(row.detected) },
         { label: "Device ID", value: detail?.deviceId || "—" },
-        { label: "Session ID", value: detail?.sessionId || "—" },
+        { label: "Session ID", value: detail?.sessionId || "—", tooltip: detail?.sessionId || undefined },
     ];
 
     return (
@@ -163,12 +192,7 @@ export function OverviewSection({ row, detail }) {
                         </VerticalStack>
                     )}
 
-                    {topo && (
-                        <>
-                            {detail?.description && <Divider />}
-                            <AssetTopologyGraph nodes={topo.nodes} edges={topo.edges} />
-                        </>
-                    )}
+                    {topo && <AssetTopologyGraph nodes={topo.nodes} edges={topo.edges} />}
 
                     {detail?.impact && (
                         <>
@@ -191,7 +215,7 @@ export function OverviewSection({ row, detail }) {
 // ─── Chat Session tab ───────────────────────────────────────────────────────────
 // Reuses the shared ChatMessage transcript component from the testing flow.
 
-export function ChatSessionSection({ messages = [] }) {
+export function ChatSessionSection({ messages = [], highlights = [] }) {
     if (!messages.length) {
         return (
             <Box padding="8">
@@ -215,6 +239,7 @@ export function ChatSessionSection({ messages = [] }) {
                         isVulnerable={!!m.isVulnerable}
                         isCode={false}
                         toolsMetadata={{}}
+                        highlights={m.isVulnerable ? highlights : []}
                     />
                 ))}
             </VerticalStack>

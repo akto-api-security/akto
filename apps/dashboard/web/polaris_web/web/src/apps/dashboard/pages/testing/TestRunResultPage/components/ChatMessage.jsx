@@ -1,12 +1,57 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, Fragment } from 'react';
 import PropTypes from 'prop-types';
-import { Box, VerticalStack, HorizontalStack, Text, Badge, Button, Tooltip } from '@shopify/polaris';
+import { Avatar, Box, VerticalStack, HorizontalStack, Text, Badge, Button, Tooltip } from '@shopify/polaris';
 import { InfoMinor, MagicMinor } from '@shopify/polaris-icons';
 import MarkdownViewer from '../../../../components/shared/MarkdownViewer';
 import SampleDataComponent from '../../../../components/shared/SampleDataComponent';
-import { CHAT_ASSETS, MESSAGE_LABELS, MESSAGE_TYPES, VULNERABILITY_BADGE } from './chatConstants';
+import { CHAT_ASSETS, MESSAGE_LABELS, MESSAGE_TYPES } from './chatConstants';
 import ChatInfoModal from './ChatInfoModal';
 import func from "@/util/func";
+import { getDomainForFavicon } from '@/apps/dashboard/pages/observe/agentic/mcpClientHelper';
+
+function splitHighlights(text, highlights = []) {
+    const phrases = (highlights || []).filter(Boolean);
+    if (!phrases.length) return [text];
+    const parts = [];
+    let remaining = text;
+    let guard = 0;
+    while (remaining.length && guard < 2000) {
+        guard++;
+        let best = null;
+        for (const h of phrases) {
+            const i = remaining.indexOf(h);
+            if (i >= 0 && (best === null || i < best.i)) best = { i, h };
+        }
+        if (!best) { parts.push(remaining); break; }
+        if (best.i > 0) parts.push(remaining.slice(0, best.i));
+        parts.push({ hl: best.h });
+        remaining = remaining.slice(best.i + best.h.length);
+    }
+    return parts;
+}
+
+function HighlightedChatText({ text, highlights }) {
+    const parts = splitHighlights(text || '', highlights);
+    return (
+        <Text variant="bodyMd" as="p">
+            {parts.map((p, i) =>
+                typeof p === 'string'
+                    ? <Fragment key={i}>{p}</Fragment>
+                    : <Box as="span" key={i} className="violation-evidence-highlight">{p.hl}</Box>
+            )}
+        </Text>
+    );
+}
+
+function initials(name) {
+    return (name || '')
+        .split(' ')
+        .map(w => w[0])
+        .filter(Boolean)
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
+}
 
 // This is done for Hybrid messages -> Markdown + JSON 
 function extractPrettyJson(content) {
@@ -118,23 +163,32 @@ function extractPrettyJson(content) {
     }
 }
 
-function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt, toolsMetadata, isExternalAgentRequest = false }) {
+function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt, toolsMetadata, highlights = [], isExternalAgentRequest = false }) {
 
     const isRequest = type === MESSAGE_TYPES.REQUEST;
-    // Icon
-    let iconSrc = isRequest ? CHAT_ASSETS.AKTO_LOGO : CHAT_ASSETS.BOT_LOGO;
-    if(isExternalAgentRequest) {
-        iconSrc = CHAT_ASSETS.MAGIC_ICON;
-    }
-    let iconAlt = isRequest ? 'Akto Logo' : 'Agent Logo';
-    if(isExternalAgentRequest) {
-        iconAlt = 'Magic Icon';
-    }
 
     // Label
     const label = customLabel || (isRequest ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE);
     const isAiAgentLabel = label === MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE;
     const isTestedInteraction = label === MESSAGE_LABELS.TESTED_INTERACTION;
+
+    // Icon element — user avatar for human senders, agent favicon for agent responses
+    let iconEl;
+    if (isExternalAgentRequest) {
+        iconEl = <img src={CHAT_ASSETS.MAGIC_ICON} alt="Magic Icon" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />;
+    } else if (isRequest) {
+        if (customLabel && !isTestedInteraction) {
+            // Human user in a conversation (e.g. violations chat) — show initials avatar
+            iconEl = <Avatar size="extraSmall" initials={initials(customLabel)} name={customLabel} />;
+        } else {
+            iconEl = <img src={CHAT_ASSETS.AKTO_LOGO} alt="Akto Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />;
+        }
+    } else {
+        // Response — try to resolve an agent-specific favicon from the label
+        const domain = customLabel && !isAiAgentLabel ? getDomainForFavicon(customLabel) : null;
+        const agentSrc = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : CHAT_ASSETS.BOT_LOGO;
+        iconEl = <img src={agentSrc} alt={customLabel || 'Agent'} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />;
+    }
     const hasModifiedPrompt = isTestedInteraction && originalPrompt && originalPrompt !== content;
     const hasHttpAttempt = isAiAgentLabel && onOpenAttempt;
 
@@ -199,15 +253,11 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
     }, [content, shouldRenderAsCode, prettyJson]);
 
     return (
-        <Box padding="3">
+        <Box padding="3" background={isVulnerable ? "bg-critical-subdued" : undefined}>
             <Box style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                 {/* Icon */}
-                <Box style={{ flexShrink: 0, width: '20px', height: '20px' }}>
-                    <img
-                        src={iconSrc}
-                        alt={iconAlt}
-                        style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-                    />
+                <Box style={{ flexShrink: 0, width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {iconEl}
                 </Box>
 
                 {/* Divider */}
@@ -222,6 +272,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                 <Text variant="bodyMd" fontWeight="semibold" color="subdued">
                                     {label}
                                 </Text>
+                                {isVulnerable && <Badge status="critical" size="small">Blocked</Badge>}
                                 {infoActions.map((action, idx) => (
                                     <Tooltip key={idx} content={action.tooltip} dismissOnMouseOut>
                                         <Button
@@ -273,7 +324,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                             </Box>
                         ) : prettyJson ? (
                             <VerticalStack gap="2">
-                                {beforeText && <MarkdownViewer markdown={beforeText} />}
+                                {beforeText && <MarkdownViewer markdown={beforeText} noPadding />}
                                 <SampleDataComponent
                                     type="response"
                                     sampleData={{ message: prettyJson }}
@@ -281,7 +332,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                     readOnly={true}
                                     simpleJson={true}
                                 />
-                                {afterText && <MarkdownViewer markdown={afterText} />}
+                                {afterText && <MarkdownViewer markdown={afterText} noPadding />}
                             </VerticalStack>
                         ) : decodedRawContent ? (
                             <SampleDataComponent
@@ -292,15 +343,18 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                 simpleJson={true}
                             />
                         ) : (
-                            <MarkdownViewer markdown={content} />
+                            isVulnerable && highlights.length > 0
+                                ? <HighlightedChatText text={content} highlights={highlights} />
+                                : <MarkdownViewer markdown={content} noPadding />
                         )}
 
                         {/* Vulnerability Badge */}
-                        {isVulnerable && !isRequest && (
+                        {/* {isVulnerable && !isRequest && (
                             <Box paddingBlockStart="2">
                                 <Badge status="critical">{VULNERABILITY_BADGE.SYSTEM_PROMPT_LEAK}</Badge>
                             </Box>
-                        )}
+                        )} */}
+
                     </VerticalStack>
                 </Box>
             </Box>

@@ -214,6 +214,25 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
   }
 }
 
+// Registered once — overrides Monaco's default blue heading colour for markdown
+// files (e.g. Skill.md in the violations flyout) to Akto purple.
+let _violationMarkdownThemeDefined = false;
+function ensureViolationMarkdownTheme() {
+    if (_violationMarkdownThemeDefined) return;
+    monaco.editor.defineTheme('violation-markdown', {
+        base: 'vs',
+        inherit: true,
+        rules: [
+            { token: 'keyword',    foreground: '9642FC' },
+            { token: 'keyword.md', foreground: '9642FC' },
+            { token: 'strong',     foreground: '553C9A', fontStyle: 'bold' },
+            { token: 'emphasis',   foreground: '805AD5', fontStyle: 'italic' },
+        ],
+        colors: {},
+    });
+    _violationMarkdownThemeDefined = true;
+}
+
 function SampleData(props) {
 
     let {showDiff, data, minHeight, editorLanguage, currLine, getLineNumbers, readOnly, getEditorData, wordWrap} = props;
@@ -345,6 +364,10 @@ function SampleData(props) {
           yamlEditorSetup.setTokenizer()
           yamlEditorSetup.setEditorTheme()
           yamlEditorSetup.setAutoComplete(keywords)
+        }
+        if(editorLanguage === 'markdown'){
+          ensureViolationMarkdownTheme();
+          options['theme'] = 'violation-markdown';
         }
         if(showDiff){
           instance = monaco.editor.createDiffEditor(ref.current, options)

@@ -1,12 +1,18 @@
 import React from "react";
-import { Box, HorizontalGrid, HorizontalStack, VerticalStack, Text } from "@shopify/polaris";
+import { Box, HorizontalGrid, HorizontalStack, VerticalStack, Text, Tooltip } from "@shopify/polaris";
 
 export default function DetailGrid({ heading, items = [], columns = 1, labelWidth = "140px" }) {
-    const cell = (d) => (
-        <Text variant="bodySm" fontWeight="semibold" color={d.isWarning ? "warning" : undefined}>
-            {d.value || "-"}
-        </Text>
-    );
+    const cell = (d) => {
+        const textNode = (
+            <Text variant="bodySm" fontWeight="semibold" color={d.isWarning ? "warning" : undefined} truncate>
+                {d.value || "-"}
+            </Text>
+        );
+        if (d.tooltip) {
+            return <Tooltip content={d.tooltip} dismissOnMouseOut preferredPosition="above">{textNode}</Tooltip>;
+        }
+        return textNode;
+    };
 
     return (
         <VerticalStack gap={columns > 1 ? "3" : "2"}>

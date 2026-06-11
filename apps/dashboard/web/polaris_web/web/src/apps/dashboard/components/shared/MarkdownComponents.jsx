@@ -82,15 +82,22 @@ export const markdownStyles = `
         line-height: 1.6;
     }
     
-    .markdown-content .markdown-ul,
+    .markdown-content .markdown-ul {
+        margin: 0.5em 0;
+        padding-left: 1.5em;
+        list-style-type: disc;
+    }
+
     .markdown-content .markdown-ol {
         margin: 0.5em 0;
         padding-left: 1.5em;
+        list-style-type: decimal;
     }
-    
+
     .markdown-content .markdown-li {
         margin: 0.2em 0;
         line-height: 1.5;
+        display: list-item;
     }
     
     .markdown-content .markdown-inline-code {
