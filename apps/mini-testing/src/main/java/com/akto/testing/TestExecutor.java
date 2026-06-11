@@ -1508,6 +1508,10 @@ public class TestExecutor {
             return true; // Digest auth doesn't require prefetch - works directly via DigestAuthParam.addAuthTokens()
         }
 
+        if (LoginFlowEnums.AuthMechanismTypes.COPILOT_OAUTH.toString().equalsIgnoreCase(authType)) {
+            return true; // Copilot OAuth doesn't require prefetch - works directly via CopilotOAuthAuthParam.addAuthTokens()
+        }
+
         if (!LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authType)) {
             return true; // Not a login request type, no prefetch needed
         }
