@@ -1491,8 +1491,7 @@ public class APICatalogSync {
                                 urlStatic.getUrl()
                             );
                             staticUrlIterator.remove();
-                            aktoPolicyNew.removeApiInfo(apiCollectionId, urlStatic.getUrl(), urlStatic.getMethod());
-                            loggerMaker.infoAndAddToDb("DEBUG: Pruned from deltaCatalog (limit): " + urlStatic.getUrl());
+                            aktoPolicyNew.removeApiInfo(apiCollectionId, urlStatic.getUrl(), urlStatic.getMethod());;
                             if (Utils.printDebugUrlLog(checkString)) {
                                 loggerMaker.infoAndAddToDb("Found debug url in updateUsageLeftAndCheckSkip skip " + checkString);
                             }
