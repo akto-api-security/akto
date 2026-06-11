@@ -579,6 +579,15 @@ export default function LeftNav() {
                                 leftNavSelected === "dashboard_threat_api",
                         },
                         ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") ? [{
+                            label: "Violations",
+                            onClick: () => {
+                                navigate("/dashboard/guardrails/violations");
+                                handleSelect("dashboard_guardrails_violations");
+                                setActive("active");
+                            },
+                            selected: leftNavSelected === "dashboard_guardrails_violations",
+                        }] : []),
+                        ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") ? [{
                             label: "Guardrail Policies",
                             onClick: () => {
                                 navigate("/dashboard/guardrails/policies");
@@ -677,6 +686,15 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_guardrails_activity",
+                    },
+                    {
+                        label: "Violations",
+                        onClick: () => {
+                            navigate("/dashboard/guardrails/violations");
+                            handleSelect("dashboard_guardrails_violations");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_guardrails_violations",
                     },
                     {
                         label: "Guardrails Policies",
