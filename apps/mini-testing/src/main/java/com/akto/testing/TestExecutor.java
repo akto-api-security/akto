@@ -1437,11 +1437,18 @@ public class TestExecutor {
 
                                             ReplaceDetail replaceDetail = new ReplaceDetail(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), kvPairs);
                                             modifyRequest(nextApi.getRequest(), replaceDetail);
+                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: ====REQUEST====");
+                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST: " + nextApi.getRequest().getMethod() + " " + nextApi.getRequest().getUrl() + "?" + nextApi.getRequest().getQueryParams());
+                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST headers: " + nextApi.getRequest().getHeaders());
+                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST body: " + nextApi.getRequest().getBody());
                                             loggerMaker.warnAndAddToDb("cleanUpTestArtifacts final URL after replacement: " + nextApi.getRequest().getUrl());
                                             loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST: " + nextApi.getRequest().getMethod() + " " + nextApi.getRequest().getUrl());
                                             loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: ====RESPONSE====");
                                             try {
                                                 OriginalHttpResponse nextResponse = ApiExecutor.sendRequest(nextApi.getRequest(), true, testingRunConfig, false, new ArrayList<>());
+                                                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE headers: " + nextApi.getResponse().getHeaders());
+                                                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE body: " + nextResponse.getBody());
+                                                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE status code: " + nextResponse.getStatusCode());
                                                 loggerMaker.warnAndAddToDb("cleanUpTestArtifacts: RESPONSE status: " + nextResponse.getStatusCode());
 
                                                 if(nextResponse.getStatusCode() < 300) {
