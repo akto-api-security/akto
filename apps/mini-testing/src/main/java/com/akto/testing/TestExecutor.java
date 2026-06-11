@@ -1250,23 +1250,44 @@ public class TestExecutor {
 
         String collectionDescription = TestingConfigurations.getInstance().getApiCollectionDescriptionMap().get(apiInfoKey.getApiCollectionId());
         if (!StringUtils.isEmpty(collectionDescription)) {
-            @SuppressWarnings("unchecked")
-            List<String> existingContext = (List<String>) varMap.getOrDefault("wordList_data_context", new ArrayList<>());
-            String yamlContext = null;
-            if (existingContext != null && !existingContext.isEmpty()) {
-                yamlContext = existingContext.get(0);
+            String collectionDataContext = extractCollectionDataContext(collectionDescription);
+            String collectionEveryPrompt = extractCollectionEveryPrompt(collectionDescription);
+
+            if (!StringUtils.isEmpty(collectionDataContext)) {
+                @SuppressWarnings("unchecked")
+                List<String> existingContext = (List<String>) varMap.get("wordList_data_context");
+                String yamlContext = null;
+                if (existingContext != null && !existingContext.isEmpty()) {
+                    yamlContext = existingContext.get(0);
+                }
+                String combinedContext;
+                if (yamlContext != null && !yamlContext.isEmpty()) {
+                    combinedContext = yamlContext.contains(collectionDataContext)
+                            ? yamlContext
+                            : yamlContext + "\n\n" + collectionDataContext;
+                } else {
+                    combinedContext = collectionDataContext;
+                }
+                varMap.put("wordList_data_context", Collections.singletonList(combinedContext));
             }
-            String combinedContext;
-            if (yamlContext != null && !yamlContext.isEmpty()) {
-                combinedContext = yamlContext.contains(collectionDescription)
-                        ? yamlContext
-                        : yamlContext + "\n\n" + collectionDescription;
-            } else {
-                combinedContext = collectionDescription;
+
+            if (!StringUtils.isEmpty(collectionEveryPrompt)) {
+                @SuppressWarnings("unchecked")
+                List<String> existingEveryPrompt = (List<String>) varMap.get("wordList_every_prompt");
+                String yamlEveryPrompt = null;
+                if (existingEveryPrompt != null && !existingEveryPrompt.isEmpty()) {
+                    yamlEveryPrompt = existingEveryPrompt.get(0);
+                }
+                String combinedEveryPrompt;
+                if (yamlEveryPrompt != null && !yamlEveryPrompt.isEmpty()) {
+                    combinedEveryPrompt = yamlEveryPrompt.contains(collectionEveryPrompt)
+                            ? yamlEveryPrompt
+                            : yamlEveryPrompt + "\n\n" + collectionEveryPrompt;
+                } else {
+                    combinedEveryPrompt = collectionEveryPrompt;
+                }
+                varMap.put("wordList_every_prompt", Collections.singletonList(combinedEveryPrompt));
             }
-            // Keeping only the first context entry.
-            // Rest of the entries are not used.
-            varMap.put("wordList_data_context", Collections.singletonList(combinedContext));
         }
 
         String testExecutionLogId = UUID.randomUUID().toString();
@@ -1647,6 +1668,34 @@ public class TestExecutor {
         } catch (Exception e) {
             throw new Exception("Error while modifying graphQL payload");
         }
+    }
+
+    private static final String EVERY_PROMPT_MARKER = "every_prompt:";
+
+    private static String extractCollectionDataContext(String collectionDescription) {
+        if (StringUtils.isEmpty(collectionDescription)) {
+            return "";
+        }
+        int markerIndex = indexOfEveryPromptMarker(collectionDescription);
+        if (markerIndex < 0) {
+            return collectionDescription.trim();
+        }
+        return collectionDescription.substring(0, markerIndex).trim();
+    }
+
+    private static String extractCollectionEveryPrompt(String collectionDescription) {
+        if (StringUtils.isEmpty(collectionDescription)) {
+            return "";
+        }
+        int markerIndex = indexOfEveryPromptMarker(collectionDescription);
+        if (markerIndex < 0) {
+            return "";
+        }
+        return collectionDescription.substring(markerIndex + EVERY_PROMPT_MARKER.length()).trim();
+    }
+
+    private static int indexOfEveryPromptMarker(String collectionDescription) {
+        return collectionDescription.toLowerCase().indexOf(EVERY_PROMPT_MARKER);
     }
 
 }
