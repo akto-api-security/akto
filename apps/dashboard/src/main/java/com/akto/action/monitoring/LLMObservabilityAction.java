@@ -4,6 +4,7 @@ import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.elasticsearch.ElasticSearchClient;
 import com.akto.utils.elasticsearch.ElasticSearchClient.SearchResult;
 import com.opensymphony.xwork2.Action;
@@ -144,6 +145,8 @@ public class LLMObservabilityAction extends UserAction {
 
             Map<String, String> filters = new HashMap<>();
             filters.put("traceId.keyword", traceId.trim());
+            if (CONTEXT_SOURCE.ENDPOINT.equals(Context.contextSource.get()))
+                filters.put("isAtlasTraffic", "true");
             JSONObject query = es.buildBaseQuery(accountId, 0L, Long.MAX_VALUE, filters, null);
 
             JSONObject body = new JSONObject()
@@ -336,6 +339,9 @@ public class LLMObservabilityAction extends UserAction {
         // traceId — used when scoping Messages tab to a specific trace
         if (traceId != null && !traceId.trim().isEmpty())
             f.put("traceId.keyword", java.util.Collections.singletonList(traceId.trim()));
+        // Atlas traffic filter: ENDPOINT context only shows Atlas-sourced records
+        if (CONTEXT_SOURCE.ENDPOINT.equals(Context.contextSource.get()))
+            f.put("isAtlasTraffic", java.util.Collections.singletonList("true"));
         return f;
     }
 

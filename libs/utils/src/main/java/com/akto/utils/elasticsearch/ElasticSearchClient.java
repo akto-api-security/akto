@@ -237,7 +237,12 @@ public class ElasticSearchClient {
         if (multiFilters != null) {
             for (Map.Entry<String, List<String>> e : multiFilters.entrySet()) {
                 List<String> vals = e.getValue();
-                if (vals != null && !vals.isEmpty()) {
+                if (vals == null || vals.isEmpty()) continue;
+                // Boolean fields must use a term clause with an actual boolean value, not a terms array.
+                if (vals.size() == 1 && isBooleanField(e.getKey())) {
+                    must.put(new JSONObject().put("term", new JSONObject()
+                        .put(e.getKey(), Boolean.parseBoolean(vals.get(0)))));
+                } else {
                     JSONArray arr = new JSONArray();
                     for (String v : vals) arr.put(v);
                     must.put(new JSONObject().put("terms", new JSONObject().put(e.getKey(), arr)));
@@ -251,6 +256,10 @@ public class ElasticSearchClient {
     }
 
     // ── Query helpers ─────────────────────────────────────────────────────────
+
+    private static boolean isBooleanField(String field) {
+        return "isAtlasTraffic".equals(field);
+    }
 
     private void applySearchString(JSONArray must, String searchString) throws JSONException {
         if (searchString == null || searchString.isEmpty()) return;
@@ -282,7 +291,8 @@ public class ElasticSearchClient {
             source.optInt("inputTokens", 0),
             source.optInt("outputTokens", 0),
             source.optString("traceId", ""),
-            source.optString("spanId", "")
+            source.optString("spanId", ""),
+            source.optBoolean("isAtlasTraffic", false)
         );
     }
 
