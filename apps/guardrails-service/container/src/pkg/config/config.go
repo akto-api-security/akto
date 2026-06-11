@@ -46,6 +46,7 @@ type Config struct {
 }
 
 type FileConfig struct {
+	Enabled          bool
 	MaxFiles         int
 	MaxTextFileBytes int
 	ChunkSize        int
@@ -100,6 +101,7 @@ func LoadConfig() *Config {
 		McpAllowedListRefreshIntervalMin: getEnvAsInt("MCP_ALLOWLIST_REFRESH_INTERVAL_MIN", 1),
 		CollectionRefreshIntervalMin:     getEnvAsInt("COLLECTION_REFRESH_INTERVAL_MIN", 5),
 		File: FileConfig{
+			Enabled:          getEnvAsBool("FILE_VALIDATION_ENABLED", false),
 			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
 			MaxTextFileBytes: getEnvAsInt("FILE_VALIDATE_MAX_TEXT_FILE_BYTES", 5*1024*1024),
 			ChunkSize:        getEnvAsInt("FILE_VALIDATE_CHUNK_SIZE", 32000),
