@@ -72,13 +72,14 @@ public class LLMObservabilityAction extends UserAction {
 
             JSONObject subAggs = new JSONObject()
                 .put("latestTimestamp", new JSONObject().put("max", new JSONObject().put("field", "timestamp")))
+                .put("firstTimestamp", new JSONObject().put("min", new JSONObject().put("field", "timestamp")))
                 .put("inTokens",  new JSONObject().put("sum", new JSONObject().put("field", "inputTokens")))
                 .put("outTokens", new JSONObject().put("sum", new JSONObject().put("field", "outputTokens")))
                 .put("messageCount", new JSONObject().put("cardinality", new JSONObject().put("field", "traceId.keyword")))
                 .put("firstHit", new JSONObject().put("top_hits", new JSONObject()
                     .put("size", 1)
                     .put("sort", new JSONArray().put(new JSONObject().put("timestamp", new JSONObject().put("order", "asc"))))
-                    .put("_source", new JSONArray().put("queryPayload").put("serviceId").put("userName").put("deviceId").put("sessionIdentifier"))));
+                    .put("_source", new JSONArray().put("queryPayload").put("responsePayload").put("serviceId").put("userName").put("deviceId").put("sessionIdentifier"))));
 
             JSONObject aggs = new JSONObject().put("groups", new JSONObject()
                 .put("terms", new JSONObject().put("field", "sessionIdentifier.keyword").put("size", 20)
@@ -108,6 +109,7 @@ public class LLMObservabilityAction extends UserAction {
 
             JSONObject subAggs = new JSONObject()
                 .put("latestTimestamp", new JSONObject().put("max", new JSONObject().put("field", "timestamp")))
+                .put("firstTimestamp", new JSONObject().put("min", new JSONObject().put("field", "timestamp")))
                 .put("inTokens",  new JSONObject().put("sum", new JSONObject().put("field", "inputTokens")))
                 .put("outTokens", new JSONObject().put("sum", new JSONObject().put("field", "outputTokens")))
                 .put("spanCount", new JSONObject().put("value_count", new JSONObject().put("field", "spanId.keyword")))
@@ -240,10 +242,18 @@ public class LLMObservabilityAction extends UserAction {
             JSONObject bucket = buckets.optJSONObject(i);
             if (bucket == null) continue;
             Map<String, Object> row = new HashMap<>();
+            long inTokens  = subAggLong(bucket, "inTokens");
+            long outTokens = subAggLong(bucket, "outTokens");
+            long latest    = subAggLong(bucket, "latestTimestamp");
+            long first     = subAggLong(bucket, "firstTimestamp");
             row.put(keyField, bucket.optString("key", ""));
             row.put("spanCount",       bucket.optLong("doc_count", 0));
-            row.put("latestTimestamp", subAggLong(bucket, "latestTimestamp"));
-            row.put("totalTokens",     subAggLong(bucket, "inTokens") + subAggLong(bucket, "outTokens"));
+            row.put("latestTimestamp", latest);
+            row.put("firstTimestamp",  first);
+            row.put("durationMs",      latest > first ? latest - first : 0);
+            row.put("inputTokens",     inTokens);
+            row.put("outputTokens",    outTokens);
+            row.put("totalTokens",     inTokens + outTokens);
             row.put("messageCount",    subAggLong(bucket, "messageCount"));
 
             JSONObject firstHitAgg = bucket.optJSONObject("firstHit");
@@ -323,6 +333,9 @@ public class LLMObservabilityAction extends UserAction {
         // deviceId (single-value only; no ag-grid filter for this field)
         if (deviceId != null && !deviceId.trim().isEmpty())
             f.put("deviceId.keyword", java.util.Collections.singletonList(deviceId.trim()));
+        // traceId — used when scoping Messages tab to a specific trace
+        if (traceId != null && !traceId.trim().isEmpty())
+            f.put("traceId.keyword", java.util.Collections.singletonList(traceId.trim()));
         return f;
     }
 
