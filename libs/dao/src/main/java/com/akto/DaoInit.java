@@ -38,6 +38,7 @@ import com.akto.dto.jira_integration.JiraIntegration;
 import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.JobParams;
 import com.akto.dto.jobs.TicketSyncJobParams;
+import com.akto.dto.jobs.WizApiEndpointsImportJobParams;
 import com.akto.dto.jobs.WizSyncJobParams;
 import com.akto.dto.loaders.Loader;
 import com.akto.dto.loaders.NormalLoader;
@@ -346,6 +347,7 @@ public class DaoInit {
         ClassModel<WizIntegration> wizIntegrationClassModel = ClassModel.builder(WizIntegration.class).enableDiscriminator(true).build();
         ClassModel<WizEndpointAsset> wizEndpointAssetClassModel = ClassModel.builder(WizEndpointAsset.class).enableDiscriminator(true).build();
         ClassModel<WizSyncJobParams> wizSyncJobParamsClassModel = ClassModel.builder(WizSyncJobParams.class).enableDiscriminator(true).build();
+        ClassModel<WizApiEndpointsImportJobParams> wizApiEndpointsImportJobParamsClassModel = ClassModel.builder(WizApiEndpointsImportJobParams.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -389,7 +391,7 @@ public class DaoInit {
                 ticketSyncJobParamsClassModel, apiHitCountInfoClassModel, collectionTagsModel, apiSequencesClassModel,
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
                 traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
-                wizIntegrationClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel,
+                wizIntegrationClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel, wizApiEndpointsImportJobParamsClassModel,
                 mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel)
             .automatic(true).build());
 
