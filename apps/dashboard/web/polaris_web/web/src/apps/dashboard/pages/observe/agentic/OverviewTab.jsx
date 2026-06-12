@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { Box, HorizontalGrid, VerticalStack, Text } from "@shopify/polaris";
 import { getAgentLinkedComponents } from "./agenticPageBuilders";
+import { findParentAgents } from "./AssetTopologyGraph";
 import AssetTopologyGraph from "./AssetTopologyGraph";
 import { RiskFactorRow } from "./RiskFactorRow";
 import DetailGrid from "./DetailGrid";
@@ -76,15 +77,23 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
             { label: (asset.skillCount || 0) === 1 ? "Skill" : "Skills", value: asset.skillCount || 0 },
             { label: totalV    === 1 ? "Violation"  : "Violations",  value: totalV },
         ];
-        if (asset.type === "MCP Server") return [
-            { label: devCount          === 1 ? "Device"     : "Devices",    value: devCount },
-            { label: mcpComponentCount === 1 ? "Component"  : "Components", value: mcpComponentCount },
-            { label: totalV            === 1 ? "Violation"  : "Violations", value: totalV },
-        ];
-        if (asset.type === "Skill") return [
-            { label: devCount === 1 ? "Device" : "Devices",       value: devCount },
-            { label: totalV   === 1 ? "Violation" : "Violations", value: totalV },
-        ];
+        if (asset.type === "MCP Server") {
+            const agentCount = findParentAgents(asset, agenticFlatData).length;
+            return [
+                { label: devCount    === 1 ? "Device"     : "Devices",    value: devCount },
+                { label: agentCount  === 1 ? "AI Agent"   : "AI Agents",  value: agentCount },
+                { label: mcpComponentCount === 1 ? "Component" : "Components", value: mcpComponentCount },
+                { label: totalV      === 1 ? "Violation"  : "Violations", value: totalV },
+            ];
+        }
+        if (asset.type === "Skill") {
+            const agentCount = findParentAgents(asset, agenticFlatData).length;
+            return [
+                { label: devCount   === 1 ? "Device"    : "Devices",    value: devCount },
+                { label: agentCount === 1 ? "AI Agent"  : "AI Agents",  value: agentCount },
+                { label: totalV     === 1 ? "Violation" : "Violations", value: totalV },
+            ];
+        }
         return [
             { label: devCount === 1 ? "Device"    : "Devices",    value: devCount },
             { label: totalV   === 1 ? "Violation" : "Violations", value: totalV },

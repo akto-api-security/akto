@@ -1181,6 +1181,22 @@ export default {
             data: { policy, policyId }
         })
         return resp
-    }
+    },
+
+    async fetchSuspectSampleData({ skip = 0, startTimestamp, endTimestamp, hosts = [], limit = 100000 } = {}) {
+        return request({
+            url: '/api/fetchSuspectSampleData',
+            method: 'post',
+            data: {
+                skip, ips: [], urls: [], types: [], apiCollectionIds: [],
+                sort: { detectedAt: -1 },
+                ...(startTimestamp ? { startTimestamp } : {}),
+                ...(endTimestamp   ? { endTimestamp }   : {}),
+                latestAttack: [],
+                limit,
+                ...(hosts?.length  ? { hosts }          : {}),
+            },
+        })
+    },
 
 }

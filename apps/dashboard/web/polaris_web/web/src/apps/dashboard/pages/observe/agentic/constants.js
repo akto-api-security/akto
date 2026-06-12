@@ -160,15 +160,22 @@ export const extractEndpointId = (hostName) => {
     return parts[0];
 };
 
+// Well-known TLD/platform suffixes that are NOT meaningful service names.
+// If parts[2] is one of these the hostname is NOT device.agent.service format
+// (e.g. vulnerable-mcp-kong.akto.io → slice(2) = "io", meaningless).
+const SUFFIX_TLDS = new Set(['io', 'com', 'net', 'org', 'cloud', 'dev', 'app', 'ai', 'co']);
+
 // Extract service name from hostname format: <endpoint-id>.<source-id>.<service-name>
-// Service name can contain dots (e.g., mcp.razorpay.com)
-// Skip first 2 parts (endpoint-id, source-id) and join the rest
+// Service name can contain dots (e.g., mcp.razorpay.com, api.githubcopilot.com).
+// Falls back to the full hostname for short hostnames that don't follow the pattern.
 export const extractServiceName = (hostName) => {
     if (!hostName) return null;
     const parts = hostName.split('.');
-    // Need at least 3 parts: endpoint-id, source-id, and at least one part of service-name
     if (parts.length < 3) return hostName;
-    // Skip first 2 parts and join the rest as service name
+    // If the third segment is a bare TLD/platform suffix the hostname is NOT in
+    // device.agent.service format — use the full hostname as the service name so it
+    // groups as a distinct asset rather than collapsing under the bare TLD.
+    if (SUFFIX_TLDS.has(parts[2].toLowerCase())) return hostName;
     return parts.slice(2).join('.');
 };
 
@@ -249,6 +256,8 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
 // Group collections by service name (extracted from hostname)
 // Hostname format: <endpoint-id>.<source-id>.<service-name>
 // Service name can contain dots (e.g., "mcp.razorpay.com" from "123.456.mcp.razorpay.com")
+const ASSET_TAG_KEYS_SET = new Set(Object.values(ASSET_TAG_KEYS));
+
 export const groupCollectionsByService = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}) => {
     const services = {};
     
@@ -256,8 +265,18 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
         if (c.deactivated) return;
         const typeTag = findTypeTag(c.envType);
         if (!typeTag) return; // Skip collections without type tag
-        // For gen-ai, the agent is the service — show only under agent grouping
-        if (typeTag.keyName === TYPE_TAG_KEYS.GEN_AI) return;
+        // gen-ai collections that also have an asset tag (ai-agent/mcp-client) or a connector
+        // agent tag (agent-name — older DEFENDER/ENDPOINT connector format) are already
+        // captured under agentGroups — skip them here to avoid double-counting.
+        // gen-ai collections WITHOUT any such tag are standalone assets that predate the
+        // tagging scheme and must still appear.
+        if (typeTag.keyName === TYPE_TAG_KEYS.GEN_AI) {
+            const tags = c.envType || [];
+            const hasAgentOwner = tags.some(t =>
+                ASSET_TAG_KEYS_SET.has(t.keyName) || t.keyName === "agent-name"
+            );
+            if (hasAgentOwner) return;
+        }
 
         const hostName = c.hostName || c.displayName || c.name;
         if (!hostName) return;
@@ -786,6 +805,7 @@ export function buildAgenticAssetsPageData(
             lastSeen: lastSeen > 0 ? func.prettifyEpoch(lastSeen) : "",
             lastSeenEpoch: lastSeen,
             skillCount: skillNames.size,
+            skillNames: skillNames.size ? [...skillNames] : undefined,
             toolCount: 0,
             hasPersonalAccount: group.hasPersonalAccount || false,
             hasLocalMcpServer: group.hasLocalMcpServer || false,
@@ -800,10 +820,17 @@ export function buildAgenticAssetsPageData(
         }
         if (group.rowType === ROW_TYPES.AGENT && group.clientType === CLIENT_TYPES.AI_AGENT) {
             const mcpNames = new Set();
+            const agentKey = group.groupKey?.toLowerCase();
             (group.collections || []).forEach((c) => {
+                // Skip collections ingested via an external connector (e.g. MICROSOFT_DEFENDER /
+                // source=DEFENDER) — these represent the agent itself via the connector, not an MCP server.
+                const isConnectorIngested = (c.envType || []).some((t) =>
+                    t.keyName === "connector" || (t.keyName === "source" && t.value === "DEFENDER")
+                );
+                if (isConnectorIngested) return;
                 const hostName = c.hostName || c.displayName || c.name;
                 const serviceName = extractServiceName(hostName);
-                if (serviceName) mcpNames.add(serviceName);
+                if (serviceName && serviceName.toLowerCase() !== agentKey) mcpNames.add(serviceName);
             });
             if (mcpNames.size) flatRow.mcpServers = [...mcpNames];
         }

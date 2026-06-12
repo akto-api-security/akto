@@ -229,10 +229,11 @@ function ThreatDetectionPage() {
             actor: searchParams.get("actor"),
             filterId: searchParams.get("filterId"),
             status: statusValue,
+            severity: searchParams.get("severity") || '',
             hasQueryEvent: Boolean(
-                searchParams.get("refId") && 
-                searchParams.get("eventType") && 
-                searchParams.get("actor") && 
+                searchParams.get("refId") &&
+                searchParams.get("eventType") &&
+                searchParams.get("actor") &&
                 searchParams.get("filterId")
             )
         };
@@ -655,7 +656,9 @@ function ThreatDetectionPage() {
               method: rowContext?.method || '',
               apiCollectionId: rowContext?.apiCollectionId,
               templateId: queryParams.filterId,
-              severity: rowContext?.severity || '',
+              // Prefer the row's severity (set by rowClicked or passed via ?severity= URL param),
+              // so deep-linked opens show the actual event severity, not the template default.
+              severity: rowContext?.severity || queryParams.severity || '',
               sessionId: rowContext?.sessionId || '',
               ruleViolated: rowContext?.ruleViolated || '-'
             },

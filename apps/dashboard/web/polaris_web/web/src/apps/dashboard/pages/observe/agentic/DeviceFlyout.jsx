@@ -9,7 +9,9 @@ import { TypeBadge, SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import AssetTopologyGraph from "./AssetTopologyGraph";
 import { RiskFactorRow } from "./RiskFactorRow";
 import DetailGrid from "./DetailGrid";
-import agenticObserveApi, { buildAgenticObserveChatMetadata } from "./agenticObserveApi";
+import { buildAgenticObserveChatMetadata, fetchAgenticViolations, openViolationInThreatActivity, deviceServiceKey, isClaudeConfigHost } from "./agenticObserveApi";
+import { extractServiceName, extractEndpointId } from "./constants";
+import func from "@/util/func";
 import "../../../components/layouts/style.css";
 
 // ─── Risk factor computation ───────────────────────────────────────────────────
@@ -104,11 +106,6 @@ function ViolTitleCellRenderer({ data }) {
     );
 }
 
-function ViolAgentCellRenderer({ data }) {
-    if (!data) return null;
-    return <TypeBadge type={data.agentType} />;
-}
-
 // ─── Column definitions ───────────────────────────────────────────────────────
 
 function buildAgentsColDefs(agentRiskData) {
@@ -146,75 +143,95 @@ function buildAgentsColDefs(agentRiskData) {
 const SEVERITY_ORDER = { low: 1, medium: 2, high: 3, critical: 4 };
 
 const VIOLATIONS_COL_DEFS = [
-    { field: "time",     headerName: "Time",               width: 120, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.timeEpoch || 0) - (nodeB?.data?.timeEpoch || 0) },
-    { field: "title",    headerName: "Violation",          flex: 1, minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "severity", headerName: "Severity",           width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, comparator: (a, b) => (SEVERITY_ORDER[a] || 0) - (SEVERITY_ORDER[b] || 0) },
-    { field: "agent",    headerName: "Agentic Component",  width: 200, cellRenderer: ViolAgentCellRenderer, cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL" })[p.data?.agentType] || "", cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "time",     headerName: "Time",      width: 120, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.timeEpoch || 0) - (nodeB?.data?.timeEpoch || 0) },
+    { field: "title",    headerName: "Violation", flex: 1, minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "severity", headerName: "Severity",  width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, comparator: (a, b) => (SEVERITY_ORDER[a] || 0) - (SEVERITY_ORDER[b] || 0) },
 ];
 
 const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 
 // ─── Topology graph ───────────────────────────────────────────────────────────
 
-function TopologyGraph({ device, agents }) {
+// Build col3 items (MCPs, LLMs, Skills) linked to a given AI Agent using collections data.
+// The agent's collectionIds tell us which collections it owns; service names on those
+// collections (excluding the agent's own service segment) are its linked MCP/LLM servers.
+function buildAgentCol3Items(agent, collections, agentIdx) {
+    const agentIdSet = new Set((agent.collectionIds || []).map(Number));
+    const deviceId = agent.path?.[0];
+    const agentServiceKey = agent.rawServiceName?.toLowerCase();
+    const seen = new Set();
+    const items = [];
+
+    collections.forEach((c) => {
+        if (!agentIdSet.has(Number(c.id))) return;
+        const hostName = c.hostName || c.displayName || c.name;
+        if (!hostName) return;
+        if (extractEndpointId(hostName) !== deviceId) return;
+        const svc = extractServiceName(hostName);
+        if (!svc || svc.toLowerCase() === agentServiceKey) return;
+        if (seen.has(svc)) return;
+        seen.add(svc);
+        const tags = c.envType || [];
+        const isLlm = tags.some(t => t.keyName === "gen-ai" || t.keyName === "llm");
+        const cat = isLlm ? "ai-model" : "mcp";
+        const type = isLlm ? "LLM" : "MCP Server";
+        const edgeColor = isLlm ? "#ec4899" : "#4cbebb";
+        items.push({ id: `c3-${agentIdx}-${seen.size}`, cat, type, label: svc, agentIdx, edgeColor });
+    });
+
+    // Also add skills from the agent's skillNames
+    (agent.skillNames || []).forEach((name, si) => {
+        items.push({ id: `skl-${agentIdx}-${si}`, cat: "skill", type: "Skill", label: name, agentIdx, edgeColor: "#7C3AED" });
+    });
+
+    return items;
+}
+
+function TopologyGraph({ device, agents, collections = [] }) {
     const { nodes, edges } = useMemo(() => {
-        const aiAgents   = agents.filter(a => a.type === "AI Agent");
-        const mcpServers = agents.filter(a => a.type === "MCP Server");
-        const llms       = agents.filter(a => a.type === "LLM");
-        const hasAgents  = aiAgents.length > 0;
+        const aiAgents = agents.filter(a => a.type === "AI Agent");
+        const hasAgents = aiAgents.length > 0;
 
-        const NODE_H = 100;
-        const COL1_X = 60, COL2_X = 310, COL3_X = 560;
-
-        const col2Count = hasAgents ? aiAgents.length : 0;
-        const col3Count = mcpServers.length + llms.length;
-        const maxRows   = Math.max(col2Count, col3Count, 1);
-        const totalH    = maxRows * NODE_H;
-        const devY      = (totalH - 70) / 2;
+        const NODE_H = 84;
+        const COL1_X = 40, COL2_X = 230, COL3_X = 420;
 
         const deviceLabel = device.username && device.username !== "-" ? device.username : device.endpoint;
-        const ns = [{
-            id: "device", type: "topoNode", draggable: false,
-            position: { x: COL1_X, y: devY },
-            data: { component: { category: "external", type: "User", label: deviceLabel } },
-        }];
-
-        if (hasAgents) {
-            const offset = Math.max(0, (col3Count - col2Count) * NODE_H / 2);
-            aiAgents.forEach((a, i) => ns.push({
-                id: `agent-${i}`, type: "topoNode", draggable: false,
-                position: { x: COL2_X, y: offset + i * NODE_H },
-                data: { component: { category: "agent", type: "AI Agent", label: a.endpoint } },
-            }));
-        }
-
-        const resX = hasAgents ? COL3_X : COL2_X;
-        mcpServers.forEach((a, i) => ns.push({
-            id: `mcp-${i}`, type: "topoNode", draggable: false,
-            position: { x: resX, y: i * NODE_H },
-            data: { component: { category: "mcp", type: "MCP Server", label: a.endpoint } },
-        }));
-        llms.forEach((a, i) => ns.push({
-            id: `llm-${i}`, type: "topoNode", draggable: false,
-            position: { x: resX, y: (mcpServers.length + i) * NODE_H },
-            data: { component: { category: "ai-model", type: "LLM", label: a.endpoint } },
-        }));
-
+        const ns = [];
         const es = [];
+
         if (hasAgents) {
-            aiAgents.forEach((_, ai) => {
-                es.push({ id: `e-d-a${ai}`, source: "device", target: `agent-${ai}`, type: "smoothstep", style: { stroke: "#9ca3af", strokeWidth: 1.5 } });
+            // Build col3 items for all agents, tagged with agentIdx
+            const col3Items = aiAgents.flatMap((a, ai) => buildAgentCol3Items(a, collections, ai));
+            const maxRows = Math.max(aiAgents.length, col3Items.length, 1);
+            const totalH  = maxRows * NODE_H;
+            const devY    = (totalH - 44) / 2;
+            const agentOffset = Math.max(0, (col3Items.length - aiAgents.length) * NODE_H / 2);
+
+            ns.push({ id: "device", type: "topoNode", draggable: false, position: { x: COL1_X, y: devY }, data: { component: { category: "external", type: "User", label: deviceLabel } } });
+            aiAgents.forEach((a, i) => {
+                ns.push({ id: `agent-${i}`, type: "topoNode", draggable: false, position: { x: COL2_X, y: agentOffset + i * NODE_H }, data: { component: { category: "agent", type: "AI Agent", label: a.endpoint } } });
+                es.push({ id: `e-d-a${i}`, source: "device", target: `agent-${i}`, type: "smoothstep", style: { stroke: "#9ca3af", strokeWidth: 1.5 } });
             });
-            const pivot = Math.floor(aiAgents.length / 2);
-            mcpServers.forEach((_, mi) => es.push({ id: `e-pivot-m${mi}`, source: `agent-${pivot}`, target: `mcp-${mi}`, sourceHandle: "b", type: "smoothstep", style: { stroke: "#4cbebb", strokeWidth: 1.5 } }));
-            llms.forEach((_, li) => es.push({ id: `e-pivot-l${li}`, source: `agent-${pivot}`, target: `llm-${li}`, sourceHandle: "b", type: "smoothstep", style: { stroke: "#ec4899", strokeWidth: 1.5 } }));
+            col3Items.forEach((item, i) => {
+                ns.push({ id: item.id, type: "topoNode", draggable: false, position: { x: COL3_X, y: i * NODE_H }, data: { component: { category: item.cat, type: item.type, label: item.label } } });
+                es.push({ id: `e-a${item.agentIdx}-${item.id}`, source: `agent-${item.agentIdx}`, target: item.id, type: "smoothstep", style: { stroke: item.edgeColor, strokeWidth: 1.5 } });
+            });
         } else {
-            mcpServers.forEach((_, i) => es.push({ id: `e-d-m${i}`, source: "device", target: `mcp-${i}`, type: "smoothstep", style: { stroke: "#9ca3af", strokeWidth: 1.5 } }));
-            llms.forEach((_, i) => es.push({ id: `e-d-l${i}`, source: "device", target: `llm-${i}`, type: "smoothstep", style: { stroke: "#9ca3af", strokeWidth: 1.5 } }));
+            // No AI Agents — show device → direct service children (MCP/LLM)
+            const direct = agents.filter(a => a.type === "MCP Server" || a.type === "LLM");
+            const maxRows = Math.max(direct.length, 1);
+            const devY = (maxRows * NODE_H - 44) / 2;
+            ns.push({ id: "device", type: "topoNode", draggable: false, position: { x: COL1_X, y: devY }, data: { component: { category: "external", type: "User", label: deviceLabel } } });
+            direct.forEach((a, i) => {
+                const cat = a.type === "LLM" ? "ai-model" : "mcp";
+                const color = a.type === "LLM" ? "#ec4899" : "#9ca3af";
+                ns.push({ id: `svc-${i}`, type: "topoNode", draggable: false, position: { x: COL2_X, y: i * NODE_H }, data: { component: { category: cat, type: a.type, label: a.endpoint } } });
+                es.push({ id: `e-d-s${i}`, source: "device", target: `svc-${i}`, type: "smoothstep", style: { stroke: color, strokeWidth: 1.5 } });
+            });
         }
 
         return { nodes: ns, edges: es };
-    }, [agents, device.endpoint]);
+    }, [agents, device.endpoint, device.username, collections]);
 
     return <AssetTopologyGraph nodes={nodes} edges={edges} />;
 }
@@ -223,7 +240,7 @@ function TopologyGraph({ device, agents }) {
 
 const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 
-function OverviewTab({ device, agents, onTabChange }) {
+function OverviewTab({ device, agents, collections, onTabChange }) {
     const { aiCount, mcpCount, llmCount, totalV } = useMemo(() => ({
         aiCount:  agents.filter(a => a.type === "AI Agent").length,
         mcpCount: agents.filter(a => a.type === "MCP Server").length,
@@ -272,7 +289,7 @@ function OverviewTab({ device, agents, onTabChange }) {
                     ))}
                 </HorizontalGrid>
 
-                <TopologyGraph device={device} agents={agents} />
+                <TopologyGraph device={device} agents={agents} collections={collections} />
 
                 <VerticalStack gap="2">
                     <Text variant="headingXs" color="subdued">Risk Analysis</Text>
@@ -343,36 +360,54 @@ function AgenticsTab({ agents, onAgentClick, agentRiskData = {} }) {
             pagination
             paginationPageSize={20}
             paginationPageSizeSelector={[20, 50, 100]}
-            sideBar={{ toolPanels: ["columns", "filters"] }}
+            sideBar={{ toolPanels: ["columns", "filters"], defaultToolPanel: null }}
             domLayout="normal" />
     );
 }
 
 // ─── Violations tab ───────────────────────────────────────────────────────────
 
-function ViolationsTab({ device }) {
+function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp }) {
     const [violations, setViolations] = useState([]);
 
+    useEffect(() => { setViolations([]); }, [hostNames, deviceId]);
+
     useEffect(() => {
-        if (!device?.path?.[0]) {
-            setViolations([]);
-            return;
-        }
+        const claudeDeviceIds = new Set(
+            hostNames
+                .filter(h => { const parts = h.split("."); return parts[parts.length - 1]?.toLowerCase() === "claude"; })
+                .map(h => h.split(".")[0])
+                .filter(Boolean)
+        );
+        if (deviceId) claudeDeviceIds.add(deviceId);
+
+        if (!hostNames.length && !claudeDeviceIds.size) { setViolations([]); return; }
+
         let cancelled = false;
-        (async () => {
-            try {
-                const rows = await agenticObserveApi.fetchAgenticViolations({ deviceId: device.path[0] });
-                if (!cancelled) setViolations(rows);
-            } catch {
+        const hostSet = new Set(hostNames);
+        const looseHostSet = new Set(hostNames.map(h => deviceServiceKey(h)).filter(Boolean));
+        fetchAgenticViolations({ startTimestamp, endTimestamp })
+            .then((rows) => {
+                if (cancelled) return;
+                const filtered = rows.filter(r =>
+                    hostSet.has(r.host) ||
+                    looseHostSet.has(deviceServiceKey(r.host)) ||
+                    (isClaudeConfigHost(r.host) && claudeDeviceIds.has(r.host.split(".")[0]))
+                );
+                setViolations(filtered.map((r) => ({
+                    ...r,
+                    time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
+                })));
+            })
+            .catch(() => {
                 if (!cancelled) setViolations([]);
-            }
-        })();
+            });
         return () => { cancelled = true; };
-    }, [device?.path?.[0]]);
+    }, [hostNames, deviceId, startTimestamp, endTimestamp]);
 
     const handleViolationClick = useCallback((e) => {
         if (!e.data) return;
-        window.open("/dashboard/protection/threat-activity", "_blank");
+        openViolationInThreatActivity(e.data);
     }, []);
 
     if (violations.length === 0) {
@@ -399,14 +434,14 @@ function ViolationsTab({ device }) {
             pagination
             paginationPageSize={20}
             paginationPageSizeSelector={[20, 50, 100]}
-            sideBar={{ toolPanels: ["columns", "filters"] }}
+            sideBar={{ toolPanels: ["columns", "filters"], defaultToolPanel: null }}
             domLayout="normal" />
     );
 }
 
 // ─── Main DeviceFlyout ────────────────────────────────────────────────────────
 
-export default function DeviceFlyout({ device, agents, show, onClose, onAgentClick, agentRiskData = {} }) {
+export default function DeviceFlyout({ device, agents, show, onClose, onAgentClick, agentRiskData = {}, deviceHostNames = [], collections = [], startTimestamp, endTimestamp }) {
     const [selectedTab, setSelectedTab] = useState(0);
 
     // Minimal identity only — the MCP agent resolves this device's collections and fetches
@@ -454,9 +489,9 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
             }
         >
             <Box padding="2" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-                {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} onTabChange={setSelectedTab} />}
+                {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} collections={collections} onTabChange={setSelectedTab} />}
                 {selectedTab === 1 && <AgenticsTab agents={agents || []} onAgentClick={onAgentClick} agentRiskData={agentRiskData} />}
-                {selectedTab === 2 && <ViolationsTab device={device} agents={agents} />}
+                {selectedTab === 2 && <ViolationsTab hostNames={deviceHostNames} deviceId={device?.path?.[0] || device?.deviceId} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
             </Box>
         </AgenticFlyoutShell>
     );

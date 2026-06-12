@@ -31,6 +31,8 @@ import NewLayoutTooltip from "./NewLayoutTooltip";
 import api from "../api";
 import agenticObserveApi, {
   aggregateViolationsByCollectionId,
+  fetchAgenticViolations,
+  deviceServiceKey,
 } from "./agenticObserveApi";
 import {
   buildAgenticAssetsPageData,
@@ -165,6 +167,9 @@ function TableSection({
   violSevFilter,
   flyout,
   setFlyout,
+  collections,
+  startTimestamp,
+  endTimestamp,
 }) {
   const gridRef = useRef(null);
   // Auto-open from a ?asset= deep link must run ONCE on load — not every time the
@@ -276,6 +281,9 @@ function TableSection({
         agenticTreeData={agenticTreeData}
         agenticFlatData={agenticFlatData}
         assetDevices={assetDevices}
+        collections={collections}
+        startTimestamp={startTimestamp}
+        endTimestamp={endTimestamp}
       />
     </>
   );
@@ -293,6 +301,7 @@ export default function AgenticAssetsPage() {
   const [agenticFlatData, setAgenticFlatData] = useState([]);
   const [assetDevices, setAssetDevices] = useState({});
   const [agenticViolationRows, setAgenticViolationRows] = useState([]);
+  const [collections, setCollections] = useState([]);
   const newLayout = LocalStore((state) => state.agenticNewLayout);
   const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
 
@@ -341,10 +350,7 @@ export default function AgenticAssetsPage() {
           api.getRiskScoreInfo(),
           api.getSensitiveInfoForCollections(),
           fetchEndpointShieldUserMetadata(),
-          agenticObserveApi.fetchAgenticViolations({
-            startTimestamp,
-            endTimestamp,
-          }),
+          fetchAgenticViolations({ startTimestamp, endTimestamp }),
           agenticObserveApi.listUserAnalysis(),
         ]);
 
@@ -361,7 +367,7 @@ export default function AgenticAssetsPage() {
           userAnalysisKeysByDeviceId = new Map(),
         } = shieldResult || {};
         const violationsByCollectionId =
-          aggregateViolationsByCollectionId(violationRows);
+          aggregateViolationsByCollectionId(violationRows, collections);
         const analysisByKey = buildUserAnalysisLookup(userAnalysisList);
 
         const pageData = buildAgenticAssetsPageData(
@@ -382,6 +388,7 @@ export default function AgenticAssetsPage() {
         setAgenticFlatData(pageData.agenticFlatData);
         setAssetDevices(pageData.assetDevices);
         setAgenticViolationRows(violationRows);
+        setCollections(collections);
 
         // Enrich Skill rows with malicious flag (same source as old UI) — async, non-blocking
         const skillCollectionIds = [];
@@ -488,12 +495,22 @@ export default function AgenticAssetsPage() {
   );
 
   const agenticCollectionViolRows = useMemo(() => {
-    const ids = new Set();
+    const treeCollIds = new Set();
     agenticFlatData.forEach((r) =>
-      (r.collectionIds || []).forEach((id) => ids.add(Number(id))),
+      (r.collectionIds || []).forEach((id) => treeCollIds.add(Number(id))),
     );
-    return agenticViolationRows.filter((v) => ids.has(Number(v.apiCollectionId)));
-  }, [agenticFlatData, agenticViolationRows]);
+    const treeHosts = new Set();
+    const treeLooseKeys = new Set();
+    collections.forEach((c) => {
+      if (!treeCollIds.has(Number(c.id)) || !c.hostName) return;
+      treeHosts.add(c.hostName);
+      const lk = deviceServiceKey(c.hostName);
+      if (lk) treeLooseKeys.add(lk);
+    });
+    return agenticViolationRows.filter(
+      (v) => v.host && (treeHosts.has(v.host) || treeLooseKeys.has(deviceServiceKey(v.host))),
+    );
+  }, [agenticFlatData, agenticViolationRows, collections]);
 
   const topViolRows = useMemo(
     () =>
@@ -510,8 +527,16 @@ export default function AgenticAssetsPage() {
         .slice(0, 5)
         .map((row) => {
           const collectionIdSet = new Set((row.collectionIds || []).map(Number));
-          const assetViolRows = agenticCollectionViolRows.filter((v) =>
-            collectionIdSet.has(Number(v.apiCollectionId)),
+          const rowHosts = new Set();
+          const rowLooseKeys = new Set();
+          collections.forEach((c) => {
+            if (!collectionIdSet.has(Number(c.id)) || !c.hostName) return;
+            rowHosts.add(c.hostName);
+            const lk = deviceServiceKey(c.hostName);
+            if (lk) rowLooseKeys.add(lk);
+          });
+          const assetViolRows = agenticCollectionViolRows.filter(
+            (v) => v.host && (rowHosts.has(v.host) || rowLooseKeys.has(deviceServiceKey(v.host))),
           );
           const series = cumulativeByMonth(
             assetViolRows,
@@ -537,7 +562,7 @@ export default function AgenticAssetsPage() {
             ),
           };
         }),
-    [agenticFlatData, agenticCollectionViolRows, startTimestamp, endTimestamp, setFlyout],
+    [agenticFlatData, agenticCollectionViolRows, collections, startTimestamp, endTimestamp, setFlyout],
   );
 
   const anchorSeriesToTotal = useCallback((series, total) => {
@@ -561,13 +586,30 @@ export default function AgenticAssetsPage() {
     { label: "Skills",     count: agenticFlatData.filter(r => r.type === "Skill").length,      color: "#D1D5DB",  key: "Skill" },
   ], [agenticFlatData]);
 
+  const violationsByCollectionId = useMemo(
+    () => aggregateViolationsByCollectionId(agenticViolationRows, collections),
+    [agenticViolationRows, collections],
+  );
+
   const violationTotals = useMemo(() => {
-    const crit = agenticFlatData.reduce((s, r) => s + (r.violations?.critical || 0), 0);
-    const high = agenticFlatData.reduce((s, r) => s + (r.violations?.high || 0), 0);
-    const med  = agenticFlatData.reduce((s, r) => s + (r.violations?.medium || 0), 0);
-    const low  = agenticFlatData.reduce((s, r) => s + (r.violations?.low || 0), 0);
-    return { crit, high, med, low, total: crit + high + med + low };
-  }, [agenticFlatData]);
+    const seen = new Set();
+    const t = { crit: 0, high: 0, med: 0, low: 0 };
+    agenticFlatData.forEach((r) => {
+      if (!r.violations) return;
+      (r.collectionIds || []).forEach((id) => {
+        const key = Number(id);
+        if (seen.has(key)) return;
+        seen.add(key);
+        const v = violationsByCollectionId[key];
+        if (!v) return;
+        t.crit += v.critical || 0;
+        t.high += v.high || 0;
+        t.med  += v.medium || 0;
+        t.low  += v.low || 0;
+      });
+    });
+    return { ...t, total: t.crit + t.high + t.med + t.low };
+  }, [agenticFlatData, violationsByCollectionId]);
 
   const violBreakdown = useMemo(() => [
     { label: "Critical", key: "critical", count: violationTotals.crit, color: "#DC2626" },
@@ -679,6 +721,9 @@ export default function AgenticAssetsPage() {
           violSevFilter={violSevFilter}
           flyout={flyout}
           setFlyout={setFlyout}
+          collections={collections}
+          startTimestamp={startTimestamp}
+          endTimestamp={endTimestamp}
         />,
       ]}
     />

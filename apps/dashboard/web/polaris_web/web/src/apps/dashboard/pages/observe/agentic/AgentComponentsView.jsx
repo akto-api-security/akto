@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Box, Text, Badge, HorizontalStack, VerticalStack } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
-import { RiskPill, TypeBadge } from "./AgenticCellRenderers";
-import { ToolDetailPanel, SkillDetailPanel, ViolationCountCellRenderer } from "./McpComponentsView";
+import { TypeBadge, RiskPill, SeverityBadge } from "./AgenticCellRenderers";
+import { ToolDetailPanel, SkillDetailPanel } from "./McpComponentsView";
+import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges";
 import agenticObserveApi from "./agenticObserveApi";
 
 // ── Cell renderers ────────────────────────────────────────────────────────────
@@ -21,20 +22,51 @@ function AgentComponentNameCellRenderer({ data }) {
 
 function AgentComponentTypeCellRenderer({ value }) {
     if (!value) return null;
+    if (value === "Config") return <Badge status="attention">Config</Badge>;
     return <TypeBadge type={value} />;
 }
 
-function DeviceRiskCellRenderer({ value }) {
-    if (value == null) return <Text variant="bodyMd" color="subdued">-</Text>;
-    return <RiskPill score={value} />;
+function AgentComponentViolationsCellRenderer({ data }) {
+    if (!data?.violations) return <Text variant="bodySm" color="subdued">-</Text>;
+    // Skill rows: violations is a plain number from fetchSkillsFlyoutData
+    if (typeof data.violations === "number") {
+        if (!data.violations) return <Text variant="bodySm" color="subdued">-</Text>;
+        return <SeverityBadge severity="critical">{data.violations}</SeverityBadge>;
+    }
+    // Config / other rows: violations is an object { critical, high, medium, low }
+    const parts = ["critical", "high", "medium", "low"].filter(k => data.violations[k] > 0);
+    if (!parts.length) return <Text variant="bodySm" color="subdued">-</Text>;
+    return (
+        <HorizontalStack gap="1" blockAlign="center">
+            {parts.map(k => <SeverityBadge key={k} severity={k}>{data.violations[k]}</SeverityBadge>)}
+        </HorizontalStack>
+    );
 }
 
 // ── Column definitions ────────────────────────────────────────────────────────
 
+function ToolRiskCellRenderer({ data }) {
+    if (!data) return null;
+    const cra = {
+        isComponentMalicious: data.isMalicious || false,
+        hasPrivilegedAccess: data.hasPrivilegedAccess || false,
+        evidence: data.riskDescription || "",
+    };
+    if (!cra.isComponentMalicious && !cra.hasPrivilegedAccess) return <Text variant="bodySm" color="subdued">-</Text>;
+    return <ComponentRiskAnalysisBadges componentRiskAnalysis={cra} />;
+}
+
+function ToolRiskScoreCellRenderer({ data }) {
+    if (!data) return null;
+    const score = data.riskScore;
+    if (!score) return <Text variant="bodyMd" color="subdued">-</Text>;
+    return <RiskPill score={score} />;
+}
+
 const TOOLS_COL_DEFS = [
-    { field: "name",      headerName: "Tool",   flex: 1,   minWidth: 160, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#202223" } },
-    { field: "riskLevel", headerName: "Risk",   width: 100, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ({ value }) => value ? <Text variant="bodyMd" color="subdued">{value}</Text> : null, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "params",    headerName: "Params", width: 80,  suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center" }, valueGetter: p => p.data?.params?.length ?? 0 },
+    { field: "name", headerName: "Tool", flex: 1, minWidth: 160, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#202223" } },
+    { field: "riskScore", headerName: "Risk Score", width: 110, sort: "desc", suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ToolRiskScoreCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, valueGetter: p => p.data?.riskScore || 0 },
+    { headerName: "Risk", width: 160, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ToolRiskCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, valueGetter: p => (p.data?.isMalicious ? 2 : 0) + (p.data?.hasPrivilegedAccess ? 1 : 0) },
 ];
 
 const COMBINED_AGENT_COL_DEFS = [
@@ -59,24 +91,19 @@ const COMBINED_AGENT_COL_DEFS = [
         cellStyle: { display: "flex", alignItems: "center" },
     },
     {
-        field: "riskScore",
-        headerName: "Risk Score",
-        width: 100,
-        filter: false,
-        suppressHeaderMenuButton: true,
-        suppressHeaderFilterButton: true,
-        cellRenderer: DeviceRiskCellRenderer,
-        cellStyle: { display: "flex", alignItems: "center" },
-    },
-    {
         headerName: "Violations",
-        width: 110,
+        width: 160,
         filter: false,
         suppressHeaderMenuButton: true,
         suppressHeaderFilterButton: true,
-        cellRenderer: ViolationCountCellRenderer,
+        cellRenderer: AgentComponentViolationsCellRenderer,
         cellStyle: { display: "flex", alignItems: "center" },
-        valueGetter: p => p.data?._type === "Skill" ? (p.data.violations || 0) : 0,
+        valueGetter: p => {
+            const v = p.data?.violations;
+            if (!v) return 0;
+            if (typeof v === "number") return v;
+            return (v.critical || 0) + (v.high || 0) + (v.medium || 0) + (v.low || 0);
+        },
     },
 ];
 
@@ -200,13 +227,24 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
         onNavChange?.(null);
     }, [onNavChange]);
 
+    // Config row: shown for Claude agents when the asset has violations attributed from
+    // claude-settings / claude config scanner events (no real collection, non-clickable).
+    const configRow = useMemo(() => {
+        const isClaudeAgent = asset?.assetTagValue?.toLowerCase() === "claude";
+        if (!isClaudeAgent) return null;
+        const v = asset?.violations;
+        if (!v || (v.critical + v.high + v.medium + v.low) === 0) return null;
+        return { id: "__config__", name: "Claude Settings", _type: "Config", violations: v, _nonClickable: true };
+    }, [asset?.assetTagValue, asset?.violations]);
+
     const allComponents = useMemo(() => [
+        ...(configRow ? [configRow] : []),
         ...connectedMcps.map(m => ({ ...m, _type: "MCP Server" })),
         ...skills.map(s => ({ ...s, _type: "Skill" })),
-    ], [connectedMcps, skills]);
+    ], [configRow, connectedMcps, skills]);
 
     const handleListRowClick = useCallback((e) => {
-        if (!e.data) return;
+        if (!e.data || e.data._nonClickable) return;
         if (e.data._type === "MCP Server") {
             setSelectedMcp(e.data);
             setView("mcp-tools");
@@ -263,13 +301,13 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
             columnDefs={COMBINED_AGENT_COL_DEFS}
             defaultColDef={GRID_DEFAULT_COL}
             onRowClicked={handleListRowClick}
-            getRowStyle={() => ({ cursor: "pointer" })}
+            getRowStyle={({ data }) => ({ cursor: data?._nonClickable ? "default" : "pointer" })}
             fillHeight
             noOuterBorder
             searchPlaceholder="Search components..."
             pagination
             paginationPageSize={20}
-            sideBar={false}
+            sideBar={{ toolPanels: ["columns", "filters"], defaultToolPanel: null }}
             domLayout="normal"
         />
     );
