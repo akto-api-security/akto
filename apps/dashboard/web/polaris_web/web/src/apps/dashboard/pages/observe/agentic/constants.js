@@ -31,8 +31,15 @@ export const SKILL_RISK_CACHE_TTL_MS = 2 * 60 * 1000;
 export const INVENTORY_PATH = '/dashboard/observe/inventory';
 export const INVENTORY_FILTER_KEY = '/dashboard/observe/inventory/';
 export const AGENTIC_ASSETS_PATH = '/dashboard/observe/agentic-assets';
+export const AGENTIC_ASSETS_LEGACY_PATH = '/dashboard/observe/agentic-assets-legacy';
 export const USERS_AND_DEVICES_PATH = '/dashboard/observe/users-and-devices';
-export const AGENTIC_OBSERVE_BACK_PATHS = [AGENTIC_ASSETS_PATH, USERS_AND_DEVICES_PATH];
+export const DEVICE_ENDPOINTS_PATH = '/dashboard/observe/endpoints';
+export const AGENTIC_OBSERVE_BACK_PATHS = [
+    AGENTIC_ASSETS_PATH,
+    AGENTIC_ASSETS_LEGACY_PATH,
+    USERS_AND_DEVICES_PATH,
+    DEVICE_ENDPOINTS_PATH,
+];
 export const ASSET_TAG_KEY_VALUES = Object.values(ASSET_TAG_KEYS);
 
 // Row ID prefixes for grouped data
