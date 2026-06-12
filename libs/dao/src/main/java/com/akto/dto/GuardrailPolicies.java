@@ -133,10 +133,13 @@ public class GuardrailPolicies {
                     .map(serverId -> new SelectedServer(serverId, serverId))
                     .collect(java.util.stream.Collectors.toList());
         }
-        if (applyToAllServers && "block".equals(this.behaviour)) {
-            return fetchApplicableServersByTag(Constants.AKTO_MCP_SERVER_TAG);
+        if (contextSource != null && contextSource != CONTEXT_SOURCE.AGENTIC) {
+            return new ArrayList<>();
         }
-        return new ArrayList<>();
+        if (!applyToAllServers) {
+            return new ArrayList<>();
+        }
+        return fetchApplicableServersByContext(Constants.AKTO_MCP_SERVER_TAG);
     }
 
     public List<SelectedServer> getEffectiveSelectedAgentServers() {
@@ -148,22 +151,35 @@ public class GuardrailPolicies {
                     .map(serverId -> new SelectedServer(serverId, serverId))
                     .collect(java.util.stream.Collectors.toList());
         }
-        if (applyToAllServers && "block".equals(this.behaviour)) {
-            return fetchApplicableServersByTag(Constants.AKTO_GEN_AI_TAG);
+        if (contextSource != null && contextSource != CONTEXT_SOURCE.AGENTIC) {
+            return new ArrayList<>();
         }
-        return new ArrayList<>();
+        if (!applyToAllServers) {
+            return new ArrayList<>();
+        }
+        return fetchApplicableServersByContext(Constants.AKTO_GEN_AI_TAG);
     }
 
-    // called only when applyToAllServers + block mode: returns inline-mode servers of the given type
-    private List<SelectedServer> fetchApplicableServersByTag(String serverTypeTag) {
+    // filters collections by the policy's contextSource tag (key="source", value=contextSource.name())
+    // excludes Atlas/endpoint collections (source=ENDPOINT); returns inline-only when behaviour is "block"
+    private List<SelectedServer> fetchApplicableServersByContext(String serverTypeTag) {
+        if (contextSource == null) return new ArrayList<>();
+        boolean isBlock = "block".equals(this.behaviour);
         Bson filter = Filters.and(
-                Filters.elemMatch(ApiCollection.TAGS_STRING,
-                        Filters.eq(CollectionTags.KEY_NAME, serverTypeTag)),
-                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
-                        Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GUARDRAIL_MODE),
-                        Filters.eq(CollectionTags.VALUE, Constants.AKTO_GUARDRAIL_MODE_INLINE)
-                ))
+                (Filters.elemMatch(ApiCollection.TAGS_STRING, 
+                    Filters.eq(CollectionTags.KEY_NAME, serverTypeTag))
+                ),
+                Filters.not(Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
+                        Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_COLLECTION_CONTEXT_TAG_KEY),
+                        Filters.eq(CollectionTags.VALUE, CONTEXT_SOURCE.ENDPOINT.name())
+                )))
         );
+        if (isBlock) {
+            filter = Filters.and(filter, Filters.not(Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
+                    Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GUARDRAIL_MODE),
+                    Filters.eq(CollectionTags.VALUE, Constants.AKTO_GUARDRAIL_MODE_OBSERVE)
+            ))));
+        }
         return ApiCollectionsDao.instance.findAll(filter, Projections.include(ApiCollection.ID, "name"))
                 .stream()
                 .map(c -> new SelectedServer(String.valueOf(c.getId()), c.getName()))
