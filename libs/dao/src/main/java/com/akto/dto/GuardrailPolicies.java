@@ -133,13 +133,14 @@ public class GuardrailPolicies {
                     .map(serverId -> new SelectedServer(serverId, serverId))
                     .collect(java.util.stream.Collectors.toList());
         }
-        if (contextSource != null && contextSource != CONTEXT_SOURCE.AGENTIC) {
-            return new ArrayList<>();
-        }
-        if (!applyToAllServers) {
-            return new ArrayList<>();
-        }
-        return fetchApplicableServersByContext(Constants.AKTO_MCP_SERVER_TAG);
+        return new ArrayList<>();
+        // if (contextSource != null && contextSource != CONTEXT_SOURCE.AGENTIC) {
+        //     return new ArrayList<>();
+        // }
+        // if (!applyToAllServers) {
+        //     return new ArrayList<>();
+        // }
+        // return fetchApplicableServersByContext(Constants.AKTO_MCP_SERVER_TAG);
     }
 
     public List<SelectedServer> getEffectiveSelectedAgentServers() {
@@ -151,13 +152,14 @@ public class GuardrailPolicies {
                     .map(serverId -> new SelectedServer(serverId, serverId))
                     .collect(java.util.stream.Collectors.toList());
         }
-        if (contextSource != null && contextSource != CONTEXT_SOURCE.AGENTIC) {
-            return new ArrayList<>();
-        }
-        if (!applyToAllServers) {
-            return new ArrayList<>();
-        }
-        return fetchApplicableServersByContext(Constants.AKTO_GEN_AI_TAG);
+        return new ArrayList<>();
+        // if (contextSource != null && contextSource != CONTEXT_SOURCE.AGENTIC) {
+        //     return new ArrayList<>();
+        // }
+        // if (!applyToAllServers) {
+        //     return new ArrayList<>();
+        // }
+        // return fetchApplicableServersByContext(Constants.AKTO_GEN_AI_TAG);
     }
 
     // filters collections by the policy's contextSource tag (key="source", value=contextSource.name())
