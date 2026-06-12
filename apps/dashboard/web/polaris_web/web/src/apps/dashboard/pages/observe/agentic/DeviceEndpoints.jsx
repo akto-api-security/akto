@@ -430,9 +430,9 @@ function TableSection({ deviceFlatData, agentRiskData, collections, startTimesta
                 treeData
                 getDataPath={getDataPath}
                 groupDefaultExpanded={0}
-                height={800}
+                height={500}
+                domLayout="normal"
                 searchPlaceholder="Search..."
-                searchOffset={400}
                 bulkActionCount={selectedCount}
                 bulkActions={bulkActions}
                 onClearBulk={() => { gridRef.current?.api?.deselectAll(); setSelectedCount(0); }}

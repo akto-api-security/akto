@@ -163,6 +163,7 @@ export default function AgGridTable({
     animateRows = true,
     suppressCellFocus = true,
     domLayout = "autoHeight",
+    height,
     onServerFetch,
     filterStateUrl,
     ...rest
@@ -313,7 +314,7 @@ export default function AgGridTable({
             {hasSearch && <SearchBar value={searchValue} onChange={(val) => {
                 setSearchValue(val);
             }} placeholder={searchPlaceholder} topRadius={!noOuterBorder} />}
-            <div style={{ flex: 1, minHeight: 0}}>
+            <div style={height ? { height } : { flex: 1, minHeight: 0 }}>
                 {gridNode}
             </div>
             {serverPaginationBar}
