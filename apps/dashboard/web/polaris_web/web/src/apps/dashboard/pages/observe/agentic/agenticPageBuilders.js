@@ -194,14 +194,25 @@ export function buildMcpComponentsFromStis(stiEndpoints = [], apiInfoList = [], 
         infoByKey[`${m} ${u}`] = { riskScore: info.riskScore || 0, violations: vCount };
     });
 
-    // type lookup keyed by resourceName (tool/resource/prompt audit rows store the component name here)
+    // type + risk metadata lookup keyed by resourceName
     // mcp-server rows have a hostname as resourceName — skip those, they don't map to individual endpoints
     const typeByName = {};
+    const isMaliciousByName = {};
+    const privilegedByName = {};
+    const riskDescByName = {};
     auditRows.forEach((row) => {
         if (!row?.type || !row?.resourceName) return;
         const t = String(row.type).toLowerCase();
-        if (t.includes("server")) return; // hostname-keyed, no per-endpoint match possible
+        if (t.includes("server")) return;
         typeByName[row.resourceName] = row.type;
+        const cra = row.componentRiskAnalysis || {};
+        if (cra.isComponentMalicious) isMaliciousByName[row.resourceName] = true;
+        if (cra.hasPrivilegedAccess) privilegedByName[row.resourceName] = true;
+        // evidence is the authoritative "why" string shown in the tooltip (from the AI analysis).
+        // Fall back to description then remarks so nothing is silently dropped.
+        if (cra.evidence || cra.description || row.remarks) {
+            riskDescByName[row.resourceName] = cra.evidence || cra.description || row.remarks || "";
+        }
     });
 
     const tools = [], resources = [], prompts = [], skills = [];
@@ -215,7 +226,11 @@ export function buildMcpComponentsFromStis(stiEndpoints = [], apiInfoList = [], 
         const name = mcpDisplayName(url);
         const type = bucketFromAuditType(typeByName[name]) || bucketFromUrl(url);
         const info = infoByKey[`${method} ${url}`] || {};
-        const item = { id: id++, name, url, method, apiCollectionId, description: "", riskLevel: null, params: [], violations: info.violations || 0 };
+        const isMalicious = isMaliciousByName[name] || false;
+        const hasPrivilegedAccess = privilegedByName[name] || false;
+        const riskDescription = riskDescByName[name] || "";
+        const riskScore = info.riskScore || 0;
+        const item = { id: id++, name, url, method, apiCollectionId, description: "", riskScore, riskLevel: isMalicious ? "critical" : null, isMalicious, hasPrivilegedAccess, riskDescription, params: [], violations: info.violations || 0 };
         if (type === "Skill") {
             skills.push(item);
         } else if (type === "Resource") {
@@ -440,6 +455,13 @@ export function buildDeviceEndpointsPageData(
         if (!hostName) return;
         const devId = extractEndpointId(hostName);
         if (!devId) return;
+        // Skip collections ingested via an external connector (e.g. MICROSOFT_DEFENDER, source=DEFENDER).
+        // These represent the AI agent as seen through the connector, not a real service child row.
+        const tags = collection.envType || [];
+        const isConnectorIngested = tags.some(t =>
+            t.keyName === "connector" || (t.keyName === "source" && t.value === "DEFENDER")
+        );
+        if (isConnectorIngested) return;
 
         collectionIdToDevice[collection.id] = devId;
         if (!deviceMap[devId]) {
@@ -478,6 +500,7 @@ export function buildDeviceEndpointsPageData(
                 type: clientType,
                 collectionIds: [],
                 skillCount: 0,
+                skillNames: new Set(),
                 riskScore: 0,
                 lastTraffic: 0,
                 violations: emptyViolations(),
@@ -486,6 +509,7 @@ export function buildDeviceEndpointsPageData(
         const child = device.children[childKey];
         child.collectionIds.push(collection.id);
         child.skillCount = Math.max(child.skillCount, skillCount);
+        (collection.skills || []).forEach(s => { if (s) child.skillNames.add(s); });
         child.riskScore = Math.max(child.riskScore, collRisk);
         child.lastTraffic = Math.max(child.lastTraffic, traffic);
 
@@ -546,6 +570,7 @@ export function buildDeviceEndpointsPageData(
                 type: child.type,
                 collectionIds: child.collectionIds,
                 skillCount: child.skillCount > 0 ? child.skillCount : undefined,
+                skillNames: child.skillNames.size > 0 ? [...child.skillNames] : undefined,
                 lastTraffic: child.lastTraffic > 0 ? func.prettifyEpoch(child.lastTraffic) : "-",
                 lastTrafficEpoch: child.lastTraffic || 0,
             });

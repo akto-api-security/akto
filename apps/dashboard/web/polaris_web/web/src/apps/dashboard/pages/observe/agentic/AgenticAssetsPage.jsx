@@ -168,6 +168,8 @@ function TableSection({
   flyout,
   setFlyout,
   collections,
+  startTimestamp,
+  endTimestamp,
 }) {
   const gridRef = useRef(null);
   // Auto-open from a ?asset= deep link must run ONCE on load — not every time the
@@ -280,6 +282,8 @@ function TableSection({
         agenticFlatData={agenticFlatData}
         assetDevices={assetDevices}
         collections={collections}
+        startTimestamp={startTimestamp}
+        endTimestamp={endTimestamp}
       />
     </>
   );
@@ -718,6 +722,8 @@ export default function AgenticAssetsPage() {
           flyout={flyout}
           setFlyout={setFlyout}
           collections={collections}
+          startTimestamp={startTimestamp}
+          endTimestamp={endTimestamp}
         />,
       ]}
     />

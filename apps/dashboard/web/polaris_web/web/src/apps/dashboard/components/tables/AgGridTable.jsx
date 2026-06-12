@@ -158,7 +158,7 @@ export default function AgGridTable({
     pagination,
     paginationPageSize = 20,
     paginationPageSizeSelector = [20, 50, 100],
-    sideBar = { toolPanels: ["columns", "filters"] },
+    sideBar = { toolPanels: ["columns", "filters"], defaultToolPanel: null },
     gridRef: gridRefProp,
     animateRows = true,
     suppressCellFocus = true,

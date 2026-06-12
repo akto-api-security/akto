@@ -6,7 +6,7 @@ import AgenticFlyoutShell from "./AgenticFlyoutShell";
 import AiChatSection from "./AiChatSection";
 import { getAgentLinkedComponents } from "./agenticPageBuilders";
 import { RiskScoreCellRenderer } from "./AgenticCellRenderers";
-import agenticObserveApi, { buildAgenticObserveChatMetadata } from "./agenticObserveApi";
+import agenticObserveApi, { buildAgenticObserveChatMetadata, openViolationInThreatActivity } from "./agenticObserveApi";
 import OverviewTab from "./OverviewTab";
 import ViolationsTab from "./ViolationsTab";
 import McpComponentsView from "./McpComponentsView";
@@ -85,6 +85,8 @@ export default function AgenticAssetFlyout({
     agenticFlatData = [],
     assetDevices = {},
     collections = [],
+    startTimestamp,
+    endTimestamp,
 }) {
     const [selectedTab,    setSelectedTab]    = useState(0);
     const [topNav,         setTopNav]         = useState(null);
@@ -227,7 +229,7 @@ export default function AgenticAssetFlyout({
                         />
                     </div>
                 )}
-                {selectedTab === 2 && <ViolationsTab asset={asset} collections={collections} />}
+                {selectedTab === 2 && <ViolationsTab asset={asset} collections={collections} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onViolationClick={asset?.type === "Skill" ? () => handleTabSelect(1) : undefined} />}
                 {selectedTab === 3 && <DevicesTab asset={asset} assetDevices={assetDevices} />}
             </Box>
         </AgenticFlyoutShell>

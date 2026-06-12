@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Text, Badge, Divider, ActionList, Button, Spinner, VerticalStack } from "@shopify/polaris";
+import { Box, Text, Badge, Divider, ActionList, Button, Spinner, VerticalStack, HorizontalStack } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
-import { ParamNameCellRenderer, ParamTypeCellRenderer, ParamDescCellRenderer, SeverityBadge } from "./AgenticCellRenderers";
+import { ParamNameCellRenderer, ParamTypeCellRenderer, ParamDescCellRenderer, SeverityBadge, RiskPill } from "./AgenticCellRenderers";
+import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges";
 import agenticObserveApi from "./agenticObserveApi";
 import observeApi from "../api";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -60,21 +61,10 @@ function useEndpointTraffic(item, active) {
 }
 
 export function ToolDetailPanel({ tool, onBack }) {
-    const [tab, setTab] = useState(0);
-    const hasSchema = tool.params?.length > 0;
-    const trafficTabIdx = hasSchema ? 1 : 0;
-
-    const { traffic, loading } = useEndpointTraffic(tool, tab === trafficTabIdx);
-
+    const { traffic, loading } = useEndpointTraffic(tool, true);
     return (
         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            {(hasSchema && tab === 0) ? (
-                <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                    <AgGridTable rowData={tool.params} columnDefs={SCHEMA_COL_DEFS} defaultColDef={GRID_DEFAULT_COL} fillHeight noOuterBorder pagination={false} sideBar={false} domLayout="normal" />
-                </div>
-            ) : (
-                <TrafficView traffic={traffic} loading={loading} />
-            )}
+            <TrafficView traffic={traffic} loading={loading} />
         </div>
     );
 }
@@ -119,6 +109,31 @@ export function ViolationCountCellRenderer({ value }) {
     return <SeverityBadge severity="critical">{value}</SeverityBadge>;
 }
 
+function McpRiskScoreCellRenderer({ data }) {
+    if (!data) return null;
+    const score = data.riskScore;
+    if (!score) return <Text variant="bodyMd" color="subdued">-</Text>;
+    return <RiskPill score={score} />;
+}
+
+function McpRiskCellRenderer({ data }) {
+    if (!data) return null;
+    const cra = {
+        isComponentMalicious: data.isMalicious || false,
+        hasPrivilegedAccess: data.hasPrivilegedAccess || false,
+        evidence: data.riskDescription || "",
+    };
+    const hasViolations = data._type === "Tool" && (data.violationCount || 0) > 0;
+    const hasRisk = cra.isComponentMalicious || cra.hasPrivilegedAccess;
+    if (!hasRisk && !hasViolations) return <Text variant="bodyMd" color="subdued">-</Text>;
+    return (
+        <HorizontalStack gap="2" blockAlign="center">
+            {hasRisk && <ComponentRiskAnalysisBadges componentRiskAnalysis={cra} />}
+            {hasViolations && <SeverityBadge severity="medium">{data.violationCount}</SeverityBadge>}
+        </HorizontalStack>
+    );
+}
+
 // ── Column definitions ────────────────────────────────────────────────────────
 
 const COMBINED_MCP_COL_DEFS = [
@@ -141,14 +156,26 @@ const COMBINED_MCP_COL_DEFS = [
         cellStyle: { display: "flex", alignItems: "center" },
     },
     {
-        headerName: "Violations",
+        field: "riskScore",
+        headerName: "Risk Score",
         width: 110,
+        filter: false,
+        sort: "desc",
+        suppressHeaderMenuButton: true,
+        suppressHeaderFilterButton: true,
+        cellRenderer: McpRiskScoreCellRenderer,
+        cellStyle: { display: "flex", alignItems: "center" },
+        valueGetter: p => p.data?.riskScore || 0,
+    },
+    {
+        headerName: "Risk",
+        width: 160,
         filter: false,
         suppressHeaderMenuButton: true,
         suppressHeaderFilterButton: true,
-        cellRenderer: ViolationCountCellRenderer,
+        cellRenderer: McpRiskCellRenderer,
         cellStyle: { display: "flex", alignItems: "center" },
-        valueGetter: p => p.data?._type === "Tool" ? (p.data.violationCount || 0) : 0,
+        valueGetter: p => (p.data?.isMalicious ? 4 : 0) + (p.data?.hasPrivilegedAccess ? 2 : 0) + (p.data?._type === "Tool" && p.data?.violationCount > 0 ? 1 : 0),
     },
 ];
 

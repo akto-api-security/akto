@@ -341,7 +341,7 @@ function getHostNamesForDevice(deviceId, collections) {
 
 // ─── Table section ────────────────────────────────────────────────────────────
 
-function TableSection({ deviceFlatData, agentRiskData, collections }) {
+function TableSection({ deviceFlatData, agentRiskData, collections, startTimestamp, endTimestamp }) {
     const [selectedCount, setSelectedCount] = useState(0);
     const [deviceFlyout, setDeviceFlyout] = useState(null);
     const gridRef = useRef(null);
@@ -454,6 +454,9 @@ function TableSection({ deviceFlatData, agentRiskData, collections }) {
                 onClose={closeAll}
                 agentRiskData={agentRiskData}
                 deviceHostNames={deviceFlyout?.hostNames || []}
+                collections={collections}
+                startTimestamp={startTimestamp}
+                endTimestamp={endTimestamp}
             />
         </VerticalStack>
     );
@@ -586,6 +589,8 @@ export default function DeviceEndpoints() {
                     deviceFlatData={deviceFlatData}
                     agentRiskData={agentRiskData}
                     collections={collections}
+                    startTimestamp={startTimestamp}
+                    endTimestamp={endTimestamp}
                 />,
             ]}
         />
