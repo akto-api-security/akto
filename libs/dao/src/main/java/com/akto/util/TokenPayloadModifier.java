@@ -32,9 +32,7 @@ public class TokenPayloadModifier {
                 headers.remove(k);
                 CookieTransformer.modifyCookie(cookieList, key, value);
             } else {
-                if (headers.containsKey(k)) {
-                    headers.put(k, Collections.singletonList(value));
-                }
+                headers.put(k, Collections.singletonList(value));
                 if (CookieTransformer.isKeyPresentInCookie(cookieList, key)) {
                     CookieTransformer.modifyCookie(cookieList, key, value);
                 }
