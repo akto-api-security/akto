@@ -196,12 +196,14 @@ func (s *Service) filterPoliciesByMcpServer(policies []types.Policy, mcpServerNa
 			continue
 		}
 		if policy.ApplyToAllServers {
-			if policy.Behaviour == "block" && (policy.ContextSource == "" || policy.ContextSource == "AGENTIC") {
-				// block+applyToAll in AGENTIC context: Java resolves the server list — fall through to match
-			} else {
-				filtered = append(filtered, policy)
-				continue
-			}
+			filtered = append(filtered, policy)
+			continue
+			// if policy.Behaviour == "block" && (policy.ContextSource == "" || policy.ContextSource == "AGENTIC") {
+			// 	// block+applyToAll in AGENTIC context: Java resolves the server list — fall through to match
+			// } else {
+			// 	filtered = append(filtered, policy)
+			// 	continue
+			// }
 		}
 		combinedServers := make(map[string]struct{}, len(policy.SelectedMcpServers)+len(policy.SelectedAgentServers))
 		for k, v := range policy.SelectedMcpServers {
