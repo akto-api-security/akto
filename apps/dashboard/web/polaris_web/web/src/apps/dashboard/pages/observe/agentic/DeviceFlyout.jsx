@@ -367,22 +367,25 @@ function AgenticsTab({ agents, onAgentClick, agentRiskData = {} }) {
 
 // ─── Violations tab ───────────────────────────────────────────────────────────
 
-function ViolationsTab({ hostNames = [], startTimestamp, endTimestamp }) {
+function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp }) {
     const [violations, setViolations] = useState([]);
 
-    useEffect(() => { setViolations([]); }, [hostNames]);
+    useEffect(() => { setViolations([]); }, [hostNames, deviceId]);
 
     useEffect(() => {
-        if (!hostNames.length) { setViolations([]); return; }
-        let cancelled = false;
-        const hostSet = new Set(hostNames);
-        const looseHostSet = new Set(hostNames.map(h => deviceServiceKey(h)).filter(Boolean));
         const claudeDeviceIds = new Set(
             hostNames
                 .filter(h => { const parts = h.split("."); return parts[parts.length - 1]?.toLowerCase() === "claude"; })
                 .map(h => h.split(".")[0])
                 .filter(Boolean)
         );
+        if (deviceId) claudeDeviceIds.add(deviceId);
+
+        if (!hostNames.length && !claudeDeviceIds.size) { setViolations([]); return; }
+
+        let cancelled = false;
+        const hostSet = new Set(hostNames);
+        const looseHostSet = new Set(hostNames.map(h => deviceServiceKey(h)).filter(Boolean));
         fetchAgenticViolations({ startTimestamp, endTimestamp })
             .then((rows) => {
                 if (cancelled) return;
@@ -400,7 +403,7 @@ function ViolationsTab({ hostNames = [], startTimestamp, endTimestamp }) {
                 if (!cancelled) setViolations([]);
             });
         return () => { cancelled = true; };
-    }, [hostNames, startTimestamp, endTimestamp]);
+    }, [hostNames, deviceId, startTimestamp, endTimestamp]);
 
     const handleViolationClick = useCallback((e) => {
         if (!e.data) return;
@@ -488,7 +491,7 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
             <Box padding="2" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
                 {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} collections={collections} onTabChange={setSelectedTab} />}
                 {selectedTab === 1 && <AgenticsTab agents={agents || []} onAgentClick={onAgentClick} agentRiskData={agentRiskData} />}
-                {selectedTab === 2 && <ViolationsTab hostNames={deviceHostNames} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
+                {selectedTab === 2 && <ViolationsTab hostNames={deviceHostNames} deviceId={device?.path?.[0] || device?.deviceId} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
             </Box>
         </AgenticFlyoutShell>
     );
