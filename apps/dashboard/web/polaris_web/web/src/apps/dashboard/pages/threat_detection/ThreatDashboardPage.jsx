@@ -13,6 +13,7 @@ import BarGraph from '../../components/charts/BarGraph';
 import InfoCard from '../dashboard/new_components/InfoCard';
 import api from './api';
 import { formatCategoryName, openThreatActivityPage } from './utils/threatDashboardUtils';
+import { getDashboardCategory, CATEGORY_AGENTIC_SECURITY, CATEGORY_ENDPOINT_SECURITY } from '../../../main/labelHelper';
 
 import ThreatDetectionOverTimeChart from './components/ThreatDetectionOverTimeChart';
 import ThreatTabbedSection from './components/ThreatTabbedSection';
@@ -222,7 +223,9 @@ function ThreatDashboardPage() {
                 <PageWithMultipleCards
                     title={
                         <Text variant='headingLg'>
-                            Threat Detection Dashboard
+                            {[CATEGORY_AGENTIC_SECURITY, CATEGORY_ENDPOINT_SECURITY].includes(getDashboardCategory())
+                                ? 'Guardrails Dashboard'
+                                : 'Threat Detection Dashboard'}
                         </Text>
                     }
                     isFirstPage={true}
