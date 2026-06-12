@@ -139,7 +139,7 @@ public class GuardrailPolicies {
         if (!applyToAllServers) {
             return new ArrayList<>();
         }
-        return fetchApplicableServersByContext();
+        return fetchApplicableServersByContext(Constants.AKTO_MCP_SERVER_TAG);
     }
 
     public List<SelectedServer> getEffectiveSelectedAgentServers() {
@@ -157,29 +157,28 @@ public class GuardrailPolicies {
         if (!applyToAllServers) {
             return new ArrayList<>();
         }
-        return fetchApplicableServersByContext();
+        return fetchApplicableServersByContext(Constants.AKTO_GEN_AI_TAG);
     }
 
     // filters collections by the policy's contextSource tag (key="source", value=contextSource.name())
     // excludes Atlas/endpoint collections (source=ENDPOINT); returns inline-only when behaviour is "block"
-    private List<SelectedServer> fetchApplicableServersByContext() {
+    private List<SelectedServer> fetchApplicableServersByContext(String serverTypeTag) {
         if (contextSource == null) return new ArrayList<>();
         boolean isBlock = "block".equals(this.behaviour);
         Bson filter = Filters.and(
-                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
-                        Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_COLLECTION_CONTEXT_TAG_KEY),
-                        Filters.eq(CollectionTags.VALUE, contextSource.name())
-                )),
+                (Filters.elemMatch(ApiCollection.TAGS_STRING, 
+                    Filters.eq(CollectionTags.KEY_NAME, serverTypeTag))
+                ),
                 Filters.not(Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
                         Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_COLLECTION_CONTEXT_TAG_KEY),
                         Filters.eq(CollectionTags.VALUE, CONTEXT_SOURCE.ENDPOINT.name())
                 )))
         );
         if (isBlock) {
-            filter = Filters.and(filter, Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
+            filter = Filters.and(filter, Filters.not(Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
                     Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GUARDRAIL_MODE),
-                    Filters.eq(CollectionTags.VALUE, Constants.AKTO_GUARDRAIL_MODE_INLINE)
-            )));
+                    Filters.eq(CollectionTags.VALUE, Constants.AKTO_GUARDRAIL_MODE_OBSERVE)
+            ))));
         }
         return ApiCollectionsDao.instance.findAll(filter, Projections.include(ApiCollection.ID, "name"))
                 .stream()
