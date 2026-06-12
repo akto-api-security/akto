@@ -109,6 +109,11 @@ function ActionCellRenderer({ value }) {
     return <Badge size="small" status={status}>{value}</Badge>;
 }
 
+function EvidenceCellRenderer({ value }) {
+    if (!value) return null;
+    return <Text variant="bodySm" truncate>{value}</Text>;
+}
+
 // ─── Column definitions ─────────────────────────────────────────────────────────
 
 // Severity ordering for the default sort: Critical → High → Medium → Low.
@@ -153,6 +158,16 @@ const COL_DEFS = [
         comparator: severityComparator,
         filter: "agSetColumnFilter",
         cellRenderer: SeverityCellRenderer,
+    },
+    {
+        field: "evidenceText",
+        headerName: "Evidence",
+        width: 200,
+        minWidth: 200,
+        suppressAutoSize: true,
+        sortable: false,
+        filter: false,
+        cellRenderer: EvidenceCellRenderer,
     },
     {
         field: "user",
