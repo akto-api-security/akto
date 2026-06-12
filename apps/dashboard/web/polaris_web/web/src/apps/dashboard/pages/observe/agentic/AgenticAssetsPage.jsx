@@ -258,11 +258,11 @@ function TableSection({
         rowData={flatRowData}
         columnDefs={COL_DEFS}
         defaultColDef={DEFAULT_COL_DEF}
-        height={800}
+        height={500}
+        domLayout="normal"
         rowHeight={44}
         headerHeight={40}
         searchPlaceholder="Search agentic assets..."
-        searchOffset={700}
         onRowClicked={handleRowClick}
         getRowStyle={getRowStyle}
         animateRows
