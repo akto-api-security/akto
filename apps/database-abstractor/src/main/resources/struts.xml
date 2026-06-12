@@ -2602,6 +2602,103 @@
             </result>
         </action>
 
+        <!-- Endpoint Remote Commands: Agent-facing -->
+        <action name="api/fetchEndpointRemoteCommands" class="com.akto.action.EndpointRemoteCommandAction" method="fetchEndpointRemoteCommands">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^executions.*,^executions\[\d+\]\.(id|command|args|timeoutSec).*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/updateEndpointRemoteCommandStatus" class="com.akto.action.EndpointRemoteCommandAction" method="updateEndpointRemoteCommandStatus">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="CONFLICT" type="json">
+                <param name="statusCode">409</param>
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/updateEndpointRemoteCommandResult" class="com.akto.action.EndpointRemoteCommandAction" method="updateEndpointRemoteCommandResult">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <!-- Endpoint Remote Commands: Dashboard-facing -->
+        <action name="api/queueEndpointRemoteCommand" class="com.akto.action.EndpointRemoteCommandAction" method="queueEndpointRemoteCommand">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^queuedCommandId</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchEndpointRemoteCommandList" class="com.akto.action.EndpointRemoteCommandAction" method="fetchEndpointRemoteCommandList">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^commands.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchEndpointRemoteCommandExecutions" class="com.akto.action.EndpointRemoteCommandAction" method="fetchEndpointRemoteCommandExecutions">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^executions.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/cancelEndpointRemoteCommand" class="com.akto.action.EndpointRemoteCommandAction" method="cancelEndpointRemoteCommand">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
     </package>
 
 </struts>

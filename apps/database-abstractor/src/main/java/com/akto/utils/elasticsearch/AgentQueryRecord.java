@@ -22,4 +22,7 @@ public class AgentQueryRecord {
     private long timeStampMs;
     private int inputTokens;
     private int outputTokens;
+    private String traceId;
+    private String spanId;
+    private boolean isAtlasTraffic;
 }
