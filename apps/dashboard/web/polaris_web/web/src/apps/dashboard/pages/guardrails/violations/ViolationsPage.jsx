@@ -18,6 +18,7 @@ import SmoothAreaChart from "@/apps/dashboard/pages/dashboard/new_components/Smo
 import AgenticStatsCard from "@/apps/dashboard/pages/observe/agentic/AgenticStatsCard";
 import AgenticTopListCard from "@/apps/dashboard/pages/observe/agentic/AgenticTopListCard";
 import AssetIcon from "@/apps/dashboard/pages/observe/agentic/AssetIcon";
+import { OsIcon } from "@/apps/dashboard/pages/observe/agentic/DeviceEndpoints";
 import observeFunc from "@/apps/dashboard/pages/observe/transform";
 import func from "@/util/func";
 import values from "@/util/values";
@@ -48,11 +49,6 @@ const TYPE_CLASS_MAP = {
 // AG Grid sandboxes its DOM, so cell renderers are the documented inline-style
 // exception. Each is a small named component (no inline logic in cellRenderer:).
 
-function OsIcon({ os, size = 16 }) {
-    if (os === "mac")     return <img src="/public/os-mac.svg"     width={size} height={size} alt="macOS"   style={{ flexShrink: 0 }} />;
-    if (os === "windows") return <img src="/public/os-windows.svg" width={size} height={size} alt="Windows" style={{ flexShrink: 0 }} />;
-    return                       <img src="/public/os-linux.svg"   width={size} height={size} alt="Linux"   style={{ flexShrink: 0 }} />;
-}
 
 function DetectedCellRenderer({ value }) {
     if (value == null) return null;
@@ -101,7 +97,7 @@ function UserCellRenderer({ value, data }) {
     if (!value) return null;
     return (
         <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-            <OsIcon os={data?.os} />
+            <OsIcon os={data?.os} size={16} />
             <Text variant="bodySm" truncate>{value}</Text>
         </HorizontalStack>
     );
