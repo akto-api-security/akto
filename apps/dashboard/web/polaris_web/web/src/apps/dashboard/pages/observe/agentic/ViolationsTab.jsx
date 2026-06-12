@@ -57,8 +57,6 @@ export default function ViolationsTab({ asset, collections = [], startTimestamp,
                 .map(h => h.split(".")[0])
                 .filter(Boolean)
         );
-        // For a Claude AI Agent with no per-device collections, match all claude-settings events.
-        const matchAllClaudeConfig = isClaudeAsset && claudeDeviceIds.size === 0;
 
         let cancelled = false;
         const hostSet = new Set(hostNames);
@@ -70,7 +68,7 @@ export default function ViolationsTab({ asset, collections = [], startTimestamp,
                     hostSet.has(r.host) ||
                     looseHostSet.has(deviceServiceKey(r.host)) ||
                     (isClaudeConfigHost(r.host) && (
-                        matchAllClaudeConfig ||
+                        isClaudeAsset ||
                         claudeDeviceIds.has(r.host.split(".")[0])
                     ))
                 );
