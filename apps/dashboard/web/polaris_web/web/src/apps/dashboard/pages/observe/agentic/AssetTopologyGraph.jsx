@@ -68,11 +68,7 @@ export function TopoNode({ data }) {
 export const TOPO_NODE_TYPES = { topoNode: TopoNode };
 
 const NODE_H = 84;
-const MIN_H  = 220;
-
-function graphHeight(rowCount) {
-    return Math.max(MIN_H, rowCount * NODE_H + 40);
-}
+const GRAPH_H = 300;
 
 // Returns parent AI Agent flat rows for an MCP/Skill asset.
 export function findParentAgents(asset, agenticFlatData = []) {
@@ -92,7 +88,7 @@ export function findParentAgents(asset, agenticFlatData = []) {
 export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], nodes: externalNodes, edges: externalEdges }) {
     const { nodes, edges, height } = useMemo(() => {
         if (externalNodes && externalEdges) {
-            return { nodes: externalNodes, edges: externalEdges, height: graphHeight(externalNodes.length) };
+            return { nodes: externalNodes, edges: externalEdges, height: GRAPH_H };
         }
 
         const devices = assetDevices[asset.id] || [];
@@ -118,7 +114,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
             const devOffset = Math.max(0, (col3Items.length - devices.length) * NODE_H / 2);
 
             return {
-                height: graphHeight(maxRows),
+                height: GRAPH_H,
                 nodes: [
                     { id: "agent", type: "topoNode", draggable: false, position: { x: COL2, y: agentY }, data: { component: { category: "agent", type: "AI Agent", label: asset.name } } },
                     ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: COL1, y: devOffset + i * NODE_H }, data: { component: { category: "external", type: "User", label: d.username || d.endpoint } } })),
@@ -144,7 +140,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
             const agOffset  = Math.max(0, (devices.length - parentAgents.length) * NODE_H / 2);
 
             return {
-                height: graphHeight(maxRows),
+                height: GRAPH_H,
                 nodes: [
                     { id: "asset", type: "topoNode", draggable: false, position: { x: COL3, y: assetY }, data: { component: { category: cat, type: asset.type, label: asset.name } } },
                     ...parentAgents.map((a, i) => ({ id: `agt-${i}`, type: "topoNode", draggable: false, position: { x: COL2, y: agOffset + i * NODE_H }, data: { component: { category: "agent", type: "AI Agent", label: a.name } } })),
@@ -162,7 +158,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
         const totalH  = maxRows * NODE_H;
         const assetY  = (totalH - 44) / 2;
         return {
-            height: graphHeight(maxRows),
+            height: GRAPH_H,
             nodes: [
                 { id: "asset", type: "topoNode", draggable: false, position: { x: COL2, y: assetY }, data: { component: { category: cat, type: asset.type, label: asset.name } } },
                 ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: COL1, y: i * NODE_H }, data: { component: { category: "external", type: "User", label: d.username || d.endpoint } } })),
