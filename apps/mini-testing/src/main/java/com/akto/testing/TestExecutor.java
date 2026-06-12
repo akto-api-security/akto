@@ -102,9 +102,9 @@ public class TestExecutor {
         currentExecutionFallback = false;
     }
 
-    public static void initRunDeadline(TestingRun testingRun) {
-        runPickedUp = testingRun.getPickedUpTimestamp() > 0 ? testingRun.getPickedUpTimestamp() : Context.now();
-        runMaxSec = testingRun.getTestRunTime() <= 0 ? 30 * 60 : testingRun.getTestRunTime();
+    public static void initRunDeadline(TestingRunResultSummary trrs, int maxRunTime) {
+        runPickedUp = trrs.getStartTimestamp() > 0  ? trrs.getStartTimestamp() : 0;
+        runMaxSec = maxRunTime;
     }
 
     public static boolean shouldContinueTestExecution(ObjectId summaryId) {

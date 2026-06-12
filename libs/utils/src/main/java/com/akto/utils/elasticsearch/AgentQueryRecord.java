@@ -138,4 +138,16 @@ public class AgentQueryRecord {
         List<String> values = headers.get(name);
         return (values != null && !values.isEmpty()) ? values.get(0) : null;
     }
+    
+    @Override
+    public String toString() {
+        return "Record{" +
+                "serviceId='" + serviceId + '\'' +
+                ", deviceId='" + deviceId + '\'' +
+                ", userName='" + userName + '\'' +
+                ", payload='" + queryPayload + '\'' +
+                ", body='" + responsePayload + '\'' +
+                ", isAtlasTraffic=" + isAtlasTraffic +
+                '}';
+    }
 }
