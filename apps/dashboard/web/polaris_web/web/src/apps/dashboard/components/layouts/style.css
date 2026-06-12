@@ -133,7 +133,9 @@
     border-left: 2px solid #E0431F;
     padding-left: 12px;
 }
-/* Avatar + quote row — force top-alignment regardless of content height. */
+/* Avatar + quote row — force top-alignment regardless of content height.
+   HorizontalStack blockAlign="start" relies on a CSS custom property pipeline that
+   can fail in some Polaris builds; an explicit class is the reliable fallback. */
 .violation-evidence-author-row {
     display: flex;
     align-items: flex-start;
@@ -160,6 +162,39 @@
     white-space: pre-wrap;
     word-break: break-word;
     color: #202223;
+}
+
+/* Violations table wrapper — flex column so AG Grid can autoHeight inside it. */
+.violations-table-wrap {
+    display: flex;
+    flex-direction: column;
+    min-height: 480px;
+}
+
+/* Chat message outer row — icon | divider | content, top-aligned.
+   Same reliable-CSS-class pattern as violation-evidence-author-row. */
+.chat-message-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--p-space-3);
+}
+
+/* Chat message icon container — fixed 20×20 centred wrapper for avatar/logo img. */
+.chat-message-icon-wrap {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Chat message left divider bar — colour set via --chat-divider-color custom prop. */
+.chat-message-divider {
+    width: 2px;
+    flex-shrink: 0;
+    align-self: stretch;
+    background-color: var(--chat-divider-color, #E1E3E5);
 }
 
 /* flex: 1 + flexDirection: column + minHeight: 0 — required for AG Grid fill-height

@@ -351,7 +351,7 @@ function Violations() {
     };
 
     const tableComponent = (
-        <div key="table" style={{ display: "flex", flexDirection: "column", minHeight: 480 }}>
+        <Box key="table" className="violations-table-wrap">
             <AgGridTable
                 rowData={filteredRows}
                 columnDefs={COL_DEFS}
@@ -366,7 +366,7 @@ function Violations() {
                 paginationPageSizeSelector={[20, 50, 100]}
                 domLayout="autoHeight"
             />
-        </div>
+        </Box>
     );
 
     const components = loading

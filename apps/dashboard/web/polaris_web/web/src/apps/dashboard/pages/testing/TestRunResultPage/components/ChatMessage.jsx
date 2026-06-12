@@ -254,14 +254,14 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
 
     return (
         <Box padding="3" background={isVulnerable ? "bg-critical-subdued" : undefined}>
-            <Box style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <Box className="chat-message-row">
                 {/* Icon */}
-                <Box style={{ flexShrink: 0, width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Box className="chat-message-icon-wrap">
                     {iconEl}
                 </Box>
 
                 {/* Divider */}
-                <Box style={{ width: '2px', flexShrink: 0, alignSelf: 'stretch', backgroundColor: isVulnerable ? '#D72C0D' : '#E1E3E5' }} />
+                <Box className="chat-message-divider" style={{ "--chat-divider-color": isVulnerable ? '#D72C0D' : '#E1E3E5' }} />
 
                 {/* Content - Takes remaining space */}
                 <Box style={{ flex: 1, minWidth: 0 }}>

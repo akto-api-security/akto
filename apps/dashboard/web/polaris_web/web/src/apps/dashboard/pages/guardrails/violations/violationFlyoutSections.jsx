@@ -66,7 +66,7 @@ export function EvidenceBlock({ evidence }) {
         <Box borderRadius="2">
             <VerticalStack gap="3">
                 <Text variant="headingXs" color="subdued">{evidence.title}</Text>
-                <div className="violation-evidence-author-row">
+                <Box className="violation-evidence-author-row">
                     {evidence.author
                         ? <Avatar size="small" name={evidence.author} initials={initials(evidence.author)} />
                         : <Box paddingBlockStart="05"><Icon source={NoteMinor} color="critical" /></Box>}
@@ -83,7 +83,7 @@ export function EvidenceBlock({ evidence }) {
                             <HighlightedText text={evidence.text} highlights={evidence.highlights} mono={evidence.mono} />
                         </VerticalStack>
                     </Box>
-                </div>
+                </Box>
             </VerticalStack>
         </Box>
     );
