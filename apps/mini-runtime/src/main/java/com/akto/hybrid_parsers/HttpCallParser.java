@@ -1599,6 +1599,10 @@ public class HttpCallParser {
                 if (record != null) {
                     loggerMaker.infoAndAddToDb("Storing agent query data for account: " + Context.getActualAccountId());
                     String payload = httpResponseParam.getRequestParams().getPayload();
+                    if(Context.getActualAccountId() == 1767812031){
+                        loggerMaker.info("Record: " + record.toString());
+                        loggerMaker.info("payload for record: " + payload);
+                    }
                     if(payload.length() > 3){
                         dataActor.storeAgentQueryData(record);
                     }
