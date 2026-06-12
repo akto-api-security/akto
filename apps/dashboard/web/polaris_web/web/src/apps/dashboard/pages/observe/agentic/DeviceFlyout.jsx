@@ -9,7 +9,7 @@ import { TypeBadge, SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import AssetTopologyGraph from "./AssetTopologyGraph";
 import { RiskFactorRow } from "./RiskFactorRow";
 import DetailGrid from "./DetailGrid";
-import { buildAgenticObserveChatMetadata, fetchAgenticViolations, openViolationInThreatActivity, deviceServiceKey } from "./agenticObserveApi";
+import { buildAgenticObserveChatMetadata, fetchAgenticViolations, openViolationInThreatActivity, deviceServiceKey, isClaudeConfigHost } from "./agenticObserveApi";
 import { extractServiceName, extractEndpointId } from "./constants";
 import func from "@/util/func";
 import "../../../components/layouts/style.css";
@@ -370,7 +370,6 @@ function AgenticsTab({ agents, onAgentClick, agentRiskData = {} }) {
 function ViolationsTab({ hostNames = [], startTimestamp, endTimestamp }) {
     const [violations, setViolations] = useState([]);
 
-    // Clear immediately when the device changes (hostNames reference changes) so no stale rows show.
     useEffect(() => { setViolations([]); }, [hostNames]);
 
     useEffect(() => {
@@ -378,10 +377,20 @@ function ViolationsTab({ hostNames = [], startTimestamp, endTimestamp }) {
         let cancelled = false;
         const hostSet = new Set(hostNames);
         const looseHostSet = new Set(hostNames.map(h => deviceServiceKey(h)).filter(Boolean));
+        const claudeDeviceIds = new Set(
+            hostNames
+                .filter(h => { const parts = h.split("."); return parts[parts.length - 1]?.toLowerCase() === "claude"; })
+                .map(h => h.split(".")[0])
+                .filter(Boolean)
+        );
         fetchAgenticViolations({ startTimestamp, endTimestamp })
             .then((rows) => {
                 if (cancelled) return;
-                const filtered = rows.filter(r => hostSet.has(r.host) || looseHostSet.has(deviceServiceKey(r.host)));
+                const filtered = rows.filter(r =>
+                    hostSet.has(r.host) ||
+                    looseHostSet.has(deviceServiceKey(r.host)) ||
+                    (isClaudeConfigHost(r.host) && claudeDeviceIds.has(r.host.split(".")[0]))
+                );
                 setViolations(filtered.map((r) => ({
                     ...r,
                     time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
