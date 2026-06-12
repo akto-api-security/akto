@@ -22,7 +22,7 @@ import {
     FileSection,
     OverviewSection,
     RemediationSection,
-} from "./violationFlyoutSections";
+} from "./ViolationFlyoutSections";
 import { VIOLATION_DETAILS, buildFallbackDetail } from "./violationsData";
 import "../../../components/layouts/style.css";
 
