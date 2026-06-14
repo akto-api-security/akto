@@ -493,6 +493,7 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 				types.ContextSource(params.ContextSource),
 				extractHostHeader(reqHeaders),
 				sessionID,
+				"block",
 			); err != nil {
 				s.logger.Warn("Failed to report threat for personal account block", zap.String("policyName", policyName), zap.Error(err))
 			}
@@ -592,6 +593,7 @@ func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCt
 				types.ContextSource(params.ContextSource),
 				extractHostHeader(valCtx.RequestHeaders),
 				sessionID,
+				"block",
 			); err != nil {
 				s.logger.Warn("Failed to report threat for blocked host", zap.Error(err))
 			}

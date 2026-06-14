@@ -10,7 +10,7 @@ import { Badge, IndexFiltersMode, Avatar, Box, HorizontalStack, Text } from "@sh
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
-import { formatActorId, extractRuleViolated } from "../utils/formatUtils";
+import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
@@ -73,6 +73,12 @@ const getHeaders = () => {
       value: "ruleViolated",
       title: "Rule Violated",
       maxWidth: "200px",
+    });
+    baseHeaders.push({
+      text: "Behaviour",
+      value: "behaviour",
+      title: "Behaviour",
+      maxWidth: "120px",
     });
   }
   baseHeaders.push(
@@ -591,7 +597,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
               {isSessionBased ? 'Session' : 'Single Prompt'}
             </Badge>
           ),
-          ruleViolated: extractRuleViolated(x?.metadata)
+          ruleViolated: extractRuleViolated(x?.metadata),
+          behaviour: (() => {
+            const b = extractBehaviour(x?.metadata);
+            return b ? <Badge tone={getBehaviourTone(b)}>{func.toSentenceCase(b)}</Badge> : '-';
+          })(),
         }),
         compliance: complianceList.length > 0 ? (
           <HorizontalStack wrap={false} gap={1}>
