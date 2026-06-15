@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import hashlib
 import json
 import logging
 import os
@@ -8,9 +7,15 @@ import ssl
 import sys
 import time
 import urllib.request
-from typing import Any, Dict, Set, Tuple, Union
+from typing import Any, Dict, Tuple, Union
 from akto_machine_id import get_machine_id, get_username
 from akto_heartbeat import send_heartbeat
+from akto_ingestion_utility import (
+    apply_warn_resubmit_flow,
+    fingerprint,
+    is_warn_behaviour,
+    parse_guardrails_result,
+)
 
 # Configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -277,20 +282,8 @@ def build_akto_request(
         "enabled_graph": None,
         "tag": json.dumps(tags),
         "metadata": json.dumps(tags),
-        "contextSource": "ENDPOINT"
+        "contextSource": CONTEXT_SOURCE
     }
-
-
-def _guardrails_behaviour_value(behaviour: Any) -> str:
-    return str(behaviour or "").strip().lower()
-
-
-def _is_warn_behaviour(behaviour: Any) -> bool:
-    return _guardrails_behaviour_value(behaviour) == "warn"
-
-
-def _is_alert_behaviour(behaviour: Any) -> bool:
-    return _guardrails_behaviour_value(behaviour) == "alert"
 
 
 def call_guardrails(
@@ -336,11 +329,7 @@ def call_guardrails(
             request_body,
             logger,
         )
-        data = result.get("data", {}) if isinstance(result, dict) else {}
-        guardrails_result = data.get("guardrailsResult", {})
-        allowed = guardrails_result.get("Allowed", True)
-        reason = guardrails_result.get("Reason", "")
-        behaviour = guardrails_result.get("behaviour", "") or guardrails_result.get("Behaviour", "")
+        allowed, reason, behaviour = parse_guardrails_result(result)
         logger.info(f"Guardrails result — allowed={allowed}, behaviour={behaviour!r}, reason={reason!r}")
 
         if allowed:
@@ -352,74 +341,6 @@ def call_guardrails(
     except Exception as e:
         logger.error(f"Guardrails validation error: {e}")
         return True, "", ""
-
-
-def posttool_fingerprint(tool_name: str, tool_args: str, result_text: str) -> str:
-    canonical = json.dumps(
-        {"t": tool_name, "a": tool_args, "r": result_text},
-        sort_keys=True,
-        ensure_ascii=False,
-    )
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def load_warn_pending(warn_state_path: str, logger) -> Set[str]:
-    if not os.path.exists(warn_state_path):
-        return set()
-    try:
-        with open(warn_state_path, encoding="utf-8") as f:
-            data = json.load(f)
-        return set(data.get("warn_pending", []))
-    except (json.JSONDecodeError, OSError) as e:
-        logger.warning(f"Could not read warn-pending map: {e}")
-        return set()
-
-
-def save_warn_pending(warn_state_path: str, hashes: Set[str], logger) -> None:
-    tmp_path = warn_state_path + ".tmp"
-    try:
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump({"warn_pending": sorted(hashes)}, f, indent=0)
-            f.write("\n")
-        os.replace(tmp_path, warn_state_path)
-    except OSError as e:
-        logger.error(f"Could not persist warn-pending map: {e}")
-        if os.path.exists(tmp_path):
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
-
-
-def apply_warn_resubmit_flow(
-    gr_allowed: bool,
-    reason: str,
-    behaviour: str,
-    fingerprint: str,
-    warn_state_path: str,
-    logger,
-) -> Tuple[bool, str]:
-    if gr_allowed:
-        return True, ""
-
-    if _is_alert_behaviour(behaviour):
-        logger.info("Alert behaviour: allowing despite violation (server-side alert only)")
-        return True, ""
-
-    if not _is_warn_behaviour(behaviour):
-        return False, reason
-
-    pending = load_warn_pending(warn_state_path, logger)
-    if fingerprint in pending:
-        pending.discard(fingerprint)
-        save_warn_pending(warn_state_path, pending, logger)
-        logger.info("Warn flow: allowing resubmit; removed fingerprint from map")
-        return True, ""
-
-    pending.add(fingerprint)
-    save_warn_pending(warn_state_path, pending, logger)
-    logger.info("Warn flow: first occurrence — blocked, resend same tool call to bypass")
-    return False, reason
 
 
 def ingest_blocked_request(
@@ -603,11 +524,11 @@ def main():
             mcp_server_name=mcp_server_name,
             mcp_tool_name=mcp_tool_name,
         )
-        fingerprint = posttool_fingerprint(tool_name, tool_args, result_text)
-        allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint, warn_state_path, logger)
+        fp = fingerprint({"t": tool_name, "a": tool_args, "r": result_text})
+        allowed, _ = apply_warn_resubmit_flow(warn_state_path, fp, gr_allowed, gr_reason, behaviour, logger)
 
         if not allowed:
-            if _is_warn_behaviour(behaviour):
+            if is_warn_behaviour(behaviour):
                 alert_message = (
                     f"⚠️ Akto Security Warning: Tool result from '{tool_name}' was flagged "
                     f"but allowed (warn mode). Please review before proceeding.\n"

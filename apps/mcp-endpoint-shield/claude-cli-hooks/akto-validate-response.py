@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
-import hashlib
 import json
 import logging
 import os
-import ssl
 import sys
 import time
-import urllib.request
-from typing import Any, Dict, Set, Tuple, Union
+from typing import Any, Dict, Tuple
 
 from akto_machine_id import get_machine_id, get_username
-from akto_ingestion_utility import installer_headers, resolve_session_info
+from akto_ingestion_utility import (
+    apply_warn_resubmit_flow,
+    build_http_proxy_url,
+    fingerprint,
+    get_last_user_prompt,
+    installer_headers,
+    is_warn_behaviour,
+    parse_guardrails_result,
+    post_payload_json,
+    resolve_host_url,
+    resolve_session_info,
+)
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/akto/logs"))
@@ -38,85 +46,13 @@ logger.addHandler(console_handler)
 
 MODE = os.getenv("MODE", "argus").lower()
 AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
-AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
-AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
 AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "claudecli")
-AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_response_warn_pending.json")
 
-# SSL Configuration
-SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
-SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
-
-# Configure CLAUDE_API_URL based on mode
-if MODE == "atlas":
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    CLAUDE_API_URL = f"https://{device_id}.ai-agent.{AKTO_CONNECTOR_VALUE}" if device_id else "https://api.anthropic.com"
-    logger.info(f"MODE: {MODE}, Device ID: {device_id}, CLAUDE_API_URL: {CLAUDE_API_URL}")
-else:
-    CLAUDE_API_URL = os.getenv("CLAUDE_API_URL", "https://api.anthropic.com")
-    logger.info(f"MODE: {MODE}, CLAUDE_API_URL: {CLAUDE_API_URL}")
-
-
-def create_ssl_context():
-    return ssl._create_unverified_context()
-
-
-def build_http_proxy_url(
-    *,
-    guardrails: bool = False,
-    response_guardrails: bool = False,
-    ingest_data: bool = False,
-) -> str:
-    params = []
-    if guardrails:
-        params.append("guardrails=true")
-    if response_guardrails:
-        params.append("response_guardrails=true")
-    params.append(f"akto_connector={AKTO_CONNECTOR}")
-    if ingest_data:
-        params.append("ingest_data=true")
-    return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
-
-
-def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
-    logger.info(f"API CALL: POST {url}")
-    if LOG_PAYLOADS:
-        logger.debug(f"Request payload: {json.dumps(payload)}")
-
-    headers = {"Content-Type": "application/json"}
-    if AKTO_API_TOKEN:
-        headers["Authorization"] = AKTO_API_TOKEN
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
-        method="POST",
-    )
-
-    start_time = time.time()
-    try:
-        ssl_context = create_ssl_context()
-        with urllib.request.urlopen(request, context=ssl_context, timeout=AKTO_TIMEOUT) as response:
-            duration_ms = int((time.time() - start_time) * 1000)
-            status_code = response.getcode()
-            raw = response.read().decode("utf-8")
-
-            logger.info(f"API RESPONSE: Status {status_code}, Duration: {duration_ms}ms, Size: {len(raw)} bytes")
-
-            if LOG_PAYLOADS:
-                logger.debug(f"Response body: {raw}")
-
-            try:
-                return json.loads(raw)
-            except json.JSONDecodeError:
-                return raw
-    except Exception as e:
-        duration_ms = int((time.time() - start_time) * 1000)
-        logger.error(f"API CALL FAILED after {duration_ms}ms: {e}")
-        raise
+CLAUDE_API_URL = resolve_host_url("https://api.anthropic.com", legacy_env="CLAUDE_API_URL")
+logger.info(f"MODE: {MODE}, CLAUDE_API_URL: {CLAUDE_API_URL}")
 
 
 def build_ingestion_payload(
@@ -181,18 +117,6 @@ def build_ingestion_payload(
     }
 
 
-def _guardrails_behaviour_value(behaviour: Any) -> str:
-    return str(behaviour or "").strip().lower()
-
-
-def _is_warn_behaviour(behaviour: Any) -> bool:
-    return _guardrails_behaviour_value(behaviour) == "warn"
-
-
-def _is_alert_behaviour(behaviour: Any) -> bool:
-    return _guardrails_behaviour_value(behaviour) == "alert"
-
-
 def call_guardrails(
     user_prompt: str, response_text: str, session_info: dict = None
 ) -> Tuple[bool, str, str]:
@@ -219,16 +143,10 @@ def call_guardrails(
                 ingest_data=False,
             ),
             request_body,
+            logger,
         )
 
-        data = result.get("data", {}) if isinstance(result, dict) else {}
-        guardrails_result = data.get("guardrailsResult", {})
-        allowed = guardrails_result.get("Allowed", True)
-        reason = guardrails_result.get("Reason", "")
-        behaviour = guardrails_result.get("behaviour", "") or guardrails_result.get(
-            "Behaviour", ""
-        )
-
+        allowed, reason, behaviour = parse_guardrails_result(result)
         if allowed:
             logger.info("Response ALLOWED by guardrails")
         else:
@@ -239,71 +157,6 @@ def call_guardrails(
     except Exception as e:
         logger.error(f"Guardrails validation error: {e}")
         return True, "", ""
-
-
-def response_fingerprint(user_prompt: str, response_text: str) -> str:
-    canonical = json.dumps(
-        {"p": user_prompt, "r": response_text}, sort_keys=True, ensure_ascii=False
-    )
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def load_warn_pending() -> Set[str]:
-    if not os.path.exists(WARN_STATE_PATH):
-        return set()
-    try:
-        with open(WARN_STATE_PATH, encoding="utf-8") as f:
-            data = json.load(f)
-        return set(data.get("warn_pending", []))
-    except (json.JSONDecodeError, OSError) as e:
-        logger.warning(f"Could not read warn-pending map: {e}")
-        return set()
-
-
-def save_warn_pending(hashes: Set[str]) -> None:
-    tmp_path = WARN_STATE_PATH + ".tmp"
-    try:
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump({"warn_pending": sorted(hashes)}, f, indent=0)
-            f.write("\n")
-        os.replace(tmp_path, WARN_STATE_PATH)
-    except OSError as e:
-        logger.error(f"Could not persist warn-pending map: {e}")
-        if os.path.exists(tmp_path):
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
-
-
-def apply_warn_resubmit_flow(
-    gr_allowed: bool,
-    reason: str,
-    behaviour: str,
-    fingerprint: str,
-) -> Tuple[bool, str]:
-    if gr_allowed:
-        return True, ""
-
-    if _is_alert_behaviour(behaviour):
-        logger.info(
-            "Alert behaviour: allowing despite violation (server-side alert only)"
-        )
-        return True, ""
-
-    if not _is_warn_behaviour(behaviour):
-        return False, reason
-
-    pending = load_warn_pending()
-    if fingerprint in pending:
-        pending.discard(fingerprint)
-        save_warn_pending(pending)
-        logger.info("Warn flow: allowing resubmit; removed fingerprint from map")
-        return True, ""
-
-    pending.add(fingerprint)
-    save_warn_pending(pending)
-    return False, reason
 
 
 def ingest_blocked_response(
@@ -342,47 +195,11 @@ def ingest_blocked_response(
         post_payload_json(
             build_http_proxy_url(guardrails=False, ingest_data=True),
             request_body,
+            logger,
         )
         logger.info("Blocked request ingestion successful")
     except Exception as e:
         logger.error(f"Ingestion error: {e}")
-
-
-def extract_text_from_entry(entry: Dict[str, Any]) -> str:
-    content = entry.get("message", {}).get("content", "")
-    if isinstance(content, str):
-        return content.strip()
-    if isinstance(content, list):
-        parts = []
-        for block in content:
-            if isinstance(block, dict) and block.get("type") == "text":
-                text = block.get("text", "")
-                if isinstance(text, str) and text:
-                    parts.append(text)
-        return "".join(parts).strip()
-    return ""
-
-
-def get_last_user_prompt(transcript_path: str) -> str:
-    if not os.path.exists(transcript_path):
-        return ""
-
-    try:
-        last_user = ""
-        with open(transcript_path, "r") as f:
-            for line in f:
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if entry.get("type") == "user":
-                    text = extract_text_from_entry(entry)
-                    if text:
-                        last_user = text
-        return last_user
-    except Exception as e:
-        logger.error(f"Error reading transcript: {e}")
-        return ""
 
 
 def send_ingestion_data(
@@ -414,6 +231,7 @@ def send_ingestion_data(
                 ingest_data=True,
             ),
             request_body,
+            logger,
         )
         logger.info("Conversation ingestion successful")
 
@@ -445,7 +263,7 @@ def main():
         response_text = input_data.get("last_assistant_message", "").strip()
         stop_hook_active = bool(input_data.get("stop_hook_active"))
 
-        user_prompt = get_last_user_prompt(transcript_path)
+        user_prompt = get_last_user_prompt(transcript_path, logger)
 
         if not user_prompt or not response_text:
             logger.info("No complete interaction found in transcript")
@@ -465,13 +283,13 @@ def main():
             gr_allowed, gr_reason, behaviour = call_guardrails(
                 user_prompt, response_text, session_info
             )
-            fingerprint = response_fingerprint(user_prompt, response_text)
+            fp = fingerprint({"p": user_prompt, "r": response_text})
             allowed, _ = apply_warn_resubmit_flow(
-                gr_allowed, gr_reason, behaviour, fingerprint
+                WARN_STATE_PATH, fp, gr_allowed, gr_reason, behaviour, logger
             )
 
             if not allowed:
-                if _is_warn_behaviour(behaviour):
+                if is_warn_behaviour(behaviour):
                     block_reason = (
                         "Warning!!, response blocked, please review it. Send again to bypass. "
                         f"Reason for blocking: {gr_reason}"

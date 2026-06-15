@@ -8,13 +8,20 @@ Hook: tool.execute.before
 import json
 import logging
 import os
-import ssl
 import sys
 import time
-import urllib.request
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Tuple
+
+# OpenCode launches hooks via a JS plugin that does not export AKTO_CONNECTOR,
+# so default it before importing the shared module (which reads it at import time).
+os.environ.setdefault("AKTO_CONNECTOR", "opencode")
 
 from akto_machine_id import get_machine_id, get_username
+from akto_ingestion_utility import (
+    build_http_proxy_url,
+    parse_guardrails_result,
+    post_payload_json,
+)
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.config/opencode/akto/logs"))
@@ -36,19 +43,12 @@ console_handler.setLevel(logging.ERROR)
 logger.addHandler(console_handler)
 
 AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
-AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
-AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "opencode")
-AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 
 # MODE configuration (for device tracking in atlas mode)
 MODE = os.getenv("MODE", "atlas").lower()
 
-SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
-SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
-
-# Configure API URL based on mode
 if MODE == "atlas":
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
     OPENCODE_API_URL = f"https://{device_id}.opencode.local" if device_id else "https://api.opencode.ai"
@@ -56,57 +56,6 @@ if MODE == "atlas":
 else:
     OPENCODE_API_URL = os.getenv("OPENCODE_API_URL", "https://api.opencode.ai")
     logger.info(f"MODE: {MODE}, OPENCODE_API_URL: {OPENCODE_API_URL}")
-
-
-def create_ssl_context():
-    return ssl._create_unverified_context()
-
-
-def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
-    params = []
-    if guardrails:
-        params.append("guardrails=true")
-    params.append(f"akto_connector={AKTO_CONNECTOR}")
-    if ingest_data:
-        params.append("ingest_data=true")
-    return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
-
-
-def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
-    logger.info(f"API CALL: POST {url}")
-    if LOG_PAYLOADS:
-        logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
-
-    headers = {"Content-Type": "application/json"}
-    if AKTO_API_TOKEN:
-        headers["Authorization"] = AKTO_API_TOKEN
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
-        method="POST",
-    )
-
-    start_time = time.time()
-    try:
-        ssl_context = create_ssl_context()
-        with urllib.request.urlopen(request, context=ssl_context, timeout=AKTO_TIMEOUT) as response:
-            duration_ms = int((time.time() - start_time) * 1000)
-            status_code = response.getcode()
-            raw = response.read().decode("utf-8")
-            logger.info(f"API RESPONSE: Status {status_code}, Duration: {duration_ms}ms, Size: {len(raw)} bytes")
-
-            if LOG_PAYLOADS:
-                logger.debug(f"Response body: {raw[:1000]}...")
-
-            try:
-                return json.loads(raw)
-            except json.JSONDecodeError:
-                return raw
-    except Exception as e:
-        duration_ms = int((time.time() - start_time) * 1000)
-        logger.error(f"API CALL FAILED after {duration_ms}ms: {e}")
-        raise
 
 
 def extract_tool_server_name(tool_name: str) -> str:
@@ -181,12 +130,10 @@ def call_guardrails(tool_name: str, tool_input: Any, tool_server_name: str) -> T
         result = post_payload_json(
             build_http_proxy_url(guardrails=True, ingest_data=False),
             request_body,
+            logger,
         )
 
-        data = result.get("data", {}) if isinstance(result, dict) else {}
-        guardrails_result = data.get("guardrailsResult", {})
-        allowed = guardrails_result.get("Allowed", True)
-        reason = guardrails_result.get("Reason", "")
+        allowed, reason, _ = parse_guardrails_result(result)
 
         if allowed:
             logger.info(f"Request ALLOWED for {tool_name}")
@@ -220,6 +167,7 @@ def ingest_blocked_request(tool_name: str, tool_input: Any, tool_server_name: st
         post_payload_json(
             build_http_proxy_url(guardrails=False, ingest_data=True),
             request_body,
+            logger,
         )
         logger.info("Blocked tool request ingestion successful")
     except Exception as e:

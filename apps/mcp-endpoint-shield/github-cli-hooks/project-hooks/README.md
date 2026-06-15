@@ -58,7 +58,7 @@ chmod +x .github/hooks/*.sh
 cp akto-validate-prompt.py .github/hooks/
 cp akto-validate-pre-tool.py .github/hooks/
 cp akto-validate-post-tool.py .github/hooks/
-cp akto_machine_id.py .github/hooks/
+cp ../shared/akto_machine_id.py .github/hooks/
 cp akto_heartbeat.py .github/hooks/
 ```
 

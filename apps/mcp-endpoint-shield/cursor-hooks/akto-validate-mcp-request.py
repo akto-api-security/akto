@@ -12,7 +12,6 @@ Cursor's beforeMCPExecution output schema only supports
 `permission: "allow" | "deny" | "ask"` — no native `warn` permission and no
 `updated_input`. The warn flow is therefore emulated via fingerprint resubmit.
 """
-import hashlib
 import json
 import logging
 import os
@@ -20,9 +19,15 @@ import ssl
 import sys
 import time
 import urllib.request
-from typing import Any, Dict, Set, Tuple, Union
+from typing import Any, Dict, Tuple, Union
 
 from akto_machine_id import get_machine_id, get_username
+from akto_ingestion_utility import (
+    apply_warn_resubmit_flow,
+    fingerprint,
+    is_warn_behaviour,
+    parse_guardrails_result,
+)
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.cursor/akto/mcp-logs"))
@@ -364,11 +369,7 @@ def call_guardrails(tool_name: str, tool_input_obj: Any, mcp_server_name: str) -
             request_body,
         )
 
-        data = result.get("data", {}) if isinstance(result, dict) else {}
-        guardrails_result = data.get("guardrailsResult", {})
-        allowed = guardrails_result.get("Allowed", True)
-        reason = guardrails_result.get("Reason", "")
-        behaviour = guardrails_result.get("behaviour", "") or guardrails_result.get("Behaviour", "")
+        allowed, reason, behaviour = parse_guardrails_result(result)
 
         if allowed:
             logger.info(f"Request ALLOWED for {mcp_server_name}")
@@ -380,77 +381,6 @@ def call_guardrails(tool_name: str, tool_input_obj: Any, mcp_server_name: str) -
     except Exception as e:
         logger.error(f"Guardrails validation error: {e}")
         return True, "", ""
-
-
-# ---------- Warn / alert behaviour (lifted from claude-cli-hooks) ----------
-
-def _guardrails_behaviour_value(behaviour: Any) -> str:
-    return str(behaviour or "").strip().lower()
-
-
-def _is_warn_behaviour(behaviour: Any) -> bool:
-    return _guardrails_behaviour_value(behaviour) == "warn"
-
-
-def _is_alert_behaviour(behaviour: Any) -> bool:
-    return _guardrails_behaviour_value(behaviour) == "alert"
-
-
-def pretool_fingerprint(tool_name: str, tool_input_obj: Any) -> str:
-    canonical = json.dumps({"t": tool_name, "i": tool_input_obj}, sort_keys=True, ensure_ascii=False)
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def load_warn_pending() -> Set[str]:
-    if not os.path.exists(WARN_STATE_PATH):
-        return set()
-    try:
-        with open(WARN_STATE_PATH, encoding="utf-8") as f:
-            data = json.load(f)
-        return set(data.get("warn_pending", []))
-    except (json.JSONDecodeError, OSError) as e:
-        logger.warning(f"Could not read warn-pending map: {e}")
-        return set()
-
-
-def save_warn_pending(hashes: Set[str]) -> None:
-    tmp_path = WARN_STATE_PATH + ".tmp"
-    try:
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump({"warn_pending": sorted(hashes)}, f, indent=0)
-            f.write("\n")
-        os.replace(tmp_path, WARN_STATE_PATH)
-    except OSError as e:
-        logger.error(f"Could not persist warn-pending map: {e}")
-        if os.path.exists(tmp_path):
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
-
-
-def apply_warn_resubmit_flow(
-    gr_allowed: bool,
-    reason: str,
-    behaviour: str,
-    fingerprint: str,
-) -> Tuple[bool, str]:
-    if gr_allowed:
-        return True, ""
-    if _is_alert_behaviour(behaviour):
-        logger.info("Alert behaviour: allowing despite violation (server-side alert only)")
-        return True, ""
-    if not _is_warn_behaviour(behaviour):
-        return False, reason
-    pending = load_warn_pending()
-    if fingerprint in pending:
-        pending.discard(fingerprint)
-        save_warn_pending(pending)
-        logger.info("Warn flow: allowing resubmit; removed fingerprint from map")
-        return True, ""
-    pending.add(fingerprint)
-    save_warn_pending(pending)
-    return False, reason
 
 
 def ingest_blocked_request(tool_name: str, tool_input_obj: Any, reason: str, mcp_server_name: str):
@@ -512,11 +442,11 @@ def main():
 
     if AKTO_SYNC_MODE:
         gr_allowed, gr_reason, behaviour = call_guardrails(tool_name, tool_input_obj, mcp_server_name)
-        fingerprint = pretool_fingerprint(tool_name, tool_input_obj)
-        allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint)
+        fp = fingerprint({"t": tool_name, "i": tool_input_obj})
+        allowed, _ = apply_warn_resubmit_flow(WARN_STATE_PATH, fp, gr_allowed, gr_reason, behaviour, logger)
 
         if not allowed:
-            if _is_warn_behaviour(behaviour):
+            if is_warn_behaviour(behaviour):
                 user_message = (
                     f"Warning!! Cursor MCP call blocked, send the same request again to bypass. "
                     f"Reason: {gr_reason or 'Policy violation'}"

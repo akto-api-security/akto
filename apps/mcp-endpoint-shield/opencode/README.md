@@ -29,7 +29,7 @@ Copy the plugin to OpenCode's plugin directory:
 ```bash
 cp akto-guardrails-plugin.js ~/.opencode/plugins/
 cp akto-*.py ~/.opencode/plugins/
-cp akto_machine_id.py ~/.opencode/plugins/
+cp ../shared/akto_machine_id.py ~/.opencode/plugins/
 ```
 
 ### 2. Configure Akto URL

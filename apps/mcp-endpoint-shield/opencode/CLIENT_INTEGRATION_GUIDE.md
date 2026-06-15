@@ -38,7 +38,7 @@ cp akto-validate-tool-request.py ~/.opencode/plugins/
 cp akto-validate-tool-response.py ~/.opencode/plugins/
 cp akto-mcp-request.py ~/.opencode/plugins/
 cp akto-mcp-response.py ~/.opencode/plugins/
-cp akto_machine_id.py ~/.opencode/plugins/
+cp ../shared/akto_machine_id.py ~/.opencode/plugins/
 cp settings.json ~/.opencode/plugins/
 
 # Make Python scripts executable

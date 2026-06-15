@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 
-import hashlib
 import json
 import logging
 import os
-import ssl
 import sys
 import time
-import urllib.request
-from typing import Any, Dict, Optional, Set, Tuple, Union
+from typing import Any, Dict, Optional, Tuple
 from akto_machine_id import get_machine_id, get_username
+from akto_ingestion_utility import (
+    apply_warn_resubmit_flow,
+    build_http_proxy_url,
+    fingerprint,
+    is_warn_behaviour,
+    parse_guardrails_result,
+    post_payload_json,
+    resolve_host_url,
+)
 
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.gemini/akto/chat-logs"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -33,81 +39,12 @@ if not logger.handlers:
     logger.addHandler(console_handler)
 
 AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
-AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
-AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
-GEMINI_API_URL = os.getenv("GEMINI_API_URL", "https://generativelanguage.googleapis.com")
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 MODE = os.getenv("MODE", "argus").lower()
-AKTO_CONNECTOR = "gemini_cli"
+CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 
-# SSL Configuration
-SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
-SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
-
-if MODE == "atlas":
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    GEMINI_API_URL = f"https://{device_id}.ai-agent.geminicli" if device_id else GEMINI_API_URL
-    logger.info(f"MODE: {MODE}, Device ID: {device_id}, GEMINI_API_URL: {GEMINI_API_URL}")
-else:
-    logger.info(f"MODE: {MODE}, GEMINI_API_URL: {GEMINI_API_URL}")
-
-
-def create_ssl_context():
-    return ssl._create_unverified_context()
-
-
-def uuid_to_ipv6_simple(uuid_str):
-    hex_str = uuid_str.replace("-", "").lower()
-    return ":".join(hex_str[i:i+4] for i in range(0, 32, 4))
-
-
-def build_http_proxy_url(*, guardrails: bool = False, response_guardrails: bool = False, ingest_data: bool = False) -> str:
-    params = []
-    if guardrails:
-        params.append("guardrails=true")
-    if response_guardrails:
-        params.append("response_guardrails=true")
-    params.append(f"akto_connector={AKTO_CONNECTOR}")
-    if ingest_data:
-        params.append("ingest_data=true")
-    return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
-
-
-def post_to_akto(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
-    logger.info(f"API CALL: POST {url}")
-    if LOG_PAYLOADS:
-        logger.debug(f"Request payload: {json.dumps(payload, default=str)[:1000]}...")
-
-    headers = {"Content-Type": "application/json"}
-    if AKTO_API_TOKEN:
-        headers["Authorization"] = AKTO_API_TOKEN
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
-        method="POST",
-    )
-
-    start_time = time.time()
-    try:
-        ssl_context = create_ssl_context()
-        with urllib.request.urlopen(request, context=ssl_context, timeout=AKTO_TIMEOUT) as response:
-            duration_ms = int((time.time() - start_time) * 1000)
-            status_code = response.getcode()
-            raw = response.read().decode("utf-8")
-
-            logger.info(f"API RESPONSE: Status {status_code}, Duration: {duration_ms}ms, Size: {len(raw)} bytes")
-            if LOG_PAYLOADS:
-                logger.debug(f"Response body: {raw[:1000]}...")
-
-            try:
-                return json.loads(raw)
-            except json.JSONDecodeError:
-                return raw
-    except Exception as e:
-        duration_ms = int((time.time() - start_time) * 1000)
-        logger.error(f"API CALL FAILED after {duration_ms}ms: {e}")
-        raise
+GEMINI_API_URL = resolve_host_url("https://generativelanguage.googleapis.com", legacy_env="GEMINI_API_URL")
+logger.info(f"MODE: {MODE}, GEMINI_API_URL: {GEMINI_API_URL}")
 
 
 def build_akto_request(
@@ -118,7 +55,7 @@ def build_akto_request(
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
         tags["ai-agent"] = "geminicli"
-        tags["source"] = "ENDPOINT"
+        tags["source"] = CONTEXT_SOURCE
 
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
     host = GEMINI_API_URL.replace("https://", "").replace("http://", "")
@@ -170,7 +107,7 @@ def build_akto_request(
         "enabled_graph": None,
         "tag": json.dumps(tags),
         "metadata": json.dumps(metadata),
-        "contextSource": "ENDPOINT"
+        "contextSource": CONTEXT_SOURCE
     }
 
 
@@ -201,16 +138,13 @@ def call_guardrails(
 
     try:
         request_body = build_akto_request(query, model=model, session_metadata=session_metadata)
-        result = post_to_akto(
+        result = post_payload_json(
             build_http_proxy_url(guardrails=True, ingest_data=False),
             request_body,
+            logger,
         )
 
-        data = result.get("data", {}) if isinstance(result, dict) else {}
-        guardrails_result = data.get("guardrailsResult", {})
-        allowed = guardrails_result.get("Allowed", True)
-        reason = guardrails_result.get("Reason", "")
-        behaviour = guardrails_result.get("behaviour", "") or guardrails_result.get("Behaviour", "")
+        allowed, reason, behaviour = parse_guardrails_result(result)
 
         if allowed:
             logger.info("Prompt ALLOWED by guardrails")
@@ -222,77 +156,6 @@ def call_guardrails(
     except Exception as e:
         logger.error(f"Guardrails validation error: {e}", exc_info=True)
         return True, "", ""
-
-
-# ---------- Warn / alert behaviour (lifted from claude-cli-hooks) ----------
-
-def _guardrails_behaviour_value(behaviour: Any) -> str:
-    return str(behaviour or "").strip().lower()
-
-
-def _is_warn_behaviour(behaviour: Any) -> bool:
-    return _guardrails_behaviour_value(behaviour) == "warn"
-
-
-def _is_alert_behaviour(behaviour: Any) -> bool:
-    return _guardrails_behaviour_value(behaviour) == "alert"
-
-
-def prompt_fingerprint(query: str) -> str:
-    canonical = json.dumps({"p": query}, sort_keys=True, ensure_ascii=False)
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def load_warn_pending() -> Set[str]:
-    if not os.path.exists(WARN_STATE_PATH):
-        return set()
-    try:
-        with open(WARN_STATE_PATH, encoding="utf-8") as f:
-            data = json.load(f)
-        return set(data.get("warn_pending", []))
-    except (json.JSONDecodeError, OSError) as e:
-        logger.warning(f"Could not read warn-pending map: {e}")
-        return set()
-
-
-def save_warn_pending(hashes: Set[str]) -> None:
-    tmp_path = WARN_STATE_PATH + ".tmp"
-    try:
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump({"warn_pending": sorted(hashes)}, f, indent=0)
-            f.write("\n")
-        os.replace(tmp_path, WARN_STATE_PATH)
-    except OSError as e:
-        logger.error(f"Could not persist warn-pending map: {e}")
-        if os.path.exists(tmp_path):
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
-
-
-def apply_warn_resubmit_flow(
-    gr_allowed: bool,
-    reason: str,
-    behaviour: str,
-    fingerprint: str,
-) -> Tuple[bool, str]:
-    if gr_allowed:
-        return True, ""
-    if _is_alert_behaviour(behaviour):
-        logger.info("Alert behaviour: allowing despite violation (server-side alert only)")
-        return True, ""
-    if not _is_warn_behaviour(behaviour):
-        return False, reason
-    pending = load_warn_pending()
-    if fingerprint in pending:
-        pending.discard(fingerprint)
-        save_warn_pending(pending)
-        logger.info("Warn flow: allowing resubmit; removed fingerprint from map")
-        return True, ""
-    pending.add(fingerprint)
-    save_warn_pending(pending)
-    return False, reason
 
 
 def ingest_blocked_request(
@@ -312,9 +175,10 @@ def ingest_blocked_request(
         })
         request_body["statusCode"] = "403"
         request_body["status"] = "403"
-        post_to_akto(
+        post_payload_json(
             build_http_proxy_url(guardrails=False, ingest_data=True),
             request_body,
+            logger,
         )
         logger.info("Blocked request ingestion successful")
     except Exception as e:
@@ -369,10 +233,12 @@ def main():
         gr_allowed, gr_reason, behaviour = call_guardrails(
             prompt, model=model, streaming=streaming, session_metadata=session_metadata
         )
-        fingerprint = prompt_fingerprint(prompt)
-        allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint)
+        fp = fingerprint({"p": prompt})
+        allowed, _ = apply_warn_resubmit_flow(
+            WARN_STATE_PATH, fp, gr_allowed, gr_reason, behaviour, logger
+        )
         if not allowed:
-            if _is_warn_behaviour(behaviour):
+            if is_warn_behaviour(behaviour):
                 deny_reason = (
                     f"Warning!! Prompt blocked, please review it. Send the same prompt again to bypass. "
                     f"Reason: {gr_reason or 'Policy violation'}"

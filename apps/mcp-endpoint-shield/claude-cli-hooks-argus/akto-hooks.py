@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dispatch entry for Akto Claude CLI observability hooks. Usage: akto-hooks.py <hookName>"""
+"""Dispatch entry for Akto Claude CLI Argus observability hooks. Usage: akto-hooks.py <hookName>"""
 import os
 
 os.environ.setdefault("LOG_DIR", os.path.expanduser("~/.claude/akto/logs"))

@@ -34,7 +34,7 @@ done
 # Shared session-state/ingestion helper (imported by the hook scripts) and its
 # machine-id dependency, which live outside this connector's directory.
 curl -o ~/.claude/hooks/akto_ingestion_utility.py "${SHIELD_BASE}/shared/akto_ingestion_utility.py"
-curl -o ~/.claude/hooks/akto_machine_id.py "${SHIELD_BASE}/claude-cli-hooks/akto_machine_id.py"
+curl -o ~/.claude/hooks/akto_machine_id.py "${SHIELD_BASE}/shared/akto_machine_id.py"
 
 chmod +x ~/.claude/hooks/*.sh
 ```

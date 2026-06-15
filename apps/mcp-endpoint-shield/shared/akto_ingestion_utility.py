@@ -2,6 +2,7 @@
 Common utilities for Akto AI agent hooks (Claude CLI, Cursor, and others).
 Shared config, HTTP, ingestion payload building, transcript reading, and hook runners.
 """
+import hashlib
 import json
 import logging
 import os
@@ -9,7 +10,7 @@ import ssl
 import sys
 import time
 import urllib.request
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 try:
     from akto_machine_id import get_machine_id, get_username
@@ -85,16 +86,25 @@ def create_ssl_context() -> ssl.SSLContext:
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(*, guardrails: bool, ingest_data: bool, client_hook: str = "") -> str:
+def build_http_proxy_url(
+    *,
+    guardrails: bool = False,
+    response_guardrails: bool = False,
+    ingest_data: bool = False,
+    client_hook: str = "",
+) -> str:
     params = []
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     params.append(f"akto_connector={AKTO_CONNECTOR}")
     if ingest_data:
         params.append("ingest_data=true")
     if client_hook:
         params.append(f"client_hook={client_hook}")
-    return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
+    base = (AKTO_DATA_INGESTION_URL or "").rstrip("/")
+    return f"{base}/api/http-proxy?{'&'.join(params)}"
 
 
 def post_payload_json(
@@ -132,6 +142,124 @@ def post_payload_json(
         duration_ms = int((time.time() - start_time) * 1000)
         logger.error(f"API CALL FAILED after {duration_ms}ms: {e}")
         raise
+
+
+# ── Host URL resolution ─────────────────────────────────────────────────────────
+
+def resolve_host_url(default_host: str, *, legacy_env: str = "") -> str:
+    """Resolve the upstream API host used for the mirrored `host` header.
+
+    atlas mode  -> https://<device_id>.ai-agent.<tag>  (default_host if no device id)
+    argus mode  -> the standardized AKTO_API_URL, else the agent's legacy env var
+                   (e.g. CLAUDE_API_URL / GEMINI_API_URL), else default_host.
+    """
+    if MODE == "atlas":
+        device_id = os.getenv("DEVICE_ID") or get_machine_id()
+        return f"https://{device_id}.ai-agent.{TAG_NAME}" if device_id else default_host
+    explicit = os.getenv("AKTO_API_URL")
+    if explicit:
+        return explicit
+    if legacy_env:
+        legacy = os.getenv(legacy_env)
+        if legacy:
+            return legacy
+    return default_host
+
+
+# ── Guardrails result parsing & behaviour ───────────────────────────────────────
+
+def parse_guardrails_result(result: Any) -> Tuple[bool, str, str]:
+    """Extract (allowed, reason, behaviour) from a guardrails API response."""
+    data = result.get("data", {}) if isinstance(result, dict) else {}
+    gr = data.get("guardrailsResult", {}) if isinstance(data, dict) else {}
+    allowed = gr.get("Allowed", True)
+    reason = gr.get("Reason", "")
+    behaviour = gr.get("behaviour", "") or gr.get("Behaviour", "")
+    return allowed, reason, behaviour
+
+
+def guardrails_behaviour_value(behaviour: Any) -> str:
+    return str(behaviour or "").strip().lower()
+
+
+def is_warn_behaviour(behaviour: Any) -> bool:
+    return guardrails_behaviour_value(behaviour) == "warn"
+
+
+def is_alert_behaviour(behaviour: Any) -> bool:
+    return guardrails_behaviour_value(behaviour) == "alert"
+
+
+# ── Warn-resubmit flow ──────────────────────────────────────────────────────────
+#
+# When guardrails return behaviour="warn", the first submission is blocked with a
+# warning and its fingerprint is remembered; an identical resubmit is then allowed
+# through (and the fingerprint cleared). behaviour="alert" allows through silently
+# (server-side alert only). Each hook owns its own state file path.
+
+def fingerprint(payload_obj: Any) -> str:
+    """SHA-256 of a canonical JSON encoding of `payload_obj`."""
+    canonical = json.dumps(payload_obj, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def load_warn_pending(state_path: str, logger: logging.Logger) -> Set[str]:
+    if not os.path.exists(state_path):
+        return set()
+    try:
+        with open(state_path, encoding="utf-8") as f:
+            data = json.load(f)
+        return set(data.get("warn_pending", []))
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f"Could not read warn-pending map: {e}")
+        return set()
+
+
+def save_warn_pending(state_path: str, hashes: Set[str], logger: logging.Logger) -> None:
+    tmp_path = state_path + ".tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump({"warn_pending": sorted(hashes)}, f, indent=0)
+            f.write("\n")
+        os.replace(tmp_path, state_path)
+    except OSError as e:
+        logger.error(f"Could not persist warn-pending map: {e}")
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+
+def apply_warn_resubmit_flow(
+    state_path: str,
+    fp: str,
+    gr_allowed: bool,
+    reason: str,
+    behaviour: str,
+    logger: logging.Logger,
+) -> Tuple[bool, str]:
+    """Return (allowed, reason) after applying the warn/alert resubmit gate."""
+    if gr_allowed:
+        return True, ""
+
+    if is_alert_behaviour(behaviour):
+        logger.info("Alert behaviour: allowing despite violation (server-side alert only)")
+        return True, ""
+
+    if not is_warn_behaviour(behaviour):
+        return False, reason
+
+    pending = load_warn_pending(state_path, logger)
+    if fp in pending:
+        pending.discard(fp)
+        save_warn_pending(state_path, pending, logger)
+        logger.info("Warn flow: allowing resubmit; removed fingerprint from map")
+        return True, ""
+
+    pending.add(fp)
+    save_warn_pending(state_path, pending, logger)
+    return False, reason
 
 
 # ── Session state (cross-event correlation) ────────────────────────────────────
@@ -533,6 +661,15 @@ def run_observability_hook(hook_name: str) -> None:
         logger.error(f"Main error: {e}")
     print(json.dumps({}))
     sys.exit(0)
+
+
+def main_observability_dispatch() -> None:
+    """Entry point for the per-agent `akto-hooks.py` dispatchers: validate argv and
+    run the named observability hook (which prints `{}` and exits 0 itself)."""
+    if len(sys.argv) < 2:
+        print("Usage: akto-hooks.py <hookName>", file=sys.stderr)
+        sys.exit(1)
+    run_observability_hook(sys.argv[1])
 
 
 def run_blocking_hook(hook_name: str) -> None:

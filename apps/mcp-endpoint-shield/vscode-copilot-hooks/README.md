@@ -40,7 +40,7 @@ chmod +x ~/.vscode/copilot/hooks/akto/*.sh
 cp ../github-cli-hooks/akto-validate-prompt.py ~/.vscode/copilot/hooks/akto/
 cp ../github-cli-hooks/akto-validate-pre-tool.py ~/.vscode/copilot/hooks/akto/
 cp ../github-cli-hooks/akto-validate-post-tool.py ~/.vscode/copilot/hooks/akto/
-cp ../github-cli-hooks/akto_machine_id.py ~/.vscode/copilot/hooks/akto/
+cp ../shared/akto_machine_id.py ~/.vscode/copilot/hooks/akto/
 cp ../github-cli-hooks/akto_heartbeat.py ~/.vscode/copilot/hooks/akto/
 ```
 
