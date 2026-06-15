@@ -4,7 +4,7 @@ import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { TypeBadge, RiskPill, SeverityBadge } from "./AgenticCellRenderers";
 import { ToolDetailPanel, SkillDetailPanel } from "./McpComponentsView";
 import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges";
-import agenticObserveApi from "./agenticObserveApi";
+import agenticObserveApi, { buildHostFilterUrl } from "./agenticObserveApi";
 
 // ── Cell renderers ────────────────────────────────────────────────────────────
 
@@ -179,7 +179,7 @@ function AgentMcpToolsView({ asset, selectedMcp, agenticFlatData, goToList, onNa
 
 // ── Main view ─────────────────────────────────────────────────────────────────
 
-export default function AgentComponentsView({ asset, onNavChange, onNavigateToAsset, agenticFlatData = [] }) {
+export default function AgentComponentsView({ asset, onNavChange, onNavigateToAsset, agenticFlatData = [], configViolations = null, configHosts = [], configUrls = [] }) {
     const [view,          setView]          = useState("list");
     const [selectedMcp,   setSelectedMcp]   = useState(null);
     const [selectedTool,  setSelectedTool]  = useState(null);
@@ -227,15 +227,23 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
         onNavChange?.(null);
     }, [onNavChange]);
 
-    // Config row: shown for Claude agents when the asset has violations attributed from
-    // claude-settings / claude config scanner events (no real collection, non-clickable).
+    // Config row: shown for Claude agents that have claude-config/settings violations attributed
+    // to their devices (host-matched, NOT the agent total). Clickable → threat-activity filtered
+    // to exactly those config event hosts. Non-clickable only if the hosts are unknown.
     const configRow = useMemo(() => {
         const isClaudeAgent = asset?.assetTagValue?.toLowerCase() === "claude";
-        if (!isClaudeAgent) return null;
-        const v = asset?.violations;
-        if (!v || (v.critical + v.high + v.medium + v.low) === 0) return null;
-        return { id: "__config__", name: "Claude Settings", _type: "Config", violations: v, _nonClickable: true };
-    }, [asset?.assetTagValue, asset?.violations]);
+        if (!isClaudeAgent || !configViolations || configViolations.total === 0) return null;
+        const hosts = configHosts || [];
+        return {
+            id: "__config__",
+            name: "Claude Settings",
+            _type: "Config",
+            violations: configViolations,
+            _configHosts: hosts,
+            _configUrls: configUrls || [],
+            _nonClickable: hosts.length === 0,
+        };
+    }, [asset?.assetTagValue, configViolations, configHosts, configUrls]);
 
     const allComponents = useMemo(() => [
         ...(configRow ? [configRow] : []),
@@ -245,6 +253,10 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
 
     const handleListRowClick = useCallback((e) => {
         if (!e.data || e.data._nonClickable) return;
+        if (e.data._type === "Config") {
+            window.open(buildHostFilterUrl(e.data._configHosts, e.data._configUrls), "_blank");
+            return;
+        }
         if (e.data._type === "MCP Server") {
             setSelectedMcp(e.data);
             setView("mcp-tools");
