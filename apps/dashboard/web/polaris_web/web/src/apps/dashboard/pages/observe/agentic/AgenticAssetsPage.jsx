@@ -397,18 +397,16 @@ export default function AgenticAssetsPage() {
         });
         if (skillCollectionIds.length) {
           fetchAndCacheSkillApiData(skillCollectionIds, { api, PersistStore })
-            .then(({ maliciousSkills, misconfiguredSkills }) => {
-              if (!isMountedRef.current) return;
-              const markSkills = (rows) =>
-                rows.map((r) => {
-                  if (r.type !== "Skill") return r;
-                  const updates = {};
-                  if (maliciousSkills?.has(r.name)) updates.isMalicious = true;
-                  if (misconfiguredSkills?.has(r.name)) updates.isMisconfigured = true;
-                  return Object.keys(updates).length ? { ...r, ...updates } : r;
-                });
-              setAgenticTreeData((prev) => markSkills(prev));
-              setAgenticFlatData((prev) => markSkills(prev));
+            .then(({ maliciousSkills }) => {
+              if (!isMountedRef.current || !maliciousSkills?.size) return;
+              const markMalicious = (rows) =>
+                rows.map((r) =>
+                  r.type === "Skill" && maliciousSkills.has(r.name)
+                    ? { ...r, isMalicious: true }
+                    : r,
+                );
+              setAgenticTreeData((prev) => markMalicious(prev));
+              setAgenticFlatData((prev) => markMalicious(prev));
             })
             .catch(() => {});
         }

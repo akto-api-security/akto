@@ -82,12 +82,11 @@ function MarkerIcon({ src, label, size = 16 }) {
 
 export function AssetNameCellRenderer({ data }) {
     if (!data) return null;
-    // Match old UI: personal-account + local-MCP markers for non-Skill rows; malicious/misconfigured markers for Skills
+    // Match old UI: personal-account + local-MCP markers for non-Skill rows; malicious marker for Skills
     const isSkill = data.type === "Skill";
     const showLocalMcp = data.hasLocalMcpServer && !isSkill;
     const showPersonal = data.hasPersonalAccount && !isSkill;
     const showMalicious = data.isMalicious && isSkill;
-    const showMisconfigured = data.isMisconfigured && isSkill;
     return (
         <HorizontalStack gap="2" blockAlign="center" wrap={false}>
             <AssetIcon type={data.type} assetTagValue={data.assetTagValue} size={24} />
@@ -97,7 +96,6 @@ export function AssetNameCellRenderer({ data }) {
             {showLocalMcp && <MarkerIcon src={McpRedIcon} label="Local MCP Server" size={24} />}
             {showPersonal && <MarkerIcon src={PersonLockIcon} label="Contains personal account" size={24} />}
             {showMalicious && <MarkerIcon src={MaliciousSkillIcon} label="Malicious skill" size={24} />}
-            {showMisconfigured && <Badge size="small" status="attention">Misconfigured</Badge>}
         </HorizontalStack>
     );
 }

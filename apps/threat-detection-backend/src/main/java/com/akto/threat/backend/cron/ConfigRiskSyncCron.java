@@ -37,8 +37,6 @@ import com.mongodb.client.model.WriteModel;
 
 public class ConfigRiskSyncCron {
 
-    private static final int INITIAL_DELAY_SECONDS = 60;
-    private static final int PERIOD_MINUTES = 15;
     private static final String MISCONFIGURED_TAG_KEY = "misconfigured-config";
     private static final String CONFIG_ENDPOINT_PREFIX = "^/claude/config/";
 
@@ -59,7 +57,7 @@ public class ConfigRiskSyncCron {
                     }
                 }, "config-risk-sync-cron");
             }
-        }, INITIAL_DELAY_SECONDS, PERIOD_MINUTES * 60, TimeUnit.SECONDS);
+        }, 0, 15, TimeUnit.MINUTES);
     }
 
     private void syncConfigRiskForAccount(int accountId) {
