@@ -424,7 +424,7 @@ const settingFunctions = {
     fetchWizIntegration: async function(){
       let wizIntegration = {}
       await settingRequests.fetchWizIntegration().then((resp)=>{
-        wizIntegration = resp.wizIntegration
+        wizIntegration = resp
       })
       return wizIntegration
     },
@@ -441,6 +441,20 @@ const settingFunctions = {
         trafficData = resp
       })
       return trafficData
+    },
+    addWizTrafficSource: async function() {
+      let result = {}
+      await settingRequests.addWizTrafficSource().then((resp)=>{
+        result = resp
+      })
+      return result
+    },
+    removeWizTrafficSource: async function() {
+      let result = {}
+      await settingRequests.removeWizTrafficSource().then((resp)=>{
+        result = resp
+      })
+      return result
     },
     fetchNewRelicIntegration: async function(){
       let newRelicIntegration = {}

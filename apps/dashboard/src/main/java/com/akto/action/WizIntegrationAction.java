@@ -1,17 +1,21 @@
 package com.akto.action;
 
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 import com.akto.dao.WizIntegrationDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.jobs.JobsDao;
 import com.akto.dto.jobs.Job;
 import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.jobs.WizApiEndpointsImportJobParams;
 import com.akto.dto.jobs.WizSyncJobParams;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.wiz_integration.WizIntegration;
 import com.akto.jobs.JobScheduler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.wiz.WizApiEndpointsImporter;
 import com.akto.wiz.WizIntegrationUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Projections;
@@ -29,6 +33,7 @@ public class WizIntegrationAction extends UserAction {
 
     private static final LoggerMaker logger = new LoggerMaker(WizIntegrationAction.class, LogDb.DASHBOARD);
     private static final int WIZ_SYNC_INTERVAL_SECONDS = 60 * 10; // 10 minutes
+    private static final int WIZ_IMPORT_API_ENDPOINTS_SYNC_INTERVAL_SECONDS = 60 * 60; // 1 hour
 
     @Getter
     @Setter
@@ -111,6 +116,10 @@ public class WizIntegrationAction extends UserAction {
             if (existingIntegration != null && existingIntegration.getWizSyncJobId() != null) {
                 JobScheduler.deleteJob(existingIntegration.getWizSyncJobId());
             }
+
+            if (existingIntegration != null && existingIntegration.getWizImportApiEndpointsJobId() != null) {
+                JobScheduler.deleteJob(existingIntegration.getWizImportApiEndpointsJobId());
+            }
             WizIntegrationDao.instance.deleteAll(new BasicDBObject());
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error while removing Wiz integration for accountId: " + Context.accountId.get());
@@ -125,11 +134,20 @@ public class WizIntegrationAction extends UserAction {
     @Setter
     private WizIntegration wizIntegration;
 
+    @Getter @Setter
+    private Job wizImportApiEndpointsJob;
+
     public String fetchWizIntegration() {
         wizIntegration = WizIntegrationDao.instance.findOne(
             new BasicDBObject(),
             Projections.exclude(WizIntegration.CLIENT_SECRET, WizIntegration.ACCESS_TOKEN)
         );
+
+        ObjectId wizImportApiEndpointsJobId = wizIntegration != null ? wizIntegration.getWizImportApiEndpointsJobId() : null;
+        if (wizImportApiEndpointsJobId != null) {
+            wizImportApiEndpointsJob = JobsDao.instance.findOne(new BasicDBObject(Job.ID, wizImportApiEndpointsJobId));
+        }
+
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -161,6 +179,61 @@ public class WizIntegrationAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String addWizTrafficSource() {
+        try {
+            boolean scopeAllowed = WizApiEndpointsImporter.checkApiEndpointsScope();
+            if (!scopeAllowed) {
+                logger.infoAndAddToDb("Wiz integration credentials does not have the required read:api_endpoints scope. Please update the Wiz integration credentials to include this scope.");
+                addActionError("Wiz integration credentials does not have the required read:api_endpoints scope. Please update the Wiz integration credentials to include this scope.");
+                return Action.ERROR.toUpperCase();
+            }
+
+            Job wizImportApiEndpointsJob = JobScheduler.scheduleRecurringJob(Context.accountId.get(),new WizApiEndpointsImportJobParams(),JobExecutorType.DASHBOARD, WIZ_IMPORT_API_ENDPOINTS_SYNC_INTERVAL_SECONDS, Context.now()); // schedule the job to run after 10 seconds
+            if (wizImportApiEndpointsJob == null) {
+                logger.errorAndAddToDb("Failed to schedule Wiz API endpoints import job for accountId: " + Context.accountId.get());
+                addActionError("Failed to connect wiz traffic source. Please try again.");
+                return Action.ERROR.toUpperCase();
+            }
+
+            Bson combineUpdates = Updates.combine(
+                Updates.set(WizIntegration.UPDATED_TS, Context.now()),
+                Updates.set(WizIntegration.WIZ_IMPORT_API_ENDPOINTS_JOB_ID, wizImportApiEndpointsJob.getId()),
+                Updates.set(WizIntegration.WIZ_IMPORT_API_ENDPOINTS_JOB_DELTA_TS, 0)
+            );
+
+            WizIntegrationDao.instance.getMCollection().updateOne(
+                new BasicDBObject(),
+                combineUpdates
+            );
+
+            logger.infoAndAddToDb("Scheduled Wiz API endpoints import job for accountId: " + Context.accountId.get());  
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error while adding Wiz traffic source for accountId: " + Context.accountId.get() + ", error: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String removeWizTrafficSource() {
+        try {
+            WizIntegration existingIntegration = WizIntegrationDao.instance.findOne(new BasicDBObject());
+            if (existingIntegration != null && existingIntegration.getWizImportApiEndpointsJobId() != null) {
+                JobScheduler.deleteJob(existingIntegration.getWizImportApiEndpointsJobId());
+            }
+            WizIntegrationDao.instance.getMCollection().updateOne(
+                new BasicDBObject(),
+                Updates.unset(WizIntegration.WIZ_IMPORT_API_ENDPOINTS_JOB_ID)
+            );
+            logger.infoAndAddToDb("Removed Wiz traffic source for accountId: " + Context.accountId.get());
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error removing Wiz traffic source: " + e.getMessage());
+            addActionError("Failed to remove Wiz traffic source. Please try again.");
+            return Action.ERROR.toUpperCase();
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
