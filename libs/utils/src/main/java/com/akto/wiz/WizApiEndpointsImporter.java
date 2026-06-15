@@ -16,7 +16,6 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.parser.core.models.ParseOptions;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -57,11 +56,13 @@ public class WizApiEndpointsImporter {
         }
     }
 
-    public static void importWizApiEndpoints(WizIntegration wizIntegration, BiConsumer<ParserResult, WizImportJobPageContext> processor, Runnable heartbeat) {
+    public static int importWizApiEndpoints(WizIntegration wizIntegration, BiConsumer<ParserResult, WizImportJobPageContext> processor, Runnable heartbeat) {
         if (wizIntegration == null) {
             loggerMaker.infoAndAddToDb("Wiz integration not configured for this account. Skipping import.");
-            return;
+            return 0; 
         }
+
+        int totalFetched = 0;
 
         try {
             String accessToken = WizIntegrationUtils.getValidAccessToken();
@@ -82,7 +83,9 @@ public class WizApiEndpointsImporter {
          
             heartbeat.run();
 
-            Instant cutoff = Instant.now().minus(24, ChronoUnit.HOURS);
+            int deltaTs = wizIntegration.getWizImportApiEndpointsJobDeltaTs();
+            Instant cutoff = Instant.ofEpochSecond(deltaTs);
+            //Instant cutoff = Instant.now().minus(24, ChronoUnit.HOURS);
             Set<String> updatedEndpointIds = new HashSet<>();
             for (BasicDBObject meta : allEndpointMeta) {
                 String updatedAt = meta.getString("updatedAt");
@@ -96,10 +99,13 @@ public class WizApiEndpointsImporter {
                         "Failed to parse updatedAt '%s' for endpoint %s", updatedAt, meta.getString("id")));
                 }
             }
-            loggerMaker.infoAndAddToDb(String.format("%d endpoints updated in the last 24 hours (out of %d total)", updatedEndpointIds.size(), allEndpointMeta.size()));
+            long cutoffEpochSeconds = deltaTs;
+            long secondsSinceCutoff = Instant.now().getEpochSecond() - cutoffEpochSeconds;
+            long hoursSinceCutoff = secondsSinceCutoff / 3600;
+            loggerMaker.infoAndAddToDb(String.format("%d endpoints updated since last sync (%d hrs ago, out of %d total)", updatedEndpointIds.size(), hoursSinceCutoff, allEndpointMeta.size()));
             
                 
-            int totalFetched = 0;
+            totalFetched = 0;
             int totalErrors = 0;
 
             if (!updatedEndpointIds.isEmpty()) {
@@ -177,5 +183,7 @@ public class WizApiEndpointsImporter {
             e.printStackTrace();
             loggerMaker.errorAndAddToDb("Error importing Wiz API endpoints: " + e.getMessage());
         }
+
+        return totalFetched;
     }
 }
