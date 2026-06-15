@@ -258,6 +258,22 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                              */
 
                             if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
+                                for (Map.Entry<String, String> entry : this.scopeRoleMapping.entrySet()) {
+                                    String entryRole = entry.getValue();
+                                    try {
+                                        Role entryBaseRole = RBAC.Role.valueOf(entryRole);
+                                        if (!entryBaseRole.equals(Role.NO_ACCESS) && !Arrays.asList(Role.ADMIN.getRoleHierarchy()).contains(entryBaseRole)) {
+                                            addActionError("Invalid role: " + entryRole);
+                                            return Action.ERROR.toUpperCase();
+                                        }
+                                    } catch (IllegalArgumentException ex) {
+                                        CustomRole entryCustomRole = CustomRoleDao.instance.findRoleByName(entryRole);
+                                        if (entryCustomRole == null) {
+                                            addActionError("Invalid role: " + entryRole);
+                                            return Action.ERROR.toUpperCase();
+                                        }
+                                    }
+                                }
                                 // Update both primary role and scope-role mapping
                                 RBACDao.instance.updateOneNoUpsert(
                                         filterRbac,
@@ -327,7 +343,8 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             if (UsageMetricCalculator.isRbacFeatureAvailable(Context.accountId.get())) {
                 defaultRole = Utils.fetchDefaultInviteRole(Context.accountId.get(), Role.MEMBER.name());
             }
-            this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, defaultRole);
+            this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(
+                    this.scopeRoleMapping, defaultRole, Context.accountId.get(), email);
         }
         loggerMaker.debugAndAddToDb("scopeRoleMapping after init: " + scopeRoleMapping);
 
@@ -347,6 +364,11 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                         loggerMaker.errorAndAddToDb("Invalid product scope attempted in scope-role mapping: " + scope + " for user: " + email);
                         return Action.ERROR.toUpperCase();
                     }
+                    if (!baseRole.equals(Role.NO_ACCESS) && !Arrays.asList(Role.ADMIN.getRoleHierarchy()).contains(baseRole)) {
+                        addActionError("Invalid role: " + roleStr);
+                        loggerMaker.errorAndAddToDb("Invalid role attempted in scope-role mapping: " + roleStr + " for user: " + email);
+                        return Action.ERROR.toUpperCase();
+                    }
                 } catch (IllegalArgumentException e) {
                     // roleStr is not a standard role, check if it's a custom role
                     CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
@@ -357,6 +379,10 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                             loggerMaker.errorAndAddToDb("Invalid product scope attempted in scope-role mapping: " + scope + " for user: " + email);
                             return Action.ERROR.toUpperCase();
                         }
+                    } else {
+                        addActionError("Invalid role: " + roleStr);
+                        loggerMaker.errorAndAddToDb("Invalid role attempted in scope-role mapping: " + roleStr + " for user: " + email);
+                        return Action.ERROR.toUpperCase();
                     }
                 }
             }

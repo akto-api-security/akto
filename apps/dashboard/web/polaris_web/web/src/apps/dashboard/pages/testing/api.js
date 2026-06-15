@@ -53,6 +53,18 @@ export default {
         })
         return resp        
     },
+    async fetchTestRunStatusSummaries(testingRunResultSummaryHexIds) {
+        if (!testingRunResultSummaryHexIds?.length) {
+            return {};
+        }
+        const resp = await request({
+            url: '/api/fetchTestRunStatusSummaries',
+            method: 'post',
+            data: { testingRunResultSummaryHexIds },
+            timeout: 60000,
+        });
+        return resp || {};
+    },
     async fetchRemediationInfo(testId) {
         const resp = await request({
             url: 'api/fetchRemediationInfo',
@@ -224,6 +236,14 @@ export default {
         }).then((resp) => resp)
     },
 
+    getLatestReplayScreenshot(screenshotSessionId) {
+        return request({
+            url: '/api/getLatestReplayScreenshot',
+            method: 'post',
+            data: { screenshotSessionId }
+        }).then((resp) => resp)
+    },
+
     fetchRecordedLoginFlow(nodeId, testingRunPlaygroundId) {
         const data = { nodeId }
         if (testingRunPlaygroundId) {
@@ -325,6 +345,13 @@ export default {
             url: '/api/addAuthToRole',
             method: 'post',
             data: {roleName, apiCond, urlRegex, authParamData, authAutomationType, reqData, recordedLoginFlowInput}
+        })
+    },
+    getCopilotOAuthAuthorizationUrl(roleId) {
+        return request({
+            url: '/api/copilot/getAuthorizationUrl',
+            method: 'post',
+            data: { roleId }
         })
     },
     deleteAuthFromRole(roleName, index) {

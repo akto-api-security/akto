@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { IndexFiltersMode, Box, Badge, HorizontalStack, Text } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
@@ -10,8 +10,10 @@ import api from "../api";
 import func from "@/util/func";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
+import LocalStore from "../../../../main/LocalStorageStore";
 import { CollectionIcon } from "../../../components/shared/CollectionIcon";
 import useTable from "@/apps/dashboard/components/tables/TableContext";
+import NewLayoutTooltip from "./NewLayoutTooltip";
 import {
     getHeaders,
     sortOptions,
@@ -24,6 +26,7 @@ import {
     groupCollectionsBySkill,
     extractEndpointId,
     buildAgenticInventoryFilterForRow,
+    fetchAndCacheSkillApiData,
 } from "./constants";
 import { CLIENT_TYPES, ROW_TYPES, hasPersonalAccountTag } from "./mcpClientHelper";
 
@@ -32,7 +35,16 @@ const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills'];
 function Endpoints() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+    const agenticNewLayout = LocalStore((state) => state.agenticNewLayout);
+    const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
+
+    useEffect(() => {
+        if (agenticNewLayout) {
+            navigate("/dashboard/observe/agentic-assets", { replace: true });
+        }
+    }, [navigate, agenticNewLayout]);
     const [data, setData] = useState({ all: [], 'ai_agents': [], 'mcp_servers': [], llms: [], skills: [] });
+    const [skillEnrichVersion, setSkillEnrichVersion] = useState(0);
     const [summaryData, setSummaryData] = useState({ totalAssets: 0, totalEndpoints: 0 });
 
     const { tabsInfo } = useTable();
@@ -45,6 +57,10 @@ function Endpoints() {
     const setAllCollections = PersistStore((state) => state.setAllCollections);
     const filtersMap = PersistStore((state) => state.filtersMap);
     const setFiltersMap = PersistStore((state) => state.setFiltersMap);
+
+    // Ref so the Skills tab effect can read current skills without being a dep
+    const dataRef = useRef(data);
+    useEffect(() => { dataRef.current = data; }, [data]);
 
     const tableCountObj = func.getTabsCount(definedTableTabs, data);
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo);
@@ -100,11 +116,61 @@ function Endpoints() {
         });
     }, [getRiskScoreStatus]);
 
+    const applySkillRiskScores = useCallback((scoreMap, maliciousSkills, isMountedRef) => {
+        if (!isMountedRef.current) return;
+        setData((prev) => {
+            const updatedSkills = prev.skills.map((row) => {
+                const riskScore = scoreMap[row.groupName] || 0;
+                const isMalicious = maliciousSkills.has(row.groupName);
+                const groupNameDisplay = (
+                    <HorizontalStack gap="2" align="start" wrap={false}>
+                        <Text>{row.groupName}</Text>
+                        {isMalicious && <Badge size="small" status="critical">Malicious</Badge>}
+                    </HorizontalStack>
+                );
+                return {
+                    ...row,
+                    riskScore,
+                    maxRiskScore: riskScore,
+                    isMalicious,
+                    groupNameDisplay,
+                    riskScoreComp: riskScore
+                        ? <Badge status={getRiskScoreStatus(riskScore)} size="small">{riskScore}</Badge>
+                        : "-",
+                };
+            });
+            return {
+                ...prev,
+                skills: updatedSkills,
+                all: prev.all.map((row) => {
+                    if (row.clientType !== CLIENT_TYPES.SKILL) return row;
+                    return updatedSkills.find((s) => s.id === row.id) || row;
+                }),
+            };
+        });
+        setSkillEnrichVersion((v) => v + 1);
+    }, [getRiskScoreStatus]);
+
+    const enrichSkillsWithApiRiskScores = useCallback(async (skillRows, isMountedRef = { current: true }) => {
+        if (!skillRows.length) return;
+
+        const allCollectionIds = [];
+        skillRows.forEach((row) => {
+            (row.collections || []).forEach((c) => {
+                if (!allCollectionIds.includes(c.id)) allCollectionIds.push(c.id);
+            });
+        });
+
+        const { skillScoreMap, maliciousSkills } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
+
+        if (!isMountedRef.current) return;
+        applySkillRiskScores(skillScoreMap, maliciousSkills, isMountedRef);
+    }, [applySkillRiskScores]);
+
     async function fetchData(isMountedRef = { current: true }) {
         try {
             setLoading(true);
 
-            // Fetch all required data in parallel
             const [
                 apiCollectionsResp,
                 trafficInfoResp,
@@ -122,12 +188,10 @@ function Endpoints() {
             const collections = apiCollectionsResp.apiCollections || [];
             setAllCollections(collections);
 
-            // Extract maps from responses
             const trafficMap = trafficInfoResp || {};
             const riskScoreMap = riskScoreResp?.riskScoreOfCollectionsMap || {};
             const sensitiveMap = sensitiveInfoResp?.sensitiveSubtypesInCollection || {};
 
-            // Group collections by agents (discovery sources), services (discovered endpoints), and skills
             const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap, riskScoreMap);
             const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);
             const skillGroups = groupCollectionsBySkill(collections, trafficMap, sensitiveMap, riskScoreMap);
@@ -136,29 +200,24 @@ function Endpoints() {
             const prettifiedServices = prettifyGroupData(serviceGroups);
             const prettifiedSkills = prettifyGroupData(skillGroups);
 
-            // For AI Agent: agent row already represents both gen-ai and mcp-server for that agent.
-            // Don't show a separate service row with the same key (would show as "2 columns").
             const agentGroupKeys = new Set(prettifiedAgents.map((a) => a.groupKey));
             const servicesToShow = prettifiedServices.filter((s) => !agentGroupKeys.has(s.groupKey));
 
             const allData = [...prettifiedAgents, ...servicesToShow, ...prettifiedSkills];
 
-            // Calculate unique endpoint IDs across all collections
             const uniqueEndpointIds = new Set();
             collections.forEach((c) => {
                 if (c.deactivated) return;
                 const hostName = c.hostName || c.displayName || c.name;
                 const endpointId = extractEndpointId(hostName);
-                if (endpointId) {
-                    uniqueEndpointIds.add(endpointId);
-                }
+                if (endpointId) uniqueEndpointIds.add(endpointId);
             });
 
             setSummaryData({
                 totalAssets: allData.length,
                 totalEndpoints: uniqueEndpointIds.size
-            })
-    
+            });
+
             setData({
                 all: allData,
                 ai_agents: allData.filter(r => r.clientType === CLIENT_TYPES.AI_AGENT),
@@ -167,6 +226,9 @@ function Endpoints() {
                 skills: prettifiedSkills,
             });
             setLoading(false);
+
+            // Async enrichment — updates skill risk scores after initial render
+            enrichSkillsWithApiRiskScores(prettifiedSkills, isMountedRef);
         } catch {
             setLoading(false);
         }
@@ -177,6 +239,14 @@ function Endpoints() {
         fetchData(isMountedRef);
         return () => { isMountedRef.current = false; };
     }, []);
+
+    // Re-enrich on Skills tab switch; reads latest skills via ref to avoid dep loop
+    useEffect(() => {
+        if (selectedTab !== "skills") return;
+        const isMountedRef = { current: true };
+        enrichSkillsWithApiRiskScores(dataRef.current.skills, isMountedRef);
+        return () => { isMountedRef.current = false; };
+    }, [selectedTab, enrichSkillsWithApiRiskScores]);
 
     const disambiguateLabel = useCallback((key, value) => {
         return func.convertToDisambiguateLabelObj(value, null, 2);
@@ -190,15 +260,15 @@ function Endpoints() {
         } else {
             delete updatedFiltersMap[INVENTORY_FILTER_KEY];
         }
+        delete updatedFiltersMap[`${INVENTORY_FILTER_KEY}agent-tree/`];
 
         setFiltersMap(updatedFiltersMap);
-        
-        // Navigate to the hostname tab in inventory
+
         setTableSelectedTab({
             ...tableSelectedTab,
             [INVENTORY_PATH]: "hostname"
         });
-        
+
         setTimeout(() => navigate(INVENTORY_PATH), 0);
     }, [filtersMap, setFiltersMap, navigate, tableSelectedTab, setTableSelectedTab]);
 
@@ -219,9 +289,10 @@ function Endpoints() {
 
     const tableComponent = useMemo(() => {
         const commonTabProps = { tableTabs, onSelect: handleSelectedTab, selected };
+        const tableKey = selectedTab === "skills" ? `table-skills-${skillEnrichVersion}` : "table";
         return (
             <GithubSimpleTable
-                key="table"
+                key={tableKey}
                 pageLimit={PAGE_LIMIT}
                 data={data[selectedTab]}
                 sortOptions={sortOptions}
@@ -239,7 +310,7 @@ function Endpoints() {
                 {...commonTabProps}
             />
         );
-    }, [data, selectedTab, headers, disambiguateLabel, handleRowClick, tableTabs, selected]);
+    }, [data, selectedTab, skillEnrichVersion, headers, disambiguateLabel, handleRowClick, tableTabs, selected]);
 
     const pageTitle = useMemo(() => (
         <TitleWithInfo
@@ -249,11 +320,16 @@ function Endpoints() {
         />
     ), []);
 
+    const layoutToggle = (
+        <NewLayoutTooltip checked={false} onChange={() => { setAgenticNewLayout(true); navigate("/dashboard/observe/agentic-assets"); }} />
+    );
+
     if (loading) {
         return (
             <PageWithMultipleCards
                 title={pageTitle}
                 isFirstPage={true}
+                secondaryActions={layoutToggle}
                 components={[<SpinnerCentered key="loading" />]}
             />
         );
@@ -263,6 +339,7 @@ function Endpoints() {
         <PageWithMultipleCards
             title={pageTitle}
             isFirstPage={true}
+            secondaryActions={layoutToggle}
             components={[summaryComponent, tableComponent]}
         />
     );

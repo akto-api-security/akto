@@ -589,16 +589,15 @@ public class IssuesAction extends UserAction {
             }
             if(!andFilters.isEmpty()){
                 Bson orFilters = Filters.or(andFilters);
-                this.testingRunResults = TestingRunResultDao.instance.findAll(orFilters);
+                this.testingRunResults = TestingRunResultDao.instance.findAllWithSummaryContext(orFilters);
             }
 
             if (!filtersForNewCollection.isEmpty()) {
                 this.testingRunResults.addAll(
-                    VulnerableTestingRunResultDao.instance.findAll(Filters.or(filtersForNewCollection))
+                    VulnerableTestingRunResultDao.instance.findAllWithSummaryContext(Filters.or(filtersForNewCollection))
                 );
             }
 
-            Map<String, String> sampleDataVsCurlMap = new HashMap<>();
             // todo: fix
             for (TestingRunResult runResult: this.testingRunResults) {
                 List<GenericTestResult> testResults = new ArrayList<>();
@@ -1039,7 +1038,7 @@ public class IssuesAction extends UserAction {
         Bson combinedFilter = buildIssueFilter(issueIds);
 
         // Query both collections
-        List<TestingRunResult> vulnerableResults = VulnerableTestingRunResultDao.instance.findAll(
+        List<TestingRunResult> vulnerableResults = VulnerableTestingRunResultDao.instance.findAllWithSummaryContext(
             combinedFilter,
             Projections.include(
                 Constants.ID,
@@ -1050,7 +1049,7 @@ public class IssuesAction extends UserAction {
             )
         );
 
-        List<TestingRunResult> regularResults = TestingRunResultDao.instance.findAll(
+        List<TestingRunResult> regularResults = TestingRunResultDao.instance.findAllWithSummaryContext(
             combinedFilter,
             Projections.include(
                 Constants.ID,
@@ -1101,7 +1100,7 @@ public class IssuesAction extends UserAction {
     private List<TestingRunResult> fetchTestResultsByIds(List<ObjectId> testResultIds) {
         List<TestingRunResult> results = new ArrayList<>();
 
-        List<TestingRunResult> vulnerable = VulnerableTestingRunResultDao.instance.findAll(
+        List<TestingRunResult> vulnerable = VulnerableTestingRunResultDao.instance.findAllWithSummaryContext(
             Filters.in(Constants.ID, testResultIds),
             Projections.include(TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE)
         );
@@ -1109,7 +1108,7 @@ public class IssuesAction extends UserAction {
             results.addAll(vulnerable);
         }
 
-        List<TestingRunResult> regular = TestingRunResultDao.instance.findAll(
+        List<TestingRunResult> regular = TestingRunResultDao.instance.findAllWithSummaryContext(
             Filters.in(Constants.ID, testResultIds),
             Projections.include(TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE)
         );
@@ -1383,7 +1382,7 @@ public class IssuesAction extends UserAction {
         }
     }
 
-    public String getReportFilters () {
+    public String fetchReportFilters () {
         if(this.generatedReportId == null){
             addActionError("Report id cannot be null");
             return ERROR.toUpperCase();

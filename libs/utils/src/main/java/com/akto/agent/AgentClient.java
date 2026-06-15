@@ -1,6 +1,11 @@
 package com.akto.agent;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.testing.AgentConversationResultDao;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.testing.CopilotOAuthAuthParam;
+import com.akto.util.HttpRequestResponseUtils;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.testing.GenericAgentConversation;
@@ -11,8 +16,10 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import okhttp3.*;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.akto.util.Constants;
 import com.akto.util.http_util.CoreHTTPClient;
 
 import java.util.ArrayList;
@@ -21,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.akto.agent.AgenticUtils.getTestModeFromRole;
 
@@ -51,14 +59,27 @@ public class AgentClient {
         String conversationId = UUID.randomUUID().toString();
         List<String> promptsList = rawApi.getConversationsList();
         String testMode = getTestModeFromRole();
-        
+
+        ApiCollection col = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        boolean isCopilot = col != null && col.isCopilotBotCollection();
+        loggerMaker.infoAndAddToDb("executeAgenticTest: starting conversationId=" + conversationId + " apiCollectionId=" + apiCollectionId + " prompts=" + promptsList.size() + " copilot=" + isCopilot);
+
         try {
-            /*
-             * the rawApi already has been modified by the testRole, 
-             * and should have the updated auth request headers
-             */
-            AgenticUtils.checkAndInitializeAgent(conversationId, rawApi, apiCollectionId);
+            if (isCopilot) {
+                String accessToken = HttpRequestResponseUtils.getHeaderValue(
+                    rawApi.getRequest() != null ? rawApi.getRequest().getHeaders() : null,
+                    CopilotOAuthAuthParam.AUTHORIZATION_HEADER
+                );
+                if (StringUtils.isEmpty(accessToken)) {
+                    throw new Exception("No Authorization token found in request — OAuth not connected for this role");
+                }
+                loggerMaker.infoAndAddToDb("executeAgenticTest: initializing Copilot agent conversationId=" + conversationId);
+                initializeCopilotAgent(conversationId, col, accessToken);
+            } else {
+                AgenticUtils.checkAndInitializeAgent(conversationId, rawApi, apiCollectionId);
+            }
         } catch(Exception e){
+            loggerMaker.errorAndAddToDb("executeAgenticTest: init failed conversationId=" + conversationId + " err=" + e.getMessage());
         }
 
         try {
@@ -248,6 +269,34 @@ public class AgentClient {
     public static boolean isRawApiValidForAgenticTest(RawApi rawApi) {
         List<String> temp = rawApi.getConversationsList();
         return (temp != null && !temp.isEmpty());
+    }
+
+    private static String getTagValue(List<CollectionTags> tags, String keyName) {
+        if (tags == null) return null;
+        return tags.stream()
+            .filter(t -> keyName.equals(t.getKeyName()))
+            .map(CollectionTags::getValue)
+            .findFirst().orElse(null);
+    }
+
+    public void initializeCopilotAgent(String conversationId, ApiCollection col, String accessToken) {
+        List<CollectionTags> tags = col != null ? col.getTagsList() : null;
+        String environmentId = getTagValue(tags, Constants.AKTO_COPILOT_BOT_ENVIRONMENT_TAG);
+        String agentSchema   = getTagValue(tags, Constants.AKTO_COPILOT_BOT_SCHEMA_TAG);
+
+        Map<String, Object> copilotConfig = new HashMap<>();
+        copilotConfig.put("environmentId", environmentId);
+        copilotConfig.put("agentSchema", agentSchema);
+        copilotConfig.put("accessToken", accessToken);
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("conversationId", conversationId);
+        requestBody.put("copilotConfig", copilotConfig);
+
+        try {
+            loggerMaker.infoAndAddToDb("initializeCopilotAgent: POST /initializeMCP ");
+        } catch (Exception ignored) {}
+        initializeAgent(requestBody);
     }
     
     public boolean performHealthCheck() {

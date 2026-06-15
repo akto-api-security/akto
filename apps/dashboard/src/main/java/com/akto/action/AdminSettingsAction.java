@@ -88,6 +88,7 @@ public class AdminSettingsAction extends UserAction {
     private Set<String> privateCidrList;
 
     public Boolean enableTelemetry;
+    private boolean enableEmptyCollectionCleanup;
 
 	private Set<String> partnerIpList;
     private List<String> allowRedundantEndpointsList;
@@ -159,6 +160,18 @@ public class AdminSettingsAction extends UserAction {
         telemetrySettings.setCustomerEnabled(enableTelemetry);
         telemetrySettings.setCustomerEnabledAt(Context.now());
         AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.TELEMETRY_SETTINGS, telemetrySettings));
+        return SUCCESS.toUpperCase();
+    }
+
+    public String toggleEmptyCollectionCleanup() {
+        if (!DashboardMode.isOnPremDeployment()) return Action.ERROR.toUpperCase();
+
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.ENABLE_EMPTY_COLLECTION_CLEANUP, this.enableEmptyCollectionCleanup),
+                new UpdateOptions().upsert(true)
+        );
+
         return SUCCESS.toUpperCase();
     }
 
@@ -716,6 +729,14 @@ public class AdminSettingsAction extends UserAction {
     }
 
 
+    public boolean isEnableEmptyCollectionCleanup() {
+        return enableEmptyCollectionCleanup;
+    }
+
+    public void setEnableEmptyCollectionCleanup(boolean enableEmptyCollectionCleanup) {
+        this.enableEmptyCollectionCleanup = enableEmptyCollectionCleanup;
+    }
+
     public Boolean getEnableTelemetry() {
         return enableTelemetry;
     }
@@ -788,6 +809,46 @@ public class AdminSettingsAction extends UserAction {
     private ConnectorType connectorType;
     @Getter
     private Map<String, AccountSettings.ProxyPatternInfo> deletedPatternResult;
+
+    @Setter
+    private String domainKey;
+    @Setter
+    private List<String> domainsToAdd;
+    @Setter
+    private List<String> domainsToRemove;
+    @Getter
+    private List<String> chattyDomains;
+    @Getter
+    private List<String> aiDomains;
+
+    public String updateAccountDomains() {
+        if (StringUtils.isEmpty(domainKey)) {
+            addActionError("Domain key is required.");
+            return ERROR.toUpperCase();
+        }
+        if (!domainKey.equals(AccountSettings.CHATTY_DOMAINS) && !domainKey.equals(AccountSettings.AI_DOMAINS)) {
+            addActionError("Invalid domain key.");
+            return ERROR.toUpperCase();
+        }
+        try {
+            Bson filter = AccountSettingsDao.generateFilter();
+            if (domainsToAdd != null && !domainsToAdd.isEmpty()) {
+                AccountSettingsDao.instance.updateOne(filter,
+                    Updates.addEachToSet(domainKey, domainsToAdd));
+            }
+            if (domainsToRemove != null && !domainsToRemove.isEmpty()) {
+                AccountSettingsDao.instance.updateOne(filter,
+                    Updates.pullAll(domainKey, domainsToRemove));
+            }
+            AccountSettings settings = AccountSettingsDao.instance.findOne(filter);
+            this.chattyDomains = settings != null ? settings.getChattyDomains() : null;
+            this.aiDomains = settings != null ? settings.getAiDomains() : null;
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error updating account domains for key={}", domainKey, e);
+            return ERROR.toUpperCase();
+        }
+    }
 
     public String deleteProxyPattern() {
         User user = getSUser();

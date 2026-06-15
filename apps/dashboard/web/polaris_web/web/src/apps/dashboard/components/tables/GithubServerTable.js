@@ -186,8 +186,7 @@ function GithubServerTable(props) {
 
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
     let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
-    
-    // Optimize: process filters once, reuse logic
+
     const processFilter = (filter) => {
       const value = filter.value;
       if (value && typeof value === 'object' && value.values !== undefined) {
@@ -200,7 +199,7 @@ function GithubServerTable(props) {
         filters[filter.key] = value;
       }
     };
-    
+
     if(tempFilters.length === 0){
       appliedFilters.forEach(processFilter);
     }else{
@@ -258,6 +257,12 @@ function GithubServerTable(props) {
       fetchData(queryValue);
     }    
   },[props?.callFromOutside])
+
+  useEffect(() => {
+    if (props?.clientSideDataUpdateKey && props?.clientSideDataTransformer) {
+      setData((prevData) => props.clientSideDataTransformer(prevData));
+    }
+  }, [props?.clientSideDataUpdateKey])
 
   const handleSort = (col, dir) => {
     let tempSortSelected = props?.sortOptions.filter(x => x.columnIndex === (col + 1))

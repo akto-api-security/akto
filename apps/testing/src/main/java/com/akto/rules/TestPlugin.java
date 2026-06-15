@@ -328,9 +328,9 @@ public abstract class TestPlugin {
         return com.akto.testing.Utils.validateFilter(filterNode, rawApi, apiInfoKey, varMap, logId);
     }
 
-    public static boolean validateValidator(FilterNode validatorNode, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
-        if (validatorNode == null) return true;
-        if (testRawApi == null) return false;
+    public static ValidationResult validateValidator(FilterNode validatorNode, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
+        if (validatorNode == null) return new ValidationResult(true, "No validator node found");
+        if (testRawApi == null) return new ValidationResult(false, "No test raw api found");
 
         OriginalHttpResponse response = testRawApi.getResponse();
         String body = response == null ? null : response.getBody();
@@ -338,7 +338,7 @@ public abstract class TestPlugin {
         ValidationResult validateResult = validate(validatorNode,rawApi,testRawApi, apiInfoKey,"validator", varMap, logId);
 
         // loggerMaker.debugAndAddToDb(logId + " isDefaultPayload = " + isDefaultPayload + "; validateResult = " + validateResult, LogDb.TESTING);
-        return !isDefaultPayload && validateResult.getIsValid();
+        return new ValidationResult(!isDefaultPayload && validateResult.getIsValid(), validateResult.getValidationReason());
     }
 
     private static ValidationResult validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap, String logId) {

@@ -14,7 +14,7 @@
     ],
     "optional": [
       "AKTO_TIMEOUT",
-      "AKTO_TOKEN",
+      "AKTO_API_TOKEN",
       "MODE",
       "DEVICE_ID",
       "LOG_PAYLOADS",

@@ -85,6 +85,7 @@ import {PollingProvider} from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
 import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
 import ProxyPatterns from "../dashboard/pages/settings/proxy_patterns/ProxyPatterns";
+import FileInspection from "../dashboard/pages/settings/file_inspection/FileInspection";
 import GoogleSamlSso from "../dashboard/pages/settings/integrations/sso/GoogleSamlSso";
 import SignUpWithSSO from "../signup/components/SignUpWithSSO";
 
@@ -107,6 +108,7 @@ import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
 import AzureDataExplorer from "../dashboard/pages/settings/integrations/AzureDataExplorer";
 import ServiceNow from "../dashboard/pages/settings/integrations/ServiceNow";
 import DevRev from "../dashboard/pages/settings/integrations/DevRev";
+import Wiz from "@/apps/dashboard/pages/settings/integrations/Wiz.jsx";
 import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
@@ -126,12 +128,20 @@ import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastP
 import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
 import UsersAndDevices from "../dashboard/pages/observe/agentic/UsersAndDevices.jsx";
+import DeviceEndpoints from "../dashboard/pages/observe/agentic/DeviceEndpoints.jsx";
+import AgenticAssetsPage from "../dashboard/pages/observe/agentic/AgenticAssetsPage.jsx";
+import LLMObservability from "../dashboard/pages/observe/llm/LLMObservability.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
 import IdentitiesPage from "../dashboard/pages/nhi_governance/IdentitiesPage.jsx";
 import ViolationsPage from "../dashboard/pages/nhi_governance/ViolationsPage.jsx";
 import PoliciesPage from "../dashboard/pages/nhi_governance/PoliciesPage.jsx";
 import AllowedHostsForPac from "../dashboard/pages/settings/allowed_hosts/AllowedHostsForPac.jsx";
+import EndpointShieldSettings from "../dashboard/pages/settings/endpoint_shield/EndpointShieldSettings.jsx";
+import RemoteCommands from "../dashboard/pages/settings/remote_commands/RemoteCommands.jsx";
+import RemoteCommandDetail from "../dashboard/pages/settings/remote_commands/RemoteCommandDetail.jsx";
+import NewRelic from "../dashboard/pages/settings/integrations/NewRelic.jsx";
+import OpenTelemetry from "../dashboard/pages/settings/integrations/OpenTelemetry.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -213,12 +223,24 @@ const router = createBrowserRouter([
                                 element: <ApiCollections/>
                             },
                             {
-                                path: "agentic-assets",
+                                path: "agentic-assets-legacy",
                                 element: <Endpoints/>
+                            },
+                            {
+                                path: "agentic-assets",
+                                element: <AgenticAssetsPage/>
                             },
                             {
                                 path: "users-and-devices",
                                 element: <UsersAndDevices/>
+                            },
+                            {
+                                path: "endpoints",
+                                element: <DeviceEndpoints/>
+                            },
+                            {
+                                path: "llm-observability",
+                                element: <LLMObservability/>
                             },
                             {
                                 path: "query_mode",
@@ -484,6 +506,10 @@ const router = createBrowserRouter([
                         element: <DevRev/>,
                     },
                     {
+                        path: "integrations/wiz",
+                        element: <Wiz/>,
+                    },
+                    {
                         path: "integrations/akto_apis",
                         element: <ApiTokens/>,
                     },
@@ -556,6 +582,14 @@ const router = createBrowserRouter([
                         element: <GmailWebhookCore/>,
                     },
                     {
+                        path: "integrations/new_relic",
+                        element: <NewRelic/>,
+                    },
+                    {
+                        path: "integrations/open_telemetry",
+                        element: <OpenTelemetry/>,
+                    },
+                    {
                         path: "logs",
                         element: <HealthLogs/>,
                     },
@@ -586,6 +620,22 @@ const router = createBrowserRouter([
                     {
                         path: 'allowed-hosts',
                         element: <AllowedHostsForPac/>
+                    },
+                    {
+                        path: 'endpoint-shield',
+                        element: <EndpointShieldSettings/>
+                    },
+                    {
+                        path: 'remote-commands',
+                        element: <RemoteCommands/>
+                    },
+                    {
+                        path: 'remote-commands/:commandId',
+                        element: <RemoteCommandDetail/>
+                    },
+                    {
+                        path: 'file-inspection',
+                        element: <FileInspection/>
                     },
                     {
                         path: "auth-types/details",

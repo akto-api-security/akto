@@ -9,7 +9,8 @@ import { useNavigate } from 'react-router-dom';
 import HeadingWithTooltip from '../../../components/shared/HeadingWithTooltip';
 import TooltipText from '../../../components/shared/TooltipText';
 import { FILTER_TYPES } from './useAgenticFilter';
-import { getAgenticCategoryLabel, hasPersonalAccountTag, hasLocalMcpServerTag } from '../agentic/mcpClientHelper';
+import { getAgenticCategoryLabel, hasPersonalAccountTag, hasLocalMcpServerTag, CLIENT_TYPES } from '../agentic/mcpClientHelper';
+import PersistStore from '../../../../main/PersistStore';
 
 /** IndexTable adds a leading selection column when `selectable` is true (see AgentEndpointTreeTable). */
 const INDEX_TABLE_SELECTION_COLUMN_COUNT = 1;
@@ -221,11 +222,32 @@ const groupByEndpointId = (collections) => {
 };
 
 /**
+ * Counts agentic assets the badge should advertise: each non-Skill child collection plus the
+ * unique skill names from c.skills[] across all children (deduped against sibling Skill
+ * collections). Matches the per-user "Agentic assets" semantic on the Users and devices page —
+ * skills bundled inside AI Agent / MCP Server collections still count even though we don't
+ * explode them into separate rows.
+ */
+const countAgenticAssets = (children, showCategoryColumn) => {
+    if (!showCategoryColumn) return children.length;
+    const skillNames = new Set();
+    let nonSkillCount = 0;
+    children.forEach(child => {
+        const category = getAgenticCategoryLabel(child);
+        if (category !== CLIENT_TYPES.SKILL) nonSkillCount += 1;
+        if (Array.isArray(child.skills)) {
+            child.skills.forEach(s => { if (s) skillNames.add(String(s).toLowerCase()); });
+        }
+    });
+    return nonSkillCount + skillNames.size;
+};
+
+/**
  * Prettifies the grouped endpoint data for display
  */
 const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expandedColSpan) => {
     return groupedData.map(group => {
-        const childCount = group.children.length;
+        const childCount = countAgenticAssets(group.children, showCategoryColumn);
         const riskScore = group.riskScore || 0;
 
         return {
@@ -273,6 +295,10 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
     const navigate = useNavigate();
     const childHeaders = getChildHeaders(filterType, showCategoryColumn);
     const columnConfig = getChildColumnConfig(filterType);
+    const maliciousSkillsSet = useMemo(() => {
+        const cached = PersistStore.getState().skillRiskScoreCache;
+        return new Set((cached?.maliciousSkills || []).map(s => String(s).toLowerCase()));
+    }, []);
     
     const handleChildClick = useCallback((collection) => {
         if (collection?.nextUrl) {
@@ -293,29 +319,34 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
                 lastTraffic: func.prettifyEpoch(child.detectedTimestamp || 0),
                 discovered: func.prettifyEpoch(child.startTs || 0),
             };
-            
-            // Get the display value based on filter type
+
             const displayValue = child[columnConfig.displayField] || child.splitApiCollectionName;
-            
-            // Add spacer for collapsible icon column alignment, then map child headers
+
             const cells = [
-                // Spacer to align with parent's collapsible icon column
                 <div key={`spacer-${child.id}`} style={{ width: '32px', minWidth: '32px' }} />
             ];
-            
+
             const childHasLocalMcp = hasLocalMcpServerTag(child.envTypeOriginal);
-            childHeaders.forEach((header, idx) => {
+            const childCategory = getAgenticCategoryLabel(child);
+            const showsBundledSkills = childCategory === CLIENT_TYPES.AI_AGENT || childCategory === CLIENT_TYPES.MCP_SERVER;
+            const bundledSkillsCount = showsBundledSkills && Array.isArray(child.skills) ? child.skills.length : 0;
+            const childHasMaliciousSkill = Array.isArray(child.skills) && child.skills.some(s => maliciousSkillsSet.has(String(s).toLowerCase()));
+            childHeaders.forEach(header => {
                 if (header.value === 'displayNameComp') {
                     cells.push(
-                        <div 
-                            key={`name-${child.id}`} 
-                            style={{ cursor: 'pointer', width: header.boxWidth }} 
+                        <div
+                            key={`name-${child.id}`}
+                            style={{ cursor: 'pointer', width: header.boxWidth }}
                             onClick={() => handleChildClick(child)}
                         >
                             <HorizontalStack gap="1" align="start" wrap={false}>
                                 <Box maxWidth="200px">
                                     <TooltipText tooltip={displayValue} text={displayValue} />
                                 </Box>
+                                {bundledSkillsCount > 0 && (
+                                    <Badge size="small" status="info">{`${bundledSkillsCount} ${bundledSkillsCount === 1 ? 'skill' : 'skills'}`}</Badge>
+                                )}
+                                {childHasMaliciousSkill && <Badge size="small" status="critical">Malicious Skills</Badge>}
                                 {childHasLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
                             </HorizontalStack>
                         </div>
@@ -332,8 +363,8 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
                     );
                 } else {
                     cells.push(
-                        <div 
-                            key={`${header.value}-${child.id}`} 
+                        <div
+                            key={`${header.value}-${child.id}`}
                             style={{ cursor: 'pointer', width: header.boxWidth }}
                             onClick={() => handleChildClick(child)}
                         >
@@ -342,10 +373,10 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
                     );
                 }
             });
-            
+
             return cells;
         });
-    }, [children, handleChildClick, childHeaders, columnConfig, showCategoryColumn]);
+    }, [children, handleChildClick, childHeaders, columnConfig, showCategoryColumn, maliciousSkillsSet]);
 
     const columnContentTypes = useMemo(
         () => ["text", ...childHeaders.map(() => "text")],

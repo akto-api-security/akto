@@ -8,10 +8,13 @@ import {
   Pagination, Key, Badge} from '@shopify/polaris';
 import SampleDataComponent from './SampleDataComponent';
 import SampleData from './SampleData';
+import ValidationReasonBanner from './ValidationReasonBanner';
 import func from '../../../../util/func';
-import { getDashboardCategory, mapLabel } from '../../../main/labelHelper';
+import { getDashboardCategory, mapLabel, isAgenticSecurityCategory, isEndpointSecurityCategory } from '../../../main/labelHelper';
 
 function SchemaValidationError({ sampleData}) {
+    const [expanded, setExpanded] = useState(false);
+
     if (!sampleData || !sampleData?.metadata) {
         return null;
     }
@@ -24,17 +27,30 @@ function SchemaValidationError({ sampleData}) {
         return null;
     }
 
+    const isGuardrails = isAgenticSecurityCategory() || isEndpointSecurityCategory();
+    const visibleErrors = (isGuardrails && !expanded) ? schemaValidationErrors.slice(0, 1) : schemaValidationErrors;
+    const hiddenCount = schemaValidationErrors.length - 1;
 
     return (
         <VerticalStack gap={"4"}>
             <Banner
-                title="Schema Validation Errors"
+                title={isGuardrails ? "Guardrails Violations" : "Schema Validation Errors"}
                 status="critical"
             >
                 <List type="bullet">
-                    {schemaValidationErrors?.map((error, index) => {
+                    {visibleErrors.map((error, index) => {
                         return <List.Item key={index}>{error?.message}</List.Item>
                     })}
+                    {isGuardrails && hiddenCount > 0 && (
+                        <List.Item>
+                            <button
+                                onClick={() => setExpanded(e => !e)}
+                                style={{background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', textDecoration: 'underline'}}
+                            >
+                                {expanded ? 'Show less' : `${hiddenCount} more violation${hiddenCount > 1 ? 's' : ''}`}
+                            </button>
+                        </List.Item>
+                    )}
                 </List>
             </Banner>
 
@@ -44,7 +60,7 @@ function SchemaValidationError({ sampleData}) {
 
 function SampleDataList(props) {
 
-    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = []} = props;
+    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp} = props;
 
     const [page, setPage] = useState(0);
 
@@ -52,9 +68,14 @@ function SampleDataList(props) {
       setPage(0);
     }, [sampleData])
   
+    const currentSample = sampleData[Math.min(page, sampleData.length - 1)];
+    const parsedSample = func.parseWebSocketSampleMessage(currentSample?.message)
+    const isWebSocket = isWebSocketProp === true || func.isWebSocketApiType(parsedSample?.type)
+    const panelTypes = isWebSocket ? ['events'] : ['request', 'response'];
+
     return (
       <VerticalStack gap="3">
-         <SchemaValidationError sampleData={sampleData[Math.min(page, sampleData.length - 1)]} />
+         <SchemaValidationError sampleData={currentSample} />
         <HorizontalStack align='space-between'>
           <HorizontalStack gap="2">
             <Text variant='headingMd'>
@@ -96,7 +117,7 @@ function SampleDataList(props) {
                 </LegacyCard>
               </Box>
               :
-            ["request","response"].map((type) => {
+            panelTypes.map((type) => {
               return (
                 <Box key={type}>
                   <LegacyCard>
@@ -109,6 +130,7 @@ function SampleDataList(props) {
                       metadata={metadata}
                       readOnly={true}
                       redactHeaders={redactHeaders}
+                      isWebSocket={isWebSocket}
                     />
                   </LegacyCard>
                 </Box>
@@ -116,6 +138,10 @@ function SampleDataList(props) {
             })
           }
         </HorizontalGrid>
+        <ValidationReasonBanner
+          validationReason={currentSample?.validationReason}
+          isVulnerable={isVulnerable}
+        />
       </VerticalStack>
     )
   }

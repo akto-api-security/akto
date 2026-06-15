@@ -119,6 +119,11 @@ export default function LeftNav() {
     ];
     const isAllowedDashboardUser = window.USER_NAME && allowedDashboardUsers.includes(window.USER_NAME.toLowerCase());
 
+
+    // Allowed users to for NHI Data
+    const allowedNhiUsers = ["ankush@akto.io"];
+    const isAllowedNhiUser = window.USER_NAME && allowedNhiUsers.includes(window.USER_NAME.toLowerCase());
+
     const navItems = useMemo(() => {
         let items = [
             {
@@ -229,7 +234,9 @@ export default function LeftNav() {
                 },
                 selected: leftNavSelected.includes("_observe"),
                 subNavigationItems: [
-                    ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
+                    ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [
+                    // { label: "Agentic assets (legacy)", onClick: () => { navigate("/dashboard/observe/agentic-assets"); handleSelect("dashboard_observe_agentic_assets"); setActive("active"); }, selected: leftNavSelected === "dashboard_observe_agentic_assets" },
+                    {
                         label: "Agentic assets",
                         onClick: () => {
                             navigate("/dashboard/observe/agentic-assets");
@@ -237,14 +244,16 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_agentic_assets",
-                    }, {
-                        label: "Users and devices",
+                    },
+                    // { label: "Users and devices", onClick: () => { navigate("/dashboard/observe/users-and-devices"); handleSelect("dashboard_observe_users_and_devices"); setActive("active"); }, selected: leftNavSelected === "dashboard_observe_users_and_devices" },
+                    {
+                        label: "Endpoints",
                         onClick: () => {
-                            navigate("/dashboard/observe/users-and-devices");
-                            handleSelect("dashboard_observe_users_and_devices");
+                            navigate("/dashboard/observe/endpoints");
+                            handleSelect("dashboard_observe_endpoints");
                             setActive("active");
                         },
-                        selected: leftNavSelected === "dashboard_observe_users_and_devices",
+                        selected: leftNavSelected === "dashboard_observe_endpoints",
                     }] : [{
                         label: "Collections",
                         onClick: () => {
@@ -254,6 +263,16 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_inventory",
                     }]),
+                    // ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && window.STIGG_FEATURE_WISE_ALLOWED?.AGENT_TRAFFIC_LOGS?.isGranted ? [{
+                    //     label: "Traces",
+                    //     badge: <Badge status="info">Beta</Badge>,
+                    //     onClick: () => {
+                    //         navigate("/dashboard/observe/llm-observability");
+                    //         handleSelect("dashboard_observe_llm_observability");
+                    //         setActive("active");
+                    //     },
+                    //     selected: leftNavSelected === "dashboard_observe_llm_observability",
+                    // }] : []),
                     ...(!(func.isDemoAccount() && (dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security")) ? [
                     {
                         label: "Recent Changes",
@@ -403,51 +422,51 @@ export default function LeftNav() {
                 ],
                 key: "5",
             }] : []),
-            // ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && func.isDemoAccount() ? [{
-            //     label: (
-            //         <Text variant="bodyMd" fontWeight="medium">
-            //             NHI Governance
-            //         </Text>
-            //     ),
-            //     icon: SocialAdMajor,
-            //     onClick: () => {
-            //         handleSelect("dashboard_nhi_identities");
-            //         navigate("/dashboard/nhi/identities");
-            //         setActive("normal");
-            //     },
-            //     selected: leftNavSelected.includes("_nhi"),
-            //     url: "#",
-            //     key: "nhi_governance",
-            //     subNavigationItems: [
-            //         {
-            //             label: "Identities",
-            //             onClick: () => {
-            //                 navigate("/dashboard/nhi/identities");
-            //                 handleSelect("dashboard_nhi_identities");
-            //                 setActive("active");
-            //             },
-            //             selected: leftNavSelected === "dashboard_nhi_identities",
-            //         },
-            //         {
-            //             label: "Violations",
-            //             onClick: () => {
-            //                 navigate("/dashboard/nhi/violations");
-            //                 handleSelect("dashboard_nhi_violations");
-            //                 setActive("active");
-            //             },
-            //             selected: leftNavSelected === "dashboard_nhi_violations",
-            //         },
-            //         {
-            //             label: "Policies",
-            //             onClick: () => {
-            //                 navigate("/dashboard/nhi/policies");
-            //                 handleSelect("dashboard_nhi_policies");
-            //                 setActive("active");
-            //             },
-            //             selected: leftNavSelected === "dashboard_nhi_policies",
-            //         },
-            //     ],
-            // }] : []),
+            ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && func.isDemoAccount() && isAllowedNhiUser  ? [{
+                label: (
+                    <Text variant="bodyMd" fontWeight="medium">
+                        NHI Governance
+                    </Text>
+                ),
+                icon: SocialAdMajor,
+                onClick: () => {
+                    handleSelect("dashboard_nhi_identities");
+                    navigate("/dashboard/nhi/identities");
+                    setActive("normal");
+                },
+                selected: leftNavSelected.includes("_nhi"),
+                url: "#",
+                key: "nhi_governance",
+                subNavigationItems: [
+                    {
+                        label: "Identities",
+                        onClick: () => {
+                            navigate("/dashboard/nhi/identities");
+                            handleSelect("dashboard_nhi_identities");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_nhi_identities",
+                    },
+                    {
+                        label: "Violations",
+                        onClick: () => {
+                            navigate("/dashboard/nhi/violations");
+                            handleSelect("dashboard_nhi_violations");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_nhi_violations",
+                    },
+                    {
+                        label: "Policies",
+                        onClick: () => {
+                            navigate("/dashboard/nhi/policies");
+                            handleSelect("dashboard_nhi_policies");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_nhi_policies",
+                    },
+                ],
+            }] : []),
             ...(dashboardCategory === "Agentic Security" && func.isDemoAccount() ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
@@ -506,7 +525,7 @@ export default function LeftNav() {
                     : reportsSubNavigationItems,
                 key: "6",
             },
-            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted && dashboardCategory !== CATEGORY_DAST  ?  [{
+            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted && dashboardCategory !== CATEGORY_DAST  ? [{
                     label: (
                         <Text variant="bodyMd" fontWeight="medium">
                             {mapLabel("Threat Detection", dashboardCategory)}

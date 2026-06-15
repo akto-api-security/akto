@@ -9,7 +9,7 @@ import { getDashboardCategory, mapLabel, isAgenticSecurityCategory } from "../..
 
 function RunTestSuites({ apiCollectionName, activeFromTesting, setTestSuiteIds, testSuiteIds,setTestNameSuiteModal,testNameSuiteModal }) {
 
-    const [data, setData] = useState({ agenticSecurity: {}, owaspTop10List: {}, testingMethods:{}, custom : {}, severity: {}, duration: {} });
+    const [data, setData] = useState({ agenticSecurity: {}, attackBaseTechnique: {}, attackStrategy: {}, owaspTop10List: {}, testingMethods:{}, custom : {}, severity: {}, duration: {} });
     const [testSuiteIdsNameMap, setTestSuiteIdsNameMap] = useState({});
 
 
@@ -47,6 +47,18 @@ function RunTestSuites({ apiCollectionName, activeFromTesting, setTestSuiteIds, 
             return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList, id: testSuiteItem.hexId }
         })
 
+        const othersLast = (a, b) => a.name === "Others" ? 1 : b.name === "Others" ? -1 : a.name.localeCompare(b.name);
+
+        const attackBaseTechniqueTestSuites = testSuitesFromBackend?.filter(testSuiteItem => testSuiteItem.suiteType === "ATTACK_BASE_TECHNIQUE").map((testSuiteItem) => {
+            idsNameMap[testSuiteItem.hexId] = testSuiteItem.name;
+            return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList, id: testSuiteItem.hexId }
+        }).sort(othersLast)
+
+        const attackStrategyTestSuites = testSuitesFromBackend?.filter(testSuiteItem => testSuiteItem.suiteType === "ATTACK_STRATEGY").map((testSuiteItem) => {
+            idsNameMap[testSuiteItem.hexId] = testSuiteItem.name;
+            return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList, id: testSuiteItem.hexId }
+        }).sort(othersLast)
+
         const fetchedData = fetchedTestSuite?.testSuiteList?.map((testSuiteItem) => {
             idsNameMap[testSuiteItem.hexId] = testSuiteItem.name;
             return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList, id: testSuiteItem.hexId }
@@ -55,6 +67,8 @@ function RunTestSuites({ apiCollectionName, activeFromTesting, setTestSuiteIds, 
         setData(prev => {
             if (
                 !func.deepArrayComparison(prev?.agenticSecurity?.testSuite||[], agenticSecurityTestSuites) ||
+                !func.deepArrayComparison(prev?.attackBaseTechnique?.testSuite||[], attackBaseTechniqueTestSuites) ||
+                !func.deepArrayComparison(prev?.attackStrategy?.testSuite||[], attackStrategyTestSuites) ||
                 !func.deepArrayComparison(prev?.owaspTop10List?.testSuite||[],newOwaspTop10TestSuites) ||
                 !func.deepArrayComparison(prev?.testingMethods?.testSuite||[], newTestingMethodsTestSuites) ||
                 !func.deepArrayComparison(prev?.custom?.testSuite||[], fetchedData) ||
@@ -64,6 +78,8 @@ function RunTestSuites({ apiCollectionName, activeFromTesting, setTestSuiteIds, 
                 return {
                     ...prev,
                     agenticSecurity: { rowName: "Agentic Security", testSuite: agenticSecurityTestSuites },
+                    attackBaseTechnique: { rowName: "Attack Base Technique", testSuite: attackBaseTechniqueTestSuites },
+                    attackStrategy: { rowName: "Attack Strategy", testSuite: attackStrategyTestSuites },
                     owaspTop10List: { rowName: "OWASP top 10", testSuite: newOwaspTop10TestSuites },
                     testingMethods: { rowName: "Testing Methods", testSuite: newTestingMethodsTestSuites },
                     custom: { rowName: "Custom", testSuite: fetchedData },
@@ -161,7 +177,7 @@ function RunTestSuites({ apiCollectionName, activeFromTesting, setTestSuiteIds, 
                                 if (isAgenticSecurityCategory()) {
                                     return key !== 'owaspTop10List';
                                 }
-                                return key !== 'agenticSecurity';
+                                return key !== 'agenticSecurity' && key !== 'attackBaseTechnique' && key !== 'attackStrategy';
                             })
                             .map(([, value]) => {
                                 const filteredTestSuite = (value?.testSuite || []).filter(suite => suite?.tests?.length > 0);

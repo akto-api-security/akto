@@ -11,6 +11,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.Log;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 
 import lombok.Getter;
 
@@ -32,6 +33,17 @@ public class EndpointShieldAgentAction extends UserAction {
     @Getter
     private UserAnalysisData userAnalysis;
 
+    @Getter
+    private List<UserAnalysisData> userAnalysisList = new ArrayList<>();
+
+    public String fetchUserAnalysisList() {
+        userAnalysisList = UserAnalysisDataDao.instance.findAll(Filters.empty(),
+                Projections.include(UserAnalysisData.USER_NAME, UserAnalysisData.LAST_UPDATED_AT,
+                        UserAnalysisData.TOPIC_COUNTS, UserAnalysisData.TOTAL_INPUT_TOKENS,
+                        UserAnalysisData.TOTAL_OUTPUT_TOKENS, UserAnalysisData.AI_SUMMARY,
+                        UserAnalysisData.HARMFUL_TOPICS));
+        return SUCCESS.toUpperCase();
+    }
 
     public String getMcpServersByAgent() {
         mcpServers = new ArrayList<>();
@@ -234,10 +246,6 @@ public class EndpointShieldAgentAction extends UserAction {
     }
 
     public String fetchUserAnalysis() {
-        if (agentId == null || agentId.trim().isEmpty()) {
-            addActionError("Agent ID is required");
-            return ERROR.toUpperCase();
-        }
         if (deviceId == null || deviceId.trim().isEmpty()) {
             addActionError("Device ID is required");
             return ERROR.toUpperCase();
@@ -245,11 +253,11 @@ public class EndpointShieldAgentAction extends UserAction {
 
         userAnalysis = UserAnalysisDataDao.instance.findOne(
             Filters.and(
-                Filters.eq(UserAnalysisData.ID_SERVICE_ID, agentId),
                 Filters.eq(UserAnalysisData.ID_DEVICE_ID, deviceId)
             )
         );
 
         return SUCCESS.toUpperCase();
     }
+
 }

@@ -217,6 +217,13 @@ const threatDetectionRequests = {
             data: data
         })
     },
+    fetchDashboardTopData(startTs, endTs) {
+        return request({
+            url: '/api/fetchDashboardTopData',
+            method: 'post',
+            data: {startTs, endTs}
+        })
+    },
     fetchThreatTopNData(startTs, endTs, latestAttack, limit = 5) {
         return request({
             url: '/api/fetchThreatTopNData',
@@ -319,6 +326,13 @@ const threatDetectionRequests = {
             url: '/api/fetchSessionContext',
             method: 'post',
             data: { sessionId }
+        })
+    },
+    fetchGuardrailLatency(startTs, endTs) {
+        return request({
+            url: '/api/metrics',
+            method: 'post',
+            data: { startTime: startTs, endTime: endTs, metricIdPrefix: 'GUARDRAIL_' }
         })
     }
 }

@@ -25,7 +25,7 @@ public class TestResultsStatsAction extends UserAction {
 
     private String testingRunResultSummaryHexId;
     private String testingRunHexId;
-    private String patternType; // required: one of [HTTP_429, HTTP_5XX, CLOUDFLARE]
+    private String patternType; // required: one of [HTTP_429, HTTP_5XX, HTTP_401, HTTP_403, CLOUDFLARE]
 
     @Getter
     private int count = 0;
@@ -90,14 +90,13 @@ public class TestResultsStatsAction extends UserAction {
             // Resolve regex pattern based on pattern type
             String resolvedRegex = resolveRegexPattern();
             if (resolvedRegex == null) {
-                addActionError("Invalid pattern type. Supported types: HTTP_429, HTTP_5XX, CLOUDFLARE");
+                addActionError("Invalid pattern type. Supported types: HTTP_429, HTTP_5XX, HTTP_401, HTTP_403, CLOUDFLARE");
                 return ERROR.toUpperCase();
             }
 
             String description = describePattern(resolvedRegex);
 
-            this.count = getCountByPattern(testingRunResultSummaryId, resolvedRegex)
-                    + getCountByPatternMultiExecResults(testingRunResultSummaryId, resolvedRegex);
+            this.count = TestRunStatusHelper.countByPattern(testingRunResultSummaryId, resolvedRegex);
 
             loggerMaker.debugAndAddToDb(
                     "Found " + count + " requests matching " + description + " for test summary: "
@@ -131,6 +130,14 @@ public class TestResultsStatsAction extends UserAction {
             case "CDN":
             case "CF":
                 return REGEX_CLOUDFLARE;
+            case "HTTP_401":
+            case "401":
+            case "UNAUTHORIZED":
+                return TestRunStatusHelper.REGEX_401;
+            case "HTTP_403":
+            case "403":
+            case "FORBIDDEN":
+                return TestRunStatusHelper.REGEX_403;
             default:
                 return null; // Invalid pattern type
         }
@@ -146,77 +153,11 @@ public class TestResultsStatsAction extends UserAction {
             return "5xx Server Errors (includes Cloudflare 520-530)";
         if (REGEX_CLOUDFLARE.equals(regex))
             return "Cloudflare Blocking/Errors (1xxx, 10xxx, WAF, security blocks)";
+        if (TestRunStatusHelper.REGEX_401.equals(regex))
+            return "401 Unauthorized";
+        if (TestRunStatusHelper.REGEX_403.equals(regex))
+            return "403 Forbidden";
         return "unknown pattern";
-    }
-
-    /**
-     * Core aggregation pipeline for pattern-based error counting
-     * Optimized for performance with proper indexing hints and limits
-     */
-    private int getCountByPattern(ObjectId testingRunResultSummaryId, String regex) {
-        List<Bson> pipeline = new ArrayList<>();
-
-        // Stage 1: Filter documents by summary ID and ensure testResults.message exists
-        pipeline.add(Aggregates.match(
-                Filters.and(
-                        Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
-                        Filters.eq("vulnerable", false),
-                        Filters.exists("testResults.message", true))));
-
-        // Stage 2: Sort by latest results and limit to prevent memory exhaustion
-        pipeline.add(Aggregates.sort(Sorts.descending("endTimestamp")));
-        pipeline.add(Aggregates.limit(10000));
-
-        // Stage 3: Project last message from testResults array for processing
-        pipeline.add(Aggregates.project(
-                Projections.computed("lastMessage",
-                        new BasicDBObject("$arrayElemAt",
-                                Arrays.asList("$testResults.message", -1)))));
-
-        // Stage 4: Filter for pattern via regex (case insensitive for Cloudflare
-        // errors)
-        pipeline.add(Aggregates.match(
-                Filters.regex("lastMessage", regex, "i")));
-
-        // Stage 5: Count matching documents and return single result
-        pipeline.add(Aggregates.count("count"));
-
-        if (shouldRunExplain()) {
-            explainAggregationPipeline(pipeline);
-        }
-
-        MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection()
-                .aggregate(pipeline, BasicDBObject.class).cursor();
-
-        int resultCount = 0;
-        if (cursor.hasNext()) {
-            BasicDBObject result = cursor.next();
-            resultCount = result.getInt("count", 0);
-        }
-
-        cursor.close();
-        return resultCount;
-    }
-
-    private int getCountByPatternMultiExecResults(ObjectId testingRunResultSummaryId, String regex) {
-        List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.match(Filters.and(
-                        Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
-                        Filters.eq("vulnerable", false),
-                        Filters.exists("testResults.nodeResultMap.x1.message", true))));
-        pipeline.add(Aggregates.sort(Sorts.descending("endTimestamp")));
-        pipeline.add(Aggregates.limit(10000));
-        pipeline.add(Aggregates.match(Filters.regex("testResults.nodeResultMap.x1.message", regex, "i")));
-        pipeline.add(Aggregates.count("count"));
-        MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection()
-                .aggregate(pipeline, BasicDBObject.class).cursor();
-        int resultCount = 0;
-        if (cursor.hasNext()) {
-            BasicDBObject result = cursor.next();
-            resultCount = result.getInt("count", 0);
-        }
-        cursor.close();
-        return resultCount;
     }
 
     private void explainAggregationPipeline(List<Bson> pipeline) {

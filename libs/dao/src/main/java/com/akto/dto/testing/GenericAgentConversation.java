@@ -17,7 +17,8 @@ public class GenericAgentConversation {
         PROMPT_PLAYGROUND,
         ANALYZE_REQUESTS,
         DOCS_AGENT,
-        ANALYZE_DASHBOARD_DATA
+        ANALYZE_DASHBOARD_DATA,
+        AGENTIC_OBSERVE
     }
 
     private String title;

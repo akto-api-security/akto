@@ -418,13 +418,27 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
 
         // Check execution result
         if (!result.isSuccess()) {
+            String outputTail = tailOfOutput(result.getStdout(), MAX_BINARY_ERROR_OUTPUT_CHARS);
             String errorMsg = "Binary execution failed with exit code " + result.getExitCode() +
-                ". Output: " + result.getStdout().substring(0, Math.min(2000, result.getStdout().length()));
+                ". Output: " + outputTail;
             logger.error("Binary execution failed: {}", errorMsg);
             throw new Exception(errorMsg);
         }
 
         logger.info("Binary execution successful: binaryName={}, exitCode={}, outputLength={}",
             binaryName, result.getExitCode(), result.getStdout().length());
+    }
+
+    /** Cap on how much of the binary's stdout we copy into the AccountJob.error field. */
+    private static final int MAX_BINARY_ERROR_OUTPUT_CHARS = 8000;
+
+    private static String tailOfOutput(String output, int maxChars) {
+        if (output == null) {
+            return "";
+        }
+        if (output.length() <= maxChars) {
+            return output;
+        }
+        return output.substring(output.length() - maxChars);
     }
 }

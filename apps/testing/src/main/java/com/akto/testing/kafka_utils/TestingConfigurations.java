@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.RawApi;
@@ -13,6 +14,7 @@ import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.jsonrpc.McpToolDescriptionsRegistry;
 import com.akto.store.TestingUtil;
 
 public class TestingConfigurations {
@@ -30,6 +32,8 @@ public class TestingConfigurations {
     private boolean doNotMarkIssuesAsFixed;
     private int maxAgentTokens = -1;
     private final AtomicLong runningAgentTokenCount = new AtomicLong(0);
+    private Map<String, String> mcpToolDescriptions = new HashMap<>();
+    private Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
 
     private TestingConfigurations() {
     }
@@ -47,6 +51,7 @@ public class TestingConfigurations {
         this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
         this.maxAgentTokens = maxAgentTokens;
         this.runningAgentTokenCount.set(0);
+        this.mcpToolDescriptions = new HashMap<>();
     }
 
     public void addAgentTokens(int tokens) {
@@ -79,6 +84,14 @@ public class TestingConfigurations {
 
     public void setMaxConcurrentRequest(int maxConcurrentRequest) {
         this.maxConcurrentRequest = maxConcurrentRequest;
+    }
+
+    public Map<ApiInfoKey, RawApi> getRawApiMap() {
+        return rawApiMap;
+    }
+
+    public void setRawApiMap(Map<ApiInfoKey, RawApi> rawApiMap) {
+        this.rawApiMap = rawApiMap;
     }
 
     public List<TestingRunResult> getTestingRunResultList() {
@@ -124,5 +137,13 @@ public class TestingConfigurations {
 
     public void setDoNotMarkIssuesAsFixed(boolean doNotMarkIssuesAsFixed) {
         this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
+    }
+
+    public Map<Integer, ApiCollection> getApiCollectionMap() {
+        return apiCollectionMap;
+    }
+
+    public void setApiCollectionMap(Map<Integer, ApiCollection> apiCollectionMap) {
+        this.apiCollectionMap = apiCollectionMap;
     }
 }

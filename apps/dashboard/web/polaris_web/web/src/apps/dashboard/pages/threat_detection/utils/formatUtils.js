@@ -35,3 +35,17 @@ export const extractRuleViolated = (metadata) => {
     return "-";
   }
 };
+
+export const extractBehaviour = (metadata) => {
+  if (!metadata) return null;
+
+  try {
+    const metadataObj = JSON.parse(metadata);
+    return metadataObj.behaviour || null;
+  } catch (e) {
+    return null;
+  }
+};
+
+export const getBehaviourTone = (behaviour) =>
+  behaviour === 'block' ? 'critical' : behaviour === 'warn' ? 'attention' : behaviour === 'alert' ? 'info' : undefined;

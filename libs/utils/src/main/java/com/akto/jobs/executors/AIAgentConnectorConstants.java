@@ -1,5 +1,10 @@
 package com.akto.jobs.executors;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * Constants for AI Agent Connector operations.
  * Centralized location for all connector-related constants.
@@ -9,6 +14,23 @@ public final class AIAgentConnectorConstants {
     private AIAgentConnectorConstants() {
         // Prevent instantiation
     }
+
+
+    // Connectors that deliver data out-of-band (webhook / async) — observe mode only
+    public static final Set<String> OBSERVE_MODE_CONNECTORS = Collections.unmodifiableSet(
+        new HashSet<>(Arrays.asList(
+            "truefoundry",
+            // Binary importers — pull data asynchronously from external systems
+            "n8n",
+            "copilot_studio",
+            "databricks",
+            "snowflake",
+            "vertex_ai_custom_deployed_model",
+            "salesforce",
+            "anthropic",
+            "openai"
+        ))
+    );
 
     // Job Types (for AccountJob.jobType)
     public static final String JOB_TYPE_AI_AGENT_CONNECTOR = "AI_AGENT_CONNECTOR";
@@ -47,6 +69,7 @@ public final class AIAgentConnectorConstants {
     public static final String CONFIG_DATAVERSE_TENANT_ID = "DATAVERSE_TENANT_ID";
     public static final String CONFIG_DATAVERSE_CLIENT_ID = "DATAVERSE_CLIENT_ID";
     public static final String CONFIG_DATAVERSE_CLIENT_SECRET = "DATAVERSE_CLIENT_SECRET";
+    public static final String CONFIG_DATAVERSE_BOT_IDS = "COPILOT_BOT_ID";
 
     // Configuration Keys - Snowflake
     public static final String CONFIG_SNOWFLAKE_ACCOUNT_URL = "SNOWFLAKE_ACCOUNT_URL";
@@ -59,6 +82,8 @@ public final class AIAgentConnectorConstants {
     public static final String CONFIG_SNOWFLAKE_WAREHOUSE = "SNOWFLAKE_WAREHOUSE";
     public static final String CONFIG_SNOWFLAKE_DATABASE = "SNOWFLAKE_DATABASE";
     public static final String CONFIG_SNOWFLAKE_SCHEMA = "SNOWFLAKE_SCHEMA";
+    public static final String CONFIG_SNOWFLAKE_OBS_LOOKBACK_SECONDS = "SNOWFLAKE_OBS_LOOKBACK_SECONDS";
+    public static final int DEFAULT_SNOWFLAKE_OBS_LOOKBACK_SECONDS = 300;
     
     // Snowflake Auth Types
     public static final String SNOWFLAKE_AUTH_TYPE_PASSWORD = "PASSWORD";

@@ -13,6 +13,7 @@ message Metadata {
   string risk_score = 5;
   string reason = 6;
   string dest_country_code = 7;
+  string behaviour = 8;
 }
 
 message SchemaConformanceError {
@@ -21,6 +22,7 @@ message SchemaConformanceError {
     LOCATION_URL = 1;
     LOCATION_HEADER = 2;
     LOCATION_BODY = 3;
+    LOCATION_RESPONSE_BODY = 4;
   }
   
   string schema_path = 1;

@@ -1,10 +1,15 @@
 package com.akto.threat.detection;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.common.Metric;
+import org.apache.kafka.common.MetricName;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -27,6 +32,7 @@ import com.akto.metrics.AllMetrics;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.hyperscan.HyperscanThreatMatcher;
+import com.akto.threat.detection.hyperscan.PatternUpdateService;
 import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
 import com.akto.threat.detection.ip_api_counter.CmsCounterLayer;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
@@ -46,6 +52,8 @@ import com.akto.dto.billing.Organization;
 public class Main {
 
   private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
+  private static final List<String> KAFKA_NUMERIC_METRICS = Arrays.asList(
+      "records-lag-max", "records-consumed-rate", "fetch-latency-avg", "bytes-consumed-rate");
   private static final LoggerMaker logger = new LoggerMaker(Main.class, LogDb.THREAT_DETECTION);
   private static boolean aggregationRulesEnabled = System.getenv().getOrDefault("AGGREGATION_RULES_ENABLED", "true").equals("true");
 
@@ -75,6 +83,21 @@ public class Main {
       }
     } catch (Exception e) {
       logger.warnAndAddToDb("Hyperscan initialization error (non-fatal): " + e.getMessage());
+    }
+
+    // Start PatternUpdateService for periodic pattern updates from public URL
+    try {
+      String patternFileUrl = "https://akto.blob.core.windows.net/threat-config/threat-patterns.txt";
+      String localPatternFile = System.getenv().getOrDefault("LOCAL_PATTERN_FILE", "threat-patterns-example.txt");
+
+      PatternUpdateService patternUpdateService = new PatternUpdateService(
+          localPatternFile,
+          patternFileUrl
+      );
+      patternUpdateService.startPeriodicUpdates();
+      logger.infoAndAddToDb("PatternUpdateService started - will check for pattern updates every 15 minutes from: " + patternFileUrl);
+    } catch (Exception e) {
+      logger.warnAndAddToDb("PatternUpdateService initialization error (non-fatal): " + e.getMessage());
     }
 
     int accountId = ClientActor.getAccountId();
@@ -119,7 +142,9 @@ public class Main {
 
     String currentTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yy-MM-dd HH:mm:ss"));
     logger.warnAndAddToDb("Initialization finished starting DetectorTask at " + currentTime);
-    new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, localRedis, distributionCalculator, apiDistributionEnabled, instanceId).run();
+    MaliciousTrafficDetectorTask detectorTask = new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, localRedis, distributionCalculator, apiDistributionEnabled, instanceId);
+    scheduleKafkaMetricsPoller(detectorTask);
+    detectorTask.run();
 
     new SendMaliciousEventsToBackend(internalKafka, KafkaTopic.ThreatDetection.ALERTS).run();
 
@@ -219,6 +244,42 @@ public class Main {
         .setKeySerializer(Serializer.STRING)
         .setValueSerializer(Serializer.BYTE_ARRAY)
         .build();
+  }
+
+  private static void scheduleKafkaMetricsPoller(MaliciousTrafficDetectorTask detectorTask) {
+    scheduler.scheduleAtFixedRate(() -> {
+      try {
+        Consumer<String, byte[]> consumer = detectorTask.getKafkaConsumer();
+        if (consumer == null) return;
+
+        for (Map.Entry<MetricName, ? extends Metric> entry : consumer.metrics().entrySet()) {
+          MetricName key = entry.getKey();
+          Metric value = entry.getValue();
+
+          if (key.tags().containsKey("partition") || key.tags().containsKey("topic")) {
+            continue;
+          }
+
+          if (!KAFKA_NUMERIC_METRICS.contains(key.name())) {
+            continue;
+          }
+
+          double metricValue = Double.isNaN((double) value.metricValue()) ? 0d : (double) value.metricValue();
+
+          if (key.name().equals("records-lag-max")) {
+            AllMetrics.instance.setKafkaRecordsLagMax((float) metricValue);
+          } else if (key.name().equals("records-consumed-rate")) {
+            AllMetrics.instance.setKafkaRecordsConsumedRate((float) metricValue);
+          } else if (key.name().equals("fetch-latency-avg")) {
+            AllMetrics.instance.setKafkaFetchAvgLatency((float) metricValue);
+          } else if (key.name().equals("bytes-consumed-rate")) {
+            AllMetrics.instance.setKafkaBytesConsumedRate((float) metricValue);
+          }
+        }
+      } catch (Exception e) {
+        logger.errorAndAddToDb("Failed to collect Kafka consumer metrics: " + e.getMessage());
+      }
+    }, 0, 1, TimeUnit.MINUTES);
   }
 
   private static void validateAndInitializeDeployment(boolean isHybridDeployment) throws Exception {

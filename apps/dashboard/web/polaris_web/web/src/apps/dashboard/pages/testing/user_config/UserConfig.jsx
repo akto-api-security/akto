@@ -257,7 +257,7 @@ function UserConfig() {
                     minHeight="500px"
                     readOnly={false}
                     getEditorData={handlePreRequestScriptChange}
-                    wordWrap={false}
+                    wordWrap={true}
                 />
             </LegacyCard.Section>
         </LegacyCard>
@@ -277,7 +277,7 @@ function UserConfig() {
                     minHeight="500px"
                     readOnly={false}
                     getEditorData={handlePostRequestScriptChange}
-                    wordWrap={false}
+                    wordWrap={true}
                 />
             </LegacyCard.Section>
         </LegacyCard>
@@ -289,7 +289,7 @@ function UserConfig() {
     }
 
     const commonTemplateComponent = (
-        <LegacyCard sectioned title="Configure global test configuration" key="commonTestTemplate" primaryFooterAction={
+        <LegacyCard sectioned title="Global Test Configuration" key="commonTestTemplate" primaryFooterAction={
             {
                 content: "Save", destructive: false, onAction: () => { saveCommonTemplate() }
             }

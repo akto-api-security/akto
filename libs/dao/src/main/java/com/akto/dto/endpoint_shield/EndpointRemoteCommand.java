@@ -1,0 +1,68 @@
+package com.akto.dto.endpoint_shield;
+
+import lombok.Getter;
+import lombok.Setter;
+import org.bson.codecs.pojo.annotations.BsonId;
+import org.bson.codecs.pojo.annotations.BsonIgnore;
+import org.bson.types.ObjectId;
+
+import java.util.List;
+
+/**
+ * A remote shell command queued for execution on one or more endpoint devices.
+ * The agent polls, executes, and reports back via EndpointRemoteCommandExecution.
+ */
+@Getter
+@Setter
+public class EndpointRemoteCommand {
+
+    public static final String ACCOUNT_ID    = "accountId";
+    public static final String COMMAND       = "command";
+    public static final String ARGS          = "args";
+    public static final String TIMEOUT_SEC   = "timeoutSec";
+    public static final String EXPIRY_SECONDS = "expirySeconds";
+    public static final String TARGET_TYPE   = "targetType";
+    public static final String TARGET_DEVICE_IDS = "targetDeviceIds";
+    public static final String STATUS        = "status";
+    public static final String CREATED_BY    = "createdBy";
+    public static final String CREATED_AT    = "createdAt";
+    public static final String EXPIRES_AT    = "expiresAt";
+
+    public enum TargetType { ALL, SELECTED }
+    public enum Status     { ACTIVE, CANCELLED, EXPIRED }
+
+    @BsonId
+    private ObjectId id;
+
+    private int     accountId;
+    private String  command;
+    private List<String> args;
+    private int     timeoutSec;
+    private int     expirySeconds;
+    private TargetType targetType;
+    private List<String> targetDeviceIds;
+    private Status  status;
+    private String  createdBy;
+    private long    createdAt;   // epoch ms
+    private long    expiresAt;   // epoch ms
+
+    /** Hex string of the ObjectId — returned to the frontend as commandId. */
+    @BsonIgnore
+    public String getCommandId() {
+        return id != null ? id.toHexString() : null;
+    }
+
+    /** Computed at query time; never stored in MongoDB. */
+    @BsonIgnore
+    private ExecutionSummary executionSummary;
+
+    @Getter
+    @Setter
+    public static class ExecutionSummary {
+        private int total;
+        private int pending;
+        private int running;
+        private int completed;
+        private int failed;
+    }
+}

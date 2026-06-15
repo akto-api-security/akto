@@ -1,10 +1,11 @@
 
-import { Text, HorizontalStack, VerticalStack, Box, Icon, Tooltip } from "@shopify/polaris"
+import { Text, HorizontalStack, VerticalStack, Box, Icon, Tooltip, IndexFiltersMode } from "@shopify/polaris"
 import { CircleTickMajor, CircleCancelMajor, SettingsMajor, ClockMinor } from "@shopify/polaris-icons";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
 import api from "./api"
+import collectionApi from "./api_collections/api"
 import func from "@/util/func"
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
@@ -22,6 +23,11 @@ import CollectionIcon from "../../components/shared/CollectionIcon";
 import settingsApi from "../settings/api";
 import { intersectServerActionFlags, getRegistryOverride } from "./auditServerActionFlags";
 import "../../components/shared/style.css";
+
+const TAB_IDS = { ALL: 'all', MCP_SERVERS: 'mcp_servers', SKILLS: 'skills' };
+const TABS_DEFAULT = ['All', 'MCP Servers', 'Skills'];
+const TABS_ENDPOINT_SECURITY = ['MCP Servers', 'Skills'];
+const MCP_TYPES = ['mcp-tool', 'mcp-resource', 'mcp-prompt', 'mcp-server'];
 
 const headingsEndpointSecurity = [
     {
@@ -136,6 +142,41 @@ const headingsDefault = [
     }
 ]
 
+const headingsSkills = [
+    {
+        text: "Skill",
+        value: "skillName",
+        title: "Skill",
+        type: CellType.TEXT,
+    },
+    {
+        text: "AI Agent",
+        value: "collectionsComp",
+        title: "AI Agent",
+        type: CellType.TEXT,
+    },
+    {
+        title: 'Last Detected',
+        text: "Last Detected",
+        value: "lastDetectedComp",
+        sortActive: true,
+        sortKey: 'lastDetected',
+        type: CellType.TEXT
+    },
+    {
+        title: 'Status',
+        text: "Status",
+        value: "statusComp",
+    },
+    {
+        title: 'Marked By',
+        text: "Marked By",
+        value: "markedBy",
+        type: CellType.TEXT,
+        filterKey: 'markedBy',
+    },
+]
+
 const sortOptions = [
     { label: 'Last Detected', value: 'lastDetected asc', directionLabel: 'Oldest', sortKey: 'lastDetected', columnIndex: 3 },
     { label: 'Last Detected', value: 'lastDetected desc', directionLabel: 'Newest', sortKey: 'lastDetected', columnIndex: 3 },
@@ -144,17 +185,19 @@ const sortOptions = [
    
 ];
 
+const MCP_TYPE_CHOICES = [
+    { label: "Tool", value: "mcp-tool" },
+    { label: "Resource", value: "mcp-resource" },
+    { label: "Prompt", value: "mcp-prompt" },
+    { label: "Server", value: "mcp-server" }
+];
+
 let filtersDefault = [
     {
         key: 'type',
         label: 'Type',
         title: 'Type',
-        choices: [
-            { label: "Tool", value: "mcp-tool" },
-            { label: "Resource", value: "mcp-resource" },
-            { label: "Prompt", value: "mcp-prompt" },
-            { label: "Server", value: "mcp-server" }
-        ],
+        choices: MCP_TYPE_CHOICES,
     },
     {
         key: 'markedBy',
@@ -180,6 +223,13 @@ let filtersDefault = [
         choices: [],
     }
 ]
+
+const getTabFilters = (tabId) => {
+    // Skills are sourced from api_info; the audit filter set is built for mcp_audit_info
+    // and would over-constrain. Return an empty filter list so the chips bar is clean.
+    if (tabId === TAB_IDS.SKILLS) return [];
+    return filtersDefault;
+}
 
 let filtersEndpointSecurity = [
     {
@@ -377,11 +427,54 @@ function AuditData() {
     const collectionsRegistryStatusMap = PersistStore(state => state.collectionsRegistryStatusMap)
 
     const isEndpointSecurity = isEndpointSecurityCategory();
-    const filters = isEndpointSecurity ? filtersEndpointSecurity : filtersDefault;
+    const definedTableTabs = isEndpointSecurity ? TABS_ENDPOINT_SECURITY : TABS_DEFAULT;
+
+    const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
+    const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
+    const persistedTabId = tableSelectedTab[window.location.pathname];
+    const allowedTabIds = definedTableTabs.map(t => func.getKeyFromName(t));
+    const initialSelectedTab = persistedTabId && allowedTabIds.includes(persistedTabId)
+        ? persistedTabId
+        : TAB_IDS.MCP_SERVERS;
+    const [selectedTab, setSelectedTab] = useState(initialSelectedTab);
+    const [selected, setSelected] = useState(
+        func.getTableTabIndexById(0, definedTableTabs, initialSelectedTab)
+    );
+    const [tabCounts, setTabCounts] = useState({ all: 0, mcp_servers: 0, skills: 0 });
+
+    // Skills are flat AGENT_SKILL records in both modes; only the MCP tab differs
+    // between endpoint-security (merged) and default (flat).
+    const isSkillsTab = selectedTab === TAB_IDS.SKILLS;
+    const useEndpointMergedView = isEndpointSecurity && !isSkillsTab;
+
+    const filters = useMemo(() => {
+        if (useEndpointMergedView) return filtersEndpointSecurity;
+        return getTabFilters(selectedTab);
+    }, [useEndpointMergedView, selectedTab]);
+
     const headings = useMemo(() => {
-        if (!isEndpointSecurity) return headingsDefault;
-        return headingsEndpointSecurity;
-    }, [isEndpointSecurity]);
+        if (useEndpointMergedView) return headingsEndpointSecurity;
+        if (isSkillsTab) return headingsSkills;
+        return headingsDefault;
+    }, [useEndpointMergedView, isSkillsTab]);
+
+    const handleSelectedTab = (selectedIndex) => {
+        setSelected(selectedIndex);
+        const tabId = func.getKeyFromName(definedTableTabs[selectedIndex] || definedTableTabs[0]);
+        setSelectedTab(tabId);
+        setTableSelectedTab({
+            ...tableSelectedTab,
+            [window.location.pathname]: tabId,
+        });
+    };
+
+    const tableTabs = func.getTableTabsContent(
+        definedTableTabs,
+        func.getTabsCount(definedTableTabs, { _counts: tabCounts }),
+        setSelectedTab,
+        selectedTab,
+        tabCounts[selectedTab] || 0
+    );
 
     const [registryConfigured, setRegistryConfigured] = useState(false);
     const endpointRowCacheRef = useRef({});
@@ -563,6 +656,64 @@ function AuditData() {
         setModalOpen(true);
     };
 
+    // Block/unblock skills — dual-writes to both api_info (legacy readers) and
+    // mcp_audit_info (new source of truth). The backend reuses the existing
+    // "remarks" convention ("Rejected" = blocked, "Approved" = allowed) used for
+    // MCP-server flows. mcpHosts narrows the audit write to the agents shown on
+    // this skill row; without it the audit write would touch every agent.
+    const bulkUpdateSkills = async (isBlocked, selectedIds) => {
+        const rows = getRowsForSelectedIds(selectedIds);
+        const validRows = rows.filter(r => r && r.skillName &&
+            ((Array.isArray(r.apiCollectionIds) && r.apiCollectionIds.length) ||
+             (Array.isArray(r.aiAgents) && r.aiAgents.length)));
+        if (!validRows.length) {
+            func.setToast(true, true, "Could not resolve selected skills");
+            return;
+        }
+        try {
+            await Promise.all(validRows.map((r) =>
+                collectionApi.updateSkillBlockStatus(
+                    r.apiCollectionIds || [],
+                    r.skillName,
+                    isBlocked,
+                    r.aiAgents || []
+                )
+            ));
+            func.setToast(true, false, isBlocked ? "Blocked selected skills" : "Allowed selected skills");
+            window.location.reload();
+        } catch (e) {
+            func.setToast(true, true, "Bulk update failed");
+        }
+    };
+
+    const skillPromotedBulkActions = (selectedIds) => {
+        if (selectedIds === "All" || !Array.isArray(selectedIds) || selectedIds.length === 0) {
+            return [];
+        }
+        const n = selectedIds.length;
+        const rows = getRowsForSelectedIds(selectedIds);
+        const allBlocked = rows.length > 0 && rows.every(r => r?.isSkillBlocked);
+        const allAllowed = rows.length > 0 && rows.every(r => !r?.isSkillBlocked);
+        const countPhrase = `${n} selected skill${n === 1 ? "" : "s"}`;
+        const allowLabel = n === 1 ? "Allow this skill" : `Allow ${countPhrase}`;
+        const blockLabel = n === 1 ? "Block this skill" : `Block ${countPhrase}`;
+        const actions = [];
+        if (!allAllowed) {
+            actions.push({
+                content: allowLabel,
+                onAction: () => bulkUpdateSkills(false, selectedIds),
+            });
+        }
+        if (!allBlocked) {
+            actions.push({
+                content: blockLabel,
+                destructive: true,
+                onAction: () => bulkUpdateSkills(true, selectedIds),
+            });
+        }
+        return actions;
+    };
+
     const endpointPromotedBulkActions = (selectedIds) => {
         if (selectedIds === "All" || !Array.isArray(selectedIds) || selectedIds.length === 0) {
             return [];
@@ -648,12 +799,108 @@ function AuditData() {
         setLoading(true);
         let ret = []
         let total = 0;
+
+        // Skills tab reads raw AGENT_SKILL audit rows from /api/fetchSkillsData
+        // (mcp_audit_info backed). One row per detection record — no client-side
+        // grouping, server pagination is the source of truth.
+        if (isSkillsTab) {
+            try {
+                const effectiveSortKey = sortKey || 'lastDetected';
+                const res = await api.fetchSkillsData(skip, limit, effectiveSortKey, sortOrder, {}, queryValue || '');
+                const auditRows = (res && Array.isArray(res.auditData)) ? res.auditData : [];
+
+                // For block/allow we need apiCollectionIds. If the audit row already
+                // carries hostCollectionId, use it. Otherwise resolve from mcpHost via
+                // the already-loaded collectionsMap (hostName ends with ".<mcpHost>").
+                const hostToIds = {};
+                Object.entries(collectionsMap).forEach(([id, name]) => {
+                    if (!name) return;
+                    const s = String(name);
+                    const dot = s.lastIndexOf('.');
+                    if (dot < 0) return;
+                    const host = s.slice(dot + 1);
+                    if (!hostToIds[host]) hostToIds[host] = [];
+                    hostToIds[host].push(Number(id));
+                });
+
+                endpointRowCacheRef.current = {};
+
+                auditRows.forEach((r) => {
+                    const skillName = r?.resourceName || '-';
+                    const mcpHost = r?.mcpHost || '-';
+                    const lastSeen = typeof r?.lastDetected === 'number' ? r.lastDetected : 0;
+                    const isBlocked = r?.remarks === 'Rejected';
+                    const markedBy = r?.markedBy || '-';
+                    const rowHexId = r?.hexId || r?.id || `${skillName}::${mcpHost}::${lastSeen}`;
+                    const collectionIds = (typeof r?.hostCollectionId === 'number' && r.hostCollectionId > 0)
+                        ? [r.hostCollectionId]
+                        : (hostToIds[mcpHost] || []);
+
+                    const dataObj = {
+                        id: rowHexId,
+                        hexId: rowHexId,
+                        skillName,
+                        apiCollectionIds: collectionIds,
+                        aiAgents: mcpHost !== '-' ? [mcpHost] : [],
+                        isSkillBlocked: isBlocked,
+                        lastSeen,
+                        lastDetectedComp: lastSeen ? func.prettifyEpoch(lastSeen) : '-',
+                        markedBy,
+                        // AI agent name with logo — same pattern as MCP-server tab's aiAgentNameComp.
+                        collectionsComp: mcpHost === '-' ? (
+                            <Text>-</Text>
+                        ) : (
+                            <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                                <Box className="audit-table-icon">
+                                    <CollectionIcon
+                                        hostName={mcpHost}
+                                        assetTagValue={mcpHost}
+                                        displayName={mcpHost}
+                                    />
+                                </Box>
+                                <Text>{mcpHost}</Text>
+                            </HorizontalStack>
+                        ),
+                        statusComp: (
+                            <Text variant="bodyMd" color={isBlocked ? 'critical' : 'success'}>
+                                {isBlocked ? 'Blocked' : 'Allowed'}
+                            </Text>
+                        ),
+                        isTerminal: false,
+                        name: skillName,
+                    };
+                    ret.push(dataObj);
+                    endpointRowCacheRef.current[String(dataObj.id)] = dataObj;
+                });
+                total = typeof res?.total === 'number' ? res.total : ret.length;
+            } catch (e) {}
+            setTabCounts((prev) => ({ ...prev, [selectedTab]: total }));
+            setLoading(false);
+            return { value: ret, total };
+        }
+
         let finalFilters = {...filterParams}
         finalFilters['lastDetected'] = [startTimestamp, endTimestamp]
 
-        if (isEndpointSecurity) {
+        if (useEndpointMergedView) {
             finalFilters['type'] = ['mcp-server']
         } else {
+            // Tab-driven type scoping for the MCP tab; the All tab respects whatever
+            // the user picked. (Skills tab is handled in its own branch above and never
+            // reaches this code.)
+            const userTypes = Array.isArray(filterParams['type']) ? filterParams['type'] : [];
+            if (selectedTab === TAB_IDS.MCP_SERVERS) {
+                finalFilters['type'] = userTypes.length
+                    ? userTypes.filter(t => MCP_TYPES.includes(t))
+                    : MCP_TYPES;
+                if (finalFilters['type'].length === 0) {
+                    finalFilters['type'] = MCP_TYPES;
+                }
+            }
+
+            // hostCollectionId scoping mirrors the original un-tabbed audit page: scope to
+            // the user's allowed collections. Backend RBAC (UsersCollectionsList) still
+            // applies to legacy records without contextSource.
             finalFilters['hostCollectionId'] = (filterParams['collectionName'] || []).map(id => parseInt(id))
             if (finalFilters['hostCollectionId'].length === 0) {
                 finalFilters['hostCollectionId'] = Object.keys(collectionsMap).map(id => parseInt(id))
@@ -662,9 +909,9 @@ function AuditData() {
         }
 
         try {
-            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators, queryValue, isEndpointSecurity)
+            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators, queryValue, useEndpointMergedView)
             if (res && res.auditData) {
-                if (isEndpointSecurity) {
+                if (useEndpointMergedView || isSkillsTab) {
                     endpointRowCacheRef.current = {};
                 }
                 res.auditData.forEach((auditRecord) => {
@@ -695,11 +942,24 @@ function AuditData() {
         } catch (error) {
         }
 
+        setTabCounts((prev) => ({ ...prev, [selectedTab]: total }));
+
         setLoading(false);
         return {value: ret, total: total};
     }
 
     const fillFilters = async () => {
+        // Always populate the default-mode filter choices: the Skills tab uses them in both modes.
+        try {
+            const res = await api.fetchAuditData('lastDetected', -1, 0, 1000, { lastDetected: [startTimestamp, endTimestamp] }, {}, '', false)
+            const markedByUsers = new Set()
+            if (res && Array.isArray(res.auditData)) {
+                res.auditData.forEach((rec) => { if (rec?.markedBy) markedByUsers.add(rec.markedBy) })
+            }
+            filtersDefault[1].choices = Array.from(markedByUsers).sort().map(u => ({ label: u, value: u }))
+        } catch (e) {}
+        filtersDefault[3].choices = Object.entries(collectionsMap).map(([id, name]) => ({ label: name, value: id }));
+
         if (isEndpointSecurity) {
             try {
                 const serversRes = await api.fetchAuditData(
@@ -722,22 +982,76 @@ function AuditData() {
                 filtersEndpointSecurity[3].choices = Array.from(servers).sort().map(s => ({ label: s, value: s }))
             } catch (e) {}
             setFilterVersion(v => v + 1)
-        } else {
-            try {
-                const res = await api.fetchAuditData('lastDetected', -1, 0, 1000, { lastDetected: [startTimestamp, endTimestamp] }, {}, '', false)
-                const markedByUsers = new Set()
-                if (res && Array.isArray(res.auditData)) {
-                    res.auditData.forEach((rec) => { if (rec?.markedBy) markedByUsers.add(rec.markedBy) })
-                }
-                filtersDefault[1].choices = Array.from(markedByUsers).sort().map(u => ({ label: u, value: u }))
-            } catch (e) {}
-            filtersDefault[3].choices = Object.entries(collectionsMap).map(([id, name]) => ({ label: name, value: id }));
         }
     }
 
     useEffect(() => {
         fillFilters()
     }, [collectionsMap, startTimestamp, endTimestamp])
+
+    // Tab badge counts for the two tabs that aren't the currently-rendered table.
+    // The active tab's count is set from fetchData's total; here we cheap-count the others
+    // with limit=1 fetches so the badges stay accurate as the user navigates. In endpoint-
+    // security mode the MCP count is fetched via the merged aggregation so the badge matches
+    // the row count the user will actually see.
+    useEffect(() => {
+        const collectionIds = Object.keys(collectionsMap).map(id => parseInt(id));
+        if (collectionIds.length === 0) return;
+        let cancelled = false;
+
+        const countFor = async (typeFilter, merge, scopeByCollection) => {
+            const filterParams = {
+                lastDetected: [startTimestamp, endTimestamp],
+            };
+            if (!merge && scopeByCollection) {
+                filterParams.hostCollectionId = collectionIds;
+            }
+            if (typeFilter) filterParams.type = typeFilter;
+            try {
+                const res = await api.fetchAuditData('lastDetected', -1, 0, 1, filterParams, {}, '', !!merge);
+                return res?.total || 0;
+            } catch {
+                return 0;
+            }
+        };
+
+        const countSkills = async () => {
+            try {
+                const res = await api.fetchSkillsData(0, 1, 'lastDetected', -1, {}, '');
+                return res?.total || 0;
+            } catch {
+                return 0;
+            }
+        };
+
+        (async () => {
+            const targets = [];
+            // [tabId, typeFilter, merge, scopeByCollection]
+            // All and MCP keep the original collection scoping for parity with the
+            // pre-tabs behavior. Skills is sourced from api_info via a separate fetch.
+            if (!isEndpointSecurity && selectedTab !== TAB_IDS.ALL) {
+                targets.push([TAB_IDS.ALL, null, false, true]);
+            }
+            if (selectedTab !== TAB_IDS.MCP_SERVERS) {
+                // In endpoint-security mode the MCP tab is merged; the count must also be merged.
+                targets.push([TAB_IDS.MCP_SERVERS, isEndpointSecurity ? ['mcp-server'] : MCP_TYPES, isEndpointSecurity, true]);
+            }
+            const results = await Promise.all(targets.map(([, tf, mg, scope]) => countFor(tf, mg, scope)));
+            if (cancelled) return;
+            setTabCounts((prev) => {
+                const next = { ...prev };
+                targets.forEach(([tabId], i) => { next[tabId] = results[i]; });
+                return next;
+            });
+            if (selectedTab !== TAB_IDS.SKILLS) {
+                const skillsTotal = await countSkills();
+                if (cancelled) return;
+                setTabCounts((prev) => ({ ...prev, [TAB_IDS.SKILLS]: skillsTotal }));
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, [isEndpointSecurity, collectionsMap, startTimestamp, endTimestamp, selectedTab])
 
     const primaryActions = (
         <HorizontalStack gap={"2"}>
@@ -765,7 +1079,7 @@ function AuditData() {
             primaryAction={primaryActions}
             components = {[
                 <GithubServerTable
-                        key={startTimestamp + endTimestamp + (isEndpointSecurity ? filterVersion : filtersDefault[1].choices.length + filtersDefault[3].choices.length) + String(isEndpointSecurity) + String(registryConfigured)}
+                        key={startTimestamp + endTimestamp + (useEndpointMergedView ? filterVersion : filtersDefault[1].choices.length + filtersDefault[3].choices.length) + String(useEndpointMergedView) + String(registryConfigured) + `-${selectedTab}`}
                         headers={headings}
                         resourceName={resourceName}
                         appliedFilters={[]}
@@ -780,7 +1094,11 @@ function AuditData() {
                         condensedHeight={true}
                         pageLimit={20}
                         headings={headings}
-                        {...(isEndpointSecurity
+                        tableTabs={tableTabs}
+                        selected={selected}
+                        onSelect={handleSelectedTab}
+                        mode={IndexFiltersMode.Default}
+                        {...(useEndpointMergedView
                             ? {
                                 onRowClick: handleRowClick,
                                 rowClickable: true,
@@ -788,13 +1106,18 @@ function AuditData() {
                                 promotedBulkActions: endpointPromotedBulkActions,
                                 filterStateUrl: "audit-data-endpoint",
                             }
-                            : { getActions: (item) => getActionsList(item), hasRowActions: true }
+                            : isSkillsTab
+                                ? {
+                                    selectable: true,
+                                    promotedBulkActions: skillPromotedBulkActions,
+                                }
+                                : { getActions: (item) => getActionsList(item), hasRowActions: true }
                         )}
                 />,
             ]}
             />
 
-            {isEndpointSecurity ? (
+            {useEndpointMergedView ? (
                 <>
                     <AuditDataDrawer
                         auditItem={selectedAuditItem}
@@ -818,6 +1141,16 @@ function AuditData() {
                         auditItem={selectedAuditItem}
                     />
                 </>
+            ) : isSkillsTab ? (
+                <ConditionalApprovalModal
+                    isOpen={modalOpen}
+                    onClose={() => {
+                        setModalOpen(false);
+                        setConditionalBulkRows(null);
+                    }}
+                    onApprove={updateAuditDataWithConditions}
+                    auditItem={selectedAuditItem}
+                />
             ) : (
                 <ConditionalApprovalModal
                     isOpen={modalOpen}

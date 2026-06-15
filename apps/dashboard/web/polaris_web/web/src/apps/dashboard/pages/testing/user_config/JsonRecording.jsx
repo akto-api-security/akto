@@ -37,6 +37,8 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
     const [modalScreenshots, setModalScreenshots] = useState([])
     const [modalLoading, setModalLoading] = useState(false)
     const [hasScreenshots, setHasScreenshots] = useState(false)
+    const [liveSessionId, setLiveSessionId] = useState(null)
+    const [liveScreenshot, setLiveScreenshot] = useState(null)
 
     const [authParams, setAuthParams] = useState([{
         key: "",
@@ -44,6 +46,8 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
         where: "HEADER",
         showHeader: true
     }])
+
+    const pollGenRef = useRef(0)
 
     useEffect(() => {
         if (extractInformation) {
@@ -85,6 +89,17 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
         }
     }, [roleName])
 
+    useEffect(() => {
+        if (!isLoading || !liveSessionId) return
+        const interval = setInterval(async () => {
+            try {
+                const resp = await api.getLatestReplayScreenshot(liveSessionId)
+                if (resp?.screenshotBase64) setLiveScreenshot(resp.screenshotBase64)
+            } catch { /* ignore */ }
+        }, 1500)
+        return () => clearInterval(interval)
+    }, [isLoading, liveSessionId])
+
     const inputRef = useRef(null);
 
     const handleClick = () => {
@@ -96,6 +111,7 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
     }
 
     async function pollExtractedToken(screenshotRoleName, playgroundId) {
+        const gen = ++pollGenRef.current
         setIsLoading(true)
         const initialWaitPeriod = 5000
         await sleep(initialWaitPeriod)
@@ -116,33 +132,47 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
         }
 
         for (let i = 0; i < pollAttempts; i++) {
+            // Abort if a newer upload has started a fresh poll
+            if (pollGenRef.current !== gen) return
             if (i > 0) {
                 await sleep(i * pollSleepDuration)
             }
 
             try {
                 const resp = await api.fetchRecordedLoginFlow("x1", playgroundId || undefined)
-                if (trimmedRole && resp.tokenFetchInProgress) {
-                    await refreshScreenshotsWhileActive()
-                }
                 if (!resp.tokenFetchInProgress) {
+                    if (pollGenRef.current !== gen) return
                     setExtractedToken(resp.token)
                     finishedOk = true
                     setIsLoading(false)
+                    setLiveScreenshot(null)
                     setToastConfig({ isActive: true, isError: false, message: "Verify extracted token" })
                     if (trimmedRole) {
                         await refreshScreenshotsWhileActive()
                     }
                     break
                 }
-            } catch {
-                /* continue polling */
+            } catch(e) {
+                const serverError = e?.response?.data?.actionErrors?.[0]
+                if (serverError) {
+                    if (pollGenRef.current !== gen) return
+                    finishedOk = true
+                    setIsLoading(false)
+                    setLiveScreenshot(null)
+                    setToastConfig({ isActive: true, isError: true, message: serverError })
+                    await refreshScreenshotsWhileActive()
+                    break
+                }
+                // transient network error — continue polling
             }
         }
 
         if (!finishedOk) {
+            if (pollGenRef.current !== gen) return
             setIsLoading(false)
+            setLiveScreenshot(null)
             setToastConfig({ isActive: true, isError: true, message: "Error while extracting token using JSON recording" })
+            await refreshScreenshotsWhileActive()
         }
     }
 
@@ -176,6 +206,8 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
 
         reader.onload = () => {
             setContent(reader.result)
+            setHasScreenshots(false)
+            setLiveScreenshot(null)
             const result = api.uploadRecordedLoginFlow(
                 reader.result,
                 tokenFetchCommand,
@@ -186,10 +218,7 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
             result.then((resp) => {
                 setToastConfig({ isActive: true, isError: false, message: "JSON recording uploaded" })
                 setShowVerify(true)
-                const trimmed = roleName && String(roleName).trim()
-                if (trimmed) {
-                    setHasScreenshots(false)
-                }
+                setLiveSessionId(resp?.screenshotSessionId || null)
                 const pgId = resp && resp.testingRunPlaygroundId
                 pollExtractedToken(roleName, pgId || null)
             }).catch((err) => {
@@ -275,7 +304,13 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
                                 <TextField value={extractedToken} readonly />
                             </div>
                         }
-
+                        {liveScreenshot && (
+                            <img
+                                alt="Replay screenshot"
+                                src={`data:image/jpeg;base64,${liveScreenshot}`}
+                                style={{ maxWidth: '100%', display: 'block', borderRadius: '4px', marginTop: '12px' }}
+                            />
+                        )}
                     </Card>
                 }
 

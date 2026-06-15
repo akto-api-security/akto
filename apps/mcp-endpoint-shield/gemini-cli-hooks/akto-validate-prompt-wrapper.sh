@@ -4,9 +4,10 @@
 
 export MODE="atlas"
 export AKTO_DATA_INGESTION_URL="{{AKTO_DATA_INGESTION_URL}}"
+export AKTO_API_TOKEN="{{AKTO_API_TOKEN}}"
 export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="gemini_cli"
 
 # Execute Python hook script
-exec python3 "$HOME/.gemini/hooks/akto-validate-response.py" "$@"
+exec python3 "$HOME/.gemini/hooks/akto-validate-prompt.py" "$@"

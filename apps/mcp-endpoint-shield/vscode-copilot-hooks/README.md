@@ -60,7 +60,7 @@ cp hooks.json ~/.copilot/hooks/hooks.json
 | Variable | Default | Description |
 |---|---|---|
 | `AKTO_DATA_INGESTION_URL` | _(required)_ | Guardrails service base URL |
-| `AKTO_TOKEN` | _(required)_ | API token for authentication |
+| `AKTO_API_TOKEN` | _(required)_ | API token for authentication |
 | `AKTO_SYNC_MODE` | `true` | `true` = validate synchronously and block; `false` = ingest only |
 | `AKTO_CONNECTOR` | `vscode` | Connector identifier sent with each request |
 | `MODE` | `atlas` | Runtime mode (`atlas` or `argus`) |

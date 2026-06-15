@@ -17,6 +17,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import org.bson.conversions.Bson;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -143,6 +144,27 @@ public class McpAgentAction extends UserAction {
                         }
                         tokensLimit = 40000;
                     }
+                } else if (StringUtils.isNotEmpty(type) && type.equals("agentic_observe")) {
+                    // Pass only the minimal asset/device identity (assetName/assetType/collectionIds
+                    // or deviceId). The MCP agent fetches what it needs on demand via the focused
+                    // akto_agentic_* tools (collections_search / users_search / skills / audit_data)
+                    // — see the agentic_observe system prompt in test-editor-services.
+                    Object data = metaData.get("data");
+                    if (data != null && data instanceof Map) {
+                        Map<String, Object> dataMap = (Map<String, Object>) data;
+                        String scope = (String) dataMap.getOrDefault("scope", "");
+                        String scopeLabel = "device".equals(scope) ? "Single device" : "asset".equals(scope) ? "Single agentic asset" : "Agentic context";
+                        try {
+                            ObjectMapper mapper = new ObjectMapper();
+                            contextString = "CONTEXT SCOPE: " + scopeLabel
+                                + ". This is only the asset/device identity — use the akto_agentic_* tools "
+                                + "(with the collectionIds, assetName, or deviceId below) to fetch its data before answering.\n\n"
+                                + mapper.writeValueAsString(dataMap);
+                        } catch (Exception e) {
+                            contextString = "Agentic Observe Context: " + dataMap.toString();
+                        }
+                        tokensLimit = 20000;
+                    }
                 }
             }
 
@@ -218,6 +240,16 @@ public class McpAgentAction extends UserAction {
         } catch (Exception e) {
             logger.error("Error deleting conversation history", e);            addActionError("Failed to delete conversation history: " + e.getMessage());
             return ERROR.toUpperCase();
+        }
+    }
+
+    private static void appendIfPresent(StringBuilder sb, String label, Object value) {
+        if (value == null) {
+            return;
+        }
+        String text = value instanceof String ? (String) value : String.valueOf(value);
+        if (StringUtils.isNotEmpty(text)) {
+            sb.append(label).append(": ").append(text).append("\n");
         }
     }
 

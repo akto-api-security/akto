@@ -17,6 +17,8 @@ const KNOWN_CLIENTS = {
     claude2: { displayName: 'Claude CLI', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
     chatgpt: { displayName: 'ChatGPT', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     openai: { displayName: 'OpenAI', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
+    gpt: { displayName: 'GPT', domain: 'openai.com', agentType: CLIENT_TYPES.LLM },
+    codex: { displayName: 'Codex', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     gemini: { displayName: 'Gemini', domain: 'gemini.google.com', agentType: CLIENT_TYPES.LLM },
     copilot: { displayName: 'Copilot', domain: 'copilot.microsoft.com', agentType: CLIENT_TYPES.AI_AGENT },
     cursor: { displayName: 'Cursor', domain: 'cursor.com', agentType: CLIENT_TYPES.AI_AGENT },
@@ -63,6 +65,9 @@ const capitalizeWord = (w) => w.toLowerCase() === 'cli' || w.toLowerCase() === '
 
 const formatDisplayName = (tagValue) => {
     if (!tagValue) return 'Unknown';
+    // Domain-style names (contain dots) are returned as-is to avoid mangling
+    // e.g. "mcp.notion.com" stays "mcp.notion.com", "api.github.com" stays "api.github.com"
+    if (tagValue.includes('.')) return tagValue;
     const info = findClientInfo(tagValue);
     if (!info) {
         return tagValue.split(/[-_\s]+/).map(capitalizeWord).join(' ');

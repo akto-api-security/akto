@@ -25,7 +25,7 @@ class Config:
 
         # Connector info
         self.connector: str = os.getenv("AKTO_CONNECTOR", "hermes")
-        self.token: str = os.getenv("AKTO_TOKEN", "")
+        self.token: str = os.getenv("AKTO_API_TOKEN", "")
 
         # Logging
         self.log_level: str = os.getenv("LOG_LEVEL", "INFO").upper()

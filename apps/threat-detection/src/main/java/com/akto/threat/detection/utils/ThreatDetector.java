@@ -96,6 +96,10 @@ public class ThreatDetector {
     }
 
 
+    public String cleanUrl(String url) {
+        return cleanThreatUrl(url, lfiTrie, osCommandInjectionTrie, ssrfTrie);
+    }
+
     public List<Pair<String, String>> getUrlParamNamesAndValues(String url, URLTemplate urlTemplate) {
         url = cleanThreatUrl(url, lfiTrie, osCommandInjectionTrie, ssrfTrie);
         url = ApiInfo.getForwardNormalizedUrl(url);

@@ -13,7 +13,7 @@ import transform from './customDiffEditor';
 
 function SampleDataComponent(props) {
 
-    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata, readOnly = false, getEditorData = () => {}, showResponse = true, simpleJson = false, redactHeaders = [] } = props;
+    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata, readOnly = false, getEditorData = () => {}, showResponse = true, simpleJson = false, redactHeaders = [], isWebSocket = false } = props;
     const [sampleJsonData, setSampleJsonData] = useState({ request: { message: "" }, response: { message: "" } });
     const [popoverActive, setPopoverActive] = useState({});
     const [lineNumbers, setLineNumbers] = useState({request: [], response: []})
@@ -32,6 +32,23 @@ function SampleDataComponent(props) {
                 [type]: {
                     message: sampleData?.message || "",
                     originalMessage: sampleData?.originalMessage,
+                }
+            }))
+            return
+        }
+
+        if (isWebSocket || type === "events") {
+            const eventsMessage = func.formatWebSocketSampleDisplay(sampleData?.message, redactHeaders)
+            const originalEventsMessage = sampleData?.originalMessage
+                ? func.formatWebSocketSampleDisplay(sampleData?.originalMessage, redactHeaders)
+                : undefined
+            setSampleJsonData((prev) => ({
+                ...prev,
+                [type]: {
+                    message: eventsMessage,
+                    originalMessage: originalEventsMessage,
+                    highlightPaths: sampleData?.highlightPaths || [],
+                    vulnerabilitySegments: sampleData?.vulnerabilitySegments || [],
                 }
             }))
             return
@@ -102,7 +119,8 @@ function SampleDataComponent(props) {
         const effectiveMetadata = metadata ?? sampleData?.metadata;
         const { segments: metadataSegments, fromMetadata } = selectMetadataSegments(effectiveMetadata);
         const baseSegments = sampleData?.vulnerabilitySegments || [];
-        const vulnerabilitySegments = metadataSegments.length > 0 ? metadataSegments : baseSegments;
+        const vulnerabilitySegments = metadataSegments.length > 0 ? metadataSegments.filter(s => s.location !== 'LOCATION_RESPONSE_BODY') : baseSegments;
+        const responseVulnerabilitySegments = metadataSegments.filter(s => s.location === 'LOCATION_RESPONSE_BODY');
         const segmentsFromMetadata = fromMetadata;
 
         if(isNewDiff){
@@ -120,16 +138,16 @@ function SampleDataComponent(props) {
 
             setSampleJsonData({
                 request: requestData,
-                response: { ...responseData, vulnerabilitySegments }
+                response: { ...responseData, vulnerabilitySegments: segmentsFromMetadata ? responseVulnerabilitySegments : vulnerabilitySegments }
             })
         }else{
             setSampleJsonData({ 
                 // If segments came from threat metadata, highlight in request; if they were provided by caller (e.g., LLM analysis), pass to both panes
                 request: { message: transform.formatData(requestJson,"http", redactHeaders), original: transform.formatData(originalRequestJson,"http", redactHeaders), highlightPaths:requestJson?.highlightPaths, vulnerabilitySegments },
-                response: showResponse ? { message: transform.formatData(responseJson,"http", redactHeaders), original: transform.formatData(originalResponseJson,"http", redactHeaders), highlightPaths:responseJson?.highlightPaths, ...(segmentsFromMetadata ? {} : {vulnerabilitySegments}) } : {},
+                response: showResponse ? { message: transform.formatData(responseJson,"http", redactHeaders), original: transform.formatData(originalResponseJson,"http", redactHeaders), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments: segmentsFromMetadata ? responseVulnerabilitySegments : vulnerabilitySegments } : {},
             })
         }
-    }, [sampleData, metadata, isNewDiff, showResponse, simpleJson, type, redactHeaders])
+    }, [sampleData, metadata, isNewDiff, showResponse, simpleJson, type, redactHeaders, isWebSocket])
 
     const copyContent = async(type, completeData, isSimpleJson = false) => {
         let copyString = "";
@@ -190,6 +208,11 @@ function SampleDataComponent(props) {
     }
 
     async function copyRequest(reqType, type, completeData) {
+        if (isWebSocket && completeData) {
+            func.copyToClipboard(completeData, ref, "Events copied to clipboard")
+            setPopoverActive({ [reqType]: !popoverActive[reqType] })
+            return
+        }
         let { copyString, snackBarMessage } = await copyContent(type, completeData, simpleJson)
         if (copyString) {
             func.copyToClipboard(copyString, ref, snackBarMessage)
@@ -209,6 +232,16 @@ function SampleDataComponent(props) {
                 })
             }
             return items;
+        }
+
+        if (isWebSocket) {
+            if (contentToUse) {
+                items.push({
+                    content: 'Copy events',
+                    onAction: () => { copyRequest(type, "RESPONSE", contentToUse) },
+                })
+            }
+            return items
         }
 
         if (type == "request") {
@@ -268,26 +301,30 @@ function SampleDataComponent(props) {
     }
 
     const checkButtonActive = (buttonType) => {
+        const lines = lineNumbers?.[type]
+        const idx = currentIndex?.[type] ?? 0
         if(buttonType === 'next'){
-            return currentIndex[type] < (lineNumbers[type]?.length - 1)
+            return lines != null && idx < lines.length - 1
         }else{
-            return currentIndex[type] > 0
+            return idx > 0
         }
     }
 
     const changeIndex = (buttonType) => {
         if(buttonType === 'next'){
             setCurrentIndex((prev)=>{
-                return {...prev, [type]: prev[type] + 1}
+                return {...prev, [type]: (prev[type] ?? 0) + 1}
             })
         }else{
             setCurrentIndex((prev)=>{
-                return {...prev, [type]: prev[type] - 1}
+                return {...prev, [type]: (prev[type] ?? 0) - 1}
             })
         }
     }
 
-    let currentLineActive = lineNumbers && lineNumbers[type].length > 0 ? lineNumbers[type][currentIndex[type]] : 1
+    const typeLineNumbers = lineNumbers?.[type]
+    const typeLineIndex = currentIndex?.[type] ?? 0
+    let currentLineActive = typeLineNumbers?.length > 0 ? typeLineNumbers[typeLineIndex] : 1
     const currentMessage = sampleJsonData?.[type]?.message
     
     const handleEditorData = (data) => {
@@ -302,7 +339,7 @@ function SampleDataComponent(props) {
                     <HorizontalStack padding="2" align='space-between'>
                         <Text variant="bodyMd" fontWeight="semibold">
                             {/* Hide the word 'response' if simpleJson is true */}
-                            {!simpleJson && func.toSentenceCase(type)}
+                            {!simpleJson && (isWebSocket ? "Events" : func.toSentenceCase(type))}
                             {!simpleJson && type==="response" && responseTime ? (` (${responseTime} ms)`) : ""}
                             {!simpleJson && type==="request" && (ipObj?.sourceIP.length>0 || ipObj?.destIP.length>0) ?
                                 (` (${ipObj?.sourceIP ? `Src: ${ipObj.sourceIP}` : ""}${ipObj?.sourceIP && ipObj?.destIP ? " & " : ""}${ipObj?.destIP ? `Dest: ${ipObj.destIP}` : ""})`)
@@ -357,7 +394,7 @@ function SampleDataComponent(props) {
                 {sampleJsonData[type] ? <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage={simpleJson ? "json" : "custom_http"} currLine={currentLineActive} getLineNumbers={getLineNumbers} readOnly={readOnly} getEditorData={handleEditorData}/> : null}
             </LegacyCard.Section>
 
-            <Modal open={expanded} onClose={() => setExpanded(false)} title={simpleJson ? " " : func.toSentenceCase(type)} large>
+            <Modal open={expanded} onClose={() => setExpanded(false)} title={simpleJson ? " " : (isWebSocket ? "Events" : func.toSentenceCase(type))} large>
                 <Modal.Section>
                     {sampleJsonData[type] ? <SampleData
                         data={sampleJsonData[type]}

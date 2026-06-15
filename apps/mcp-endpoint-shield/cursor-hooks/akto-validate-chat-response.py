@@ -41,6 +41,7 @@ logger.addHandler(console_handler)
 
 MODE = os.getenv("MODE", "argus").lower()
 AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
+AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = "cursor"
@@ -77,10 +78,12 @@ def create_ssl_context():
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
+def build_http_proxy_url(*, guardrails: bool = False, response_guardrails: bool = False, ingest_data: bool = False) -> str:
     params = []
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     params.append(f"akto_connector={AKTO_CONNECTOR}")
     if ingest_data:
         params.append("ingest_data=true")
@@ -106,6 +109,8 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
 
     headers = {"Content-Type": "application/json"}
+    if AKTO_API_TOKEN:
+        headers["Authorization"] = AKTO_API_TOKEN
 
     # Generate and log curl command
     curl_cmd = generate_curl_command(url, payload, headers)
@@ -215,9 +220,13 @@ def send_ingestion_data(response_text: str):
 
     try:
         request_body = build_ingestion_payload(response_text)
+        # response_guardrails=true asks Akto to evaluate response-side guardrails on the mirrored
+        # response. afterAgentResponse is observe-only per Cursor docs, so we cannot block here —
+        # but Akto can still alert server-side based on the verdict.
         post_payload_json(
             build_http_proxy_url(
-                guardrails=not AKTO_SYNC_MODE,
+                guardrails=False,
+                response_guardrails=True,
                 ingest_data=True,
             ),
             request_body,

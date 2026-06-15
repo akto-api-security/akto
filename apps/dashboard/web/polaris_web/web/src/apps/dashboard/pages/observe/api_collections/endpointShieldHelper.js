@@ -47,80 +47,84 @@ const registerDeviceKeys = (usernameMap, username, rawIds) => {
     });
 };
 
+const buildUsernameMapFromModuleInfos = (moduleInfos = []) => {
+    const usernameMap = {};
+    moduleInfos.forEach((module) => {
+        const username = resolveModuleUsername(module);
+        if (!username) return;
+
+        const ad = module.additionalData || {};
+        registerDeviceKeys(usernameMap, username, [
+            module.name,
+            ad.deviceId,
+            ad.endpointId,
+        ]);
+
+        const mcpServers = ad.mcpServers || {};
+        Object.values(mcpServers).forEach((server) => {
+            if (server.collectionName) {
+                usernameMap[server.collectionName.toLowerCase()] = username;
+            }
+        });
+    });
+    return usernameMap;
+};
+
+/**
+ * UserAnalysisData keys from Endpoint Shield: serviceId = module id, deviceId = module name
+ * (matches ES / UserAnalysisCron and collection hostnames <deviceId>.<source>.<service>).
+ */
+const buildUserAnalysisKeysByDeviceId = (moduleInfos = []) => {
+    const byDeviceId = new Map();
+    moduleInfos.forEach((module) => {
+        const serviceId = module.id != null ? String(module.id) : (module._id != null ? String(module._id) : null);
+        const deviceId = module.name;
+        if (!serviceId || !deviceId) return;
+        const entry = { serviceId, deviceId };
+        byDeviceId.set(deviceId, entry);
+        byDeviceId.set(String(deviceId).toLowerCase(), entry);
+    });
+    return byDeviceId;
+};
+
 /**
  * Fetches endpoint shield module info and builds username map from additionalData.
- * Also returns a userMetadataMap with team and userRole per username.
- * @returns {Promise<{usernameMap: Object, userMetadataMap: Object}>}
+ * @returns {Promise<Object>}
  */
 const fetchEndpointShieldUsernameMap = async () => {
-    const usernameMap = {};
-
     try {
         const response = await settingRequests.fetchModuleInfo({ moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD });
-        const moduleInfos = response?.moduleInfos || [];
-
-        moduleInfos.forEach((module) => {
-            const username = resolveModuleUsername(module);
-            if (!username) return;
-
-            const ad = module.additionalData || {};
-            registerDeviceKeys(usernameMap, username, [
-                module.name,
-                ad.deviceId,
-                ad.endpointId,
-            ]);
-
-            const mcpServers = ad.mcpServers || {};
-            Object.values(mcpServers).forEach((server) => {
-                if (server.collectionName) {
-                    usernameMap[server.collectionName.toLowerCase()] = username;
-                }
-            });
-        });
-
-        return usernameMap;
+        return buildUsernameMapFromModuleInfos(response?.moduleInfos || []);
     } catch (e) {
         return {};
     }
 };
 
 const fetchEndpointShieldUserMetadata = async () => {
-    const usernameMap = {};
-    const userMetadataMap = {};
-
     try {
-        const response = await settingRequests.fetchModuleInfo({ moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD });
-        const moduleInfos = response?.moduleInfos || [];
+        const [moduleResp, agenticUsersResp] = await Promise.all([
+            settingRequests.fetchModuleInfo({ moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD }),
+            settingRequests.fetchAgenticUsers().catch(() => ({ agenticUsers: [] })),
+        ]);
 
-        moduleInfos.forEach((module) => {
-            const username = resolveModuleUsername(module);
-            if (!username) return;
+        const moduleInfos = moduleResp?.moduleInfos || [];
+        const usernameMap = buildUsernameMapFromModuleInfos(moduleInfos);
+        const userAnalysisKeysByDeviceId = buildUserAnalysisKeysByDeviceId(moduleInfos);
 
-            const ad = module.additionalData || {};
-            registerDeviceKeys(usernameMap, username, [
-                module.name,
-                ad.deviceId,
-                ad.endpointId,
-            ]);
-
-            const mcpServers = ad.mcpServers || {};
-            Object.values(mcpServers).forEach((server) => {
-                if (server.collectionName) {
-                    usernameMap[server.collectionName.toLowerCase()] = username;
-                }
-            });
-
-            if (!userMetadataMap[username]) {
-                userMetadataMap[username] = {
-                    team: ad.team || '',
-                    userRole: ad.userRole || '',
-                };
-            }
+        const userMetadataMap = {};
+        const agenticUsers = agenticUsersResp?.agenticUsers || [];
+        agenticUsers.forEach((u) => {
+            if (!u?.userName) return;
+            userMetadataMap[u.userName] = {
+                team: u.teamName || '',
+                userRole: u.userRole || '',
+                userEmail: u.userEmail || '',
+            };
         });
 
-        return { usernameMap, userMetadataMap };
+        return { usernameMap, userMetadataMap, userAnalysisKeysByDeviceId, moduleInfos };
     } catch (e) {
-        return { usernameMap: {}, userMetadataMap: {} };
+        return { usernameMap: {}, userMetadataMap: {}, userAnalysisKeysByDeviceId: new Map(), moduleInfos: [] };
     }
 };
 
@@ -190,6 +194,7 @@ const getResolvedUsernameForCollection = (collection, usernameMap) => {
 export {
     fetchEndpointShieldUsernameMap,
     fetchEndpointShieldUserMetadata,
+    buildUserAnalysisKeysByDeviceId,
     getUsernameForCollection,
     getResolvedUsernameForCollection,
     MODULE_TYPE,

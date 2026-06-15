@@ -2,7 +2,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon } from "@shopify/polaris"
 import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import api from "../api"
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {useLocation, useNavigate, useParams } from "react-router-dom"
@@ -42,6 +42,7 @@ import AgentDiscoverGraphWithDummyData from "./AgentDiscoveryGraphWithDummyData"
 import AgentDiscoverGraph from "./AgentDiscoverGraph"
 import { dummyCollections } from "./AgentDiscoveryDummyData"
 import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges"
+import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent"
 
 const headings = [
     {
@@ -165,7 +166,7 @@ const headings = [
         textValue: "tagsString",
         title: "Tags",
         showFilter: true,
-        filterKey: "tagsString",
+        filterKey: "tagsFilterList",
     },
     {
         text: "Description",
@@ -183,6 +184,7 @@ if(!getDashboardCategory().includes("MCP")){
     headers.push({
         text: 'Method',
         filterKey: 'method',
+        value: 'methodComp',
         showFilter: true,
         textValue: 'method',
         sortActive: true
@@ -294,6 +296,15 @@ function ApiEndpoints(props) {
     const [showGuardrailSchemaModal, setShowGuardrailSchemaModal] = useState(false)
     const [selectedEndpointForSchema, setSelectedEndpointForSchema] = useState(null)
     const [savingGuardrailSchema, setSavingGuardrailSchema] = useState(false)
+    const [endpointTagsPopover, setEndpointTagsPopover] = useState(false)
+    const endpointTagsMap = useMemo(() => {
+        const map = {}
+        ;(endpointData["all"] || []).forEach(ep => {
+            const stableKey = `${ep.method}###${ep.endpoint}###${ep.apiCollectionId}`
+            map[stableKey] = ep.tagsList || []
+        })
+        return map
+    }, [endpointData])
 
     const queryParams = new URLSearchParams(location.search);
     const selectedUrl = queryParams.get('selected_url')
@@ -522,11 +533,12 @@ function ApiEndpoints(props) {
 
         // Step 1: Create lightweight objects for ALL endpoints (for filtering & counting only)
         const allEndpointsLight = allEndpoints.map((obj) => {
-            const t = collectionTagsMap[obj.apiCollectionId];
+            const endpointTagsFormatted = (obj.tagsList || []).map(func.formatCollectionType);
             return {
                 ...obj,
-                tagsComp: t?.comp || null,
-                tagsString: t?.str || "",
+                tagsComp: endpointTagsFormatted.length > 0 ? getTagsCompactComponent(endpointTagsFormatted) : null,
+                tagsString: endpointTagsFormatted.join(" "),
+                tagsFilterList: endpointTagsFormatted,
                 isNew: transform.isNewEndpoint(obj.lastSeenTs),
                 open:  obj.auth_type === undefined || obj.auth_type.toLowerCase() === "unauthenticated" || obj.auth_type.toLowerCase() === "no auth type found",
                 componentRiskAnalysisComp: riskCompByEndpoint.get(obj.endpoint) ?? null
@@ -609,12 +621,15 @@ function ApiEndpoints(props) {
         const prettifyPageWithTags = (pageData) => {
             const prettified = transform.prettifyEndpointsData(pageData);
             prettified.forEach((obj) => {
-                const t = collectionTagsMap[obj.apiCollectionId];
-                if (t) {
-                    obj.tagsComp = t.comp;
-                    obj.tagsString = t.str;
+                const endpointTagsFormatted = (obj.tagsList || []).map(func.formatCollectionType);
+                if (endpointTagsFormatted.length > 0) {
+                    obj.tagsComp = getTagsCompactComponent(endpointTagsFormatted);
+                    obj.tagsString = endpointTagsFormatted.join(" ");
+                    obj.tagsFilterList = endpointTagsFormatted;
                 } else {
+                    obj.tagsComp = null;
                     obj.tagsString = "";
+                    obj.tagsFilterList = [];
                 }
             });
             return prettified;
@@ -657,12 +672,15 @@ function ApiEndpoints(props) {
             // Small collection: render all normally
             const prettifyData = transform.prettifyEndpointsData(allEndpointsLight);
             prettifyData.forEach((obj) => {
-                const t = collectionTagsMap[obj.apiCollectionId];
-                if (t) {
-                    obj.tagsComp = t.comp;
-                    obj.tagsString = t.str;
+                const endpointTagsFormatted = (obj.tagsList || []).map(func.formatCollectionType);
+                if (endpointTagsFormatted.length > 0) {
+                    obj.tagsComp = getTagsCompactComponent(endpointTagsFormatted);
+                    obj.tagsString = endpointTagsFormatted.join(" ");
+                    obj.tagsFilterList = endpointTagsFormatted;
                 } else {
+                    obj.tagsComp = null;
                     obj.tagsString = "";
+                    obj.tagsFilterList = [];
                 }
             });
 
@@ -1137,7 +1155,7 @@ function ApiEndpoints(props) {
     function getTagsCompactComponent(envTypeList) {
         const list = envTypeList || []
         // Use shared badge renderer to show 1 tag and a +N badge with tooltip inline
-        return transform.getCollectionTypeList(list, 1, true)
+        return transform.getCollectionTypeList(list, 1, false)
     }
 
     function getCollectionTypeListComp(collectionsObj) {
@@ -1172,6 +1190,13 @@ function ApiEndpoints(props) {
     }
 
     const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
+
+    const isAgentProxyCollection = Array.isArray(collectionsObj?.envType) &&
+        collectionsObj.envType.some(tag => tag.keyName === 'agent-proxy')
+
+    const _tags = collectionsObj?.envType || []
+    const isCopilotCollection = _tags.some(t => t.keyName === 'source' && t.value === 'COPILOT_STUDIO') && _tags.some(t => t.keyName === 'bot-name')
+    const isCopilotUnpublished = isCopilotCollection && !_tags.some(t => t.keyName === 'bot-published-state')
 
     const isApiGroup = collectionsObj?.type === 'API_GROUP'
     const isHostnameCollection = hostNameMap[collectionsObj?.id] !== null && hostNameMap[collectionsObj?.id] !== undefined
@@ -1379,6 +1404,7 @@ function ApiEndpoints(props) {
                     disabled={showEmptyScreen || window.USER_ROLE === "GUEST" || (collectionsObj?.isOutOfTestingScope || false)}
                     selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
                     preActivator={false}
+                    warningMessage={isCopilotUnpublished ? "Bot is not published. Please publish the bot in Copilot Studio before running a scan." : null}
                 />
             )}
             <SelectSource
@@ -1460,10 +1486,34 @@ function ApiEndpoints(props) {
 
     const promotedBulkActions = (selectedResources) => {
 
+        const stableIds = selectedResources.map(stableKeyFromResourceId)
+
+        const setEndpointTagsContent = (
+            <Popover
+                activator={<div onClick={() => setEndpointTagsPopover(!endpointTagsPopover)}>Set endpoint tags</div>}
+                onClose={() => setEndpointTagsPopover(false)}
+                active={endpointTagsPopover}
+                autofocusTarget="first-node"
+            >
+                <Popover.Pane>
+                    <SetUserEnvPopupComponent
+                        popover={endpointTagsPopover}
+                        setPopover={setEndpointTagsPopover}
+                        tags={endpointTagsMap}
+                        apiCollectionIds={stableIds}
+                        updateTags={updateEndpointTags}
+                    />
+                </Popover.Pane>
+            </Popover>
+        )
+
         let ret = [
             {
                 content: 'Export as CSV',
                 onAction: () => exportCsv(selectedResources)
+            },
+            {
+                content: setEndpointTagsContent
             }
         ]
         if (isApiGroup) {
@@ -1486,8 +1536,8 @@ function ApiEndpoints(props) {
             onAction: () => handleBulkDeMerge(selectedResources)
         })
 
-        // Add bulk guardrail actions (only for Argus dashboard)
-        if (isAgenticSecurityCategory()) {
+        // Add bulk guardrail actions (only for agent proxy collections in Argus dashboard)
+        if (isAgenticSecurityCategory() && isAgentProxyCollection) {
             ret.push({
                 content: 'Enable guardrails',
                 onAction: () => handleBulkGuardrail(selectedResources, true)
@@ -1607,6 +1657,35 @@ function ApiEndpoints(props) {
             }, 500)
         } catch (error) {
             func.setToast(true, true, `Error updating guardrail: ${error.message || 'Unknown error'}`)
+        }
+    }
+
+    // Stable key for an endpoint: method###url###apiCollectionId (strips the Math.random() suffix from row id)
+    function stableKeyFromResourceId(resourceId) {
+        return resourceId.split("###").slice(0, 3).join("###")
+    }
+
+    function buildEndpointTagsMap() {
+        const map = {}
+        ;(endpointData["all"] || []).forEach(ep => {
+            const stableKey = `${ep.method}###${ep.endpoint}###${ep.apiCollectionId}`
+            map[stableKey] = ep.tagsList || []
+        })
+        return map
+    }
+
+    async function updateEndpointTags(stableIds, tagObj) {
+        const apiInfoKeys = stableIds.map(stableKey => {
+            const tmp = stableKey.split("###")
+            return { method: tmp[0], url: tmp[1], apiCollectionId: parseInt(tmp[2]) }
+        })
+        try {
+            await api.updateApiInfoTags(tagObj === null ? tagObj : [tagObj], apiInfoKeys, tagObj === null)
+            func.setToast(true, false, "Endpoint tags updated successfully")
+            setEndpointTagsPopover(false)
+            setTimeout(() => { fetchData() }, 500)
+        } catch (e) {
+            func.setToast(true, true, "Error updating endpoint tags")
         }
     }
 
@@ -1735,8 +1814,8 @@ function ApiEndpoints(props) {
         
         const actions = []
         
-        // Add guardrail actions (only for Argus dashboard)
-        if (isAgenticSecurityCategory()) {
+        // Add guardrail actions (only for agent proxy collections in Argus dashboard)
+        if (isAgenticSecurityCategory() && isAgentProxyCollection) {
             if (guardrailEnabled) {
                 actions.push({
                     content: 'Disable guardrails for this endpoint',
@@ -1785,7 +1864,7 @@ function ApiEndpoints(props) {
         filters={[]}
         disambiguateLabel={disambiguateLabel}
         headers={headers.filter(x => {
-            if (!canShowTags() && (x.text === 'Collection' || x.text === 'Tags')) {
+            if (!canShowTags() && x.text === 'Collection') {
                 return false;
             }
             return true;
@@ -1797,7 +1876,7 @@ function ApiEndpoints(props) {
         getFilteredItems={getFilteredItems}
         mode={IndexFiltersMode.Default}
         headings={headings.filter(x => {
-            if (!canShowTags() && (x.text === 'Collection' || x.text === 'Tags')) {
+            if (!canShowTags() && x.text === 'Collection') {
                 return false;
             }
             return true;
@@ -1807,7 +1886,7 @@ function ApiEndpoints(props) {
         tableTabs={tableTabs}
         selectable={true}
         promotedBulkActions={promotedBulkActions}
-        hasRowActions={true}
+        hasRowActions={isAgenticSecurityCategory() && isAgentProxyCollection}
         getActions={getActions}
         loading={tableLoading || loading}
         setSelectedResourcesForPrimaryAction={setSelectedResourcesForPrimaryAction}
@@ -1938,9 +2017,10 @@ function ApiEndpoints(props) {
 
     const handleSaveDescription = () => {
         // Check for special characters
-        const specialChars = /[!@#$%^&*()\-_=+\[\]{}\\|;:'",.<>/?~]/;
-        if (specialChars.test(editableDescription)) {
-            func.setToast(true, true, "Description contains special characters that are not allowed.");
+        const allowedChars = /^[a-zA-Z0-9\s.,!?;:'"()\-_/&]+$/;
+
+        if (editableDescription.length > 0 && !allowedChars.test(editableDescription)) {
+            func.setToast(true, true, "Description contains invalid characters.");
             return;
         }
         

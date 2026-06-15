@@ -15,6 +15,11 @@ public class AuthParamData {
     private String value;
     private Boolean showHeader;
 
+    // Microsoft Copilot Studio OAuth fields
+    private String tenantId;
+    private String clientId;
+    private String clientSecret;
+
     private String certAuthorityCertificate;
     private CertificateType certificateType;
     private String clientCertificate;

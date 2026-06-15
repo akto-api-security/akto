@@ -1,10 +1,9 @@
 package com.akto.gateway;
 
+import com.akto.log.LoggerMaker;
 import com.akto.utils.SlackUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.*;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -12,7 +11,7 @@ import java.util.concurrent.TimeUnit;
 
 public class GuardrailsClient {
 
-    private static final Logger logger = LogManager.getLogger(GuardrailsClient.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(GuardrailsClient.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
@@ -22,7 +21,7 @@ public class GuardrailsClient {
     public GuardrailsClient() {
         this.guardrailsServiceUrl = loadServiceUrlFromEnv();
         this.httpClient = createHttpClient(10000);
-        logger.info("GuardrailsClient initialized - URL: {}", guardrailsServiceUrl);
+        loggerMaker.infoAndAddToDb("GuardrailsClient initialized - URL: {}", guardrailsServiceUrl);
     }
 
     public GuardrailsClient(String serviceUrl, int timeout) {
@@ -44,30 +43,40 @@ public class GuardrailsClient {
             String jsonRequest = objectMapper.writeValueAsString(request);
             String url = guardrailsServiceUrl + endpoint;
 
-            logger.info("Calling guardrails service at: {}", url);
+            loggerMaker.infoAndAddToDb("Calling guardrails service at: {}", url);
 
             RequestBody body = RequestBody.create(jsonRequest, JSON);
-            Request httpRequest = new Request.Builder()
+            Request.Builder requestBuilder = new Request.Builder()
                     .url(url)
                     .post(body)
-                    .addHeader("Content-Type", "application/json")
-                    .build();
+                    .addHeader("Content-Type", "application/json");
+
+            if (isGuardrailsAuthEnabled()) {
+                String authToken = loadGuardrailsAuthToken();
+                if (authToken == null || authToken.trim().isEmpty()) {
+                    loggerMaker.warnAndAddToDb("AKTO_GR_AUTHENTICATE is enabled but DATABASE_ABSTRACTOR_SERVICE_TOKEN is not set");
+                } else {
+                    requestBuilder.addHeader("Authorization", authToken.trim());
+                }
+            }
+
+            Request httpRequest = requestBuilder.build();
 
             try (Response response = httpClient.newCall(httpRequest).execute()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
 
-                logger.info("Guardrails response (status {}): {}", response.code(), responseBody);
+                loggerMaker.infoAndAddToDb("Guardrails response (status {}): {}", response.code(), responseBody);
 
                 if (response.isSuccessful()) {
                     return objectMapper.readValue(responseBody, Map.class);
                 } else {
-                    logger.warn("Guardrails service returned error status: {}", response.code());
+                    loggerMaker.warnAndAddToDb("Guardrails service returned error status: {}", response.code());
                     return buildErrorResponse("Guardrails service error: HTTP " + response.code());
                 }
             }
 
         } catch (Exception e) {
-            logger.error("Error calling guardrails service: {}", e.getMessage(), e);
+            loggerMaker.errorAndAddToDb(e, "Error calling guardrails service: {}", e.getMessage());
             String alertMsg = "[guardrails] Service call failed - path: " + request.get("path")
                 + ", method: " + request.get("method")
                 + ", account: " + request.get("akto_account_id")
@@ -92,6 +101,19 @@ public class GuardrailsClient {
         error.put("reason", "Guardrails validation failed: " + errorMessage);
         error.put("error", errorMessage);
         return error;
+    }
+
+    private static boolean isGuardrailsAuthEnabled() {
+        String envValue = System.getenv("AKTO_GR_AUTHENTICATE");
+        return "true".equalsIgnoreCase(envValue);
+    }
+
+    private static String loadGuardrailsAuthToken() {
+        String token = System.getProperty("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+        if (token == null || token.trim().isEmpty()) {
+            token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+        }
+        return token;
     }
 
     private static String loadServiceUrlFromEnv() {

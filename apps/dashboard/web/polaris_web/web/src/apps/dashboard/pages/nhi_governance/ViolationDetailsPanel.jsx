@@ -2,12 +2,76 @@ import { useState } from "react";
 import { ActionList, Badge, Box, Button, Divider, HorizontalStack, Link, Popover, Text, VerticalStack } from "@shopify/polaris";
 import FlyLayout from "../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
-import { IdentityIcon, AgentIcon, getViolationDetail, resolvePolicyName } from "./nhiViolationsData";
+import { IdentityIcon, AgentIcon, resolvePolicyName } from "./nhiViolationsData";
 import func from "@/util/func";
+import observeRequests from "../observe/api";
+import JiraTicketCreationModal from "../../components/shared/JiraTicketCreationModal.jsx";
+import issuesFunctions from "@/apps/dashboard/pages/issues/module";
+import settingFunctions from "@/apps/dashboard/pages/settings/module";
 
 export default function ViolationDetailsPanel({ row, show, setShow }) {
     const [actionActive, setActionActive] = useState(false);
-    const detail = getViolationDetail(row.violation);
+    const [marking, setMarking] = useState(false);
+    const [jiraModalActive, setJiraModalActive] = useState(false);
+    const [projId, setProjId] = useState("");
+    const [issueType, setIssueType] = useState("");
+    const [labelsText, setLabelsText] = useState("");
+    const [jiraProjectMap, setJiraProjectMap] = useState({});
+    const handleMarkAsFixed = async () => {
+        try {
+            setMarking(true);
+
+            await observeRequests.markViolationAsFixed(row.id);
+
+            setMarking(false);
+            setActionActive(false);
+            setShow(false);
+
+            // Refresh the violations list
+            window.location.reload();
+        } catch (err) {
+            console.error("Error marking violation as fixed:", err);
+            setMarking(false);
+            setActionActive(false);
+        }
+    };
+
+    const handleOpenJiraModal = () => {
+        setActionActive(false);
+        settingFunctions.fetchJiraIntegration().then((jiraIntegration) => {
+            if (jiraIntegration.projectIdsMap !== null && Object.keys(jiraIntegration.projectIdsMap).length > 0) {
+                setJiraProjectMap(jiraIntegration.projectIdsMap);
+                if (Object.keys(jiraIntegration.projectIdsMap).length > 0) {
+                    setProjId(Object.keys(jiraIntegration.projectIdsMap)[0]);
+                }
+            } else {
+                setProjId(jiraIntegration.projId);
+                setIssueType(jiraIntegration.issueType);
+            }
+            setJiraModalActive(true);
+        });
+    };
+
+    const handleSaveJiraAction = (issueId, labels) => {
+        let jiraMetaData;
+        try {
+            jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData(projId, issueType);
+            // Use labels parameter if provided
+            if (labels !== undefined && labels && labels.trim()) {
+                jiraMetaData.labels = labels.trim();
+            }
+        } catch (error) {
+            return;
+        }
+
+        setJiraModalActive(false);
+        observeRequests.createJiraTicketFromViolation(row.id, window.location.origin, projId, issueType, jiraMetaData).then((res) => {
+            if (!res?.errorMessage) {
+                setShow(false);
+                window.location.reload();
+            }
+        }).catch(() => {});
+    };
 
     // ── TitleComponent ────────────────────────────────────────────────────────
     const TitleComponent = () => (
@@ -46,10 +110,21 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                     onClose={() => setActionActive(false)}
                 >
                     <ActionList items={[
-                        { content: "Open Jira Ticket",  onAction: () => setActionActive(false) },
-                        { content: "Mark as Fixed",     onAction: () => setActionActive(false) },
-                        { content: "Update Policy",     onAction: () => setActionActive(false) },
-                        { content: "Disable Identity",  destructive: true, onAction: () => setActionActive(false) },
+                        { content: "Open Jira Ticket",  onAction: handleOpenJiraModal },
+                        { content: "Mark as Fixed",     onAction: handleMarkAsFixed },
+                        {
+                            content: "Update Policy",
+                            onAction: () => {
+                                setActionActive(false);
+                                const policyName = typeof row.policy === "object"
+                                    ? row.policy.primary
+                                    : row.policy;
+                                if (policyName) {
+                                    sessionStorage.setItem("nhi_policy_edit_name", policyName);
+                                }
+                                window.location.href = "/dashboard/nhi/policies";
+                            },
+                        },
                     ]} />
                 </Popover>
             </HorizontalStack>
@@ -65,7 +140,7 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                 <VerticalStack gap="5">
                     <VerticalStack gap="2">
                         <Text variant="headingSm" color="subdued">Description</Text>
-                        <Text variant="bodyMd">{detail.description}</Text>
+                        <Text variant="bodyMd">{row.description}</Text>
                     </VerticalStack>
                     <Divider />
                     <HorizontalStack gap="8">
@@ -99,7 +174,7 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                         <Box style={{ alignSelf: "flex-start" }}>
                             <VerticalStack gap="1">
                                 <Text variant="headingSm" color="subdued">Affected Resources</Text>
-                                <Text variant="bodyMd" fontWeight="semibold">{detail.affectedResources}</Text>
+                                <Text variant="bodyMd" fontWeight="semibold">{(row.affectedResources || []).join(", ")}</Text>
                             </VerticalStack>
                         </Box>
                         <Box style={{ alignSelf: "flex-start" }}>
@@ -110,15 +185,19 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                         </Box>
                     </HorizontalStack>
                     <Divider />
-                    <VerticalStack gap="2">
-                        <Text variant="headingSm" color="subdued">Why This Triggered</Text>
-                        <Text variant="bodyMd">{detail.whyTriggered}</Text>
-                    </VerticalStack>
-                    <Divider />
+                    {row.whyTriggered && (
+                        <>
+                            <VerticalStack gap="2">
+                                <Text variant="headingSm" color="subdued">Why This Triggered</Text>
+                                <Text variant="bodyMd">{row.whyTriggered}</Text>
+                            </VerticalStack>
+                            <Divider />
+                        </>
+                    )}
                     <VerticalStack gap="2">
                         <Text variant="headingSm" color="subdued">Blast Radius</Text>
                         <VerticalStack gap="2">
-                            {detail.blastRadius.map((item, i) => (
+                            {(row.blastRadius || []).map((item, i) => (
                                 <HorizontalStack key={i} gap="2" blockAlign="start" wrap={false}>
                                     <Text variant="bodyMd">•</Text>
                                     <Text variant="bodyMd">{item}</Text>
@@ -140,7 +219,7 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                 <VerticalStack gap="4">
                     <Text variant="headingSm" color="subdued">Steps to resolve</Text>
                     <VerticalStack gap="4">
-                        {detail.remediationSteps.map((step, i) => (
+                        {(row.remediationSteps || []).map((step, i) => (
                             <HorizontalStack key={i} gap="3" blockAlign="start" wrap={false}>
                                 <Box style={{
                                     background: "#F6F6F7", borderRadius: "50%",
@@ -164,12 +243,12 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
         component: (
             <Box padding="5">
                 <VerticalStack>
-                    {detail.timeline.map((item, i) => (
+                    {(row.timeline || []).map((item, i) => (
                         <HorizontalStack key={i} align="space-between" blockAlign="start" wrap={false}>
                             <HorizontalStack gap="3" blockAlign="start" wrap={false}>
                                 <Box style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                                     <img src="/public/issues-event-icon.svg" width={20} height={20} alt="" style={{ flexShrink: 0 }} />
-                                    {i < detail.timeline.length - 1 && (
+                                    {i < (row.timeline || []).length - 1 && (
                                         <Box style={{ width: 2, flex: 1, minHeight: 24, background: "var(--p-color-border-subdued, #E4E5E7)", margin: "4px 0" }} />
                                     )}
                                 </Box>
@@ -178,7 +257,9 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                                 </Box>
                             </HorizontalStack>
                             <Box paddingInlineStart="4" paddingBlockStart="05" style={{ whiteSpace: "nowrap" }}>
-                                <Text variant="bodySm" color="subdued">{item.time}</Text>
+                                <Text variant="bodySm" color="subdued">
+                                    {item.timestamp ? new Date(item.timestamp * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
+                                </Text>
                             </Box>
                         </HorizontalStack>
                     ))}
@@ -188,21 +269,37 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
     };
 
     return (
-        <FlyLayout
-            title="Violation details"
-            show={show}
-            setShow={setShow}
-            components={[
-                <TitleComponent key="title" />,
-                <LayoutWithTabs
-                    key={row.id}
-                    tabs={[overviewTab, remediationTab, timelineTab]}
-                    currTab={() => {}}
-                    noLoading
-                />,
-            ]}
-            showDivider
-            newComp
-        />
+        <>
+            <FlyLayout
+                title="Violation details"
+                show={show}
+                setShow={setShow}
+                components={[
+                    <TitleComponent key="title" />,
+                    <LayoutWithTabs
+                        key={row.id}
+                        tabs={[overviewTab, remediationTab, timelineTab]}
+                        currTab={() => {}}
+                        noLoading
+                    />,
+                ]}
+                showDivider
+                newComp
+            />
+            <JiraTicketCreationModal
+                activator={<div />}
+                modalActive={jiraModalActive}
+                setModalActive={setJiraModalActive}
+                handleSaveAction={handleSaveJiraAction}
+                jiraProjectMaps={jiraProjectMap}
+                setProjId={setProjId}
+                setIssueType={setIssueType}
+                projId={projId}
+                issueType={issueType}
+                issueId={row.id}
+                labelsText={labelsText}
+                setLabelsText={setLabelsText}
+            />
+        </>
     );
 }

@@ -34,7 +34,7 @@ const SettingsLeftNav = () => {
     }] : []
 
     const logsArr = window?.IS_SAAS !== 'true' ||
-        (window?.USER_NAME && window?.USER_NAME.includes("akto")) ? [{
+        (window?.USER_NAME && (window?.USER_NAME.includes("akto") || window?.USER_NAME.includes("mongodb"))) ? [{
             label: 'Logs',
             icon: ListFilledMajor,
             selected: page === "logs",
@@ -172,6 +172,24 @@ const SettingsLeftNav = () => {
                         icon: GlobeMajor,
                         selected: page === "allowed-hosts",
                         onClick: () => navigate("/dashboard/settings/allowed-hosts")
+                    },
+                    ...(window.USER_NAME?.toLowerCase()?.endsWith("@akto.io") ? [{
+                        label: 'Installer Version Control',
+                        icon: LockFilledMajor,
+                        selected: page === "endpoint-shield",
+                        onClick: () => navigate("/dashboard/settings/endpoint-shield")
+                    },
+                    {
+                        label: 'Remote Commands',
+                        icon: AutomationFilledMajor,
+                        selected: page === "remote-commands" || path.includes("/settings/remote-commands/"),
+                        onClick: () => navigate("/dashboard/settings/remote-commands")
+                    }] : []),
+                    {
+                        label: 'File Inspection',
+                        icon: CodeMajor,
+                        selected: page === "file-inspection",
+                        onClick: () => navigate("/dashboard/settings/file-inspection")
                     }
                 ] : []),
                     {

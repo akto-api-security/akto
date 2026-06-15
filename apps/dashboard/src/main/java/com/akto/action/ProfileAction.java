@@ -154,6 +154,15 @@ public class ProfileAction extends UserAction {
         } catch (Exception e) {
         }
 
+        boolean wizIntegrated = false;
+        try {
+            long documentCount = WizIntegrationDao.instance.estimatedDocumentCount();
+            if (documentCount > 0) {
+                wizIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
         InitializerListener.insertStateInAccountSettings(accountSettings);
 
         Organization organization = OrganizationsDao.instance.findOne(
@@ -194,6 +203,7 @@ public class ProfileAction extends UserAction {
                 .append("activeAccount", sessionAccId)
                 .append("dashboardMode", DashboardMode.getDashboardMode())
                 .append("isSaas","true".equals(System.getenv("IS_SAAS")))
+                .append("airgapped", "true".equalsIgnoreCase(System.getenv("AIRGAPPED")))
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
                 .append("cloudType", Utils.getCloudType())
                 .append("accountName", accountName)
@@ -202,12 +212,14 @@ public class ProfileAction extends UserAction {
                 .append("azureBoardsIntegrated", azureBoardsIntegrated)
                 .append("servicenowIntegrated", servicenowIntegrated)
                 .append("devrevIntegrated", devrevIntegrated)
+                .append("wizIntegrated", wizIntegrated)
                 .append("userRole", userRole!=null ?userRole.toString().toUpperCase(): "")
                 .append("currentTimeZone", timeZone)
                 .append("organizationName", orgName)
                 .append("isAwsWafIntegrated", awsWafCount != 0)
                 .append("isCloudflareWafIntegrated", cloudflareWafCount != 0)
-                .append("scopeRoleMapping", scopeRoleMapping);
+                .append("scopeRoleMapping", scopeRoleMapping)
+                .append("AG_GRID_LICENSE_KEY", System.getenv("AG_GRID_LICENSE_KEY"));
 
         boolean inviteDisabledForSSO = com.akto.utils.Utils.allowNewUserInviteViaDashboard(sessionAccId, user);
         userDetails.append("inviteDisabledForSSO", inviteDisabledForSSO);

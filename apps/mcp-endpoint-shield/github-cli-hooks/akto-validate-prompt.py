@@ -20,7 +20,7 @@ LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
 AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
-AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
+AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 MODE = os.getenv("MODE", "argus").lower()
 
@@ -33,7 +33,7 @@ def detect_connector(input_data: dict) -> str:
     """Detect connector from hook payload. hookEventName is present in all VSCode payloads."""
     if "hookEventName" in input_data:
         return "vscode"
-    return os.getenv("AKTO_CONNECTOR", "vscode")
+    return os.getenv("AKTO_CONNECTOR", "copilot_cli")
 
 
 def get_connector_config(connector: str) -> dict:
@@ -47,7 +47,7 @@ def get_connector_config(connector: str) -> dict:
             "ai_agent_tag": "vscode",
             "hook_header": "x-vscode-hook",
             "atlas_domain": "ai-agent.vscode",
-            "log_dir_default": "~/akto/.github/akto/vscode/logs",
+            "log_dir_default": "~/.github/akto/vscode/logs",
             "blocked_exit_code": 2
         }
     else:
@@ -59,7 +59,7 @@ def get_connector_config(connector: str) -> dict:
             "ai_agent_tag": "copilotcli",
             "hook_header": "x-copilot-hook",
             "atlas_domain": "ai-agent.copilot",
-            "log_dir_default": "~/akto/.github/akto/copilot/logs",
+            "log_dir_default": "~/.github/akto/copilot/logs",
             "blocked_exit_code": 0,  # github-cli cannot block prompts
         }
 
@@ -99,8 +99,8 @@ def post_to_akto(url: str, payload: Dict[str, Any], logger) -> Union[Dict[str, A
         logger.debug(f"Payload: {json.dumps(payload, default=str)[:1000]}...")
 
     headers = {"Content-Type": "application/json"}
-    if AKTO_TOKEN:
-        headers["authorization"] = AKTO_TOKEN
+    if AKTO_API_TOKEN:
+        headers["Authorization"] = AKTO_API_TOKEN
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -391,8 +391,6 @@ def main():
             sys.stdout.write(json.dumps(output))
             sys.stdout.flush()
             sys.exit(cfg["blocked_exit_code"])
-        else:
-            ingest_request(prompt, cwd, timestamp, gr_reason, blocked=False, cfg=cfg, logger=logger)
 
     logger.info("Hook completed")
     sys.exit(0)

@@ -23,6 +23,7 @@ import GridRows from "../../../components/shared/GridRows";
 import Dropdown from "../../../components/layouts/Dropdown";
 import ApiIssuesTab from "./ApiIssuesTab";
 import ForbiddenRole from "../../../components/shared/ForbiddenRole";
+import MarkdownViewer from "../../../components/shared/MarkdownViewer";
 
 import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
@@ -82,7 +83,7 @@ function ApiDetails(props) {
     const [apiCallStats, setApiCallStats] = useState([]);
     const [apiCallDistribution, setApiCallDistribution] = useState([]);
     const endTs = func.timeNow();
-    const [startTime, setStartTime] = useState(endTs - statsOptions[6].value)
+    const [startTime, setStartTime] = useState(endTs - statsOptions[7].value)
     const [hasApiStats, setHasApiStats] = useState(false);
     const [hasApiDistribution, setHasApiDistribution] = useState(false);
     const apiStatsAvailableRef = useRef(false);
@@ -334,31 +335,53 @@ function ApiDetails(props) {
             let commonMessages = []
             try {
                 const res = await api.fetchSampleData(endpoint, apiCollectionId, method)
+                const firstSample = (res.sampleDataList || [])[0]?.samples?.[0]
+                const isWebSocket = func.isWebSocketApiType(apiDetail?.apiType)
+                    || func.isWebSocketApiType(func.parseWebSocketSampleMessage(firstSample)?.type)
                 try {
-                    const resp = await api.fetchSensitiveSampleData(endpoint, apiCollectionId, method)
-                    if (resp.sensitiveSampleData && Object.keys(resp.sensitiveSampleData).length > 0) {
-                        if (res.sampleDataList.length > 0) {
-                            commonMessages = transform.getCommonSamples(res.sampleDataList[0].samples, resp)
-                        } else {
-                            commonMessages = transform.prepareSampleData(resp, '')
+                    if (isWebSocket) {
+                        let samples = (res.sampleDataList || []).flatMap((x) => x.samples || [])
+                        samples = samples.reverse()
+                        if (samples.length === 0 && res?.events != null) {
+                            samples = [JSON.stringify({
+                                type: "WEBSOCKET",
+                                path: endpoint,
+                                events: res.events,
+                            })]
                         }
-                    } else {
-                        let sensitiveData = []
-                        try {
-                            const res3 = await api.loadSensitiveParameters(apiCollectionId, endpoint, method)
-                            sensitiveData = res3.data.endpoints;
-                        } catch (error) {
-                            if (isRBACError(error)) {
-                                setShowForbidden(true);
-                                setLoading(false);
-                                return;
+                        commonMessages = samples.map((s) => {
+                            const parsed = func.parseWebSocketSampleMessage(s)
+                            return {
+                                message: parsed ? JSON.stringify(parsed) : s,
+                                highlightPaths: [],
                             }
+                        })
+                    } else {
+                        const resp = await api.fetchSensitiveSampleData(endpoint, apiCollectionId, method)
+                        if (resp.sensitiveSampleData && Object.keys(resp.sensitiveSampleData).length > 0) {
+                            if (res.sampleDataList.length > 0) {
+                                commonMessages = transform.getCommonSamples(res.sampleDataList[0].samples, resp)
+                            } else {
+                                commonMessages = transform.prepareSampleData(resp, '')
+                            }
+                        } else {
+                            let sensitiveData = []
+                            try {
+                                const res3 = await api.loadSensitiveParameters(apiCollectionId, endpoint, method)
+                                sensitiveData = res3.data.endpoints;
+                            } catch (error) {
+                                if (isRBACError(error)) {
+                                    setShowForbidden(true);
+                                    setLoading(false);
+                                    return;
+                                }
+                            }
+                            let samples = res.sampleDataList.map(x => x.samples)
+                            samples = samples.reverse();
+                            samples = samples.flat()
+                            let newResp = transform.convertSampleDataToSensitiveSampleData(samples, sensitiveData)
+                            commonMessages = transform.prepareSampleData(newResp, '')
                         }
-                        let samples = res.sampleDataList.map(x => x.samples)
-                        samples = samples.reverse();
-                        samples = samples.flat()
-                        let newResp = transform.convertSampleDataToSensitiveSampleData(samples, sensitiveData)
-                        commonMessages = transform.prepareSampleData(newResp, '')
                     }
                     setSampleData(commonMessages)
                 } catch (error) {
@@ -395,7 +418,7 @@ function ApiDetails(props) {
             // }catch (e) {
             // }   
             fetchStats(apiCollectionId, endpoint, method)
-            fetchDistributionData(); // Fetch distribution data
+            fetchDistributionData()
         }
     }
 
@@ -498,6 +521,9 @@ function ApiDetails(props) {
         }
         return options;
     };
+
+    const isWebSocket = func.isWebSocketApiType(apiDetail?.apiType)
+        || func.isWebSocketApiType(func.parseWebSocketSampleMessage(sampleData?.[0]?.message)?.type)
 
     const distributionBoxplotOptions = {
         chart: {
@@ -610,20 +636,39 @@ function ApiDetails(props) {
             </VerticalStack>
         </Box>
     }
+    const isSkillEndpoint = apiDetail?.endpoint?.includes('/skills/')
+
+    let skillMarkdown = null
+    if (isSkillEndpoint && sampleData.length > 0) {
+        try {
+            const parsedMsg = JSON.parse(sampleData[0].message)
+            const bodyStr = parsedMsg?.request?.body || parsedMsg?.requestPayload || '{}'
+            const body = JSON.parse(bodyStr)
+            if (body.skill_name) {
+                skillMarkdown = `# ${body.skill_name}\n\n` +
+                    (body.skill_description ? `**${body.skill_description}**\n\n` : '') +
+                    (body.skill_content || '')
+            }
+        } catch (_) {}
+    }
+
     const ValuesTab = {
         id: 'values',
         content: "Values",
-        component: sampleData.length > 0 && <Box paddingBlockStart={"4"}>
-            <SampleDataList
-                key="Sample values"
-                sampleData={sampleData}
-                heading={"Sample values"}
-                minHeight={"35vh"}
-                vertical={true}
-                isAPISampleData={true}
-                metadata={headersWithData.map(x => x.split(" ")[0])}
-            />
-        </Box>,
+        component: isSkillEndpoint && skillMarkdown
+            ? <MarkdownViewer markdown={skillMarkdown} />
+            : sampleData.length > 0 && <Box paddingBlockStart={"4"}>
+                <SampleDataList
+                    key="Sample values"
+                    sampleData={sampleData}
+                    heading={"Sample values"}
+                    minHeight={"35vh"}
+                    vertical={true}
+                    isAPISampleData={true}
+                    isWebSocket={isWebSocket}
+                    metadata={headersWithData.map(x => x.split(" ")[0])}
+                />
+            </Box>,
     }
     const DependencyTab = {
         id: 'dependency',
@@ -867,13 +912,13 @@ function ApiDetails(props) {
                 key="tabs"
                 tabs={[
                     ValuesTab,
-                    SchemaTab,
+                    ...(!isSkillEndpoint ? [SchemaTab] : []),
                     ...(shouldShowBasePromptTab ? [BasePromptTab] : []),
                     ...(hasIssues ? [IssuesTab] : []),
                     ...(apiDetail?.isThreatEnabled ? [ThreatIssuesTab] : []),
                     ApiCallStatsTab,
                     DependencyTab,
-                    ...(showTraces ? [TracesTab] : [])
+                    ...(!isSkillEndpoint && showTraces ? [TracesTab] : [])
                 ]}
                 currTab={(tab) => setSelectedTabId(tab.id)}
                 disabledTabs={disabledTabs}

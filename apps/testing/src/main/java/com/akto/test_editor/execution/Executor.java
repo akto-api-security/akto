@@ -29,14 +29,19 @@ import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.type.KeyTypes;
 import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
+import com.akto.jsonrpc.McpToolDescriptionsRegistry;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpJsonRpcModel;
+import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.TestingUtilsSingleton;
 import com.akto.test_editor.Utils;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.util.Constants;
 import com.akto.util.CookieTransformer;
 import com.akto.util.HttpRequestResponseUtils;
+import com.akto.util.JSONUtils;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -244,13 +249,13 @@ public class Executor {
                 }
                 if (res != null) {
                     result.add(res);
+                    vulnerable = res.getVulnerable();
                 }
-                vulnerable = res.getVulnerable();
                 
             } catch(Exception e) {
                 testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
                 error_messages.add("Error executing test request: " + e.getMessage());
-                loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage());
             }
         }
         
@@ -438,9 +443,9 @@ public class Executor {
 
         String msg = convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
         RawApi testRawApi = new RawApi(attempt.getRequest(), attempt.getResponse(), msg);
-        boolean vulnerable = TestPlugin.validateValidator(validatorNode, rawApi, testRawApi , apiInfoKey, varMap, logId);
-        if (vulnerable) {
-            loggerMaker.debugAndAddToDb("found vulnerable " + logId, LogDb.TESTING);
+        ValidationResult vulnerable = TestPlugin.validateValidator(validatorNode, rawApi, testRawApi , apiInfoKey, varMap, logId);
+        if (vulnerable.getIsValid()) {
+            loggerMaker.debugAndAddToDb("found vulnerable " + logId);
         }
         double percentageMatch = 0;
         if (rawApi.getResponse() != null && testRawApi.getResponse() != null) {
@@ -449,8 +454,9 @@ public class Executor {
             );
         }
         TestResult testResult = new TestResult(
-                msg, rawApi.getOriginalMessage(), new ArrayList<>(), percentageMatch, vulnerable, TestResult.Confidence.HIGH, null
+                msg, rawApi.getOriginalMessage(), new ArrayList<>(), percentageMatch, vulnerable.getIsValid(), TestResult.Confidence.HIGH, null
         );
+        testResult.setValidationReason(vulnerable.getValidationReason());
 
         return testResult;
     }
@@ -496,6 +502,27 @@ public class Executor {
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             // FeatureAccess featureAccess = FeatureAccess.fullAccess;
             if (featureAccess.getIsGranted()) {
+
+                if (McpRequestResponseUtils.isMcpRequest(rawApi)) {
+                    McpJsonRpcModel mcpModel = JSONUtils.fromJson(rawApi.getRequest().getBody(), McpJsonRpcModel.class);
+                    if (mcpModel != null && mcpModel.getParams() != null) {
+                        String toolName = mcpModel.getParams().getName();
+                        if (toolName != null && !toolName.isEmpty()) {
+                            String toolDescription = McpToolDescriptionsRegistry.get(toolName);
+                            String operationTypeLower = operationType.toLowerCase();
+                            String operationContext = "Tool: " + toolName  + "\nParam under test: " + key + "\nTest intent: " + value;
+                            if (toolDescription != null && !toolDescription.isEmpty()) {
+                                operationContext += "\nDescription: " + toolDescription;
+                            }
+                            BasicDBObject queryData = new BasicDBObject();
+                            queryData.put(TestExecutorModifier._REQUEST, com.akto.test_editor.Utils.buildRequestIHttpFormat(rawApi));
+                            queryData.put(TestExecutorModifier._TOOL_CONTEXT, operationContext);
+                            queryData.put(TestExecutorModifier._OPERATION, operationTypeLower + ": " + value);
+                            BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
+                            generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
+                        }
+                    }
+                }
 
                 String request = Utils.buildRequestIHttpFormat(rawApi);
 
@@ -817,10 +844,13 @@ public class Executor {
                     return new ExecutorSingleOperationResp(false, response != null ? response.getString("error") : "Billing token required for SSRF");
                 }
             case "conversations_list":
-                // conversations list will be the variable of wordlists, hence it will come in key after being resolved
-                // we need to use them in AgentClient so just add those in any request headers of raw-api
+                @SuppressWarnings("unchecked")
+                List<String> initialConversations = (List<String>) varMap.getOrDefault("wordList_initial_conversations", new ArrayList<>());
+                @SuppressWarnings("unchecked")
                 List<String> conversationsList = (List<String>) value;
-                rawApi.setConversationsList(conversationsList);
+                List<String> mergedConversations = new ArrayList<>(initialConversations);
+                mergedConversations.addAll(conversationsList);
+                rawApi.setConversationsList(mergedConversations);
                 return Operations.addHeader(rawApi, Constants.AKTO_AGENT_CONVERSATIONS , "0");
                 
             case "attach_file":

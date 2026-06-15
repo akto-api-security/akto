@@ -109,12 +109,15 @@ public abstract class DataActor {
 
     public abstract void insertDataIngestionLog(Log log);
 
+    public abstract void insertGuardrailsServiceLog(Log log);
+
     public abstract List<ApiCollection> fetchAllApiCollections();
 
     public abstract List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName);
 
     public abstract void ingestMetricData(List<MetricData> metricData);
 
+    public abstract List<ApiSequences> fetchApiSequences();
     public abstract List<EndpointMcpConfig> fetchEndpointMcpConfigs(String tempCollectionName, int updatedDate);
 
 }

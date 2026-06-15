@@ -1,7 +1,8 @@
-import { Box, Button, HorizontalStack, Text, VerticalStack, Icon } from '@shopify/polaris'
+import { Box, Button, HorizontalStack, Text, VerticalStack, Icon, Tooltip } from '@shopify/polaris'
 import React, { useState } from 'react'
 import TooltipText from "../../../components/shared/TooltipText"
-import { DeleteMajor, ViewMinor, HideMinor } from "@shopify/polaris-icons"
+import { DeleteMajor, ViewMinor, HideMinor, CircleTickMajor, CircleAlertMajor } from "@shopify/polaris-icons"
+import { COPILOT_OAUTH } from "./TestRoleConstants"
 
 function ParamsCard({dataObj, handleDelete, showEdit}) {
     const [hideValues, setHideValues] = useState(true)
@@ -48,9 +49,21 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
         )
     }
 
+    const isCopilotOAuth = authMechanism.type === COPILOT_OAUTH
+    const hasRefreshToken = isCopilotOAuth && !!authMechanism.authParams?.[0]?.refreshToken
+
     return (
         <Box borderWidth="1" borderRadius='2' padding={2} borderColor="border-subdued" >
             <VerticalStack gap={2}>
+                {isCopilotOAuth && (
+                    <HorizontalStack align="end">
+                        <Tooltip content={hasRefreshToken ? "Connected" : "Not connected - User Sign Required"} dismissOnMouseOut>
+                            <div style={{ width: '40px', height: '40px' }}>
+                                <Icon source={hasRefreshToken ? CircleTickMajor : CircleAlertMajor} color={hasRefreshToken ? "success" : "critical"} />
+                            </div>
+                        </Tooltip>
+                    </HorizontalStack>
+                )}
                 <VerticalStack gap={3}>
 
                     {headerKey.length > 0 ? <VerticalStack gap={2}>

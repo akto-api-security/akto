@@ -128,45 +128,13 @@ public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> 
             aiAgentSecuritySuites.put(key, testSubCategories);
         }
 
-        Bson owaspAgenticSingleShotCategoryFilter = Filters.in(
-                YamlTemplate.INFO_CATEGORY_NAME,
-                DefaultTestSuites.owaspAgenticSingleShotCategoryNames());
-        Bson owaspAgenticSingleShotFetchFilter = (isFirstTime || addedNewCategory)
-                ? owaspAgenticSingleShotCategoryFilter
-                : Filters.and(
-                        owaspAgenticSingleShotCategoryFilter,
-                        Filters.gt(YamlTemplate.CREATED_AT, lastUpdatedDefaultTestSuite));
-        List<YamlTemplate> owaspAgenticSingleShotTemplatesWithContent = YamlTemplateDao.instance.findAll(
-                owaspAgenticSingleShotFetchFilter,
-                Projections.include(Constants.ID, YamlTemplate.INFO, YamlTemplate.CONTENT));
-
-        Map<String, List<String>> owaspAgenticSingleShotSuites = new HashMap<>();
-        for (Map.Entry<String, List<String>> entry : DefaultTestSuites.owaspAgenticSingleShotSuiteList.entrySet()) {
-            String key = entry.getKey();
-            List<String> categories = entry.getValue();
-            List<String> testSubCategories = new ArrayList<>();
-            for (YamlTemplate yamlTemplate : owaspAgenticSingleShotTemplatesWithContent) {
-                if (!categories.contains(yamlTemplate.getInfo().getCategory().getName())) {
-                    continue;
-                }
-                if (TestConfigYamlParser.countAgenticConversationTurns(yamlTemplate.getContent()) != 1) {
-                    continue;
-                }
-                testSubCategories.add(yamlTemplate.getId());
-            }
-            owaspAgenticSingleShotSuites.put(key, testSubCategories);
-        }
-
         Map<String, Map<String, List<String>>> defaultTestSuites = new HashMap<>();
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.OWASP.name(), owaspSuites);
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.TESTING_METHODS.name(), testingMethodsSuites);
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.SEVERITY.name(), severitySuites);
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.DURATION.name(), durationTestSuites);
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.MCP_SECURITY.name(), mcpSecuritySuites);
-
-        Map<String, List<String>> mergedAiAgentSecuritySuites = new HashMap<>(aiAgentSecuritySuites);
-        mergedAiAgentSecuritySuites.putAll(owaspAgenticSingleShotSuites);
-        defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.AI_AGENT_SECURITY.name(), mergedAiAgentSecuritySuites);
+        defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.AI_AGENT_SECURITY.name(), aiAgentSecuritySuites);
 
         return defaultTestSuites;
     }

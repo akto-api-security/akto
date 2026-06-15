@@ -35,6 +35,7 @@ import lombok.Setter;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
+import java.util.UUID;
 
 public class LoginRecorderAction extends UserAction {
 
@@ -64,6 +65,13 @@ public class LoginRecorderAction extends UserAction {
 
     /** Set on hybrid {@link #uploadRecordedFlow()} response; sent on {@link #fetchRecordedFlowOutput()} polls. */
     private String testingRunPlaygroundId;
+
+    /** Live screenshot session ID — returned on upload, used by frontend to poll getLatestReplayScreenshot. */
+    @Getter @Setter
+    private String screenshotSessionId;
+
+    @Getter @Setter
+    private String screenshotBase64;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -95,12 +103,25 @@ public class LoginRecorderAction extends UserAction {
             playground.setRecordedFlowContent(payload);
             playground.setRecordedFlowTokenFetchCommand(tokenFetchCommand);
             playground.setRecordedFlowRoleName(roleName != null ? roleName.trim() : null);
+            playground.setRecordedFlowOwnerUserId(userId);
             TestingRunPlaygroundDao.instance.insertOne(playground);
             this.testingRunPlaygroundId = playground.getId().toHexString();
+            if (roleName != null && !roleName.trim().isEmpty()) {
+                this.screenshotSessionId = roleName.trim();
+            }
             return SUCCESS.toUpperCase();
         }
 
         this.testingRunPlaygroundId = null;
+
+        final String liveSessionId;
+        if (roleName != null && !roleName.trim().isEmpty()) {
+            liveSessionId = UUID.randomUUID().toString();
+            this.screenshotSessionId = liveSessionId;
+        } else {
+            liveSessionId = null;
+            this.screenshotSessionId = null;
+        }
 
         executorService.schedule( new Runnable() {
             public void run() {
@@ -108,7 +129,7 @@ public class LoginRecorderAction extends UserAction {
                     Context.accountId.set(accountId);
                     File tmpOutputFile = File.createTempFile("output", ".json");
                     File tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
-                    RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), userId, roleName);
+                    RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), userId, roleName, liveSessionId);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,"error running recorded flow " + e.toString(), LogDb.DASHBOARD);
                 }
@@ -198,13 +219,39 @@ public class LoginRecorderAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String getLatestReplayScreenshot() {
+        if (screenshotSessionId == null || screenshotSessionId.isEmpty()) {
+            addActionError("sessionId is required");
+            return ERROR.toUpperCase();
+        }
+        boolean isUuid = true;
+        try {
+            UUID.fromString(screenshotSessionId);
+        } catch (IllegalArgumentException e) {
+            isUuid = false;
+        }
+        if (isUuid) {
+            String puppeteerUrl = System.getenv("PUPPETEER_REPLAY_SERVICE_URL");
+            if (puppeteerUrl != null && !puppeteerUrl.isEmpty()) {
+                screenshotBase64 = RecordedLoginFlowUtil.fetchLatestLiveScreenshot(puppeteerUrl, screenshotSessionId);
+            }
+        } else {
+            RecordedLoginFlowScreenshot doc = RecordedLoginScreenshotDao.instance.findOne(
+                    Filters.eq("roleName", screenshotSessionId));
+            if (doc != null && doc.getScreenshotsBase64() != null && !doc.getScreenshotsBase64().isEmpty()) {
+                List<String> shots = doc.getScreenshotsBase64();
+                screenshotBase64 = shots.get(shots.size() - 1);
+            }
+        }
+        return SUCCESS.toUpperCase();
+    }
+
     public String fetchRecordedLoginScreenshots() {
         if (roleName == null || roleName.trim().isEmpty()) {
             addActionError("roleName is required");
             return ERROR.toUpperCase();
         }
-        RecordedLoginFlowScreenshot doc = RecordedLoginScreenshotDao.instance.findOne(
-                Filters.and(Filters.eq("roleName", roleName.trim()), Filters.eq("userId", getSUser().getId())));
+        RecordedLoginFlowScreenshot doc = RecordedLoginScreenshotDao.instance.findOne(Filters.eq("roleName", roleName.trim()));
         if (doc == null) {
             screenshotsBase64 = new ArrayList<>();
             screenshotsUpdatedAt = 0;

@@ -78,6 +78,17 @@ export default {
         });
     },
 
+    // Paginated AGENT_SKILL audit rows from mcp_audit_info — same response shape as
+    // fetchAuditData ({ auditData: [...], total: N }). One row per (skill, mcpHost)
+    // detection. The Skills tab uses this both for table rows and for the badge count.
+    async fetchSkillsData(skip = 0, limit = 50, sortKey = 'lastDetected', sortOrder = -1, filters = {}, searchString = '') {
+        const resp = await request({
+            url: '/api/fetchSkillsData',
+            method: 'post',
+            data: { skip, limit, sortKey, sortOrder, filters, searchString }
+        });
+        return resp || { auditData: [], total: 0 };
+    },
     async fetchMcpAuditInfoByCollection(apiCollectionId) {
         const id = typeof apiCollectionId === 'string' ? parseInt(apiCollectionId, 10) : apiCollectionId;
         const resp = await request({
@@ -918,6 +929,13 @@ export default {
             data: {envType, apiCollectionIds,resetEnvTypes}
         })
     },
+    async updateApiInfoTags(envType, apiInfoKeys, resetTags) {
+        return await request({
+            url: '/api/updateApiInfoTags',
+            method: 'post',
+            data: { envType, apiInfoKeys, resetTags }
+        })
+    },
     fetchEndpoint(apiInfoKey){
         return request({
             url: '/api/getSingleEndpoint',
@@ -1091,6 +1109,94 @@ export default {
             method: 'post',
             data: { hostnames }
         })
-    }
+    },
+
+    async fetchNhiIdentities() {
+        const resp = await request({
+            url: '/api/fetchNhiIdentities',
+            method: 'post',
+            data: {}
+        })
+        return resp?.identities || []
+    },
+
+    async fetchAllNhiViolations() {
+        const resp = await request({
+            url: '/api/fetchAllNhiViolations',
+            method: 'post',
+            data: {}
+        })
+        return resp?.violations || []
+    },
+
+    async fetchViolationCountsByIdentity() {
+        const resp = await request({
+            url: '/api/fetchViolationCountsByIdentity',
+            method: 'post',
+            data: {}
+        })
+        return resp?.violations || []
+    },
+
+    async disableNhiIdentity(identityId) {
+        const resp = await request({
+            url: '/api/disableNhiIdentity',
+            method: 'post',
+            data: { identityId }
+        })
+        return resp?.success || false
+    },
+
+    async markViolationAsFixed(violationId) {
+        const resp = await request({
+            url: '/api/markViolationAsFixed',
+            method: 'post',
+            data: { violationId }
+        })
+        return resp?.success || false
+    },
+
+    async createJiraTicketFromViolation(violationId, aktoDashboardHost, projId, issueType, jiraMetaData) {
+        const resp = await request({
+            url: '/api/createJiraTicketFromViolation',
+            method: 'post',
+            data: { violationId, aktoDashboardHost, projId, issueType, jiraMetaData }
+        })
+        return resp
+    },
+
+    async fetchNhiPolicies() {
+        const resp = await request({
+            url: '/api/fetchNhiPolicies',
+            method: 'post',
+            data: {}
+        })
+        return resp?.policies || []
+    },
+
+    async saveNhiPolicy(policy, policyId) {
+        const resp = await request({
+            url: '/api/saveNhiPolicy',
+            method: 'post',
+            data: { policy, policyId }
+        })
+        return resp
+    },
+
+    async fetchSuspectSampleData({ skip = 0, startTimestamp, endTimestamp, hosts = [], limit = 100000 } = {}) {
+        return request({
+            url: '/api/fetchSuspectSampleData',
+            method: 'post',
+            data: {
+                skip, ips: [], urls: [], types: [], apiCollectionIds: [],
+                sort: { detectedAt: -1 },
+                ...(startTimestamp ? { startTimestamp } : {}),
+                ...(endTimestamp   ? { endTimestamp }   : {}),
+                latestAttack: [],
+                limit,
+                ...(hosts?.length  ? { hosts }          : {}),
+            },
+        })
+    },
 
 }

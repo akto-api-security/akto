@@ -31,15 +31,24 @@ public class AllMetrics {
         Organization organization = OrgUtils.getOrganizationCached(accountId);
         String orgId = organization.getId();
 
-        if(LogDb.RUNTIME.equals(module)){
-            runtimeKafkaRecordCount = new SumMetric("RT_KAFKA_RECORD_COUNT", 60, accountId, orgId, moduleType);
-            runtimeKafkaRecordSize = new SumMetric("RT_KAFKA_RECORD_SIZE", 60, accountId, orgId, moduleType);
-            runtimeProcessLatency = new LatencyMetric("RT_KAFKA_LATENCY", 60, accountId, orgId, moduleType);
-            runtimeApiReceivedCount = new SumMetric("RT_API_RECEIVED_COUNT", 60, accountId, orgId, moduleType);
+        if(moduleType.equals(ModuleInfo.ModuleType.MINI_RUNTIME.name()) || moduleType.equals(ModuleInfo.ModuleType.THREAT_DETECTION.name())){
             kafkaRecordsLagMax = new MaxMetric("KAFKA_RECORDS_LAG_MAX", 60, accountId, orgId, moduleType);
             kafkaRecordsConsumedRate = new GaugeMetric("KAFKA_RECORDS_CONSUMED_RATE", 60, accountId, orgId, moduleType);
             kafkaFetchAvgLatency = new GaugeMetric("KAFKA_FETCH_AVG_LATENCY", 60, accountId, orgId, moduleType);
             kafkaBytesConsumedRate = new GaugeMetric("KAFKA_BYTES_CONSUMED_RATE", 60, accountId, orgId, moduleType);
+        }
+
+        if(moduleType.equals(ModuleInfo.ModuleType.THREAT_DETECTION.name())){
+            tdKafkaRecordCount = new SumMetric("TD_KAFKA_RECORD_COUNT", 60, accountId, orgId, moduleType);
+            tdKafkaRecordSize = new SumMetric("TD_KAFKA_RECORD_SIZE", 60, accountId, orgId, moduleType);
+            tdKafkaProcessLatency = new LatencyMetric("TD_KAFKA_LATENCY", 60, accountId, orgId, moduleType);
+        }
+
+        if(moduleType.equals(ModuleInfo.ModuleType.MINI_RUNTIME.name())){
+            runtimeKafkaRecordCount = new SumMetric("RT_KAFKA_RECORD_COUNT", 60, accountId, orgId, moduleType);
+            runtimeKafkaRecordSize = new SumMetric("RT_KAFKA_RECORD_SIZE", 60, accountId, orgId, moduleType);
+            runtimeProcessLatency = new LatencyMetric("RT_KAFKA_LATENCY", 60, accountId, orgId, moduleType);
+            runtimeApiReceivedCount = new SumMetric("RT_API_RECEIVED_COUNT", 60, accountId, orgId, moduleType);
             cyborgNewApiCount = new SumMetric("CYBORG_NEW_API_COUNT", 60, accountId, orgId, moduleType);
             cyborgTotalApiCount = new SumMetric("CYBORG_TOTAL_API_COUNT", 60, accountId, orgId, moduleType);
             deltaCatalogTotalCount = new SumMetric("DELTA_CATALOG_TOTAL_COUNT", 60, accountId, orgId, moduleType);
@@ -59,7 +68,7 @@ public class AllMetrics {
             pgDataSizeInMb = new SumMetric("PG_DATA_SIZE_IN_MB", 60, accountId, orgId, moduleType);
         }
 
-        if(LogDb.TESTING.equals(module)){
+        if(moduleType.equals(ModuleInfo.ModuleType.MINI_TESTING.name())){
             testingRunCount = new SumMetric("TESTING_RUN_COUNT", 60, accountId, orgId, moduleType);
             testingRunLatency = new LatencyMetric("TESTING_RUN_LATENCY", 60, accountId, orgId, moduleType);
             sampleDataFetchLatency = new LatencyMetric("SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId, moduleType);
@@ -91,6 +100,7 @@ public class AllMetrics {
                 pgDataSizeInMb, kafkaRecordsLagMax, kafkaRecordsConsumedRate, kafkaFetchAvgLatency,
                 kafkaBytesConsumedRate, cyborgNewApiCount, cyborgTotalApiCount, deltaCatalogNewCount, deltaCatalogTotalCount,
                 cyborgApiPayloadSize, multipleSampleDataFetchLatency, runtimeApiReceivedCount,
+                tdKafkaRecordCount, tdKafkaRecordSize, tdKafkaProcessLatency,
                 cpuUsagePercent, heapMemoryUsedMb, heapMemoryMaxMb, nonHeapMemoryUsedMb, threadCount,
                 availableProcessors, totalPhysicalMemoryMb);
 
@@ -170,6 +180,9 @@ public class AllMetrics {
     private Metric runtimeKafkaRecordCount;
     private Metric runtimeKafkaRecordSize;
     private Metric runtimeProcessLatency = null;
+    private Metric tdKafkaRecordCount = null;
+    private Metric tdKafkaRecordSize = null;
+    private Metric tdKafkaProcessLatency = null;
     private Metric postgreSampleDataInsertedCount = null;
     private Metric postgreSampleDataInsertLatency = null;
     private Metric mergingJobLatency = null;
@@ -223,6 +236,21 @@ public class AllMetrics {
     public void setRuntimeProcessLatency(float val){
         if(runtimeProcessLatency != null)
             runtimeProcessLatency.record(val);
+    }
+
+    public void setTdKafkaRecordCount(float val){
+        if(tdKafkaRecordCount != null)
+            tdKafkaRecordCount.record(val);
+    }
+
+    public void setTdKafkaRecordSize(float val){
+        if(tdKafkaRecordSize != null)
+            tdKafkaRecordSize.record(val);
+    }
+
+    public void setTdKafkaProcessLatency(float val){
+        if(tdKafkaProcessLatency != null)
+            tdKafkaProcessLatency.record(val);
     }
 
     public void setRuntimeApiReceivedCount(float val){

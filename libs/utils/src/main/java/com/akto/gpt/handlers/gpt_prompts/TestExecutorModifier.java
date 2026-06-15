@@ -1,10 +1,14 @@
 package com.akto.gpt.handlers.gpt_prompts;
 
+import java.util.Arrays;
+import java.util.stream.Collectors;
+
 import javax.validation.ValidationException;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.mongodb.BasicDBObject;
 
 public class TestExecutorModifier extends AzureOpenAIPromptHandler {
@@ -15,7 +19,23 @@ public class TestExecutorModifier extends AzureOpenAIPromptHandler {
     public static final String _REQUEST = "request";
     public static final String _OPERATION = "operation";
     static final String _NOT_FOUND = "not_found";
+    public static final String _TOOL_CONTEXT = "toolContext";
     public final static String _AKTO_GPT_AI = "AKTO_GPT_AI";
+
+    TestCategory[] mcpCategories = {
+        TestCategory.MCP_AUTH ,
+        TestCategory.MCP_INPUT_VALIDATION,
+        TestCategory.MCP_DOS,
+        TestCategory.MCP_SENSITIVE_DATA_LEAKAGE,
+        TestCategory.MCP,
+        TestCategory.MCP_TOOL_POISONING,
+        TestCategory.MCP_PROMPT_INJECTION,
+        TestCategory.MCP_PRIVILEGE_ABUSE,
+        TestCategory.MCP_INDIRECT_PROMPT_INJECTION,
+        TestCategory.MCP_MALICIOUS_CODE_EXECUTION  ,
+        TestCategory.MCP_FUNCTION_MANIPULATION,
+        TestCategory.MCP_SECURITY,
+    };
 
     @Override
     protected void validate(BasicDBObject queryData) throws ValidationException {
@@ -54,7 +74,19 @@ public class TestExecutorModifier extends AzureOpenAIPromptHandler {
         StringBuilder promptBuilder = new StringBuilder();
         promptBuilder.append("You are a API request expert.\n\n");
 
-        if (queryData.containsKey(_REQUEST)) {
+        if (queryData.containsKey(_TOOL_CONTEXT)) {
+            String toolContext = queryData.getString(_TOOL_CONTEXT);
+            promptBuilder.append("You are red-teaming an MCP (Model Context Protocol) tool. Here is the tool context:\n")
+                .append("----------------------------------------\n")
+                .append(toolContext)
+                .append("\n----------------------------------------\n\n")
+                .append("You have the access to the following OWASP categories: ")
+                .append(String.join(", ", Arrays.stream(mcpCategories).map(category -> category.getDisplayName()).collect(Collectors.toList())))
+                .append("\n\n")
+                .append("You have to perform the operation based on the Test intent, Tool description and the OWASP categories you have the access to.");
+        }
+
+        if (queryData.containsKey(_REQUEST) && !queryData.containsKey(_TOOL_CONTEXT)) {
             String request = queryData.getString(_REQUEST);
             promptBuilder.append("You are given an API request :\n")
                 .append("----------------------------------------\n")

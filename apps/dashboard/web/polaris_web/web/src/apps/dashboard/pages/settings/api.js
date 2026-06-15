@@ -512,6 +512,15 @@ const settingRequests = {
             }
         });
     },
+    toggleEmptyCollectionCleanup(enableEmptyCollectionCleanup) {
+        return request({
+            url: '/api/toggleEmptyCollectionCleanup',
+            method: 'post',
+            data: {
+                enableEmptyCollectionCleanup
+            }
+        });
+    },
     addFilterHeaderValueMap(filterHeaderValueMap){
         return request({
             url: '/api/addFilterHeaderValueMap',
@@ -872,6 +881,13 @@ const settingRequests = {
             data: { username, team, userRole }
         })
     },
+    async fetchAgenticUsers() {
+        return await request({
+            url: '/api/fetchAgenticUsers',
+            method: 'post',
+            data: {}
+        })
+    },
     async fetchCloudflareWafIntegration() {
         return await request({
             url: '/api/fetchCloudflareWafIntegration',
@@ -972,12 +988,11 @@ const settingRequests = {
             }
         })
     },
-    getUserAnalysis(agentId, deviceId) {
+    getUserAnalysis(deviceId) {
         return request({
             url: '/api/getUserAnalysis',
             method: 'post',
             data: {
-                agentId,
                 deviceId
             }
         })
@@ -1059,6 +1074,27 @@ const settingRequests = {
             data: {}
         })
     },
+    fetchWizIntegration() {
+        return request({
+            url: '/api/fetchWizIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addWizIntegration(tenantDataCenter, clientId, clientSecret) {
+        return request({
+            url: '/api/addWizIntegration',
+            method: 'post',
+            data: {tenantDataCenter, clientId, clientSecret}
+        })
+    },
+    removeWizIntegration() {
+        return request({
+            url: '/api/removeWizIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
     addMatchingPatternForProxy(proxyPattern, switchProxyMode) {
         return request({
             url: '/api/addMatchingPatternForProxy',
@@ -1078,6 +1114,140 @@ const settingRequests = {
             url: '/api/deleteProxyPattern',
             method: 'post',
             data: {patternValue, connectorType}
+        })
+    },
+
+    fetchFileInspectionRules() {
+        return request({ url: '/api/fetchFileInspectionRules', method: 'post', data: {} })
+    },
+    addFileInspectionRule(path, existenceOnly, maxDepth) {
+        return request({
+            url: '/api/addFileInspectionRule',
+            method: 'post',
+            data: { path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0 }
+        })
+    },
+    deleteFileInspectionRule(path) {
+        return request({
+            url: '/api/deleteFileInspectionRule',
+            method: 'post',
+            data: { path }
+        })
+    },
+    fetchFileInspectionResults(ruleId) {
+        return request({
+            url: '/api/fetchFileInspectionResults',
+            method: 'post',
+            data: { ruleId: ruleId || '' }
+        })
+    },
+    getFileInspectionContent(sha256) {
+        return request({
+            url: '/api/getFileInspectionContent',
+            method: 'post',
+            data: { sha256 }
+        })
+    },
+    fetchNewRelicIntegration() {
+        return request({
+            url: '/api/fetchNewRelicIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addNewRelicIntegration(apiKey) {
+        return request({
+            url: '/api/addNewRelicIntegration',
+            method: 'post',
+            data: {apiKey}
+        })
+    },
+    removeNewRelicIntegration() {
+        return request({
+            url: '/api/removeNewRelicIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    fetchOpenTelemetryIntegration() {
+        return request({
+            url: '/api/fetchOpenTelemetryIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addOpenTelemetryIntegration(endpoint, apiKey, headerName) {
+        return request({
+            url: '/api/addOpenTelemetryIntegration',
+            method: 'post',
+            data: { endpoint, apiKey, headerName }
+        })
+    },
+    removeOpenTelemetryIntegration() {
+        return request({
+            url: '/api/removeOpenTelemetryIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    updateAccountDomains(domainKey, domainsToAdd, domainsToRemove) {
+        return request({
+            url: '/api/updateAccountDomains',
+            method: 'post',
+            data: { domainKey, domainsToAdd, domainsToRemove }
+        })
+    },
+    fetchEndpointShieldSettings() {
+        return request({
+            url: '/api/fetchEndpointShieldSettings',
+            method: 'post',
+            data: {}
+        })
+    },
+    saveEndpointShieldSettings(platformKey, platformConfig) {
+        return request({
+            url: '/api/saveEndpointShieldSettings',
+            method: 'post',
+            data: {platformKey, platformConfig}
+        })
+    },
+    refreshEndpointShieldLatestVersion(platformKey) {
+        return request({
+            url: '/api/refreshEndpointShieldLatestVersion',
+            method: 'post',
+            data: {platformKey}
+        })
+    },
+    queueEndpointRemoteCommand(command, args, timeoutSec, expirySeconds, targetType, targetDeviceIds) {
+        return request({
+            url: '/api/queueEndpointRemoteCommand',
+            method: 'post',
+            data: { command, args, timeoutSec, expirySeconds, targetType, targetDeviceIds }
+        })
+    },
+    fetchEndpointRemoteCommandList(limit, createdAfter) {
+        return request({
+            url: '/api/fetchEndpointRemoteCommandList',
+            method: 'post',
+            data: { limit, ...(createdAfter ? { createdAfter } : {}) }
+        })
+    },
+    fetchEndpointRemoteCommandExecutions(commandId, deviceId, limit) {
+        return request({
+            url: '/api/fetchEndpointRemoteCommandExecutions',
+            method: 'post',
+            data: {
+                ...(commandId ? { commandId } : {}),
+                ...(deviceId ? { deviceId } : {}),
+                limit
+            }
+        })
+    },
+    cancelEndpointRemoteCommand(commandId) {
+        return request({
+            url: '/api/cancelEndpointRemoteCommand',
+            method: 'post',
+            data: { commandId }
         })
     }
 }

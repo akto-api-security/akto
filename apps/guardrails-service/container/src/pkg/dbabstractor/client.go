@@ -272,6 +272,19 @@ func (c *Client) SendRequest(method, endpoint string, body interface{}) ([]byte,
 	return respBody, nil
 }
 
+// IngestMetrics sends accumulated latency metrics to the database-abstractor for persistence.
+// accountId is included in each MetricData object so the receiver can route to the correct account DB.
+func (c *Client) IngestMetrics(metrics []interface{}) error {
+	payload := map[string]interface{}{
+		"metricData": metrics,
+	}
+	_, err := c.SendRequest("POST", "/ingestMetricsData", payload)
+	if err != nil {
+		return fmt.Errorf("ingestMetrics: %w", err)
+	}
+	return nil
+}
+
 func (c *Client) FetchMcpAllowedHostList() ([]byte, error) {
 	url := c.baseURL + "/fetchMcpAllowlist"
 

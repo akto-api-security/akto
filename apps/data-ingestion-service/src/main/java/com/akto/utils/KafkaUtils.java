@@ -9,8 +9,15 @@ import com.mongodb.BasicDBObject;
 public class KafkaUtils {
 
     private static final LoggerMaker logger = new LoggerMaker(KafkaUtils.class, LoggerMaker.LogDb.DATA_INGESTION);
+    private static final String KAFKA_TOPIC_KEY = "AKTO_KAFKA_TOPIC";
+    private static final String DEFAULT_API_LOGS_TOPIC = "akto.api.logs";
+    private static final String API_LOGS_TOPIC;
+    static {
+        String env = System.getenv(KAFKA_TOPIC_KEY);
+        API_LOGS_TOPIC = (env != null && !env.isEmpty()) ? env : DEFAULT_API_LOGS_TOPIC;
+    }
     private static Kafka kafkaProducer;
-    private static TopicPublisher topicPublisher;
+    private static TrafficPublisher topicPublisher;
 
     public void initKafkaProducer() {
         String kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "localhost:29092");
@@ -18,14 +25,18 @@ public class KafkaUtils {
         int kafkaLingerMS = Integer.parseInt(System.getenv().getOrDefault("AKTO_KAFKA_PRODUCER_LINGER_MS", "10"));
         String kafkaUsername = System.getenv("AKTO_KAFKA_USERNAME");
         String kafkaPassword = System.getenv("AKTO_KAFKA_PASSWORD");
-        kafkaProducer = new Kafka(kafkaBrokerUrl, kafkaLingerMS, batchSize, kafkaUsername, kafkaPassword, LoggerMaker.LogDb.DATA_INGESTION);
+        String kafkaSaslMechanism = System.getenv().getOrDefault("AKTO_KAFKA_SASL_MECHANISM", "PLAIN");
+        kafkaProducer = new Kafka(kafkaBrokerUrl, kafkaLingerMS, batchSize, kafkaUsername, kafkaPassword, kafkaSaslMechanism, LoggerMaker.LogDb.DATA_INGESTION);
+
+        if (kafkaUsername != null && !kafkaUsername.isEmpty()) {
+            logger.infoAndAddToDb("Kafka authentication enabled with mechanism: " + kafkaSaslMechanism, LoggerMaker.LogDb.DATA_INGESTION);
+        }
         logger.infoAndAddToDb("Kafka Producer Init " + Context.now(), LoggerMaker.LogDb.DATA_INGESTION);
     }
 
     public static void insertData(IngestDataBatch payload, boolean publishToGuardrails) {
-        String topicName = "akto.api.logs";
         BasicDBObject obj = buildMessageObject(payload);
-        topicPublisher.publish(obj.toString(), topicName, publishToGuardrails);
+        topicPublisher.publish(obj.toString(), API_LOGS_TOPIC, publishToGuardrails);
     }
 
     /**
@@ -66,7 +77,7 @@ public class KafkaUtils {
         return kafkaProducer;
     }
 
-    public static void setTopicPublisher(TopicPublisher publisher) {
+    public static void setTopicPublisher(TrafficPublisher publisher) {
         topicPublisher = publisher;
     }
 
