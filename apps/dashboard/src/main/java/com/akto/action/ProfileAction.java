@@ -218,7 +218,8 @@ public class ProfileAction extends UserAction {
                 .append("organizationName", orgName)
                 .append("isAwsWafIntegrated", awsWafCount != 0)
                 .append("isCloudflareWafIntegrated", cloudflareWafCount != 0)
-                .append("scopeRoleMapping", scopeRoleMapping);
+                .append("scopeRoleMapping", scopeRoleMapping)
+                .append("AG_GRID_LICENSE_KEY", System.getenv("AG_GRID_LICENSE_KEY"));
 
         boolean inviteDisabledForSSO = com.akto.utils.Utils.allowNewUserInviteViaDashboard(sessionAccId, user);
         userDetails.append("inviteDisabledForSSO", inviteDisabledForSSO);

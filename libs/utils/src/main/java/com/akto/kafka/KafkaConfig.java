@@ -3,16 +3,18 @@ package com.akto.kafka;
 import java.util.Properties;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 
+import com.akto.dao.context.Context;
+
 public class KafkaConfig {
   // Kafka authentication configuration constants
   public static final String SECURITY_PROTOCOL = "security.protocol";
   public static final String SASL_MECHANISM = "sasl.mechanism";
   public static final String SASL_JAAS_CONFIG = "sasl.jaas.config";
   public static final String SECURITY_PROTOCOL_SASL_PLAINTEXT = "SASL_PLAINTEXT";
+  public static final String SECURITY_PROTOCOL_SASL_SSL = "SASL_SSL";
   public static final String SASL_MECHANISM_PLAIN = "PLAIN";
   public static final String SASL_MECHANISM_SCRAM_SHA_256 = "SCRAM-SHA-256";
   public static final String SASL_MECHANISM_SCRAM_SHA_512 = "SCRAM-SHA-512";
-  public static final String SECURITY_PROTOCOL_SASL_SSL = "SASL_SSL";
 
   private final String bootstrapServers;
   private final String groupId;
@@ -116,6 +118,7 @@ public class KafkaConfig {
     if (consumerConfig != null) {
       properties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, consumerConfig.getMaxPollRecords());
       if (consumerConfig.getFetchMaxBytes() > 0) {
+        //TODO: verify 100 * 1024 * 1024 is coming
         properties.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, consumerConfig.getFetchMaxBytes());
       }
     }
@@ -139,8 +142,14 @@ public class KafkaConfig {
     String securityProtocol = System.getenv().getOrDefault(
         "AKTO_KAFKA_SECURITY_PROTOCOL",
         SECURITY_PROTOCOL_SASL_PLAINTEXT);
+    
+    if(Context.accountId.get() == 1758787662){
+      saslMechanism = System.getenv().getOrDefault("AKTO_KAFKA_SASL_MECHANISM", SASL_MECHANISM_SCRAM_SHA_512);
+      securityProtocol = System.getenv().getOrDefault("AKTO_KAFKA_SECURITY_PROTOCOL",SECURITY_PROTOCOL_SASL_SSL); 
+    }
     addAuthenticationProperties(properties, username, password, saslMechanism, securityProtocol);
   }
+
 
   /**
    * Adds Kafka SASL authentication properties to the given Properties object.
@@ -171,5 +180,10 @@ public class KafkaConfig {
         "%s required username=\"%s\" password=\"%s\";",
         loginModule, username, password);
     properties.put(SASL_JAAS_CONFIG, jaasConfig);
+
+    // If using SSL, disable hostname verification for NLB with SSL termination
+    if (SECURITY_PROTOCOL_SASL_SSL.equals(securityProtocol)) {
+      properties.put("ssl.endpoint.identification.algorithm", "");
+    }
   }
 }

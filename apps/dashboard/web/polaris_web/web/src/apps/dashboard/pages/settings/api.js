@@ -145,6 +145,13 @@ const settingRequests = {
             data: {}
         })
     },
+    fetchAccountConfig() {
+        return request({
+            url: '/api/fetchAccountConfig',
+            method: 'post',
+            data: {}
+        })
+    },
     fetchTrafficMetricsDesciptions() {
         return request({
             url: '/api/fetchTrafficMetricsDesciptions',
@@ -1230,6 +1237,38 @@ const settingRequests = {
             url: '/api/refreshEndpointShieldLatestVersion',
             method: 'post',
             data: {platformKey}
+        })
+    },
+    queueEndpointRemoteCommand(command, args, timeoutSec, expirySeconds, targetType, targetDeviceIds) {
+        return request({
+            url: '/api/queueEndpointRemoteCommand',
+            method: 'post',
+            data: { command, args, timeoutSec, expirySeconds, targetType, targetDeviceIds }
+        })
+    },
+    fetchEndpointRemoteCommandList(limit, createdAfter) {
+        return request({
+            url: '/api/fetchEndpointRemoteCommandList',
+            method: 'post',
+            data: { limit, ...(createdAfter ? { createdAfter } : {}) }
+        })
+    },
+    fetchEndpointRemoteCommandExecutions(commandId, deviceId, limit) {
+        return request({
+            url: '/api/fetchEndpointRemoteCommandExecutions',
+            method: 'post',
+            data: {
+                ...(commandId ? { commandId } : {}),
+                ...(deviceId ? { deviceId } : {}),
+                limit
+            }
+        })
+    },
+    cancelEndpointRemoteCommand(commandId) {
+        return request({
+            url: '/api/cancelEndpointRemoteCommand',
+            method: 'post',
+            data: { commandId }
         })
     }
 }

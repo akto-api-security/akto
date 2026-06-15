@@ -53,6 +53,18 @@ export default {
         })
         return resp        
     },
+    async fetchTestRunStatusSummaries(testingRunResultSummaryHexIds) {
+        if (!testingRunResultSummaryHexIds?.length) {
+            return {};
+        }
+        const resp = await request({
+            url: '/api/fetchTestRunStatusSummaries',
+            method: 'post',
+            data: { testingRunResultSummaryHexIds },
+            timeout: 60000,
+        });
+        return resp || {};
+    },
     async fetchRemediationInfo(testId) {
         const resp = await request({
             url: 'api/fetchRemediationInfo',
@@ -221,6 +233,14 @@ export default {
             url: '/api/fetchRecordedLoginScreenshots',
             method: 'post',
             data: { roleName }
+        }).then((resp) => resp)
+    },
+
+    getLatestReplayScreenshot(screenshotSessionId) {
+        return request({
+            url: '/api/getLatestReplayScreenshot',
+            method: 'post',
+            data: { screenshotSessionId }
         }).then((resp) => resp)
     },
 

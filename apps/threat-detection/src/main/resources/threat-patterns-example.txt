@@ -11,7 +11,7 @@ sqli_union_from::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_union_from>\
 sqli_or_boolean::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_or_boolean>\s(?:or|and)\s+(?:1\s*=\s*1|'[^']*'\s*=\s*'[^']*|true|false))
 sqli_exec_execute::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_exec_execute>\b(?:exec|execute)(?:\s+\w+|\s*\())
 # Fixed: removed bare # (matches URL fragments, markdown). Now requires SQL-specific comment context.
-sqli_comment_evasion::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_comment_evasion>(?:'\s*--|'\s*#|\/\*[^*]*\*\/|;\s*--))
+sqli_comment_evasion::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_comment_evasion>(?:'\s*--|'\s*#|[\s'"=;(),]\/\*[^*]*\*\/|;\s*--))
 sqli_stacked_queries::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_stacked_queries>;\s*(?:insert|update|delete|select|drop|create|alter)\b)
 sqli_time_based::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_time_based>(?:waitfor\s+delay\s*'[^']*'|(?:benchmark|pg_sleep|sleep)\s*\(\s*['"]?\d+))
 sqli_into_outfile::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_into_outfile>\binto\s+(?:outfile|dumpfile))
@@ -69,7 +69,7 @@ windows_ping::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<windows_ping>\bping(
 ssrf_localhost::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<ssrf_localhost>\bhttps?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d+)?(?:/|\b))
 ssrf_private_ip::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<ssrf_private_ip>\bhttps?://(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})(?::\d+)?(?:/|\b))
 ssrf_metadata::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<ssrf_metadata>\bhttps?://(?:169\.254\.169\.254|metadata\.google\.internal)\b)
-ssrf_file_protocol::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<ssrf_file_protocol>(?:file|gopher|dict|tftp)://)
+ssrf_file_protocol::REQUEST_URL,REQUEST_BODY::(?P<ssrf_file_protocol>(?:file|gopher|dict|tftp)://)
 
 # ===== PATH TRAVERSAL / LOCAL FILE INCLUSION (Request Only) =====
 lfi_directory_traversal::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<lfi_directory_traversal>(?:\.\./|\.\.\\|%2e%2e/|%2e%2e\\|%2e%2e%2f|%2e%2e%5c){2,})

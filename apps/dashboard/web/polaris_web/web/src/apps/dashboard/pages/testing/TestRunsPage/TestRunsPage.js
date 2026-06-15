@@ -3,9 +3,9 @@ import {Text, IndexFiltersMode, Box} from '@shopify/polaris';
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import api from "../api";
 import testingApi from "../../testing/api";
-import { useEffect, useReducer, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { useCollectionPageScope } from '../../../hooks/useCollectionPageScope';
-import transform from "../transform";
+import transform, { getStatus } from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func"
 import { CellType } from "../../../components/tables/rows/GithubRow";
@@ -18,6 +18,41 @@ import PersistStore from "../../../../main/PersistStore";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 import SummaryCardComponent from "./SummaryCardComponent";
+
+// Module-level cache for test run execution status counts. Counts for COMPLETED runs are
+// stable, so caching them here (instead of a component ref) keeps them across remounts and
+// avoids re-hitting the heavy backend status API when revisiting the page within the TTL.
+const RUN_STATUS_CACHE_TTL_MS = 5 * 60 * 1000;
+const runStatusCache = new Map(); // testingRunResultSummaryHexId -> { counts, ts }
+
+function getCachedRunStatusCounts(hexId) {
+  const entry = runStatusCache.get(hexId);
+  if (!entry) return undefined;
+  if (Date.now() - entry.ts > RUN_STATUS_CACHE_TTL_MS) {
+    runStatusCache.delete(hexId);
+    return undefined;
+  }
+  return entry.counts;
+}
+
+function getValidRunStatusMap() {
+  const result = {};
+  const now = Date.now();
+  runStatusCache.forEach((entry, hexId) => {
+    if (now - entry.ts > RUN_STATUS_CACHE_TTL_MS) {
+      runStatusCache.delete(hexId);
+    } else {
+      result[hexId] = entry.counts;
+    }
+  });
+  return result;
+}
+
+function setCachedRunStatusCounts(statusSummaries) {
+  Object.entries(statusSummaries || {}).forEach(([hexId, counts]) => {
+    runStatusCache.set(hexId, { counts, ts: Date.now() });
+  });
+}
 /*
   {
     text:"", // req. -> The text to be shown wherever the header is being shown
@@ -50,6 +85,17 @@ const headers = [
     itemOrder: 3,
     type: CellType.TEXT,
     tooltipContent: (<Text variant="bodySm">Count of attempted testing run results</Text>)
+  },
+  {
+    text: mapLabel("Test", getDashboardCategory()) + " run status",
+    title: mapLabel("Test", getDashboardCategory()) + " run status",
+    value: 'run_message',
+    maxWidth: '220px',
+    tooltipContent: (
+      <Text variant="bodySm">
+        Run-level execution summary (e.g. unreachable hosts, auth errors, skipped tests). Vulnerabilities are shown in Issues.
+      </Text>
+    )
   },
   {
     text:"Severity",
@@ -155,7 +201,6 @@ const endTimestamp = getTimeEpoch("until") + 86400
 
 
 const [loading, setLoading] = useState(true);
-const [updateTable, setUpdateTable] = useState("");
 const [countMap, setCountMap] = useState({});
 
 const definedTableTabs = ['All', 'One time', mapLabel("Continuous Testing", getDashboardCategory()), 'Scheduled', 'CI/CD']
@@ -171,12 +216,20 @@ const [selected, setSelected] = useState(initialTabIdx)
 const tableCountObj = func.getTabsCount(definedTableTabs, {}, initialCount)
 const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setCurrentTab, currentTab, tabsInfo)
 
+function shouldFetchRunStatusSummary(item) {
+  return getStatus(item?.testRunState) === "COMPLETED"
+    && !item?.authError
+    && !item?.tokenRateLimited;
+}
+
 const [severityMap, setSeverityMap] = useState({})
 const [subCategoryInfo, setSubCategoryInfo] = useState({})
 const [collapsible, setCollapsible] = useState(true)
 const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 const [totalNumberOfTests, setTotalNumberOfTests] = useState(0)
 const [summaryLoading, setSummaryLoading] = useState(false)
+const [runStatusUpdateKey, setRunStatusUpdateKey] = useState("")
+const pendingRunStatusRequestRef = useRef(null)
 
   async function fetchTableData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) {
     setLoading(true);
@@ -234,6 +287,44 @@ const [summaryLoading, setSummaryLoading] = useState(false)
           total = testingRunsCount;
         });
         break;
+    }
+
+    ret = transform.enrichWithRunStatus(ret, getValidRunStatusMap());
+
+    const summaryHexIds = [...new Set(
+      ret
+        .filter(shouldFetchRunStatusSummary)
+        .map((item) => item.testingRunResultSummaryHexId)
+        .filter((hexId) => hexId && getCachedRunStatusCounts(hexId) === undefined)
+    )];
+
+    if (summaryHexIds.length > 0) {
+      const requestKey = summaryHexIds.slice().sort().join(',');
+      if (pendingRunStatusRequestRef.current !== requestKey) {
+        pendingRunStatusRequestRef.current = requestKey;
+        const chunkSize = 10;
+        const chunks = [];
+        for (let i = 0; i < summaryHexIds.length; i += chunkSize) {
+          chunks.push(summaryHexIds.slice(i, i + chunkSize));
+        }
+        // Fire all chunks in parallel so rows populate as soon as each batch returns,
+        // instead of waiting for chunks to resolve one after another.
+        Promise.all(chunks.map((chunk) =>
+          api.fetchTestRunStatusSummaries(chunk)
+            .then((statusSummaries) => {
+              if (pendingRunStatusRequestRef.current !== requestKey) {
+                return;
+              }
+              setCachedRunStatusCounts(statusSummaries);
+              setRunStatusUpdateKey(Date.now().toString());
+            })
+            .catch(() => {})
+        )).finally(() => {
+          if (pendingRunStatusRequestRef.current === requestKey) {
+            pendingRunStatusRequestRef.current = null;
+          }
+        });
+      }
     }
 
     // show the running tests at the top.
@@ -386,7 +477,8 @@ const coreTable = (
     condensedHeight={true}
     promotedBulkActions={promotedBulkActions}
     selectable= {true}
-    callFromOutside={updateTable}
+    clientSideDataUpdateKey={runStatusUpdateKey}
+    clientSideDataTransformer={(rows) => transform.enrichWithRunStatus(rows, getValidRunStatusMap())}
     lastColumnSticky={true}
   />   
 )

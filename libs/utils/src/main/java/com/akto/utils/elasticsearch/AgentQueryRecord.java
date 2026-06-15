@@ -17,11 +17,15 @@ public class AgentQueryRecord {
     private final long timeStampMs;
     private final int inputTokens;
     private final int outputTokens;
+    private final String traceId;
+    private final String spanId;
+    private final boolean isAtlasTraffic;
 
     public AgentQueryRecord(String docId, int accountId, String serviceId, String deviceId,
                             String userName, String sessionIdentifier,
                             String queryPayload, String responsePayload,
-                            long timeStampMs, int inputTokens, int outputTokens) {
+                            long timeStampMs, int inputTokens, int outputTokens,
+                            String traceId, String spanId, boolean isAtlasTraffic) {
         this.docId = docId;
         this.accountId = accountId;
         this.serviceId = serviceId;
@@ -33,6 +37,9 @@ public class AgentQueryRecord {
         this.timeStampMs = timeStampMs;
         this.inputTokens = inputTokens;
         this.outputTokens = outputTokens;
+        this.traceId = traceId;
+        this.spanId = spanId;
+        this.isAtlasTraffic = isAtlasTraffic;
     }
 
     public String getDocId() { return docId; }
@@ -46,4 +53,7 @@ public class AgentQueryRecord {
     public long getTimeStampMs() { return timeStampMs; }
     public int getInputTokens() { return inputTokens; }
     public int getOutputTokens() { return outputTokens; }
+    public String getTraceId() { return traceId; }
+    public String getSpanId() { return spanId; }
+    public boolean getIsAtlasTraffic() { return isAtlasTraffic; }
 }

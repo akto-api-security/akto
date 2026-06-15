@@ -20,7 +20,7 @@ export const getMethod = (url, method, apiType) => {
             return "PROMPT";
         }else if(url.includes("server")){
             return "SERVER";
-        }else if(url.includes("settings")){
+        }else if(url.includes("settings") || url.includes("config")){
             return "CONFIG";
         } else if (url.includes("v1/hooks")){
           return "HOOK"
@@ -56,7 +56,7 @@ export function MethodBox({method, methodBoxWidth, url, apiType}){
     )
 }
 
-function GetPrettifyEndpoint({method, url, isNew, maxWidth, methodBoxWidth, guardrailEnabled, isMalicious, apiType}){
+function GetPrettifyEndpoint({method, url, isNew, maxWidth, methodBoxWidth, guardrailEnabled, isMalicious, isMisconfigured, apiType}){
     const ref = useRef(null)
     const localUrl = url || "/"
     const [copyActive, setCopyActive] = useState(false)
@@ -95,6 +95,11 @@ function GetPrettifyEndpoint({method, url, isNew, maxWidth, methodBoxWidth, guar
               {isMalicious ? (
                 <Tooltip content="Malicious activity detected on this skill" dismissOnMouseOut>
                   <Badge status="critical" size="small">Malicious</Badge>
+                </Tooltip>
+              ) : null}
+              {isMisconfigured ? (
+                <Tooltip content="Misconfigured Claude settings detected on this skill" dismissOnMouseOut>
+                  <Badge status="attention" size="small">Misconfigured</Badge>
                 </Tooltip>
               ) : null}
               {copyActive ? (

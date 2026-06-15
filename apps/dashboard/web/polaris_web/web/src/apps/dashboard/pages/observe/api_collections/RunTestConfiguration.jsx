@@ -339,6 +339,13 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                     onChange={(val) => setTestRun(prev => ({ ...prev, runAutomatedTests: val }))}
                 />
             )}
+            { (window?.STIGG_FEATURE_WISE_ALLOWED?.CLEAN_UP_TESTING_RESOURCES?.isGranted === true) && (
+                <Checkbox
+                    label="Clean up testing resources after test run"
+                    checked={testRun.cleanUpTestingResources}
+                    onChange={(val) => setTestRun(prev => ({ ...prev, cleanUpTestingResources: val }))}
+                />
+            )}
         </VerticalStack>
     );
 };

@@ -20,7 +20,8 @@ For the per-device atlas variant, see `../claude-cli-hooks/`.
 
 ```bash
 mkdir -p ~/.claude/hooks
-HOOKS_BASE="https://raw.githubusercontent.com/akto-api-security/akto/master/apps/mcp-endpoint-shield/claude-cli-hooks-argus"
+SHIELD_BASE="https://raw.githubusercontent.com/akto-api-security/akto/master/apps/mcp-endpoint-shield"
+HOOKS_BASE="${SHIELD_BASE}/claude-cli-hooks-argus"
 
 for f in akto-validate-prompt.py akto-validate-prompt-wrapper.sh \
          akto-validate-response.py akto-validate-response-wrapper.sh \
@@ -30,6 +31,11 @@ for f in akto-validate-prompt.py akto-validate-prompt-wrapper.sh \
   curl -o ~/.claude/hooks/"$f" "${HOOKS_BASE}/${f}"
 done
 
+# Shared session-state/ingestion helper (imported by the hook scripts) and its
+# machine-id dependency, which live outside this connector's directory.
+curl -o ~/.claude/hooks/akto_ingestion_utility.py "${SHIELD_BASE}/shared/akto_ingestion_utility.py"
+curl -o ~/.claude/hooks/akto_machine_id.py "${SHIELD_BASE}/claude-cli-hooks/akto_machine_id.py"
+
 chmod +x ~/.claude/hooks/*.sh
 ```
 
@@ -37,11 +43,11 @@ chmod +x ~/.claude/hooks/*.sh
 
 ```bash
 AKTO_URL="https://your-akto-instance.com"
-AKTO_TOKEN_VALUE="your-akto-token"
+AKTO_API_TOKEN_VALUE="your-akto-token"
 AKTO_HOST_VALUE="api.anthropic.com"   # or your custom host
 
 sed -i.bak "s|{{AKTO_DATA_INGESTION_URL}}|${AKTO_URL}|g" ~/.claude/hooks/*-wrapper.sh
-sed -i.bak "s|{{AKTO_TOKEN}}|${AKTO_TOKEN_VALUE}|g"      ~/.claude/hooks/*-wrapper.sh
+sed -i.bak "s|{{AKTO_API_TOKEN}}|${AKTO_API_TOKEN_VALUE}|g"      ~/.claude/hooks/*-wrapper.sh
 sed -i.bak "s|{{AKTO_HOST}}|${AKTO_HOST_VALUE}|g"        ~/.claude/hooks/*-wrapper.sh
 ```
 
@@ -63,7 +69,7 @@ claude
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `AKTO_DATA_INGESTION_URL` | yes | — | Akto ingestion base URL |
-| `AKTO_TOKEN` | yes | — | Authorization header value |
+| `AKTO_API_TOKEN` | yes | — | Authorization header value |
 | `AKTO_HOST` | no | `https://api.anthropic.com` | host header in mirrored requests |
 | `CONTEXT_SOURCE` | no | `AGENTIC` | payload `contextSource` + `source` tag |
 | `AKTO_SYNC_MODE` | no | `true` | `true` blocks on guardrail violation; `false` observe-only |

@@ -348,14 +348,33 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private String nameRegex;
+    private String hostNameRegex;
+
     public String fetchAllCollections() {
-        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty());
+        // Optional case-insensitive regex on name / hostName. When both are null/blank (every
+        // existing caller — the UI sends no such param), the filter is Filters.empty(), i.e.
+        // byte-for-byte identical to the previous behaviour. The filter only engages when a
+        // caller (the MCP agentic tools) explicitly supplies a regex.
+        List<Bson> regexFilters = new ArrayList<>();
+        if (nameRegex != null && !nameRegex.trim().isEmpty()) {
+            regexFilters.add(Filters.regex(ApiCollection.NAME, nameRegex, "i"));
+        }
+        if (hostNameRegex != null && !hostNameRegex.trim().isEmpty()) {
+            regexFilters.add(Filters.regex(ApiCollection.HOST_NAME, hostNameRegex, "i"));
+        }
+        Bson collectionFilter = regexFilters.isEmpty() ? Filters.empty() : Filters.and(regexFilters);
+
+        this.apiCollections = ApiCollectionsDao.instance.findAll(collectionFilter);
         for (ApiCollection c : this.apiCollections) {
             ApiCollectionsDao.instance.ensureEnvTypeFromHostname(c);
         }
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.empty());
         return Action.SUCCESS.toUpperCase();
     }
+
+    public void setNameRegex(String nameRegex) { this.nameRegex = nameRegex; }
+    public void setHostNameRegex(String hostNameRegex) { this.hostNameRegex = hostNameRegex; }
 
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 

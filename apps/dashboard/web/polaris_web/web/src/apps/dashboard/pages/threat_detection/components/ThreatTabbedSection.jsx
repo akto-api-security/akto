@@ -140,11 +140,11 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
 
     const handleDonutSegmentClick = (segmentName) => {
         const eventStatus = STATUS_NAME_TO_EVENT_STATUS[segmentName] || segmentName.toUpperCase();
-        openThreatActivityPage({ eventStatus });
+        openThreatActivityPage({ eventStatus, startTimestamp, endTimestamp });
     };
 
     const handleThreatNameClick = (rawName) => {
-        openThreatActivityPage({ latestAttack: rawName });
+        openThreatActivityPage({ latestAttack: rawName, startTimestamp, endTimestamp });
     };
 
     // --- Tab 1: Total Threats ---
@@ -219,7 +219,7 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
                     <div
                         key={item.api}
                         style={{ cursor: "pointer" }}
-                        onClick={() => openThreatActivityPage({ url: item.api })}
+                        onClick={() => openThreatActivityPage({ url: item.api, startTimestamp, endTimestamp })}
                     >
                         <GetPrettifyEndpoint
                             method={item.method}
@@ -264,7 +264,7 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
                         <div
                             key={actor.id}
                             style={{ cursor: "pointer" }}
-                            onClick={() => openThreatActivityPage({ actor: actor.id })}
+                            onClick={() => openThreatActivityPage({ actor: actor.id, startTimestamp, endTimestamp })}
                         >
                             <HorizontalStack gap="2" blockAlign="center">
                                 <img

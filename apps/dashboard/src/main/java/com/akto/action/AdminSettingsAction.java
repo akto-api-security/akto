@@ -102,6 +102,29 @@ public class AdminSettingsAction extends UserAction {
     private boolean allowRetrospectiveMerging;
 
     private Map<String, Boolean> compulsoryDescription;
+    private boolean hybridTestingEnabled;
+    private Map<String, String> jiraTicketUrlMap;
+
+    public String fetchAccountConfig() {
+        AccountSettings settings = AccountSettingsDao.instance.findOne(
+            AccountSettingsDao.generateFilter(),
+            Projections.include(AccountSettings.COMPULSORY_DESCRIPTION, AccountSettings.JIRA_TICKET_URL_MAP)
+        );
+        if (settings != null) {
+            compulsoryDescription = settings.getCompulsoryDescription();
+            jiraTicketUrlMap = settings.getJiraTicketUrlMap();
+        }
+        if (Context.accountId.get() != null && Context.accountId.get() != 0) {
+            Account account = AccountsDao.instance.findOne(
+                Filters.eq(Constants.ID, Context.accountId.get()),
+                Projections.include(Account.HYBRID_TESTING_ENABLED)
+            );
+            if (account != null) {
+                hybridTestingEnabled = account.getHybridTestingEnabled();
+            }
+        }
+        return SUCCESS.toUpperCase();
+    }
 
     @Setter
     @Getter
@@ -795,6 +818,14 @@ public class AdminSettingsAction extends UserAction {
 
     public void setCompulsoryDescription(Map<String, Boolean> compulsoryDescription) {
         this.compulsoryDescription = compulsoryDescription;
+    }
+
+    public boolean isHybridTestingEnabled() {
+        return hybridTestingEnabled;
+    }
+
+    public Map<String, String> getJiraTicketUrlMap() {
+        return jiraTicketUrlMap;
     }
 
     public void setProxyPattern(String proxyPattern) {

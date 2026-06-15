@@ -47,6 +47,8 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.net.URL;
 import java.util.*;
@@ -71,6 +73,8 @@ public class AktoJaxAction extends UserAction {
     private String applicationPages;
 
     private String crawlerData;
+    @Getter @Setter
+    private List<String> crawlerDataList;
 
     private String apiCollectionId;
 
@@ -89,6 +93,10 @@ public class AktoJaxAction extends UserAction {
     private boolean runTestAfterCrawling;
     private String selectedMiniTestingService;
     private String collectionName;
+    @Getter @Setter
+    private boolean enableAiJsDiscovery;
+    @Getter @Setter
+    private String crawlUrlsBatch;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoJaxAction.class, LogDb.DASHBOARD);
 
@@ -247,6 +255,7 @@ public class AktoJaxAction extends UserAction {
                 crawlerRun.setCustomHeaders(customHeaders);
                 crawlerRun.setUrlTemplatePatterns(urlTemplatePatterns);
                 crawlerRun.setApplicationPages(applicationPages);
+                crawlerRun.setEnableAiJsDiscovery(enableAiJsDiscovery);
 
                 if(runTestAfterCrawling && selectedMiniTestingService != null && !selectedMiniTestingService.isEmpty()) {
                     crawlerRun.setSelectedMiniTestingService(selectedMiniTestingService);
@@ -260,7 +269,7 @@ public class AktoJaxAction extends UserAction {
                 // Fallback to internal DAST API
                 initiateInternalCrawl(crawlId, hostname, username, password, apiKey,
                     dashboardUrl, collectionId, cookies, crawlingTime, outscopeUrls, runTestAfterCrawling,
-                    urlTemplatePatterns, applicationPages, testRoleHexId);
+                    urlTemplatePatterns, applicationPages, testRoleHexId, enableAiJsDiscovery);
             }
 
             // Send Slack alert for crawler initiation
@@ -373,7 +382,7 @@ public class AktoJaxAction extends UserAction {
                                      int collectionId, String cookies, int crawlingTime,
                                      String outscopeUrls, boolean runTestAfterCrawling,
                                      String urlTemplatePatterns, String applicationPages,
-                                     String testRoleHexId) throws Exception {
+                                     String testRoleHexId, boolean enableAiJsDiscovery) throws Exception {
         String url = System.getenv("AKTOJAX_SERVICE_URL") + "/triggerCrawler";
         loggerMaker.infoAndAddToDb("Using internal DAST crawler service: " + url);
 
@@ -408,6 +417,8 @@ public class AktoJaxAction extends UserAction {
             requestBody.put("applicationPages", applicationPages);
         }
 
+        requestBody.put("enableAiJsDiscovery", enableAiJsDiscovery);
+
         String reqData = requestBody.toString();
         loggerMaker.infoAndAddToDb("Internal DAST crawler request data: " + reqData);
 
@@ -439,6 +450,7 @@ public class AktoJaxAction extends UserAction {
             crawlerRun.setCustomHeaders(customHeaders);
             crawlerRun.setUrlTemplatePatterns(urlTemplatePatterns);
             crawlerRun.setApplicationPages(applicationPages);
+            crawlerRun.setEnableAiJsDiscovery(enableAiJsDiscovery);
 
             if(runTestAfterCrawling && selectedMiniTestingService != null && !selectedMiniTestingService.isEmpty()) {
                 crawlerRun.setSelectedMiniTestingService(selectedMiniTestingService);
@@ -558,56 +570,100 @@ public class AktoJaxAction extends UserAction {
         }
     }
 
-    public String uploadCrawlerData() {
+    // -------------------------------------------------------------------------
+    // Shared helpers
+    // -------------------------------------------------------------------------
+
+    private ApiCollection findApiCollection() {
+        try (MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection()
+                .find(Filters.eq("_id", Integer.valueOf(apiCollectionId))).cursor()) {
+            return cursor.hasNext() ? cursor.next() : null;
+        }
+    }
+
+    private String pushCrawlerDataToKafka(List<String> records) {
         String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         if (topic == null) topic = "akto.api.logs";
 
-        loggerMaker.infoAndAddToDb("uploadCrawlerData() - Crawler topic: " + topic);
-
-        // fetch collection id
-        ApiCollection apiCollection = null;
-        MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().find(Filters.eq("_id", Integer.valueOf(apiCollectionId))).cursor();
-        while (cursor.hasNext()) {
-            apiCollection = cursor.next();
-            break;
-        }
-        if(apiCollection == null) {
+        ApiCollection apiCollection = findApiCollection();
+        if (apiCollection == null) {
             addActionError("API collection not found");
             return Action.ERROR.toUpperCase();
         }
-
         try {
-            loggerMaker.infoAndAddToDb("uploadCrawlerData() - Pushing crawler data to kafka");
-            Utils.pushDataToKafka(apiCollection.getId(), topic, Arrays.asList(crawlerData), new ArrayList<>(), true, true, true);
+            Utils.pushDataToKafka(apiCollection.getId(), topic, records, new ArrayList<>(), true, true, true);
+            loggerMaker.infoAndAddToDb("pushCrawlerDataToKafka: pushed " + records.size() + " record(s)");
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Exception while inserting crawler data");
-            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "Exception pushing crawler data to Kafka");
         }
-
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String saveCrawlerUrl() {
+    private String insertCrawlerUrls(List<CrawlerUrl> urls) {
         try {
-            loggerMaker.infoAndAddToDb("Saving crawler URL");
-
-            if (StringUtils.isEmpty(url) || StringUtils.isEmpty(crawlId)) {
-                addActionError("URL and crawl ID are required");
-                return Action.ERROR.toUpperCase();
-            }
-
-            CrawlerUrl crawlerUrl = new CrawlerUrl(url, accepted, timestamp, crawlId, sourceUrl, sourceXpath, buttonText);
-            CrawlerUrlDao.instance.insertOne(crawlerUrl);
-
-            loggerMaker.infoAndAddToDb("Crawler URL saved successfully");
+            for (CrawlerUrl u : urls) CrawlerUrlDao.instance.insertOne(u);
+            loggerMaker.infoAndAddToDb("insertCrawlerUrls: saved " + urls.size() + " URL(s)");
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while saving crawler URL: " + e.getMessage());
-            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "Exception saving crawler URL(s)");
             return Action.ERROR.toUpperCase();
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Single-item endpoints (used by older crawler versions)
+    // -------------------------------------------------------------------------
+
+    public String uploadCrawlerData() {
+        loggerMaker.infoAndAddToDb("uploadCrawlerData() called");
+        return pushCrawlerDataToKafka(Arrays.asList(crawlerData));
+    }
+
+    public String saveCrawlerUrl() {
+        if (StringUtils.isEmpty(url) || StringUtils.isEmpty(crawlId)) {
+            addActionError("URL and crawl ID are required");
+            return Action.ERROR.toUpperCase();
+        }
+        return insertCrawlerUrls(Arrays.asList(
+            new CrawlerUrl(url, accepted, timestamp, crawlId, sourceUrl, sourceXpath, buttonText)));
+    }
+
+    // -------------------------------------------------------------------------
+    // Batch endpoints (used by current crawler version)
+    // -------------------------------------------------------------------------
+
+    public String uploadCrawlerDataBatch() {
+        if (crawlerDataList == null || crawlerDataList.isEmpty()) {
+            addActionError("crawlerDataList is required");
+            return Action.ERROR.toUpperCase();
+        }
+        return pushCrawlerDataToKafka(crawlerDataList);
+    }
+
+    public String saveCrawlerUrlsBatch() {
+        if (crawlUrlsBatch == null || crawlUrlsBatch.isEmpty()) {
+            addActionError("crawlUrlsBatch is required");
+            return Action.ERROR.toUpperCase();
+        }
+        try {
+            List<Map<String, Object>> items = new ObjectMapper().readValue(
+                crawlUrlsBatch, new TypeReference<List<Map<String, Object>>>() {});
+            List<CrawlerUrl> urls = new ArrayList<>();
+            for (Map<String, Object> item : items) {
+                String u        = (String) item.get("url");
+                boolean acc     = Boolean.TRUE.equals(item.get("accepted"));
+                int ts          = item.containsKey("timestamp")
+                                  ? ((Number) item.get("timestamp")).intValue() : Context.now();
+                String cid      = item.containsKey("crawlId") ? (String) item.get("crawlId") : crawlId;
+                urls.add(new CrawlerUrl(u, acc, ts, cid,
+                    (String) item.get("sourceUrl"), (String) item.get("sourceXpath"), (String) item.get("buttonText")));
+            }
+            return insertCrawlerUrls(urls);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Exception in saveCrawlerUrlsBatch");
+            return Action.ERROR.toUpperCase();
+        }
+    }
 
     private List<Map<String, Object>> availableModules;
 

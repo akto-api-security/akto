@@ -118,8 +118,8 @@ const PageWithMultipleCards = (props) => {
 
     const useSecondaryActions = (
         <HorizontalStack gap={2}>
-            {learnMoreComp}
             {secondaryActions}
+            {learnMoreComp}
         </HorizontalStack>
     )
 

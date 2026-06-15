@@ -234,7 +234,9 @@ export default function LeftNav() {
                 },
                 selected: leftNavSelected.includes("_observe"),
                 subNavigationItems: [
-                    ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
+                    ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [
+                    // { label: "Agentic assets (legacy)", onClick: () => { navigate("/dashboard/observe/agentic-assets"); handleSelect("dashboard_observe_agentic_assets"); setActive("active"); }, selected: leftNavSelected === "dashboard_observe_agentic_assets" },
+                    {
                         label: "Agentic assets",
                         onClick: () => {
                             navigate("/dashboard/observe/agentic-assets");
@@ -242,14 +244,16 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_agentic_assets",
-                    }, {
-                        label: "Users and devices",
+                    },
+                    // { label: "Users and devices", onClick: () => { navigate("/dashboard/observe/users-and-devices"); handleSelect("dashboard_observe_users_and_devices"); setActive("active"); }, selected: leftNavSelected === "dashboard_observe_users_and_devices" },
+                    {
+                        label: "Endpoints",
                         onClick: () => {
-                            navigate("/dashboard/observe/users-and-devices");
-                            handleSelect("dashboard_observe_users_and_devices");
+                            navigate("/dashboard/observe/endpoints");
+                            handleSelect("dashboard_observe_endpoints");
                             setActive("active");
                         },
-                        selected: leftNavSelected === "dashboard_observe_users_and_devices",
+                        selected: leftNavSelected === "dashboard_observe_endpoints",
                     }] : [{
                         label: "Collections",
                         onClick: () => {
@@ -259,6 +263,16 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_inventory",
                     }]),
+                    // ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && window.STIGG_FEATURE_WISE_ALLOWED?.AGENT_TRAFFIC_LOGS?.isGranted ? [{
+                    //     label: "Traces",
+                    //     badge: <Badge status="info">Beta</Badge>,
+                    //     onClick: () => {
+                    //         navigate("/dashboard/observe/llm-observability");
+                    //         handleSelect("dashboard_observe_llm_observability");
+                    //         setActive("active");
+                    //     },
+                    //     selected: leftNavSelected === "dashboard_observe_llm_observability",
+                    // }] : []),
                     ...(!(func.isDemoAccount() && (dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security")) ? [
                     {
                         label: "Recent Changes",
@@ -511,7 +525,7 @@ export default function LeftNav() {
                     : reportsSubNavigationItems,
                 key: "6",
             },
-            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted && dashboardCategory !== CATEGORY_DAST  ?  [{
+            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted && dashboardCategory !== CATEGORY_DAST  ? [{
                     label: (
                         <Text variant="bodyMd" fontWeight="medium">
                             {mapLabel("Threat Detection", dashboardCategory)}

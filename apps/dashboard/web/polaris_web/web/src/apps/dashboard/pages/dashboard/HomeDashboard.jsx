@@ -616,7 +616,7 @@ function HomeDashboard() {
 
     useEffect(() => {
         fetchData()
-        if (func.checkForFeatureSaas('THREAT_DETECTION')) {
+        if (func.checkForFeatureSaas('THREAT_DETECTION') && func.hasThreatAccess()) {
             fetchThreatData()
         }
     }, [startTimestamp, endTimestamp])
@@ -1583,7 +1583,7 @@ function HomeDashboard() {
     );
 
     const showForAccount = func.isDemoAccount();
-    const threatComponents = func.checkForFeatureSaas('THREAT_DETECTION') ? [
+    const threatComponents = func.checkForFeatureSaas('THREAT_DETECTION') && func.hasThreatAccess() ? [
         ...(showForAccount ? [{id: 'threat-timeline', component: threatActorsTimelineComponent}] : []),
         {id: 'threat-severity', component: threatSeverityComponent},
         {id: 'threat-categories', component: threatCategoryComponent},

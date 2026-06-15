@@ -27,6 +27,7 @@ import JiraTicketDisplay from "../../components/shared/JiraTicketDisplay";
 import { getMethod } from "../observe/GetPrettifyEndpoint";
 import { getDashboardCategory, mapLabel, CATEGORY_API_SECURITY, CATEGORY_DAST } from "../../../main/labelHelper";
 import TooltipWithLink from "../../components/shared/TooltipWithLink";
+import { buildRunStatusCell } from "./TestRunsPage/runStatusUtils";
 
 let headers = [
   {
@@ -69,7 +70,7 @@ let headers = [
 const SKIPPED_TESTS_DOCS_URL = "https://docs.akto.io/api-security-testing/concepts/skipped-test-cases";
 const MAX_SEVERITY_THRESHOLD = 100000;
 
-function getStatus(state) {
+export function getStatus(state) {
   if (state)
     return state._name ? state._name : (state.name ? state.name : state)
   return "UNKNOWN"
@@ -128,7 +129,7 @@ function getRuntime(scheduleTimestamp, endTimestamp, state) {
   return <div data-testid="test_run_status">Last run {func.prettifyEpoch(endTimestamp)}</div>;
 }
 
-function getAlternateTestsInfo(state) {
+export function getAlternateTestsInfo(state) {
   let status = getStatus(state);
   switch (status) {
     case "RUNNING": return "Tests are still running";
@@ -140,8 +141,56 @@ function getAlternateTestsInfo(state) {
   }
 }
 
-function getTestsInfo(testResultsCount, state) {
-  return (testResultsCount == null) ? getAlternateTestsInfo(state) : testResultsCount
+function normalizeObjectIdHex(value) {
+  if (typeof value === 'string' && value.length === 24) {
+    return value;
+  }
+  if (value && typeof value === 'object' && value.$oid) {
+    return value.$oid;
+  }
+  return undefined;
+}
+
+function getTestingSummaryHexId(summary) {
+  if (!summary || typeof summary !== 'object') {
+    return undefined;
+  }
+  return normalizeObjectIdHex(summary.hexId)
+    || normalizeObjectIdHex(summary.id);
+}
+
+function getLatestSummaryForTestingRun(summariesMap, testingRunHexId) {
+  if (!summariesMap || !testingRunHexId) {
+    return {};
+  }
+  if (summariesMap[testingRunHexId]) {
+    return summariesMap[testingRunHexId];
+  }
+
+  const summaries = Object.values(summariesMap);
+  return summaries.find((summary) => {
+    const summaryTestingRunHexId = normalizeObjectIdHex(summary?.testingRunHexId)
+      || normalizeObjectIdHex(summary?.testingRunId);
+    return summaryTestingRunHexId === testingRunHexId;
+  }) || {};
+}
+
+function getRunMessage(state, metadata) {
+  if (metadata?.error) {
+    return metadata.error;
+  }
+  if (metadata?.tokenRateLimited) {
+    return metadata.tokenRateLimited;
+  }
+  const reason = getAlternateTestsInfo(state);
+  if (reason === "Tests are still running" || reason === "Tests have been scheduled" || reason === "Information unavailable") {
+    return "-";
+  }
+  return reason;
+}
+
+function getTestsInfo(testResultsCount) {
+  return testResultsCount == null ? "-" : testResultsCount;
 }
 
 function minimizeTagList(items) {
@@ -223,7 +272,7 @@ const transform = {
   },
   prepareDataFromSummary: (data, testRunState) => {
     let obj = {};
-    obj['testingRunResultSummaryHexId'] = data?.hexId;
+    obj['testingRunResultSummaryHexId'] = getTestingSummaryHexId(data);
     let state = data?.state;
     if (checkTestFailure(state, testRunState)) {
       state = 'FAIL'
@@ -299,12 +348,13 @@ const transform = {
     const iconObj = func.getTestingRunIconObj(state)
 
     obj['id'] = data.hexId;
-    obj['testingRunResultSummaryHexId'] = testingRunResultSummary?.hexId;
+    obj['testingRunResultSummaryHexId'] = getTestingSummaryHexId(testingRunResultSummary);
     obj['orderPriority'] = getOrderPriority(state)
     obj['icon'] = iconObj.icon;
     obj['iconColor'] = iconObj.color
     obj['name'] = data.name || "Test"
-    obj['number_of_tests'] = data.testIdConfig == 1 ? "-" : getTestsInfo(testingRunResultSummary?.testResultsCount, state)
+    obj['number_of_tests'] = data.testIdConfig == 1 ? "-" : getTestsInfo(testingRunResultSummary?.testResultsCount)
+    obj['run_message'] = getRunMessage(state, testingRunResultSummary?.metadata)
     obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
     obj['run_time_epoch'] = Math.max(data.scheduleTimestamp, (cicd ? (testingRunResultSummary?.endTimestamp) : (data.endTimestamp)))
     obj['scheduleTimestamp'] = data.scheduleTimestamp
@@ -327,6 +377,7 @@ const transform = {
     ) : testingRunResultSummary?.metadata;
     
     obj['authError'] = authError; // For clean display near title/created by
+    obj['tokenRateLimited'] = testingRunResultSummary?.metadata?.tokenRateLimited;
     obj['metadata'] = func.flattenObject(filteredMetadata)
     obj['apiCollectionId'] = apiCollectionId
     obj['testingEndpoints'] = data?.testingEndpoints
@@ -350,11 +401,24 @@ const transform = {
     let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries, cicd, true);
     return testRuns;
   },
+  enrichWithRunStatus: (rows, statusSummaries = {}) => {
+    return rows.map((row) => ({
+      ...row,
+      run_message: buildRunStatusCell(
+        row.testRunState,
+        {
+          error: row.authError,
+          tokenRateLimited: row.tokenRateLimited,
+        },
+        statusSummaries?.[row.testingRunResultSummaryHexId]
+      ),
+    }));
+  },
   prepareTestRuns: (testingRuns, latestTestingRunResultSummaries, cicd, prettified) => {
     let testRuns = []
     testingRuns.forEach((data) => {
       let obj = {};
-      let testingRunResultSummary = latestTestingRunResultSummaries[data['hexId']] || {};
+      let testingRunResultSummary = getLatestSummaryForTestingRun(latestTestingRunResultSummaries, data['hexId']);
       obj = transform.prepareTestRun(data, testingRunResultSummary, cicd, prettified)
       testRuns.push(obj);
     })
@@ -1505,6 +1569,8 @@ const transform = {
       autoTicketingDetails: autoTicketingDetails,
       selectedSlackChannelId: testRun?.slackChannel || 0,
       doNotMarkIssuesAsFixed: Boolean(testRun.doNotMarkIssuesAsFixed),
+      cleanUp: Boolean(testRun.cleanUpTestingResources),
+      runAutomatedTests: Boolean(testRun.runAutomatedTests),
     }
   },
   prepareTestingEndpointsApisList(apiEndpoints) {

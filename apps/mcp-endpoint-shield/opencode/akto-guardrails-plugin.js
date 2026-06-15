@@ -14,6 +14,7 @@ const { spawn } = require('child_process')
 const LOG_DIR = `${process.env.HOME}/.config/opencode/akto/logs`
 const OPENCODE_DIR = path.dirname(__filename)
 const AKTO_DATA_INGESTION_URL = process.env.AKTO_DATA_INGESTION_URL || ''
+const AKTO_API_TOKEN = process.env.AKTO_API_TOKEN || ''
 const AKTO_SYNC_MODE = (process.env.AKTO_SYNC_MODE || 'true').toLowerCase() === 'true'
 const AKTO_TIMEOUT = parseInt(process.env.AKTO_TIMEOUT || '5', 10) * 1000
 
@@ -50,6 +51,10 @@ function sendToAkto(payload) {
       'Content-Type': 'application/json',
     },
     timeout: 5000,
+  }
+
+  if (AKTO_API_TOKEN) {
+    options.headers.Authorization = AKTO_API_TOKEN
   }
 
   const payloadJson = JSON.stringify(payload)

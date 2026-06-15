@@ -6,7 +6,8 @@ import {
     Text,
     Button,
     Badge,
-    Autocomplete
+    Autocomplete,
+    Checkbox,
 } from "@shopify/polaris";
 import { DeleteMajor } from "@shopify/polaris-icons";
 
@@ -52,22 +53,44 @@ const validatePattern = (p) => {
 
 export const BlockedHostsConfig = {
     number: 11,
-    title: "Block host / path",
+    title: "Access restrictions",
 
     validate: () => ({ isValid: true, errorMessage: null }),
 
-    getSummary: ({ blockedHosts }) => {
+    getSummary: ({ blockedHosts, blockPersonalAccounts }) => {
         const rows = (blockedHosts || []).filter((r) => (r.pattern || "").trim());
-        if (rows.length === 0) {
-            return "";
+        const parts = [];
+        if (rows.length > 0) {
+            const names = rows.map((r) => r.pattern.trim()).slice(0, 2).join(", ");
+            const more = rows.length > 2 ? ` +${rows.length - 2}` : "";
+            parts.push(`${rows.length} pattern${rows.length === 1 ? "" : "s"}: ${names}${more}`);
         }
-        const names = rows.map((r) => r.pattern.trim()).slice(0, 2).join(", ");
-        const more = rows.length > 2 ? ` +${rows.length - 2}` : "";
-        return `Blocking ${rows.length} pattern${rows.length === 1 ? "" : "s"}: ${names}${more}`;
+        if (blockPersonalAccounts) {
+            parts.push("personal accounts blocked");
+        }
+        return parts.length > 0 ? parts.join(" · ") : "";
     }
 };
 
-const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, hostSuggestions = [] }) => {
+const SectionCard = ({ title, description, children }) => (
+    <Box
+        padding="5"
+        borderColor="border"
+        borderWidth="1"
+        borderRadius="3"
+        background="bg-surface"
+    >
+        <VerticalStack gap="4">
+            <VerticalStack gap="1">
+                <Text variant="headingSm" as="h3">{title}</Text>
+                <Text variant="bodySm" tone="subdued">{description}</Text>
+            </VerticalStack>
+            {children}
+        </VerticalStack>
+    </Box>
+);
+
+const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts, setBlockPersonalAccounts, hostSuggestions = [] }) => {
     const entries = blockedHosts || [];
     const [inputValue, setInputValue] = useState("");
     const [error, setError] = useState("");
@@ -114,81 +137,96 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, hostSuggestions = [] 
 
     return (
         <VerticalStack gap="5">
-            <Text variant="bodyMd" tone="subdued">
-                Block traffic by host or path pattern. Use <Text as="span" fontWeight="semibold">*</Text> as
-                a wildcard (it matches anything, including <Text as="span" fontWeight="semibold">/</Text>).
-                Examples: <Text as="span" fontWeight="semibold">chatgpt.com/*</Text> (whole host),{" "}
-                <Text as="span" fontWeight="semibold">*/v1/chat/completions</Text> (any host),{" "}
-                <Text as="span" fontWeight="semibold">deepseek.com/api/v1/*</Text> (path prefix).
-            </Text>
-
-            <Autocomplete
-                options={options}
-                selected={[]}
-                onSelect={(selected) => addPattern(selected[0])}
-                textField={
-                    <Autocomplete.TextField
-                        label="Host or path pattern"
-                        value={inputValue}
-                        onChange={handleInputChange}
-                        placeholder="e.g. chatgpt.com/*  or  */v1/chat/completions"
-                        autoComplete="off"
-                        error={error || undefined}
-                        connectedRight={
-                            <Button onClick={() => addPattern(inputValue)} disabled={!inputValue.trim()}>
-                                Add
-                            </Button>
-                        }
-                        onKeyPress={(e) => {
-                            if (e.key === "Enter") {
-                                e.preventDefault();
-                                addPattern(inputValue);
-                            }
-                        }}
-                    />
+            <SectionCard
+                title="Block host / path"
+                description={
+                    <>
+                        Block traffic by host or path pattern. Use <Text as="span" fontWeight="semibold">*</Text> as
+                        a wildcard. Examples: <Text as="span" fontWeight="semibold">chatgpt.com/*</Text>,{" "}
+                        <Text as="span" fontWeight="semibold">*/v1/chat/completions</Text>,{" "}
+                        <Text as="span" fontWeight="semibold">deepseek.com/api/v1/*</Text>
+                    </>
                 }
-            />
+            >
+                <Autocomplete
+                    options={options}
+                    selected={[]}
+                    onSelect={(selected) => addPattern(selected[0])}
+                    textField={
+                        <Autocomplete.TextField
+                            label="Host or path pattern"
+                            value={inputValue}
+                            onChange={handleInputChange}
+                            placeholder="e.g. chatgpt.com/*  or  */v1/chat/completions"
+                            autoComplete="off"
+                            error={error || undefined}
+                            connectedRight={
+                                <Button onClick={() => addPattern(inputValue)} disabled={!inputValue.trim()}>
+                                    Add
+                                </Button>
+                            }
+                            onKeyPress={(e) => {
+                                if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    addPattern(inputValue);
+                                }
+                            }}
+                        />
+                    }
+                />
 
-            <VerticalStack gap="3">
-                <HorizontalStack gap="2" blockAlign="center">
-                    <Text variant="headingSm" as="h3">Blocked patterns</Text>
-                    {entries.length > 0 && <Badge status="critical">{`${entries.length}`}</Badge>}
-                </HorizontalStack>
+                <VerticalStack gap="3">
+                    <HorizontalStack gap="2" blockAlign="center">
+                        <Text variant="headingSm" as="h3">Blocked patterns</Text>
+                        {entries.length > 0 && <Badge status="critical">{`${entries.length}`}</Badge>}
+                    </HorizontalStack>
 
-                {entries.length === 0 ? (
-                    <Box padding="6" borderColor="border" borderWidth="1" borderRadius="3" background="bg-subdued">
-                        <Text variant="bodySm" tone="subdued" alignment="center">
-                            No patterns blocked yet. Add a host or path pattern above to start blocking traffic.
-                        </Text>
-                    </Box>
-                ) : (
-                    <VerticalStack gap="2">
-                        {entries.map((entry, index) => (
-                            <Box
-                                key={index}
-                                paddingBlockStart="3"
-                                paddingBlockEnd="3"
-                                paddingInlineStart="4"
-                                paddingInlineEnd="3"
-                                borderColor="border"
-                                borderWidth="1"
-                                borderRadius="3"
-                                background="bg-surface"
-                            >
-                                <HorizontalStack align="space-between" blockAlign="center">
-                                    <Text variant="bodyMd" fontWeight="semibold" alignment="start">{entry.pattern}</Text>
-                                    <Button
-                                        plain
-                                        icon={DeleteMajor}
-                                        onClick={() => removePattern(index)}
-                                        accessibilityLabel={`Delete ${entry.pattern}`}
-                                    />
-                                </HorizontalStack>
-                            </Box>
-                        ))}
-                    </VerticalStack>
-                )}
-            </VerticalStack>
+                    {entries.length === 0 ? (
+                        <Box padding="4" borderColor="border" borderWidth="1" borderRadius="3" background="bg-subdued">
+                            <Text variant="bodySm" tone="subdued" alignment="center">
+                                No patterns blocked yet. Add a host or path pattern above to start blocking traffic.
+                            </Text>
+                        </Box>
+                    ) : (
+                        <VerticalStack gap="2">
+                            {entries.map((entry, index) => (
+                                <Box
+                                    key={index}
+                                    paddingBlockStart="3"
+                                    paddingBlockEnd="3"
+                                    paddingInlineStart="4"
+                                    paddingInlineEnd="3"
+                                    borderColor="border"
+                                    borderWidth="1"
+                                    borderRadius="3"
+                                    background="bg-surface"
+                                >
+                                    <HorizontalStack align="space-between" blockAlign="center">
+                                        <Text variant="bodyMd" fontWeight="semibold" alignment="start">{entry.pattern}</Text>
+                                        <Button
+                                            plain
+                                            icon={DeleteMajor}
+                                            onClick={() => removePattern(index)}
+                                            accessibilityLabel={`Delete ${entry.pattern}`}
+                                        />
+                                    </HorizontalStack>
+                                </Box>
+                            ))}
+                        </VerticalStack>
+                    )}
+                </VerticalStack>
+            </SectionCard>
+
+            <SectionCard
+                title="Block personal accounts"
+                description="Prevent users with personal or consumer email accounts from accessing the AI agent. Enterprise accounts (company email domains) are allowed through."
+            >
+                <Checkbox
+                    label="Enable personal account blocking"
+                    checked={!!blockPersonalAccounts}
+                    onChange={setBlockPersonalAccounts}
+                />
+            </SectionCard>
         </VerticalStack>
     );
 };

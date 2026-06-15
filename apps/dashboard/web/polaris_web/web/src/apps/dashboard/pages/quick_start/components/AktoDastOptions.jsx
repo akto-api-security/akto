@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import Dropdown from '../../../components/layouts/Dropdown'
 import testingApi from '../../testing/api';
 
-const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, setUrlTemplatePatterns, applicationPages, setApplicationPages, maxPageVisits, setMaxPageVisits, domLoadTimeout, setDomLoadTimeout, waitAfterEvent, setWaitAfterEvent, enableJsRendering, setEnableJsRendering, parseSoapServices, setParseSoapServices, parseRestServices, setParseRestServices, clickExternalLinks, setClickExternalLinks, crawlingTime, setCrawlingTime, runTestAfterCrawling, setRunTestAfterCrawling, selectedMiniTestingService, setSelectedMiniTestingService }) => {
+const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, setUrlTemplatePatterns, applicationPages, setApplicationPages, maxPageVisits, setMaxPageVisits, domLoadTimeout, setDomLoadTimeout, waitAfterEvent, setWaitAfterEvent, enableJsRendering, setEnableJsRendering, parseSoapServices, setParseSoapServices, parseRestServices, setParseRestServices, clickExternalLinks, setClickExternalLinks, crawlingTime, setCrawlingTime, runTestAfterCrawling, setRunTestAfterCrawling, selectedMiniTestingService, setSelectedMiniTestingService, enableAiJsDiscovery, setEnableAiJsDiscovery }) => {
     const [miniTestingServiceNames, setMiniTestingServiceNames] = useState([]);
     const handleMiniTestingServiceChange = (value) => {
         setSelectedMiniTestingService(value)
@@ -148,6 +148,14 @@ const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, s
                             }
                         }}
                     />
+
+                    {window?.STIGG_FEATURE_WISE_ALLOWED?.AI_DAST?.isGranted && (
+                        <Checkbox
+                            label="AI based discovery"
+                            checked={enableAiJsDiscovery}
+                            onChange={(checked) => setEnableAiJsDiscovery(checked)}
+                        />
+                    )}
                 </HorizontalStack>
                 {runTestAfterCrawling && miniTestingServiceNames.length > 0 && (
                     <Dropdown

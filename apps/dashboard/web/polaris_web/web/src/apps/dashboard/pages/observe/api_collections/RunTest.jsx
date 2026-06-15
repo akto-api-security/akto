@@ -26,7 +26,7 @@ const initialAutoTicketingDetails = {
     issueType: "",
 }
 
-function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable }) {
+function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable, warningMessage }) {
 
     const initialState = {
         categories: [],
@@ -315,6 +315,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
                     miniTestingServiceNames: testIdConfig?.allowedMiniTestingServiceNames || [],
                     slackChannel: testIdConfig?.selectedSlackChannelId || 0,
                     doNotMarkIssuesAsFixed: testIdConfig?.doNotMarkIssuesAsFixed ?? false,
+                    cleanUpTestingResources: testIdConfig?.testingRunConfig?.cleanUp ?? false,
+                    runAutomatedTests: testIdConfig?.runAutomatedTests ?? false,
                 }));
                 setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
                 setTestNameSuiteModal(testIdConfig?.name||"")
@@ -897,6 +899,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
                     testMode ?
                         <Modal.Section>
                             <VerticalStack gap={"3"}>
+                                {warningMessage &&
+                                    <Banner status="warning">
+                                        <Text variant="bodyMd">
+                                            {warningMessage}
+                                        </Text>
+                                    </Banner>
+                                }
                                 {!testRun.authMechanismPresent &&
                                     <div>
                                         <Banner

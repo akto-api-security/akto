@@ -17,7 +17,7 @@ import GetPrettifyEndpoint from '../../observe/GetPrettifyEndpoint';
 import PersistStore from "../../../../main/PersistStore";
 import { labelMap } from '../../../../main/labelHelperMap';
 import { isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel } from '../../../../main/labelHelper';
-import { extractRuleViolated } from '../utils/formatUtils';
+import { extractRuleViolated, extractBehaviour, getBehaviourTone } from '../utils/formatUtils';
   
  export const ActivityLog = ({ activityLog, actorDetails, loading = false }) => {
     const [itemStrings] = useState([
@@ -88,6 +88,10 @@ import { extractRuleViolated } from '../utils/formatUtils';
         const ruleViolated = (isAgenticSecurityCategory() || isEndpointSecurityCategory())
           ? extractRuleViolated(metadata)
           : null;
+        const behaviour = (isAgenticSecurityCategory() || isEndpointSecurityCategory())
+          ? extractBehaviour(metadata)
+          : null;
+        const behaviourTone = getBehaviourTone(behaviour);
 
         return (
           <IndexTable.Row
@@ -111,6 +115,13 @@ import { extractRuleViolated } from '../utils/formatUtils';
                 <Text variant="bodyMd" fontWeight="medium" as="span">
                   {ruleViolated}
                 </Text>
+              </IndexTable.Cell>
+            )}
+            {(isAgenticSecurityCategory() || isEndpointSecurityCategory()) && (
+              <IndexTable.Cell>
+                {behaviour ? (
+                  <Badge tone={behaviourTone}>{func.toSentenceCase(behaviour)}</Badge>
+                ) : "-"}
               </IndexTable.Cell>
             )}
             <IndexTable.Cell>
@@ -180,6 +191,7 @@ import { extractRuleViolated } from '../utils/formatUtils';
                   {title: 'Time'},
                   {title: labelMap[PersistStore.getState().dashboardCategory]["Attack type"]},
                   ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? [{title: 'Rule Violated'}] : []),
+                  ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? [{title: 'Behaviour'}] : []),
                   {title: 'Severity'},
                   {title: 'Host'},
                   {title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"]},
