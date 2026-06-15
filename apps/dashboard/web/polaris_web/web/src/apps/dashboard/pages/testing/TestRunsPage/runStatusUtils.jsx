@@ -19,7 +19,7 @@ const STATIC_LABELS = {
 const STATIC_ORDER = ['domainUnreachable', 'cloudflare', 'skipped', 'needConfig'];
 
 // Friendly names for common HTTP status codes; any other code falls back to "<code> error".
-const HTTP_CODE_LABELS = {
+export const HTTP_CODE_LABELS = {
   '400': '400 Bad Request',
   '401': '401 Unauthorized',
   '403': '403 Forbidden',
@@ -42,6 +42,19 @@ const HTTP_CODE_LABELS = {
 
 // Keys rendered with a highlighted (critical) tone in the scan run status column.
 const HIGHLIGHT_KEYS = new Set(['http_403']);
+
+// Build filter choices from codes actually present in the current test run.
+export function buildResponseCodeFilterChoices(codes) {
+  if (!codes?.length) {
+    return [];
+  }
+  return [...codes]
+    .sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+    .map((code) => ({
+      label: HTTP_CODE_LABELS[code] || `${code} error`,
+      value: code,
+    }));
+}
 
 function statusCodeFromKey(key) {
   const match = /^http_(\d{3})$/.exec(key);

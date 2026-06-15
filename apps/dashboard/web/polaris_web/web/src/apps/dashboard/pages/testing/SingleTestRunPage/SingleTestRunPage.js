@@ -59,6 +59,7 @@ import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 import MarkdownReportGenerator from "../../../components/shared/MarkdownReportGenerator";
 import { saveAs } from 'file-saver';
 import SeveritySelector from '../../issues/components/SeveritySelector';
+import { buildResponseCodeFilterChoices, HTTP_CODE_LABELS } from "../TestRunsPage/runStatusUtils";
 
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -125,7 +126,7 @@ let filterOptions = [
     label: mapLabel('API', getDashboardCategory()) + ' Name',
     title: mapLabel('API', getDashboardCategory()) + ' name',
     choices: [],
-  }
+  },
 ]
 
 function SingleTestRunPage() {
@@ -196,6 +197,7 @@ function SingleTestRunPage() {
   }
 
   const [copyFilters, setCopyFilters] = useState({})
+  const [responseCodeFilterChoices, setResponseCodeFilterChoices] = useState([])
 
   const refreshId = useRef(null);
   const hexId = params.hexId;
@@ -220,6 +222,8 @@ function SingleTestRunPage() {
         return func.convertToDisambiguateLabelObj(value, null, 2)
       case 'apiNameFilter':
         return func.convertToDisambiguateLabelObj(value, null, 1)
+      case 'responseCodeFilter':
+        return func.convertToDisambiguateLabelObj(value, HTTP_CODE_LABELS, 2)
       default:
         return value;
     }
@@ -300,6 +304,11 @@ function SingleTestRunPage() {
     // Fetch test results stats for the new summary
     if (summary && summary.hexId) {
       fetchTestResultsStats(hexId, summary.hexId);
+      api.fetchDistinctResponseCodes(summary.hexId)
+        .then((codes) => setResponseCodeFilterChoices(buildResponseCodeFilterChoices(codes)))
+        .catch(() => setResponseCodeFilterChoices([]));
+    } else {
+      setResponseCodeFilterChoices([]);
     }
 
     if (!initialCall && updateTable) {
@@ -795,6 +804,19 @@ function SingleTestRunPage() {
     }, 200)
   }
 
+  let tableFilterOptions = filterOptions.filter((filter) => filter.key !== 'responseCodeFilter');
+  if (responseCodeFilterChoices.length > 0) {
+    tableFilterOptions = [
+      ...tableFilterOptions,
+      {
+        key: 'responseCodeFilter',
+        label: 'Response code',
+        title: 'Response code',
+        choices: responseCodeFilterChoices,
+      },
+    ];
+  }
+
   function getCollectionId() {
     const testingEndpoints = testingRunResultSummariesObj?.testingRun?.testingEndpoints;
 
@@ -846,7 +868,7 @@ function SingleTestRunPage() {
         sortOptions={sortOptions}
         resourceName={resourceName}
         hideQueryField={true}
-        filters={filterOptions}
+        filters={tableFilterOptions}
         disambiguateLabel={disambiguateLabel}
         headers={tableHeaders}
         selectable={true}
