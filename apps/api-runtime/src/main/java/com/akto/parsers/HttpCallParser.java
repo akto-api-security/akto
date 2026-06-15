@@ -82,6 +82,7 @@ public class HttpCallParser {
             .build();
 
     private Map<Integer, ApiCollection> apiCollectionMap;
+    private boolean skipDependencyAnalysis = false;
 
     private static final ConcurrentLinkedQueue<BasicDBObject> queue = new ConcurrentLinkedQueue<>();
 
@@ -295,7 +296,7 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId, makeApisCaseInsensitive);
         }
 
-        if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
+        if (!skipDependencyAnalysis && DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
             for (HttpResponseParams responseParam: filteredResponseParams) {
                 try{
                     dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
@@ -321,7 +322,7 @@ public class HttpCallParser {
             numberOfSyncs++;
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit, mcpAssetsSyncLimit, aiAssetsSyncLimit,
                 responseParams.get(0).getSource());
-            if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
+            if (!skipDependencyAnalysis && DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
                 dependencyAnalyser.dbState = apiCatalogSync.dbState;
                 dependencyAnalyser.syncWithDb();
             }
@@ -873,5 +874,9 @@ public class HttpCallParser {
             featureAccess.setUsageLimit(0);
         }
         return featureAccess.fetchSyncLimit();
+    }
+
+    public void setSkipDependencyAnalysis(boolean skipDependencyAnalysis) {
+        this.skipDependencyAnalysis = skipDependencyAnalysis;
     }
 }

@@ -28,6 +28,7 @@ public class WizApiEndpointsImportJobUtil {
         if (aktoPolicyInfo == null) {
             aktoPolicyInfo = new AccountHTTPCallParserAktoPolicyInfo();
             HttpCallParser httpCallParser = new HttpCallParser("userIdentifier", 10, 5, 30, false, true);
+            httpCallParser.setSkipDependencyAnalysis(true);
             aktoPolicyInfo.setHttpCallParser(httpCallParser);
             RuntimeListener.accountHTTPParserMap.put(accountId, aktoPolicyInfo);
         }
