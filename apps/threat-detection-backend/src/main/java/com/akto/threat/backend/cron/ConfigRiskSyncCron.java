@@ -13,15 +13,19 @@ import java.util.function.Consumer;
 
 import org.bson.conversions.Bson;
 
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.util.AccountTask;
+import com.akto.util.Constants;
+import com.akto.util.LastCronRunInfo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
@@ -60,25 +64,49 @@ public class ConfigRiskSyncCron {
 
     private void syncConfigRiskForAccount(int accountId) {
         int startTimestamp = Context.now();
-        loggerMaker.infoAndAddToDb("Config risk sync started for account " + accountId);
+        loggerMaker.infoAndAddToDb("Config risk sync cron started for account " + accountId + " at " + startTimestamp);
 
-        Set<Integer> misconfiguredCollectionIds = findMisconfiguredCollectionIds(accountId);
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        LastCronRunInfo lastRunTimerInfo = accountSettings.getLastUpdatedCronInfo();
+        int deltaEndTime = Context.now();
+        int deltaStartTime = deltaEndTime - Constants.ONE_DAY_TIMESTAMP;
+
+        Bson updateForLastCronRunInfo = Updates.set(
+            AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_ATLAS_THREAT_SCORE_SYNC,
+            deltaEndTime
+        );
+
+        if (lastRunTimerInfo != null) {
+            if (deltaEndTime - lastRunTimerInfo.getLastInfoResetted() <= Constants.ONE_DAY_TIMESTAMP) {
+                int last = lastRunTimerInfo.getLastAtlasThreatScoreSync();
+                deltaStartTime = (last > 0) ? last : (deltaEndTime - Constants.ONE_DAY_TIMESTAMP);
+            } else {
+                updateForLastCronRunInfo = Updates.combine(
+                    updateForLastCronRunInfo,
+                    Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_INFO_RESETTED, deltaEndTime)
+                );
+            }
+        }
+
+        Set<Integer> misconfiguredCollectionIds = findMisconfiguredCollectionIds(accountId, deltaStartTime, deltaEndTime);
         loggerMaker.infoAndAddToDb("Config misconfigured collection count: " + misconfiguredCollectionIds.size() + " for account " + accountId);
 
         if (!misconfiguredCollectionIds.isEmpty()) {
             stampMisconfiguredTag(misconfiguredCollectionIds);
         }
 
-        loggerMaker.infoAndAddToDb("Config risk sync completed for account " + accountId
-                + " in " + (Context.now() - startTimestamp) + "s");
+        AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), updateForLastCronRunInfo);
+        loggerMaker.infoAndAddToDb("Config risk sync cron completed for account " + accountId + " in " + (Context.now() - startTimestamp) + " seconds");
     }
 
-    private Set<Integer> findMisconfiguredCollectionIds(int accountId) {
+    private Set<Integer> findMisconfiguredCollectionIds(int accountId, int deltaStartTime, int deltaEndTime) {
         BasicDBObject groupedId = new BasicDBObject("host", "$host")
                 .append("endpoint", "$latestApiEndpoint");
 
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(Filters.and(
+                Filters.gte("detectedAt", deltaStartTime),
+                Filters.lte("detectedAt", deltaEndTime),
                 Filters.eq("successfulExploit", true),
                 Filters.eq("contextSource", "ENDPOINT"),
                 Filters.regex("latestApiEndpoint", CONFIG_ENDPOINT_PREFIX)
