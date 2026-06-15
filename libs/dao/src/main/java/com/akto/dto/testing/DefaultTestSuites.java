@@ -21,7 +21,6 @@ public class DefaultTestSuites extends TestSuites {
         testSuitesPerType.put(DefaultSuitesType.SEVERITY.name(), 4);
         testSuitesPerType.put(DefaultSuitesType.DURATION.name(), 2);
         testSuitesPerType.put(DefaultSuitesType.MCP_SECURITY.name(), 8);
-        testSuitesPerType.put(DefaultSuitesType.AI_AGENT_SECURITY.name(), 16);
         testSuitesPerType.put(DefaultSuitesType.ATTACK_BASE_TECHNIQUE.name(), 14);
         testSuitesPerType.put(DefaultSuitesType.ATTACK_STRATEGY.name(), 6);
     }
@@ -130,7 +129,10 @@ public class DefaultTestSuites extends TestSuites {
     }
 
     public static int countOfDefaultTestSuites() {
-        return testSuitesPerType.values().stream()
-            .reduce(0, Integer::sum);
+        int count = 0;
+        for (Integer v : testSuitesPerType.values()) {
+            count += v;
+        }
+        return count;
     }
 }
