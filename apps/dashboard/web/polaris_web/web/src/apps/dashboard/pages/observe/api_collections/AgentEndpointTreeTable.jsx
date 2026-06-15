@@ -317,24 +317,6 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
         }
     }, [navigate]);
 
-    const [configExpanded, setConfigExpanded] = useState(false);
-    const [configEndpoints, setConfigEndpoints] = useState(null);
-
-    const handleConfigToggle = useCallback(() => {
-        if (!configExpanded && configEndpoints === null) {
-            import('../api').then(mod => {
-                const api = mod.default;
-                api.fetchApisFromStis(misconfiguredCollectionId).then(resp => {
-                    const endpoints = (resp?.list || [])
-                        .map(x => x._id)
-                        .filter(e => e?.url?.startsWith('/claude/config/'));
-                    setConfigEndpoints(endpoints);
-                }).catch(() => setConfigEndpoints([]));
-            });
-        }
-        setConfigExpanded(v => !v);
-    }, [configExpanded, configEndpoints, misconfiguredCollectionId]);
-
     const configRow = useMemo(() => {
         if (!misconfiguredCollectionId) return null;
         const cells = [
@@ -343,13 +325,9 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
         childHeaders.forEach((header, idx) => {
             if (header.value === 'displayNameComp') {
                 cells.push(
-                    <div
-                        key="name-config"
-                        style={{ cursor: 'pointer', width: header.boxWidth }}
-                        onClick={handleConfigToggle}
-                    >
+                    <div key="name-config" style={{ width: header.boxWidth }}>
                         <HorizontalStack gap="1" align="start" wrap={false}>
-                            <Text variant="bodyMd" as="span">{configExpanded ? '▾' : '▸'} config</Text>
+                            <Text variant="bodyMd" as="span">config</Text>
                             <Badge size="small" status="attention">Misconfigured</Badge>
                         </HorizontalStack>
                     </div>
@@ -359,32 +337,7 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
             }
         });
         return cells;
-    }, [misconfiguredCollectionId, childHeaders, handleConfigToggle, configExpanded]);
-
-    const configEndpointRows = useMemo(() => {
-        if (!configExpanded || !configEndpoints) return [];
-        return configEndpoints.map((ep, i) => {
-            const cells = [
-                <div key={`config-spacer2-${i}`} style={{ width: '64px', minWidth: '64px' }} />
-            ];
-            childHeaders.forEach((header, idx) => {
-                if (header.value === 'displayNameComp') {
-                    cells.push(
-                        <div
-                            key={`config-ep-${i}`}
-                            style={{ cursor: 'pointer', width: header.boxWidth }}
-                            onClick={() => navigate(`/dashboard/observe/inventory/${misconfiguredCollectionId}?selected_url=${encodeURIComponent(ep.url)}&selected_method=${ep.method}`)}
-                        >
-                            <Text variant="bodySm" as="span" color="subdued">{ep.url}</Text>
-                        </div>
-                    );
-                } else {
-                    cells.push(<div key={`config-ep-empty-${i}-${idx}`} style={{ width: header.boxWidth }} />);
-                }
-            });
-            return cells;
-        });
-    }, [configExpanded, configEndpoints, childHeaders, navigate, misconfiguredCollectionId]);
+    }, [misconfiguredCollectionId, childHeaders]);
 
     const rows = useMemo(() => {
         return children.map(child => {
@@ -465,7 +418,7 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
         <td colSpan={expandedColSpan} style={{ padding: '0px !important' }} className="control-row">
             <Box width="100%">
                 <DataTable
-                    rows={configRow ? [configRow, ...configEndpointRows, ...rows] : rows}
+                    rows={configRow ? [configRow, ...rows] : rows}
                     hasZebraStripingOnData
                     headings={[]}
                     columnContentTypes={columnContentTypes}
