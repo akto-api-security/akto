@@ -78,6 +78,9 @@ public class CrawlerRun {
     public static final String TEST_ROLE_HEX_ID = "testRoleHexId";
     private String testRoleHexId;
 
+    public static final String ENABLE_AI_JS_DISCOVERY = "enableAiJsDiscovery";
+    private boolean enableAiJsDiscovery;
+
     public CrawlerRun() {
     }
 
