@@ -1,6 +1,7 @@
 package com.akto.dao.monitoring;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
@@ -25,6 +26,11 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
                 Filters.eq(ModuleInfo.NAME, moduleName),
                 Filters.gt(ModuleInfo.LAST_HEARTBEAT_RECEIVED, Context.now() - INACTIVE_THRESHOLD)));
         return moduleInfo != null;
+    }
+
+    public void createIndicesIfAbsent() {
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { ModuleInfo.MODULE_TYPE, ModuleInfo._REBOOT, ModuleInfo.MINI_RUNTIME_NAME }, false);
     }
 
     @Override
