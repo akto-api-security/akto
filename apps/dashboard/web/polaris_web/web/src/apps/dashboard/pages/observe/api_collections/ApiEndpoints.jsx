@@ -309,6 +309,9 @@ function ApiEndpoints(props) {
     const queryParams = new URLSearchParams(location.search);
     const selectedUrl = queryParams.get('selected_url')
     const selectedMethod = queryParams.get('selected_method')
+    // Scope an agentic collection's inventory to only config (/claude/config/*) or only
+    // skill (/skills/*) endpoints — config and skills share one collection.
+    const agenticView = queryParams.get('agentic_view')
     const [isEditing, setIsEditing] = useState(false);
     const [editableTitle, setEditableTitle] = useState(pageTitle);
     const [description, setDescription] = useState("");
@@ -439,6 +442,14 @@ function ApiEndpoints(props) {
 
         let data = {}
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap,apiInfoSeverityMap)
+
+        // Scope to config-only or skills-only endpoints when navigated from the agent tree.
+        // Config and skill endpoints live in the same collection; this keeps the two views distinct.
+        if (agenticView === 'config') {
+            allEndpoints = allEndpoints.filter(e => e?.endpoint?.startsWith('/claude/config/'))
+        } else if (agenticView === 'skills') {
+            allEndpoints = allEndpoints.filter(e => e?.endpoint?.startsWith('/skills/'))
+        }
 
         // handle code analysis endpoints
         const codeAnalysisCollectionInfo = sourceCodeData.codeAnalysisCollectionInfo
@@ -805,7 +816,7 @@ function ApiEndpoints(props) {
         //     checkGptActive()
         // }
         fetchData()
-    }, [apiCollectionId, endpointListFromConditions])
+    }, [apiCollectionId, endpointListFromConditions, agenticView])
 
     useEffect(() => {
         if (pageTitle !== collectionsMap[apiCollectionId]) { 
