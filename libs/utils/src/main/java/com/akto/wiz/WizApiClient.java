@@ -2,6 +2,8 @@ package com.akto.wiz;
 
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
 import com.mongodb.BasicDBObject;
 
@@ -15,8 +17,11 @@ import java.util.Set;
 
 public class WizApiClient {
 
+    private static final LoggerMaker loggerMaker = new LoggerMaker(WizApiClient.class, LogDb.DASHBOARD);
+
     static final int HOST_FETCH_PAGE_SIZE = 500;
     static final int ENDPOINT_FETCH_PAGE_SIZE = 20;
+    static final int ENDPOINT_META_FETCH_PAGE_SIZE = 500;
 
     private static Map<String, List<String>> buildHeaders(String accessToken) {
         Map<String, List<String>> headers = new HashMap<>();
@@ -27,53 +32,55 @@ public class WizApiClient {
     }
 
     /**
-     * Paginates apiEndpoints fetching only the host field, returns the full set of unique hosts.
+     * Paginates apiEndpoints fetching only id and updatedAt, returns the full list.
      */
-    public static Set<String> fetchAllHosts(String apiUrl, String accessToken) throws Exception {
-        Set<String> hosts = new HashSet<>();
+    public static List<BasicDBObject> fetchAllEndpointMeta(String apiUrl, String accessToken) throws Exception {
+        List<BasicDBObject> results = new ArrayList<>();
         String cursor = null;
         boolean hasNextPage = true;
         Map<String, List<String>> headers = buildHeaders(accessToken);
 
         while (hasNextPage) {
             String variablesPart = cursor == null
-                ? String.format("{\"first\":%d}", HOST_FETCH_PAGE_SIZE)
-                : String.format("{\"first\":%d,\"after\":\"%s\"}", HOST_FETCH_PAGE_SIZE, cursor);
+                ? String.format("{\"first\":%d}", ENDPOINT_META_FETCH_PAGE_SIZE)
+                : String.format("{\"first\":%d,\"after\":\"%s\"}", ENDPOINT_META_FETCH_PAGE_SIZE, cursor);
 
-            String graphqlQuery = "{\"query\":\"query($first: Int, $after: String) { apiEndpoints(first: $first, after: $after) { nodes { host } pageInfo { endCursor hasNextPage } } }\",\"variables\":" + variablesPart + "}";
+            String graphqlQuery = "{\"query\":\"query($first: Int, $after: String) { apiEndpoints(first: $first, after: $after) { nodes { id updatedAt } pageInfo { endCursor hasNextPage } } }\",\"variables\":" + variablesPart + "}";
 
+            loggerMaker.infoAndAddToDb(String.format("fetchAllEndpointMeta: page cursor=%s", cursor));
             BasicDBObject root = executeAndGetRoot(apiUrl, graphqlQuery, headers, "apiEndpoints");
 
             List<?> nodes = (List<?>) root.get("nodes");
             BasicDBObject pageInfo = (BasicDBObject) root.get("pageInfo");
 
             for (Object nodeObj : nodes) {
-                String host = ((BasicDBObject) nodeObj).getString("host");
-                if (host != null && !host.isEmpty()) {
-                    hosts.add(host);
-                }
+                results.add((BasicDBObject) nodeObj);
             }
 
             hasNextPage = pageInfo.getBoolean("hasNextPage", false);
             cursor = pageInfo.getString("endCursor");
         }
 
-        return hosts;
+        return results;
     }
 
     /**
-     * Fetches one page of full endpoint details for a specific host.
+     * Fetches one page of full endpoint details filtered by a set of endpoint IDs.
      * Returns the apiEndpoints root object containing "nodes" and "pageInfo".
-     * Throws on non-200 or null response.
      */
-    public static BasicDBObject fetchEndpointsPage(String apiUrl, String accessToken, String host, String cursor) throws Exception {
-        String escapedHost = host.replace("\\", "\\\\").replace("\"", "\\\"");
-        String variablesPart = cursor == null
-            ? String.format("{\"first\":%d,\"fetchTotalCount\":true,\"filterBy\":{\"host\":{\"equals\":[\"%s\"]}}}", ENDPOINT_FETCH_PAGE_SIZE, escapedHost)
-            : String.format("{\"first\":%d,\"after\":\"%s\",\"fetchTotalCount\":false,\"filterBy\":{\"host\":{\"equals\":[\"%s\"]}}}", ENDPOINT_FETCH_PAGE_SIZE, cursor, escapedHost);
+    public static BasicDBObject fetchEndpointsPageByIds(String apiUrl, String accessToken, List<String> ids) throws Exception {
+        StringBuilder idsJson = new StringBuilder("[");
+        for (int i = 0; i < ids.size(); i++) {
+            if (i > 0) idsJson.append(",");
+            idsJson.append("\"").append(ids.get(i).replace("\"", "\\\"")).append("\"");
+        }
+        idsJson.append("]");
 
-        String graphqlQuery = "{\"query\":\"query APIEndpointsTable($first: Int, $after: String, $fetchTotalCount: Boolean = true, $filterBy: APIEndpointFilters) { apiEndpoints(first: $first, after: $after, filterBy: $filterBy) { nodes { id host source authSchemes isAiGenerated createdAt updatedAt ... on HTTPRestAPIEndpoint { httpMethod pathname specification { string } } ... on HTTPGraphqlAPIEndpoint { operationType operationName } ... on HTTPGrpcAPIEndpoint { methodName } ... on HTTPSoapAPIEndpoint { methodName } ... on HTTPMcpAPIEndpoint { method name } } pageInfo { endCursor hasNextPage } totalCount @include(if: $fetchTotalCount) } }\",\"variables\":" + variablesPart + "}";
+        String variablesPart = String.format("{\"first\":%d,\"filterBy\":{\"id\":{\"equals\":%s}}}", ENDPOINT_FETCH_PAGE_SIZE, idsJson);
 
+        String graphqlQuery = "{\"query\":\"query APIEndpointsTable($first: Int, $filterBy: APIEndpointFilters) { apiEndpoints(first: $first, filterBy: $filterBy) { nodes { id host source authSchemes isAiGenerated createdAt updatedAt ... on HTTPRestAPIEndpoint { httpMethod pathname specification { string } } ... on HTTPGraphqlAPIEndpoint { operationType operationName } ... on HTTPGrpcAPIEndpoint { methodName } ... on HTTPSoapAPIEndpoint { methodName } ... on HTTPMcpAPIEndpoint { method name } } } }\",\"variables\":" + variablesPart + "}";
+
+        loggerMaker.infoAndAddToDb(String.format("fetchEndpointsPageByIds: %d ids", ids.size()));
         return executeAndGetRoot(apiUrl, graphqlQuery, buildHeaders(accessToken), "apiEndpoints");
     }
 
@@ -82,9 +89,11 @@ public class WizApiClient {
         OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, true, new ArrayList<>(), WizIntegrationUtils.isWizDevMode());
 
         if (response == null || response.getStatusCode() != 200 || response.getBody() == null) {
+            loggerMaker.errorAndAddToDb(String.format("Wiz API call failed. Status: %d", response != null ? response.getStatusCode() : -1));
             throw new Exception(String.format("Wiz API call failed. Status: %d",
                 response != null ? response.getStatusCode() : -1));
         }
+        loggerMaker.infoAndAddToDb(String.format("Response status: %d", response.getStatusCode()));
 
         BasicDBObject responseObj = BasicDBObject.parse(response.getBody());
         return (BasicDBObject) ((BasicDBObject) responseObj.get("data")).get(rootKey);
