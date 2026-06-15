@@ -45,6 +45,8 @@ public class DependencyNode {
         public static final String IS_HEADER = "isHeader";
         private String responseParam;
         public static final String RESPONSE_PARAM = "responseParam";
+        private String responseUrlPath;
+        public static final String RESPONSE_URL_PATH = "responseUrlPath";
         private int count;
         public static final String COUNT = "count";
 
@@ -54,6 +56,16 @@ public class DependencyNode {
         public ParamInfo(String requestParam, String responseParam, int count, boolean isUrlParam, boolean isHeader) {
             this.requestParam = requestParam;
             this.responseParam = responseParam;
+            this.isUrlParam = isUrlParam;
+            this.count = count;
+            this.isHeader = isHeader;
+            this.responseUrlPath = null;
+        }
+
+        public ParamInfo(String requestParam, String responseParam, String responseUrlPath, int count, boolean isUrlParam, boolean isHeader) {
+            this.requestParam = requestParam;
+            this.responseParam = responseParam;
+            this.responseUrlPath = responseUrlPath;
             this.isUrlParam = isUrlParam;
             this.count = count;
             this.isHeader = isHeader;
@@ -107,21 +119,29 @@ public class DependencyNode {
             isHeader = header;
         }
 
+        public String getResponseUrlPath() {
+            return responseUrlPath;
+        }
+
+        public void setResponseUrlPath(String responseUrlPath) {
+            this.responseUrlPath = responseUrlPath;
+        }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             ParamInfo paramInfo = (ParamInfo) o;
-            return isUrlParam == paramInfo.isUrlParam && isHeader == paramInfo.isHeader && requestParam.equals(paramInfo.requestParam) && responseParam.equals(paramInfo.responseParam);
+            return isUrlParam == paramInfo.isUrlParam && isHeader == paramInfo.isHeader && requestParam.equals(paramInfo.requestParam) && responseParam.equals(paramInfo.responseParam) && responseUrlPath.equals(paramInfo.responseUrlPath);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(requestParam, responseParam, isUrlParam, isHeader);
+            return Objects.hash(requestParam, responseParam, responseUrlPath, isUrlParam, isHeader);
         }
 
         public ParamInfo copy() {
-            return new ParamInfo(requestParam, responseParam, count, isUrlParam, isHeader);
+            return new ParamInfo(requestParam, responseParam, responseUrlPath, count, isUrlParam, isHeader);
         }
     }
 

@@ -1424,17 +1424,34 @@ public class TestExecutor {
                                             for(ParamInfo paramInfo: node.getParamInfos()) {
                                                 // TODO: Handle for header
                                                 if (paramInfo.isHeader()) continue;
-                                                Set<Object> valuesFromResponse = valuesMap.get(paramInfo.getResponseParam());
+                                                
+                                                // Extract value - try URL path first if responseUrlPath is set
+                                                Object valueExtracted = null;
+                                                String requestUrl = rawApiToBeReplayed.getRequest().getUrl();
+                                                
+                                                if (paramInfo.getResponseUrlPath() != null && !paramInfo.getResponseUrlPath().isEmpty()) {
+                                                    // Try to extract from request URL path
+                                                    valueExtracted = extractValueFromRequestUrlPath(requestUrl, paramInfo.getResponseUrlPath());
+                                                    if (valueExtracted != null) {
+                                                        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts extracted from request URL path: " + paramInfo.getResponseUrlPath() + " = " + valueExtracted);
+                                                    }
+                                                } else {
+                                                    // Fall back to response extraction if responseUrlPath is not set
+                                                    Set<Object> valuesFromResponse = valuesMap.get(paramInfo.getResponseParam());
+                                                    if (valuesFromResponse != null && !valuesFromResponse.isEmpty()) {
+                                                        valueExtracted = valuesFromResponse.iterator().next();
+                                                        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts extracted from response: " + paramInfo.getResponseParam() + " = " + valueExtracted);
+                                                    }
+                                                }
 
-                                                if (valuesFromResponse == null || valuesFromResponse.isEmpty()) {
+                                                if (valueExtracted == null) {
                                                     fullReplace = false;
+                                                    loggerMaker.warnAndAddToDb("cleanUpTestArtifacts unable to extract value for paramInfo: " + paramInfo.getRequestParam());
                                                     break;
                                                 }
 
-                                                Object valueFromResponse = valuesFromResponse.iterator().next();
-
-                                                KVPair.KVType type = valueFromResponse instanceof Integer ? KVPair.KVType.INTEGER : KVPair.KVType.STRING;
-                                                KVPair kvPair = new KVPair(paramInfo.getRequestParam(), valueFromResponse.toString(), false, paramInfo.isUrlParam(), type);
+                                                KVPair.KVType type = valueExtracted instanceof Integer ? KVPair.KVType.INTEGER : KVPair.KVType.STRING;
+                                                KVPair kvPair = new KVPair(paramInfo.getRequestParam(), valueExtracted.toString(), false, paramInfo.isUrlParam(), type);
                                                 loggerMaker.warnAndAddToDb("cleanUpTestArtifacts kvPair created - key: " + kvPair.getKey() + " | value: " + kvPair.getValue());
                                                 kvPairs.add(kvPair);
                                             }
@@ -1696,6 +1713,22 @@ public class TestExecutor {
 
     private static int indexOfEveryPromptMarker(String collectionDescription) {
         return collectionDescription.toLowerCase().indexOf(EVERY_PROMPT_MARKER);
+    }
+
+    private static Object extractValueFromRequestUrlPath(String requestUrl, String urlPathIndex) {
+        if (requestUrl == null || requestUrl.isEmpty() || urlPathIndex == null || urlPathIndex.isEmpty()) {
+            return null;
+        }
+        try {
+            String[] urlSegments = requestUrl.split("/");
+            int index = Integer.parseInt(urlPathIndex);
+            if (index >= 0 && index < urlSegments.length) {
+                return urlSegments[index];
+            }
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        return null;
     }
 
 }
