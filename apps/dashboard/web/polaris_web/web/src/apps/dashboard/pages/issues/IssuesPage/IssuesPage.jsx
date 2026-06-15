@@ -352,10 +352,10 @@ function IssuesPage() {
     useEffect(() => {
         const fetchCompulsorySettings = async () => {
             try {
-                const { resp } = await settingFunctions.fetchAdminInfo();
+                const accountConfig = await settingFunctions.fetchAccountConfig();
 
-                if (resp?.compulsoryDescription) {
-                    setCompulsorySettings(resp.compulsoryDescription);
+                if (accountConfig?.compulsoryDescription) {
+                    setCompulsorySettings(accountConfig.compulsoryDescription);
                 }
             } catch (error) {
                 console.error("Error fetching compulsory settings:", error);

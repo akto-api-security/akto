@@ -164,6 +164,9 @@ const settingFunctions = {
 
       await settingRequests.saveAktoGptConfig(arr)
     },
+    fetchAccountConfig: async function(){
+      return await settingRequests.fetchAccountConfig()
+    },
     fetchLoginInfo: async function(){
       let lastLogin = ''
       await settingRequests.fetchUserLastLoginTs().then((resp)=>{
@@ -171,8 +174,8 @@ const settingFunctions = {
       })
       return lastLogin
     },
-    fetchAdminInfo: async function(){
-      const loginInfo = await this.fetchLoginInfo()
+    fetchAdminInfo: async function(fetchLoginInfoFlag = false){
+      const loginInfo = fetchLoginInfoFlag ? await this.fetchLoginInfo() : ''
       let arr = []
       let resp = {}
       let accountSettingsDetails = {}

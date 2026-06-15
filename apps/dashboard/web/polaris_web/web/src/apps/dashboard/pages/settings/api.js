@@ -145,6 +145,13 @@ const settingRequests = {
             data: {}
         })
     },
+    fetchAccountConfig() {
+        return request({
+            url: '/api/fetchAccountConfig',
+            method: 'post',
+            data: {}
+        })
+    },
     fetchTrafficMetricsDesciptions() {
         return request({
             url: '/api/fetchTrafficMetricsDesciptions',
