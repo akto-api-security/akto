@@ -10,6 +10,7 @@ import urllib.request
 from typing import Any, Dict, Set, Tuple, Union
 
 from akto_machine_id import get_machine_id, get_username
+from akto_ingestion_utility import installer_headers, resolve_session_info
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.codex/akto/logs"))
@@ -140,9 +141,7 @@ def build_validation_request(query: str, session_info: dict = None) -> dict:
         "content-type": "application/json",
     }
     if session_info:
-        for key, value in session_info.items():
-            if value is not None:
-                req_headers[f"x-akto-installer-{key}"] = str(value)
+        req_headers.update(installer_headers(session_info))
 
     request_headers = json.dumps(req_headers)
 
@@ -342,18 +341,7 @@ def main():
     prompt = input_data.get("prompt", "")
     session_id = input_data.get("session_id", "")
 
-    session_info = {}
-    for field in (
-        "session_id",
-        "transcript_path",
-        "cwd",
-        "hook_event_name",
-        "model",
-        "turn_id",
-    ):
-        value = input_data.get(field)
-        if value is not None:
-            session_info[field] = value
+    session_info = resolve_session_info(input_data, logger, is_prompt_hook=True)
 
     logger.info(f"Session: {session_id}, Hook: {input_data.get('hook_event_name', 'UserPromptSubmit')}")
 

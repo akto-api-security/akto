@@ -214,10 +214,10 @@ function TestRunResultFlyout(props) {
     useEffect(() => {
         const fetchCompulsorySettings = async () => {
             try {
-                const { resp } = await settingFunctions.fetchAdminInfo();
+                const accountConfig = await settingFunctions.fetchAccountConfig();
 
-                if (resp?.compulsoryDescription) {
-                    setCompulsorySettings(resp.compulsoryDescription);
+                if (accountConfig?.compulsoryDescription) {
+                    setCompulsorySettings(accountConfig.compulsoryDescription);
                 }
             } catch (error) {
 
