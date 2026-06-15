@@ -43,6 +43,7 @@ function computeAssetRiskFactors(asset) {
         });
     }
 
+
     if (factors.length === 0) {
         factors.push({
             severity: "low",

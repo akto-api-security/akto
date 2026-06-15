@@ -87,12 +87,14 @@ function Endpoints() {
         return groups.map((group) => {
             const showPersonal = group.hasPersonalAccount && group.rowType !== ROW_TYPES.SKILL;
             const showLocalMcp = group.hasLocalMcpServer && group.rowType !== ROW_TYPES.SKILL;
-            const groupNameDisplay = (showPersonal || showLocalMcp)
+            const showMisconfigured = group.hasMisconfiguredConfig && group.rowType !== ROW_TYPES.SKILL;
+            const groupNameDisplay = (showPersonal || showLocalMcp || showMisconfigured)
                 ? (
                     <HorizontalStack gap="2" align="start" wrap={false}>
                         <Text>{group.groupName}</Text>
                         {showPersonal && <Badge size="small" status="warning">Contains personal account</Badge>}
                         {showLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
+                        {showMisconfigured && <Badge size="small" status="attention">Misconfigured</Badge>}
                     </HorizontalStack>
                 )
                 : group.groupName;

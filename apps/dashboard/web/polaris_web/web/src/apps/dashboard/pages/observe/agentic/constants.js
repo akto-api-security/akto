@@ -12,6 +12,7 @@ import {
     getAgentTypeFromValue,
     hasPersonalAccountTag,
     hasLocalMcpServerTag,
+    hasMisconfiguredConfigTag,
 } from "./mcpClientHelper";
 import func from "@/util/func";
 import {
@@ -211,6 +212,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
                 maxRiskScore: 0,
                 hasPersonalAccount: false,
                 hasLocalMcpServer: false,
+                hasMisconfiguredConfig: false,
             };
         }
 
@@ -218,6 +220,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
         if (!agents[key].firstCollection) agents[key].firstCollection = c;
         if (hasPersonalAccountTag(c.envType)) agents[key].hasPersonalAccount = true;
         if (hasLocalMcpServerTag(c.envType)) agents[key].hasLocalMcpServer = true;
+        if (hasMisconfiguredConfigTag(c.envType)) agents[key].hasMisconfiguredConfig = true;
         
         // Track unique endpoint IDs
         if (endpointId) {
@@ -303,6 +306,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
                 maxRiskScore: 0,
                 hasPersonalAccount: false,
                 hasLocalMcpServer: false,
+                hasMisconfiguredConfig: false,
             };
         }
 
@@ -313,6 +317,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
         if (!services[key].firstCollection) services[key].firstCollection = c;
         if (hasPersonalAccountTag(c.envType)) services[key].hasPersonalAccount = true;
         if (hasLocalMcpServerTag(c.envType)) services[key].hasLocalMcpServer = true;
+        if (hasMisconfiguredConfigTag(c.envType)) services[key].hasMisconfiguredConfig = true;
         
         // Track unique endpoint IDs
         if (endpointId) {
@@ -782,6 +787,7 @@ export function buildAgenticAssetsPageData(
             lastSeenEpoch: lastSeen,
             hasPersonalAccount: group.hasPersonalAccount || false,
             hasLocalMcpServer: group.hasLocalMcpServer || false,
+            hasMisconfiguredConfig: group.hasMisconfiguredConfig || false,
         };
         if (aiInteractions) {
             treeRow.aiInteractions = aiInteractions.total;
@@ -809,6 +815,7 @@ export function buildAgenticAssetsPageData(
             toolCount: 0,
             hasPersonalAccount: group.hasPersonalAccount || false,
             hasLocalMcpServer: group.hasLocalMcpServer || false,
+            hasMisconfiguredConfig: group.hasMisconfiguredConfig || false,
         };
         if (violations) flatRow.violations = violations;
         if (aiInteractions) {
@@ -853,16 +860,16 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
     const cacheAge = Date.now() - (cached?.ts || 0);
 
     if (cacheAge <= SKILL_RISK_CACHE_TTL_MS && cached?.ts > 0) {
-        return { skillScoreMap: cached.data || {}, maliciousSkills: new Set(cached.maliciousSkills || []), misconfiguredSkills: new Set(cached.misconfiguredSkills || []) };
+        return { skillScoreMap: cached.data || {}, maliciousSkills: new Set(cached.maliciousSkills || []), misconfiguredSkills: new Set(cached.misconfiguredSkills || []), misconfiguredCollectionIds: new Set(cached.misconfiguredCollectionIds || []) };
     }
 
     const results = await Promise.all(
         collectionIds.map(async (id) => {
             try {
                 const resp = await api.fetchApiInfosForCollection(id);
-                return resp?.apiInfoList || [];
+                return { id, infos: resp?.apiInfoList || [] };
             } catch {
-                return [];
+                return { id, infos: [] };
             }
         })
     );
@@ -870,19 +877,26 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
     const skillScoreMap = {};
     const maliciousSkills = new Set();
     const misconfiguredSkills = new Set();
-    results.forEach((infos) => {
+    const misconfiguredCollectionIds = new Set();
+    results.forEach(({ id: collectionId, infos }) => {
         infos.forEach((info) => {
-            const splits = info?.id?.url?.split("skills/");
+            const url = info?.id?.url || "";
+            const splits = url.split("skills/");
             const skillName = splits?.[1];
-            if (!skillName) return;
-            skillScoreMap[skillName] = info.riskScore || 0;
-            const isMalicious = (info.tagsList || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true");
-            if (isMalicious) maliciousSkills.add(skillName);
-            const isMisconfigured = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
-            if (isMisconfigured) misconfiguredSkills.add(skillName);
+            if (skillName) {
+                skillScoreMap[skillName] = info.riskScore || 0;
+                const isMalicious = (info.tagsList || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true");
+                if (isMalicious) maliciousSkills.add(skillName);
+                const isMisconfigured = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
+                if (isMisconfigured) misconfiguredSkills.add(skillName);
+            }
+            if (url.includes("/claude/config/")) {
+                const hasMisconfiguredTag = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
+                if (hasMisconfiguredTag) misconfiguredCollectionIds.add(collectionId);
+            }
         });
     });
 
-    PersistStore.getState().setSkillRiskScoreCache({ data: skillScoreMap, maliciousSkills: [...maliciousSkills], misconfiguredSkills: [...misconfiguredSkills], ts: Date.now() });
-    return { skillScoreMap, maliciousSkills, misconfiguredSkills };
+    PersistStore.getState().setSkillRiskScoreCache({ data: skillScoreMap, maliciousSkills: [...maliciousSkills], misconfiguredSkills: [...misconfiguredSkills], misconfiguredCollectionIds: [...misconfiguredCollectionIds], ts: Date.now() });
+    return { skillScoreMap, maliciousSkills, misconfiguredSkills, misconfiguredCollectionIds };
 }

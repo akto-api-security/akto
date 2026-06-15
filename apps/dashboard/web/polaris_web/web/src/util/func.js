@@ -1273,6 +1273,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
   if(Object.keys(idToName).length === 0){
     idToName = func.mapCollectionIdToName(allCollections)
   }
+  const collectionEnvTypeMap = {}
+  allCollections.forEach(c => { collectionEnvTypeMap[c.id] = c.envType || [] })
 
   let ret = {}
   let apiInfoMap = {}
@@ -1361,7 +1363,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               agentProxyGuardrailEnabled: apiInfoMap[key] ? (apiInfoMap[key]["agentProxyGuardrailEnabled"] || false) : false,
               guardrailSchema: apiInfoMap[key] ? (apiInfoMap[key]["guardrailSchema"] || null) : null,
               isMalicious: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true") : false,
-              isMisconfigured: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true") : false,
+              isMisconfigured: (apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true") : false) || (x.endpoint?.startsWith("/claude/config/") && (collectionEnvTypeMap[x.apiCollectionId] || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true")),
               tagsList: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []) : [],
               apiType,
           }
@@ -2422,7 +2424,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       })} ${timeStr}`;
   },
   isDemoAccount(){
-     return window.ACTIVE_ACCOUNT === 1000000
+     return window.ACTIVE_ACCOUNT === 1669322524
   },
 
   shouldShowIpReputation() {

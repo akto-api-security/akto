@@ -176,6 +176,7 @@ function SkillBadge({ count }) {
     return <Badge>{`${count} ${count === 1 ? "skill" : "skills"}`}</Badge>;
 }
 
+
 function RiskScoreCellRenderer({ value }) {
     if (value == null) return null;
     return <RiskPill score={value} />;
