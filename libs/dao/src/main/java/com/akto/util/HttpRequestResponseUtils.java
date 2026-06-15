@@ -169,10 +169,24 @@ public class HttpRequestResponseUtils {
 
     public static Map<String, Set<Object>> extractValuesFromPayload(String body) {
         if (body == null) return new HashMap<>();
-        if (body.startsWith("[")) body = "{\"json\": "+body+"}";
+        
+        String trimmedBody = body.trim();
+        
+        if (!trimmedBody.startsWith("{") && !trimmedBody.startsWith("[")) {
+            Map<String, Set<Object>> result = new HashMap<>();
+            String value = trimmedBody;
+
+            if (value.startsWith("\"") && value.endsWith("\"")) {
+                value = value.substring(1, value.length() - 1);
+            }
+            result.put("", new HashSet<>(Collections.singletonList(value)));
+            return result;
+        }
+        
+        if (trimmedBody.startsWith("[")) trimmedBody = "{\"json\": "+trimmedBody+"}";
         BasicDBObject respPayloadObj;
         try {
-            respPayloadObj = BasicDBObject.parse(body);
+            respPayloadObj = BasicDBObject.parse(trimmedBody);
         } catch (Exception e) {
             respPayloadObj = BasicDBObject.parse("{}");
         }
