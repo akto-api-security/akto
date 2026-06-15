@@ -2219,7 +2219,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
 
   hasThreatAccess(){
-    return ['ADMIN', 'THREAT_ENGINEER', 'THREAT_VIEWER'].includes(window.USER_ROLE)
+    return !['MEMBER', 'DEVELOPER', 'GUEST', 'NO_ACCESS'].includes(window.USER_ROLE)
   },
   checkUserValidForIntegrations(){
     const rbacAccess = this.checkForRbacFeatureBasic();
