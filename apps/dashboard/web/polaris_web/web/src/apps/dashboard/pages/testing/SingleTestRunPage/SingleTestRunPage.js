@@ -59,7 +59,7 @@ import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 import MarkdownReportGenerator from "../../../components/shared/MarkdownReportGenerator";
 import { saveAs } from 'file-saver';
 import SeveritySelector from '../../issues/components/SeveritySelector';
-import { buildResponseCodeFilterChoices, HTTP_CODE_LABELS } from "../TestRunsPage/runStatusUtils";
+import { buildResponseCodeFilterChoices, getExecutionIssueList, HTTP_CODE_LABELS } from "../TestRunsPage/runStatusUtils";
 
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -169,13 +169,7 @@ function SingleTestRunPage() {
   const [testingRunResultSummariesObj, setTestingRunResultSummariesObj] = useState({})
   const [allResultsLength, setAllResultsLength] = useState(undefined)
   const [currentSummary, setCurrentSummary] = useState('')
-  const [testResultsStatsCount, setTestResultsStatsCount] = useState(0)
-  const [allTestResultsStats, setAllTestResultsStats] = useState({
-    count429: 0,
-    count500: 0,
-    countCloudflare: 0,
-    totalCount: 0
-  })
+  const [statusCounts, setStatusCounts] = useState({})
 
   const localCategoryMap = LocalStore.getState().categoryMap
   const localSubCategoryMap = LocalStore.getState().subCategoryMap
@@ -245,35 +239,19 @@ function SingleTestRunPage() {
     })
   }
 
-  async function fetchTestResultsStats(testingRunHexId, testingRunResultSummaryHexId) {
+  // Pull the full per-status-code execution breakdown (403, 404, 429, 5xx, cloudflare, domain
+  // unreachable, skipped, ...) from the same bulk endpoint the test runs list column uses, so the
+  // header surfaces every error code present in the run instead of just 429/5xx/cloudflare.
+  async function fetchTestResultsStats(testingRunResultSummaryHexId) {
     try {
-      if (testingRunHexId && testingRunResultSummaryHexId) {
-        const reqBase = { testingRunHexId: testingRunHexId, testingRunResultSummaryHexId: testingRunResultSummaryHexId }
-
-        const [res429, res5xx, resCf] = await Promise.allSettled([
-          api.fetchTestResultsStatsCount({ ...reqBase, patternType: 'HTTP_429' }),
-          api.fetchTestResultsStatsCount({ ...reqBase, patternType: 'HTTP_5XX' }),
-          api.fetchTestResultsStatsCount({ ...reqBase, patternType: 'CLOUDFLARE' })
-        ]);
-
-        const count429 = res429.status === 'fulfilled' ? (res429.value || 0) : 0;
-        const count500 = res5xx.status === 'fulfilled' ? (res5xx.value || 0) : 0;
-        const countCloudflare = resCf.status === 'fulfilled' ? (resCf.value || 0) : 0;
-
-        setTestResultsStatsCount(count429);
-        setAllTestResultsStats({
-          count429,
-          count500,
-          countCloudflare,
-          totalCount: count429 + count500 + countCloudflare
-        });
+      if (testingRunResultSummaryHexId) {
+        const summaries = await api.fetchTestRunStatusSummaries([testingRunResultSummaryHexId]);
+        setStatusCounts(summaries?.[testingRunResultSummaryHexId] || {});
       } else {
-        setTestResultsStatsCount(0);
-        setAllTestResultsStats({ count429: 0, count500: 0, countCloudflare: 0, totalCount: 0 });
+        setStatusCounts({});
       }
     } catch (error) {
-      setTestResultsStatsCount(0);
-      setAllTestResultsStats({ count429: 0, count500: 0, countCloudflare: 0, totalCount: 0 });
+      setStatusCounts({});
     }
   }
 
@@ -303,7 +281,7 @@ function SingleTestRunPage() {
 
     // Fetch test results stats for the new summary
     if (summary && summary.hexId) {
-      fetchTestResultsStats(hexId, summary.hexId);
+      fetchTestResultsStats(summary.hexId);
       api.fetchDistinctResponseCodes(summary.hexId)
         .then((codes) => setResponseCodeFilterChoices(buildResponseCodeFilterChoices(codes)))
         .catch(() => setResponseCodeFilterChoices([]));
@@ -1121,74 +1099,60 @@ function SingleTestRunPage() {
               </HorizontalStack>
             </>
           )}
-          {allTestResultsStats.totalCount > 0 && (
-            <>
-              <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
-              <HorizontalStack gap={"1"}>
-                <Box><Icon color="subdued" source={CircleInformationMajor} /></Box>
-                <Tooltip
-                  content={
-                    <VerticalStack gap="2">
-                      <Text variant="bodyMd">API request error statistics breakdown:</Text>
-                      <VerticalStack gap="1">
-                        <Text variant="bodySm">• 429 errors: {allTestResultsStats.count429}</Text>
-                        <Text variant="bodySm">• 5XX errors: {allTestResultsStats.count500}</Text>
-                        <Text variant="bodySm">• Cloudflare errors: {allTestResultsStats.countCloudflare}</Text>
+          {(() => {
+            const issues = getExecutionIssueList(statusCounts);
+            if (issues.length === 0) {
+              return null;
+            }
+            const total = currentSummary?.testResultsCount || 0;
+            const severityFor = (issue) => {
+              if (issue.highlighted) return 'CRITICAL';
+              const percentage = total > 0 ? (issue.count / total) * 100 : 0;
+              if (percentage > 70) return 'CRITICAL';
+              if (percentage >= 40) return 'HIGH';
+              return 'MEDIUM';
+            };
+            return (
+              <>
+                <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
+                <HorizontalStack gap={"1"}>
+                  <Box><Icon color="subdued" source={CircleInformationMajor} /></Box>
+                  <Tooltip
+                    content={
+                      <VerticalStack gap="2">
+                        <Text variant="bodyMd">API request error statistics breakdown:</Text>
+                        <VerticalStack gap="1">
+                          {issues.map((issue) => (
+                            <Text key={issue.key} variant="bodySm">{`• ${issue.label}: ${issue.countLabel}`}</Text>
+                          ))}
+                        </VerticalStack>
+                        <Box paddingBlockStart="1" borderBlockStartWidth="1" borderColor="border-subdued">
+                          <Text variant="bodySm" color="subdued" fontWeight="medium">Approximate counts based on sampled data.</Text>
+                        </Box>
                       </VerticalStack>
-                      <Box paddingBlockStart="1" borderBlockStartWidth="1" borderColor="border-subdued">
-                        <Text variant="bodySm" color="subdued" fontWeight="medium">Approximate counts based on sampled data.</Text>
-                      </Box>
-                    </VerticalStack>
-                  }
-                  hasUnderline={false}
-                >
-                  <HorizontalStack gap="1" align="center">
-                    <Text color="subdued" fontWeight="medium" variant="bodyMd" style={{ cursor: 'pointer' }}>API error stats:</Text>
-                  </HorizontalStack>
-                </Tooltip>
-                {(() => {
-                  const total = currentSummary?.testResultsCount || 0;
-                  const severityFor = (count) => {
-                    const percentage = total > 0 ? (count / total) * 100 : 0;
-                    if (percentage > 70) return 'CRITICAL';
-                    if (percentage >= 40) return 'HIGH';
-                    return 'MEDIUM';
-                  }
-                  return (
-                    <HorizontalStack gap="2" align="center">
-                      {allTestResultsStats.count429 > 0 && (() => {
-                        const sev = severityFor(allTestResultsStats.count429); return (
-                          <div className={`badge-wrapper-${sev.toUpperCase()}`}>
-                            <Badge>
-                              429: {allTestResultsStats.count429}
-                            </Badge>
-                          </div>
-                        )
-                      })()}
-                      {allTestResultsStats.count500 > 0 && (() => {
-                        const sev = severityFor(allTestResultsStats.count500); return (
-                          <div className={`badge-wrapper-${sev.toUpperCase()}`}>
-                            <Badge>
-                              5XX: {allTestResultsStats.count500}
-                            </Badge>
-                          </div>
-                        )
-                      })()}
-                      {allTestResultsStats.countCloudflare > 0 && (() => {
-                        const sev = severityFor(allTestResultsStats.countCloudflare); return (
-                          <div className={`badge-wrapper-${sev.toUpperCase()}`}>
-                            <Badge>
-                              Cloudflare errors: {allTestResultsStats.countCloudflare}
-                            </Badge>
-                          </div>
-                        )
-                      })()}
+                    }
+                    hasUnderline={false}
+                  >
+                    <HorizontalStack gap="1" align="center">
+                      <Text color="subdued" fontWeight="medium" variant="bodyMd" style={{ cursor: 'pointer' }}>API error stats:</Text>
                     </HorizontalStack>
-                  );
-                })()}
-              </HorizontalStack>
-            </>
-          )}
+                  </Tooltip>
+                  <HorizontalStack gap="2" align="center">
+                    {issues.map((issue) => {
+                      const sev = severityFor(issue);
+                      return (
+                        <div key={issue.key} className={`badge-wrapper-${sev}`}>
+                          <Badge>
+                            {`${issue.label}: ${issue.countLabel}`}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </HorizontalStack>
+                </HorizontalStack>
+              </>
+            );
+          })()}
         </HorizontalStack>
       </VerticalStack>
     </Box>

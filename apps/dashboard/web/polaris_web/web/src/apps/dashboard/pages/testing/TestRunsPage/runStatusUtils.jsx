@@ -127,6 +127,19 @@ function issueTone(key) {
   return HIGHLIGHT_KEYS.has(key) ? 'critical' : 'warning';
 }
 
+// Enriched, ordered execution-issue list for callers that render their own UI (e.g. the single
+// test run page header). Reuses the same counts, labels, ordering and highlighting as the scan
+// run status column so both stay consistent.
+export function getExecutionIssueList(statusCounts) {
+  return getExecutionIssues(statusCounts).map((item) => ({
+    key: item.key,
+    count: item.count,
+    label: labelForKey(item.key),
+    countLabel: formatCount(item.count),
+    highlighted: HIGHLIGHT_KEYS.has(item.key),
+  }));
+}
+
 function buildSummaryNodes(issues) {
   const topIssues = issues.slice(0, 2);
   const remaining = issues.length - topIssues.length;
