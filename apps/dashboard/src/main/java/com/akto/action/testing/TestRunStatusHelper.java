@@ -32,6 +32,18 @@ public final class TestRunStatusHelper {
     private static final String MULTI_EXEC_MESSAGE_FIELD = "testResults.nodeResultMap.x1.message";
     private static final String STATUS_MESSAGE = "statusMessage";
 
+    private static final String CLOUDFLARE_KEY = "cloudflare";
+    /** Per-status-code counts are keyed as {@code http_<code>}, e.g. {@code http_429}. */
+    private static final String HTTP_CODE_KEY_PREFIX = "http_";
+    /**
+     * Captures the actual HTTP status code from a result message, but only for 4xx/5xx
+     * responses. This lets us surface every client/server error by its real code (the way 429
+     * was surfaced) instead of collapsing them into generic buckets. The negative lookahead
+     * guards against 4-digit values (e.g. Cloudflare 1xxx codes) being truncated to 3 digits.
+     */
+    private static final String STATUS_CODE_CAPTURE_REGEX =
+            "\"statusCode\"\\s*:\\s*([45][0-9]{2})(?![0-9])";
+
     /*
      * Execution status counts are derived from TestingRunResult docs, which are immutable
      * once a run finishes. The bulk status API is only called for COMPLETED runs, so caching
@@ -40,13 +52,6 @@ public final class TestRunStatusHelper {
     private static final long CACHE_TTL_MILLIS = TimeUnit.MINUTES.toMillis(30);
     private static final int CACHE_MAX_SIZE = 20000;
     private static final Map<String, CacheEntry> STATUS_COUNTS_CACHE = new ConcurrentHashMap<>();
-
-    private static final List<PatternDefinition> PATTERN_DEFINITIONS = Arrays.asList(
-            new PatternDefinition("http401", REGEX_401),
-            new PatternDefinition("http403", REGEX_403),
-            new PatternDefinition("http5xx", TestResultsStatsAction.REGEX_5XX),
-            new PatternDefinition("http429", TestResultsStatsAction.REGEX_429),
-            new PatternDefinition("cloudflare", TestResultsStatsAction.REGEX_CLOUDFLARE));
 
     private TestRunStatusHelper() {
     }
@@ -81,7 +86,7 @@ public final class TestRunStatusHelper {
         counts.put("domainUnreachable", countDomainUnreachable(testingRunResultSummaryId));
         counts.put("skipped", countSkipped(testingRunResultSummaryId));
         counts.put("needConfig", countNeedConfig(testingRunResultSummaryId));
-        counts.putAll(countAllPatterns(testingRunResultSummaryId));
+        counts.putAll(countStatusCodesAndCloudflare(testingRunResultSummaryId));
         return counts;
     }
 
@@ -114,8 +119,8 @@ public final class TestRunStatusHelper {
 
     /**
      * Counts results matching a single message pattern for a summary. Reuses the same
-     * sampled, coalesced-message pipeline as {@link #countAllPatterns(ObjectId)} so the
-     * stats endpoint and the bulk status endpoint stay consistent.
+     * sampled, coalesced-message pipeline as {@link #countStatusCodesAndCloudflare(ObjectId)}
+     * so the stats endpoint and the bulk status endpoint stay consistent.
      */
     public static int countByPattern(ObjectId testingRunResultSummaryId, String regex) {
         List<Bson> pipeline = sampledMessagePipeline(testingRunResultSummaryId);
@@ -132,33 +137,59 @@ public final class TestRunStatusHelper {
     }
 
     /**
-     * Counts all HTTP/error patterns in a single aggregation per summary.
-     * Both single-exec ({@code testResults.message}) and multi-exec
+     * Surfaces every 4xx/5xx response by its actual HTTP status code (e.g. {@code http_429},
+     * {@code http_404}, {@code http_500}) plus a Cloudflare bucket, in a single aggregation per
+     * summary. Both single-exec ({@code testResults.message}) and multi-exec
      * ({@code testResults.nodeResultMap.x1.message}) messages are coalesced into one
-     * {@code statusMessage} field, then matched in parallel via a single {@code $facet}.
+     * {@code statusMessage}; one {@code $facet} branch groups by the extracted status code while
+     * the other counts Cloudflare blocking pages (which are body-based, not status-code based).
      */
-    private static Map<String, Integer> countAllPatterns(ObjectId testingRunResultSummaryId) {
+    private static Map<String, Integer> countStatusCodesAndCloudflare(ObjectId testingRunResultSummaryId) {
         List<Bson> pipeline = sampledMessagePipeline(testingRunResultSummaryId);
 
-        List<Facet> facets = new ArrayList<>();
-        for (PatternDefinition definition : PATTERN_DEFINITIONS) {
-            facets.add(new Facet(
-                    definition.key,
-                    Aggregates.match(Filters.regex(STATUS_MESSAGE, definition.regex, "i")),
-                    Aggregates.count("count")));
-        }
-        pipeline.add(Aggregates.facet(facets.toArray(new Facet[0])));
+        BasicDBObject regexFind = new BasicDBObject("$regexFind",
+                new BasicDBObject("input", "$" + STATUS_MESSAGE)
+                        .append("regex", STATUS_CODE_CAPTURE_REGEX)
+                        .append("options", "i"));
+
+        Facet byCode = new Facet("byCode",
+                new BasicDBObject("$project", new BasicDBObject("codeMatch", regexFind)),
+                new BasicDBObject("$match", new BasicDBObject("codeMatch", new BasicDBObject("$ne", null))),
+                new BasicDBObject("$project", new BasicDBObject("code",
+                        new BasicDBObject("$arrayElemAt", Arrays.asList("$codeMatch.captures", 0)))),
+                new BasicDBObject("$group", new BasicDBObject("_id", "$code")
+                        .append("count", new BasicDBObject("$sum", 1))));
+
+        Facet cloudflare = new Facet(CLOUDFLARE_KEY,
+                Aggregates.match(Filters.regex(STATUS_MESSAGE, TestResultsStatsAction.REGEX_CLOUDFLARE, "i")),
+                Aggregates.count("count"));
+
+        pipeline.add(Aggregates.facet(byCode, cloudflare));
+
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        counts.put(CLOUDFLARE_KEY, 0);
 
         MongoCursor<Document> cursor = TestingRunResultDao.instance.getMCollection()
                 .aggregate(pipeline, Document.class)
                 .cursor();
-
-        Map<String, Integer> counts = initializePatternCounts();
         try {
             if (cursor.hasNext()) {
                 Document facetResult = cursor.next();
-                for (PatternDefinition definition : PATTERN_DEFINITIONS) {
-                    counts.put(definition.key, extractFacetCount(facetResult, definition.key));
+
+                List<Document> codeBuckets = facetResult.getList("byCode", Document.class);
+                if (codeBuckets != null) {
+                    for (Document bucket : codeBuckets) {
+                        String code = bucket.getString("_id");
+                        if (code == null || code.isEmpty()) {
+                            continue;
+                        }
+                        counts.put(HTTP_CODE_KEY_PREFIX + code, bucket.getInteger("count", 0));
+                    }
+                }
+
+                List<Document> cloudflareBuckets = facetResult.getList(CLOUDFLARE_KEY, Document.class);
+                if (cloudflareBuckets != null && !cloudflareBuckets.isEmpty()) {
+                    counts.put(CLOUDFLARE_KEY, cloudflareBuckets.get(0).getInteger("count", 0));
                 }
             }
         } finally {
@@ -185,29 +216,6 @@ public final class TestRunStatusHelper {
                                         Arrays.asList("$testResults.message", -1)),
                                 "$" + MULTI_EXEC_MESSAGE_FIELD)))));
         return pipeline;
-    }
-
-    private static Map<String, Integer> initializePatternCounts() {
-        Map<String, Integer> counts = new LinkedHashMap<>();
-        for (PatternDefinition definition : PATTERN_DEFINITIONS) {
-            counts.put(definition.key, 0);
-        }
-        return counts;
-    }
-
-    private static int extractFacetCount(Document facetResult, String key) {
-        @SuppressWarnings("unchecked")
-        List<Document> bucket = (List<Document>) facetResult.get(key);
-        if (bucket == null || bucket.isEmpty()) {
-            return 0;
-        }
-        return bucket.get(0).getInteger("count", 0);
-    }
-
-    @AllArgsConstructor
-    private static final class PatternDefinition {
-        private final String key;
-        private final String regex;
     }
 
     @AllArgsConstructor
