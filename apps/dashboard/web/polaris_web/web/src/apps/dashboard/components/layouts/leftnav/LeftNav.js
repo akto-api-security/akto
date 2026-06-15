@@ -532,8 +532,13 @@ export default function LeftNav() {
                     ),
                     icon: DiamondAlertMinor,
                     onClick: () => {
-                        handleSelect("dashboard_threat_actor");
-                        navigate("/dashboard/protection/threat-actor");
+                        if (dashboardCategory === CATEGORY_ENDPOINT_SECURITY) {
+                            handleSelect("dashboard_guardrails_violations");
+                            navigate("/dashboard/guardrails/violations");
+                        } else {
+                            handleSelect("dashboard_threat_actor");
+                            navigate("/dashboard/protection/threat-actor");
+                        }
                         setActive("normal");
                     },
                     selected: (leftNavSelected.includes("_threat") && !leftNavSelected.includes("_reports")) || leftNavSelected.includes("_guardrails"),
