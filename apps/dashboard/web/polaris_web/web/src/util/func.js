@@ -2221,6 +2221,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return access;
   },
 
+  hasThreatAccess(){
+    return !['MEMBER', 'DEVELOPER', 'GUEST', 'NO_ACCESS'].includes(window.USER_ROLE)
+  },
   checkUserValidForIntegrations(){
     const rbacAccess = this.checkForRbacFeatureBasic();
     if(!rbacAccess){
