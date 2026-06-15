@@ -147,8 +147,18 @@ public final class TestRunStatusHelper {
     private static Map<String, Integer> countStatusCodesAndCloudflare(ObjectId testingRunResultSummaryId) {
         List<Bson> pipeline = sampledMessagePipeline(testingRunResultSummaryId);
 
+        // $regexFind errors out unless "input" is a string. statusMessage can resolve to a
+        // non-string (e.g. an empty array when a result has no testResults, since the multi-exec
+        // fallback path is evaluated over the testResults array) which would fail the whole
+        // aggregation. Coerce any non-string to "" so it simply yields no match, mirroring the
+        // null/type-tolerant behaviour of the previous $match/$regex approach.
+        BasicDBObject statusMessageAsString = new BasicDBObject("$cond", Arrays.asList(
+                new BasicDBObject("$eq", Arrays.asList(
+                        new BasicDBObject("$type", "$" + STATUS_MESSAGE), "string")),
+                "$" + STATUS_MESSAGE,
+                ""));
         BasicDBObject regexFind = new BasicDBObject("$regexFind",
-                new BasicDBObject("input", "$" + STATUS_MESSAGE)
+                new BasicDBObject("input", statusMessageAsString)
                         .append("regex", STATUS_CODE_CAPTURE_REGEX)
                         .append("options", "i"));
 

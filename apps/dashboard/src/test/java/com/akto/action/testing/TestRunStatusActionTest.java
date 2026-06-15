@@ -57,6 +57,17 @@ public class TestRunStatusActionTest extends MongoBasedTest {
         TestingRunResultDao.instance.insertOne(runResult);
     }
 
+    // a result with no testResults => coalesced statusMessage resolves to null,
+    // which must not break the status-code aggregation for other rows
+    private void insertResultWithoutMessage(ObjectId summaryId) {
+        ApiInfo.ApiInfoKey key = new ApiInfo.ApiInfoKey(1, "/path" + (urlCounter++), URLMethods.Method.GET);
+        TestingRunResult runResult = new TestingRunResult(
+                new ObjectId(), key, "BOLA", "BOLA",
+                new ArrayList<>(), false, new ArrayList<SingleTypeInfo>(),
+                80, Context.now(), Context.now(), summaryId, null, new ArrayList<>());
+        TestingRunResultDao.instance.insertOne(runResult);
+    }
+
     private Map<String, Integer> fetchCounts(ObjectId summaryId) {
         TestRunStatusAction action = new TestRunStatusAction();
         action.setTestingRunResultSummaryHexIds(Collections.singletonList(summaryId.toHexString()));
@@ -199,6 +210,20 @@ public class TestRunStatusActionTest extends MongoBasedTest {
         insertResult(summaryId, messageResult("{\"statusCode\": 200, \"body\": \"OK\"}"), false);
         Map<String, Integer> counts = fetchCounts(summaryId);
         assertEquals(0, count(counts, "http_200"));
+    }
+
+    @Test
+    public void testNullMessageRowsDoNotBreakStatusCodeCounts() {
+        ObjectId summaryId = new ObjectId();
+        // rows whose coalesced message is null must be tolerated by the $regexFind aggregation
+        insertResultWithoutMessage(summaryId);
+        insertResultWithoutMessage(summaryId);
+        insertResult(summaryId, messageResult("{\"statusCode\": 403, \"body\": \"Forbidden\"}"), false);
+        insertResult(summaryId, messageResult("{\"statusCode\": 500, \"body\": \"Internal Server Error\"}"), false);
+
+        Map<String, Integer> counts = fetchCounts(summaryId);
+        assertEquals(1, count(counts, "http_403"));
+        assertEquals(1, count(counts, "http_500"));
     }
 
     @Test

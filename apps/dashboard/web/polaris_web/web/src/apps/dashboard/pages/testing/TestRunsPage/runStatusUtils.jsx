@@ -56,6 +56,16 @@ function labelForKey(key) {
   return STATIC_LABELS[key] || key;
 }
 
+/** Column summary: HTTP codes as "403 Forbidden (126)", others as "5,066 Skipped". */
+function columnSummaryForIssue({ key, count }) {
+  const label = labelForKey(key);
+  const countStr = formatCount(count);
+  if (statusCodeFromKey(key)) {
+    return `${label} (${countStr})`;
+  }
+  return `${countStr} ${label}`;
+}
+
 // 403 first (highlighted), then remaining status codes ascending, then the static buckets.
 function issueOrderScore(key) {
   if (HIGHLIGHT_KEYS.has(key)) {
@@ -118,7 +128,7 @@ function buildSummaryNodes(issues) {
         tone={issueTone(item.key)}
         fontWeight={HIGHLIGHT_KEYS.has(item.key) ? 'semibold' : undefined}
       >
-        {labelForKey(item.key)}
+        {columnSummaryForIssue(item)}
       </Text>
     );
     if (idx < topIssues.length - 1) {
