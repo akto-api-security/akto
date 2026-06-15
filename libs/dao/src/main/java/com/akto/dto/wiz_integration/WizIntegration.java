@@ -35,6 +35,7 @@ public class WizIntegration {
     public static final String LAST_UPLOADED_SCAN_TS = "lastUploadedScanTs";
     public static final String WIZ_SYNC_JOB_ID = "wizSyncJobId";
     public static final String WIZ_IMPORT_API_ENDPOINTS_JOB_ID = "wizImportApiEndpointsJobId";
+    public static final String WIZ_IMPORT_API_ENDPOINTS_JOB_DELTA_ENDPOINT_COUNT = "wizImportApiEndpointsJobDeltaEndpointCount";
     public static final String WIZ_IMPORT_API_ENDPOINTS_JOB_DELTA_TS = "wizImportApiEndpointsJobDeltaTs";
 
 
@@ -63,6 +64,7 @@ public class WizIntegration {
 
     // Wiz Import API Endpoints Job
     private ObjectId wizImportApiEndpointsJobId;
+    private int wizImportApiEndpointsJobDeltaEndpointCount;
     private int wizImportApiEndpointsJobDeltaTs;
     
     public boolean isTokenValid() {
