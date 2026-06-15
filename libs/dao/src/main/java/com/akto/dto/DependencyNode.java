@@ -47,6 +47,8 @@ public class DependencyNode {
         public static final String RESPONSE_PARAM = "responseParam";
         private String responseUrlPath;
         public static final String RESPONSE_URL_PATH = "responseUrlPath";
+        private String responseBody;
+        public static final String RESPONSE_BODY = "responseBody";
         private int count;
         public static final String COUNT = "count";
 
@@ -60,12 +62,24 @@ public class DependencyNode {
             this.count = count;
             this.isHeader = isHeader;
             this.responseUrlPath = null;
+            this.responseBody = null;
         }
 
         public ParamInfo(String requestParam, String responseParam, String responseUrlPath, int count, boolean isUrlParam, boolean isHeader) {
             this.requestParam = requestParam;
             this.responseParam = responseParam;
             this.responseUrlPath = responseUrlPath;
+            this.isUrlParam = isUrlParam;
+            this.count = count;
+            this.isHeader = isHeader;
+            this.responseBody = null;
+        }
+
+        public ParamInfo(String requestParam, String responseParam, String responseUrlPath, String responseBody, int count, boolean isUrlParam, boolean isHeader) {
+            this.requestParam = requestParam;
+            this.responseParam = responseParam;
+            this.responseUrlPath = responseUrlPath;
+            this.responseBody = responseBody;
             this.isUrlParam = isUrlParam;
             this.count = count;
             this.isHeader = isHeader;
@@ -127,21 +141,29 @@ public class DependencyNode {
             this.responseUrlPath = responseUrlPath;
         }
 
+        public String getResponseBody() {
+            return responseBody;
+        }
+
+        public void setResponseBody(String responseBody) {
+            this.responseBody = responseBody;
+        }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             ParamInfo paramInfo = (ParamInfo) o;
-            return isUrlParam == paramInfo.isUrlParam && isHeader == paramInfo.isHeader && requestParam.equals(paramInfo.requestParam) && responseParam.equals(paramInfo.responseParam) && responseUrlPath.equals(paramInfo.responseUrlPath);
+            return isUrlParam == paramInfo.isUrlParam && isHeader == paramInfo.isHeader && requestParam.equals(paramInfo.requestParam) && responseParam.equals(paramInfo.responseParam) && Objects.equals(responseUrlPath, paramInfo.responseUrlPath) && Objects.equals(responseBody, paramInfo.responseBody);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(requestParam, responseParam, responseUrlPath, isUrlParam, isHeader);
+            return Objects.hash(requestParam, responseParam, responseUrlPath, responseBody, isUrlParam, isHeader);
         }
 
         public ParamInfo copy() {
-            return new ParamInfo(requestParam, responseParam, responseUrlPath, count, isUrlParam, isHeader);
+            return new ParamInfo(requestParam, responseParam, responseUrlPath, responseBody, count, isUrlParam, isHeader);
         }
     }
 
