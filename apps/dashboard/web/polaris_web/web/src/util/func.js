@@ -2687,7 +2687,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
 
    getStiggFeatureGrants() {
       const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {}
-      const agenticSecurityGranted = stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false
+      const agenticSecurityGranted = stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || true
       const mcpSecurityGranted = stiggFeatures?.MCP_SECURITY?.isGranted || true
       const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
       const endpointSecurityFromStigg = stiggFeatures?.ENDPOINT_SECURITY?.isGranted
