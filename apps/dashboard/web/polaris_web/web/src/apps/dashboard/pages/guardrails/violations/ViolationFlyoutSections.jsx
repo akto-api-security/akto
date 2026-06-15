@@ -15,46 +15,9 @@ import AssetTopologyGraph from "@/apps/dashboard/pages/observe/agentic/AssetTopo
 import DetailGrid from "@/apps/dashboard/pages/observe/agentic/DetailGrid";
 import SampleData from "@/apps/dashboard/components/shared/SampleData";
 import MarkdownViewer from "@/apps/dashboard/components/shared/MarkdownViewer";
+import { HighlightedText } from "@/apps/dashboard/components/shared/MarkdownComponents";
 import ConversationHistory from "@/apps/dashboard/pages/testing/TestRunResultPage/components/ConversationHistory";
 import func from "@/util/func";
-
-// ─── Inline highlighting ────────────────────────────────────────────────────────
-// Splits `text` so any phrase in `highlights` is wrapped in a pink highlight span
-// (.violation-evidence-highlight, style.css). Sequential first-match scan.
-
-function splitHighlights(text, highlights = []) {
-    const phrases = (highlights || []).filter(Boolean);
-    if (!phrases.length) return [text];
-    const parts = [];
-    let remaining = text;
-    let guard = 0;
-    while (remaining.length && guard < 2000) {
-        guard++;
-        let best = null;
-        for (const h of phrases) {
-            const i = remaining.indexOf(h);
-            if (i >= 0 && (best === null || i < best.i)) best = { i, h };
-        }
-        if (!best) { parts.push(remaining); break; }
-        if (best.i > 0) parts.push(remaining.slice(0, best.i));
-        parts.push({ hl: best.h });
-        remaining = remaining.slice(best.i + best.h.length);
-    }
-    return parts;
-}
-
-function HighlightedText({ text, highlights, mono }) {
-    const parts = useMemo(() => splitHighlights(text || "", highlights), [text, highlights]);
-    const nodes = parts.map((p, i) =>
-        typeof p === "string"
-            ? <React.Fragment key={i}>{p}</React.Fragment>
-            : <Box as="span" key={i} className="violation-evidence-highlight">{p.hl}</Box>
-    );
-    if (mono) {
-        return <Box className="violation-evidence-pre">{nodes}</Box>;
-    }
-    return <Text variant="bodyMd" as="span">{nodes}</Text>;
-}
 
 // ─── Evidence block (Blocked Prompt / Suspicious Skill / Suspicious Config) ──────
 
@@ -67,7 +30,7 @@ export function EvidenceBlock({ evidence }) {
                 <Text variant="headingXs" color="subdued">{evidence.title}</Text>
                 <Box className="violation-evidence-author-row">
                     {evidence.author
-                        ? <Avatar size="small" name={evidence.author} initials={initials(evidence.author)} />
+                        ? <Avatar size="small" name={evidence.author} initials={func.initials(evidence.author)} />
                         : <Box paddingBlockStart="05"><Icon source={NoteMinor} color="critical" /></Box>}
                     <Box className="violation-evidence-quote" width="100%">
                         <VerticalStack gap="1">
@@ -86,16 +49,6 @@ export function EvidenceBlock({ evidence }) {
             </VerticalStack>
         </Box>
     );
-}
-
-function initials(name) {
-    return (name || "")
-        .split(" ")
-        .map((w) => w[0])
-        .filter(Boolean)
-        .slice(0, 2)
-        .join("")
-        .toUpperCase();
 }
 
 // Render the trigger reason, linking the policy name when present.

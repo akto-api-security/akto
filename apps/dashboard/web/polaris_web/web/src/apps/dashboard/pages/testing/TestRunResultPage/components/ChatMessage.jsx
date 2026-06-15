@@ -1,57 +1,14 @@
-import { useMemo, useState, Fragment } from 'react';
+import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Avatar, Box, VerticalStack, HorizontalStack, Text, Badge, Button, Tooltip } from '@shopify/polaris';
 import { InfoMinor, MagicMinor } from '@shopify/polaris-icons';
 import MarkdownViewer from '../../../../components/shared/MarkdownViewer';
+import { HighlightedText } from '../../../../components/shared/MarkdownComponents';
 import SampleDataComponent from '../../../../components/shared/SampleDataComponent';
 import { CHAT_ASSETS, MESSAGE_LABELS, MESSAGE_TYPES } from './chatConstants';
 import ChatInfoModal from './ChatInfoModal';
 import func from "@/util/func";
 import { getDomainForFavicon } from '@/apps/dashboard/pages/observe/agentic/mcpClientHelper';
-
-function splitHighlights(text, highlights = []) {
-    const phrases = (highlights || []).filter(Boolean);
-    if (!phrases.length) return [text];
-    const parts = [];
-    let remaining = text;
-    let guard = 0;
-    while (remaining.length && guard < 2000) {
-        guard++;
-        let best = null;
-        for (const h of phrases) {
-            const i = remaining.indexOf(h);
-            if (i >= 0 && (best === null || i < best.i)) best = { i, h };
-        }
-        if (!best) { parts.push(remaining); break; }
-        if (best.i > 0) parts.push(remaining.slice(0, best.i));
-        parts.push({ hl: best.h });
-        remaining = remaining.slice(best.i + best.h.length);
-    }
-    return parts;
-}
-
-function HighlightedChatText({ text, highlights }) {
-    const parts = splitHighlights(text || '', highlights);
-    return (
-        <Text variant="bodyMd" as="p">
-            {parts.map((p, i) =>
-                typeof p === 'string'
-                    ? <Fragment key={i}>{p}</Fragment>
-                    : <Box as="span" key={i} className="violation-evidence-highlight">{p.hl}</Box>
-            )}
-        </Text>
-    );
-}
-
-function initials(name) {
-    return (name || '')
-        .split(' ')
-        .map(w => w[0])
-        .filter(Boolean)
-        .slice(0, 2)
-        .join('')
-        .toUpperCase();
-}
 
 // This is done for Hybrid messages -> Markdown + JSON 
 function extractPrettyJson(content) {
@@ -179,7 +136,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
     } else if (isRequest) {
         if (customLabel && !isTestedInteraction) {
             // Human user in a conversation (e.g. violations chat) — show initials avatar
-            iconEl = <Avatar size="extraSmall" initials={initials(customLabel)} name={customLabel} />;
+            iconEl = <Avatar size="extraSmall" initials={func.initials(customLabel)} name={customLabel} />;
         } else {
             iconEl = <img src={CHAT_ASSETS.AKTO_LOGO} alt="Akto Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />;
         }
@@ -344,7 +301,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                             />
                         ) : (
                             isVulnerable && highlights.length > 0
-                                ? <HighlightedChatText text={content} highlights={highlights} />
+                                ? <HighlightedText text={content} highlights={highlights} />
                                 : <MarkdownViewer markdown={content} noPadding />
                         )}
 
