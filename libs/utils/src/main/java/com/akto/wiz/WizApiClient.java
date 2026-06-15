@@ -10,10 +10,8 @@ import com.mongodb.BasicDBObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public class WizApiClient {
 
@@ -23,7 +21,7 @@ public class WizApiClient {
     static final int ENDPOINT_FETCH_PAGE_SIZE = 20;
     static final int ENDPOINT_META_FETCH_PAGE_SIZE = 500;
 
-    private static Map<String, List<String>> buildHeaders(String accessToken) {
+    static Map<String, List<String>> buildHeaders(String accessToken) {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Content-Type", Collections.singletonList("application/json"));
         headers.put("Authorization", Collections.singletonList("Bearer " + accessToken));
@@ -82,6 +80,18 @@ public class WizApiClient {
 
         loggerMaker.infoAndAddToDb(String.format("fetchEndpointsPageByIds: %d ids", ids.size()));
         return executeAndGetRoot(apiUrl, graphqlQuery, buildHeaders(accessToken), "apiEndpoints");
+    }
+
+    static BasicDBObject executeRaw(String apiUrl, String graphqlQuery, Map<String, List<String>> headers) throws Exception {
+        OriginalHttpRequest request = new OriginalHttpRequest(apiUrl, "", "POST", graphqlQuery, headers, "");
+        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, true, new ArrayList<>(), WizIntegrationUtils.isWizDevMode());
+
+        if (response == null || response.getStatusCode() != 200 || response.getBody() == null) {
+            throw new Exception(String.format("Wiz API call failed. Status: %d",
+                response != null ? response.getStatusCode() : -1));
+        }
+
+        return BasicDBObject.parse(response.getBody());
     }
 
     private static BasicDBObject executeAndGetRoot(String apiUrl, String graphqlQuery, Map<String, List<String>> headers, String rootKey) throws Exception {

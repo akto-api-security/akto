@@ -1,9 +1,6 @@
 package com.akto.wiz;
 
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.context.Context;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.traffic.CollectionTags;
+import com.akto.dao.WizIntegrationDao;
 import com.akto.dto.wiz_integration.WizIntegration;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -14,24 +11,16 @@ import com.akto.open_api.parser.ParserResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
-import com.mongodb.MongoCommandException;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.FindOneAndUpdateOptions;
-import com.mongodb.client.model.ReturnDocument;
-import com.mongodb.client.model.Updates;
 import io.swagger.parser.OpenAPIParser;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.parser.core.models.ParseOptions;
-import org.bson.conversions.Bson;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 
 public class WizApiEndpointsImporter {
@@ -39,7 +28,36 @@ public class WizApiEndpointsImporter {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final LoggerMaker loggerMaker = new LoggerMaker(WizApiEndpointsImporter.class, LogDb.DASHBOARD);
 
-    public static void importWizApiEndpoints(WizIntegration wizIntegration, BiConsumer<Integer, ParserResult> processor) {
+    public static boolean checkApiEndpointsScope() {
+        try {
+            WizIntegration wizIntegration = WizIntegrationDao.instance.findOne(new BasicDBObject());
+            if (wizIntegration == null) return false;
+            String accessToken = WizIntegrationUtils.getValidAccessToken();
+            String apiUrl = String.format(WizIntegration.API_BASE_URL_PATTERN, wizIntegration.getTenantDataCenter(), WizIntegration.ENVIRONMENT);
+            if (WizIntegrationUtils.isWizDevMode()) {
+                apiUrl = WizIntegrationUtils.getWizDevGraphQLEndpoint();
+            }
+
+            String graphqlQuery = "{\"query\":\"{ apiEndpoints(first: 1) { nodes { id } } }\"}";
+            BasicDBObject response = WizApiClient.executeRaw(apiUrl, graphqlQuery, WizApiClient.buildHeaders(accessToken));
+
+            List<?> errors = (List<?>) response.get("errors");
+            if (errors != null && !errors.isEmpty()) {
+                BasicDBObject firstError = (BasicDBObject) errors.get(0);
+                BasicDBObject extensions = (BasicDBObject) firstError.get("extensions");
+                if (extensions != null && "UNAUTHORIZED".equals(extensions.getString("code"))) {
+                    loggerMaker.infoAndAddToDb("Wiz credentials are missing read:api_endpoints scope");
+                    return false;
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Failed to check Wiz api_endpoints scope: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public static void importWizApiEndpoints(WizIntegration wizIntegration, BiConsumer<ParserResult, WizImportJobPageContext> processor, Runnable heartbeat) {
         if (wizIntegration == null) {
             loggerMaker.infoAndAddToDb("Wiz integration not configured for this account. Skipping import.");
             return;
@@ -59,57 +77,66 @@ public class WizApiEndpointsImporter {
                 loggerMaker.infoAndAddToDb("Wiz dev mode enabled. Using dev GraphQL endpoint: " + apiUrl);
             }
 
-            // Phase 1: Fetch all unique hosts
-            Set<String> uniqueHosts = WizApiClient.fetchAllHosts(apiUrl, accessToken);
-            loggerMaker.infoAndAddToDb(String.format("Found %d unique hosts in Wiz API endpoints", uniqueHosts.size()));
+            List<BasicDBObject> allEndpointMeta = WizApiClient.fetchAllEndpointMeta(apiUrl, accessToken);
+            loggerMaker.infoAndAddToDb(String.format("Fetched metadata for %d total endpoints from Wiz", allEndpointMeta.size()));
+         
+            heartbeat.run();
 
-            // Phase 2: Pre-create collections for each host
-            Map<String, Integer> hostToCollectionId = new HashMap<>();
-            AtomicInteger idGen = new AtomicInteger(Context.now());
-            for (String host : uniqueHosts) {
-                hostToCollectionId.put(host, getOrCreateCollectionForHost(host, idGen));
+            Instant cutoff = Instant.now().minus(24, ChronoUnit.HOURS);
+            Set<String> updatedEndpointIds = new HashSet<>();
+            for (BasicDBObject meta : allEndpointMeta) {
+                String updatedAt = meta.getString("updatedAt");
+                if (updatedAt == null) continue;
+                try {
+                    if (Instant.parse(updatedAt).isAfter(cutoff)) {
+                        updatedEndpointIds.add(meta.getString("id"));
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(String.format(
+                        "Failed to parse updatedAt '%s' for endpoint %s", updatedAt, meta.getString("id")));
+                }
             }
-            loggerMaker.infoAndAddToDb(String.format("Pre-created %d host collections", hostToCollectionId.size()));
-
-            // Phase 3: For each host, paginate endpoints per page and dispatch
+            loggerMaker.infoAndAddToDb(String.format("%d endpoints updated in the last 24 hours (out of %d total)", updatedEndpointIds.size(), allEndpointMeta.size()));
+            
+                
             int totalFetched = 0;
+            int totalErrors = 0;
 
-            for (String host : uniqueHosts) {
-                int collectionId = hostToCollectionId.get(host);
-                String cursor = null;
-                boolean hasNextPage = true;
-                int hostErrorCount = 0;
-                int hostFetched = 0;
+            if (!updatedEndpointIds.isEmpty()) {
+                List<String> idList = new ArrayList<>(updatedEndpointIds);
+                int batchSize = WizApiClient.ENDPOINT_FETCH_PAGE_SIZE;
 
-                while (hasNextPage) {
+                for (int i = 0; i < idList.size(); i += batchSize) {
+                    List<String> batch = idList.subList(i, Math.min(i + batchSize, idList.size()));
+                    boolean isFirstBatch = (i == 0);
+                    boolean isLastBatch = (i + batchSize) >= idList.size();
+
                     List<JsonNode> pageSpecs = new ArrayList<>();
                     BasicDBObject root;
                     try {
-                        root = WizApiClient.fetchEndpointsPage(apiUrl, accessToken, host, cursor);
+                        root = WizApiClient.fetchEndpointsPageByIds(apiUrl, accessToken, batch);
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(String.format("Failed to fetch endpoints for host %s: %s", host, e.getMessage()));
-                        break;
+                        loggerMaker.errorAndAddToDb(String.format("Failed to fetch batch [%d-%d]: %s", i, i + batch.size(), e.getMessage()));
+                        continue;
                     }
 
-                    List<?> apiEndpoints = (List<?>) root.get("nodes");
-                    BasicDBObject pageInfo = (BasicDBObject) root.get("pageInfo");
+                    List<?> nodes = (List<?>) root.get("nodes");
 
-                    for (Object nodeObj : apiEndpoints) {
+                    for (Object nodeObj : nodes) {
                         BasicDBObject node = (BasicDBObject) nodeObj;
+                        String host = node.getString("host");
                         String path = node.getString("pathname");
                         String method = node.getString("httpMethod");
-
                         try {
                             JsonNode spec = WizSpecProcessor.resolveSpec(node.get("specification"), host, path, method);
                             if (spec != null) pageSpecs.add(spec);
                         } catch (Exception e) {
-                            hostErrorCount++;
+                            totalErrors++;
                             loggerMaker.errorAndAddToDb(String.format(
                                 "Error processing endpoint [host=%s, path=%s, method=%s]: %s", host, path, method, e.getMessage()));
                         }
                     }
 
-                    hostFetched += pageSpecs.size();
                     totalFetched += pageSpecs.size();
 
                     if (!pageSpecs.isEmpty()) {
@@ -130,66 +157,25 @@ public class WizApiEndpointsImporter {
                                         log.setAktoFormat(msg.toJson());
                                     }
                                 }
-                                processor.accept(collectionId, parsedSwagger);
+                                processor.accept(parsedSwagger, new WizImportJobPageContext(isFirstBatch, isLastBatch));
                             } else {
-                                loggerMaker.infoAndAddToDb(String.format(
-                                    "Failed to parse OpenAPI spec page for host %s, skipping page", host));
+                                loggerMaker.infoAndAddToDb(String.format("Failed to parse OpenAPI spec for batch [%d-%d], skipping", i, i + batch.size()));
                             }
                         } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(String.format(
-                                "Error dispatching page for host %s: %s", host, e.getMessage()));
+                            loggerMaker.errorAndAddToDb(String.format("Error dispatching batch [%d-%d]: %s", i, i + batch.size(), e.getMessage()));
                         }
                     }
 
-                    hasNextPage = pageInfo.getBoolean("hasNextPage", false);
-                    cursor = pageInfo.getString("endCursor");
+                    heartbeat.run();
                 }
-
-                loggerMaker.infoAndAddToDb(String.format(
-                    "Processed host %s: %d endpoints, %d errors", host, hostFetched, hostErrorCount));
             }
 
             loggerMaker.infoAndAddToDb(String.format(
-                "Wiz import completed. Total API endpoints fetched: %d across %d hosts", totalFetched, hostToCollectionId.size()));
+                "Wiz import completed. Total endpoints dispatched: %d, errors: %d", totalFetched, totalErrors));
 
         } catch (Exception e) {
             e.printStackTrace();
             loggerMaker.errorAndAddToDb("Error importing Wiz API endpoints: " + e.getMessage());
         }
-    }
-
-    private static int getOrCreateCollectionForHost(String host, AtomicInteger idGen) throws Exception {
-        // Fast path: collection already exists from a previous import run
-        ApiCollection existing = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.HOST_NAME, host));
-        if (existing != null) {
-            loggerMaker.infoAndAddToDb(String.format("Reusing existing collectionId=%d for host %s", existing.getId(), host));
-            return existing.getId();
-        }
-
-        // Upsert with setOnInsert-only operators: behaves as "insert if not exists, return existing
-        // if exists". This is safe under concurrent calls — unlike insertOne which would throw on
-        // a duplicate HOST_NAME. The retry loop handles _id collisions (error 11000): the candidate
-        // id may already be taken by a different document, so we advance the counter and try again.
-        FindOneAndUpdateOptions options = new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER);
-        for (int attempt = 0; attempt < 500; attempt++) {
-            int id = idGen.getAndIncrement();
-            CollectionTags wizTag = new CollectionTags(id, "source", "wiz", CollectionTags.TagSource.USER);
-            Bson updates = Updates.combine(
-                Updates.setOnInsert("_id", id),
-                Updates.setOnInsert(ApiCollection.HOST_NAME, host),
-                Updates.setOnInsert("startTs", id),
-                Updates.setOnInsert("urls", new HashSet<>()),
-                Updates.setOnInsert(ApiCollection.TAGS_STRING, Collections.singletonList(wizTag))
-            );
-            try {
-                ApiCollection created = ApiCollectionsDao.instance.getMCollection()
-                    .findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, options);
-                loggerMaker.infoAndAddToDb(String.format("Created collectionId=%d for host %s", created.getId(), host));
-                return created.getId();
-            } catch (MongoCommandException e) {
-                if (e.getErrorCode() != 11000) throw e;
-            }
-        }
-        throw new Exception("Failed to create collection for host after 500 retries: " + host);
     }
 }
