@@ -191,7 +191,7 @@ export function buildMcpComponentsFromStis(stiEndpoints = [], apiInfoList = [], 
         const u = info?.id?.url;
         if (!m || !u) return;
         const vCount = Object.values(info.violations || {}).reduce((a, b) => a + (b || 0), 0);
-        infoByKey[`${m} ${u}`] = { riskScore: info.riskScore || 0, violations: vCount };
+        infoByKey[`${m} ${u}`] = { riskScore: info.riskScore || 0, violations: vCount, tagsList: info.tagsList || [] };
     });
 
     // type + risk metadata lookup keyed by resourceName
@@ -230,7 +230,8 @@ export function buildMcpComponentsFromStis(stiEndpoints = [], apiInfoList = [], 
         const hasPrivilegedAccess = privilegedByName[name] || false;
         const riskDescription = riskDescByName[name] || "";
         const riskScore = info.riskScore || 0;
-        const item = { id: id++, name, url, method, apiCollectionId, description: "", riskScore, riskLevel: isMalicious ? "critical" : null, isMalicious, hasPrivilegedAccess, riskDescription, params: [], violations: info.violations || 0 };
+        const isMisconfigured = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
+        const item = { id: id++, name, url, method, apiCollectionId, description: "", riskScore, riskLevel: isMalicious ? "critical" : null, isMalicious, isMisconfigured, hasPrivilegedAccess, riskDescription, params: [], violations: info.violations || 0 };
         if (type === "Skill") {
             skills.push(item);
         } else if (type === "Resource") {
