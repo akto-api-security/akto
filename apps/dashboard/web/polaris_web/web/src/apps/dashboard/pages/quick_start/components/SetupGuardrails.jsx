@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Avatar, Box, Button, Card, Divider, HorizontalStack, Tag, Text, VerticalStack } from '@shopify/polaris'
+import { Avatar, Box, Button, Card, Divider, HorizontalStack, Tag, Text, Tooltip, VerticalStack } from '@shopify/polaris'
+import { ClipboardMinor } from '@shopify/polaris-icons'
 import api from '../api'
-import JsonComponent from './shared/JsonComponent'
 import func from "@/util/func"
 import Dropdown from '../../../components/layouts/Dropdown'
 import GridRows from '../../../components/shared/GridRows'
@@ -50,9 +50,6 @@ function GuardrailsSetupGuide() {
     const [selectedExpiryDuration, setSelectedExpiryDuration] = useState(6)
     const ref = useRef(null)
 
-    const helmAddCommand = "helm repo add akto https://akto-api-security.github.io/helm-charts/"
-    const guardrailsSvcCommand = "helm install akto-guardrails akto/akto-guardrails -n dev --set guardrails.aktoGuardrails.env.databaseAbstractorToken=\"" + apiToken + "\""
-
     const copyCommandUtil = (data) => { func.copyToClipboard(data, ref, null) }
 
     const fetchGuardrailsToken = async (expiryDuration) => {
@@ -79,12 +76,7 @@ function GuardrailsSetupGuide() {
             <VerticalStack gap="2">
                 <div ref={ref} />
 
-                <span>1. Run the below command to add akto helm repo. </span>
-                <VerticalStack gap="1">
-                    <JsonComponent title="Add akto helm repo" toolTipContent="Copy command" onClickFunc={() => copyCommandUtil(helmAddCommand)} dataString={helmAddCommand} language="text" minHeight="60px" />
-                </VerticalStack>
-
-                <span>2. Select the expiry time of the jwt token used in the command. </span>
+                <span>1. Select the expiry time of the jwt token. </span>
                 <Box maxWidth="180px" paddingInlineStart={"4"}>
                     <Dropdown
                         id={`select-guardrails-expiry`}
@@ -95,10 +87,17 @@ function GuardrailsSetupGuide() {
                     />
                 </Box>
 
-                <span>3. Run the below command to setup Akto Guardrails service. Change the namespace according to your requirements. </span>
-                <VerticalStack gap="1">
-                    <JsonComponent title="Guardrails Service Command" toolTipContent="Copy command" onClickFunc={() => copyCommandUtil(guardrailsSvcCommand)} dataString={guardrailsSvcCommand} language="text" minHeight="300px" />
-                </VerticalStack>
+                <span>2. Copy the token below and set it as the guardrails service authentication token in your configuration. </span>
+                <Box paddingInlineStart={"4"}>
+                    <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                        <Box background="bg-subdued" padding="2" borderRadius="2" borderWidth="1" borderColor="border-subdued">
+                            <Text variant="bodyMd" breakWord>{apiToken}</Text>
+                        </Box>
+                        <Tooltip content="Copy token">
+                            <Button icon={ClipboardMinor} plain onClick={() => copyCommandUtil(apiToken)} />
+                        </Tooltip>
+                    </HorizontalStack>
+                </Box>
             </VerticalStack>
         </div>
     )
