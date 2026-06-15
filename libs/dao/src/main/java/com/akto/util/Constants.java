@@ -89,6 +89,7 @@ public class Constants {
     public static final String HOST_HEADER = "Host";
     public static final String AKTO_ENDPOINT_SOURCE_TAG = "source";
     public static final String AKTO_ENDPOINT_SOURCE_VALUE = "ENDPOINT";
+    public static final String AKTO_WIZ_SOURCE_VALUE = "wiz";
     public static final String FAVICON_SOURCE_URL ="https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://";
 
     public static final String LFI_OS_FILES_DATA = "/lfi-os-files.data";

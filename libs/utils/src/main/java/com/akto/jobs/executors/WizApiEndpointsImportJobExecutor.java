@@ -8,6 +8,7 @@ import com.akto.jobs.JobExecutor;
 import com.akto.log.LoggerMaker;
 import com.akto.open_api.parser.ParserResult;
 import com.akto.wiz.WizApiEndpointsImporter;
+import com.akto.wiz.WizImportJobPageContext;
 import com.mongodb.BasicDBObject;
 
 import java.util.function.BiConsumer;
@@ -17,9 +18,9 @@ public class WizApiEndpointsImportJobExecutor extends JobExecutor<WizApiEndpoint
     private static final LoggerMaker logger = new LoggerMaker(WizApiEndpointsImportJobExecutor.class, LoggerMaker.LogDb.DASHBOARD);
     public static final WizApiEndpointsImportJobExecutor INSTANCE = new WizApiEndpointsImportJobExecutor();
 
-    private BiConsumer<Integer, ParserResult> wizApiEndpointsProcessor;
+    private BiConsumer<ParserResult, WizImportJobPageContext> wizApiEndpointsProcessor;
 
-    public void setWizApiEndpointsProcessor(BiConsumer<Integer, ParserResult> wizApiEndpointsProcessor) {
+    public void setWizApiEndpointsProcessor(BiConsumer<ParserResult, WizImportJobPageContext> wizApiEndpointsProcessor) {
         this.wizApiEndpointsProcessor = wizApiEndpointsProcessor;
     }
 
@@ -37,7 +38,7 @@ public class WizApiEndpointsImportJobExecutor extends JobExecutor<WizApiEndpoint
                 return;
             }
 
-            WizApiEndpointsImporter.importWizApiEndpoints(wizIntegration, wizApiEndpointsProcessor);
+            WizApiEndpointsImporter.importWizApiEndpoints(wizIntegration, wizApiEndpointsProcessor, () -> updateJobHeartbeat(job));
 
             logger.info("Wiz API endpoints import job completed successfully.");
         } catch (Exception e) {
