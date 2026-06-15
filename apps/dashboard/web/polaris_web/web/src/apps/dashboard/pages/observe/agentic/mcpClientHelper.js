@@ -185,6 +185,16 @@ const hasLocalMcpServerTag = (envType) => {
     });
 };
 
+const hasMisconfiguredConfigTag = (envType) => {
+    if (!Array.isArray(envType)) return false;
+    return envType.some((tag) => {
+        if (typeof tag === 'string') {
+            return tag === 'misconfigured-config=true';
+        }
+        return (tag.keyName === 'misconfigured-config' || tag.key === 'misconfigured-config') && tag.value === 'true';
+    });
+};
+
 export {
     formatDisplayName,
     getDomainForFavicon,
@@ -197,6 +207,7 @@ export {
     getAgenticCategoryLabel,
     hasPersonalAccountTag,
     hasLocalMcpServerTag,
+    hasMisconfiguredConfigTag,
     CLIENT_TYPES,
     TYPE_TAG_KEYS,
     ASSET_TAG_KEYS,
