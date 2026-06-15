@@ -2218,6 +2218,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return access;
   },
 
+  hasThreatAccess(){
+    return ['ADMIN', 'THREAT_ENGINEER', 'THREAT_VIEWER'].includes(window.USER_ROLE)
+  },
   checkUserValidForIntegrations(){
     const rbacAccess = this.checkForRbacFeatureBasic();
     if(!rbacAccess){
