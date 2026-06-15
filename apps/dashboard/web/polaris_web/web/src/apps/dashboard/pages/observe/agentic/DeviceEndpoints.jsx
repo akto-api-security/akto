@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
-import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Badge } from "@shopify/polaris";
+import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Badge, Tooltip } from "@shopify/polaris";
+import MisconfiguredConfigIcon from "@/assets/MisconfiguredConfigIcon.svg";
+import PersonLockIcon from "@/assets/PersonLockIcon.svg";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
@@ -169,6 +171,15 @@ function OsIcon({ os }) {
     return                       <img src="/public/os-linux.svg"   width={15} height={15} alt="Linux" />;
 }
 
+// Marker icon shown next to a row label (matches the personal-account marker pattern in AgenticCellRenderers).
+function MarkerIcon({ src, label, size = 16 }) {
+    return (
+        <Tooltip content={label} dismissOnMouseOut activatorWrapper="div">
+            <img src={src} width={size} height={size} alt={label} style={{ flexShrink: 0, display: "block" }} />
+        </Tooltip>
+    );
+}
+
 // ─── Cell renderers ───────────────────────────────────────────────────────────
 
 function SkillBadge({ count }) {
@@ -232,6 +243,14 @@ function UsernameCellInner({ data, node }) {
             icon={<OsIcon os={data.os} />}
             label={username || "-"}
             isBold={!!username}
+            warning={
+                (data.hasPersonalAccount || data.hasMisconfiguredConfig) ? (
+                    <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+                        {data.hasPersonalAccount && <MarkerIcon src={PersonLockIcon} label="Contains personal account" size={24} />}
+                        {data.hasMisconfiguredConfig && <MarkerIcon src={MisconfiguredConfigIcon} label="Misconfigured config" size={24} />}
+                    </HorizontalStack>
+                ) : null
+            }
         />
     );
 }
