@@ -114,8 +114,8 @@ public class Main {
     SkillsRiskScoreSyncCron skillsRiskScoreSyncCron = new SkillsRiskScoreSyncCron();
     skillsRiskScoreSyncCron.setUp();
 
-    ConfigRiskSyncCron configRiskSyncCron = new ConfigRiskSyncCron();
-    configRiskSyncCron.setUp();
+    // ConfigRiskSyncCron configRiskSyncCron = new ConfigRiskSyncCron();
+    // configRiskSyncCron.setUp();
 
     CloudflareWafSyncCron cloudflareWafSyncCron = new CloudflareWafSyncCron();
     cloudflareWafSyncCron.setUpCloudflareWafSyncCronScheduler();
