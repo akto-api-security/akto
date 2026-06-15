@@ -1425,18 +1425,26 @@ public class TestExecutor {
                                                 // TODO: Handle for header
                                                 if (paramInfo.isHeader()) continue;
                                                 
-                                                // Extract value - try URL path first if responseUrlPath is set
+                                                // Extract value - priority: responseBody -> responseUrlPath -> responseParam
                                                 Object valueExtracted = null;
                                                 String requestUrl = rawApiToBeReplayed.getRequest().getUrl();
                                                 
-                                                if (paramInfo.getResponseUrlPath() != null && !paramInfo.getResponseUrlPath().isEmpty()) {
+                                                if (paramInfo.getResponseBody() != null && !paramInfo.getResponseBody().isEmpty()) {
+                                                    // Try to extract from request body first
+                                                    Map<String, Set<Object>> requestBodyValuesMap = Build.getRequestValuesMap(rawApiToBeReplayed.getRequest());
+                                                    Set<Object> valuesFromRequestBody = requestBodyValuesMap.get(paramInfo.getResponseBody());
+                                                    if (valuesFromRequestBody != null && !valuesFromRequestBody.isEmpty()) {
+                                                        valueExtracted = valuesFromRequestBody.iterator().next();
+                                                        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts extracted from request body: " + paramInfo.getResponseBody() + " = " + valueExtracted);
+                                                    }
+                                                } else if (paramInfo.getResponseUrlPath() != null && !paramInfo.getResponseUrlPath().isEmpty()) {
                                                     // Try to extract from request URL path
                                                     valueExtracted = extractValueFromRequestUrlPath(requestUrl, paramInfo.getResponseUrlPath());
                                                     if (valueExtracted != null) {
                                                         loggerMaker.infoAndAddToDb("cleanUpTestArtifacts extracted from request URL path: " + paramInfo.getResponseUrlPath() + " = " + valueExtracted);
                                                     }
                                                 } else {
-                                                    // Fall back to response extraction if responseUrlPath is not set
+                                                    // Fall back to response extraction if neither responseBody nor responseUrlPath is set
                                                     Set<Object> valuesFromResponse = valuesMap.get(paramInfo.getResponseParam());
                                                     if (valuesFromResponse != null && !valuesFromResponse.isEmpty()) {
                                                         valueExtracted = valuesFromResponse.iterator().next();
