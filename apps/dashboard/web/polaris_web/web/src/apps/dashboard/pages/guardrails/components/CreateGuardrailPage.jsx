@@ -691,18 +691,25 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
                     code: enableCodeFilter ? { level: codeFilterLevel.toUpperCase() } : null
                 },
-                deniedTopics,
-                wordFilters,
+                deniedTopics: enableDeniedTopics ? deniedTopics : [],
+                wordFilters: {
+                    profanity: wordFilters.profanity,
+                    custom: wordFilters.profanity ? (wordFilters.custom || []) : []
+                },
                 piiFilters: enablePiiTypes ? piiTypes : [],
-                regexPatterns: enableRegexPatterns ? regexPatterns
-                    .filter(r => r && r.pattern)
-                    .map(r => r.pattern) : [],
-                regexPatternsV2: enableRegexPatterns ? regexPatterns
-                    .filter(r => r && r.pattern && r.behavior)
-                    .map(r => ({
-                        pattern: r.pattern,
-                        behavior: r.behavior.toLowerCase()
-                    })) : [],
+                regexPatterns: enableRegexPatterns
+                    ? regexPatterns
+                        .filter(r => r && r.pattern)
+                        .map(r => r.pattern)
+                    : [],
+                regexPatternsV2: enableRegexPatterns
+                    ? regexPatterns
+                        .filter(r => r && r.pattern && r.behavior)
+                        .map(r => ({
+                            pattern: r.pattern,
+                            behavior: r.behavior.toLowerCase()
+                        }))
+                    : [],
                 llmRule: {
                     enabled: enableLlmPrompt && !!llmPrompt.trim(),
                     userPrompt: llmPrompt.trim(),
@@ -951,12 +958,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // Helper function to build policy data for playground testing
     const buildPlaygroundPolicyData = () => {
         const b = normalizeBehaviourValue(policyBehaviour);
-        const regexPatternsV2 = regexPatterns
-            .filter(r => r && r.pattern && r.behavior)
-            .map(r => ({
-                pattern: r.pattern,
-                behavior: r.behavior.toLowerCase()
-            }));
+        const regexPatternsV2 = enableRegexPatterns
+            ? regexPatterns
+                .filter(r => r && r.pattern && r.behavior)
+                .map(r => ({
+                    pattern: r.pattern,
+                    behavior: r.behavior.toLowerCase()
+                }))
+            : [];
 
         return {
             name: name || "Playground Test Policy",
@@ -969,12 +978,17 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
                 code: enableCodeFilter ? { level: codeFilterLevel.toUpperCase() } : null
             },
-            deniedTopics: deniedTopics,
-            wordFilters: wordFilters,
-            piiFilters: piiTypes,
-            regexPatterns: regexPatterns
-                .filter(r => r && r.pattern)
-                .map(r => r.pattern),
+            deniedTopics: enableDeniedTopics ? deniedTopics : [],
+            wordFilters: {
+                profanity: wordFilters.profanity,
+                custom: wordFilters.profanity ? (wordFilters.custom || []) : []
+            },
+            piiFilters: enablePiiTypes ? piiTypes : [],
+            regexPatterns: enableRegexPatterns
+                ? regexPatterns
+                    .filter(r => r && r.pattern)
+                    .map(r => r.pattern)
+                : [],
             regexPatternsV2,
             ...(enableLlmPrompt && llmPrompt?.trim() ? {
                 llmRule: {
