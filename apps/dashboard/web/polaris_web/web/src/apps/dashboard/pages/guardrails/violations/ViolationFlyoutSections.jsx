@@ -15,8 +15,7 @@ import AssetTopologyGraph from "@/apps/dashboard/pages/observe/agentic/AssetTopo
 import DetailGrid from "@/apps/dashboard/pages/observe/agentic/DetailGrid";
 import SampleData from "@/apps/dashboard/components/shared/SampleData";
 import MarkdownViewer from "@/apps/dashboard/components/shared/MarkdownViewer";
-import ChatMessage from "@/apps/dashboard/pages/testing/TestRunResultPage/components/ChatMessage";
-import { MESSAGE_TYPES } from "@/apps/dashboard/pages/testing/TestRunResultPage/components/chatConstants";
+import ConversationHistory from "@/apps/dashboard/pages/testing/TestRunResultPage/components/ConversationHistory";
 import func from "@/util/func";
 
 // ─── Inline highlighting ────────────────────────────────────────────────────────
@@ -117,50 +116,65 @@ function TriggerReason({ reason, policyName }) {
 
 // ─── Overview tab ───────────────────────────────────────────────────────────────
 
+// ─── Topology builder ───────────────────────────────────────────────────────────
+// Builds ReactFlow nodes + edges from a violation topology object so OverviewSection
+// stays lean. Node type "topoNode" is registered in AssetTopologyGraph (TOPO_NODE_TYPES).
+
+function buildViolationTopo(topology) {
+    if (!topology) return null;
+    const { user, agent, model, skill, tool } = topology;
+    const node = (id, category, type, label, x) => ({
+        id, type: "topoNode", draggable: false,
+        position: { x, y: 0 },
+        data: { component: { category, type, label } },
+    });
+    const edge = (id, source, target, stroke) => ({
+        id, source, target, type: "smoothstep", style: { stroke, strokeWidth: 1.5 },
+    });
+
+    if (skill) {
+        return {
+            nodes: [
+                node("user",  "external",  "User",     user,  0),
+                node("agent", "agent",     "AI Agent", agent, 200),
+                node("skill", "skill",     "Skill",    skill, 400),
+                node("model", "ai-model",  "AI Model", model, 600),
+            ],
+            edges: [
+                edge("e1", "user",  "agent", "#9CA3AF"),
+                edge("e2", "agent", "skill", "#7C3AED"),
+                edge("e3", "skill", "model", "#ec4899"),
+            ],
+        };
+    }
+    if (tool) {
+        return {
+            nodes: [
+                node("user",  "external", "User",      user,  0),
+                node("agent", "agent",    "AI Agent",  agent, 260),
+                node("tool",  "mcp",      "Tool Call", tool,  520),
+            ],
+            edges: [
+                edge("e1", "user",  "agent", "#9CA3AF"),
+                edge("e2", "agent", "tool",  "#4cbebb"),
+            ],
+        };
+    }
+    return {
+        nodes: [
+            node("user",  "external",  "User",     user,  0),
+            node("agent", "agent",     "AI Agent", agent, 260),
+            node("model", "ai-model",  "AI Model", model, 520),
+        ],
+        edges: [
+            edge("e1", "user",  "agent", "#9CA3AF"),
+            edge("e2", "agent", "model", "#ec4899"),
+        ],
+    };
+}
+
 export function OverviewSection({ row, detail }) {
-    const topo = useMemo(() => {
-        if (!detail?.topology) return null;
-        const { user, agent, model, skill, tool } = detail.topology;
-        if (skill) {
-            // Skill violation: User → Agent → Skill → Model (4 nodes)
-            const nodes = [
-                { id: "user",  type: "topoNode", draggable: false, position: { x: 0,   y: 0 }, data: { component: { category: "external",  type: "User",     label: user  } } },
-                { id: "agent", type: "topoNode", draggable: false, position: { x: 200, y: 0 }, data: { component: { category: "agent",     type: "AI Agent", label: agent } } },
-                { id: "skill", type: "topoNode", draggable: false, position: { x: 400, y: 0 }, data: { component: { category: "skill",     type: "Skill",    label: skill } } },
-                { id: "model", type: "topoNode", draggable: false, position: { x: 600, y: 0 }, data: { component: { category: "ai-model",  type: "AI Model", label: model } } },
-            ];
-            const edges = [
-                { id: "e1", source: "user",  target: "agent", type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } },
-                { id: "e2", source: "agent", target: "skill", type: "smoothstep", style: { stroke: "#7C3AED", strokeWidth: 1.5 } },
-                { id: "e3", source: "skill", target: "model", type: "smoothstep", style: { stroke: "#ec4899", strokeWidth: 1.5 } },
-            ];
-            return { nodes, edges };
-        }
-        if (tool) {
-            // Tool Call violation: User → Agent → Tool (3 nodes)
-            const nodes = [
-                { id: "user",  type: "topoNode", draggable: false, position: { x: 0,   y: 0 }, data: { component: { category: "external", type: "User",      label: user  } } },
-                { id: "agent", type: "topoNode", draggable: false, position: { x: 260, y: 0 }, data: { component: { category: "agent",    type: "AI Agent",  label: agent } } },
-                { id: "tool",  type: "topoNode", draggable: false, position: { x: 520, y: 0 }, data: { component: { category: "mcp",      type: "Tool Call", label: tool  } } },
-            ];
-            const edges = [
-                { id: "e1", source: "user",  target: "agent", type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } },
-                { id: "e2", source: "agent", target: "tool",  type: "smoothstep", style: { stroke: "#4cbebb", strokeWidth: 1.5 } },
-            ];
-            return { nodes, edges };
-        }
-        // Default: User → Agent → Model (3 nodes)
-        const nodes = [
-            { id: "user",  type: "topoNode", draggable: false, position: { x: 0,   y: 0 }, data: { component: { category: "external",  type: "User",     label: user  } } },
-            { id: "agent", type: "topoNode", draggable: false, position: { x: 260, y: 0 }, data: { component: { category: "agent",     type: "AI Agent", label: agent } } },
-            { id: "model", type: "topoNode", draggable: false, position: { x: 520, y: 0 }, data: { component: { category: "ai-model",  type: "AI Model", label: model } } },
-        ];
-        const edges = [
-            { id: "e1", source: "user",  target: "agent", type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } },
-            { id: "e2", source: "agent", target: "model", type: "smoothstep", style: { stroke: "#ec4899", strokeWidth: 1.5 } },
-        ];
-        return { nodes, edges };
-    }, [detail]);
+    const topo = useMemo(() => buildViolationTopo(detail?.topology), [detail]);
 
     const gridItems = [
         { label: "Detected", value: func.epochToDateTime(row.detected) },
@@ -213,7 +227,8 @@ export function OverviewSection({ row, detail }) {
 }
 
 // ─── Chat Session tab ───────────────────────────────────────────────────────────
-// Reuses the shared ChatMessage transcript component from the testing flow.
+// Normalises violation message format → ConversationHistory's expected shape, then
+// delegates rendering to the shared ConversationHistory component.
 
 export function ChatSessionSection({ messages = [], highlights = [] }) {
     if (!messages.length) {
@@ -226,23 +241,18 @@ export function ChatSessionSection({ messages = [], highlights = [] }) {
             </Box>
         );
     }
+
+    const conversations = messages.map(m => ({
+        role: m.type === "request" ? "user" : "assistant",
+        message: m.text,
+        creationTimestamp: m.timestamp,
+        validation: !!m.isVulnerable,
+        customLabel: m.author,
+    }));
+
     return (
         <Box padding="2">
-            <VerticalStack gap="2">
-                {messages.map((m, i) => (
-                    <ChatMessage
-                        key={i}
-                        type={m.type === "request" ? MESSAGE_TYPES.REQUEST : MESSAGE_TYPES.RESPONSE}
-                        customLabel={m.author}
-                        content={m.text}
-                        timestamp={m.timestamp}
-                        isVulnerable={!!m.isVulnerable}
-                        isCode={false}
-                        toolsMetadata={{}}
-                        highlights={m.isVulnerable ? highlights : []}
-                    />
-                ))}
-            </VerticalStack>
+            <ConversationHistory conversations={conversations} highlights={highlights} />
         </Box>
     );
 }

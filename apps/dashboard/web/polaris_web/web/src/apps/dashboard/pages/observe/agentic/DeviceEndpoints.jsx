@@ -195,14 +195,16 @@ function ViolationsCellRenderer({ value }) {
 // ─── Endpoint cell — uses AgGridRow as shared inner renderer ──────────────────
 
 // Username cell renderer — used as innerRenderer of the auto-group (expand) column.
-const TYPE_CLASS_MAP = {
+export const TYPE_CLASS_MAP = {
     "AI Agent": "agentic-type-AGENT",
     "MCP Server": "agentic-type-MCP",
     "LLM": "agentic-type-LLM",
     "Skill": "agentic-type-SKILL",
     "Tool": "agentic-type-TOOL",
+    "Tool Call": "agentic-type-TOOL",
     "Resource": "agentic-type-RESOURCE",
     "Prompt": "agentic-type-PROMPT",
+    "Config": "agentic-type-CONFIG",
 };
 
 function UsernameCellInner({ data, node }) {

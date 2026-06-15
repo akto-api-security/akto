@@ -5,7 +5,7 @@ import ChatMessage from './ChatMessage';
 import { MESSAGE_LABELS } from './chatConstants';
 import ChatInfoModal from './ChatInfoModal';
 
-function ConversationHistory({ conversations, isInventory = false, testResults = [] }) {
+function ConversationHistory({ conversations, isInventory = false, testResults = [], highlights = [] }) {
     const label = isInventory ? MESSAGE_LABELS.INVENTORY_ANALYSIS : MESSAGE_LABELS.TESTED_INTERACTION;
 
     const [httpModalOpen, setHttpModalOpen] = useState(false);
@@ -36,18 +36,20 @@ function ConversationHistory({ conversations, isInventory = false, testResults =
                     const isUser = msg.role === 'user';
                     const testResultIndex = Math.floor(index / 2);
                     const hasAttemptData = !isInventory && testResults.length > 0 && testResults[testResultIndex]?.message;
+                    const defaultLabel = isInventory ? label : isUser ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE;
                     return (
                         <ChatMessage
                             key={msg._id ? `conv-${msg._id}-${index}` : `conv-${index}`}
                             type={isUser ? 'request' : 'response'}
                             content={msg.message}
                             timestamp={msg.creationTimestamp} // Normalize then convert to seconds for ChatMessage
-                            customLabel={isInventory ? label : isUser ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE}
+                            customLabel={msg.customLabel || defaultLabel}
                             isVulnerable={msg.validation}
                             isCode={false}
                             onOpenAttempt={hasAttemptData ? () => handleOpenAttempt(index) : null}
                             originalPrompt={msg.originalPrompt}
                             toolsMetadata={isUser ? {} : (msg?.toolsMetadata || {})}
+                            highlights={msg.validation ? highlights : []}
                         />
                     )
                 })}
@@ -72,15 +74,18 @@ ConversationHistory.propTypes = {
         creationTimestamp: PropTypes.number,
         validation: PropTypes.bool,
         originalPrompt: PropTypes.string,
+        customLabel: PropTypes.string,
     })),
     isInventory: PropTypes.bool,
     testResults: PropTypes.array,
+    highlights: PropTypes.arrayOf(PropTypes.string),
 };
 
 ConversationHistory.defaultProps = {
     conversations: [],
     isInventory: false,
     testResults: [],
+    highlights: [],
 };
 
 export default ConversationHistory;

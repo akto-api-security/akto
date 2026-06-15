@@ -18,7 +18,7 @@ import SmoothAreaChart from "@/apps/dashboard/pages/dashboard/new_components/Smo
 import AgenticStatsCard from "@/apps/dashboard/pages/observe/agentic/AgenticStatsCard";
 import AgenticTopListCard from "@/apps/dashboard/pages/observe/agentic/AgenticTopListCard";
 import AssetIcon from "@/apps/dashboard/pages/observe/agentic/AssetIcon";
-import { OsIcon } from "@/apps/dashboard/pages/observe/agentic/DeviceEndpoints";
+import { OsIcon, TYPE_CLASS_MAP } from "@/apps/dashboard/pages/observe/agentic/DeviceEndpoints";
 import observeFunc from "@/apps/dashboard/pages/observe/transform";
 import func from "@/util/func";
 import values from "@/util/values";
@@ -35,30 +35,10 @@ import {
     VIOLATION_ROWS,
 } from "./violationsData";
 
-// ─── Type badge — colours a Polaris <Badge> via the .agentic-type-* classes ─────
-// (style.css). Same technique TestRunResultFlyout uses for severity; no inline CSS.
-const TYPE_CLASS_MAP = {
-    Prompt: "agentic-type-PROMPT",
-    Skill: "agentic-type-SKILL",
-    Config: "agentic-type-CONFIG",
-    "Tool Call": "agentic-type-TOOL",
-    LLM: "agentic-type-LLMS",
-};
-
 // ─── Cell renderers ─────────────────────────────────────────────────────────────
 // AG Grid sandboxes its DOM, so cell renderers are the documented inline-style
 // exception. Each is a small named component (no inline logic in cellRenderer:).
 
-
-function DetectedCellRenderer({ value }) {
-    if (value == null) return null;
-    return <Text variant="bodySm">{func.epochToDateTime(value)}</Text>;
-}
-
-function ViolationCellRenderer({ value }) {
-    if (!value) return null;
-    return <Text variant="bodySm" fontWeight="medium" truncate>{value}</Text>;
-}
 
 function TypeCellRenderer({ value }) {
     if (!value) return null;
@@ -79,11 +59,6 @@ function AssetCellRenderer({ value, data }) {
             </Box>
         </HorizontalStack>
     );
-}
-
-function PolicyCellRenderer({ value }) {
-    if (!value) return null;
-    return <Text variant="bodySm" truncate>{value}</Text>;
 }
 
 function SeverityCellRenderer({ value }) {
@@ -135,7 +110,7 @@ const COL_DEFS = [
         headerName: "Detected",
         minWidth: 150,
         filter: false,
-        cellRenderer: DetectedCellRenderer,
+        valueFormatter: p => p.value != null ? func.epochToDateTime(p.value) : "",
     },
     {
         field: "type",
@@ -148,7 +123,6 @@ const COL_DEFS = [
         field: "violation",
         headerName: "Violation",
         minWidth: 200,
-        cellRenderer: ViolationCellRenderer,
     },
     {
         field: "severity",
@@ -193,7 +167,6 @@ const COL_DEFS = [
         headerName: "Policy Triggered",
         minWidth: 160,
         filter: "agSetColumnFilter",
-        cellRenderer: PolicyCellRenderer,
     },
 ];
 
@@ -239,6 +212,7 @@ function ViolationsDashboard({ severityFilter, onSeverityFilter, policyFilter, o
                     deltaColor="subdued"
                     sparklineCounts={TOTAL_VIOLATIONS_SUMMARY.sparkline}
                     sparklineColor="#EF4444"
+                    sparklineLabels={SPARKLINE_LABELS}
                     breakdown={TOTAL_VIOLATIONS_SUMMARY.breakdown}
                     onFilterClick={onSeverityFilter}
                     activeFilter={severityFilter}
@@ -250,6 +224,7 @@ function ViolationsDashboard({ severityFilter, onSeverityFilter, policyFilter, o
                     deltaColor="subdued"
                     sparklineCounts={OPEN_VIOLATIONS_SUMMARY.sparkline}
                     sparklineColor="#EF4444"
+                    sparklineLabels={SPARKLINE_LABELS}
                     breakdown={OPEN_VIOLATIONS_SUMMARY.breakdown}
                 />
             </HorizontalGrid>

@@ -15,6 +15,7 @@ import { MobileCancelMajor } from "@shopify/polaris-icons";
 import AgenticFlyoutShell from "@/apps/dashboard/pages/observe/agentic/AgenticFlyoutShell";
 import AiChatSection from "@/apps/dashboard/pages/observe/agentic/AiChatSection";
 import { SeverityBadge } from "@/apps/dashboard/pages/observe/agentic/AgenticCellRenderers";
+import JiraTicketCreationModal from "@/apps/dashboard/components/shared/JiraTicketCreationModal";
 import func from "@/util/func";
 
 import {
@@ -28,33 +29,51 @@ import "../../../components/layouts/style.css";
 
 // ─── Action dropdown ──────────────────────────────────────────────────────────
 
-const ACTION_ITEMS = [
-    { content: "Create Jira Ticket" },
-    { content: "Edit Policy" },
-    { content: "Mark As False Positive" },
-];
-
-function ActionDropdown() {
+function ActionDropdown({ violationId }) {
     const [open, setOpen] = useState(false);
-    const items = ACTION_ITEMS.map((a) => ({
-        content: a.content,
-        onAction: () => {
-            setOpen(false);
-            func.setToast(true, false, `${a.content} — coming soon`);
-        },
-    }));
+    const [jiraModalActive, setJiraModalActive] = useState(false);
+
+    const otherItems = [
+        { content: "Edit Policy",           onAction: () => { setOpen(false); func.setToast(true, false, "Edit Policy — coming soon"); } },
+        { content: "Mark As False Positive", onAction: () => { setOpen(false); func.setToast(true, false, "Mark As False Positive — coming soon"); } },
+    ];
+
     return (
-        <Popover
-            active={open}
-            onClose={() => setOpen(false)}
-            activator={<Button size="slim" disclosure onClick={() => setOpen((p) => !p)}>Action</Button>}
-            autofocusTarget="none"
-            preferredAlignment="right"
-        >
-            <Box minWidth="220px">
-                <ActionList actionRole="menuitem" items={items} />
-            </Box>
-        </Popover>
+        <>
+            <JiraTicketCreationModal
+                activator={<></>}
+                modalActive={jiraModalActive}
+                setModalActive={setJiraModalActive}
+                handleSaveAction={() => func.setToast(true, false, "Jira integration coming soon")}
+                jiraProjectMaps={[]}
+                projId=""
+                setProjId={() => {}}
+                issueType=""
+                setIssueType={() => {}}
+                issueId={violationId}
+            />
+            <Popover
+                active={open}
+                onClose={() => setOpen(false)}
+                activator={<Button size="slim" disclosure onClick={() => setOpen((p) => !p)}>Action</Button>}
+                autofocusTarget="none"
+                preferredAlignment="right"
+            >
+                <Box minWidth="220px">
+                    <ActionList
+                        actionRole="menuitem"
+                        items={[
+                            {
+                                content: "Create Jira Ticket",
+                                onAction: () => { setOpen(false); setJiraModalActive(true); },
+                                disabled: window.JIRA_INTEGRATED !== "true",
+                            },
+                            ...otherItems,
+                        ]}
+                    />
+                </Box>
+            </Popover>
+        </>
     );
 }
 
@@ -71,7 +90,7 @@ function FlyoutHeader({ row, onClose }) {
                         <Badge size="small" status={row.action === "Blocked" ? "critical" : undefined}>{row.action}</Badge>
                     </HorizontalStack>
                     <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                        <ActionDropdown />
+                        <ActionDropdown violationId={row.id} />
                         <Button plain icon={MobileCancelMajor} onClick={onClose} accessibilityLabel="Close" />
                     </HorizontalStack>
                 </HorizontalStack>
@@ -112,6 +131,16 @@ export default function ViolationFlyout({ violation, show, onClose }) {
 
     const activeId = tabModel.tabs[selectedTab]?.id;
 
+    function renderTabContent(id) {
+        switch (id) {
+            case "overview":    return <OverviewSection row={violation} detail={detail} />;
+            case "chat":        return <ChatSessionSection messages={detail?.chatSession} highlights={detail?.evidence?.highlights || []} />;
+            case "file":        return <FileSection detail={detail} />;
+            case "remediation": return <RemediationSection markdown={detail?.remediation} />;
+            default:            return null;
+        }
+    }
+
     return (
         <AgenticFlyoutShell
             show={show}
@@ -134,10 +163,7 @@ export default function ViolationFlyout({ violation, show, onClose }) {
             }
         >
             <Box style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-                {activeId === "overview" && <OverviewSection row={violation} detail={detail} />}
-                {activeId === "chat" && <ChatSessionSection messages={detail?.chatSession} highlights={detail?.evidence?.highlights || []} />}
-                {activeId === "file" && <FileSection detail={detail} />}
-                {activeId === "remediation" && <RemediationSection markdown={detail?.remediation} />}
+                {renderTabContent(activeId)}
             </Box>
         </AgenticFlyoutShell>
     );
