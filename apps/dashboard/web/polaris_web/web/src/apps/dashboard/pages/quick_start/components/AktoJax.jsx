@@ -40,6 +40,7 @@ const AktoJax = () => {
     const [customHeaders, setCustomHeaders] = useState([]);
     const [runTestAfterCrawling, setRunTestAfterCrawling] = useState(false);
     const [selectedMiniTestingService, setSelectedMiniTestingService] = useState('');
+    const [enableAiJsDiscovery, setEnableAiJsDiscovery] = useState(false);
     const [collectionName, setCollectionName] = useState('');
 
     const [availableModules, setAvailableModules] = useState([])
@@ -86,7 +87,7 @@ const AktoJax = () => {
         });
 
         setLoading(true)
-        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls, crawlingTime, selectedModule, customHeadersMap, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages, collectionName).then((res) => {
+        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls, crawlingTime, selectedModule, customHeadersMap, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages, collectionName, enableAiJsDiscovery).then((res) => {
             func.setToast(true, false, "Crawler initiated successfully. Please check your dashboard for updates.")
         }).catch((err) => {
         }).finally(() => {
@@ -102,6 +103,7 @@ const AktoJax = () => {
             setUrlTemplatePatterns('')
             setApplicationPages('')
             setCollectionName('')
+            setEnableAiJsDiscovery(false)
         })
     }
 
@@ -136,6 +138,7 @@ const AktoJax = () => {
             setApplicationPages(duplicateScanData.applicationPages || '')
             setRunTestAfterCrawling(duplicateScanData.runTestAfterCrawling || false)
             setSelectedMiniTestingService(duplicateScanData.selectedMiniTestingService || '')
+            setEnableAiJsDiscovery(duplicateScanData.enableAiJsDiscovery || false)
             setApiKey(duplicateScanData.apiKey || '')
             setCollectionName(duplicateScanData.collectionName || '')
 
@@ -190,6 +193,8 @@ const AktoJax = () => {
                 setRunTestAfterCrawling={setRunTestAfterCrawling}
                 selectedMiniTestingService={selectedMiniTestingService}
                 setSelectedMiniTestingService={setSelectedMiniTestingService}
+                enableAiJsDiscovery={enableAiJsDiscovery}
+                setEnableAiJsDiscovery={setEnableAiJsDiscovery}
             />
 
             <Box paddingBlockStart={3}><Divider /></Box>

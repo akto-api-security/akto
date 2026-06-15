@@ -1,15 +1,5 @@
 package com.akto.log;
 
-import com.akto.dao.AgenticTestingLogsDao;
-import com.akto.dao.AnalyserLogsDao;
-import com.akto.dao.AwsApiGatewayLogsDao;
-import com.akto.dao.GuardrailsServiceLogsDao;
-import com.akto.dao.BillingLogsDao;
-import com.akto.dao.ConfigsDao;
-import com.akto.dao.DashboardLogsDao;
-import com.akto.dao.LogsDao;
-import com.akto.dao.PupeteerLogsDao;
-import com.akto.dao.RuntimeLogsDao;
 import com.akto.dao.monitoring.EndpointShieldLogsDao;
 import com.akto.dto.monitoring.EndpointShieldLog;
 import com.akto.RuntimeMode;
@@ -70,6 +60,18 @@ public class LoggerMaker  {
 
     private static final boolean shouldNotSendLogs = System.getenv("BLOCK_LOGS") != null && System.getenv("BLOCK_LOGS").equals("true");
 
+    // Flag to send logs to infra only (no console output) - lazy initialized from env var
+    private static Boolean SEND_TO_INFRA_ONLY = null;
+
+    private static boolean isSendToInfraOnly() {
+        if (SEND_TO_INFRA_ONLY == null) {
+            // Enabled by default, set env var to "false" to disable
+            String envValue = System.getenv().getOrDefault("SEND_TO_INFRA_ONLY", "false");
+            SEND_TO_INFRA_ONLY = !"false".equalsIgnoreCase(envValue);
+        }
+        return SEND_TO_INFRA_ONLY;
+    }
+
     static {
         scheduler.scheduleAtFixedRate(new Runnable() {
 
@@ -112,7 +114,7 @@ public class LoggerMaker  {
     private static AccountSettings accountSettings = null;
 
     private static final ScheduledExecutorService scheduler2 = Executors.newScheduledThreadPool(1);
-
+    
     static {
         scheduler2.scheduleAtFixedRate(new Runnable() {
             @Override
@@ -128,7 +130,9 @@ public class LoggerMaker  {
 
     private static void updateAccountSettings() {
         try {
-            internalLogger.info("Running updateAccountSettings....................................");
+            if (!isSendToInfraOnly()) {
+                internalLogger.info("Running updateAccountSettings....................................");
+            }
             Context.accountId.set(1_000_000);
             accountSettings = dataActor.fetchAccountSettingsForAccount(1_000_000);
         } catch (Exception e) {
@@ -175,7 +179,9 @@ public class LoggerMaker  {
         if(Context.accountId.get() != null){
             err = String.format("%s\nAccount id: %d", err, Context.accountId.get());
         }
-        logger.error(err);
+        if (!isSendToInfraOnly()) {
+            logger.error(err);
+        }
         try{
             insert(err, "error", db);
         } catch (Exception e){
@@ -211,7 +217,13 @@ public class LoggerMaker  {
         try {
             if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
                 StackTraceElement stackTraceElement = e.getStackTrace()[0];
-                err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+                err = String.format("Err msg: %s\nException: %s\nException msg: %s\nClass: %s\nFile: %s\nLine: %d",
+                    err, e.getClass().getName(), e.getMessage(), stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+
+                // Also log root cause if present
+                if (e.getCause() != null) {
+                    err += String.format("\nCause: %s - %s", e.getCause().getClass().getName(), e.getCause().getMessage());
+                }
             } else {
                 err = String.format("Err msg: %s\nStackTrace not available", err);
                 e.printStackTrace();
@@ -226,7 +238,9 @@ public class LoggerMaker  {
     public void infoAndAddToDb(String info, LogDb db) {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
         String infoMessage = "acc: " + accountId + ", " + info;
-        logger.info(infoMessage);
+        if (!isSendToInfraOnly()) {
+            logger.info(infoMessage);
+        }
         try{
             insert(infoMessage, "info",db);
         } catch (Exception e){
@@ -237,7 +251,9 @@ public class LoggerMaker  {
     public void warnAndAddToDb(String info, LogDb db) {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
         String infoMessage = "acc: " + accountId + ", " + info;
-        logger.warn(infoMessage);
+        if (!isSendToInfraOnly()) {
+            logger.warn(infoMessage);
+        }
         try{
             insert(infoMessage, "warn",db);
         } catch (Exception e){
@@ -449,18 +465,30 @@ public class LoggerMaker  {
     }
 
     public void info(String message, Object... vars) {
+        if (isSendToInfraOnly()) {
+            return;
+        }
         logger.info(message, vars);
     }
 
     public void error(String errorMessage, Object... vars) {
+        if (isSendToInfraOnly()) {
+            return;
+        }
         logger.error(errorMessage, vars);
     }
 
     public void debug(String message, Object... vars) {
+        if (isSendToInfraOnly()) {
+            return;
+        }
         logger.debug(message, vars);
     }
 
     public void warn(String message, Object... vars) {
+        if (isSendToInfraOnly()) {
+            return;
+        }
         logger.warn(message, vars);
     }
 

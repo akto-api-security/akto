@@ -10,9 +10,11 @@ import api from "../api";
 import func from "@/util/func";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
+import LocalStore from "../../../../main/LocalStorageStore";
 import useTable from "@/apps/dashboard/components/tables/TableContext";
 import settingRequests from "../../settings/api";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
+import NewLayoutTooltip from "./NewLayoutTooltip";
 import {
     getHeaders,
     getSortOptionsWithoutIconColumn,
@@ -35,6 +37,14 @@ const usersAndDevicesCountColumnOpts = {
 function UsersAndDevices() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+    const agenticNewLayout = LocalStore((state) => state.agenticNewLayout);
+    const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
+
+    useEffect(() => {
+        if (agenticNewLayout) {
+            navigate("/dashboard/observe/endpoints", { replace: true });
+        }
+    }, [navigate, agenticNewLayout]);
     const [data, setData] = useState({ users: [], devices: [] });
     const [userEnrichVersion, setUserEnrichVersion] = useState(0);
     const [summaryData, setSummaryData] = useState({ profileCount: 0, collectionCount: 0 });
@@ -104,20 +114,24 @@ function UsersAndDevices() {
         [getRiskScoreStatus],
     );
 
-    const applyMaliciousBadgeToUsers = useCallback((maliciousSkillsSet, isMountedRef) => {
+    const applyMaliciousBadgeToUsers = useCallback((maliciousSkillsSet, misconfiguredCollectionIdsSet, isMountedRef) => {
         if (!isMountedRef.current) return;
         setData((prev) => ({
             ...prev,
             users: prev.users.map((row) => {
                 const skillNames = row.uniqueSkillNames || new Set();
                 const hasMalicious = [...skillNames].some((s) => maliciousSkillsSet.has(s));
-                const groupNameDisplay = hasMalicious ? (
+                const collectionIds = (row.collections || []).map((c) => c.id);
+                const hasMisconfigured = collectionIds.some((id) => misconfiguredCollectionIdsSet.has(id));
+                const badges = [];
+                if (hasMalicious) badges.push(<Badge key="malicious" size="small" status="critical">Malicious Skills</Badge>);
+                const groupNameDisplay = badges.length > 0 ? (
                     <HorizontalStack gap="2" align="start" wrap={false}>
                         <Text>{row.groupName}</Text>
-                        <Badge size="small" status="critical">Malicious Skills</Badge>
+                        {badges}
                     </HorizontalStack>
                 ) : row.groupName;
-                return { ...row, hasMaliciousSkill: hasMalicious, groupNameDisplay };
+                return { ...row, hasMaliciousSkill: hasMalicious, hasMisconfiguredConfig: hasMisconfigured, groupNameDisplay };
             }),
         }));
         setUserEnrichVersion((v) => v + 1);
@@ -132,10 +146,10 @@ function UsersAndDevices() {
         });
         if (!allCollectionIds.length) return;
 
-        const { maliciousSkills } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
+        const { maliciousSkills, misconfiguredCollectionIds } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
 
         if (!isMountedRef.current) return;
-        applyMaliciousBadgeToUsers(maliciousSkills, isMountedRef);
+        applyMaliciousBadgeToUsers(maliciousSkills, misconfiguredCollectionIds || new Set(), isMountedRef);
     }, [applyMaliciousBadgeToUsers]);
 
     async function fetchData(isMountedRef = { current: true }) {
@@ -334,11 +348,16 @@ function UsersAndDevices() {
         [],
     );
 
+    const layoutToggle = (
+        <NewLayoutTooltip checked={false} onChange={() => { setAgenticNewLayout(true); navigate("/dashboard/observe/endpoints"); }} />
+    );
+
     if (loading) {
         return (
             <PageWithMultipleCards
                 title={pageTitle}
                 isFirstPage={true}
+                secondaryActions={layoutToggle}
                 components={[<SpinnerCentered key="loading" />]}
             />
         );
@@ -378,6 +397,7 @@ function UsersAndDevices() {
             <PageWithMultipleCards
                 title={pageTitle}
                 isFirstPage={true}
+                secondaryActions={layoutToggle}
                 components={[summaryComponent, tableComponent]}
             />
             {editTagModalComp}

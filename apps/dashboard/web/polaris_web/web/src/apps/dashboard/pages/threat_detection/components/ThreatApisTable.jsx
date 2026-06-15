@@ -142,7 +142,11 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
 
 
     if(url.length > 0){
-      const navigateUrl = window.location.origin + "/dashboard/protection/threat-activity?filters=url__" + url;
+      const params = new URLSearchParams();
+      params.set("filters", `url__${url}`);
+      params.set("startTimestamp", startTimestamp);
+      params.set("endTimestamp", endTimestamp);
+      const navigateUrl = `${window.location.origin}/dashboard/protection/threat-activity?${params.toString()}`;
       window.open(navigateUrl, "_blank")
     }
    

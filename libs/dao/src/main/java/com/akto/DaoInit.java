@@ -284,6 +284,7 @@ public class DaoInit {
         ClassModel<TagsTestingEndpoints> tagsTestingEndpointsClassModel = ClassModel.builder(TagsTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<ApiTagsTestingEndpoints> apiTagsTestingEndpointsClassModel = ClassModel.builder(ApiTagsTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<AuthTypeTestingEndpoints> authTypeTestingEndpointsClassModel = ClassModel.builder(AuthTypeTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<AccessTypeTestingEndpoints> accessTypeTestingEndpointsClassModel = ClassModel.builder(AccessTypeTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<MultiCollectionTestingEndpoints> multiCollectionTestingEndpointsClassModel = ClassModel.builder(MultiCollectionTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<DependencyNode> dependencyNodeClassModel = ClassModel.builder(DependencyNode.class).enableDiscriminator(true).build();
         ClassModel<ParamInfo> paramInfoClassModel = ClassModel.builder(ParamInfo.class).enableDiscriminator(true).build();
@@ -355,6 +356,7 @@ public class DaoInit {
         ClassModel<WizSyncJobParams> wizSyncJobParamsClassModel = ClassModel.builder(WizSyncJobParams.class).enableDiscriminator(true).build();
         ClassModel<EndpointMcpConfig> endpointMcpConfigClassModel = ClassModel.builder(EndpointMcpConfig.class).enableDiscriminator(true).build();
         ClassModel<NewRelicIntegration> newRelicIntegrationClassModel = ClassModel.builder(NewRelicIntegration.class).enableDiscriminator(true).build();
+        ClassModel<OpenTelemetryIntegration> openTelemetryIntegrationClassModel = ClassModel.builder(OpenTelemetryIntegration.class).enableDiscriminator(true).build();
         ClassModel<ModelConfig> modelConfigClassModel = ClassModel.builder(ModelConfig.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -382,7 +384,7 @@ public class DaoInit {
                 setupClassModel,
                 cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
                 methodConditionClassModel, regexTestingEndpointsClassModel, hostRegexTestingEndpointsClassModel,
-                tagsTestingEndpointsClassModel, authTypeTestingEndpointsClassModel, multiCollectionTestingEndpointsClassModel, allTestingEndpointsClassModel,
+                tagsTestingEndpointsClassModel, authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, multiCollectionTestingEndpointsClassModel, allTestingEndpointsClassModel,
                 apiTagsTestingEndpointsClassModel,
                 UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel,
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel,
@@ -401,7 +403,7 @@ public class DaoInit {
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
                 traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
                 wizIntegrationClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel,
-                mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel, newRelicIntegrationClassModel, modelConfigClassModel)
+                mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel, newRelicIntegrationClassModel, modelConfigClassModel, openTelemetryIntegrationClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(

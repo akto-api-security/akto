@@ -15,6 +15,7 @@ from typing import Any, Dict, Set, Tuple, Union
 from urllib.parse import quote
 
 from akto_machine_id import get_machine_id, get_username
+from akto_ingestion_utility import installer_headers, resolve_session_info
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.codex/akto/logs"))
@@ -41,7 +42,7 @@ AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "codex_cli")
 AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "codexcli")
-AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
+AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 # Built-in (e.g. Bash) tool traffic: mirror non-MCP path; blocked-request ingestion off by default (claude-cli-hooks).
 AKTO_INGEST_NON_MCP_TOOLS = os.getenv("AKTO_INGEST_NON_MCP_TOOLS", "false").lower() == "true"
@@ -160,8 +161,8 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
 
     headers = {"Content-Type": "application/json"}
-    if AKTO_TOKEN:
-        headers["authorization"] = AKTO_TOKEN
+    if AKTO_API_TOKEN:
+        headers["Authorization"] = AKTO_API_TOKEN
 
     request = urllib.request.Request(
         url,
@@ -230,9 +231,7 @@ def build_validation_request(
     if is_mcp and mcp_server_name:
         req_headers["x-mcp-server"] = mcp_server_name
     if session_info:
-        for key, value in session_info.items():
-            if value is not None:
-                req_headers[f"x-akto-installer-{key}"] = str(value)
+        req_headers.update(installer_headers(session_info))
 
     request_headers = json.dumps(req_headers)
     response_headers = json.dumps({"x-codex-hook": "PreToolUse"})
@@ -466,19 +465,7 @@ def main():
         logger.error(f"Invalid JSON input: {e}")
         sys.exit(0)
 
-    session_info = {}
-    for field in (
-        "session_id",
-        "transcript_path",
-        "cwd",
-        "hook_event_name",
-        "model",
-        "turn_id",
-        "tool_use_id",
-    ):
-        value = input_data.get(field)
-        if value is not None:
-            session_info[field] = value
+    session_info = resolve_session_info(input_data, logger)
 
     tool_name = str(input_data.get("tool_name") or "")
     tool_input = input_data.get("tool_input") or {}

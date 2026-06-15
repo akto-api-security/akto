@@ -128,6 +128,9 @@ import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastP
 import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
 import UsersAndDevices from "../dashboard/pages/observe/agentic/UsersAndDevices.jsx";
+import DeviceEndpoints from "../dashboard/pages/observe/agentic/DeviceEndpoints.jsx";
+import AgenticAssetsPage from "../dashboard/pages/observe/agentic/AgenticAssetsPage.jsx";
+import LLMObservability from "../dashboard/pages/observe/llm/LLMObservability.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
 import IdentitiesPage from "../dashboard/pages/nhi_governance/IdentitiesPage.jsx";
@@ -135,7 +138,10 @@ import ViolationsPage from "../dashboard/pages/nhi_governance/ViolationsPage.jsx
 import PoliciesPage from "../dashboard/pages/nhi_governance/PoliciesPage.jsx";
 import AllowedHostsForPac from "../dashboard/pages/settings/allowed_hosts/AllowedHostsForPac.jsx";
 import EndpointShieldSettings from "../dashboard/pages/settings/endpoint_shield/EndpointShieldSettings.jsx";
+import RemoteCommands from "../dashboard/pages/settings/remote_commands/RemoteCommands.jsx";
+import RemoteCommandDetail from "../dashboard/pages/settings/remote_commands/RemoteCommandDetail.jsx";
 import NewRelic from "../dashboard/pages/settings/integrations/NewRelic.jsx";
+import OpenTelemetry from "../dashboard/pages/settings/integrations/OpenTelemetry.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -217,12 +223,24 @@ const router = createBrowserRouter([
                                 element: <ApiCollections/>
                             },
                             {
-                                path: "agentic-assets",
+                                path: "agentic-assets-legacy",
                                 element: <Endpoints/>
+                            },
+                            {
+                                path: "agentic-assets",
+                                element: <AgenticAssetsPage/>
                             },
                             {
                                 path: "users-and-devices",
                                 element: <UsersAndDevices/>
+                            },
+                            {
+                                path: "endpoints",
+                                element: <DeviceEndpoints/>
+                            },
+                            {
+                                path: "llm-observability",
+                                element: <LLMObservability/>
                             },
                             {
                                 path: "query_mode",
@@ -568,6 +586,10 @@ const router = createBrowserRouter([
                         element: <NewRelic/>,
                     },
                     {
+                        path: "integrations/open_telemetry",
+                        element: <OpenTelemetry/>,
+                    },
+                    {
                         path: "logs",
                         element: <HealthLogs/>,
                     },
@@ -602,6 +624,14 @@ const router = createBrowserRouter([
                     {
                         path: 'endpoint-shield',
                         element: <EndpointShieldSettings/>
+                    },
+                    {
+                        path: 'remote-commands',
+                        element: <RemoteCommands/>
+                    },
+                    {
+                        path: 'remote-commands/:commandId',
+                        element: <RemoteCommandDetail/>
                     },
                     {
                         path: 'file-inspection',

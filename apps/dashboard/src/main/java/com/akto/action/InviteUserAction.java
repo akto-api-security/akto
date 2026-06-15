@@ -103,6 +103,8 @@ public class InviteUserAction extends UserAction{
         commonOrganisationsMap.put("betsoftware.com ", "hollywoodbets.net ");
         commonOrganisationsMap.put("lambdatest.com", "testmuai.com");
         commonOrganisationsMap.put("testmuai.com", "lambdatest.com");
+        commonOrganisationsMap.put("razorpay.com", "razorpay.com");
+        commonOrganisationsMap.put("popclub.co", "razorpay.com");
     }
 
     public static String validateEmail(String email, String adminLogin) {

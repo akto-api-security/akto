@@ -2,6 +2,7 @@ package com.akto.threat.detection.cache;
 
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.data_actor.DataActor;
+import com.akto.dto.api_protection_parse_layer.Rule;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.log.LoggerMaker;
@@ -11,14 +12,22 @@ import com.akto.utils.GzipUtils;
 import io.lettuce.core.api.StatefulRedisConnection;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class FilterCache {
 
     private static final LoggerMaker logger = new LoggerMaker(FilterCache.class, LogDb.THREAT_DETECTION);
     private static final int REFRESH_INTERVAL_SEC = 300;
+    private static final Set<String> DEFAULT_THREAT_PROTECTION_FILTER_IDS = new HashSet<>(Arrays.asList(
+      "LocalFileInclusionLFIRFI", "NoSQLInjection", "OSCommandInjection", "SQLInjection",
+      "SSRF", "SecurityMisconfig", "WindowsCommandInjection", "XSS"
+  ));
 
     private final DataActor dataActor;
     private final StatefulRedisConnection<String, String> apiCache;
@@ -33,7 +42,7 @@ public class FilterCache {
         this.apiCache = apiCache;
     }
 
-    public Map<String, FilterConfig> getFilters() {
+    public Map<String, FilterConfig> getFilters(boolean isHyperScanEnabled) {
         int now = (int) (System.currentTimeMillis() / 1000);
         if (apiFilters != null && now - lastUpdatedAt < REFRESH_INTERVAL_SEC) {
             return apiFilters;
@@ -62,8 +71,15 @@ public class FilterCache {
                 }
             }
         }
+
+         // When hyperscan is enabled, skip default threat protection filters (hyperscan handles them)
+        // Only custom YAML templates should run through the filter loop
+        if (isHyperScanEnabled && apiFilters != null && !apiFilters.isEmpty()) {
+          apiFilters.keySet().removeAll(DEFAULT_THREAT_PROTECTION_FILTER_IDS);
+        }
+
         return apiFilters;
-    }
+  }
 
     public List<FilterConfig> getSuccessfulExploitFilters() {
         return successfulExploitFilters;
@@ -71,6 +87,23 @@ public class FilterCache {
 
     public List<FilterConfig> getIgnoredEventFilters() {
         return ignoredEventFilters;
+    }
+
+    /**
+     * Returns the first Rule from the API_LEVEL_RATE_LIMITING filter, or null if none configured.
+     * Callers use rule.getCondition().getWindowThreshold() and getMatchCount().
+     */
+    public Rule getApiLevelRateLimitRule() {
+        if (apiFilters == null) return null;
+        for (FilterConfig f : apiFilters.values()) {
+            if (f.getInfo() != null
+                    && "API_LEVEL_RATE_LIMITING".equalsIgnoreCase(f.getInfo().getSubCategory())
+                    && f.getAggregationRules() != null
+                    && !f.getAggregationRules().getRule().isEmpty()) {
+                return f.getAggregationRules().getRule().get(0);
+            }
+        }
+        return null;
     }
 
     public String getApiSchema(int apiCollectionId) {

@@ -476,6 +476,7 @@ function GuardrailPolicies() {
                 selectedAgentServersV2: guardrailData.selectedAgentServersV2 || [],
                 // Block-only host blocklist
                 blockedHosts: guardrailData.blockedHosts || [],
+                blockPersonalAccounts: guardrailData.blockPersonalAccounts || false,
                 deniedTopics: guardrailData.deniedTopics || [],
                 regexPatterns: guardrailData.regexPatterns || [],
                 // Add V2 field for enhanced regex data

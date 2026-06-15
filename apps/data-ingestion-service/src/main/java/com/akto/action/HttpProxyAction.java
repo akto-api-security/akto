@@ -1,8 +1,10 @@
 package com.akto.action;
 
 import com.akto.gateway.Gateway;
+import com.akto.jobs.executors.AIAgentConnectorConstants;
 import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
+import com.akto.util.Constants;
 import com.akto.utils.McpCollectionResolver;
 import com.akto.utils.SlackUtils;
 import com.mongodb.BasicDBObject;
@@ -156,6 +158,21 @@ public class HttpProxyAction extends ActionSupport {
         loggerMaker.infoAndAddToDb("MCP host rewrite: " + tempCollectionName + " -> " + realCollectionName);
     }
 
+    private String buildTagJson() {
+        if (!"true".equalsIgnoreCase(ingest_data)) return tag;
+        try {
+            BasicDBObject tagObj = (tag != null && !tag.isEmpty()) ? BasicDBObject.parse(tag) : new BasicDBObject();
+            String connector = akto_connector != null ? akto_connector.toLowerCase() : "";
+            String mode = AIAgentConnectorConstants.OBSERVE_MODE_CONNECTORS.contains(connector)
+                    ? Constants.AKTO_GUARDRAIL_MODE_OBSERVE
+                    : Constants.AKTO_GUARDRAIL_MODE_INLINE;
+            tagObj.put(Constants.AKTO_GUARDRAIL_MODE, mode);
+            return tagObj.toJson();
+        } catch (Exception e) {
+            return tag;
+        }
+    }
+
     private Map<String, Object> buildRequestData() {
         Map<String, Object> requestData = new HashMap<>();
 
@@ -181,7 +198,7 @@ public class HttpProxyAction extends ActionSupport {
         requestData.put("is_pending", is_pending);
         requestData.put("source", source);
         requestData.put("direction", direction);
-        requestData.put("tag", tag);
+        requestData.put("tag", buildTagJson());
         requestData.put("metadata", metadata);
         requestData.put("process_id", process_id);
         requestData.put("socket_id", socket_id);

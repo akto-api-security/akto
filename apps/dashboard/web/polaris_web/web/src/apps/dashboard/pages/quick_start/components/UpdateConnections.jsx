@@ -9,7 +9,8 @@ import FlyLayout from '../../../components/layouts/FlyLayout';
 import { useSearchParams } from 'react-router-dom';
 import func from "@/util/func"
 import EndpointShieldCard from './EndpointShieldCard';
-import { isEndpointSecurityCategory, getDashboardCategory } from '@/apps/main/labelHelper';
+import SetupGuardrails from './SetupGuardrails';
+import { isEndpointSecurityCategory, isAgenticSecurityCategory, getDashboardCategory } from '@/apps/main/labelHelper';
 
 function UpdateConnections(props) {
 
@@ -69,6 +70,7 @@ function UpdateConnections(props) {
     };
 
     const showRecommendedSetup = !func.checkLocal() && isEndpointSecurityCategory();
+    const showSetupGuardrails = isEndpointSecurityCategory() || isAgenticSecurityCategory();
 
     return (
         <Page 
@@ -91,6 +93,7 @@ function UpdateConnections(props) {
                             />
                         </VerticalStack>
                     )}
+                    {showSetupGuardrails && <SetupGuardrails />}
                     {Object.keys(obj).filter(key => key !== "").map((key, index) => {
                         return (
                             <VerticalStack gap="4" key={key}>

@@ -95,7 +95,7 @@ export async function fetchActionItemsData() {
     const results = await Promise.allSettled([
         api.fetchApiStats(startTimestamp, endTimestamp),
         observeApi.fetchCountMapOfApis(),
-        settingsModule.fetchAdminInfo(),
+        settingsModule.fetchAccountConfig(),
         api.fetchUnauthenticatedApis(false),
         api.getNotTestedAPICount(false),
         api.getOnlyOnceTestedAPICount(false),
@@ -110,7 +110,7 @@ export async function fetchActionItemsData() {
     const [
         apiStatsResult,
         countMapRespResult,
-        adminSettingsResult,
+        accountConfigResult,
         unauthenticatedApisResult,
         notTestedApiCountResult,
         onlyOnceTestedApiCountResult,
@@ -134,9 +134,8 @@ export async function fetchActionItemsData() {
 
     const apiStats = apiStatsResult.status === 'fulfilled' ? apiStatsResult.value : null;
     const countMapResp = countMapRespResult.status === 'fulfilled' ? countMapRespResult.value : null;
-    const adminSettings = adminSettingsResult.status === 'fulfilled' ? adminSettingsResult.value.resp : {};
     const unauthenticatedApis = unauthenticatedApisResult.status === 'fulfilled' ? unauthenticatedApisResult.value.unauthenticatedApis || 0 : 0;
-    const jiraTicketUrlMap = adminSettings?.jiraTicketUrlMap || {};
+    const jiraTicketUrlMap = accountConfigResult.status === 'fulfilled' ? accountConfigResult.value?.jiraTicketUrlMap || {} : {};
     const issuesByApis = issuesByApisResult.status === 'fulfilled' ? issuesByApisResult.value : null;
     const urlsByIssues = urlsByIssuesResult.status === 'fulfilled' ? urlsByIssuesResult.value : null;
     const brokenAuthIssuesResp = brokenAuthIssuesResult.status === 'fulfilled' ? brokenAuthIssuesResult.value : null;

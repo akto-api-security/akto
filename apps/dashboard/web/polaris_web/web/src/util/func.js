@@ -150,7 +150,7 @@ const func = {
     let d = date.getDate();
     let m = strArray[date.getMonth()];
     let y = date.getFullYear();
-    return m + ' ' + d + (needYear ? ' ' + y : '');
+    return m + ' ' + d + (needYear ? ', ' + y : '');
   },
   prettifyShort(num) {
     return new Intl.NumberFormat( 'en-US', { maximumFractionDigits: 1,notation: "compact" , compactDisplay: "short" }).format(num)
@@ -1273,6 +1273,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
   if(Object.keys(idToName).length === 0){
     idToName = func.mapCollectionIdToName(allCollections)
   }
+  const collectionEnvTypeMap = {}
+  allCollections.forEach(c => { collectionEnvTypeMap[c.id] = c.envType || [] })
 
   let ret = {}
   let apiInfoMap = {}
@@ -1361,6 +1363,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               agentProxyGuardrailEnabled: apiInfoMap[key] ? (apiInfoMap[key]["agentProxyGuardrailEnabled"] || false) : false,
               guardrailSchema: apiInfoMap[key] ? (apiInfoMap[key]["guardrailSchema"] || null) : null,
               isMalicious: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true") : false,
+              isMisconfigured: (apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true") : false) || (x.endpoint?.startsWith("/claude/config/") && (collectionEnvTypeMap[x.apiCollectionId] || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true")),
               tagsList: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []) : [],
               apiType,
           }
@@ -2218,6 +2221,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return access;
   },
 
+  hasThreatAccess(){
+    return !['MEMBER', 'DEVELOPER', 'GUEST', 'NO_ACCESS'].includes(window.USER_ROLE)
+  },
   checkUserValidForIntegrations(){
     const rbacAccess = this.checkForRbacFeatureBasic();
     if(!rbacAccess){

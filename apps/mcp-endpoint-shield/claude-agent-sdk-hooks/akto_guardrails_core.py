@@ -11,7 +11,7 @@ Environment Variables:
                                "false" to ingest-only (observational).
     AKTO_TIMEOUT             : HTTP request timeout in seconds (default: 5).
     AKTO_CONNECTOR           : Connector name sent to Akto (default: "claude_agent_sdk").
-    AKTO_TOKEN               : Authorization header value sent to AKTO_DATA_INGESTION_URL.
+    AKTO_API_TOKEN               : Authorization header value sent to AKTO_DATA_INGESTION_URL.
     AGENT_ID                 : Identifies this agent server instance; used as
                                akto_vxlan_id in payloads. Set to a stable identifier
                                for your deployment (e.g. pod name, service name).
@@ -70,7 +70,7 @@ def _data_ingestion_url() -> str:
     return os.getenv("AKTO_DATA_INGESTION_URL", "")
 
 def _akto_token() -> str:
-    return os.getenv("AKTO_TOKEN", "")
+    return os.getenv("AKTO_API_TOKEN", "")
 
 # contextSource is always AGENTIC for server-side agent deployments
 CONTEXT_SOURCE = "AGENTIC"
@@ -112,7 +112,7 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
     headers = {"Content-Type": "application/json"}
     token = _akto_token()
     if token:
-        headers["authorization"] = token
+        headers["Authorization"] = token
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),

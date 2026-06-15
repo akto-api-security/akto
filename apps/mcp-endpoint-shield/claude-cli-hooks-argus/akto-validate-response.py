@@ -10,6 +10,7 @@ import urllib.request
 from typing import Any, Dict, Set, Tuple, Union
 
 from akto_helpers import get_device_ip
+from akto_ingestion_utility import installer_headers, resolve_session_info
 
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/akto/logs"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -30,7 +31,7 @@ console_handler.setLevel(logging.ERROR)
 logger.addHandler(console_handler)
 
 AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
-AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
+AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
 AKTO_HOST = os.getenv("AKTO_HOST", "https://api.anthropic.com")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
@@ -72,8 +73,8 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         logger.debug(f"Request payload: {json.dumps(payload)}")
 
     headers = {"Content-Type": "application/json"}
-    if AKTO_TOKEN:
-        headers["authorization"] = AKTO_TOKEN
+    if AKTO_API_TOKEN:
+        headers["Authorization"] = AKTO_API_TOKEN
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -115,9 +116,7 @@ def build_ingestion_payload(
         "content-type": "application/json",
     }
     if session_info:
-        for key, value in session_info.items():
-            if value is not None:
-                req_headers[f"x-akto-installer-{key}"] = str(value)
+        req_headers.update(installer_headers(session_info))
 
     return {
         "path": "/v1/messages",
@@ -385,17 +384,7 @@ def main():
         logger.error(f"Invalid JSON input: {e}")
         sys.exit(0)
 
-    session_info = {}
-    for field in (
-        "session_id",
-        "transcript_path",
-        "cwd",
-        "permission_mode",
-        "hook_event_name",
-    ):
-        value = input_data.get(field)
-        if value is not None:
-            session_info[field] = value
+    session_info = resolve_session_info(input_data, logger)
 
     try:
         transcript_path = input_data.get("transcript_path")

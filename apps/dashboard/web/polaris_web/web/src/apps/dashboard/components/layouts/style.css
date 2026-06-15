@@ -1,4 +1,4 @@
-.flyLayout{
+.flyLayout {
     position: absolute;
     top: 0;
     right: -50vw;
@@ -7,13 +7,177 @@
     height: 100vh;
 }
 
-.innerFlyLayout{
+/* Inner scroll container for the shared FlyLayout (components/layouts/FlyLayout.jsx). */
+.innerFlyLayout {
     height: 100vh;
     position: fixed;
     overflow-y: scroll;
     scrollbar-width: none;
 }
 
-.show{
-    right:0;
+.show {
+    right: 0;
+}
+
+
+/* Asset-type badges — colour a Polaris <Badge> per type (same technique as the
+   dashboard-wide .badge-wrapper-<SEVERITY> classes). Keeps TypeBadge a plain Polaris
+   <Badge> instead of an inline-styled span. */
+.agentic-type-AGENT .Polaris-Badge   { background-color: #F3E8FF; color: #9642FC; }
+.agentic-type-MCP .Polaris-Badge     { background-color: #ECFDF5; color: #0D9488; }
+.agentic-type-LLM .Polaris-Badge     { background-color: #FEFCE8; color: #CA8A04; }
+.agentic-type-SKILL .Polaris-Badge   { background-color: #F9FAFB; color: #6B7280; }
+.agentic-type-DEFAULT .Polaris-Badge { background-color: #F3F4F6; color: #374151; }
+
+
+/* Clickable risk-factor row — edge-to-edge hover, divider between rows. */
+.agentic-clickable-row {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    padding: 10px 12px;
+    border-radius: 8px;
+}
+.agentic-clickable-row:hover {
+    background-color: var(--p-color-bg-hover, #f6f6f7);
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.agentic-risk-factors {
+    border: 1px solid var(--p-color-border-subdued, #e1e3e5);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Card 1 legend chips — pill around dot + label. Transparent border avoids layout shift when active. */
+.agentic-chip {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    padding: 2px 6px;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+}
+.agentic-chip:focus {
+    outline: none;
+}
+/* Selected chip — full border around dot + label. */
+.agentic-chip--active {
+    border-color: #8c9196;
+}
+
+/* Legend dot — colour via --dot-color custom property. */
+.agentic-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: inline-block;
+    background: var(--dot-color);
+}
+
+
+/* AG Grid auto-group column: align the cell-wrapper (checkbox + arrow + content) vertically */
+.ag-cell-wrapper {
+    align-items: center;
+}
+
+/* Cursor + hover — DataTable owns all spacing/borders */
+.agentic-list-table .Polaris-DataTable__Cell {
+    cursor: pointer;
+}
+/* Click target fills the whole cell so clicks in empty cell space still open the flyout. */
+.agentic-list-cell-click {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.agentic-list-table .Polaris-DataTable__TableRow:hover .Polaris-DataTable__Cell {
+    background-color: var(--p-color-bg-hover, #f6f6f7);
+}
+.agentic-list-table .Polaris-DataTable__Cell--header {
+    color: var(--p-color-text-subdued, #6D7175);
+    font-weight: 500;
+}
+
+/* Segmented proportion bar */
+.agentic-seg-bar {
+    display: flex;
+    height: 5px;
+    border-radius: 3px;
+    overflow: hidden;
+    gap: 1px;
+}
+.agentic-seg-bar > .agentic-seg {
+    min-width: 2px;
+}
+
+
+/* flex: 1 + flexDirection: column + minHeight: 0 — required for AG Grid fill-height
+   inside flyout panels. No Polaris prop equivalent for flex/flexDirection. */
+.agentic-flex-fill {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+/* AiChatSection — flex column with a pinned input row. The expand/collapse flex
+   behaviour and overflow can't be Box props; padding/border/background are. */
+.agentic-chat {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+.agentic-chat--expanded {
+    flex: 1;
+    min-height: 0;
+}
+.agentic-chat-header,
+.agentic-chat-input {
+    flex-shrink: 0;
+}
+.agentic-chat-messages {
+    flex: 1;
+    min-height: 0;
+}
+.agentic-chat-messages--scroll {
+    overflow-y: scroll;
+}
+.agentic-chat-section {
+    margin-inline-start: var(--p-space-2);
+    margin-inline-end: var(--p-space-2);
+    margin-block-end: var(--p-space-2);
+}
+.agentic-chat-fill {
+    flex: 1;
+    min-height: 0;
+}
+.agentic-chat-drag-handle {
+    cursor: ns-resize;
+}
+.agentic-chat-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Stats card column inside HorizontalGrid — fills parent height, distributes
+   children evenly so Card 1 height matches Card 2 / Card 3. */
+.agentic-stats-card-fill {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+.agentic-stats-card-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }

@@ -297,10 +297,10 @@ function CompliancePage() {
     useEffect(() => {
         const fetchCompulsorySettings = async () => {
             try {
-                const {resp} = await settingFunctions.fetchAdminInfo();
-                
-                if (resp?.compulsoryDescription) {
-                    setCompulsorySettings(resp.compulsoryDescription);
+                const accountConfig = await settingFunctions.fetchAccountConfig();
+
+                if (accountConfig?.compulsoryDescription) {
+                    setCompulsorySettings(accountConfig.compulsoryDescription);
                 }
             } catch (error) {
             }

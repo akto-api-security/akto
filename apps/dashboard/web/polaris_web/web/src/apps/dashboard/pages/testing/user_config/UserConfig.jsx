@@ -289,7 +289,7 @@ function UserConfig() {
     }
 
     const commonTemplateComponent = (
-        <LegacyCard sectioned title="Configure global test configuration" key="commonTestTemplate" primaryFooterAction={
+        <LegacyCard sectioned title="Global Test Configuration" key="commonTestTemplate" primaryFooterAction={
             {
                 content: "Save", destructive: false, onAction: () => { saveCommonTemplate() }
             }

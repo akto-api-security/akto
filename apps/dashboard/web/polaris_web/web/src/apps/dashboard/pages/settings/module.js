@@ -164,6 +164,9 @@ const settingFunctions = {
 
       await settingRequests.saveAktoGptConfig(arr)
     },
+    fetchAccountConfig: async function(){
+      return await settingRequests.fetchAccountConfig()
+    },
     fetchLoginInfo: async function(){
       let lastLogin = ''
       await settingRequests.fetchUserLastLoginTs().then((resp)=>{
@@ -171,8 +174,8 @@ const settingFunctions = {
       })
       return lastLogin
     },
-    fetchAdminInfo: async function(){
-      const loginInfo = await this.fetchLoginInfo()
+    fetchAdminInfo: async function(fetchLoginInfoFlag = false){
+      const loginInfo = fetchLoginInfoFlag ? await this.fetchLoginInfo() : ''
       let arr = []
       let resp = {}
       let accountSettingsDetails = {}
@@ -462,6 +465,27 @@ const settingFunctions = {
         trafficData = resp
       })
       return trafficData
+    },
+    fetchOpenTelemetryIntegration: async function(){
+      let openTelemetryIntegration = {}
+      await settingRequests.fetchOpenTelemetryIntegration().then((resp)=>{
+        openTelemetryIntegration = resp.openTelemetryIntegration
+      })
+      return openTelemetryIntegration
+    },
+    addOpenTelemetryIntegration: async function(endpoint, apiKey, headerName) {
+      let result = {}
+      await settingRequests.addOpenTelemetryIntegration(endpoint, apiKey, headerName).then((resp)=>{
+        result = resp
+      })
+      return result
+    },
+    removeOpenTelemetryIntegration: async function() {
+      let result = {}
+      await settingRequests.removeOpenTelemetryIntegration().then((resp)=>{
+        result = resp
+      })
+      return result
     },
 }
 

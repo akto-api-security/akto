@@ -10,6 +10,7 @@ import (
 
 	"github.com/akto-api-security/akto-endpoint-shield/utils"
 	"github.com/akto-api-security/guardrails-service/handlers"
+	"github.com/akto-api-security/guardrails-service/pkg/auth"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
@@ -83,7 +84,19 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 
 	validationHandler := handlers.NewValidationHandler(validatorService, logger, cfg, fileRegistry, acc)
 
-	router := setupRouter(validationHandler, logger)
+	var authMiddleware gin.HandlerFunc
+	if cfg.AuthEnabled {
+		m, err := auth.NewMiddleware(cfg.RSAPublicKey, logger)
+		if err != nil {
+			logger.Fatal("Failed to initialize auth middleware", zap.Error(err))
+		}
+		authMiddleware = m
+		logger.Info("Inbound JWT authentication enabled for /api endpoints")
+	} else {
+		logger.Warn("Inbound authentication disabled (set AKTO_GR_AUTHENTICATE=true to enable)")
+	}
+
+	router := setupRouter(validationHandler, authMiddleware, logger)
 
 	addr := fmt.Sprintf(":%d", cfg.ServerPort)
 	logger.Info("Server starting in HTTP mode", zap.String("address", addr))
@@ -128,7 +141,7 @@ func corsMiddleware() gin.HandlerFunc {
 	}
 }
 
-func setupRouter(validationHandler *handlers.ValidationHandler, logger *zap.Logger) *gin.Engine {
+func setupRouter(validationHandler *handlers.ValidationHandler, authMiddleware gin.HandlerFunc, logger *zap.Logger) *gin.Engine {
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -139,9 +152,13 @@ func setupRouter(validationHandler *handlers.ValidationHandler, logger *zap.Logg
 	router.Use(corsMiddleware())
 	router.Use(loggingMiddleware(logger))
 
+	// Root health check stays unauthenticated for liveness probes (worker/orchestrator).
 	router.GET("/health", validationHandler.HealthCheck)
 
 	api := router.Group("/api")
+	if authMiddleware != nil {
+		api.Use(authMiddleware)
+	}
 	{
 		api.POST("/health", validationHandler.HealthCheck)
 		api.POST("/ingestData", validationHandler.IngestData)
