@@ -176,19 +176,6 @@ export function summarizeViolations(rows = []) {
     return t;
 }
 
-// Deep-link to threat-activity pre-filtered to the given hosts (and optionally config URLs).
-// SusDataTable reads ?filters=host__<csv>&url__<csv> on load. Passing the config URLs narrows the
-// view to exactly the config violations rather than all activity on the host.
-export function buildHostFilterUrl(hosts = [], urls = []) {
-    const uniqHosts = [...new Set(hosts.filter(Boolean))];
-    const uniqUrls = [...new Set(urls.filter(Boolean))];
-    const parts = [];
-    if (uniqHosts.length) parts.push(`host__${uniqHosts.join(",")}`);
-    if (uniqUrls.length) parts.push(`url__${uniqUrls.join(",")}`);
-    if (!parts.length) return "/dashboard/protection/threat-activity?filters=#active";
-    return `/dashboard/protection/threat-activity?filters=${encodeURIComponent(parts.join("&"))}#active`;
-}
-
 export function buildAgenticObserveChatMetadata(scope, data = {}) {
     return {
         type: "agentic_observe",

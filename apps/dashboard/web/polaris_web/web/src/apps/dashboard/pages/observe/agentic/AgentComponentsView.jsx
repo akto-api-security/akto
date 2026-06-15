@@ -4,7 +4,8 @@ import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { TypeBadge, RiskPill, SeverityBadge } from "./AgenticCellRenderers";
 import { ToolDetailPanel, SkillDetailPanel } from "./McpComponentsView";
 import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges";
-import agenticObserveApi, { buildHostFilterUrl } from "./agenticObserveApi";
+import agenticObserveApi, { openViolationInThreatActivity } from "./agenticObserveApi";
+import func from "@/util/func";
 
 // ── Cell renderers ────────────────────────────────────────────────────────────
 
@@ -177,9 +178,64 @@ function AgentMcpToolsView({ asset, selectedMcp, agenticFlatData, goToList, onNa
     );
 }
 
+// ── Config violations drill-down ──────────────────────────────────────────────
+// Mirrors the MCP tools drill-down: a breadcrumb sub-view listing the individual config
+// violation events; clicking a row opens that event in threat-activity.
+
+const SEVERITY_ORDER = { low: 1, medium: 2, high: 3, critical: 4 };
+
+function ConfigViolTitleCellRenderer({ data }) {
+    if (!data) return null;
+    return (
+        <Box width="100%" overflowX="hidden">
+            <Text variant="bodySm" fontWeight="semibold" truncate>{data.title}</Text>
+        </Box>
+    );
+}
+
+function ConfigViolSeverityCellRenderer({ data }) {
+    if (!data) return null;
+    return <SeverityBadge severity={data.severity} />;
+}
+
+const CONFIG_VIOL_COL_DEFS = [
+    { field: "time", headerName: "Time", width: 160, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.timeEpoch || 0) - (nodeB?.data?.timeEpoch || 0) },
+    { field: "title", headerName: "Violation", flex: 1, minWidth: 200, cellRenderer: ConfigViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
+    { field: "severity", headerName: "Severity", width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ConfigViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, comparator: (a, b) => (SEVERITY_ORDER[a] || 0) - (SEVERITY_ORDER[b] || 0) },
+];
+
+function ConfigViolationsView({ configRows = [] }) {
+    const rows = useMemo(
+        () => configRows.map((r) => ({ ...r, time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "" })),
+        [configRows],
+    );
+
+    if (!rows.length) {
+        return <Box padding="4"><Text variant="bodySm" color="subdued">No config violations found.</Text></Box>;
+    }
+
+    return (
+        <Box className="agentic-flex-fill">
+            <AgGridTable
+                rowData={rows}
+                columnDefs={CONFIG_VIOL_COL_DEFS}
+                defaultColDef={GRID_DEFAULT_COL}
+                onRowClicked={(e) => { if (e.data) openViolationInThreatActivity(e.data); }}
+                getRowStyle={() => ({ cursor: "pointer" })}
+                fillHeight
+                noOuterBorder
+                searchPlaceholder="Search config violations..."
+                pagination={false}
+                sideBar={false}
+                domLayout="normal"
+            />
+        </Box>
+    );
+}
+
 // ── Main view ─────────────────────────────────────────────────────────────────
 
-export default function AgentComponentsView({ asset, onNavChange, onNavigateToAsset, agenticFlatData = [], configViolations = null, configHosts = [], configUrls = [] }) {
+export default function AgentComponentsView({ asset, onNavChange, onNavigateToAsset, agenticFlatData = [], configViolations = null, configRows = [] }) {
     const [view,          setView]          = useState("list");
     const [selectedMcp,   setSelectedMcp]   = useState(null);
     const [selectedTool,  setSelectedTool]  = useState(null);
@@ -227,23 +283,19 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
         onNavChange?.(null);
     }, [onNavChange]);
 
-    // Config row: shown for Claude agents that have claude-config/settings violations attributed
-    // to their devices (host-matched, NOT the agent total). Clickable → threat-activity filtered
-    // to exactly those config event hosts. Non-clickable only if the hosts are unknown.
+    // Config row: shown for Claude agents that have claude-config violations (url /claude/config/*)
+    // attributed to their devices. Clicking drills into a breadcrumb sub-view listing the individual
+    // config violations; each of those rows opens in threat-activity.
     const configRow = useMemo(() => {
         const isClaudeAgent = asset?.assetTagValue?.toLowerCase() === "claude";
         if (!isClaudeAgent || !configViolations || configViolations.total === 0) return null;
-        const hosts = configHosts || [];
         return {
             id: "__config__",
             name: "Claude Settings",
             _type: "Config",
             violations: configViolations,
-            _configHosts: hosts,
-            _configUrls: configUrls || [],
-            _nonClickable: hosts.length === 0,
         };
-    }, [asset?.assetTagValue, configViolations, configHosts, configUrls]);
+    }, [asset?.assetTagValue, configViolations]);
 
     const allComponents = useMemo(() => [
         ...(configRow ? [configRow] : []),
@@ -254,7 +306,11 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
     const handleListRowClick = useCallback((e) => {
         if (!e.data || e.data._nonClickable) return;
         if (e.data._type === "Config") {
-            window.open(buildHostFilterUrl(e.data._configHosts, e.data._configUrls), "_blank");
+            setView("config-detail");
+            onNavChange?.([
+                { label: asset.name, onClick: goToList },
+                { label: e.data.name },
+            ]);
             return;
         }
         if (e.data._type === "MCP Server") {
@@ -301,6 +357,10 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
 
     if (view === "skill-detail" && selectedSkill) {
         return <SkillDetailPanel skill={selectedSkill} />;
+    }
+
+    if (view === "config-detail") {
+        return <ConfigViolationsView configRows={configRows} />;
     }
 
     if (allComponents.length === 0) {

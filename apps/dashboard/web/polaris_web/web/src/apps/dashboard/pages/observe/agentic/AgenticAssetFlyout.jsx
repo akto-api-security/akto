@@ -6,7 +6,7 @@ import AgenticFlyoutShell from "./AgenticFlyoutShell";
 import AiChatSection from "./AiChatSection";
 import { getAgentLinkedComponents } from "./agenticPageBuilders";
 import { RiskScoreCellRenderer } from "./AgenticCellRenderers";
-import agenticObserveApi, { buildAgenticObserveChatMetadata, openViolationInThreatActivity, selectConfigViolationRows, summarizeViolations } from "./agenticObserveApi";
+import agenticObserveApi, { buildAgenticObserveChatMetadata, selectConfigViolationRows, summarizeViolations } from "./agenticObserveApi";
 import OverviewTab from "./OverviewTab";
 import ViolationsTab from "./ViolationsTab";
 import McpComponentsView from "./McpComponentsView";
@@ -64,9 +64,9 @@ function DevicesTab({ asset, assetDevices = {} }) {
 
 // ─── Components tab router ────────────────────────────────────────────────────
 
-function AgenticComponentsTab({ asset, onNavChange, onNavigateToAsset, agenticFlatData = [], configViolations, configHosts, configUrls }) {
+function AgenticComponentsTab({ asset, onNavChange, onNavigateToAsset, agenticFlatData = [], configViolations, configRows }) {
     if (asset.type === "MCP Server") return <McpComponentsView asset={asset} onNavChange={onNavChange} />;
-    if (asset.type === "AI Agent")   return <AgentComponentsView asset={asset} onNavChange={onNavChange} onNavigateToAsset={onNavigateToAsset} agenticFlatData={agenticFlatData} configViolations={configViolations} configHosts={configHosts} configUrls={configUrls} />;
+    if (asset.type === "AI Agent")   return <AgentComponentsView asset={asset} onNavChange={onNavChange} onNavigateToAsset={onNavigateToAsset} agenticFlatData={agenticFlatData} configViolations={configViolations} configRows={configRows} />;
     // Skills: fetch from parent collections then show the skill's own traffic
     if (asset.type === "Skill") return <SkillComponentsView asset={asset} />;
     // LLMs: their collectionIds are their own collections — show actual LLM API endpoints
@@ -148,8 +148,6 @@ export default function AgenticAssetFlyout({
         const summary = summarizeViolations(configRows);
         return summary.total > 0 ? summary : null;
     }, [configRows]);
-    const configHosts = useMemo(() => [...new Set(configRows.map((r) => r.host).filter(Boolean))], [configRows]);
-    const configUrls = useMemo(() => [...new Set(configRows.map((r) => r.url).filter(Boolean))], [configRows]);
 
     const handleTabSelect = useCallback((tab) => {
         setSelectedTab(tab);
@@ -241,8 +239,7 @@ export default function AgenticAssetFlyout({
                             onNavigateToAsset={onNavigateToAsset}
                             agenticFlatData={agenticFlatData}
                             configViolations={configViolations}
-                            configHosts={configHosts}
-                            configUrls={configUrls}
+                            configRows={configRows}
                         />
                     </div>
                 )}
