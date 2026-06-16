@@ -1,5 +1,8 @@
 package com.akto.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
@@ -33,6 +36,9 @@ public class DependencyNode {
 
     private int lastUpdated;
     public static final String LAST_UPDATED = "lastUpdated";
+
+    private boolean arrayResponse;
+    public static final String IS_ARRAY_RESPONSE = "arrayResponse";
 
     public static class ParamInfo {
         private String requestParam;
@@ -181,6 +187,19 @@ public class DependencyNode {
         this.methodReq = methodReq;
         this.paramInfos = paramInfos;
         this.lastUpdated = lastUpdated;
+        this.arrayResponse = false;
+    }
+
+    public DependencyNode(String apiCollectionIdResp, String urlResp, String methodResp, String apiCollectionIdReq, String urlReq, String methodReq, List<ParamInfo> paramInfos, int lastUpdated, boolean arrayResponse) {
+        this.apiCollectionIdResp = apiCollectionIdResp;
+        this.urlResp = urlResp;
+        this.methodResp = methodResp;
+        this.apiCollectionIdReq = apiCollectionIdReq;
+        this.urlReq = urlReq;
+        this.methodReq = methodReq;
+        this.paramInfos = paramInfos;
+        this.lastUpdated = lastUpdated;
+        this.arrayResponse = arrayResponse;
     }
 
     @Override
@@ -188,7 +207,7 @@ public class DependencyNode {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         DependencyNode that = (DependencyNode) o;
-        return apiCollectionIdResp.equals(that.apiCollectionIdResp) && urlResp.equals(that.urlResp) && methodResp.equals(that.methodResp) && apiCollectionIdReq.equals(that.apiCollectionIdReq) && urlReq.equals(that.urlReq) && methodReq.equals(that.methodReq);
+        return apiCollectionIdResp.equals(that.apiCollectionIdResp) && urlResp.equals(that.urlResp) && methodResp.equals(that.methodResp) && apiCollectionIdReq.equals(that.apiCollectionIdReq) && urlReq.equals(that.urlReq) && methodReq.equals(that.methodReq) && arrayResponse == that.arrayResponse;
     }
 
     @Override
@@ -220,7 +239,7 @@ public class DependencyNode {
         return new DependencyNode(
                 this.apiCollectionIdResp, this.urlResp, this.methodResp,
                 this.apiCollectionIdReq, this.urlReq, this.methodReq,
-                paramInfoList, this.lastUpdated
+                paramInfoList, this.lastUpdated, this.arrayResponse
         );
     }
 
@@ -308,5 +327,21 @@ public class DependencyNode {
 
     public void setLastUpdated(int lastUpdated) {
         this.lastUpdated = lastUpdated;
+    }
+
+    @JsonIgnore
+    public boolean isArrayResponse() {
+        return arrayResponse;
+    }
+
+    @JsonProperty("arrayResponse")
+    public boolean getArrayResponse() {
+        return arrayResponse;
+    }
+
+    @JsonProperty("arrayResponse")
+    @JsonAlias("isArrayResponse")
+    public void setArrayResponse(boolean arrayResponse) {
+        this.arrayResponse = arrayResponse;
     }
 }
