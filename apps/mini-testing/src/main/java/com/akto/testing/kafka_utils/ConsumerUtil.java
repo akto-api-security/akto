@@ -51,7 +51,7 @@ public class ConsumerUtil {
     private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null;
     private static final LoggerMaker loggerMaker = new LoggerMaker(ConsumerUtil.class, LogDb.TESTING);
     public static ExecutorService executor = Executors.newFixedThreadPool(150);
-    private static final int maxRunTimeForTests = 5 * 60;
+    private static final int maxRunTimeForTests = 10 * 60;
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     private static final ConcurrentHashMap<ApiInfoKey, Integer> testedApisMap = new ConcurrentHashMap<>();
