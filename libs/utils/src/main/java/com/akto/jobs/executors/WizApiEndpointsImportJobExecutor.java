@@ -32,15 +32,15 @@ public class WizApiEndpointsImportJobExecutor extends JobExecutor<WizApiEndpoint
 
     @Override
     protected void runJob(Job job) throws Exception {
-        logger.info("Starting Wiz API endpoints import job for job: {}", job.getId());
+        logger.infoAndAddToDb(String.format("Starting Wiz API endpoints import job for job: %s", job.getId()));
         if (wizApiEndpointsProcessor == null) {
-            logger.error("wizApiEndpointsProcessor is not configured. Skipping Wiz API endpoints import.");
+            logger.errorAndAddToDb("wizApiEndpointsProcessor is not configured. Skipping Wiz API endpoints import.");
             return;
         }
         try {
             WizIntegration wizIntegration = WizIntegrationDao.instance.findOne(new BasicDBObject());
             if (wizIntegration == null) {
-                logger.info("No Wiz integration found. Skipping Wiz API endpoints import.");
+                logger.infoAndAddToDb("No Wiz integration found. Skipping Wiz API endpoints import.");
                 return;
             }
 
@@ -55,9 +55,9 @@ public class WizApiEndpointsImportJobExecutor extends JobExecutor<WizApiEndpoint
                 )
             );
 
-            logger.info("Wiz API endpoints import job completed successfully.");
+            logger.infoAndAddToDb("Wiz API endpoints import job completed successfully.");
         } catch (Exception e) {
-            logger.error("Error in Wiz API endpoints import job: {}", e.getMessage(), e);
+            logger.errorAndAddToDb(e, String.format("Error in Wiz API endpoints import job: %s", e.getMessage()));
             throw e;
         }
     }
