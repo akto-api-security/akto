@@ -855,7 +855,7 @@ public class HttpCallParser {
     }
 
     private CollectionTags getWizCollectionTag() {
-        return new CollectionTags(Context.now(), Constants.AKTO_ENDPOINT_SOURCE_TAG, Constants.AKTO_WIZ_SOURCE_VALUE, TagSource.USER);
+        return new CollectionTags(Context.now(), Constants.AKTO_ENDPOINT_SOURCE_TAG, Constants.AKTO_WIZ_SOURCE_VALUE, TagSource.AKTO);
     }
 
     private Bson getUpdatesIfWizCollection(boolean isWizRequest, Bson updates) {
