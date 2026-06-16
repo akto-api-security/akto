@@ -1350,6 +1350,7 @@ public class TestExecutor {
 
         if (testingRunConfig!=null && testingRunConfig.getCleanUp()) {
             try {
+                loggerMaker.warnAndAddToDb("Initiating the cleanUp for apiInfoKey " + apiInfoKey + "test " + testSubType + " logId " + testExecutionLogId);
                 cleanUpTestArtifacts(Collections.singletonList(ret), apiInfoKey, sampleMessageStore, testingRunConfig);
             } catch(Exception e){
                 loggerMaker.errorAndAddToDb(e, "Error while cleaning up test artifacts: " + e.getMessage());
