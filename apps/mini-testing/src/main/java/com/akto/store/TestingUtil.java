@@ -1,10 +1,12 @@
 package com.akto.store;
 
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestRoles;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -15,6 +17,7 @@ public class TestingUtil {
     private String userEmail;
 
     private List<CustomAuthType> customAuthTypes;
+    private Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
 
     public TestingUtil(SampleMessageStore sampleMessageStore, List<TestRoles> testRoles,
                        String userEmail, List<CustomAuthType> customAuthTypes) {
@@ -61,5 +64,13 @@ public class TestingUtil {
 
     public void setCustomAuthTypes(List<CustomAuthType> customAuthTypes) {
         this.customAuthTypes = customAuthTypes;
+    }
+
+    public Map<Integer, ApiCollection> getApiCollectionMap() {
+        return apiCollectionMap;
+    }
+
+    public void setApiCollectionMap(Map<Integer, ApiCollection> apiCollectionMap) {
+        this.apiCollectionMap = apiCollectionMap;
     }
 }

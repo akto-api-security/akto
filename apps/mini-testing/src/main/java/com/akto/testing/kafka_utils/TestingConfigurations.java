@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.RawApi;
@@ -29,7 +28,6 @@ public class TestingConfigurations {
     private  Map<ApiInfoKey, RawApi> rawApiMap = new HashMap<>();
     private boolean doNotMarkIssuesAsFixed;
     private boolean runAutomatedTests;
-    private Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
 
     private TestingConfigurations() {
     }
@@ -125,11 +123,4 @@ public class TestingConfigurations {
         this.runAutomatedTests = runAutomatedTests;
     }
 
-    public Map<Integer, ApiCollection> getApiCollectionMap() {
-        return apiCollectionMap;
-    }
-
-    public void setApiCollectionMap(Map<Integer, ApiCollection> apiCollectionMap) {
-        this.apiCollectionMap = apiCollectionMap;
-    }
 }
