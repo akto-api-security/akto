@@ -87,13 +87,11 @@ function Billing() {
             <Box>
                 <CustomerPortalProvider>
                     <CustomerUsageData />
-                    <PaymentDetailsSection />
                     <SubscriptionsOverview />
                     <AddonsList/>
                     <Promotions/>
                     <InvoicesSection/>
                 </CustomerPortalProvider>
-
             </Box>
     )
 
