@@ -5,6 +5,7 @@ import { buildMcpComponentsFromStis, buildSkillsFlyoutData, normalizeSeverity } 
 function normalizeEvent(e) {
     return {
         host:      e.host || "",
+        url:       e.url || "",
         severity:  e.severity?.toLowerCase() || "medium",
         title:     e.filterId || "Policy violation",
         timeEpoch: e.timestamp || 0,
@@ -127,6 +128,52 @@ export function openViolationInThreatActivity(row = {}) {
     } else {
         window.open(`${base}?filters=#active`, "_blank");
     }
+}
+
+// ── Claude config violation scoping ──────────────────────────────────────────
+// The authoritative signal for a config violation (matching ConfigRiskSyncCron on the backend)
+// is the event URL prefix `/claude/config/` — NOT the host. These events DO have a real host
+// equal to a collection's hostName. We scope to an asset by matching the event host against the
+// asset's own collection hosts (exact) and their loose device+service key, mirroring how the
+// Violations tab attributes rows. Config violations are thus a subset of the asset's violations.
+const CONFIG_URL_PREFIX = "/claude/config/";
+
+export function isConfigViolationRow(row) {
+    return !!row?.url && row.url.startsWith(CONFIG_URL_PREFIX);
+}
+
+function assetHostSets(asset, collections = []) {
+    const ids = new Set((asset?.collectionIds || []).map(Number));
+    const hosts = new Set();
+    const looseKeys = new Set();
+    collections.forEach((c) => {
+        if (!ids.has(Number(c.id)) || !c.hostName) return;
+        hosts.add(c.hostName);
+        const lk = deviceServiceKey(c.hostName);
+        if (lk) looseKeys.add(lk);
+    });
+    return { hosts, looseKeys };
+}
+
+// Config violation rows (url starts with /claude/config/) attributed to this asset's hosts.
+export function selectConfigViolationRows(violationRows = [], asset, collections = []) {
+    const { hosts, looseKeys } = assetHostSets(asset, collections);
+    if (!hosts.size && !looseKeys.size) return [];
+    return violationRows.filter((r) =>
+        isConfigViolationRow(r) &&
+        r.host &&
+        (hosts.has(r.host) || looseKeys.has(deviceServiceKey(r.host))),
+    );
+}
+
+export function summarizeViolations(rows = []) {
+    const t = { critical: 0, high: 0, medium: 0, low: 0 };
+    rows.forEach((r) => {
+        const sev = (r.severity || "").toLowerCase();
+        if (t[sev] != null) t[sev] += 1;
+    });
+    t.total = t.critical + t.high + t.medium + t.low;
+    return t;
 }
 
 export function buildAgenticObserveChatMetadata(scope, data = {}) {
