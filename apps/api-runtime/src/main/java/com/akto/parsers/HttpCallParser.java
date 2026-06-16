@@ -586,8 +586,13 @@ public class HttpCallParser {
 
         if (isTagPresent) return;
 
-        if (collectionTags == null) collectionTags = new ArrayList<>();
-        collectionTags.add(tag);
+        if (collectionTags == null) {
+            collectionTags = new ArrayList<>();
+            collectionTags.add(tag);
+            apiCollection.setTagsList(collectionTags);
+        } else {
+            collectionTags.add(tag);
+        }
 
         ApiCollectionsDao.instance.updateOne(
             Filters.eq(ApiCollection.ID, apiCollection.getId()),
