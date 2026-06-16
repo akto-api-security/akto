@@ -1093,7 +1093,7 @@ public class TestExecutor {
     }
 
     private static final ExecutorService legacyTestTimeoutExecutor = Executors.newCachedThreadPool();
-    private static final int MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS = 5 * 60;
+    private static final int MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS = 10 * 60;
 
     /**
      * Executes legacy testing approach (fallback mode)
