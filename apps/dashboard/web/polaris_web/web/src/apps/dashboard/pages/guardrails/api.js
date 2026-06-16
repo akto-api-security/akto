@@ -65,4 +65,12 @@ export default {
         return resp
     },
 
+    async fetchGuardrailCompliancePresets() {
+        const resp = await request({
+            url: '/api/fetchGuardrailCompliancePresets',
+            method: 'post'
+        })
+        return resp
+    },
+
 }

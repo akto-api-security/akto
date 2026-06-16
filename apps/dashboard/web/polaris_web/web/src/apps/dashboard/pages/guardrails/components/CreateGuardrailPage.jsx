@@ -6,7 +6,8 @@ import {
     Box,
     Icon,
     Button,
-    Badge
+    Badge,
+    Select
 } from "@shopify/polaris";
 import {
     CancelMajor,
@@ -54,6 +55,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // Step management
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
+
+    // Compliance preset picker (create mode only)
+    const [compliancePresets, setCompliancePresets] = useState([]);
+    const [selectedCompliance, setSelectedCompliance] = useState(null);
 
     // Playground state
     const [playgroundInput, setPlaygroundInput] = useState("");
@@ -351,6 +356,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
     }, [isEditMode, editingPolicy]);
 
+    // Fetch compliance presets once on create mode
+    useEffect(() => {
+        if (isEditMode) return;
+        guardrailApi.fetchGuardrailCompliancePresets()
+            .then(res => setCompliancePresets(res?.guardrailCompliancePresets || []))
+            .catch(() => {});
+    }, [isEditMode]);
+
     const isVisibilityOnly = (collection) =>
         collection.envType && collection.envType.some(tag =>
             tag.keyName === 'visibilityOnly' && tag.value === 'true'
@@ -617,6 +630,18 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             pattern: entry.pattern || ""
         })));
         setBlockPersonalAccounts(policy.blockPersonalAccounts || false);
+    };
+
+    const applyCompliancePreset = (preset) => {
+        if (selectedCompliance === preset.key) {
+            resetForm();
+            setSelectedCompliance(null);
+            return;
+        }
+        populateFormForEdit(preset);
+        setSelectedCompliance(preset.key);
+        setCurrentStep(1);
+        func.setToast(true, false, `${preset.name} preset applied — review and customize each step`);
     };
 
     const handleClose = () => {
@@ -1190,9 +1215,29 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     <div className="guardrail-content-inner">
                         <Box padding="5">
                             <VerticalStack gap="4">
-                                <Text variant="headingMd" as="h2" fontWeight="semibold">
-                                    {steps.find(s => s.number === currentStep)?.title}
-                                </Text>
+                                <HorizontalStack align="space-between" blockAlign="center">
+                                    <Text variant="headingMd" as="h2" fontWeight="semibold">
+                                        {steps.find(s => s.number === currentStep)?.title}
+                                    </Text>
+                                    {!isEditMode && compliancePresets.length > 0 && (
+                                        <Box minWidth="220px">
+                                            <Select
+                                                label=""
+                                                labelHidden
+                                                options={[
+                                                    { label: "Start from a template…", value: "" },
+                                                    ...compliancePresets.map(p => ({ label: p.name, value: p.key }))
+                                                ]}
+                                                value={selectedCompliance || ""}
+                                                onChange={(val) => {
+                                                    if (!val) { resetForm(); setSelectedCompliance(null); return; }
+                                                    const preset = compliancePresets.find(p => p.key === val);
+                                                    if (preset) applyCompliancePreset(preset);
+                                                }}
+                                            />
+                                        </Box>
+                                    )}
+                                </HorizontalStack>
                                 <Box>
                                     {renderStepContent(currentStep)}
                                 </Box>

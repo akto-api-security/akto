@@ -141,7 +141,10 @@ import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.jobs.EmptyCollectionCleanupJob;
 import com.akto.utils.jobs.JobUtils;
 import com.akto.utils.scripts.BackwardCompatibilityUtils;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.akto.dto.GuardrailCompliancePreset;
 import com.google.gson.Gson;
 import com.mongodb.*;
 import com.mongodb.bulk.BulkWriteResult;
@@ -3848,6 +3851,13 @@ public class InitializerListener implements ServletContextListener {
                     e.printStackTrace();
                     logger.errorAndAddToDb("Unable to import threat compliance", LogDb.DASHBOARD);
                 }
+                try {
+                    logger.infoAndAddToDb("Processing Guardrail Compliance Presets from tests-library", LogDb.DASHBOARD);
+                    processGuardrailCompliancePresetsFromZip(testingTemplates);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    logger.errorAndAddToDb("Unable to import guardrail compliance presets", LogDb.DASHBOARD);
+                }
                 Map<String, ComplianceInfo> complianceCommonMap = getFromCommonDb();
                 Map<String, ThreatComplianceInfo> threatComplianceCommonMap = getThreatComplianceFromCommonDb();
                 Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(getAktoTestLibraryReposForZipFetch());
@@ -3895,7 +3905,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "update-test-editor-templates-github");
             }
-        }, 0, 4, TimeUnit.HOURS);
+        }, 0, 60, TimeUnit.SECONDS);
     }
 
     public static void processRemedationFilesZip(byte[] zipFile) {
@@ -4302,6 +4312,96 @@ public class InitializerListener implements ServletContextListener {
             }
         } else {
             logger.debugAndAddToDb("Received null zip file for threat compliance");
+        }
+    }
+
+    public static void processGuardrailCompliancePresetsFromZip(byte[] zipFile) {
+        if (zipFile == null) {
+            logger.debugAndAddToDb("Received null zip file for guardrail compliance presets");
+            return;
+        }
+        try (ByteArrayInputStream inputStream = new ByteArrayInputStream(zipFile);
+                ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
+
+            ZipEntry entry;
+            while ((entry = zipInputStream.getNextEntry()) != null) {
+                if (entry.isDirectory()) {
+                    zipInputStream.closeEntry();
+                    continue;
+                }
+                String entryName = entry.getName();
+                if (!entryName.contains("compliance/guardrail_compliance_presets.yaml")) {
+                    zipInputStream.closeEntry();
+                    continue;
+                }
+
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                byte[] buffer = new byte[1024];
+                int bytesRead;
+                while ((bytesRead = zipInputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                }
+                String yamlContent = outputStream.toString("UTF-8");
+
+                if (yamlContent == null || yamlContent.trim().isEmpty()) {
+                    logger.debugAndAddToDb("guardrail_compliance_presets.yaml is empty, skipping");
+                    zipInputStream.closeEntry();
+                    continue;
+                }
+
+                ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());
+                @SuppressWarnings("unchecked")
+                Map<String, Object> root = yamlMapper.readValue(yamlContent,
+                    new TypeReference<Map<String, Object>>() {});
+
+                @SuppressWarnings("unchecked")
+                Map<String, Object> presets = (Map<String, Object>) root.get("presets");
+                if (presets == null || presets.isEmpty()) {
+                    logger.debugAndAddToDb("No presets found in guardrail_compliance_presets.yaml");
+                    zipInputStream.closeEntry();
+                    continue;
+                }
+
+                ObjectMapper jsonMapper = new ObjectMapper();
+
+                for (Map.Entry<String, Object> presetEntry : presets.entrySet()) {
+                    String key = presetEntry.getKey();
+                    try {
+                        String presetJson = jsonMapper.writeValueAsString(presetEntry.getValue());
+                        int hash = presetJson.hashCode();
+
+                        GuardrailCompliancePreset existing =
+                            GuardrailCompliancePresetsDao.instance.findOne(
+                                Filters.eq("key", key));
+
+                        if (existing != null && existing.getHash() != null
+                                && existing.getHash().equals(String.valueOf(hash))) {
+                            logger.debugAndAddToDb("Guardrail compliance preset unchanged, skipping: " + key);
+                            continue;
+                        }
+
+                        GuardrailCompliancePreset preset =
+                            jsonMapper.readValue(presetJson, GuardrailCompliancePreset.class);
+                        preset.setKey(key);
+                        preset.setHash(String.valueOf(hash));
+                        preset.setSyncedAt(Context.now());
+
+                        ReplaceOptions upsertOpt = new ReplaceOptions().upsert(true);
+                        GuardrailCompliancePresetsDao.instance.getMCollection().replaceOne(
+                            Filters.eq("key", key), preset, upsertOpt);
+
+                        logger.infoAndAddToDb("Upserted guardrail compliance preset: " + key, LogDb.DASHBOARD);
+                    } catch (Exception e) {
+                        logger.errorAndAddToDb("Error processing guardrail compliance preset " + key + ": " + e.getMessage(), LogDb.DASHBOARD);
+                    }
+                }
+
+                zipInputStream.closeEntry();
+                break; // only one file to process
+            }
+        } catch (Exception ex) {
+            logger.errorAndAddToDb("Error while processing guardrail compliance presets from zip: " + ex.getMessage(), LogDb.DASHBOARD);
+            ex.printStackTrace();
         }
     }
 

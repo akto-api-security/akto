@@ -1,6 +1,8 @@
 package com.akto.action;
 
+import com.akto.dao.GuardrailCompliancePresetsDao;
 import com.akto.dao.GuardrailPoliciesDao;
+import com.akto.dto.GuardrailCompliancePreset;
 import com.akto.dao.context.Context;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.User;
@@ -417,6 +419,19 @@ public class GuardrailPoliciesAction extends UserAction {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error in guardrail playground test: " + e.getMessage(), LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+    }
+
+    @Getter
+    private List<GuardrailCompliancePreset> guardrailCompliancePresets;
+
+    public String fetchGuardrailCompliancePresets() {
+        try {
+            this.guardrailCompliancePresets = GuardrailCompliancePresetsDao.instance.findAll(Filters.exists("key"));
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching guardrail compliance presets: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
     }
