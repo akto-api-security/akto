@@ -531,6 +531,49 @@
             </result>
         </action>
 
+        <!--
+          NHI identity ingestion. Posted to by:
+            - guardrails-service (endpoint-shield findings)
+            - akto-browser-extension (GenAI host credential observations)
+            - ai-agent-shield      (per-request Authorization headers)
+          Behaviour lives in com.akto.utils.nhi_governance.NhiIdentityUpsertService.
+        -->
+        <action name="api/upsertNhiIdentity" class="com.akto.action.NhiUpsertAction" method="upsertNhiIdentity">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^success</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/upsertNhiIdentities" class="com.akto.action.NhiUpsertAction" method="upsertNhiIdentities">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^(success|upsertedCount|skippedCount)</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/saveFileInspectionResult" class="com.akto.action.FileInspectionResultAction" method="saveFileInspectionResult">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^success</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
     </package>
 
 </struts>

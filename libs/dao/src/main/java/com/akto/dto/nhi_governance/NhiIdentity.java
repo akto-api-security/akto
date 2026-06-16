@@ -34,6 +34,13 @@ public class NhiIdentity {
     public static final String RISK_LEVEL = "riskLevel";
     public static final String METADATA = "metadata";
     public static final String RELATED_VIOLATION_IDS = "relatedViolationIds";
+    public static final String SOURCE = "source";
+    public static final String SOURCE_TYPE = "sourceType";
+    public static final String DEVICE_ID = "deviceId";
+    public static final String DEVICE_LABEL = "deviceLabel";
+    public static final String HASH = "hash";
+    public static final String PREFIX = "prefix";
+    public static final String SUFFIX = "suffix";
 
     private ObjectId id;
     private String identityName;
@@ -55,6 +62,14 @@ public class NhiIdentity {
     private String riskLevel;
     private Map<String, Object> metadata;
     private List<String> relatedViolationIds;
+
+    private String source;
+    private String sourceType;
+    private String deviceId;
+    private String deviceLabel;
+    private String hash;
+    private String prefix;
+    private String suffix;
 
     public NhiIdentity(String identityName, String identityType, String contextSource, String agentName) {
         this.identityName = identityName;

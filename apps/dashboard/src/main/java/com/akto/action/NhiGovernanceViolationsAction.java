@@ -119,7 +119,6 @@ public class NhiGovernanceViolationsAction extends UserAction {
                             NhiViolation.RESOLUTION_NOTES,
                             NhiViolation.RESOLUTION_TYPE,
                             NhiViolation.METADATA,
-                            NhiViolation.POLICY_IDS,
                             "policyDocs"
                     )
             )));

@@ -1,11 +1,11 @@
 package com.akto.dao.nhi_governance;
 
-import com.akto.dao.AccountsContextDaoWithContextSource;
+import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.nhi_governance.NhiIdentity;
 
-public class NhiIdentityDao extends AccountsContextDaoWithContextSource<NhiIdentity> {
+public class NhiIdentityDao extends AccountsContextDao<NhiIdentity> {
 
     public static NhiIdentityDao instance = new NhiIdentityDao();
 

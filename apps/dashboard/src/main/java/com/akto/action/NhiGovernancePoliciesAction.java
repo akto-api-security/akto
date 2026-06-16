@@ -75,9 +75,10 @@ public class NhiGovernancePoliciesAction extends UserAction {
             if (policy.getExpirationTracking() != null) {
                 updates.add(Updates.set(NhiPolicy.EXPIRATION_TRACKING, policy.getExpirationTracking()));
             }
-            if (policy.getContextSource() != null) {
-                updates.add(Updates.set(NhiPolicy.CONTEXT_SOURCE, policy.getContextSource()));
+            if (policy.getRotationEnforcement() != null) {
+                updates.add(Updates.set(NhiPolicy.ROTATION_ENFORCEMENT, policy.getRotationEnforcement()));
             }
+
             updates.add(Updates.set(NhiPolicy.UPDATED_AT, now));
             updates.add(Updates.set(NhiPolicy.UPDATED_BY, user));
             updates.add(Updates.setOnInsert(NhiPolicy.CREATED_AT, now));
