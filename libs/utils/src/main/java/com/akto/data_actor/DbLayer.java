@@ -3162,4 +3162,290 @@ public class DbLayer {
         }
         return result;
     }
+
+    // --- Endpoint Remote Commands ---
+
+    /**
+     * Lazy fan-out: for each ACTIVE command targeting this device that has not yet
+     * been executed (or is still PENDING), create/return an execution record.
+     * Stamps agentId on newly-created records.
+     * Returns at most 10 executions with transient command fields set for the agent response.
+     */
+    public static List<EndpointRemoteCommandExecution> fetchPendingEndpointRemoteCommandExecutions(
+            String agentId, String deviceId) {
+        try {
+            long now = (long) Context.now();
+            List<EndpointRemoteCommand> activeCmds = EndpointRemoteCommandDao.instance.findAll(
+                    Filters.and(
+                            Filters.eq(EndpointRemoteCommand.STATUS, EndpointRemoteCommand.Status.ACTIVE.name()),
+                            Filters.or(
+                                    Filters.eq(EndpointRemoteCommand.TARGET_TYPE,
+                                            EndpointRemoteCommand.TargetType.ALL.name()),
+                                    Filters.in(EndpointRemoteCommand.TARGET_DEVICE_IDS, deviceId))));
+
+            // No expiry check here — the background job transitions expired commands to EXPIRED
+            // before agents can poll them, so any ACTIVE command is still within its window.
+            List<EndpointRemoteCommandExecution> result = new ArrayList<>();
+            for (EndpointRemoteCommand cmd : activeCmds) {
+                if (result.size() >= 10) break;
+
+                EndpointRemoteCommandExecution exec = EndpointRemoteCommandExecutionDao.instance.findOne(
+                        Filters.and(
+                                Filters.eq(EndpointRemoteCommandExecution.COMMAND_ID, cmd.getId()),
+                                Filters.eq(EndpointRemoteCommandExecution.DEVICE_ID, deviceId)));
+
+                if (exec == null) {
+                    exec = new EndpointRemoteCommandExecution();
+                    exec.setId(UUID.randomUUID().toString().replace("-", "").substring(0, 16));
+                    exec.setCommandId(cmd.getId());
+                    exec.setDeviceId(deviceId);
+                    exec.setAgentId(agentId);
+                    exec.setStatus(EndpointRemoteCommandExecution.Status.PENDING);
+                    exec.setCreatedAt(now);
+                    exec.setUpdatedAt(now);
+                    try {
+                        EndpointRemoteCommandExecutionDao.instance.insertOne(exec);
+                    } catch (com.mongodb.MongoBulkWriteException | com.mongodb.MongoWriteException dup) {
+                        // Race: another request just created it — re-fetch
+                        exec = EndpointRemoteCommandExecutionDao.instance.findOne(
+                                Filters.and(
+                                        Filters.eq(EndpointRemoteCommandExecution.COMMAND_ID, cmd.getId()),
+                                        Filters.eq(EndpointRemoteCommandExecution.DEVICE_ID, deviceId)));
+                        if (exec == null || exec.getStatus() != EndpointRemoteCommandExecution.Status.PENDING) continue;
+                    }
+                } else if (exec.getStatus() != EndpointRemoteCommandExecution.Status.PENDING) {
+                    continue;
+                }
+
+                exec.setCommand(cmd.getCommand());
+                exec.setArgs(cmd.getArgs());
+                exec.setTimeoutSec(cmd.getTimeoutSec());
+                result.add(exec);
+            }
+            return result;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchPendingEndpointRemoteCommandExecutions: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Atomic CAS: PENDING → RUNNING (or PENDING → FAILED).
+     * Returns 0 on success, 1 if another agent already claimed it (409), -1 if not found (400).
+     */
+    public static int claimEndpointRemoteCommandExecution(
+            String executionId, String agentId, String deviceId,
+            EndpointRemoteCommandExecution.Status newStatus) {
+        try {
+            com.mongodb.client.result.UpdateResult r =
+                    EndpointRemoteCommandExecutionDao.instance.getMCollection().updateOne(
+                            Filters.and(
+                                    Filters.eq(EndpointRemoteCommandExecution.ID, executionId),
+                                    Filters.eq(EndpointRemoteCommandExecution.DEVICE_ID, deviceId),
+                                    Filters.eq(EndpointRemoteCommandExecution.STATUS,
+                                            EndpointRemoteCommandExecution.Status.PENDING.name())),
+                            Updates.combine(
+                                    Updates.set(EndpointRemoteCommandExecution.STATUS, newStatus.name()),
+                                    Updates.set(EndpointRemoteCommandExecution.AGENT_ID, agentId),
+                                    Updates.set(EndpointRemoteCommandExecution.UPDATED_AT, (long) Context.now())));
+            if (r.getMatchedCount() == 0) {
+                // Distinguish not-found from already-claimed
+                EndpointRemoteCommandExecution exec = EndpointRemoteCommandExecutionDao.instance.findOne(
+                        Filters.and(
+                                Filters.eq(EndpointRemoteCommandExecution.ID, executionId),
+                                Filters.eq(EndpointRemoteCommandExecution.DEVICE_ID, deviceId)));
+                return exec == null ? -1 : 1; // -1 = not found, 1 = conflict
+            }
+            return 0;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in claimEndpointRemoteCommandExecution: " + e.getMessage());
+            return -1;
+        }
+    }
+
+    /**
+     * Upload execution result. Allowed transitions: RUNNING → COMPLETED/FAILED,
+     * and PENDING → COMPLETED/FAILED (if the claim call was lost in transit).
+     */
+    public static boolean updateEndpointRemoteCommandResult(
+            String executionId, String deviceId,
+            EndpointRemoteCommandExecution.Status newStatus,
+            String stdout, String stderr,
+            int exitCode, long durationMs, long executedAt, String errorReason) {
+        try {
+            EndpointRemoteCommandExecution exec = EndpointRemoteCommandExecutionDao.instance.findOne(
+                    Filters.and(
+                            Filters.eq(EndpointRemoteCommandExecution.ID, executionId),
+                            Filters.eq(EndpointRemoteCommandExecution.DEVICE_ID, deviceId),
+                            Filters.in(EndpointRemoteCommandExecution.STATUS,
+                                    EndpointRemoteCommandExecution.Status.RUNNING.name(),
+                                    EndpointRemoteCommandExecution.Status.PENDING.name())));
+            if (exec == null) return false;
+
+            final int maxBytes = 512 * 1024;
+            if (stdout != null && stdout.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > maxBytes) {
+                stdout = new String(stdout.getBytes(java.nio.charset.StandardCharsets.UTF_8), 0, maxBytes,
+                        java.nio.charset.StandardCharsets.UTF_8) + "\n[truncated by server]";
+            }
+            if (stderr != null && stderr.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > maxBytes) {
+                stderr = new String(stderr.getBytes(java.nio.charset.StandardCharsets.UTF_8), 0, maxBytes,
+                        java.nio.charset.StandardCharsets.UTF_8) + "\n[truncated by server]";
+            }
+
+            EndpointRemoteCommandExecutionDao.instance.getMCollection().updateOne(
+                    Filters.and(
+                            Filters.eq(EndpointRemoteCommandExecution.ID, executionId),
+                            Filters.eq(EndpointRemoteCommandExecution.DEVICE_ID, deviceId)),
+                    Updates.combine(
+                            Updates.set(EndpointRemoteCommandExecution.STATUS, newStatus.name()),
+                            Updates.set(EndpointRemoteCommandExecution.STDOUT, stdout),
+                            Updates.set(EndpointRemoteCommandExecution.STDERR, stderr),
+                            Updates.set(EndpointRemoteCommandExecution.EXIT_CODE, exitCode),
+                            Updates.set(EndpointRemoteCommandExecution.DURATION_MS, durationMs),
+                            Updates.set(EndpointRemoteCommandExecution.EXECUTED_AT, executedAt),
+                            Updates.set(EndpointRemoteCommandExecution.ERROR_REASON,
+                                    errorReason != null ? errorReason : ""),
+                            Updates.set(EndpointRemoteCommandExecution.UPDATED_AT, (long) Context.now())));
+            return true;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateEndpointRemoteCommandResult: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Create a new command definition. Timestamps stored as milliseconds to match the
+     * dashboard document format. Returns the generated commandId (ObjectId hex), or null on error.
+     */
+    public static String queueEndpointRemoteCommand(
+            String command, List<String> args, int timeoutSec, int expirySeconds,
+            EndpointRemoteCommand.TargetType targetType, List<String> targetDeviceIds,
+            String createdBy) {
+        try {
+            long nowMs = System.currentTimeMillis();
+            EndpointRemoteCommand doc = new EndpointRemoteCommand();
+            doc.setCommand(command);
+            doc.setArgs(args);
+            doc.setTimeoutSec(timeoutSec);
+            doc.setExpirySeconds(expirySeconds);
+            doc.setTargetType(targetType);
+            doc.setTargetDeviceIds(targetDeviceIds);
+            doc.setStatus(EndpointRemoteCommand.Status.ACTIVE);
+            doc.setCreatedAt(nowMs);
+            doc.setExpiresAt(nowMs + (long) expirySeconds * 1000L);
+            doc.setUpdatedAt(nowMs);
+            doc.setCreatedBy(createdBy);
+            EndpointRemoteCommandDao.instance.insertOne(doc);
+            return doc.getObjectId() != null ? doc.getObjectId().toHexString() : null;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in queueEndpointRemoteCommand: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * List command definitions with per-command execution status counts.
+     * Sorted by createdAt DESC; default limit 20, max 100.
+     */
+    public static List<EndpointRemoteCommand> fetchEndpointRemoteCommandList(long createdAfter, int limit) {
+        try {
+            if (limit <= 0 || limit > 100) limit = 20;
+            List<EndpointRemoteCommand> commands = EndpointRemoteCommandDao.instance.findAll(
+                    createdAfter > 0
+                            ? Filters.gt(EndpointRemoteCommand.CREATED_AT, createdAfter)
+                            : Filters.empty(),
+                    0, limit, Sorts.descending(EndpointRemoteCommand.CREATED_AT));
+            if (commands.isEmpty()) return commands;
+
+            List<String> commandIds = new ArrayList<>();
+            for (EndpointRemoteCommand c : commands) commandIds.add(c.getId());
+
+            // Aggregate execution counts: group by (commandId, status)
+            List<org.bson.conversions.Bson> pipeline = new ArrayList<>();
+            pipeline.add(Aggregates.match(Filters.in(EndpointRemoteCommandExecution.COMMAND_ID, commandIds)));
+            pipeline.add(Aggregates.group(
+                    new BasicDBObject("commandId", "$" + EndpointRemoteCommandExecution.COMMAND_ID)
+                            .append("status", "$" + EndpointRemoteCommandExecution.STATUS),
+                    Accumulators.sum("count", 1)));
+
+            Map<String, EndpointRemoteCommand.ExecutionSummary> summaryMap = new HashMap<>();
+            EndpointRemoteCommandExecutionDao.instance.getMCollection()
+                    .aggregate(pipeline, BasicDBObject.class)
+                    .forEach((BasicDBObject row) -> {
+                        BasicDBObject id = (BasicDBObject) row.get("_id");
+                        String cmdId = id.getString("commandId");
+                        String status = id.getString("status");
+                        int count = row.getInt("count", 0);
+                        EndpointRemoteCommand.ExecutionSummary s =
+                                summaryMap.computeIfAbsent(cmdId, k -> new EndpointRemoteCommand.ExecutionSummary());
+                        s.setTotal(s.getTotal() + count);
+                        if ("PENDING".equals(status)) s.setPending(s.getPending() + count);
+                        else if ("RUNNING".equals(status)) s.setRunning(s.getRunning() + count);
+                        else if ("COMPLETED".equals(status)) s.setCompleted(s.getCompleted() + count);
+                        else if ("FAILED".equals(status)) s.setFailed(s.getFailed() + count);
+                    });
+
+            for (EndpointRemoteCommand c : commands) {
+                c.setExecutionSummary(summaryMap.getOrDefault(c.getId(),
+                        new EndpointRemoteCommand.ExecutionSummary()));
+            }
+            return commands;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchEndpointRemoteCommandList: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    /** Per-device execution results for one command. Default limit 50, max 100. */
+    public static List<EndpointRemoteCommandExecution> fetchEndpointRemoteCommandExecutions(
+            String commandId, int limit) {
+        try {
+            if (limit <= 0 || limit > 100) limit = 50;
+            return EndpointRemoteCommandExecutionDao.instance.findAll(
+                    Filters.eq(EndpointRemoteCommandExecution.COMMAND_ID, commandId),
+                    0, limit, Sorts.descending(EndpointRemoteCommandExecution.CREATED_AT));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchEndpointRemoteCommandExecutions: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Cancel an ACTIVE command and immediately mark all its PENDING executions FAILED/cancelled.
+     * Returns false if the command is already CANCELLED or EXPIRED (caller should return 400).
+     * RUNNING executions are left untouched — the agent already claimed them.
+     */
+    public static boolean cancelEndpointRemoteCommand(String commandId) {
+        try {
+            long nowMs = System.currentTimeMillis();
+            // commandId is always the ObjectId hex string — filter by _id
+            com.mongodb.client.result.UpdateResult r =
+                    EndpointRemoteCommandDao.instance.getMCollection().updateOne(
+                            Filters.and(
+                                    Filters.eq("_id", new org.bson.types.ObjectId(commandId)),
+                                    Filters.eq(EndpointRemoteCommand.STATUS,
+                                            EndpointRemoteCommand.Status.ACTIVE.name())),
+                            Updates.combine(
+                                    Updates.set(EndpointRemoteCommand.STATUS,
+                                            EndpointRemoteCommand.Status.CANCELLED.name()),
+                                    Updates.set(EndpointRemoteCommand.UPDATED_AT, nowMs)));
+            if (r.getMatchedCount() == 0) return false;
+
+            // Mark all PENDING executions for this command as FAILED/cancelled
+            EndpointRemoteCommandExecutionDao.instance.getMCollection().updateMany(
+                    Filters.and(
+                            Filters.eq(EndpointRemoteCommandExecution.COMMAND_ID, commandId),
+                            Filters.eq(EndpointRemoteCommandExecution.STATUS,
+                                    EndpointRemoteCommandExecution.Status.PENDING.name())),
+                    Updates.combine(
+                            Updates.set(EndpointRemoteCommandExecution.STATUS,
+                                    EndpointRemoteCommandExecution.Status.FAILED.name()),
+                            Updates.set(EndpointRemoteCommandExecution.ERROR_REASON, "cancelled"),
+                            Updates.set(EndpointRemoteCommandExecution.UPDATED_AT, nowMs)));
+            return true;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in cancelEndpointRemoteCommand: " + e.getMessage());
+            return false;
+        }
+    }
 }
