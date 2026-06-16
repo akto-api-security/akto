@@ -51,12 +51,14 @@ public class WizApiClient {
             List<?> nodes = (List<?>) root.get("nodes");
             BasicDBObject pageInfo = (BasicDBObject) root.get("pageInfo");
 
-            for (Object nodeObj : nodes) {
-                results.add((BasicDBObject) nodeObj);
+            if (nodes != null) {
+                for (Object nodeObj : nodes) {
+                    results.add((BasicDBObject) nodeObj);
+                }
             }
 
-            hasNextPage = pageInfo.getBoolean("hasNextPage", false);
-            cursor = pageInfo.getString("endCursor");
+            hasNextPage = pageInfo != null && pageInfo.getBoolean("hasNextPage", false);
+            cursor = pageInfo != null ? pageInfo.getString("endCursor") : null;
         }
 
         return results;
@@ -106,6 +108,20 @@ public class WizApiClient {
         loggerMaker.infoAndAddToDb(String.format("Response status: %d", response.getStatusCode()));
 
         BasicDBObject responseObj = BasicDBObject.parse(response.getBody());
-        return (BasicDBObject) ((BasicDBObject) responseObj.get("data")).get(rootKey);
+
+        List<?> errors = (List<?>) responseObj.get("errors");
+        if (errors != null && !errors.isEmpty()) {
+            String errorMsg = errors.get(0) instanceof BasicDBObject
+                ? ((BasicDBObject) errors.get(0)).getString("message")
+                : errors.get(0).toString();
+            loggerMaker.errorAndAddToDb(String.format("Wiz GraphQL error for key '%s': %s", rootKey, errorMsg));
+            throw new Exception(String.format("Wiz GraphQL error: %s", errorMsg));
+        }
+
+        BasicDBObject data = (BasicDBObject) responseObj.get("data");
+        if (data == null) {
+            throw new Exception(String.format("Wiz API response missing 'data' field for key '%s'", rootKey));
+        }
+        return (BasicDBObject) data.get(rootKey);
     }
 }

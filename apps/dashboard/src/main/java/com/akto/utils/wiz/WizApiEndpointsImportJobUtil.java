@@ -68,7 +68,7 @@ public class WizApiEndpointsImportJobUtil {
             HttpCallParser httpCallParser = aktoPolicyInfo.getHttpCallParser();
             httpCallParser.syncFunction(responses, syncImmediately, false, accountSettings, false);
         } catch (Exception e) {
-            logger.error("Error pushing Wiz import data to Kafka: " + e.getMessage(), e);
+            logger.error("Error processing Wiz import data: " + e.getMessage(), e);
         }
     }
 

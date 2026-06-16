@@ -33,6 +33,10 @@ public class WizApiEndpointsImportJobExecutor extends JobExecutor<WizApiEndpoint
     @Override
     protected void runJob(Job job) throws Exception {
         logger.info("Starting Wiz API endpoints import job for job: {}", job.getId());
+        if (wizApiEndpointsProcessor == null) {
+            logger.error("wizApiEndpointsProcessor is not configured. Skipping Wiz API endpoints import.");
+            return;
+        }
         try {
             WizIntegration wizIntegration = WizIntegrationDao.instance.findOne(new BasicDBObject());
             if (wizIntegration == null) {
