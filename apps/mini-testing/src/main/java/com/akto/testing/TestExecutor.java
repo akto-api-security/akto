@@ -71,6 +71,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.akto.testing.workflow_node_executor.Utils;
+import com.akto.agent.AgentClient;
 
 public class TestExecutor {
 
@@ -385,15 +386,13 @@ public class TestExecutor {
 
         Set<Integer> collectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
         List<ApiCollection> apiCollections = dataActor.fetchApiCollectionsByIds(new ArrayList<>(collectionIds), LogDb.TESTING);
-        Map<Integer, String> apiCollectionDescriptionMap = new HashMap<>();
+        Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
         if (apiCollections != null) {
             for (ApiCollection col : apiCollections) {
-                if (!StringUtils.isEmpty(col.getDescription())) {
-                    apiCollectionDescriptionMap.put(col.getId(), col.getDescription());
-                }
+                apiCollectionMap.put(col.getId(), col);
             }
         }
-        TestingConfigurations.getInstance().setApiCollectionDescriptionMap(apiCollectionDescriptionMap);
+        TestingConfigurations.getInstance().setApiCollectionMap(apiCollectionMap);
 
         //Clear the cache for sample data
         VariableResolver.clearSampleDataCache();
@@ -1175,6 +1174,18 @@ public class TestExecutor {
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
         Boolean agenticTestingAllowed = testConfig.getInfo().getAgenticTestingAllowed();
+
+        // Copilot Studio bots expose a /copilot/conversation endpoint that is a duplicate of the
+        // actual bot endpoint we already test. Skip it to avoid redundant test results.
+        ApiCollection apiCollection = TestingConfigurations.getInstance().getApiCollectionMap().get(apiInfoKey.getApiCollectionId());
+        if (AgentClient.isCopilotBotCollection(apiCollection) &&
+                apiInfoKey.getUrl().startsWith(Constants.AKTO_COPILOT_CONVERSATION_URL_PREFIX)) {
+            loggerMaker.infoAndAddToDb("Skipping test for Copilot Studio endpoint already covered: " + apiInfoKey);
+            return generateFailedRunResultForMessage(testRunId, apiInfoKey, testSuperType, testSubType,
+                    testRunResultSummaryId, Collections.singletonList(rawApi.getOriginalMessage()),
+                    TestError.SKIPPING_COPILOT_INTERNAL_ENDPOINT.getMessage());
+        }
+
         if(shouldCallClientLayerForSampleData){
             try {
                 long start = System.currentTimeMillis();
@@ -1248,7 +1259,8 @@ public class TestExecutor {
             varMap.put("yaml_template_content", testConfig.getContent());
         }
 
-        String collectionDescription = TestingConfigurations.getInstance().getApiCollectionDescriptionMap().get(apiInfoKey.getApiCollectionId());
+        ApiCollection col = TestingConfigurations.getInstance().getApiCollectionMap().get(apiInfoKey.getApiCollectionId());
+        String collectionDescription = col != null ? col.getDescription() : null;
         if (!StringUtils.isEmpty(collectionDescription)) {
             String collectionDataContext = extractCollectionDataContext(collectionDescription);
             String collectionEveryPrompt = extractCollectionEveryPrompt(collectionDescription);

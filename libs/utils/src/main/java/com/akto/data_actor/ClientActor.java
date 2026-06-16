@@ -2652,7 +2652,7 @@ public class ClientActor extends DataActor {
         return roleList;
     }
 
-    public void updateCopilotRefreshToken(String roleId, String newRefreshToken) {
+    public boolean updateCopilotRefreshToken(String roleId, String newRefreshToken) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("roleId", roleId);
@@ -2662,9 +2662,12 @@ public class ClientActor extends DataActor {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             if (response.getStatusCode() != 200) {
                 loggerMaker.errorAndAddToDb("non 2xx response in updateCopilotRefreshToken", LoggerMaker.LogDb.RUNTIME);
+                return false;
             }
+            return true;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in updateCopilotRefreshToken " + e, LoggerMaker.LogDb.RUNTIME);
+            return false;
         }
     }
 
