@@ -2780,6 +2780,8 @@ public class ClientActor extends DataActor {
                     case "DIGEST_AUTH":
                         defaultAuthParam.put("_t", "com.akto.dto.testing.DigestAuthParam");
                         break;
+                    case "COPILOT_OAUTH":
+                        defaultAuthParam.put("_t", "com.akto.dto.testing.CopilotOAuthAuthParam");
                     default:
                         break;
                 }

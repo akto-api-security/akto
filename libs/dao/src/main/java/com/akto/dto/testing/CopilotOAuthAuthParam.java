@@ -91,7 +91,7 @@ public class CopilotOAuthAuthParam extends AuthParam {
 
     @Override
     public String getValue() {
-        return cachedAccessToken != null ? "Bearer " + cachedAccessToken : null;
+        return cachedAccessToken;
     }
 
     @Override
