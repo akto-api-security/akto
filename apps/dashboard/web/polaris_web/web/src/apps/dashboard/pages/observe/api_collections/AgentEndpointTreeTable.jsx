@@ -309,13 +309,25 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
         return new Set((cached?.maliciousSkills || []).map(s => String(s).toLowerCase()));
     }, []);
 
+    // Config endpoints (/claude/config/*) and skill endpoints (/skills/*) coexist in one collection.
+    // Scope the inventory view so the config row shows only config endpoints and a skill-bearing
+    // row shows only its skills, instead of mixing both.
     const handleChildClick = useCallback((collection) => {
+        const childCategory = getAgenticCategoryLabel(collection);
+        const bundlesSkills = (childCategory === CLIENT_TYPES.AI_AGENT || childCategory === CLIENT_TYPES.MCP_SERVER)
+            && Array.isArray(collection?.skills) && collection.skills.length > 0;
+        const scope = bundlesSkills ? '?agentic_view=skills' : '';
         if (collection?.nextUrl) {
-            navigate(collection.nextUrl);
+            navigate(`${collection.nextUrl}${scope}`);
         } else if (collection?.id) {
-            navigate(`/dashboard/observe/inventory/${collection.id}`);
+            navigate(`/dashboard/observe/inventory/${collection.id}${scope}`);
         }
     }, [navigate]);
+
+    const handleConfigClick = useCallback(() => {
+        if (!misconfiguredCollectionId) return;
+        navigate(`/dashboard/observe/inventory/${misconfiguredCollectionId}?agentic_view=config`);
+    }, [navigate, misconfiguredCollectionId]);
 
     const configRow = useMemo(() => {
         if (!misconfiguredCollectionId) return null;
@@ -325,7 +337,7 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
         childHeaders.forEach((header, idx) => {
             if (header.value === 'displayNameComp') {
                 cells.push(
-                    <div key="name-config" style={{ width: header.boxWidth }}>
+                    <div key="name-config" style={{ cursor: 'pointer', width: header.boxWidth }} onClick={handleConfigClick}>
                         <HorizontalStack gap="1" align="start" wrap={false}>
                             <Text variant="bodyMd" as="span">config</Text>
                             <Badge size="small" status="attention">Misconfigured</Badge>
@@ -333,11 +345,13 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
                     </div>
                 );
             } else {
-                cells.push(<div key={`config-empty-${idx}`} style={{ width: header.boxWidth }} />);
+                cells.push(
+                    <div key={`config-empty-${idx}`} style={{ cursor: 'pointer', width: header.boxWidth }} onClick={handleConfigClick} />
+                );
             }
         });
         return cells;
-    }, [misconfiguredCollectionId, childHeaders]);
+    }, [misconfiguredCollectionId, childHeaders, handleConfigClick]);
 
     const rows = useMemo(() => {
         return children.map(child => {
