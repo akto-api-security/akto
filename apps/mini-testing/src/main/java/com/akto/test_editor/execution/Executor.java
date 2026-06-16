@@ -762,6 +762,16 @@ public class Executor {
 
         ExecutorSingleOperationResp ret = authMechanismForRole.addAuthToRequest(rawApi.getRequest(), eligibleForCachedToken);
 
+        for (AuthParam param : authParamList) {
+            if (param instanceof CopilotOAuthAuthParam) {
+                CopilotOAuthAuthParam copilotParam = (CopilotOAuthAuthParam) param;
+                if (copilotParam.isRefreshTokenRotated()
+                    && dataActor.updateCopilotRefreshToken(copilotParam.getRoleId(), copilotParam.getRefreshToken())) {
+                    copilotParam.setRefreshTokenRotated(false);
+                }
+            }
+        }
+
         return ret;
     }
 
