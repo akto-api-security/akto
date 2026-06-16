@@ -4775,7 +4775,6 @@ public class ClientActor extends DataActor {
 
     private static void flushAgentQueryRecords() {
         List<AgentQueryRecord> batch;
-        loggerMaker.infoAndAddToDb("Flushing agent query records", LoggerMaker.LogDb.RUNTIME);
         synchronized (agentQueryRecordBuffer) {
             if (agentQueryRecordBuffer.isEmpty()) return;
             batch = new ArrayList<>(agentQueryRecordBuffer);

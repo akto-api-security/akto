@@ -54,8 +54,8 @@ public class AuthMechanism {
         boolean modifiedAtLeastOne = false;
 
         for (AuthParam authParam1: authParamsToUse) {
-            if(authParam1.authTokenPresent(request)){
-                authParam1.addAuthTokens(request);
+            boolean modified = authParam1.addAuthTokens(request);
+            if (modified) {
                 messageKeysPresent += authParam1.getKey()+", ";
                 modifiedAtLeastOne = true;
             } else {

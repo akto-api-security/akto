@@ -284,6 +284,14 @@ public class AktoPolicyNew {
         return newPolicyCatalog;
     }
 
+    public void removeApiInfo(int apiCollectionId, String url, URLMethods.Method method) {
+        ApiInfoCatalog catalog = apiInfoCatalogMap.get(apiCollectionId);
+        if (catalog == null) return;
+        URLStatic urlStatic = new URLStatic(url, method);
+        if (catalog.getStrictURLToMethods().remove(urlStatic) != null) return;
+        catalog.getTemplateURLToMethods().keySet().removeIf(t -> t.match(urlStatic));
+    }
+
     public static List<ApiInfo> getUpdates(Map<Integer, ApiInfoCatalog> apiInfoCatalogMap) {
         List<ApiInfo> apiInfoList = new ArrayList<>();
         List<FilterSampleData> filterSampleDataList = new ArrayList<>();

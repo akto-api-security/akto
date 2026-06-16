@@ -830,6 +830,58 @@ public class Executor {
     }
 
     @SuppressWarnings("unchecked")
+    private static List<String> toConversationStringList(Object value) {
+        if (value instanceof List) {
+            return new ArrayList<>((List<String>) value);
+        }
+        if (value instanceof String) {
+            return new ArrayList<>(Collections.singletonList((String) value));
+        }
+        return new ArrayList<>();
+    }
+
+    private static String resolveEveryPromptSuffix(Map<String, Object> varMap) {
+        if (!varMap.containsKey("wordList_every_prompt")) {
+            return "";
+        }
+        @SuppressWarnings("unchecked")
+        List<String> everyPromptList = (List<String>) varMap.get("wordList_every_prompt");
+        if (everyPromptList == null || everyPromptList.isEmpty()) {
+            return "";
+        }
+        List<String> resolved = new ArrayList<>();
+        for (String entry : everyPromptList) {
+            if (StringUtils.isEmpty(entry)) {
+                continue;
+            }
+            if (VariableResolver.isWordListVariable(entry, varMap)) {
+                resolved.addAll(VariableResolver.resolveWordListVar(entry, varMap));
+            } else {
+                resolved.add(entry);
+            }
+        }
+        if (resolved.isEmpty()) {
+            return "";
+        }
+        return String.join("\n\n", resolved);
+    }
+
+    private static List<String> appendEveryPromptToConversations(List<String> conversations, String everyPromptSuffix) {
+        if (StringUtils.isEmpty(everyPromptSuffix)) {
+            return conversations;
+        }
+        List<String> result = new ArrayList<>();
+        for (String conversation : conversations) {
+            if (StringUtils.isEmpty(conversation)) {
+                result.add(everyPromptSuffix);
+            } else {
+                result.add(conversation + "\n\n" + everyPromptSuffix);
+            }
+        }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
     private static String resolveLegacyCallbackUrl(Map<String, Object> varMap, String url, String generatedUUID) {
         List<String> urlList = (List<String>) varMap.get("wordList_url");
         if (urlList != null && !urlList.isEmpty()) {
@@ -911,8 +963,9 @@ public class Executor {
             case "conversations_list":
                 @SuppressWarnings("unchecked")
                 List<String> initialConversations = (List<String>) varMap.getOrDefault("wordList_initial_conversations", new ArrayList<>());
-                @SuppressWarnings("unchecked")
-                List<String> conversationsList = (List<String>) value;
+                List<String> conversationsList = toConversationStringList(value);
+                String everyPromptSuffix = resolveEveryPromptSuffix(varMap);
+                conversationsList = appendEveryPromptToConversations(conversationsList, everyPromptSuffix);
                 List<String> mergedConversations = new ArrayList<>(initialConversations);
                 mergedConversations.addAll(conversationsList);
                 rawApi.setConversationsList(mergedConversations);
