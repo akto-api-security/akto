@@ -6,6 +6,7 @@ import {
     formatDisplayName,
     getTypeFromTags,
     hasPersonalAccountTag,
+    hasMisconfiguredConfigTag,
 } from "./mcpClientHelper";
 import func from "@/util/func";
 import { getResolvedUsernameForCollection, DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
@@ -477,6 +478,7 @@ export function buildDeviceEndpointsPageData(
                 maxRisk: 0,
                 maxTraffic: 0,
                 hasPersonalAccount: false,
+                hasMisconfiguredConfig: false,
                 violations: emptyViolations(),
                 children: {},
             };
@@ -485,6 +487,7 @@ export function buildDeviceEndpointsPageData(
         // Personal-account marker is per-collection (browser-llm-account-type=personal /
         // login-user-email-type=personal); OR it across all of a device's collections.
         if (hasPersonalAccountTag(collection.envType)) device.hasPersonalAccount = true;
+        if (hasMisconfiguredConfigTag(collection.envType)) device.hasMisconfiguredConfig = true;
         const serviceName = extractServiceName(hostName);
         const childKey = toChildPathKey(serviceName);
         const clientType = getTypeFromTags(collection.envType);
@@ -554,6 +557,7 @@ export function buildDeviceEndpointsPageData(
             lastTrafficEpoch: device.maxTraffic || 0,
         };
         if (device.hasPersonalAccount) deviceRow.hasPersonalAccount = true;
+        if (device.hasMisconfiguredConfig) deviceRow.hasMisconfiguredConfig = true;
         deviceFlatData.push(deviceRow);
 
         if (device.username && device.username !== "-") {
