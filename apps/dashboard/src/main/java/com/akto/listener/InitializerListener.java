@@ -192,6 +192,7 @@ public class InitializerListener implements ServletContextListener {
     private static Map<String, String> piiFileMap;
     Crons crons = new Crons();
     TestingAlertsCron testingAlertsCron = new TestingAlertsCron();
+    EndpointInfoViewCron endpointStatViewCron = new EndpointInfoViewCron();
 
     public static String getDomain() {
         if (domain == null) {
@@ -2559,6 +2560,8 @@ public class InitializerListener implements ServletContextListener {
                 com.akto.action.ApiCollectionsAction.initAllCollectionsBasicCacheRefresher();
 
                 int now = Context.now();
+
+                endpointStatViewCron.setUpEndpointInfoViewCronScheduler();
 
                 if (runJobFunctions > 0 || runJobFunctionsAnyway) {
 

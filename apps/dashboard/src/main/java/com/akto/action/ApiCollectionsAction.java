@@ -383,6 +383,18 @@ public class ApiCollectionsAction extends UserAction {
     private int startTimestamp;
     private int endTimestamp;
     public String fetchApiStats() {
+        if (AccountSettingsDao.isEndpointInfoViewEnabled()) {
+            long t = System.currentTimeMillis();
+            Bson filter = Filters.empty();
+            apiStatsEnd = EndpointInfoViewDao.instance.buildApiStats(filter, startTimestamp, endTimestamp);
+            if (apiStatsEnd.getTotalAPIs() > 0) {
+                loggerMaker.warnAndAddToDb("[fetchApiStats] startTimestamp=" + startTimestamp + ", endTimestamp=" + endTimestamp);
+                apiStatsStart = EndpointInfoViewDao.instance.buildApiStats(filter, 0, startTimestamp);
+                loggerMaker.warnAndAddToDb("[fetchApiStats] view query took " + (System.currentTimeMillis() - t) + "ms, endAPIs=" + apiStatsEnd.getTotalAPIs() + ", startAPIs=" + apiStatsStart.getTotalAPIs());
+                return SUCCESS.toUpperCase();
+            }
+            loggerMaker.warnAndAddToDb("[fetchApiStats] view empty, falling back. Took " + (System.currentTimeMillis() - t) + "ms");
+        }
         Bson filter = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
         Bson collFilter = UsageMetricCalculator.excludeDemosAndDeactivated(Constants.ID);
         Pair<ApiStats, ApiStats> result = ApiInfoDao.instance.fetchApiInfoStats(collFilter, filter, startTimestamp, endTimestamp);
