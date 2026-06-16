@@ -44,6 +44,7 @@ public class CopilotOAuthAuthParam extends AuthParam {
     private transient long cachedAccessTokenExpiresAt;
     // set to true when refresh token was rotated, so caller can persist via dataActor
     @Getter
+    @Setter
     private transient boolean refreshTokenRotated = false;
 
     public CopilotOAuthAuthParam() {}

@@ -216,7 +216,7 @@ public abstract class DataActor {
     public abstract List<TestingRunResult> fetchLatestTestingRunResultBySummaryId(String summaryId, int limit, int skip);
 
     public abstract List<TestRoles> fetchTestRoles();
-    public abstract void updateCopilotRefreshToken(String roleId, String newRefreshToken);
+    public abstract boolean updateCopilotRefreshToken(String roleId, String newRefreshToken);
 
     public abstract List<SampleData> fetchSampleData(Set<Integer> apiCollectionIds, int skip);
 
