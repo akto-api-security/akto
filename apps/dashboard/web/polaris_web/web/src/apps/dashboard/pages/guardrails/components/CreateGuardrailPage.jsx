@@ -7,7 +7,8 @@ import {
     Icon,
     Button,
     Badge,
-    Select
+    Popover,
+    ActionList
 } from "@shopify/polaris";
 import {
     CancelMajor,
@@ -59,6 +60,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // Compliance preset picker (create mode only)
     const [compliancePresets, setCompliancePresets] = useState([]);
     const [selectedCompliance, setSelectedCompliance] = useState(null);
+    const [presetPopoverActive, setPresetPopoverActive] = useState(false);
 
     // Playground state
     const [playgroundInput, setPlaygroundInput] = useState("");
@@ -1220,22 +1222,37 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                         {steps.find(s => s.number === currentStep)?.title}
                                     </Text>
                                     {!isEditMode && compliancePresets.length > 0 && (
-                                        <Box minWidth="220px">
-                                            <Select
-                                                label=""
-                                                labelHidden
-                                                options={[
-                                                    { label: "Start from a template…", value: "" },
-                                                    ...compliancePresets.map(p => ({ label: p.name, value: p.key }))
+                                        <Popover
+                                            active={presetPopoverActive}
+                                            activator={
+                                                <Button
+                                                    onClick={() => setPresetPopoverActive(p => !p)}
+                                                    disclosure
+                                                    removeUnderline
+                                                >
+                                                    {selectedCompliance
+                                                        ? compliancePresets.find(p => p.key === selectedCompliance)?.name
+                                                        : "Start from a template"}
+                                                </Button>
+                                            }
+                                            autofocusTarget="first-node"
+                                            onClose={() => setPresetPopoverActive(false)}
+                                        >
+                                            <ActionList
+                                                actionRole="menuitem"
+                                                items={[
+                                                    ...(selectedCompliance ? [{
+                                                        content: "Clear template",
+                                                        onAction: () => { resetForm(); setSelectedCompliance(null); setPresetPopoverActive(false); }
+                                                    }] : []),
+                                                    ...compliancePresets.map(p => ({
+                                                        content: p.name,
+                                                        active: selectedCompliance === p.key,
+                                                        onAction: () => { applyCompliancePreset(p); setPresetPopoverActive(false); }
+                                                    }))
                                                 ]}
-                                                value={selectedCompliance || ""}
-                                                onChange={(val) => {
-                                                    if (!val) { resetForm(); setSelectedCompliance(null); return; }
-                                                    const preset = compliancePresets.find(p => p.key === val);
-                                                    if (preset) applyCompliancePreset(preset);
-                                                }}
                                             />
-                                        </Box>
+                                        </Popover>
                                     )}
                                 </HorizontalStack>
                                 <Box>
