@@ -947,6 +947,30 @@ public class DbLayer {
         return TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(roleId)));
     }
 
+    public static boolean updateCopilotRefreshToken(String roleId, String newRefreshToken) {
+        try {
+            TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(roleId)));
+            if (role == null || role.getAuthWithCondList() == null) return false;
+            for (com.akto.dto.testing.sources.AuthWithCond authWithCond : role.getAuthWithCondList()) {
+                if (authWithCond.getAuthMechanism() == null) continue;
+                List<com.akto.dto.testing.AuthParam> params = authWithCond.getAuthMechanism().getAuthParams();
+                if (params == null) continue;
+                for (com.akto.dto.testing.AuthParam param : params) {
+                    if (param instanceof com.akto.dto.testing.CopilotOAuthAuthParam) {
+                        ((com.akto.dto.testing.CopilotOAuthAuthParam) param).setRefreshToken(newRefreshToken);
+                    }
+                }
+            }
+            TestRolesDao.instance.updateOneNoUpsert(
+                Filters.eq("_id", new ObjectId(roleId)),
+                Updates.set(TestRoles.AUTH_WITH_COND_LIST, role.getAuthWithCondList())
+            );
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public static Tokens fetchToken(String organizationId, int accountId) {
         Bson filters = Filters.and(
                 Filters.eq(Tokens.ORG_ID, organizationId),

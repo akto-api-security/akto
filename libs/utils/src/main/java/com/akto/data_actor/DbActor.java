@@ -400,6 +400,10 @@ public class DbActor extends DataActor {
         return DbLayer.fetchTestRoles();
     }
 
+    public boolean updateCopilotRefreshToken(String roleId, String newRefreshToken) {
+        return DbLayer.updateCopilotRefreshToken(roleId, newRefreshToken);
+    }
+
     public List<TestRoles> fetchTestRolesForRoleName(String roleFromTask) {
         return DbLayer.fetchTestRolesForRoleName(roleFromTask);
     }

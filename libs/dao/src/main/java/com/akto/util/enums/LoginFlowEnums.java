@@ -6,7 +6,8 @@ public class LoginFlowEnums {
         HARDCODED,
         LOGIN_REQUEST,
         TLS_AUTH,
-        DIGEST_AUTH
+        DIGEST_AUTH,
+        COPILOT_OAUTH
     }
 
     public enum LoginStepTypesEnums {

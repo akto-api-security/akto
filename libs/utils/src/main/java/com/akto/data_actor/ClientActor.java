@@ -2652,6 +2652,25 @@ public class ClientActor extends DataActor {
         return roleList;
     }
 
+    public boolean updateCopilotRefreshToken(String roleId, String newRefreshToken) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("roleId", roleId);
+        obj.put("newRefreshToken", newRefreshToken);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateCopilotRefreshToken", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateCopilotRefreshToken", LoggerMaker.LogDb.RUNTIME);
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateCopilotRefreshToken " + e, LoggerMaker.LogDb.RUNTIME);
+            return false;
+        }
+    }
+
     public List<SampleData> fetchSampleData(Set<Integer> apiCollectionIds, int skip) {
         Map<String, List<String>> headers = buildHeaders();
         List<SampleData> sampleDataList = new ArrayList<>();
@@ -2734,6 +2753,8 @@ public class ClientActor extends DataActor {
                     case "DIGEST_AUTH":
                         authParam.put("_t", "com.akto.dto.testing.DigestAuthParam");
                         break;
+                    case "COPILOT_OAUTH":
+                        authParam.put("_t", "com.akto.dto.testing.CopilotOAuthAuthParam");
                     default:
                         break;
                 }
@@ -2759,6 +2780,8 @@ public class ClientActor extends DataActor {
                     case "DIGEST_AUTH":
                         defaultAuthParam.put("_t", "com.akto.dto.testing.DigestAuthParam");
                         break;
+                    case "COPILOT_OAUTH":
+                        defaultAuthParam.put("_t", "com.akto.dto.testing.CopilotOAuthAuthParam");
                     default:
                         break;
                 }
