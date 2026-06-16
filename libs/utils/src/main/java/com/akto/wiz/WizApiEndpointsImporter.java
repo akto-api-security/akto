@@ -85,14 +85,14 @@ public class WizApiEndpointsImporter {
 
             int deltaTs = wizIntegration.getWizImportApiEndpointsJobDeltaTs();
             Instant cutoff = Instant.ofEpochSecond(deltaTs);
-            //Instant cutoff = Instant.now().minus(24, ChronoUnit.HOURS);
             Set<String> updatedEndpointIds = new HashSet<>();
             for (BasicDBObject meta : allEndpointMeta) {
                 String updatedAt = meta.getString("updatedAt");
                 if (updatedAt == null) continue;
                 try {
-                    if (Instant.parse(updatedAt).isAfter(cutoff)) {
-                        updatedEndpointIds.add(meta.getString("id"));
+                    String id = meta.getString("id");
+                    if (id != null && Instant.parse(updatedAt).isAfter(cutoff)) {
+                        updatedEndpointIds.add(id);
                     }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(String.format(
@@ -127,6 +127,7 @@ public class WizApiEndpointsImporter {
                     }
 
                     List<?> nodes = (List<?>) root.get("nodes");
+                    if (nodes == null) continue;
 
                     for (Object nodeObj : nodes) {
                         BasicDBObject node = (BasicDBObject) nodeObj;
@@ -180,7 +181,6 @@ public class WizApiEndpointsImporter {
                 "Wiz import completed. Total endpoints dispatched: %d, errors: %d", totalFetched, totalErrors));
 
         } catch (Exception e) {
-            e.printStackTrace();
             loggerMaker.errorAndAddToDb("Error importing Wiz API endpoints: " + e.getMessage());
         }
 

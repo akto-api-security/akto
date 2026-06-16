@@ -43,7 +43,7 @@ public class WizSpecProcessor {
         JsonNode spec;
 
         if (specString == null || specString.isEmpty()) {
-            if (path == null || path.isEmpty() || method == null || method.isEmpty()) {
+            if (host == null || host.isEmpty() || path == null || path.isEmpty() || method == null || method.isEmpty()) {
                 return null;
             }
             spec = buildSyntheticSpec(host, path, method);
@@ -121,11 +121,15 @@ public class WizSpecProcessor {
     }
 
     private static JsonNode normaliseServerUrl(JsonNode spec, String host) {
+        if (!(spec instanceof ObjectNode)) return spec;
+
         String serverUrl = spec.path("servers").path(0).path("url").asText("");
         boolean missingScheme = !serverUrl.startsWith("http://") && !serverUrl.startsWith("https://");
         if (!missingScheme) return spec;
 
         String baseUrl = serverUrl.isEmpty() ? host : serverUrl;
+        if (baseUrl == null || baseUrl.isEmpty()) return spec;
+
         ArrayNode servers = (ArrayNode) ((ObjectNode) spec).withArray("servers");
         servers.removeAll().addObject().put("url", "https://" + baseUrl);
         return spec;
