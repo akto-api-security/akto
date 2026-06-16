@@ -13,8 +13,10 @@ import com.akto.dto.jobs.JobParams;
 import com.akto.dto.jobs.JobStatus;
 import com.akto.dto.jobs.JobType;
 import com.akto.jobs.JobExecutorFactory;
+import com.akto.jobs.executors.WizApiEndpointsImportJobExecutor;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.utils.wiz.WizApiEndpointsImportJobUtil;
 import com.mongodb.client.model.*;
 
 import org.bson.conversions.Bson;
@@ -28,6 +30,10 @@ public class JobsCron {
     private static final int MAX_HEARTBEAT_THRESHOLD_SECONDS = 300;
 
     private static final LoggerMaker logger = new LoggerMaker(JobsCron.class, LogDb.DASHBOARD);
+
+    private JobsCron() {
+        WizApiEndpointsImportJobExecutor.INSTANCE.setWizApiEndpointsProcessor(WizApiEndpointsImportJobUtil::wizApiEndpointsProcessor);
+    }
 
     public void jobsScheduler(JobExecutorType jobExecutorType) {
         scheduler.scheduleAtFixedRate(() -> {
@@ -91,7 +97,7 @@ public class JobsCron {
             Job finalJob = job;
             try {
                 JobParams params = finalJob.getJobParams();
-                if(params.getJobType() == JobType.DATADOG_TRAFFIC_COLLECTOR || params.getJobType() == JobType.JIRA_AUTO_CREATE_TICKETS || params.getJobType() == JobType.WIZ_SYNC) {
+                if(params.getJobType() == JobType.DATADOG_TRAFFIC_COLLECTOR || params.getJobType() == JobType.JIRA_AUTO_CREATE_TICKETS || params.getJobType() == JobType.WIZ_SYNC || params.getJobType() == JobType.WIZ_API_ENDPOINTS_IMPORT) {
                     executorService.submit(
                         () -> {
                             Context.accountId.set(finalJob.getAccountId());
