@@ -50,6 +50,7 @@ import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.mongodb.BasicDBList;
 
 import static com.akto.test_editor.execution.Build.modifyRequest;
 import com.akto.testing.kafka_utils.TestingConfigurations;
@@ -1349,6 +1350,7 @@ public class TestExecutor {
 
         if (testingRunConfig!=null && testingRunConfig.getCleanUp()) {
             try {
+                loggerMaker.warnAndAddToDb("Initiating the cleanUp for apiInfoKey " + apiInfoKey + "test " + testSubType + " logId " + testExecutionLogId);
                 cleanUpTestArtifacts(Collections.singletonList(ret), apiInfoKey, sampleMessageStore, testingRunConfig);
             } catch(Exception e){
                 loggerMaker.errorAndAddToDb(e, "Error while cleaning up test artifacts: " + e.getMessage());
@@ -1395,10 +1397,13 @@ public class TestExecutor {
                                                     + " | methodResp: " + node.getMethodResp() 
                                                     + " | urlReq: " + node.getUrlReq() 
                                                     + " | methodReq: " + node.getMethodReq() 
-                                                    + " | paramInfos: " + node.getParamInfos());
+                                                    + " | paramInfos: " + node.getParamInfos()
+                                                    + " | isArrayResponse: " + node.isArrayResponse());
 
 
                                         Map<String, Set<Object>> valuesMap = Build.getValuesMap(rawApiToBeReplayed.getResponse());
+                                        Map<String, Set<Object>> requestBodyValuesMap = Build.getRequestValuesMap(rawApiToBeReplayed.getRequest());
+                                        String requestUrl = rawApiToBeReplayed.getRequest().getUrl();
 
                                         ApiInfoKey cleanUpApiInfoKey = new ApiInfoKey(Integer.valueOf(node.getApiCollectionIdReq()), node.getUrlReq(), Method.valueOf(node.getMethodReq()));
                                         List<String> samples = sampleMessageStore.getSampleDataMap().get(cleanUpApiInfoKey);
@@ -1416,85 +1421,57 @@ public class TestExecutor {
                                         if (samples == null || samples.isEmpty()) {
                                             loggerMaker.infoAndAddToDb(String.format("cleanUpTestArtifacts samples not found for: %s %s %s", node.getApiCollectionIdReq(), node.getUrlReq(), node.getMethodReq()));
                                             continue;
-                                        } else {
-                                            RawApi nextApi = RawApi.buildFromMessage(samples.get(0), true);
+                                        }
 
-                                            List<KVPair> kvPairs = new ArrayList<>();
-                                            boolean fullReplace = true;
-                                            for(ParamInfo paramInfo: node.getParamInfos()) {
-                                                // TODO: Handle for header
-                                                if (paramInfo.isHeader()) continue;
-                                                Set<Object> valuesFromResponse = valuesMap.get(paramInfo.getResponseParam());
+                                        String sampleMessage = samples.get(0);
+                                        boolean arrayCleanupHandled = false;
 
-                                                if (valuesFromResponse == null || valuesFromResponse.isEmpty()) {
-                                                    fullReplace = false;
-                                                    break;
+                                        if (node.isArrayResponse()) {
+                                            String responseBody = rawApiToBeReplayed.getResponse().getBody();
+                                            List<BasicDBObject> arrayElements = extractResponseArrayElements(responseBody);
+                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts the array elements will be " + arrayElements);
+
+                                            if (arrayElements.isEmpty()) {
+                                                String trimmedResponse = responseBody != null ? responseBody.trim() : "";
+                                                if (trimmedResponse.startsWith("[")) {
+                                                    loggerMaker.infoAndAddToDb("cleanUpTestArtifacts array response is empty, skipping cleanup");
+                                                    arrayCleanupHandled = true;
+                                                } else {
+                                                    loggerMaker.warnAndAddToDb("cleanUpTestArtifacts isArrayResponse=true but response is not an array, falling back to single-delete");
                                                 }
+                                            } else {
+                                                int totalElements = arrayElements.size();
+                                                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts array cleanup starting for " + totalElements + " elements");
+                                                for (int i = 0; i < totalElements; i++) {
+                                                    BasicDBObject element = arrayElements.get(i);
+                                                    Map<String, Set<Object>> elementValuesMap = JSONUtils.flatten(element);
+                                                    RawApi nextApi = RawApi.buildFromMessage(sampleMessage, true);
+                                                    List<KVPair> kvPairs = new ArrayList<>();
 
-                                                Object valueFromResponse = valuesFromResponse.iterator().next();
+                                                    if (!buildKvPairsFromParamInfos(node.getParamInfos(), elementValuesMap, requestBodyValuesMap, requestUrl, kvPairs)) {
+                                                        loggerMaker.warnAndAddToDb("cleanUpTestArtifacts array cleanup iteration " + (i + 1) + "/" + totalElements + " skipped: unable to extract all param values");
+                                                        continue;
+                                                    }
 
-                                                KVPair.KVType type = valueFromResponse instanceof Integer ? KVPair.KVType.INTEGER : KVPair.KVType.STRING;
-                                                KVPair kvPair = new KVPair(paramInfo.getRequestParam(), valueFromResponse.toString(), false, paramInfo.isUrlParam(), type);
-                                                loggerMaker.warnAndAddToDb("cleanUpTestArtifacts kvPair created - key: " + kvPair.getKey() + " | value: " + kvPair.getValue());
-                                                kvPairs.add(kvPair);
+                                                    loggerMaker.infoAndAddToDb("cleanUpTestArtifacts array cleanup iteration " + (i + 1) + "/" + totalElements + " kvPairs: " + kvPairs);
+                                                    ReplaceDetail replaceDetail = new ReplaceDetail(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), kvPairs);
+                                                    executeCleanupDelete(nextApi, replaceDetail, apiInfoKey, cleanUpApiInfoKey, testingRunConfig, cleanedUpRequests);
+                                                }
+                                                arrayCleanupHandled = true;
                                             }
+                                        }
 
-                                            if (!fullReplace) {
+                                        if (!arrayCleanupHandled) {
+                                            RawApi nextApi = RawApi.buildFromMessage(sampleMessage, true);
+                                            List<KVPair> kvPairs = new ArrayList<>();
+
+                                            if (!buildKvPairsFromParamInfos(node.getParamInfos(), valuesMap, requestBodyValuesMap, requestUrl, kvPairs)) {
                                                 loggerMaker.infoAndAddToDb(String.format("cleanUpTestArtifacts unable to replace all values in dependency node %s %s %s", node.getApiCollectionIdReq(), node.getUrlReq(), node.getMethodReq()));
                                                 continue;
                                             }
 
-                                            if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
-                                                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts overriding auth with test role: " + testingRunConfig.getTestRoleId());
-                                                try {
-                                                    TestRoles role = Executor.fetchOrFindTestRole(testingRunConfig.getTestRoleId(), true);
-                                                    loggerMaker.infoAndAddToDb("cleanUpTestArtifacts role fetched: " + (role != null ? "YES" : "NULL"));
-                                                    if (role != null) {
-                                                        String endpointLogicalGroupId = role.getEndpointLogicalGroupIdHexId();
-                                                        EndpointLogicalGroup endpointLogicalGroup = dataActor.fetchEndpointLogicalGroupById(endpointLogicalGroupId);
-                                                        if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
-                                                            if (Executor.modifyAuthTokenInRawApi(role, nextApi) == null) {
-                                                                loggerMaker.infoAndAddToDb("Default auth mechanism absent");
-                                                            }
-                                                        }
-                                                    } else {
-                                                        loggerMaker.infoAndAddToDb("Test role not found, using sample auth");
-                                                    }
-                                                } catch (Exception e) {
-                                                    loggerMaker.errorAndAddToDb(e, "cleanUpTestArtifacts auth override failed: " + e.getMessage());
-                                                }
-                                            }
-
                                             ReplaceDetail replaceDetail = new ReplaceDetail(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), kvPairs);
-                                            modifyRequest(nextApi.getRequest(), replaceDetail);
-                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: ====REQUEST====");
-                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST: " + nextApi.getRequest().getMethod() + " " + nextApi.getRequest().getUrl() + "?" + nextApi.getRequest().getQueryParams());
-                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST headers: " + nextApi.getRequest().getHeaders());
-                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST body: " + nextApi.getRequest().getBody());
-                                            loggerMaker.warnAndAddToDb("cleanUpTestArtifacts final URL after replacement: " + nextApi.getRequest().getUrl());
-                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST: " + nextApi.getRequest().getMethod() + " " + nextApi.getRequest().getUrl());
-                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: ====RESPONSE====");
-                                            try {
-                                                OriginalHttpResponse nextResponse = ApiExecutor.sendRequest(nextApi.getRequest(), true, testingRunConfig, false, new ArrayList<>());
-                                                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE headers: " + nextApi.getResponse().getHeaders());
-                                                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE body: " + nextResponse.getBody());
-                                                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE status code: " + nextResponse.getStatusCode());
-                                                loggerMaker.warnAndAddToDb("cleanUpTestArtifacts: RESPONSE status: " + nextResponse.getStatusCode());
-
-                                                if(nextResponse.getStatusCode() < 300) {
-                                                    if(cleanedUpRequests.get(apiInfoKey) != null) {
-                                                        cleanedUpRequests.get(apiInfoKey).add(cleanUpApiInfoKey);
-                                                    } else {
-                                                        cleanedUpRequests.put(apiInfoKey, Arrays.asList(cleanUpApiInfoKey));
-                                                    }
-                                                }
-
-                                            } catch (Exception e) {
-                                                e.printStackTrace();
-                                                loggerMaker.errorAndAddToDb(e,
-                                                        "cleanUpTestArtifacts: exception in sending api request for cleanup"
-                                                                + e.getMessage());
-                                            }
+                                            executeCleanupDelete(nextApi, replaceDetail, apiInfoKey, cleanUpApiInfoKey, testingRunConfig, cleanedUpRequests);
                                         }
                                     }
                                 } else {
@@ -1696,6 +1673,165 @@ public class TestExecutor {
 
     private static int indexOfEveryPromptMarker(String collectionDescription) {
         return collectionDescription.toLowerCase().indexOf(EVERY_PROMPT_MARKER);
+    }
+
+    private static Object extractValueFromRequestUrlPath(String requestUrl, String urlPathIndex) {
+        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts extracted from request URL path: " + requestUrl + " = " + urlPathIndex);
+        if (requestUrl == null || requestUrl.isEmpty() || urlPathIndex == null || urlPathIndex.isEmpty()) {
+            return null;
+        }
+        try {
+            String[] urlSegments = requestUrl.split("/");
+            int index = Integer.parseInt(urlPathIndex);
+            if (index >= 0 && index < urlSegments.length) {
+                return urlSegments[index];
+            }
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        return null;
+    }
+
+    private static List<BasicDBObject> extractResponseArrayElements(String body) {
+        List<BasicDBObject> elements = new ArrayList<>();
+        if (body == null || body.trim().isEmpty()) {
+            return elements;
+        }
+
+        String trimmedBody = body.trim();
+        BasicDBList arrayList = null;
+
+        try {
+            if (trimmedBody.startsWith("[")) {
+                BasicDBObject wrapped = BasicDBObject.parse("{\"json\": " + trimmedBody + "}");
+                Object jsonVal = wrapped.get("json");
+                if (jsonVal instanceof BasicDBList) {
+                    arrayList = (BasicDBList) jsonVal;
+                }
+            } else if (trimmedBody.startsWith("{")) {
+                BasicDBObject obj = BasicDBObject.parse(trimmedBody);
+                Object jsonVal = obj.get("json");
+                if (jsonVal instanceof BasicDBList) {
+                    arrayList = (BasicDBList) jsonVal;
+                }
+            }
+        } catch (Exception e) {
+            return elements;
+        }
+
+        if (arrayList == null) {
+            return elements;
+        }
+
+        for (Object elem : arrayList) {
+            if (elem instanceof BasicDBObject) {
+                elements.add((BasicDBObject) elem);
+            }
+        }
+        return elements;
+    }
+
+    private static boolean buildKvPairsFromParamInfos(
+            List<ParamInfo> paramInfos,
+            Map<String, Set<Object>> responseValuesMap,
+            Map<String, Set<Object>> requestBodyValuesMap,
+            String requestUrl,
+            List<KVPair> outKvPairs) {
+        for (ParamInfo paramInfo : paramInfos) {
+            if (paramInfo.isHeader()) continue;
+
+            Object valueExtracted = null;
+            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts the paramInfo will be: " + paramInfo.getResponseParam() + " = " + valueExtracted);
+
+            if (paramInfo.getResponseBody() != null && !paramInfo.getResponseBody().isEmpty()) {
+                Set<Object> valuesFromRequestBody = requestBodyValuesMap.get(paramInfo.getResponseBody());
+                if (valuesFromRequestBody != null && !valuesFromRequestBody.isEmpty()) {
+                    valueExtracted = valuesFromRequestBody.iterator().next();
+                    loggerMaker.infoAndAddToDb("cleanUpTestArtifacts extracted from request body: " + paramInfo.getResponseBody() + " = " + valueExtracted);
+                }
+            } else if (paramInfo.getResponseUrlPath() != null && !paramInfo.getResponseUrlPath().isEmpty()) {
+                valueExtracted = extractValueFromRequestUrlPath(requestUrl, paramInfo.getResponseUrlPath());
+                if (valueExtracted != null) {
+                    loggerMaker.infoAndAddToDb("cleanUpTestArtifacts extracted from request URL path: " + paramInfo.getResponseUrlPath() + " = " + valueExtracted);
+                }
+            } else {
+                Set<Object> valuesFromResponse = responseValuesMap.get(paramInfo.getResponseParam());
+                if (valuesFromResponse != null && !valuesFromResponse.isEmpty()) {
+                    valueExtracted = valuesFromResponse.iterator().next();
+                    loggerMaker.infoAndAddToDb("cleanUpTestArtifacts extracted from response: " + paramInfo.getResponseParam() + " = " + valueExtracted);
+                }
+            }
+
+            if (valueExtracted == null) {
+                loggerMaker.warnAndAddToDb("cleanUpTestArtifacts unable to extract value for paramInfo: " + paramInfo.getRequestParam());
+                return false;
+            }
+
+            KVPair.KVType type = valueExtracted instanceof Integer ? KVPair.KVType.INTEGER : KVPair.KVType.STRING;
+            KVPair kvPair = new KVPair(paramInfo.getRequestParam(), valueExtracted.toString(), false, paramInfo.isUrlParam(), type);
+            loggerMaker.warnAndAddToDb("cleanUpTestArtifacts kvPair created - key: " + kvPair.getKey() + " | value: " + kvPair.getValue());
+            outKvPairs.add(kvPair);
+        }
+        return true;
+    }
+
+    private static boolean  executeCleanupDelete(
+            RawApi nextApi,
+            ReplaceDetail replaceDetail,
+            ApiInfoKey apiInfoKey,
+            ApiInfoKey cleanUpApiInfoKey,
+            TestingRunConfig testingRunConfig,
+            Map<ApiInfoKey, List<ApiInfoKey>> cleanedUpRequests) {
+        if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
+            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts overriding auth with test role: " + testingRunConfig.getTestRoleId());
+            try {
+                TestRoles role = Executor.fetchOrFindTestRole(testingRunConfig.getTestRoleId(), true);
+                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts role fetched: " + (role != null ? "YES" : "NULL"));
+                if (role != null) {
+                    String endpointLogicalGroupId = role.getEndpointLogicalGroupIdHexId();
+                    EndpointLogicalGroup endpointLogicalGroup = dataActor.fetchEndpointLogicalGroupById(endpointLogicalGroupId);
+                    if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
+                        if (Executor.modifyAuthTokenInRawApi(role, nextApi) == null) {
+                            loggerMaker.infoAndAddToDb("Default auth mechanism absent");
+                        }
+                    }
+                } else {
+                    loggerMaker.infoAndAddToDb("Test role not found, using sample auth");
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "cleanUpTestArtifacts auth override failed: " + e.getMessage());
+            }
+        }
+
+        modifyRequest(nextApi.getRequest(), replaceDetail);
+        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: ====REQUEST====");
+        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST: " + nextApi.getRequest().getMethod() + " " + nextApi.getRequest().getUrl() + "?" + nextApi.getRequest().getQueryParams());
+        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST headers: " + nextApi.getRequest().getHeaders());
+        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST body: " + nextApi.getRequest().getBody());
+        loggerMaker.warnAndAddToDb("cleanUpTestArtifacts final URL after replacement: " + nextApi.getRequest().getUrl());
+        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST: " + nextApi.getRequest().getMethod() + " " + nextApi.getRequest().getUrl());
+        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: ====RESPONSE====");
+
+        try {
+            OriginalHttpResponse nextResponse = ApiExecutor.sendRequest(nextApi.getRequest(), true, testingRunConfig, false, new ArrayList<>());
+            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE headers: " + nextApi.getResponse().getHeaders());
+            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE body: " + nextResponse.getBody());
+            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE status code: " + nextResponse.getStatusCode());
+            loggerMaker.warnAndAddToDb("cleanUpTestArtifacts: RESPONSE status: " + nextResponse.getStatusCode());
+
+            if (nextResponse.getStatusCode() < 300) {
+                if (cleanedUpRequests.get(apiInfoKey) != null) {
+                    cleanedUpRequests.get(apiInfoKey).add(cleanUpApiInfoKey);
+                } else {
+                    cleanedUpRequests.put(apiInfoKey, Arrays.asList(cleanUpApiInfoKey));
+                }
+                return true;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "cleanUpTestArtifacts: exception in sending api request for cleanup" + e.getMessage());
+        }
+        return false;
     }
 
 }
