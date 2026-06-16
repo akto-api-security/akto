@@ -409,6 +409,10 @@ public class Build {
 
     }
 
+    public static Map<String, Set<Object>> getRequestValuesMap(OriginalHttpRequest request) {
+        return extractValuesFromPayload(request.getBody());
+    }
+
     public static Map<String, Set<Object>> getValuesMap(OriginalHttpResponse response) {
         String respPayload = response.getBody();
         Map<String, Set<Object>> valuesMap = extractValuesFromPayload(respPayload);
