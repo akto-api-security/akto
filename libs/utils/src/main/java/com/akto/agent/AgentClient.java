@@ -75,7 +75,7 @@ public class AgentClient {
                     "Authorization"
                 );
                 if (accessToken == null || accessToken.isEmpty()) {
-                    throw new Exception("No Authorization token found in request — OAuth not connected for this role");
+                    throw new Exception("Init failed for Copilot Bot. No Authorization token found in request");
                 }
                 loggerMaker.infoAndAddToDb("executeAgenticTest: initializing Copilot agent conversationId=" + conversationId);
                 initializeCopilotAgent(conversationId, col, accessToken);
@@ -88,6 +88,10 @@ public class AgentClient {
             }
         } catch(Exception e){
             loggerMaker.errorAndAddToDb("executeAgenticTest: init failed conversationId=" + conversationId + " err=" + e.getMessage());
+            TestResult errorResult = new TestResult();
+            errorResult.setMessage("Agentic test execution failed: " + e.getMessage());
+            setAgenticResultFields(errorResult, conversationId, false, Arrays.asList(e.getMessage()), 0.0, TestResult.Confidence.LOW);
+            return Collections.singletonList(errorResult);
         }
 
         try {
