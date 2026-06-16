@@ -1102,6 +1102,20 @@ const settingRequests = {
             data: {}
         })
     },
+    addWizTrafficSource() {
+        return request({
+            url: '/api/addWizTrafficSource',
+            method: 'post',
+            data: {}
+        })
+    },
+    removeWizTrafficSource() {
+        return request({
+            url: '/api/removeWizTrafficSource',
+            method: 'post',
+            data: {}
+        })
+    },
     addMatchingPatternForProxy(proxyPattern, switchProxyMode) {
         return request({
             url: '/api/addMatchingPatternForProxy',

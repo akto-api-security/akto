@@ -82,6 +82,7 @@ public class HttpCallParser {
             .build();
 
     private Map<Integer, ApiCollection> apiCollectionMap;
+    private boolean skipDependencyAnalysis = false;
 
     private static final ConcurrentLinkedQueue<BasicDBObject> queue = new ConcurrentLinkedQueue<>();
 
@@ -140,7 +141,7 @@ public class HttpCallParser {
         return null;
     }
 
-    public int createCollectionSimple(int vxlanId, boolean isMcpRequest) {
+    public int createCollectionSimple(int vxlanId, List<CollectionTags> tagsToApply) {
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
 
@@ -150,7 +151,7 @@ public class HttpCallParser {
             Updates.setOnInsert("urls", new HashSet<>())
         );
 
-        updates = getUpdatesIfMcpCollection(isMcpRequest, updates);
+        updates = getUpdatesForTags(tagsToApply, updates);
 
 
         ApiCollectionsDao.instance.getMCollection().updateOne(
@@ -162,7 +163,7 @@ public class HttpCallParser {
     }
 
 
-    public int createCollectionBasedOnHostName(int id, String host, boolean isMcpRequest)  throws Exception {
+    public int createCollectionBasedOnHostName(int id, String host, List<CollectionTags> tagsToApply)  throws Exception {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
         updateOptions.returnDocument(ReturnDocument.AFTER);
@@ -180,7 +181,7 @@ public class HttpCallParser {
                     Updates.setOnInsert("urls", new HashSet<>())
                 );
 
-                updates = getUpdatesIfMcpCollection(isMcpRequest, updates);
+                updates = getUpdatesForTags(tagsToApply, updates);
 
                 ApiCollection createdCollection = ApiCollectionsDao.instance.getMCollection()
                     .findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
@@ -294,7 +295,7 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId, makeApisCaseInsensitive);
         }
 
-        if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
+        if (!skipDependencyAnalysis && DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
             for (HttpResponseParams responseParam: filteredResponseParams) {
                 try{
                     dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
@@ -320,7 +321,7 @@ public class HttpCallParser {
             numberOfSyncs++;
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit, mcpAssetsSyncLimit, aiAssetsSyncLimit,
                 responseParams.get(0).getSource());
-            if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
+            if (!skipDependencyAnalysis && DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
                 dependencyAnalyser.dbState = apiCatalogSync.dbState;
                 dependencyAnalyser.syncWithDb();
             }
@@ -419,7 +420,7 @@ public class HttpCallParser {
     }
 
     public static boolean useHostCondition(String hostName, HttpResponseParams.Source source) {
-        List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING, HttpResponseParams.Source.OTHER, HttpResponseParams.Source.SDK);
+        List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING, HttpResponseParams.Source.OTHER, HttpResponseParams.Source.SDK, HttpResponseParams.Source.WIZ);
         boolean hostNameCondition;
         if (hostName == null) {
             hostNameCondition = false;
@@ -502,6 +503,11 @@ public class HttpCallParser {
         int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
 
         boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(httpResponseParam).getFirst();
+
+        List<CollectionTags> tagsToApply = new ArrayList<>();
+        if (isMcpRequest) tagsToApply.add(getMcpServerTag());
+        if (httpResponseParam.getSource().equals(HttpResponseParams.Source.WIZ)) tagsToApply.add(getWizCollectionTag());
+
         if (useHostCondition(hostName, httpResponseParam.getSource())) {
             hostName = hostName.toLowerCase();
             hostName = hostName.trim();
@@ -510,17 +516,19 @@ public class HttpCallParser {
 
             if (hostNameToIdMap.containsKey(key)) {
                 apiCollectionId = hostNameToIdMap.get(key);
-                updateMcpServerTag(apiCollectionId, isMcpRequest);
+                for (CollectionTags tag : tagsToApply) {
+                    updateCollectionTag(apiCollectionId, tag);
+                }
             } else {
                 int id = hostName.hashCode();
                 try {
 
-                    apiCollectionId = createCollectionBasedOnHostName(id, hostName, isMcpRequest);
+                    apiCollectionId = createCollectionBasedOnHostName(id, hostName, tagsToApply);
 
                     hostNameToIdMap.put(key, apiCollectionId);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
-                    createCollectionSimple(vxlanId, isMcpRequest);
+                    createCollectionSimple(vxlanId, tagsToApply);
                     hostNameToIdMap.put("null " + vxlanId, vxlanId);
                     apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
                 }
@@ -529,7 +537,7 @@ public class HttpCallParser {
         } else {
             String key = "null" + " " + vxlanId;
             if (!hostNameToIdMap.containsKey(key)) {
-                createCollectionSimple(vxlanId, isMcpRequest);
+                createCollectionSimple(vxlanId, tagsToApply);
                 hostNameToIdMap.put(key, vxlanId);
             }
 
@@ -538,29 +546,24 @@ public class HttpCallParser {
         return apiCollectionId;
     }
 
-    private void updateMcpServerTag(int apiCollectionId, boolean isMcpRequest) {
-        if (!isMcpRequest) {
-            return;
-        }
-
+    private void updateCollectionTag(int apiCollectionId, CollectionTags tag) {
         ApiCollection apiCollection = apiCollectionMap.get(apiCollectionId);
-        if (apiCollection == null) {
-            return;
-        }
+        if (apiCollection == null) return;
 
         List<CollectionTags> collectionTags = apiCollection.getTagsList();
-        boolean isMcpTagPresent = !CollectionUtils.isEmpty(collectionTags) &&
-            collectionTags.stream().anyMatch(tag -> Constants.AKTO_MCP_SERVER_TAG.equals(tag.getKeyName()));
+        boolean isTagPresent = !CollectionUtils.isEmpty(collectionTags) &&
+            collectionTags.stream().anyMatch(t ->
+                tag.getKeyName().equals(t.getKeyName()) && tag.getValue().equals(t.getValue()));
 
-        if (isMcpTagPresent) {
-            return;
-        }
+        if (isTagPresent) return;
 
         if (collectionTags == null) {
             collectionTags = new ArrayList<>();
+            collectionTags.add(tag);
+            apiCollection.setTagsList(collectionTags);
+        } else {
+            collectionTags.add(tag);
         }
-
-        collectionTags.add(getMcpServerTag());
 
         ApiCollectionsDao.instance.updateOne(
             Filters.eq(ApiCollection.ID, apiCollection.getId()),
@@ -817,14 +820,13 @@ public class HttpCallParser {
         return new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES);
     }
 
-    private Bson getUpdatesIfMcpCollection(boolean isMcpRequest, Bson updates) {
-        if (!isMcpRequest) {
-            return updates;
-        }
+    private CollectionTags getWizCollectionTag() {
+        return new CollectionTags(Context.now(), Constants.AKTO_ENDPOINT_SOURCE_TAG, Constants.AKTO_WIZ_SOURCE_VALUE, TagSource.AKTO);
+    }
 
-        updates = Updates.combine(updates,
-            Updates.set(ApiCollection.TAGS_STRING, Collections.singletonList(getMcpServerTag())));
-        return updates;
+    private Bson getUpdatesForTags(List<CollectionTags> tagsToApply, Bson updates) {
+        if (tagsToApply == null || tagsToApply.isEmpty()) return updates;
+        return Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, tagsToApply));
     }
 
     private SyncLimit fetchSyncLimit(MetricTypes metricType) {
@@ -833,5 +835,9 @@ public class HttpCallParser {
             featureAccess.setUsageLimit(0);
         }
         return featureAccess.fetchSyncLimit();
+    }
+
+    public void setSkipDependencyAnalysis(boolean skipDependencyAnalysis) {
+        this.skipDependencyAnalysis = skipDependencyAnalysis;
     }
 }
