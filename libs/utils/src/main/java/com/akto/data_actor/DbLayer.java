@@ -105,6 +105,9 @@ import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.config.TestScript;
+import com.akto.dto.testing.AuthParam;
+import com.akto.dto.testing.CopilotOAuthAuthParam;
+import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.tracing.Span;
@@ -2141,6 +2144,25 @@ public class DbLayer {
 
     public static TestRoles fetchTestRolesforId(String roleId) {
         return TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(roleId)));
+    }
+
+    public static void updateCopilotRefreshToken(String roleId, String newRefreshToken) {
+        TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(roleId)));
+        if (role == null || role.getAuthWithCondList() == null) return;
+        for (AuthWithCond authWithCond : role.getAuthWithCondList()) {
+            if (authWithCond.getAuthMechanism() == null) continue;
+            List<AuthParam> params = authWithCond.getAuthMechanism().getAuthParams();
+            if (params == null) continue;
+            for (AuthParam param : params) {
+                if (param instanceof CopilotOAuthAuthParam) {
+                    ((CopilotOAuthAuthParam) param).setRefreshToken(newRefreshToken);
+                }
+            }
+        }
+        TestRolesDao.instance.updateOneNoUpsert(
+            Filters.eq("_id", new ObjectId(roleId)),
+            Updates.set(TestRoles.AUTH_WITH_COND_LIST, role.getAuthWithCondList())
+        );
     }
 
     public static Tokens fetchToken(String organizationId, int accountId) {

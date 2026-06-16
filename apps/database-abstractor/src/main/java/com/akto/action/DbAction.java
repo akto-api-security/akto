@@ -355,6 +355,7 @@ public class DbAction extends ActionSupport {
     SampleData sampleData;
     TestRoles testRole;
     List<TestRoles> testRoles;
+    String newRefreshToken;
     Map<ObjectId, TestingRunResultSummary> testingRunResultSummaryMap;
     BasicDBObject testingRunResult;
     Tokens token;
@@ -2437,6 +2438,16 @@ public class DbAction extends ActionSupport {
             testRole = DbLayer.fetchTestRolesforId(roleId);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchTestRolesforId " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateCopilotRefreshToken() {
+        try {
+            DbLayer.updateCopilotRefreshToken(roleId, newRefreshToken);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateCopilotRefreshToken " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -4962,6 +4973,14 @@ public class DbAction extends ActionSupport {
 
     public void setRoleId(String roleId) {
         this.roleId = roleId;
+    }
+
+    public String getNewRefreshToken() {
+        return newRefreshToken;
+    }
+
+    public void setNewRefreshToken(String newRefreshToken) {
+        this.newRefreshToken = newRefreshToken;
     }
 
     public Bson getFilterForRunResult() {
