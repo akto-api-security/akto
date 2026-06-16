@@ -765,7 +765,7 @@ public class Executor {
         for (AuthParam param : authParamList) {
             if (param instanceof CopilotOAuthAuthParam) {
                 CopilotOAuthAuthParam copilotParam = (CopilotOAuthAuthParam) param;
-                if (copilotParam.isRefreshTokenRotated() 
+                if (copilotParam.isRefreshTokenRotated()
                     && dataActor.updateCopilotRefreshToken(copilotParam.getRoleId(), copilotParam.getRefreshToken())) {
                     copilotParam.setRefreshTokenRotated(false);
                 }
