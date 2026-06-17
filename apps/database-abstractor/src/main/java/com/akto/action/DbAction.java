@@ -3936,6 +3936,17 @@ public class DbAction extends ActionSupport {
                         Updates.set(CrawlerRun.END_TIMESTAMP, Context.now()),
                         Updates.set(CrawlerRun.ERROR_MESSAGE, errorMessage)
                 );
+            } else if (status.equals(CrawlerRun.CrawlerRunStatus.STOPPED.name())) {
+                updates = Updates.combine(
+                        Updates.set(CrawlerRun.STATUS, status),
+                        Updates.set(CrawlerRun.END_TIMESTAMP, Context.now())
+                );
+            }
+
+            // Fallback so an unrecognized status still persists, and we never
+            // call updateOne with a null update (which would throw).
+            if (updates == null) {
+                updates = Updates.set(CrawlerRun.STATUS, status);
             }
 
             CrawlerRunDao.instance.updateOne(
@@ -3954,6 +3965,25 @@ public class DbAction extends ActionSupport {
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in updateDastJobStatus");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Returns the current status of a crawl by crawlId so the crawler can detect
+     * a dashboard-issued STOP_REQUESTED while a job is running. Response shape:
+     * { "status": "<CrawlerRunStatus>" }.
+     */
+    public String checkCrawlStatus() {
+        try {
+            CrawlerRun crawlerRun = CrawlerRunDao.instance.findOne(
+                    Filters.eq(CrawlerRun.CRAWL_ID, crawlId)
+            );
+            this.status = (crawlerRun != null && crawlerRun.getStatus() != null)
+                    ? crawlerRun.getStatus().name() : null;
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in checkCrawlStatus");
             return Action.ERROR.toUpperCase();
         }
     }
