@@ -315,15 +315,8 @@ public class GuardrailPoliciesAction extends UserAction {
             User user = getSUser();
             int currentTime = Context.now();
 
-            // Build per-account guardrail service URL.
-            // Default: https://<accountId>-guardrails.akto.io
-            // Exception: the US / demo account (1768362636) is hosted on a custom
-            // domain (https://ingest-demo.akto.io) instead of the standard
-            // <accountId>-guardrails.akto.io pattern, so it needs a hardcoded override.
             int accountId = Context.accountId.get();
-            String guardrailServiceUrl = accountId == 1768362636
-                    ? "https://ingest-demo.akto.io"
-                    : "https://" + accountId + "-guardrails.akto.io";
+            String guardrailServiceUrl = "https://" + accountId + "-guardrails.akto.io";
             String validateUrl = guardrailServiceUrl + "/api/validate/requestWithPolicy";
 
             // Prepare request payload - wrap testInput in JSON with "prompt" key
