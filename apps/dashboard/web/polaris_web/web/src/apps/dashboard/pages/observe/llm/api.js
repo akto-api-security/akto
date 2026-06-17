@@ -78,6 +78,9 @@ export default {
             url: "/api/fetchLLMTraceDetail",
             method: "post",
             data: { traceId },
-        }).then(r => Array.isArray(r) ? r : (r?.spans ?? []));
+        }).then(r => {
+            if (Array.isArray(r)) return r;
+            return r?.spans ?? r?.prompts ?? r?.messages ?? [];
+        });
     },
 };
