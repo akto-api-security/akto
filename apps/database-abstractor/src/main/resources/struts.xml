@@ -2472,6 +2472,17 @@
             </result>
         </action>
 
+        <action name="api/checkCrawlStatus" class="com.akto.action.DbAction" method="checkCrawlStatus">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^status$</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+            </result>
+        </action>
+
         <action name="api/updateDastJobStatus" class="com.akto.action.DbAction" method="updateDastJobStatus">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
