@@ -840,6 +840,8 @@ const transform = {
     let resp = {}
     if(!isEndpointSecurityCategory()){
       resp = await this.getAllSubcategoriesData(false, type, setTestsLoaded)
+    }else{
+      return;
     }
     let subCategoryMap = {};
     resp?.subCategories.forEach((x) => {
