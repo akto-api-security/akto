@@ -785,14 +785,16 @@ prettifyEpoch(epoch) {
   webSocketRequestFirstLine(message, queryParams) {
     let pathString = ""
     let type = message?.type || "WEBSOCKET"
+    const method = func.WEBSOCKET_METHOD_LABEL
     if (message["request"]) {
       pathString = (message["request"]["url"] || "").split("?")[0]
       type = message["request"]["type"] || type
     } else if (message.path != null && message.path !== undefined) {
       pathString = message.path.split("?")[0]
     }
-    const suffix = type ? " " + type : ""
-    return pathString + func.convertQueryParamsToUrl(queryParams) + suffix
+    const query = func.convertQueryParamsToUrl(queryParams)
+    const typeSuffix = type ? ` ${type}` : ""
+    return `${method} ${pathString}${query}${typeSuffix}`
   },
   responseFirstLine(message) {
     if (message["response"]) {
@@ -866,16 +868,48 @@ prettifyEpoch(epoch) {
       return `${key}: ${value}`
     })
   },
+  parseWebSocketEventPayload(payload) {
+    if (payload == null || typeof payload !== "string") return payload
+    let current = payload.trim()
+    for (let i = 0; i < 4; i++) {
+      if (typeof current !== "string") break
+      try {
+        current = JSON.parse(current)
+      } catch {
+        break
+      }
+    }
+    return current
+  },
+  formatWebSocketEventPayloadForDisplay(payload) {
+    if (payload == null) return ""
+    const parsed = typeof payload === "string" ? func.parseWebSocketEventPayload(payload) : payload
+    if (typeof parsed === "object" && parsed !== null) {
+      return JSON.stringify(parsed, null, 2)
+    }
+    return String(parsed)
+  },
+  formatWebSocketEventForDisplay(event) {
+    if (event == null || typeof event !== "object" || Array.isArray(event)) {
+      return func.formatWebSocketEventPayloadForDisplay(event)
+    }
+    // const direction = event.direction ? `[${String(event.direction).toLowerCase()}]` : ""
+    const payload = func.formatWebSocketEventPayloadForDisplay(event.payload)
+    // if (!direction) return payload
+    // if (!payload) return direction
+    // return `${direction}\n${payload}`
+    return payload
+  },
   formatWebSocketEventsMessage(events) {
     const parsed = func.parseWebSocketEventsField(events)
-    if (parsed == null) return "{}"
+    if (parsed == null) return ""
     if (Array.isArray(parsed)) {
       return parsed.map((e, i) => {
-        const body = JSON.stringify(e, null, 2)
+        const body = func.formatWebSocketEventForDisplay(e)
         return parsed.length > 1 ? `--- Event ${i + 1} ---\n${body}` : body
       }).join("\n\n")
     }
-    return JSON.stringify(parsed, null, 2)
+    return func.formatWebSocketEventForDisplay(parsed)
   },
   isWebSocketUpgradeResponse(parsed) {
     const code = parsed?.statusCode ?? parsed?.response?.statusCode
@@ -900,18 +934,24 @@ prettifyEpoch(epoch) {
       const requestHeaders = func.parseWebSocketHeaders(parsed.requestHeaders || parsed.request?.headers)
       const requestHeaderLines = func.formatWebSocketHeaderLines(requestHeaders, redactSet)
       if (requestHeaderLines.length > 0) {
+        parts.push("")
         parts.push(requestHeaderLines.join("\n"))
       }
       const isUpgrade = func.isWebSocketUpgradeResponse(parsed)
       const responseHeaders = func.parseWebSocketHeaders(parsed.responseHeaders || parsed.response?.headers)
       const responseHeaderLines = func.formatWebSocketHeaderLines(responseHeaders, redactSet)
-      if (!isUpgrade && (parsed.statusCode != null || parsed.status)) {
+      if (responseHeaderLines.length > 0 || (!isUpgrade && (parsed.statusCode != null || parsed.status))) {
         parts.push("")
-        parts.push(func.responseFirstLine(parsed))
-      }
-      if (responseHeaderLines.length > 0) {
-        parts.push("")
-        parts.push(responseHeaderLines.join("\n"))
+        if (isUpgrade) {
+          const statusText = parsed.status || "Switching Protocols"
+          parts.push(`101 ${statusText}`)
+        } else if (parsed.statusCode != null || parsed.status) {
+          parts.push(func.responseFirstLine(parsed))
+        }
+        if (responseHeaderLines.length > 0) {
+          parts.push("")
+          parts.push(responseHeaderLines.join("\n"))
+        }
       }
       if (parsed.events != null && parsed.events !== "") {
         parts.push("")
