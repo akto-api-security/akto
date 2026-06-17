@@ -56,7 +56,8 @@ function GuardrailDetection() {
                 templateId: data.filterId,
                 sessionId: data.sessionId,
                 severity: data.severity,
-                ruleViolated: data.ruleViolated
+                ruleViolated: data.ruleViolated,
+                complianceMap: data.complianceMapData || {}
             })
         } else {
             setShowDetails(!showDetails)

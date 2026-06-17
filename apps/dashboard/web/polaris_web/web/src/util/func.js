@@ -1788,11 +1788,15 @@ updateQueryParams(searchParams, setSearchParams, key, value) {
 },
  getComplianceIcon: (complianceName) => {
   if (!complianceName || typeof complianceName !== "string") return "";
-  const trimmed = complianceName.trim();
-  if (trimmed === "OWASP Agentic Top 10") {
-    return "/public/OWASP.svg";
-  }
-  return "/public/" + trimmed.toUpperCase() + ".svg";
+  const key = complianceName.trim().toUpperCase();
+  // Framework keys are upper-cased upstream; these icon files use mixed case, so map them explicitly.
+  const aliases = {
+    "OWASP AGENTIC TOP 10": "OWASP Agentic.svg",
+    "OWASP AGENTIC": "OWASP Agentic.svg",
+    "EU AI ACT": "EU AI Act.svg",
+    "NIST AI RISK MANAGEMENT FRAMEWORK": "NIST AI Risk Management Framework.svg",
+  };
+  return "/public/" + (aliases[key] || (key + ".svg"));
 },
 
  convertToDisambiguateLabel(value, convertFunc, maxAllowed){

@@ -1,5 +1,5 @@
 import { Badge, Box, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
-import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
+import { getDashboardCategory, mapLabel, isAgenticSecurityCategory, isEndpointSecurityCategory } from '@/apps/main/labelHelper'
 import BarGraph from '@/apps/dashboard/components/charts/BarGraph'
 import ChartypeComponent from '../../testing/TestRunsPage/ChartypeComponent'
 import GetPrettifyEndpoint from '../../observe/GetPrettifyEndpoint'
@@ -16,7 +16,9 @@ const ThreatReportSummary = ({
     threatsByCategory,
     dateRange,
     organizationName,
-    topAttackedApis
+    topAttackedApis,
+    complianceContextSlot,
+    activeComplianceFilters
 }) => {
 
     // Format date range for display - concise format
@@ -97,9 +99,21 @@ const ThreatReportSummary = ({
                 <Text variant="headingLg">1. Report summary</Text>
                 <VerticalStack gap="3">
                     <Text variant="bodyMd" color='subdued'>
-                        The {mapLabel("threat", getDashboardCategory()).toLowerCase()} detection assessment {isAllTime ? 'covering all available data' : `conducted from ${formatDate(dateRange.start)} to ${formatDate(dateRange.end)}`} focused on identifying and analyzing malicious activities targeting <span id='organization-name'>{organizationName}</span>'s {mapLabel("API endpoints", getDashboardCategory())}. The analysis examined successful attack attempts, {mapLabel("threat", getDashboardCategory()).toLowerCase()} actor patterns, and attack categories to provide actionable insights for strengthening security posture.
+                        {(() => {
+                            const isGuardrail = isAgenticSecurityCategory() || isEndpointSecurityCategory()
+                            const complianceName = activeComplianceFilters?.length > 0 ? activeComplianceFilters[0] : null
+                            const reportLabel = isGuardrail && complianceName
+                                ? `${complianceName} guardrail violations report`
+                                : `${mapLabel("threat", getDashboardCategory()).toLowerCase()} detection report`
+                            const periodText = isAllTime
+                                ? 'covers all available data and'
+                                : `covers the period from ${formatDate(dateRange.start)} to ${formatDate(dateRange.end)} and`
+                            return <>This {reportLabel} {periodText} identifies malicious activities targeting <span id='organization-name'>{organizationName}</span>'s {mapLabel("API endpoints", getDashboardCategory())}. The findings highlight {mapLabel("threat", getDashboardCategory()).toLowerCase()} actor patterns and attack categories to support informed security decisions.</>
+                        })()}
                     </Text>
                     <ThreatReportSummaryInfoCard summaryItems={summaryItems} />
+
+                    {complianceContextSlot}
 
                     <Box width='100%' paddingBlockStart={4} paddingBlockEnd={2}>
                         <VerticalStack gap={3}>

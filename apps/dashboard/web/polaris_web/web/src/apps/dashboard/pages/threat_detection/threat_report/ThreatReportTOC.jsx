@@ -6,7 +6,6 @@ const ThreatReportTOC = ({ organizationName, severityCount }) => {
     const dashboardCategory = getDashboardCategory()
 
     const severityChildren = []
-
     func.getAktoSeverities().forEach((severity) => {
         if (severityCount && severityCount[severity] > 0) {
             severityChildren.push({
