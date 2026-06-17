@@ -723,6 +723,7 @@ function ThreatDetectionPage() {
             rowClicked={rowClicked}
             triggerRefresh={() => setTriggerTableRefresh(prev => prev + 1)}
             initialTab={queryParams.status ? queryParams.status.toLowerCase() : undefined}
+            label={LABELS.THREAT}
         />,
         !showNewTab ? <NormalSampleDetails
             title={"Attacker payload"}

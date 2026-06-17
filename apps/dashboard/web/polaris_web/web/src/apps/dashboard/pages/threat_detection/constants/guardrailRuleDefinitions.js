@@ -17,6 +17,7 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── Prompt Injection ──────────────────────────────────────────────────────
     {
         prefixes: ["PromptInjection", "prompt_injection"],
+        capability: "promptAttacks",
         heading: "Prompt Injection Attack",
         overview: [
             {
@@ -49,6 +50,7 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── Harmful Categories / Toxicity ─────────────────────────────────────────
     {
         prefixes: ["Toxicity", "HarmfulCategories", "harmful"],
+        capability: "harmfulCategories",
         heading: "Harmful Content Detected",
         overview: [
             {
@@ -77,6 +79,7 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── Denied Topics / BanTopics ─────────────────────────────────────────────
     {
         prefixes: ["BanTopics", "deniedTopics", "denied_topic"],
+        capability: "deniedTopics",
         heading: "Denied Topic Accessed",
         overview: [
             {
@@ -132,6 +135,7 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── PII ───────────────────────────────────────────────────────────────────
     {
         prefixes: ["PII-", "PII_", "pii"],
+        capability: "piiTypes",
         heading: "Personally Identifiable Information (PII) Detected",
         overview: [
             {
@@ -161,6 +165,7 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── Custom Regex ──────────────────────────────────────────────────────────
     {
         prefixes: ["UserDefinedRegex", "regex"],
+        capability: "regexPatterns",
         heading: "Custom Regex Pattern Match",
         overview: [
             {
@@ -188,6 +193,7 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── Secrets Detection ─────────────────────────────────────────────────────
     {
         prefixes: ["Secrets", "SecretsDetection", "secret"],
+        capability: "secretsDetection",
         heading: "Secret or Credential Detected",
         overview: [
             {
@@ -216,6 +222,7 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── Anonymize ─────────────────────────────────────────────────────────────
     {
         prefixes: ["Anonymize", "anonymize"],
+        capability: "anonymizeDetection",
         heading: "Data Anonymization Applied",
         overview: [
             {
@@ -244,6 +251,7 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── Intent Analysis / Base Prompt ─────────────────────────────────────────
     {
         prefixes: ["IntentAnalysis", "BasePrompt", "base_prompt", "intent"],
+        capability: "basePromptRule",
         heading: "Intent Mismatch - Agent Purpose Violated",
         overview: [
             {
@@ -272,6 +280,7 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── Gibberish ─────────────────────────────────────────────────────────────
     {
         prefixes: ["Gibberish", "gibberish"],
+        capability: "gibberishDetection",
         heading: "Gibberish Input Detected",
         overview: [
             {
@@ -298,6 +307,7 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── Sentiment ─────────────────────────────────────────────────────────────
     {
         prefixes: ["Sentiment", "sentiment"],
+        capability: "sentimentDetection",
         heading: "Abusive Sentiment Detected",
         overview: [
             {
@@ -343,6 +353,7 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── Code Detection ────────────────────────────────────────────────────────
     {
         prefixes: ["BanCode", "Code", "ban_code", "code_detection"],
+        capability: "code",
         heading: "Code Detected in Payload",
         overview: [
             {
@@ -370,6 +381,7 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── LLM Rule / Custom URL Rule ────────────────────────────────────────────
     {
         prefixes: ["UserDefinedLLMRule", "CustomURLRule", "LLMRule"],
+        capability: "llmRule",
         heading: "Custom Business Rule Violation",
         overview: [
             {
@@ -398,6 +410,7 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── Token Limit ───────────────────────────────────────────────────────────
     {
         prefixes: ["tokenLimit", "TokenLimit", "token_limit"],
+        capability: "tokenLimitDetection",
         heading: "Token Limit Exceeded",
         overview: [
             {
@@ -550,6 +563,7 @@ Identify the specific rule from the \`ruleViolated\` field:
     // ─── Personal Account ──────────────────────────────────────────────────────
     {
         prefixes: ["block_personal_account", "personal_account"],
+        capability: "blockPersonalAccounts",
         templateIdPrefixes: ["block-personal-account"],
         heading: "Personal Account Usage Blocked",
         overview: [
@@ -601,6 +615,24 @@ export function getGuardrailRuleInfo(ruleViolated, templateId) {
         for (const def of GUARDRAIL_RULE_DEFINITIONS) {
             if (def.templateIdPrefixes && matches(templateId, def.templateIdPrefixes)) return def;
         }
+    }
+    return null;
+}
+
+// Capabilities without a detail-dialog entry above. capability === guardrails/<capability>.conf filename.
+const EXTRA_CAPABILITY_PREFIXES = [
+    { prefixes: ["ContextPoisoning", "context_poisoning"], capability: "contextPoisoning" },
+    { prefixes: ["BlockedHosts", "blocked_host", "EndpointNotWhitelisted"], capability: "blockedHosts" },
+];
+
+// Maps an event's rule_violated to its compliance capability (e.g. "PII_EMAIL" -> "piiTypes").
+export function getGuardrailCapabilityForRule(ruleViolated) {
+    if (!ruleViolated || ruleViolated === '-') return null;
+    const v = ruleViolated.trim().toLowerCase();
+    const matches = (prefixes) => prefixes.some(p => v.startsWith(p.toLowerCase()) || v.includes(p.toLowerCase()));
+
+    for (const def of [...GUARDRAIL_RULE_DEFINITIONS, ...EXTRA_CAPABILITY_PREFIXES]) {
+        if (def.capability && matches(def.prefixes)) return def.capability;
     }
     return null;
 }

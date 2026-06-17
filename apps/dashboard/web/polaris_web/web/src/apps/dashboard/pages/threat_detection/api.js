@@ -307,6 +307,13 @@ const threatDetectionRequests = {
             data: {}
         })
     },
+    fetchGuardrailComplianceInfos() {
+        return request({
+            url: '/api/fetchGuardrailComplianceInfos',
+            method: 'post',
+            data: {}
+        })
+    },
     getIpReputationScore(ipAddress) {
         return request({
             url: '/api/getIpReputationScore',
