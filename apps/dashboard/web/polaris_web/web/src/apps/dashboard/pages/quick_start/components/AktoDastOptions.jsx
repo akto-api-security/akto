@@ -1,4 +1,4 @@
-import { Box, Checkbox, HorizontalStack, Icon, Select, Text, TextField, Tooltip, VerticalStack } from '@shopify/polaris'
+import { Checkbox, HorizontalStack, Icon, Text, TextField, Tooltip, VerticalStack } from '@shopify/polaris'
 import { InfoMinor } from '@shopify/polaris-icons'
 import React, { useEffect, useState } from 'react'
 import Dropdown from '../../../components/layouts/Dropdown'
@@ -151,26 +151,34 @@ const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, s
 
                     {window?.STIGG_FEATURE_WISE_ALLOWED?.AI_DAST?.isGranted && (
                         <Checkbox
-                            label="AI based discovery"
+                            label="AI based crawling"
                             checked={enableAiJsDiscovery}
-                            onChange={(checked) => setEnableAiJsDiscovery(checked)}
+                            onChange={(checked) => {
+                                setEnableAiJsDiscovery(checked)
+                                if (!checked) setCrawlMode('DETERMINISTIC')
+                            }}
                         />
                     )}
                 </HorizontalStack>
-                {window?.STIGG_FEATURE_WISE_ALLOWED?.AI_DAST?.isGranted && (
-                    <Box maxWidth="300px">
-                        <Select
+
+                {window?.STIGG_FEATURE_WISE_ALLOWED?.AI_DAST?.isGranted && enableAiJsDiscovery && (
+                    <VerticalStack gap="1">
+                        <Dropdown
                             label="Crawl mode"
-                            helpText="DETERMINISTIC = rule-based crawl (default). AGENTIC = AI agent drives the browser. HYBRID = deterministic with AI on stuck pages."
-                            options={[
-                                { label: 'Deterministic', value: 'DETERMINISTIC' },
-                                { label: 'AI Agentic', value: 'AGENTIC' },
-                                { label: 'Hybrid', value: 'HYBRID' },
+                            menuItems={[
+                                { label: 'Deterministic', value: 'DETERMINISTIC', id: 'DETERMINISTIC' },
+                                { label: 'AI Agentic', value: 'AGENTIC', id: 'AGENTIC' },
+                                { label: 'Hybrid', value: 'HYBRID', id: 'HYBRID' },
                             ]}
-                            value={crawlMode}
-                            onChange={(value) => setCrawlMode(value)}
+                            initial={crawlMode}
+                            selected={(value) => setCrawlMode(value)}
                         />
-                    </Box>
+                        <Text variant="bodySm" color="subdued">
+                            DETERMINISTIC = rule-based crawl (default).<br />
+                            AGENTIC = AI agent drives the browser.<br />
+                            HYBRID = deterministic with AI on stuck pages.
+                        </Text>
+                    </VerticalStack>
                 )}
                 {runTestAfterCrawling && miniTestingServiceNames.length > 0 && (
                     <Dropdown

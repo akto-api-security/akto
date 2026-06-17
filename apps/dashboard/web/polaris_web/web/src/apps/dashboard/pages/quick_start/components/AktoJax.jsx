@@ -212,16 +212,18 @@ const AktoJax = () => {
                 setCustomHeaders={setCustomHeaders}
             />
 
-            <Box paddingBlockStart={3}><Divider /></Box>
+            {enableAiJsDiscovery && <>
+                <Box paddingBlockStart={3}><Divider /></Box>
 
-            <TextField
-                label="Custom prompt for crawl (Optional)"
-                value={userPrompt}
-                onChange={(value) => setUserPrompt(value)}
-                placeholder='E.g. Focus on crawling the login and payment pages'
-                helpText="This prompt will be used to guide the crawler to focus on specific areas of your application. It can help improve crawl efficiency and ensure critical paths are thoroughly tested."
-                multiline={true}
-            />
+                <TextField
+                    label="Custom prompt for crawl (Optional)"
+                    value={userPrompt}
+                    onChange={(value) => setUserPrompt(value)}
+                    placeholder='E.g. Focus on crawling login and payment pages'
+                    helpText="This prompt will be used to guide the crawler to focus on specific areas of your application. It can help improve crawl efficiency and ensure critical paths are thoroughly tested."
+                    multiline={true}
+                />
+            </>}
 
             <Box paddingBlockStart={3}><Divider /></Box>
 
