@@ -140,6 +140,11 @@ export function getExecutionIssueList(statusCounts) {
   }));
 }
 
+// HTTP status-code issues only (4xx/5xx), for the single test run page "API error stats" header.
+export function getHttpStatusIssueList(statusCounts) {
+  return getExecutionIssueList(statusCounts).filter((item) => statusCodeFromKey(item.key) != null);
+}
+
 function buildSummaryNodes(issues) {
   const topIssues = issues.slice(0, 2);
   const remaining = issues.length - topIssues.length;

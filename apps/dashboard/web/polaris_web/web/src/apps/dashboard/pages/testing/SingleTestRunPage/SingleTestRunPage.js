@@ -59,7 +59,7 @@ import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 import MarkdownReportGenerator from "../../../components/shared/MarkdownReportGenerator";
 import { saveAs } from 'file-saver';
 import SeveritySelector from '../../issues/components/SeveritySelector';
-import { buildResponseCodeFilterChoices, getExecutionIssueList, HTTP_CODE_LABELS } from "../TestRunsPage/runStatusUtils";
+import { buildResponseCodeFilterChoices, getHttpStatusIssueList, HTTP_CODE_LABELS } from "../TestRunsPage/runStatusUtils";
 
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -1100,7 +1100,7 @@ function SingleTestRunPage() {
             </>
           )}
           {(() => {
-            const issues = getExecutionIssueList(statusCounts);
+            const issues = getHttpStatusIssueList(statusCounts);
             if (issues.length === 0) {
               return null;
             }
@@ -1123,7 +1123,7 @@ function SingleTestRunPage() {
                         <Text variant="bodyMd">API request error statistics breakdown:</Text>
                         <VerticalStack gap="1">
                           {issues.map((issue) => (
-                            <Text key={issue.key} variant="bodySm">{`• ${issue.label}: ${issue.countLabel}`}</Text>
+                            <Text key={issue.key} variant="bodySm">{`- ${issue.label}: ${issue.countLabel}`}</Text>
                           ))}
                         </VerticalStack>
                         <Box paddingBlockStart="1" borderBlockStartWidth="1" borderColor="border-subdued">
