@@ -264,7 +264,7 @@ export default function LeftNav() {
                         selected: leftNavSelected === "dashboard_observe_inventory",
                     }]),
                     ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && func.isDemoAccount() ? [{
-                        label: "LLM Observability",
+                        label: "Traces",
                         badge: <Badge status="info">Beta</Badge>,
                         onClick: () => {
                             navigate("/dashboard/observe/llm-observability");
