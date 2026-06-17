@@ -757,9 +757,12 @@ public class IssuesAction extends UserAction {
     public String fetchAllSubCategories() {
         boolean includeYamlContent = false;
         categories = TestTemplateUtils.getAllTestCategoriesWithinContext(Context.contextSource.get());
-        // Bson filters = Filters.in(
-        //         "info.category", Arrays.asList(categories)
-        // );
+        List<Bson> filters = new ArrayList<>();
+        for (TestCategory category : categories) {
+            filters.add(
+                Filters.eq("info.category.name", category.getName())
+            );
+        }
         switch (mode) {
             case "runTests":
                 break;
@@ -772,7 +775,7 @@ public class IssuesAction extends UserAction {
         }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(includeYamlContent,
-                fetchOnlyActive, skip, limit, Filters.empty());
+                fetchOnlyActive, skip, limit, Filters.or(filters));
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             try {
