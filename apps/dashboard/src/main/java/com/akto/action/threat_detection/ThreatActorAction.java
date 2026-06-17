@@ -377,7 +377,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         this.guardrailComplianceInfos.add(obj);
       }
 
-      loggerMaker.infoAndAddToDb("Fetched " + this.guardrailComplianceInfos.size() + " guardrail compliance infos", LogDb.DASHBOARD);
+      loggerMaker.info("Fetched " + this.guardrailComplianceInfos.size() + " guardrail compliance infos", LogDb.DASHBOARD);
       return SUCCESS.toUpperCase();
     } catch (Exception e) {
       loggerMaker.errorAndAddToDb(e, "Error while fetching guardrail compliance infos: " + e.getMessage(), LogDb.DASHBOARD);

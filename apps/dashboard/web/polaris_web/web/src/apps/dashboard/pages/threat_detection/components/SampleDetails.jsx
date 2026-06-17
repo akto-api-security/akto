@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Divider, HorizontalStack, Modal, Tag, Text, Tooltip, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
+import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -19,6 +19,7 @@ import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import OwaspTag from "../../guardrails/components/OwaspTag";
+import ComplianceTags from "../../guardrails/components/ComplianceTags";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
@@ -145,31 +146,7 @@ function SampleDetails(props) {
                         )}
                     </div>
                 ))}
-                {moreInfoData?.complianceMap && Object.keys(moreInfoData.complianceMap).length > 0 && (
-                    <>
-                        <Divider />
-                        <VerticalStack gap={"2"}>
-                            <Text variant="headingMd" fontWeight="bold">Compliance</Text>
-                            <HorizontalStack gap={"2"} wrap>
-                                {Object.entries(moreInfoData.complianceMap).flatMap(([framework, clauses], idx) => {
-                                    const clauseList = Array.isArray(clauses) && clauses.length > 0 ? clauses : [null];
-                                    return clauseList.map((clause, cIdx) => (
-                                        <Tag key={`${idx}-${cIdx}`}>
-                                            <HorizontalStack gap="1" blockAlign="center">
-                                                <Avatar
-                                                    source={func.getComplianceIcon(framework)}
-                                                    shape="square"
-                                                    size="extraSmall"
-                                                />
-                                                <Text variant="bodySm" fontWeight="medium">{clause ? framework + ' - ' + clause : framework}</Text>
-                                            </HorizontalStack>
-                                        </Tag>
-                                    ));
-                                })}
-                            </HorizontalStack>
-                        </VerticalStack>
-                    </>
-                )}
+                <ComplianceTags complianceMap={moreInfoData?.complianceMap} />
             </VerticalStack>
         </Box>
     ) : (
