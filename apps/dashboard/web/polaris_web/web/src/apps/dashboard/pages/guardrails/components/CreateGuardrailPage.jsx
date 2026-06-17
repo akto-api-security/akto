@@ -6,9 +6,7 @@ import {
     Box,
     Icon,
     Button,
-    Badge,
-    Popover,
-    ActionList
+    Badge
 } from "@shopify/polaris";
 import {
     CancelMajor,
@@ -16,6 +14,7 @@ import {
 } from "@shopify/polaris-icons";
 import PersistStore from '../../../../main/PersistStore';
 import AgenticSearchInput from '../../agentic/components/AgenticSearchInput';
+import DropdownSearch from '../../shared/DropdownSearch';
 import guardrailApi from '../api';
 import {
     transformPolicyForBackend,
@@ -60,7 +59,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // Compliance preset picker (create mode only)
     const [compliancePresets, setCompliancePresets] = useState([]);
     const [selectedCompliance, setSelectedCompliance] = useState(null);
-    const [presetPopoverActive, setPresetPopoverActive] = useState(false);
 
     // Playground state
     const [playgroundInput, setPlaygroundInput] = useState("");
@@ -1222,37 +1220,23 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                         {steps.find(s => s.number === currentStep)?.title}
                                     </Text>
                                     {!isEditMode && compliancePresets.length > 0 && (
-                                        <Popover
-                                            active={presetPopoverActive}
-                                            activator={
-                                                <Button
-                                                    onClick={() => setPresetPopoverActive(p => !p)}
-                                                    disclosure
-                                                    removeUnderline
-                                                >
-                                                    {selectedCompliance
-                                                        ? compliancePresets.find(p => p.key === selectedCompliance)?.name
-                                                        : "Start from a template"}
-                                                </Button>
-                                            }
-                                            autofocusTarget="first-node"
-                                            onClose={() => setPresetPopoverActive(false)}
-                                        >
-                                            <ActionList
-                                                actionRole="menuitem"
-                                                items={[
-                                                    ...(selectedCompliance ? [{
-                                                        content: "Clear template",
-                                                        onAction: () => { resetForm(); setSelectedCompliance(null); setPresetPopoverActive(false); }
-                                                    }] : []),
-                                                    ...compliancePresets.map(p => ({
-                                                        content: p.name,
-                                                        active: selectedCompliance === p.key,
-                                                        onAction: () => { applyCompliancePreset(p); setPresetPopoverActive(false); }
-                                                    }))
-                                                ]}
-                                            />
-                                        </Popover>
+                                        <DropdownSearch
+                                            placeholder="Start from a template"
+                                            optionsList={compliancePresets.map(p => ({
+                                                label: p.name,
+                                                value: p.key
+                                            }))}
+                                            value={selectedCompliance ? compliancePresets.find(p => p.key === selectedCompliance)?.name : ""}
+                                            setSelected={(selected) => {
+                                                if (selected) {
+                                                    const preset = compliancePresets.find(p => p.key === selected);
+                                                    applyCompliancePreset(preset);
+                                                } else {
+                                                    resetForm();
+                                                    setSelectedCompliance(null);
+                                                }
+                                            }}
+                                        />
                                     )}
                                 </HorizontalStack>
                                 <Box>
