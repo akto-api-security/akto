@@ -3848,18 +3848,6 @@ public class InitializerListener implements ServletContextListener {
                     e.printStackTrace();
                     logger.errorAndAddToDb("Unable to import threat compliance", LogDb.DASHBOARD);
                 }
-                try {
-                    logger.info("Processing Guardrail Compliance from tests-library", LogDb.DASHBOARD);
-                    byte[] guardrailTemplates = new com.akto.utils.GithubSync().syncRepo("akto-api-security/tests-library", "feat/guardrails-compliance");
-                    if (guardrailTemplates != null) {
-                        processGuardrailComplianceInfosFromZip(guardrailTemplates);
-                    } else {
-                        logger.errorAndAddToDb("Unable to fetch guardrail compliance branch, skipping", LogDb.DASHBOARD);
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    logger.errorAndAddToDb("Unable to import guardrail compliance", LogDb.DASHBOARD);
-                }
                 Map<String, ComplianceInfo> complianceCommonMap = getFromCommonDb();
                 Map<String, ThreatComplianceInfo> threatComplianceCommonMap = getThreatComplianceFromCommonDb();
                 Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(getAktoTestLibraryReposForZipFetch());
