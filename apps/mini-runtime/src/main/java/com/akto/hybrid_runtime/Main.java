@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
+import com.akto.DaoInit;
 import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
@@ -46,6 +47,7 @@ import com.akto.utility.UtilityServer;
 import com.akto.util.DashboardMode;
 import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
+import com.mongodb.ConnectionString;
 import com.alibaba.fastjson2.JSON;
 
 import org.apache.kafka.clients.consumer.*;
@@ -54,6 +56,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -836,8 +839,20 @@ public class Main {
             Map<String, Object> jsonMap = JSON.parseObject(messageValue);
             
             if (WebSocketMessageParser.isWebSocketMessage(jsonMap)) {
-                List<HttpResponseParams> wsParams = WebSocketEventProcessor.processWebSocketMessage(jsonMap);
-                result.addAll(wsParams);
+                try {
+                    List<HttpResponseParams> wsParams = WebSocketEventProcessor.processWebSocketMessage(jsonMap);
+                    result.addAll(wsParams);
+                    
+                    if (wsParams.isEmpty()) {
+                        loggerMaker.infoAndAddToDb("WebSocket message processed but no valid events extracted (likely control frames like PING/PONG)");
+                    }
+                } catch (Exception wsException) {
+                    loggerMaker.warn("Error in WebSocket processing: " + wsException.getMessage() + ", attempting HTTP fallback");
+                    HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(messageValue);
+                    if (httpResponseParams != null) {
+                        result.add(httpResponseParams);
+                    }
+                }
             } else {
                 HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(messageValue);
                 if (httpResponseParams != null) {
@@ -845,9 +860,14 @@ public class Main {
                 }
             }
         } catch (Exception e) {
-            HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(messageValue);
-            if (httpResponseParams != null) {
-                result.add(httpResponseParams);
+            loggerMaker.warn("Exception parsing as WebSocket/HTTP: " + e.getMessage());
+            try {
+                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(messageValue);
+                if (httpResponseParams != null) {
+                    result.add(httpResponseParams);
+                }
+            } catch (Exception httpException) {
+                loggerMaker.warn("Failed to parse as both WebSocket and HTTP: " + httpException.getMessage());
             }
         }
         
