@@ -1,9 +1,39 @@
-import { Badge, Box, Text, VerticalStack, HorizontalStack, Link } from '@shopify/polaris'
+import { Avatar, Badge, Box, Text, VerticalStack, HorizontalStack, Link } from '@shopify/polaris'
 import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
 import { CellType } from '../../../components/tables/rows/GithubRow'
+import func from '@/util/func'
 
-const ThreatReportFindings = ({ threatsTableData, severityCount, organizationName }) => {
+const ComplianceCell = ({ complianceWithClauses, activeComplianceFilters }) => {
+    if (!complianceWithClauses || Object.keys(complianceWithClauses).length === 0) {
+        return <Text color="subdued">-</Text>
+    }
+
+    // When a filter is active show only matching frameworks; otherwise show all
+    const frameworksToShow = activeComplianceFilters?.length > 0
+        ? Object.entries(complianceWithClauses).filter(([name]) =>
+            activeComplianceFilters.some(f => f.toUpperCase() === name.toUpperCase())
+        )
+        : Object.entries(complianceWithClauses)
+
+    if (frameworksToShow.length === 0) return <Text color="subdued">-</Text>
+
+    return (
+        <VerticalStack gap="1">
+            {frameworksToShow.map(([framework, clauses]) => (
+                <HorizontalStack key={framework} gap="1" blockAlign="center" wrap={true}>
+                    <Avatar source={func.getComplianceIcon(framework)} shape="square" size="extraSmall" />
+                    <Text variant="bodySm" fontWeight="semibold">{framework}</Text>
+                    {Array.isArray(clauses) && clauses.map((clause, i) => (
+                        <Badge key={i} size="small" status="info">{clause}</Badge>
+                    ))}
+                </HorizontalStack>
+            ))}
+        </VerticalStack>
+    )
+}
+
+const ThreatReportFindings = ({ threatsTableData, severityCount, organizationName, activeComplianceFilters = [], sectionNumber = 2 }) => {
     const dashboardCategory = getDashboardCategory()
 
     const handleThreatClick = (threat) => {
@@ -45,6 +75,11 @@ const ThreatReportFindings = ({ threatsTableData, severityCount, organizationNam
             title: "Severity",
             value: "severityBadge",
             type: CellType.TEXT
+        },
+        {
+            title: "Compliance",
+            value: "complianceIcons",
+            type: CellType.TEXT
         }
     ]
 
@@ -56,7 +91,7 @@ const ThreatReportFindings = ({ threatsTableData, severityCount, organizationNam
     return (
         <Box id="threat-report-findings" paddingBlockStart={6} paddingBlockEnd={6} paddingInlineStart={5} paddingInlineEnd={5}>
             <VerticalStack gap="4">
-                <Text variant="headingLg">2. {mapLabel("Threat", getDashboardCategory())} Detection Findings for {organizationName}</Text>
+                <Text variant="headingLg">{sectionNumber}. {mapLabel("Threat", getDashboardCategory())} Detection Findings for {organizationName}</Text>
                 <VerticalStack gap="3">
                     <Text variant="bodyMd" color='subdued'>
                         The following section details each {mapLabel("threat", getDashboardCategory()).toLowerCase()} detected during the assessment period. Each entry includes the {mapLabel("threat", getDashboardCategory()).toLowerCase()} actor, timestamp, attack category, targeted {mapLabel("API endpoint", getDashboardCategory())}, and severity level.
@@ -82,6 +117,12 @@ const ThreatReportFindings = ({ threatsTableData, severityCount, organizationNam
                                     <div className={`badge-wrapper-${threat.severity}`}>
                                         <Badge>{threat.severity}</Badge>
                                     </div>
+                                ),
+                                complianceIcons: (
+                                    <ComplianceCell
+                                        complianceWithClauses={threat.complianceWithClauses}
+                                        activeComplianceFilters={activeComplianceFilters}
+                                    />
                                 )
                             }))
 

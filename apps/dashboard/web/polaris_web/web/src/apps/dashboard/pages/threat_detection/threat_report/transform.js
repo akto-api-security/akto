@@ -1,12 +1,90 @@
 import func from '@/util/func'
+import { getGuardrailCapabilityForRule } from '../constants/guardrailRuleDefinitions'
+import { extractRuleViolated } from '../utils/formatUtils'
+import { isAgenticSecurityCategory, isEndpointSecurityCategory } from '@/apps/main/labelHelper'
 
 const transform = {
-    /**
-     * Process threats data for report display
-     * @param {Array} threats - Array of malicious event objects
-     * @returns {Object} Transformed data for report
-     */
-    processThreatsForReport(threats) {
+    
+    groupRawEventsForReport(rawEvents, localThreatFiltersMap = {}, localGuardrailComplianceMap = {}, collectionsMap = {}) {
+        const isGuardrail = isAgenticSecurityCategory() || isEndpointSecurityCategory()
+        const uniqueThreatsMap = new Map()
+        const severityCount = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
+        const threatsByCategoryMap = {}
+
+        rawEvents.forEach(item => {
+            const effectiveSeverity = isGuardrail
+                ? ((item.severity || 'HIGH').toUpperCase())
+                : ((localThreatFiltersMap[item?.filterId]?.severity || 'HIGH').toUpperCase())
+            const normalizedSeverity = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(effectiveSeverity) ? effectiveSeverity : 'HIGH'
+
+            // Resolve compliance map for this event — matches SusDataTable logic exactly
+            let complianceMap
+            if (isGuardrail) {
+                const capability = getGuardrailCapabilityForRule(extractRuleViolated(item.metadata))
+                complianceMap = localGuardrailComplianceMap[capability] || {}
+            } else {
+                complianceMap = localThreatFiltersMap[item?.filterId]?.compliance?.mapComplianceToListClauses || {}
+            }
+
+            const key = `${item?.filterId}|${normalizedSeverity}`
+            const getDomain = (i) => {
+                if (i?.apiCollectionId && collectionsMap[i.apiCollectionId]) return collectionsMap[i.apiCollectionId]
+                if (i?.host) return i.host
+                return '-'
+            }
+
+            if (!uniqueThreatsMap.has(key)) {
+                severityCount[normalizedSeverity]++
+                const category = item.filterId || 'Unknown'
+                if (!threatsByCategoryMap[category]) {
+                    threatsByCategoryMap[category] = { category, count: 0 }
+                }
+                threatsByCategoryMap[category].count++
+
+                uniqueThreatsMap.set(key, {
+                    id: item.filterId,
+                    refId: item.refId || '',
+                    actor: item.actor || 'Unknown',
+                    time: item.timestamp ? new Date(item.timestamp * 1000).toLocaleString() : '-',
+                    timestamp: item.timestamp || 0,
+                    category: item.filterId || 'Unknown',
+                    targetedApi: `${item.method || ''} ${item.url || ''}`.trim(),
+                    endpoint: item.url || '',
+                    method: item.method || '',
+                    severity: normalizedSeverity,
+                    filterId: item.filterId || '',
+                    compliance: Object.keys(complianceMap),
+                    complianceWithClauses: complianceMap,
+                    numberOfEndpoints: 1,
+                    domains: [getDomain(item)],
+                    country: item.country || '',
+                })
+            } else {
+                const existing = uniqueThreatsMap.get(key)
+                existing.numberOfEndpoints++
+                const domain = getDomain(item)
+                if (!existing.domains.includes(domain)) existing.domains.push(domain)
+                if (item.timestamp && item.timestamp > existing.timestamp) {
+                    existing.timestamp = item.timestamp
+                    existing.time = new Date(item.timestamp * 1000).toLocaleString()
+                }
+            }
+        })
+
+        const groupedRows = Array.from(uniqueThreatsMap.values())
+            .sort((a, b) => {
+                const order = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
+                const diff = order.indexOf(a.severity) - order.indexOf(b.severity)
+                return diff !== 0 ? diff : b.timestamp - a.timestamp
+            })
+
+        const threatsByCategory = Object.values(threatsByCategoryMap)
+            .sort((a, b) => b.count - a.count)
+
+        return { groupedRows, severityCount, threatsByCategory }
+    },
+
+    processThreatsForReport(threats, threatFiltersMap = {}, guardrailComplianceMap = {}) {
         const severityCount = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
         const threatsByActor = {}
         const threatsByCategory = {}
@@ -51,6 +129,13 @@ const transform = {
             threatsByCategory[category].threats.push(threat)
 
             // Prepare table data
+            let complianceMap;
+            if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+                const capability = getGuardrailCapabilityForRule(extractRuleViolated(threat.metadata));
+                complianceMap = guardrailComplianceMap[capability] || {};
+            } else {
+                complianceMap = threatFiltersMap[threat.filterId]?.compliance?.mapComplianceToListClauses || {};
+            }
             threatsTableData.push({
                 id: threat.id || threat._id,
                 refId: threat.refId || '',
@@ -65,7 +150,9 @@ const transform = {
                 severity: severity,
                 country: threat.country || '',
                 payload: threat.latestApiOrig || '',
-                filterId: threat.filterId || ''
+                filterId: threat.filterId || '',
+                compliance: Object.keys(complianceMap),
+                complianceWithClauses: complianceMap
             })
         })
 
