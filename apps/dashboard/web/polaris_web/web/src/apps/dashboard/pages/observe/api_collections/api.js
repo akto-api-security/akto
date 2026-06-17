@@ -95,6 +95,16 @@ export default {
             return typeof resp === 'string' ? JSON.parse(resp) : resp
         })
     },
+    getCrawlerGraph(crawlId) {
+        return request({
+            url: '/api/getCrawlerGraph',
+            method: 'post',
+            data: { crawlId }
+        }).then(resp => {
+            const obj = typeof resp === 'string' ? JSON.parse(resp) : resp
+            return (obj && obj.navigationGraph) ? obj.navigationGraph : ''
+        })
+    },
     findMissingUrls(missingUrls){
         return request({
             url: '/api/findMissingUrls',

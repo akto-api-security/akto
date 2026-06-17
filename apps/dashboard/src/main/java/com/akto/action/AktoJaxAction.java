@@ -109,6 +109,12 @@ public class AktoJaxAction extends UserAction {
     @Getter @Setter
     private String latestFrameJson;
 
+    // Fields for the navigation graph (Mermaid) shared by the crawler at the end.
+    @Getter @Setter
+    private String graph;
+    @Getter @Setter
+    private String navigationGraph;
+
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoJaxAction.class, LogDb.DASHBOARD);
 
     public String initiateCrawler() {
@@ -825,6 +831,55 @@ public class AktoJaxAction extends UserAction {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching frame: " + e.getMessage(), LogDb.DASHBOARD);
             addActionError("Failed to fetch frame");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Upload the navigation graph (Mermaid flowchart source) from the DAST module.
+     * Persisted on the CrawlerRun so it can be displayed after the crawl finishes.
+     */
+    public String uploadCrawlerGraph() {
+        try {
+            if (crawlId == null || graph == null) {
+                addActionError("crawlId and graph are required");
+                return ERROR.toUpperCase();
+            }
+
+            CrawlerRunDao.instance.updateOne(
+                    Filters.eq(CrawlerRun.CRAWL_ID, crawlId),
+                    Updates.set(CrawlerRun.NAVIGATION_GRAPH, graph)
+            );
+
+            loggerMaker.infoAndAddToDb("Navigation graph uploaded for crawl: " + crawlId, LogDb.DASHBOARD);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error uploading navigation graph: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Failed to upload navigation graph");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Return the stored navigation graph (Mermaid source) for a crawlId, or empty.
+     */
+    public String getCrawlerGraph() {
+        try {
+            if (crawlId == null) {
+                addActionError("crawlId is required");
+                return ERROR.toUpperCase();
+            }
+
+            CrawlerRun crawlerRun = CrawlerRunDao.instance.findOne(
+                    Filters.eq(CrawlerRun.CRAWL_ID, crawlId)
+            );
+            navigationGraph = (crawlerRun != null && crawlerRun.getNavigationGraph() != null)
+                    ? crawlerRun.getNavigationGraph() : "";
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching navigation graph: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Failed to fetch navigation graph");
             return ERROR.toUpperCase();
         }
     }

@@ -87,6 +87,11 @@ public class CrawlerRun {
     public static final String CRAWL_MODE = "crawlMode";
     private String crawlMode;
 
+    // Mermaid flowchart source of the page-to-page navigation graph, uploaded by
+    // the crawler when the crawl finishes (POST /api/uploadCrawlerGraph).
+    public static final String NAVIGATION_GRAPH = "navigationGraph";
+    private String navigationGraph;
+
     public CrawlerRun() {
     }
 

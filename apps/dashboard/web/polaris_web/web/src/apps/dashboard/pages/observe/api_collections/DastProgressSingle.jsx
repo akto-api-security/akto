@@ -8,6 +8,7 @@ import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentere
 import TooltipText from "@/apps/dashboard/components/shared/TooltipText"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import LiveBrowserView from './LiveBrowserView'
+import CrawlGraphView from './CrawlGraphView'
 
 const headers = [
     {
@@ -239,7 +240,11 @@ function DastProgressSingle() {
                     </Box>
                 ),
 
-                // todo("dast graph")
+                (crawlerStatus === 'COMPLETED' || crawlerStatus === 'STOPPED') && (
+                    <Box paddingBlockEnd="4" key="crawl-graph">
+                        <CrawlGraphView crawlId={crawlId} />
+                    </Box>
+                ),
 
                 <GithubSimpleTable
                     data={data}
