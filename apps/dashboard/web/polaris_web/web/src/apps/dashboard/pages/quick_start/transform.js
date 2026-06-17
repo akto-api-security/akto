@@ -446,6 +446,18 @@ const awsBedrockObj = {
     />
 }
 
+const awsAgentCoreObj = {
+    icon: '/public/aws_bedrock.svg',
+    label: "AWS AgentCore",
+    text: "Import your AWS Bedrock AgentCore AI agents seamlessly into Akto.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/aws-bedrock-agentcore',
+    key: "AWS_AGENT_CORE",
+    component: <BannerComponent
+        content="Import your AWS Bedrock AgentCore AI agents seamlessly into Akto."
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/aws-bedrock-agentcore'
+    />
+}
+
 const aiAgentGlobalProxy = {
     icon: '/public/aws_bedrock.svg',
     label: "Global Proxy",
@@ -2124,7 +2136,7 @@ const quickStartFunc = {
         ]
 
         const aiAgentConnectors = [
-            awsBedrockObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
+            awsBedrockObj, awsAgentCoreObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
             n8nImportObj, langchainImportObj, copilotStudioImportObj, snowflakeObj,
             vertexAICustomDeployedModelImportObj, salesforceImportObj,
             anthropicImportObj, openaiImportObj
