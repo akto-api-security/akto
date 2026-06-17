@@ -2,14 +2,12 @@ import React from "react";
 import { HorizontalStack, Link, Text } from "@shopify/polaris";
 import func from "@/util/func";
 import { formatCost, formatDurationMs, latencyColor, truncate } from "./constants";
+import { OsIcon } from "../agentic/DeviceEndpoints";
 
-// ─── Shared LLM Observability cell renderers ──────────────────────────────────
-// Pure Polaris: layout via HorizontalStack/Box, every value via <Text>. No custom
-// CSS classes. Icons use the same Google favicon approach as AssetIcon.jsx.
+export { OsIcon };
 
 const DASH = "-";
 
-// Map a model string to the provider domain used for the Google favicon service.
 function modelDomain(model) {
     if (!model) return null;
     const m = model.toLowerCase();
@@ -21,15 +19,6 @@ function modelDomain(model) {
     if (/grok/.test(m)) return "x.ai";
     if (/cohere/.test(m)) return "cohere.com";
     return null;
-}
-
-// Provider → Polaris Text color token.
-function modelColor(model) {
-    if (!model) return "subdued";
-    if (/claude|anthropic/i.test(model)) return "warning";
-    if (/gpt|openai|text-embedding|o1|o3/i.test(model)) return "success";
-    if (/gemini|palm|bison/i.test(model)) return "interactive";
-    return "subdued";
 }
 
 // 16×16 provider favicon icon — same pattern as AssetIcon.jsx.
@@ -52,14 +41,25 @@ export function ModelIcon({ model, size = 16 }) {
 // Title: prompt text in interactive blue so it reads as a clickable row label.
 export function TitleCell({ data }) {
     if (!data) return null;
-    const name = data._promptText ? truncate(data._promptText, 90) : (data.traceId || data.sessionIdentifier || DASH);
+    const name = data._promptText ? truncate(data._promptText, 90) : DASH;
     return <Text variant="bodySm" color="interactive" truncate>{name}</Text>;
 }
 
-// Monospace-ish id (plain subdued Text).
+// User cell: OS icon + username.
+export function UserCell({ data }) {
+    if (!data) return null;
+    return (
+        <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+            <OsIcon os={data.os} />
+            <Text variant="bodySm" truncate>{data.userName || DASH}</Text>
+        </HorizontalStack>
+    );
+}
+
+// Monospace-ish id (plain Text).
 export function IdCell({ value }) {
     if (!value) return <Text variant="bodySm" color="subdued">{DASH}</Text>;
-    return <Text variant="bodySm" color="subdued" truncate>{value}</Text>;
+    return <Text variant="bodySm" truncate>{value}</Text>;
 }
 
 // Application / service name (text only).
@@ -72,9 +72,9 @@ export function AppCell({ value }) {
 export function ModelChip({ model }) {
     if (!model) return <Text variant="bodySm" color="subdued">{DASH}</Text>;
     return (
-        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+        <HorizontalStack gap="2" blockAlign="center" wrap={false}>
             <ModelIcon model={model} size={14} />
-            <Text variant="bodySm" color={modelColor(model)} truncate>{model}</Text>
+            <Text variant="bodySm" truncate>{model}</Text>
         </HorizontalStack>
     );
 }
@@ -83,16 +83,16 @@ export function ModelChipCellRenderer({ data }) {
     return <ModelChip model={data?._model} />;
 }
 
-// Session models: icon cluster for each distinct model + "+N" overflow.
+// Primary model + "+N more" overflow — always exactly one icon.
 export function ModelsCell({ data }) {
     const models = (data?._models && data._models.length) ? data._models : (data?._model ? [data._model] : []);
     if (!models.length) return <Text variant="bodySm" color="subdued">{DASH}</Text>;
-    const visible = models.slice(0, 2);
-    const extra = models.length - visible.length;
+    const primary = models[0];
+    const extra = models.length - 1;
     return (
-        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
-            {visible.map((m, i) => <ModelIcon key={i} model={m} size={16} />)}
-            <Text variant="bodySm" color={modelColor(visible[0])} truncate>{visible[0]}</Text>
+        <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+            <ModelIcon model={primary} size={24} />
+            <Text variant="bodySm" truncate>{primary}</Text>
             {extra > 0 && <Text variant="bodySm" color="subdued">+{extra}</Text>}
         </HorizontalStack>
     );
@@ -126,7 +126,7 @@ export function CountCell({ value }) {
 
 // Relative time from an epoch-ms value.
 export function TimeCell({ value }) {
-    return <Text variant="bodySm" color="subdued">{func.prettifyEpoch(Math.floor((value || 0) / 1000))}</Text>;
+    return <Text variant="bodySm">{func.prettifyEpoch(Math.floor((value || 0) / 1000))}</Text>;
 }
 
 // Clickable session id (used in unscoped Traces table).

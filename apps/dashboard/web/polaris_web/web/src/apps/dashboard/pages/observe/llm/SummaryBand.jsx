@@ -1,37 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
-import api from "./api";
-import { enrichRow } from "./utils";
 import { formatCompact } from "./constants";
 import AgenticStatsCard from "../agentic/AgenticStatsCard";
 import AgenticTopListCard from "../agentic/AgenticTopListCard";
 import "../../../components/layouts/style.css";
 
-// Distinct colors for the top-users segment bar (up to 8 users).
 const USER_SEGMENT_COLORS = ["#9642FC", "#4285F4", "#10A37F", "#EAB308", "#F97316", "#DC2626", "#CC785C", "#06B6D4"];
 
-// Summary band above the tabs, built from the same cards as the Agentic AI area so the
-// look matches. Real data only: AI-interactions total + token sparkline, and Top models
-// by tokens. Violation/severity panels from the design are omitted (no data source).
-export default function SummaryBand({ currDateRange }) {
-    const [sessions, setSessions] = useState([]);
-    const [recent, setRecent] = useState([]);
+export default function SummaryBand({ sessions, recent }) {
 
-    const epochs = useMemo(() => ({
-        since: Math.floor(Date.parse(currDateRange.period.since) / 1000),
-        until: Math.floor(Date.parse(currDateRange.period.until) / 1000),
-    }), [currDateRange]);
-
-    useEffect(() => {
-        let cancelled = false;
-        api.fetchSessions(epochs.since, epochs.until, {})
-            .then(rows => { if (!cancelled) setSessions((rows || []).map(enrichRow)); });
-        api.searchPrompts({ startTime: epochs.since, endTime: epochs.until, sortKey: "timestamp", sortOrder: 1, skip: 0, limit: 100 })
-            .then(r => { if (!cancelled) setRecent(r?.value || []); });
-        return () => { cancelled = true; };
-    }, [epochs]);
-
-    // Total tokens across all sessions (sessions are pre-enriched by enrichRow).
     const totalTokens = useMemo(
         () => sessions.reduce((s, r) => s + (Number(r._inputTokens) || 0) + (Number(r._outputTokens) || 0), 0),
         [sessions]
@@ -39,6 +16,13 @@ export default function SummaryBand({ currDateRange }) {
 
     const topModelRows = useMemo(() => {
         const byModel = {};
+        // Sessions carry aggregated token counts per model (primary source).
+        sessions.forEach(r => {
+            const m = r._model;
+            if (!m) return;
+            byModel[m] = (byModel[m] || 0) + (Number(r._inputTokens) || 0) + (Number(r._outputTokens) || 0);
+        });
+        // Individual LLM spans supplement session data (e.g. when model isn't on the session aggregate).
         recent.forEach(r => {
             const m = r._model;
             if (!m) return;
@@ -60,7 +44,6 @@ export default function SummaryBand({ currDateRange }) {
             }));
     }, [recent]);
 
-    // Breakdown bar: top 8 users by tokens (sessions pre-enriched).
     const breakdown = useMemo(() => {
         const byUser = {};
         sessions.forEach(r => {

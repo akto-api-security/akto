@@ -1,40 +1,35 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
-import api from "./api";
-import { enrichRow } from "./utils";
 import { SESSION_COLUMN_DEFS } from "./columns";
 
-// Sessions tab — one row per session (traces grouped on session id). Clicking a row
-// drills into the Traces tab scoped to that session (handled by the parent via
-// onOpenSession). Search + column filters use AgGridTable's built-in controls.
-export default function SessionsView({ currDateRange, onOpenSession }) {
-    const [sessions, setSessions] = useState([]);
+const DEFAULT_COL_DEF = { sortable: true, resizable: true, filter: false };
 
-    const getEpochs = useCallback(() => ({
-        since: Math.floor(Date.parse(currDateRange.period.since) / 1000),
-        until: Math.floor(Date.parse(currDateRange.period.until) / 1000),
-    }), [currDateRange]);
-
-    useEffect(() => {
-        let cancelled = false;
-        const { since, until } = getEpochs();
-        api.fetchSessions(since, until, {})
-            .then(rows => { if (!cancelled) setSessions((rows || []).map(enrichRow)); });
-        return () => { cancelled = true; };
-    }, [getEpochs]);
+export default function SessionsView({ rowData, onOpenSession }) {
+    const handleRowClick = useCallback(
+        p => p.data && onOpenSession?.(p.data.sessionIdentifier),
+        [onOpenSession]
+    );
+    const getRowStyle = useCallback(() => ({ cursor: "pointer" }), []);
 
     return (
         <AgGridTable
-            rowData={sessions}
+            rowData={rowData}
             columnDefs={SESSION_COLUMN_DEFS}
-            defaultColDef={{ resizable: true, sortable: false, filter: false }}
-            searchPlaceholder="Search sessions"
+            defaultColDef={DEFAULT_COL_DEF}
+            height={500}
+            domLayout="normal"
+            rowHeight={44}
+            headerHeight={40}
+            searchPlaceholder="Search sessions..."
             rowSelection="single"
-            pagination={true}
+            pagination
             paginationPageSize={20}
-            noOuterBorder
-            getRowStyle={() => ({ cursor: "pointer" })}
-            onRowClicked={(p) => p.data && onOpenSession?.(p.data.sessionIdentifier)}
+            paginationPageSizeSelector={[20, 50, 100]}
+            animateRows
+            suppressCellFocus
+            getRowStyle={getRowStyle}
+            onRowClicked={handleRowClick}
+            sideBar={{ toolPanels: ["columns", "filters"] }}
         />
     );
 }
