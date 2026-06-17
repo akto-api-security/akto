@@ -2,6 +2,7 @@ package com.akto.action;
 
 import com.akto.dao.GuardrailPoliciesDao;
 import com.akto.dao.context.Context;
+import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
@@ -30,6 +31,8 @@ import org.bson.types.ObjectId;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -376,6 +379,17 @@ public class GuardrailPoliciesAction extends UserAction {
                 return ERROR.toUpperCase();
             }
 
+            // Generate short-lived JWT for authenticating with the guardrail service
+            String authToken;
+            try {
+                Map<String, Object> claims = new HashMap<>();
+                claims.put("accountId", accountId);
+                authToken = JwtAuthenticator.createJWT(claims, "Akto", "invite_user", Calendar.MINUTE, 120);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Failed to generate auth token for guardrail service: " + e.getMessage(), LogDb.DASHBOARD);
+                return ERROR.toUpperCase();
+            }
+
             // Call guardrail service using shared HTTP client
             MediaType mediaType = MediaType.parse("application/json");
             RequestBody body = RequestBody.create(requestPayload.toJson(), mediaType);
@@ -383,6 +397,7 @@ public class GuardrailPoliciesAction extends UserAction {
                     .url(validateUrl)
                     .method("POST", body)
                     .addHeader("Content-Type", "application/json")
+                    .addHeader("Authorization", authToken)
                     .build();
 
             // Call guardrail service using shared HTTP client
