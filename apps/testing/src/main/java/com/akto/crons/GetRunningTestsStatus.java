@@ -70,6 +70,9 @@ public class GetRunningTestsStatus {
     }
 
     public boolean isTestRunning(ObjectId runId, boolean isSummary){
+        if(isSummary && (currentRunningTestsMap == null || !currentRunningTestsMap.containsKey(runId))){
+            return false;
+        }
         // handles cases for CICD as it has summary state as scheduled
         boolean ans = isTestRunning(runId);
         if(!ans){

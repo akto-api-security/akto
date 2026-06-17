@@ -538,6 +538,8 @@ public class TestExecutor {
 
                             Thread.sleep(2000);
                     }
+                    boolean isTimeoutOvershoot = Context.now() - waitTs >= maxRunTime;
+                    loggerMaker.infoAndAddToDb("[TestExecutor] - whileloop exited. summaryId: {}. runId: {}. isTimeout: {}", summaryId.toHexString(), testingRun.getHexId(), isTimeoutOvershoot);
                 }else{
                     Thread.sleep(20000); // wait for 20 seconds to ensure all messages are processed
                     dbObject.put("PRODUCER_RUNNING", false);
@@ -675,7 +677,8 @@ public class TestExecutor {
             updatedState = State.FAILED;
             loggerMaker.infoAndAddToDb("Preserving FAILED state for test run", LogDb.TESTING);
         } else {
-            updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
+            TestingRun.State currentState = GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
+            updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true) ? State.COMPLETED : (currentState != null ? currentState : State.COMPLETED);
         }
         
         Map<String,Integer> finalCountMap = Utils.finalCountIssuesMap(summaryId);
@@ -971,13 +974,13 @@ public class TestExecutor {
                         for (GenericTestResult testResult : runResult.getTestResults()) {
                             if (testResult instanceof TestResult) {
                                 int tokens = ((TestResult) testResult).getExternalApiTokens();
-                                loggerMaker.infoAndAddToDb("📊 TestExecutor reading tokens from TestResult: " + tokens, LogDb.TESTING);
+                                // loggerMaker.infoAndAddToDb("📊 TestExecutor reading tokens from TestResult: " + tokens, LogDb.TESTING);
                                 totalExternalApiTokens += tokens;
                             }
                         }
                     }
                 }
-                loggerMaker.infoAndAddToDb("TestExecutor TOTAL tokens to add to summary: " + totalExternalApiTokens, LogDb.TESTING);
+                // loggerMaker.infoAndAddToDb("TestExecutor TOTAL tokens to add to summary: " + totalExternalApiTokens, LogDb.TESTING);
                 TestingConfigurations.getInstance().addAgentTokens(totalExternalApiTokens);
 
                 // Update summary with test count and cumulative external API tokens
@@ -989,7 +992,7 @@ public class TestExecutor {
                     )
                 );
 
-                loggerMaker.infoAndAddToDb("Updated TestingRunResultSummary with " + totalExternalApiTokens + " tokens", LogDb.TESTING);
+                // loggerMaker.infoAndAddToDb("Updated TestingRunResultSummary with " + totalExternalApiTokens + " tokens", LogDb.TESTING);
 
                 TestingIssuesHandler handler = new TestingIssuesHandler();
                 boolean triggeredByTestEditor = false;

@@ -852,7 +852,7 @@ public class Main {
                         }                   
                     }
                     
-            } catch (Exception e) {
+                } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error in init " + e);
                 }
                 testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
