@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 public class TestTemplateUtils {
 
@@ -100,38 +101,30 @@ public class TestTemplateUtils {
             TestCategory.MCP_SECURITY,
         };
 
-        final TestCategory[] llmCategories = {
-            GlobalEnums.TestCategory.LLM,
-            GlobalEnums.TestCategory.PROMPT_INJECTION,
-            GlobalEnums.TestCategory.SENSITIVE_INFORMATION_DISCLOSURE,
-            GlobalEnums.TestCategory.SUPPLY_CHAIN,
-            GlobalEnums.TestCategory.DATA_AND_MODEL_POISONING,
-            GlobalEnums.TestCategory.IMPROPER_OUTPUT_HANDLING,
-            GlobalEnums.TestCategory.EXCESSIVE_AGENCY,
-            GlobalEnums.TestCategory.SYSTEM_PROMPT_LEAKAGE,
-            GlobalEnums.TestCategory.VECTOR_AND_EMBEDDING_WEAKNESSES,
-            GlobalEnums.TestCategory.MISINFORMATION,
-            GlobalEnums.TestCategory.UNBOUNDED_CONSUMPTION,
-            TestCategory.AGENTIC_BUSINESS_ALIGNMENT,
-            TestCategory.AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS,
-            TestCategory.AGENTIC_SAFETY,
-            TestCategory.AGENTIC_SECURITY,
-            TestCategory.AGENTIC_SECURITY_PROMPT_INJECTION,
-            TestCategory.AGENTIC_SECURITY_AGENT_EXPLOITATION,
-            TestCategory.AGENTIC_SECURITY_INFRASTRUCTURE,
-            TestCategory.AGENTIC_SECURITY_DATA_EXPOSURE,
-            TestCategory.AGENTIC_SECURITY_CODE_EXECUTION,
-            TestCategory.AGENT_GOAL_HIJACK,
-            TestCategory.TOOL_MISUSE_AND_EXPLOITATION,
-            TestCategory.IDENTITY_AND_PRIVILEGE_ABUSE,
-            TestCategory.AGENTIC_SUPPLY_CHAIN,
-            TestCategory.UNEXPECTED_CODE_EXECUTION,
-            TestCategory.MEMORY_AND_CONTEXT_POISONING,
-            TestCategory.INSECURE_INTER_AGENT_COMMUNICATION,
-            TestCategory.CASCADING_FAILURES,
-            TestCategory.HUMAN_AGENT_TRUST_EXPLOITATION,
-            TestCategory.ROGUE_AGENTS,
-        };
+        final TestCategory[] llmCategories = Stream.concat(
+                Stream.of(
+                        GlobalEnums.TestCategory.LLM,
+                        GlobalEnums.TestCategory.PROMPT_INJECTION,
+                        GlobalEnums.TestCategory.SENSITIVE_INFORMATION_DISCLOSURE,
+                        GlobalEnums.TestCategory.SUPPLY_CHAIN,
+                        GlobalEnums.TestCategory.DATA_AND_MODEL_POISONING,
+                        GlobalEnums.TestCategory.IMPROPER_OUTPUT_HANDLING,
+                        GlobalEnums.TestCategory.EXCESSIVE_AGENCY,
+                        GlobalEnums.TestCategory.SYSTEM_PROMPT_LEAKAGE,
+                        GlobalEnums.TestCategory.VECTOR_AND_EMBEDDING_WEAKNESSES,
+                        GlobalEnums.TestCategory.MISINFORMATION,
+                        GlobalEnums.TestCategory.UNBOUNDED_CONSUMPTION,
+                        TestCategory.AGENTIC_BUSINESS_ALIGNMENT,
+                        TestCategory.AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS,
+                        TestCategory.AGENTIC_SAFETY,
+                        TestCategory.AGENTIC_SECURITY,
+                        TestCategory.AGENTIC_SECURITY_PROMPT_INJECTION,
+                        TestCategory.AGENTIC_SECURITY_AGENT_EXPLOITATION,
+                        TestCategory.AGENTIC_SECURITY_INFRASTRUCTURE,
+                        TestCategory.AGENTIC_SECURITY_DATA_EXPOSURE,
+                        TestCategory.AGENTIC_SECURITY_CODE_EXECUTION),
+                Arrays.stream(TestCategory.OWASP_AGENTIC_TOP10_PROBE_CATEGORIES))
+                .toArray(TestCategory[]::new);
 
         TestCategory[] apiAgenticCategories = {
             TestCategory.BOLA_AGENTIC,

@@ -2,6 +2,7 @@ package com.akto.dao.testing;
 
 import com.akto.dao.AccountsContextDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -15,7 +16,13 @@ import com.mongodb.client.model.Updates;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static com.akto.dto.testing.DefaultTestSuites.owaspTop10List;
 
@@ -105,16 +112,15 @@ public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> 
             mcpSecuritySuites.put(key, testSubCategories);
         }
 
-        // Add AI Agent Security suites
         Map<String, List<String>> aiAgentSecuritySuites = new HashMap<>();
-        for(Map.Entry<String, List<String>> entry : DefaultTestSuites.aiAgentSecurityList.entrySet()) {
+        for (Map.Entry<String, List<String>> entry : DefaultTestSuites.aiAgentSecurityList.entrySet()) {
             String key = entry.getKey();
             List<String> categories = entry.getValue();
 
             List<String> testSubCategories = new ArrayList<>();
 
-            for(YamlTemplate yamlTemplate : yamlTemplateList) {
-                if(categories.contains(yamlTemplate.getInfo().getCategory().getName())) {
+            for (YamlTemplate yamlTemplate : yamlTemplateList) {
+                if (categories.contains(yamlTemplate.getInfo().getCategory().getName())) {
                     testSubCategories.add(yamlTemplate.getId());
                 }
             }
@@ -122,7 +128,35 @@ public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> 
             aiAgentSecuritySuites.put(key, testSubCategories);
         }
 
-        // Add Attack Base Technique and Attack Strategy suites - dynamically derived from info.name
+        Bson owaspAgenticSingleShotCategoryFilter = Filters.in(
+                YamlTemplate.INFO_CATEGORY_NAME,
+                DefaultTestSuites.owaspAgenticSingleShotCategoryNames());
+        Bson owaspAgenticSingleShotFetchFilter = (isFirstTime || addedNewCategory)
+                ? owaspAgenticSingleShotCategoryFilter
+                : Filters.and(
+                        owaspAgenticSingleShotCategoryFilter,
+                        Filters.gt(YamlTemplate.CREATED_AT, lastUpdatedDefaultTestSuite));
+        List<YamlTemplate> owaspAgenticSingleShotTemplatesWithContent = YamlTemplateDao.instance.findAll(
+                owaspAgenticSingleShotFetchFilter,
+                Projections.include(Constants.ID, YamlTemplate.INFO, YamlTemplate.CONTENT));
+
+        Map<String, List<String>> owaspAgenticSingleShotSuites = new HashMap<>();
+        for (Map.Entry<String, List<String>> entry : DefaultTestSuites.owaspAgenticSingleShotSuiteList.entrySet()) {
+            String key = entry.getKey();
+            List<String> categories = entry.getValue();
+            List<String> testSubCategories = new ArrayList<>();
+            for (YamlTemplate yamlTemplate : owaspAgenticSingleShotTemplatesWithContent) {
+                if (!categories.contains(yamlTemplate.getInfo().getCategory().getName())) {
+                    continue;
+                }
+                if (TestConfigYamlParser.countAgenticConversationTurns(yamlTemplate.getContent()) != 1) {
+                    continue;
+                }
+                testSubCategories.add(yamlTemplate.getId());
+            }
+            owaspAgenticSingleShotSuites.put(key, testSubCategories);
+        }
+
         Set<String> agenticCategories = new HashSet<>();
         for (List<String> cats : DefaultTestSuites.aiAgentSecurityList.values()) {
             agenticCategories.addAll(cats);
@@ -158,7 +192,10 @@ public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> 
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.SEVERITY.name(), severitySuites);
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.DURATION.name(), durationTestSuites);
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.MCP_SECURITY.name(), mcpSecuritySuites);
-        defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.AI_AGENT_SECURITY.name(), aiAgentSecuritySuites);
+
+        Map<String, List<String>> mergedAiAgentSecuritySuites = new HashMap<>(aiAgentSecuritySuites);
+        mergedAiAgentSecuritySuites.putAll(owaspAgenticSingleShotSuites);
+        defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.AI_AGENT_SECURITY.name(), mergedAiAgentSecuritySuites);
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.ATTACK_BASE_TECHNIQUE.name(), attackBaseTechniqueSuites);
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.ATTACK_STRATEGY.name(), attackStrategySuites);
 
