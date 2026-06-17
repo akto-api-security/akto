@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
+import { Badge, Box, Button, Divider, HorizontalStack, Modal, Tag, Text, Tooltip, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -145,6 +145,31 @@ function SampleDetails(props) {
                         )}
                     </div>
                 ))}
+                {moreInfoData?.complianceMap && Object.keys(moreInfoData.complianceMap).length > 0 && (
+                    <>
+                        <Divider />
+                        <VerticalStack gap={"2"}>
+                            <Text variant="headingMd" fontWeight="bold">Compliance</Text>
+                            <HorizontalStack gap={"2"} wrap>
+                                {Object.entries(moreInfoData.complianceMap).flatMap(([framework, clauses], idx) => {
+                                    const clauseList = Array.isArray(clauses) && clauses.length > 0 ? clauses : [null];
+                                    return clauseList.map((clause, cIdx) => (
+                                        <Tag key={`${idx}-${cIdx}`}>
+                                            <HorizontalStack gap="1" blockAlign="center">
+                                                <Avatar
+                                                    source={func.getComplianceIcon(framework)}
+                                                    shape="square"
+                                                    size="extraSmall"
+                                                />
+                                                <Text variant="bodySm" fontWeight="medium">{clause ? framework + ' - ' + clause : framework}</Text>
+                                            </HorizontalStack>
+                                        </Tag>
+                                    ));
+                                })}
+                            </HorizontalStack>
+                        </VerticalStack>
+                    </>
+                )}
             </VerticalStack>
         </Box>
     ) : (
@@ -1014,8 +1039,8 @@ Reference URL: ${window.location.href}`.trim();
         <LayoutWithTabs
             key={`tabs-comp-${eventId || 'default'}`}
             tabs={ window.location.href.indexOf("guardrails") > -1
-                ? (showSessionContext ? [overviewTab, ValuesTab, sessionContextTab] : [overviewTab, ValuesTab])
-                : (showSessionContext ? [overviewTab, timelineTab, ValuesTab, sessionContextTab, remediationTab] : [overviewTab, timelineTab, ValuesTab, remediationTab])}
+                ? (showSessionContext ? [overviewTab, ValuesTab, sessionContextTab] : [overviewTab, ValuesTab]).filter(Boolean)
+                : (showSessionContext ? [overviewTab, timelineTab, ValuesTab, sessionContextTab, remediationTab] : [overviewTab, timelineTab, ValuesTab, remediationTab]).filter(Boolean)}
             currTab = {() => {}}
         />
     )

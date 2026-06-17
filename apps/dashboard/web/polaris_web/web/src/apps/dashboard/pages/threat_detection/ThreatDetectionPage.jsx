@@ -459,7 +459,8 @@ function ThreatDetectionPage() {
             jiraTicketUrl: data.jiraTicketUrl || '',
             severity: data.severity || '',
             sessionId: data.sessionId || '',
-            ruleViolated: data.ruleViolated || '-'
+            ruleViolated: data.ruleViolated || '-',
+            complianceMapData: data.complianceMapData || {}
         });
 
         setShowDetails(true);
@@ -475,7 +476,8 @@ function ThreatDetectionPage() {
                 templateId: data.filterId,
                 severity: data.severity || '',
                 sessionId: data.sessionId || '',
-                ruleViolated: data.ruleViolated || '-'
+                ruleViolated: data.ruleViolated || '-',
+                complianceMap: data.complianceMapData || {}
             },
             currentEventId: data.id || '',
             currentEventStatus: data.status || '',
@@ -660,7 +662,8 @@ function ThreatDetectionPage() {
               // so deep-linked opens show the actual event severity, not the template default.
               severity: rowContext?.severity || queryParams.severity || '',
               sessionId: rowContext?.sessionId || '',
-              ruleViolated: rowContext?.ruleViolated || '-'
+              ruleViolated: rowContext?.ruleViolated || '-',
+              complianceMap: rowContext?.complianceMapData || {}
             },
             currentEventId: rowContext?.eventId || '',
             currentEventStatus: queryParams.status || rowContext?.status || '',

@@ -162,13 +162,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   useEffect(() => {
     if (!needsGuardrailCompliance) return;
     api.fetchGuardrailComplianceInfos().then((resp) => {
-      console.log('[GuardrailCompliance] raw response:', resp);
       const capabilityMap = {};
       (resp?.guardrailComplianceInfos || []).forEach((entry) => {
         const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
         if (capability) capabilityMap[capability] = entry.mapComplianceToListClauses;
       });
-      console.log('[GuardrailCompliance] capabilityMap:', capabilityMap);
       setGuardrailComplianceMap(capabilityMap);
     });
   }, [label]);
@@ -563,13 +561,15 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
       const filterTemplate = threatFiltersMap[x?.filterId];
       let complianceList;
+      let complianceMapData = {};
       if (needsGuardrailCompliance) {
         const ruleViolated = extractRuleViolated(x?.metadata);
         const capability = getGuardrailCapabilityForRule(ruleViolated);
-        complianceList = Object.keys(guardrailComplianceMap[capability] || {});
-        console.log('[GuardrailCompliance] row:', x?.filterId, 'ruleViolated:', ruleViolated, 'capability:', capability, 'compliance:', complianceList, 'mapKeys:', Object.keys(guardrailComplianceMap));
+        complianceMapData = guardrailComplianceMap[capability] || {};
+        complianceList = Object.keys(complianceMapData);
       } else {
-        complianceList = Object.keys(filterTemplate?.compliance?.mapComplianceToListClauses || {});
+        complianceMapData = filterTemplate?.compliance?.mapComplianceToListClauses || {};
+        complianceList = Object.keys(complianceMapData);
       }
 
       // Determine if this is session-based by checking if sessionId is present and not empty
@@ -645,7 +645,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
             )}
           </HorizontalStack>
         ) : <Text color="subdued">-</Text>,
-        nextUrl: nextUrl
+        nextUrl: nextUrl,
+        complianceMapData: complianceMapData
       };
 
       if (func.shouldShowIpReputation()) {
