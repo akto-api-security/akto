@@ -17,6 +17,8 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import java.util.ArrayList;
+import java.util.List;
 
 import java.util.List;
 
@@ -123,7 +125,7 @@ public class FileInspectionRuleAction extends UserAction {
         try {
             FileInspectionResultDao.instance.createIndicesIfAbsent();
 
-            java.util.List<Bson> clauses = new java.util.ArrayList<>();
+            List<Bson> clauses = new ArrayList<>();
             if (StringUtils.isNotBlank(ruleId)) {
                 clauses.add(Filters.eq(FileInspectionResult.RULE_ID, ruleId));
             }

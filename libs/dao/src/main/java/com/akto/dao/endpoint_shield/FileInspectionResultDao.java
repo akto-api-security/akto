@@ -30,7 +30,7 @@ public class FileInspectionResultDao extends AccountsContextDao<FileInspectionRe
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[]{FileInspectionResult.DEVICE_ID, FileInspectionResult.EXECUTED_AT}, false);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[]{FileInspectionResult.DEVICE_ID, FileInspectionResult.RULE_ID}, true);
+                new String[]{FileInspectionResult.DEVICE_ID, FileInspectionResult.RULE_ID}, false);
     }
 
     @Override
