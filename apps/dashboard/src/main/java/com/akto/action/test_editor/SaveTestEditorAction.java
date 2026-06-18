@@ -337,11 +337,9 @@ public class SaveTestEditorAction extends UserAction {
                 apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
                 URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
 
-        if (account.getHybridTestingEnabled()) {
+        if (account.getHybridTestingEnabled() && StringUtils.isNotBlank(miniTestingName)) {
             ModuleInfo moduleInfo = ModuleInfoDao.instance.getMCollection().find(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MINI_TESTING)).sort(Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED)).limit(1).first();
             if (moduleInfo != null) {
-                String version = moduleInfo.getCurrentVersion().split(" - ")[0];
-                if (Utils.compareVersions("1.44.9", version) <= 0) {//latest version
                     TestingRunPlayground testingRunPlayground = new TestingRunPlayground();
                     testingRunPlayground.setTestTemplate(content);
                     testingRunPlayground.setState(State.SCHEDULED);
@@ -364,7 +362,6 @@ public class SaveTestEditorAction extends UserAction {
                         addActionError("Failed to create TestingRunPlayground");
                         return ERROR.toUpperCase();
                     }
-                }
             }
         }
 
