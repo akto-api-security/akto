@@ -1034,6 +1034,19 @@ function ApiEndpoints(props) {
         }
     }
 
+    function uploadGraphQLSchemaFile(file) {
+        const reader = new FileReader();
+        reader.readAsText(file);
+        reader.onload = async () => {
+            try {
+                await api.uploadGraphQLSchema(apiCollectionId, reader.result);
+                func.setToast(true, false, "GraphQL schema uploaded successfully");
+            } catch (e) {
+                func.setToast(true, true, "Failed to upload GraphQL schema: " + (e?.response?.data?.actionErrors?.[0] || e.message));
+            }
+        };
+    }
+
     function uploadOpenFileWithSource(source, file, isAiAgent = false, skipLiveReplay = false) {
         const reader = new FileReader();
         if (!file) {
@@ -1312,7 +1325,26 @@ function ApiEndpoints(props) {
                                                                 <Text>Upload OpenAPI file</Text>
                                                             </div>
                                                         )}
-                                                        primary={false} 
+                                                        primary={false}
+                                                    />
+                                                </Box>)
+                                    },
+                                    !isApiGroup && {
+                                        content: '',
+                                        prefix: (<Box width="160px">
+                                                    <UploadFile
+                                                        fileFormat=".graphql,.gql"
+                                                        fileChanged={file => { uploadGraphQLSchemaFile(file); setExportOpen(false) }}
+                                                        tooltipText="Upload GraphQL schema"
+                                                        label={(
+                                                            <div style={{ display: "flex", gap: '6px' }}>
+                                                                <Box>
+                                                                    <Icon source={FileMinor} />
+                                                                </Box>
+                                                                <Text>Upload GraphQL schema</Text>
+                                                            </div>
+                                                        )}
+                                                        primary={false}
                                                     />
                                                 </Box>)
                                     },
