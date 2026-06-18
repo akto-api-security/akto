@@ -86,6 +86,7 @@ import DataDogConnector from "./components/DataDogConnector"
 import MicrosoftDefenderConnector from "./components/MicrosoftDefenderConnector"
 import MicrosoftDefenderRunQueriesConnector from "./components/MicrosoftDefenderRunQueriesConnector"
 import SentinelOneConnector from "./components/SentinelOneConnector"
+import WizSource from "./components/WizSource"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -780,7 +781,7 @@ const impervaImportObj = {
     icon: '/public/imperva.svg',
     label: 'Imperva Import',
     text: 'Upload Imperva specification file to Akto to create an API inventory.',
-    docsUrl: 'https://docs.akto.io/traffic-connector/manual/imperva',
+    docsUrl: 'https://docs.akto.io/traffic-connector/third-party-software/imperva',
     component: <ImpervaImport/>,
     key: "IMPERVA_IMPORT"
 }
@@ -1480,6 +1481,15 @@ const arcadeImportObj = {
     />
 }
 
+const wizObj = {
+    icon: '/public/wiz_logo.svg',
+    label: 'Wiz',
+    text: 'Once you connect Wiz, Akto will periodically import your API endpoints to keep your inventory up to date.',
+    docsUrl: 'https://docs.akto.io/integrations/wiz',
+    component: <WizSource/>,
+    key: "WIZ"
+}
+
 
 const quick_start_policy_lines= [
     `{`,
@@ -2115,7 +2125,7 @@ const quickStartFunc = {
 
         // Manual
         const manual = [
-            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj, impervaImportObj, dataDogConnectorObj
+            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj
         ];
 
         // Crawler
@@ -2183,6 +2193,10 @@ const quickStartFunc = {
             jamfEndpointObj, kandjiEndpointObj, customEndpointObj
         ]
 
+        const thirdPartySoftware = [
+            wizObj, impervaImportObj, dataDogConnectorObj
+        ]
+
        if(func.checkLocal() || func.isLimitedAccount()){
            return {
                "Manual": manual
@@ -2235,6 +2249,7 @@ const quickStartFunc = {
                 "Manual": manual,
                 "Akto SDK": aktoSdk,
                 "Virtual Machines": vm,
+                "Third Party Software": thirdPartySoftware,
                 // "Source Code": sourceCode,
             }
         }
