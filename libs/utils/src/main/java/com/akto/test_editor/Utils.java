@@ -596,7 +596,7 @@ public class Utils {
                 return urlModifierPayload;
             }
             String y[] = x[1].split("}}");
-            x[1] = y[0].toString() + "\"}}";
+            x[1] = (y.length > 0 ? y[0] : "") + "\"}}";
             payload = String.join("replace_with:\"", x);
             payload = payload.replace("\\", "\\\\");
             Map<String, Object> json = gson.fromJson(payload, Map.class);
