@@ -25,4 +25,9 @@ public class AgentQueryRecord {
     private String traceId;
     private String spanId;
     private boolean isAtlasTraffic;
+
+    // Java Introspector maps JSON key "isAtlasTraffic" → setIsAtlasTraffic()
+    public void setIsAtlasTraffic(boolean isAtlasTraffic) {
+        this.isAtlasTraffic = isAtlasTraffic;
+    }
 }
