@@ -78,7 +78,7 @@ function StackedChart(props) {
                 },
                 visible: text,
                 gridLineWidth: showGridLines ? 1 : 0,
-                min: 1,
+                min: 0,
             }
         ],
         time: {
