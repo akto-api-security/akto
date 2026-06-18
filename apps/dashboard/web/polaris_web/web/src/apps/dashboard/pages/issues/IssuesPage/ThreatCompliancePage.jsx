@@ -13,8 +13,7 @@ import values from "@/util/values";
 import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import threatDetectionApi from "../../threat_detection/api.js"
 import SessionStore from "../../../../main/SessionStore"
-import { getGuardrailCapabilityForRule } from "../../threat_detection/constants/guardrailRuleDefinitions"
-import { extractRuleViolated } from "../../threat_detection/utils/formatUtils"
+import { resolveComplianceClauseMap } from "../../threat_detection/utils/formatUtils"
 import ShowListInBadge from "../../../components/shared/ShowListInBadge";
 import { CellType } from "../../../components/tables/rows/GithubRow.js";
 import SampleDetails from "../../threat_detection/components/SampleDetails";
@@ -455,8 +454,7 @@ function ThreatCompliancePage() {
             setCurrentAppliedFilters(appliedFilters);
 
             const sort = sortKey && sortOrder ? { [sortKey]: sortOrder === -1 ? 1 : -1 } : {};
-            // Guardrail events (Agentic/Endpoint) are never successfulExploit=true — pass undefined
-            // so the backend returns all events regardless of exploit status
+            
             const successfulBool = needsGuardrailCompliance ? undefined : true;
 
             const res = await threatDetectionApi.fetchSuspectSampleData(
@@ -484,18 +482,10 @@ function ThreatCompliancePage() {
             (res?.maliciousEvents || []).forEach(item => {
                 const threatPolicy = threatFiltersMap[item?.filterId];
 
-                // For Agentic/Endpoint, compliance lives in guardrailComplianceMap keyed by capability.
-                // filterId IS the capability name (e.g. "banCodeDetection").
-                // For API Security, compliance is on the threat filter template.
-                let complianceData;
-                if (needsGuardrailCompliance) {
-                    const ruleViolated = extractRuleViolated(item?.metadata);
-                    const capability = getGuardrailCapabilityForRule(ruleViolated);
-                    complianceData = guardrailComplianceMap[capability] || {};
-                } else {
-                    if (!threatPolicy) return;
-                    complianceData = threatPolicy?.compliance?.mapComplianceToListClauses || {};
-                }
+                // Guardrail (Agentic/Endpoint): compliance keyed by capability derived from
+                // metadata.rule_violated. API Security: compliance on the threat filter template.
+                if (!needsGuardrailCompliance && !threatPolicy) return;
+                const complianceData = resolveComplianceClauseMap(item, needsGuardrailCompliance, threatFiltersMap, guardrailComplianceMap);
                 const availableCompliances = Object.keys(complianceData);
 
                 // If filter-bar compliance selections are active, use them (multi-select OR match).
