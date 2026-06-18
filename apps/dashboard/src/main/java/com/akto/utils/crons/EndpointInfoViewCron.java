@@ -23,7 +23,7 @@ public class EndpointInfoViewCron {
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private static final LoggerMaker logger = new LoggerMaker(EndpointInfoViewCron.class, LoggerMaker.LogDb.DASHBOARD);
-    private static final int ACTIVE_THRESHOLD = 30 * 60;
+    private static final int ACTIVE_THRESHOLD = 10 * 60;
     private static final int INACTIVE_THRESHOLD = 24 * 60 * 60;
     private static final int ACTIVITY_LOOKBACK = 3 * 24 * 60 * 60;
     private static final int STI_FULL_REBUILD_INTERVAL = 24 * 60 * 60;

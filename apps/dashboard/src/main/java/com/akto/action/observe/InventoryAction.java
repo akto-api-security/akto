@@ -107,29 +107,29 @@ public class InventoryAction extends UserAction {
     long newCount = 0;
     long oldCount = 0;
     public String fetchEndpointsCount() {
+        long startTime = System.currentTimeMillis();
+
         if (endTimestamp == 0) endTimestamp = Context.now();
 
-        if (AccountSettingsDao.isEndpointInfoViewEnabled()) {
-            long t = System.currentTimeMillis();
-            Bson filter = Filters.empty();
-            ApiStats endStats = EndpointInfoViewDao.instance.buildApiStatsForEndpointCount(filter, endTimestamp);
-            if (endStats.getTotalAPIs() > 0) {
-                newCount = endStats.getTotalAPIs();
-                ApiStats startStats = EndpointInfoViewDao.instance.buildApiStatsForEndpointCount(filter, startTimestamp);
-                oldCount = startStats.getTotalAPIs();
-                loggerMaker.infoAndAddToDb("[fetchEndpointsCount] view query took " + (System.currentTimeMillis() - t) + "ms, newCount=" + newCount + ", oldCount=" + oldCount);
-                return SUCCESS.toUpperCase();
-            }
-        }
-
-        Set<Integer> demoCollections = new HashSet<>(deactivatedCollections);
+        Set<Integer> demoCollections = new HashSet<>();
+        demoCollections.addAll(deactivatedCollections);
         demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
         demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+
         ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
         if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
 
+        long beforeNewCount = System.currentTimeMillis();
         newCount = SingleTypeInfoDao.instance.fetchEndpointsCount(0, endTimestamp, demoCollections);
+        long newCountTime = System.currentTimeMillis() - beforeNewCount;
+
+        long beforeOldCount = System.currentTimeMillis();
         oldCount = SingleTypeInfoDao.instance.fetchEndpointsCount(0, startTimestamp, demoCollections);
+        long oldCountTime = System.currentTimeMillis() - beforeOldCount;
+
+        long totalTime = System.currentTimeMillis() - startTime;
+        loggerMaker.warnAndAddToDb("fetchEndpointsCount: totalTime=" + totalTime + "ms (newCount=" + newCountTime + "ms, oldCount=" + oldCountTime + "ms), results: newCount=" + newCount + ", oldCount=" + oldCount, LogDb.DASHBOARD);
+
         return SUCCESS.toUpperCase();
     }
 
