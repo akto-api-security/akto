@@ -78,6 +78,7 @@ function ThreatCompliancePage() {
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
     const setThreatFiltersMap = SessionStore((state) => state.setThreatFiltersMap);
     const guardrailComplianceMap = SessionStore((state) => state.guardrailComplianceMap);
+    const setGuardrailComplianceMap = SessionStore((state) => state.setGuardrailComplianceMap);
     const needsGuardrailCompliance = isAgenticSecurityCategory() || isEndpointSecurityCategory();
 
     const { tabsInfo, selectItems } = useTable();
@@ -122,23 +123,18 @@ function ThreatCompliancePage() {
                     });
                 }
 
-                // Agentic/Endpoint Security: guardrails/{filterId}.conf
+                // Agentic/Endpoint Security: guardrails/{capability}.conf
                 if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
                     const guardrailComplianceResp = await threatDetectionApi.fetchGuardrailComplianceInfos();
                     if (guardrailComplianceResp?.guardrailComplianceInfos && Array.isArray(guardrailComplianceResp.guardrailComplianceInfos)) {
-                        const guardrailComplianceMap = {};
-                        guardrailComplianceResp.guardrailComplianceInfos.forEach((compliance) => {
-                            guardrailComplianceMap[compliance._id] = compliance;
+                        // Key by capability name (strip "guardrails/" prefix and ".conf" suffix)
+                        // so resolveComplianceClauseMap can look up by capability directly
+                        const capabilityKeyedMap = {};
+                        guardrailComplianceResp.guardrailComplianceInfos.forEach((entry) => {
+                            const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
+                            if (capability) capabilityKeyedMap[capability] = entry.mapComplianceToListClauses;
                         });
-                        Object.keys(updatedThreatFiltersMap).forEach((filterId) => {
-                            const compliance = guardrailComplianceMap[`guardrails/${filterId}.conf`];
-                            if (compliance) {
-                                updatedThreatFiltersMap[filterId] = {
-                                    ...updatedThreatFiltersMap[filterId],
-                                    compliance: { mapComplianceToListClauses: compliance.mapComplianceToListClauses }
-                                };
-                            }
-                        });
+                        setGuardrailComplianceMap(capabilityKeyedMap);
                     }
                 }
 
@@ -151,7 +147,7 @@ function ThreatCompliancePage() {
         };
 
         fetchThreatFiltersData();
-    }, []);
+    }, [setThreatFiltersMap, setGuardrailComplianceMap]);
 
     const resetResourcesSelected = () => {
         TableStore.getState().setSelectedItems([])
