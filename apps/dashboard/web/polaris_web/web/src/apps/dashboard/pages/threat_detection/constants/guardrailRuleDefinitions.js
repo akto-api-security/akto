@@ -79,7 +79,6 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── Denied Topics / BanTopics ─────────────────────────────────────────────
     {
         prefixes: ["BanTopics", "deniedTopics", "denied_topic"],
-        capability: "deniedTopics",
         heading: "Denied Topic Accessed",
         overview: [
             {
@@ -165,7 +164,6 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── Custom Regex ──────────────────────────────────────────────────────────
     {
         prefixes: ["UserDefinedRegex", "regex"],
-        capability: "regexPatterns",
         heading: "Custom Regex Pattern Match",
         overview: [
             {
@@ -251,7 +249,6 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── Intent Analysis / Base Prompt ─────────────────────────────────────────
     {
         prefixes: ["IntentAnalysis", "BasePrompt", "base_prompt", "intent"],
-        capability: "basePromptRule",
         heading: "Intent Mismatch - Agent Purpose Violated",
         overview: [
             {
@@ -353,7 +350,6 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── Code Detection ────────────────────────────────────────────────────────
     {
         prefixes: ["BanCode", "Code", "ban_code", "code_detection"],
-        capability: "code",
         heading: "Code Detected in Payload",
         overview: [
             {
@@ -381,7 +377,6 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── LLM Rule / Custom URL Rule ────────────────────────────────────────────
     {
         prefixes: ["UserDefinedLLMRule", "CustomURLRule", "LLMRule"],
-        capability: "llmRule",
         heading: "Custom Business Rule Violation",
         overview: [
             {
@@ -410,7 +405,6 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── Token Limit ───────────────────────────────────────────────────────────
     {
         prefixes: ["tokenLimit", "TokenLimit", "token_limit"],
-        capability: "tokenLimitDetection",
         heading: "Token Limit Exceeded",
         overview: [
             {
@@ -563,7 +557,6 @@ Identify the specific rule from the \`ruleViolated\` field:
     // ─── Personal Account ──────────────────────────────────────────────────────
     {
         prefixes: ["block_personal_account", "personal_account"],
-        capability: "blockPersonalAccounts",
         templateIdPrefixes: ["block-personal-account"],
         heading: "Personal Account Usage Blocked",
         overview: [
