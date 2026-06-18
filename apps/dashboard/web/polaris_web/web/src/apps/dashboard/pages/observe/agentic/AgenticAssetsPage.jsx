@@ -168,6 +168,7 @@ function TableSection({
   flyout,
   setFlyout,
   collections,
+  agenticViolationRows,
   startTimestamp,
   endTimestamp,
 }) {
@@ -282,6 +283,7 @@ function TableSection({
         agenticFlatData={agenticFlatData}
         assetDevices={assetDevices}
         collections={collections}
+        agenticViolationRows={agenticViolationRows}
         startTimestamp={startTimestamp}
         endTimestamp={endTimestamp}
       />
@@ -722,6 +724,7 @@ export default function AgenticAssetsPage() {
           flyout={flyout}
           setFlyout={setFlyout}
           collections={collections}
+          agenticViolationRows={agenticViolationRows}
           startTimestamp={startTimestamp}
           endTimestamp={endTimestamp}
         />,

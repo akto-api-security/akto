@@ -65,6 +65,7 @@ import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.request.oauth.OAuthV2AccessRequest;
 import com.slack.api.methods.request.users.UsersIdentityRequest;
 import com.slack.api.methods.response.oauth.OAuthV2AccessResponse;
+import com.akto.utils.TestTemplateUtils;
 import com.slack.api.methods.response.users.UsersIdentityResponse;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
@@ -75,6 +76,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.interfaces.RSAPublicKey;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
@@ -86,6 +89,7 @@ import org.json.JSONObject;
 public class SignupAction implements Action, ServletResponseAware, ServletRequestAware {
 
     private static final LoggerMaker logger = new LoggerMaker(SignupAction.class, LogDb.DASHBOARD);
+    private static final ExecutorService service = Executors.newFixedThreadPool(1);
     public static final String CHECK_INBOX_URI = "/check-inbox";
     public static final String BUSINESS_EMAIL_URI = "/business-email";
     public static final String TEST_EDITOR_URL = "/tools/test-editor";
@@ -1467,6 +1471,20 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     logger.info("[createUserAndRedirect] Set session accountId to: " + accountId);
                 }
                 }
+                // To be reverted once cron is added
+                final User finalUser = user;
+                service.submit(() -> {
+                    try {
+                        for (String accountIdStr : finalUser.getAccounts().keySet()) {
+                            Context.accountId.set(Integer.parseInt(accountIdStr));
+                        }
+                        logger.debug("updating guardrail compliance info for account " + Context.accountId.get());
+                        InitializerListener.processGuardrailComplianceInfosFromZip(TestTemplateUtils.getTestingTemplates());
+                        logger.debug("Finished updating guardrail compliance info for account " + Context.accountId.get());
+                    } catch (Exception e) {
+                        logger.error("Error while updating guardrail compliance info for account " + Context.accountId.get(), e);
+                    }
+                });
                 logger.info("[createUserAndRedirect] Logging in existing user and redirecting to /dashboard/observe/inventory");
                 LoginAction.loginUser(user, servletResponse, true, servletRequest, signupInfo);
                 servletResponse.sendRedirect("/dashboard/observe/inventory");

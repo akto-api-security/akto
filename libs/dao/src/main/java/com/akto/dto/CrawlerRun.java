@@ -81,6 +81,17 @@ public class CrawlerRun {
     public static final String ENABLE_AI_JS_DISCOVERY = "enableAiJsDiscovery";
     private boolean enableAiJsDiscovery;
 
+    public static final String USER_PROMPT = "userPrompt";
+    private String userPrompt;
+
+    public static final String CRAWL_MODE = "crawlMode";
+    private String crawlMode;
+
+    // Mermaid flowchart source of the page-to-page navigation graph, uploaded by
+    // the crawler when the crawl finishes (POST /api/uploadCrawlerGraph).
+    public static final String NAVIGATION_GRAPH = "navigationGraph";
+    private String navigationGraph;
+
     public CrawlerRun() {
     }
 
@@ -109,6 +120,7 @@ public class CrawlerRun {
                 ", outScopeUrls=" + outScopeUrls +
                 ", status='" + status.name() + '\'' +
                 ", moduleName='" + moduleName + '\'' +
+                ", userPrompt='" + userPrompt + '\'' +
                 ", runTestAfterCrawling='" + runTestAfterCrawling + '\'' +
                 '}';
     }

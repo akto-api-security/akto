@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import HeadingWithTooltip from '../../../components/shared/HeadingWithTooltip';
 import TooltipText from '../../../components/shared/TooltipText';
 import { FILTER_TYPES } from './useAgenticFilter';
-import { getAgenticCategoryLabel, hasPersonalAccountTag, hasLocalMcpServerTag, CLIENT_TYPES } from '../agentic/mcpClientHelper';
+import { getAgenticCategoryLabel, hasPersonalAccountTag, hasLocalMcpServerTag, hasMisconfiguredConfigTag, CLIENT_TYPES } from '../agentic/mcpClientHelper';
 import PersistStore from '../../../../main/PersistStore';
 
 /** IndexTable adds a leading selection column when `selectable` is true (see AgentEndpointTreeTable). */
@@ -187,6 +187,7 @@ const groupByEndpointId = (collections) => {
                 username: '-',
                 hasPersonalAccount: false,
                 hasLocalMcpServer: false,
+                hasMisconfiguredConfig: false,
             };
         }
         groups[endpointId].children.push(collection);
@@ -200,6 +201,9 @@ const groupByEndpointId = (collections) => {
         }
         if (hasLocalMcpServerTag(collection.envTypeOriginal)) {
             groups[endpointId].hasLocalMcpServer = true;
+        }
+        if (hasMisconfiguredConfigTag(collection.envTypeOriginal)) {
+            groups[endpointId].hasMisconfiguredConfig = true;
         }
         
         // Merge values
@@ -249,6 +253,7 @@ const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expand
     return groupedData.map(group => {
         const childCount = countAgenticAssets(group.children, showCategoryColumn);
         const riskScore = group.riskScore || 0;
+        const hasMisconfiguredConfig = group.hasMisconfiguredConfig || false;
 
         return {
             ...group,
@@ -265,6 +270,7 @@ const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expand
                     <Badge size="small" status="new">{childCount}</Badge>
                     {group.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
                     {group.hasLocalMcpServer && <Badge size="small" status="critical">Local MCP Server</Badge>}
+                    {hasMisconfiguredConfig && <Badge size="small" status="attention">Misconfigured</Badge>}
                 </HorizontalStack>
             ),
             username: group.username || '-',
@@ -282,6 +288,9 @@ const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expand
                     filterType={filterType}
                     showCategoryColumn={showCategoryColumn}
                     expandedColSpan={expandedColSpan}
+                    misconfiguredCollectionId={hasMisconfiguredConfig
+                        ? (group.children.find(c => hasMisconfiguredConfigTag(c.envTypeOriginal))?.id || null)
+                        : null}
                 />
             ),
         };
@@ -291,7 +300,7 @@ const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expand
 /**
  * Children table component for expanded rows
  */
-const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSpan }) => {
+const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSpan, misconfiguredCollectionId }) => {
     const navigate = useNavigate();
     const childHeaders = getChildHeaders(filterType, showCategoryColumn);
     const columnConfig = getChildColumnConfig(filterType);
@@ -299,15 +308,51 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
         const cached = PersistStore.getState().skillRiskScoreCache;
         return new Set((cached?.maliciousSkills || []).map(s => String(s).toLowerCase()));
     }, []);
-    
+
+    // Config endpoints (/claude/config/*) and skill endpoints (/skills/*) coexist in one collection.
+    // Scope the inventory view so the config row shows only config endpoints and a skill-bearing
+    // row shows only its skills, instead of mixing both.
     const handleChildClick = useCallback((collection) => {
+        const childCategory = getAgenticCategoryLabel(collection);
+        const bundlesSkills = (childCategory === CLIENT_TYPES.AI_AGENT || childCategory === CLIENT_TYPES.MCP_SERVER)
+            && Array.isArray(collection?.skills) && collection.skills.length > 0;
+        const scope = bundlesSkills ? '?agentic_view=skills' : '';
         if (collection?.nextUrl) {
-            navigate(collection.nextUrl);
+            navigate(`${collection.nextUrl}${scope}`);
         } else if (collection?.id) {
-            navigate(`/dashboard/observe/inventory/${collection.id}`);
+            navigate(`/dashboard/observe/inventory/${collection.id}${scope}`);
         }
     }, [navigate]);
-    
+
+    const handleConfigClick = useCallback(() => {
+        if (!misconfiguredCollectionId) return;
+        navigate(`/dashboard/observe/inventory/${misconfiguredCollectionId}?agentic_view=config`);
+    }, [navigate, misconfiguredCollectionId]);
+
+    const configRow = useMemo(() => {
+        if (!misconfiguredCollectionId) return null;
+        const cells = [
+            <div key="spacer-config" style={{ width: '32px', minWidth: '32px' }} />
+        ];
+        childHeaders.forEach((header, idx) => {
+            if (header.value === 'displayNameComp') {
+                cells.push(
+                    <div key="name-config" style={{ cursor: 'pointer', width: header.boxWidth }} onClick={handleConfigClick}>
+                        <HorizontalStack gap="1" align="start" wrap={false}>
+                            <Text variant="bodyMd" as="span">config</Text>
+                            <Badge size="small" status="attention">Misconfigured</Badge>
+                        </HorizontalStack>
+                    </div>
+                );
+            } else {
+                cells.push(
+                    <div key={`config-empty-${idx}`} style={{ cursor: 'pointer', width: header.boxWidth }} onClick={handleConfigClick} />
+                );
+            }
+        });
+        return cells;
+    }, [misconfiguredCollectionId, childHeaders, handleConfigClick]);
+
     const rows = useMemo(() => {
         return children.map(child => {
             const childRiskScore = child.riskScore || 0;
@@ -387,7 +432,7 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
         <td colSpan={expandedColSpan} style={{ padding: '0px !important' }} className="control-row">
             <Box width="100%">
                 <DataTable
-                    rows={rows}
+                    rows={configRow ? [configRow, ...rows] : rows}
                     hasZebraStripingOnData
                     headings={[]}
                     columnContentTypes={columnContentTypes}

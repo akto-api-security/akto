@@ -40,7 +40,7 @@ function MessagePreview({ span }) {
     const ts = Math.floor((span.timestamp || 0) / 1000);
     const kind = classifySpan(span);
     return (
-        <Box padding="3" background="bg-subdued" borderRadius="2" borderWidth="1" borderColor="border-subdued">
+        <Box background="bg-subdued" borderRadius="2" borderWidth="1" borderColor="border-subdued" padding="2">
             <VerticalStack gap="1">
                 <HorizontalStack gap="2" blockAlign="center">
                     <Badge>{SPAN_TYPE_LABEL[kind] || "Span"}</Badge>

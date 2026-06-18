@@ -4,6 +4,7 @@ import { Badge, Box, HorizontalStack, Text, Tooltip } from "@shopify/polaris";
 import McpRedIcon from "@/assets/McpRedIcon.svg";
 import PersonLockIcon from "@/assets/PersonLockIcon.svg";
 import MaliciousSkillIcon from "@/assets/MaliciousSkill.svg";
+import MisconfiguredConfigIcon from "@/assets/MisconfiguredConfigIcon.svg";
 import observeFunc from "../transform";
 import { getRiskStatus } from "./agenticPageBuilders";
 import AssetIcon from "./AssetIcon";
@@ -87,6 +88,7 @@ export function AssetNameCellRenderer({ data }) {
     const showLocalMcp = data.hasLocalMcpServer && !isSkill;
     const showPersonal = data.hasPersonalAccount && !isSkill;
     const showMalicious = data.isMalicious && isSkill;
+    const showMisconfigured = data.hasMisconfiguredConfig && !isSkill;
     return (
         <HorizontalStack gap="2" blockAlign="center" wrap={false}>
             <AssetIcon type={data.type} assetTagValue={data.assetTagValue} size={24} />
@@ -95,6 +97,7 @@ export function AssetNameCellRenderer({ data }) {
             </Box>
             {showLocalMcp && <MarkerIcon src={McpRedIcon} label="Local MCP Server" size={24} />}
             {showPersonal && <MarkerIcon src={PersonLockIcon} label="Contains personal account" size={24} />}
+            {showMisconfigured && <MarkerIcon src={MisconfiguredConfigIcon} label="Misconfigured config" size={24} />}
             {showMalicious && <MarkerIcon src={MaliciousSkillIcon} label="Malicious skill" size={24} />}
         </HorizontalStack>
     );
