@@ -58,7 +58,8 @@ export const transformPolicyForBackend = (policyData) => {
     return {
         ...policyData,
         piiTypes: policyData.piiFilters || [],
-        contentFiltering: policyData.contentFilters || {}
+        contentFiltering: policyData.contentFilters || {},
+        deniedTopics: (policyData.deniedTopics || []).map(({ fromCatalog, ...rest }) => rest)
     };
 };
 

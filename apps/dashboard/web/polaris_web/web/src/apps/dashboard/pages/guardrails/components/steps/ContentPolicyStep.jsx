@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
     VerticalStack,
     Text,
@@ -16,6 +16,7 @@ import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
 import func from "@/util/func";
+import DropdownSearch from "../../../../components/shared/DropdownSearch";
 
 export const ContentPolicyConfig = {
     number: 2,
@@ -59,7 +60,9 @@ const ContentPolicyStep = ({
     enableBasePromptRule,
     setEnableBasePromptRule,
     basePromptConfidenceScore,
-    setBasePromptConfidenceScore
+    setBasePromptConfidenceScore,
+    // Catalog
+    guardrailTopicsCatalog
 }) => {
     // Denied topics state
     const [editingIndex, setEditingIndex] = useState(null);
@@ -69,12 +72,18 @@ const ContentPolicyStep = ({
         samplePhrases: []
     });
     const [newPhraseInput, setNewPhraseInput] = useState("");
+    const topicsListRef = useRef(null);
 
     // Denied topics functions
     const startAdding = () => {
         setEditingIndex(deniedTopics.length);
         setEditFormData({ topic: "", description: "", samplePhrases: [] });
         setNewPhraseInput("");
+        setTimeout(() => {
+            if (topicsListRef.current) {
+                topicsListRef.current.scrollTop = topicsListRef.current.scrollHeight;
+            }
+        }, 0);
     };
 
     const startEditing = (index) => {
@@ -162,32 +171,33 @@ const ContentPolicyStep = ({
         }
     };
 
-    const renderViewRow = (topic, index) => (
-        <Box key={index} padding="4" borderColor="border" borderWidth="025" borderRadius="2">
+    const renderViewRow = (topic, index) => {
+        const isFromCatalog = topic.fromCatalog === true;
+        return (
+        <Box key={index} padding="4" borderColor="border" borderWidth="1" borderRadius="2">
             <HorizontalStack align="space-between" blockAlign="start">
                 <Box style={{ flex: 1 }}>
                     <VerticalStack gap="2">
                         <Text variant="headingSm" fontWeight="semibold">{topic.topic}</Text>
                         <Text variant="bodyMd" tone="subdued">{topic.description}</Text>
-                        {topic.samplePhrases.length > 0 && (
-                            <HorizontalStack gap="1">
-                                <Text variant="bodySm" tone="subdued">
-                                    {topic.samplePhrases.length} sample phrase{topic.samplePhrases.length !== 1 ? 's' : ''}
-                                </Text>
-                            </HorizontalStack>
+                        {!isFromCatalog && topic.samplePhrases.length > 0 && (
+                            <Text variant="bodySm" tone="subdued">
+                                {topic.samplePhrases.length} sample phrase{topic.samplePhrases.length !== 1 ? 's' : ''}
+                            </Text>
                         )}
                     </VerticalStack>
                 </Box>
                 <HorizontalStack gap="2">
-                    <Button icon={EditMinor} onClick={() => startEditing(index)} accessibilityLabel="Edit topic" />
+                    {!isFromCatalog && <Button icon={EditMinor} onClick={() => startEditing(index)} accessibilityLabel="Edit topic" />}
                     <Button icon={DeleteMinor} onClick={() => deleteRow(index)} tone="critical" accessibilityLabel="Delete topic" />
                 </HorizontalStack>
             </HorizontalStack>
         </Box>
-    );
+        );
+    };
 
     const renderEditRow = (isNew) => (
-        <Box key={isNew ? "new" : editingIndex} padding="4" borderColor="border" borderWidth="025" borderRadius="2" background="bg-surface-secondary">
+        <Box key={isNew ? "new" : editingIndex} padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface-secondary">
             <VerticalStack gap="4">
                 <TextField
                     label="Name"
@@ -312,13 +322,45 @@ const ContentPolicyStep = ({
                     {enableDeniedTopics && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
-                                {deniedTopics.map((topic, index) => {
-                                    if (editingIndex === index) return renderEditRow(false);
-                                    return renderViewRow(topic, index);
-                                })}
-                                {editingIndex === deniedTopics.length && renderEditRow(true)}
+                                {Object.keys(guardrailTopicsCatalog || {}).length > 0 && (
+                                    <div style={{ maxWidth: '400px' }}>
+                                        <DropdownSearch
+                                            label="Add from catalog"
+                                            placeholder="Search topics (e.g. Weapons, Malware)"
+                                            optionsList={Object.values(guardrailTopicsCatalog).map(t => ({
+                                                label: t.topic,
+                                                value: t.topic,
+                                                description: t.category
+                                            }))}
+                                            setSelected={(selectedValues) => {
+                                                const selected = selectedValues || [];
+                                                const manual = deniedTopics.filter(d => !d.fromCatalog);
+                                                const fromCatalog = selected.map(v => {
+                                                    const existing = deniedTopics.find(d => d.topic === v);
+                                                    if (existing) return { ...existing, fromCatalog: true };
+                                                    const src = guardrailTopicsCatalog[v];
+                                                    return { topic: src.topic, description: src.description, samplePhrases: src.samplePhrases || [], fromCatalog: true };
+                                                });
+                                                setDeniedTopics([...manual, ...fromCatalog]);
+                                            }}
+                                            preSelected={deniedTopics.filter(d => d.fromCatalog).map(d => d.topic)}
+                                            allowMultiple={true}
+                                            itemName="topic"
+                                            searchDisable={false}
+                                        />
+                                    </div>
+                                )}
+                                <div ref={topicsListRef} style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                    <VerticalStack gap="3">
+                                        {deniedTopics.map((topic, index) => {
+                                            if (editingIndex === index) return renderEditRow(false);
+                                            return renderViewRow(topic, index);
+                                        })}
+                                        {editingIndex === deniedTopics.length && renderEditRow(true)}
+                                    </VerticalStack>
+                                </div>
                                 {editingIndex === null && (
-                                    <Button icon={PlusMinor} onClick={startAdding} fullWidth textAlign="left">Add denied topic</Button>
+                                    <Button icon={PlusMinor} onClick={startAdding} fullWidth textAlign="left">Add custom topic</Button>
                                 )}
                             </VerticalStack>
                         </Box>

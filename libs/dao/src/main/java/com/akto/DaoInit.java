@@ -556,6 +556,7 @@ public class DaoInit {
         NhiViolationDao.instance.createIndicesIfAbsent();
         McpReconRequestDao.instance.createIndicesIfAbsent();
         GuardrailPoliciesDao.instance.createIndicesIfAbsent();
+        GuardrailTopicsDao.instance.createIndices();
         McpAllowlistDao.instance.createIndicesIfAbsent();
         McpRegistryConfigDao.instance.createIndicesIfAbsent();
         HistoricalDataDao.instance.createIndicesIfAbsent();
