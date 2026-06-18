@@ -62,7 +62,7 @@ public class ModifyHeaderRegexReplaceTest {
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("(dev|prod|prd)-api\\.", "qa-api."),
-                new HashMap<>(), dummyApiInfoKey());
+                new HashMap<>(), dummyApiInfoKey(), false);
 
         assertEquals("catalog.qa-api.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
@@ -74,7 +74,7 @@ public class ModifyHeaderRegexReplaceTest {
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("(dev|prod|prd)-api\\.", "qa-api."),
-                new HashMap<>(), dummyApiInfoKey());
+                new HashMap<>(), dummyApiInfoKey(), false);
 
         assertEquals("inventory.qa-api.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
@@ -86,7 +86,7 @@ public class ModifyHeaderRegexReplaceTest {
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("(dev|prod|prd)-api\\.", "qa-api."),
-                new HashMap<>(), dummyApiInfoKey());
+                new HashMap<>(), dummyApiInfoKey(), false);
 
         assertEquals("orders.qa-api.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
@@ -98,7 +98,7 @@ public class ModifyHeaderRegexReplaceTest {
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("(dev|prod|prd)-api\\.", "qa-api."),
-                new HashMap<>(), dummyApiInfoKey());
+                new HashMap<>(), dummyApiInfoKey(), false);
 
         assertEquals("auth.spiqa-api.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
@@ -112,7 +112,7 @@ public class ModifyHeaderRegexReplaceTest {
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("-(dev|prd|prod)([.-])", "-qa$2"),
-                new HashMap<>(), dummyApiInfoKey());
+                new HashMap<>(), dummyApiInfoKey(), false);
 
         assertEquals("api-qa.internal.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
@@ -124,7 +124,7 @@ public class ModifyHeaderRegexReplaceTest {
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("-(dev|prd|prod)([.-])", "-qa$2"),
-                new HashMap<>(), dummyApiInfoKey());
+                new HashMap<>(), dummyApiInfoKey(), false);
 
         assertEquals("app.search-qa.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
@@ -136,7 +136,7 @@ public class ModifyHeaderRegexReplaceTest {
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("-(dev|prd|prod)([.-])", "-qa$2"),
-                new HashMap<>(), dummyApiInfoKey());
+                new HashMap<>(), dummyApiInfoKey(), false);
 
         assertEquals("worker-qa-us-west-2.internal.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
@@ -150,7 +150,7 @@ public class ModifyHeaderRegexReplaceTest {
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("(dev|prod|prd)-api\\.", "qa-api."),
-                new HashMap<>(), dummyApiInfoKey());
+                new HashMap<>(), dummyApiInfoKey(), false);
 
         assertEquals("catalog.qa-api.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
@@ -162,7 +162,7 @@ public class ModifyHeaderRegexReplaceTest {
 
         ExecutorSingleOperationResp resp = Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("(dev|prod|prd)-api\\.", "qa-api."),
-                new HashMap<>(), dummyApiInfoKey());
+                new HashMap<>(), dummyApiInfoKey(), false);
 
         assertTrue(resp.getErrMsg().contains("header key not present"));
     }
@@ -173,7 +173,7 @@ public class ModifyHeaderRegexReplaceTest {
                 makeHeaders("host", "old.example.com"));
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host", "new.example.com",
-                new HashMap<>(), dummyApiInfoKey());
+                new HashMap<>(), dummyApiInfoKey(), false);
 
         assertEquals("new.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
@@ -185,7 +185,7 @@ public class ModifyHeaderRegexReplaceTest {
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "x-forwarded-host",
                 buildRegexReplace("(dev|prod|prd)-api\\.", "qa-api."),
-                new HashMap<>(), dummyApiInfoKey());
+                new HashMap<>(), dummyApiInfoKey(), false);
 
         assertEquals("service.qa-api.example.com", rawApi.fetchReqHeaders().get("x-forwarded-host").get(0));
     }
