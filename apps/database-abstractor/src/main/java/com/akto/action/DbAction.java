@@ -108,6 +108,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import com.akto.dto.nhi_governance.NhiIdentity;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -6430,5 +6431,55 @@ public class DbAction extends ActionSupport {
             }
         }
         return null;
+    }
+
+    @Getter @Setter
+    private NhiIdentity nhiIdentity;
+
+    @Getter @Setter
+    private List<NhiIdentity> nhiIdentities;
+
+    @Getter @Setter
+    private int nhiUpsertedCount;
+
+    public String upsertNhiIdentity() {
+        try {
+            if (nhiIdentity == null) {
+                addActionError("nhiIdentity is required");
+                return Action.ERROR.toUpperCase();
+            }
+            DbLayer.upsertNhiIdentity(nhiIdentity);
+            nhiUpsertedCount = 1;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in upsertNhiIdentity: " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String upsertNhiIdentities() {
+        if (nhiIdentities == null || nhiIdentities.isEmpty()) {
+            addActionError("nhiIdentities is required");
+            return Action.ERROR.toUpperCase();
+        }
+        // Per-record try/catch: one malformed identity must not fail the whole
+        // batch. The scanner sends ~5-30 records per device per scan; losing
+        // the batch means losing a whole device's data until the next tick.
+        int ok = 0;
+        int failed = 0;
+        for (NhiIdentity i : nhiIdentities) {
+            try {
+                DbLayer.upsertNhiIdentity(i);
+                ok++;
+            } catch (Exception inner) {
+                failed++;
+                loggerMaker.errorAndAddToDb(inner, "upsertNhiIdentities: one record failed (continuing): " + inner.toString());
+            }
+        }
+        nhiUpsertedCount = ok;
+        if (failed > 0) {
+            loggerMaker.errorAndAddToDb("upsertNhiIdentities: " + failed + "/" + nhiIdentities.size() + " records failed");
+        }
+        return Action.SUCCESS.toUpperCase();
     }
 }

@@ -10,29 +10,53 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.blob.AzureBlobClient;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.ActionSupport;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.regex.Pattern;
 
 /**
  * Endpoints called by the akto-endpoint-shield agent. Account context is set
  * by AuthFilter from the JWT, so each agent only sees its own account's data.
+ *
+ * Also hosts the small control-plane endpoints used by sibling services
+ * (e.g. guardrails-service) to:
+ *   - seed file-inspection rules     ({@link #addFileInspectionRule()})
+ *   - pull recent results            ({@link #fetchFileInspectionResults()})
+ *   - re-read a previously uploaded  ({@link #getFileContent()})
+ *     file's content from blob storage
  */
 public class FileInspectionAction extends ActionSupport {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(FileInspectionAction.class, LogDb.DB_ABS);
     private static final Pattern SHA256_RE = Pattern.compile("^[a-f0-9]{64}$");
-    private static final long MAX_BLOB_BYTES = 50L * 1024 * 1024;
+    private static final int MAX_PATH_LENGTH = 1024;
+    private static final int RESULTS_PAGE_MAX = 500;
 
     @Setter private long updatedAfter;
     @Setter private FileInspectionResult result;
 
+    @Setter private String path;
+    @Setter private boolean existenceOnly;
+    @Setter private int maxDepth;
+    @Setter private String addedBy;
+
+    @Setter private long sinceExecutedAt;
+    @Setter private int limit;
+
+    @Setter private String sha256;
+
     @Getter private List<FileInspectionRule> rules;
+    @Getter private FileInspectionRule rule;
+    @Getter private List<FileInspectionResult> results;
+    @Getter private String blobContent;
 
     public String fetchFileInspectionRules() {
         try {
@@ -56,18 +80,145 @@ public class FileInspectionAction extends ActionSupport {
                 addActionError("result is required");
                 return ERROR.toUpperCase();
             }
+            if (StringUtils.isBlank(result.getRuleId())) {
+                addActionError("ruleId is required");
+                return ERROR.toUpperCase();
+            }
+            if (StringUtils.isBlank(result.getDeviceId())) {
+                addActionError("deviceId is required");
+                return ERROR.toUpperCase();
+            }
             FileInspectionResultDao.instance.createIndicesIfAbsent();
-            result.setId(new ObjectId());
             result.setAccountId(Context.accountId.get());
             if (result.getExecutedAt() == 0) {
                 result.setExecutedAt(Context.now());
             }
             uploadMatchBlobs(result);
-            FileInspectionResultDao.instance.insertOne(result);
+
+            Bson filter = Filters.and(
+                    Filters.eq(FileInspectionResult.RULE_ID, result.getRuleId()),
+                    Filters.eq(FileInspectionResult.DEVICE_ID, result.getDeviceId())
+            );
+            Bson update = Updates.combine(
+                    Updates.set(FileInspectionResult.EXECUTED_AT,   result.getExecutedAt()),
+                    Updates.set(FileInspectionResult.ACCOUNT_ID,    result.getAccountId()),
+                    Updates.set(FileInspectionResult.AGENT_ID,      result.getAgentId()),
+                    Updates.set(FileInspectionResult.DEVICE_LABEL,  result.getDeviceLabel()),
+                    Updates.set(FileInspectionResult.STATUS,        result.getStatus()),
+                    Updates.set(FileInspectionResult.MATCHES,       result.getMatches()),
+                    Updates.set(FileInspectionResult.ERROR_MESSAGE, result.getErrorMessage())
+            );
+            long matched = FileInspectionResultDao.instance.getMCollection()
+                    .updateOne(filter, update)
+                    .getMatchedCount();
+            if (matched == 0) {
+                result.setId(new ObjectId());
+                FileInspectionResultDao.instance.insertOne(result);
+            }
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("uploadFileInspectionResult failed: " + e.getMessage(), LogDb.DB_ABS);
             addActionError("Failed to upload result");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Idempotent rule create/update keyed by path. Mirrors
+     * dashboard's FileInspectionRuleAction#addFileInspectionRule so other
+     * akto services (guardrails-service) can seed rules without going
+     * through the dashboard.
+     */
+    public String addFileInspectionRule() {
+        try {
+            FileInspectionRuleDao.getInstance().createIndicesIfAbsent();
+
+            String validation = validatePath(path);
+            if (validation != null) {
+                addActionError(validation);
+                return ERROR.toUpperCase();
+            }
+            String trimmed = path.trim();
+            int now = Context.now();
+
+            Bson filter = Filters.eq(FileInspectionRule.PATH, trimmed);
+            FileInspectionRule existing = FileInspectionRuleDao.getInstance().findOne(filter);
+            if (existing != null) {
+                existing.setExistenceOnly(existenceOnly);
+                existing.setMaxDepth(maxDepth);
+                existing.setUpdatedTs(now);
+                FileInspectionRuleDao.getInstance().replaceOne(filter, existing);
+                this.rule = existing;
+            } else {
+                FileInspectionRule r = new FileInspectionRule();
+                r.setId(new ObjectId());
+                r.setAccountId(Context.accountId.get());
+                r.setPath(trimmed);
+                r.setExistenceOnly(existenceOnly);
+                r.setMaxDepth(maxDepth);
+                r.setAddedBy(StringUtils.isBlank(addedBy) ? "system" : addedBy);
+                r.setCreatedTs(now);
+                r.setUpdatedTs(now);
+                FileInspectionRuleDao.getInstance().insertOne(r);
+                this.rule = r;
+            }
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("addFileInspectionRule failed: " + e.getMessage(), LogDb.DB_ABS);
+            addActionError("Failed to save rule");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Return recent inspection results with executedAt > sinceExecutedAt.
+     * Sorted ascending by executedAt so the caller can advance a cursor.
+     */
+    public String fetchFileInspectionResults() {
+        try {
+            FileInspectionResultDao.instance.createIndicesIfAbsent();
+            int pageSize = limit > 0 && limit <= RESULTS_PAGE_MAX ? limit : RESULTS_PAGE_MAX;
+            Bson filter = sinceExecutedAt > 0
+                ? Filters.gt(FileInspectionResult.EXECUTED_AT, (int) sinceExecutedAt)
+                : Filters.empty();
+            this.results = FileInspectionResultDao.instance.findAll(
+                filter, 0, pageSize,
+                Sorts.ascending(FileInspectionResult.EXECUTED_AT)
+            );
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("fetchFileInspectionResults failed: " + e.getMessage(), LogDb.DB_ABS);
+            addActionError("Failed to fetch results");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Download a previously-uploaded file's content from Azure blob storage
+     * and return it as a UTF-8 string. Callers identify the blob by the
+     * sha256 the agent reported; blob name is rebuilt from (accountId, sha256).
+     */
+    public String getFileContent() {
+        try {
+            if (StringUtils.isBlank(sha256) || !SHA256_RE.matcher(sha256.trim().toLowerCase()).matches()) {
+                addActionError("valid sha256 is required");
+                return ERROR.toUpperCase();
+            }
+            String blobName = AzureBlobClient.buildBlobName(Context.accountId.get(), sha256.trim().toLowerCase());
+            byte[] data = AzureBlobClient.getInstance().download(blobName);
+            if (data == null) {
+                addActionError("Content not found");
+                return ERROR.toUpperCase();
+            }
+            this.blobContent = new String(data, StandardCharsets.UTF_8);
+            return SUCCESS.toUpperCase();
+        } catch (IllegalStateException e) {
+            loggerMaker.errorAndAddToDb("getFileContent: blob storage not configured: " + e.getMessage(), LogDb.DB_ABS);
+            addActionError("Blob storage not configured");
+            return ERROR.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("getFileContent failed: " + e.getMessage(), LogDb.DB_ABS);
+            addActionError("Failed to fetch content");
             return ERROR.toUpperCase();
         }
     }
@@ -108,5 +259,13 @@ public class FileInspectionAction extends ActionSupport {
                 loggerMaker.infoAndAddToDb("Cleared raw content for " + m.getPath(), LogDb.DB_ABS);
             }
         }
+    }
+
+    private static String validatePath(String p) {
+        if (StringUtils.isBlank(p)) return "Path is required";
+        String t = p.trim();
+        if (t.length() > MAX_PATH_LENGTH) return "Path too long (max " + MAX_PATH_LENGTH + ")";
+        if ("/".equals(t)) return "Path cannot be the root '/'";
+        return null;
     }
 }

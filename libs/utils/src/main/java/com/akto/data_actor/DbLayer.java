@@ -52,6 +52,8 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.file.FilesDao;
+import com.akto.dao.nhi_governance.NhiIdentityDao;
+import com.akto.dto.nhi_governance.NhiIdentity;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
@@ -3446,6 +3448,138 @@ public class DbLayer {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in cancelEndpointRemoteCommand: " + e.getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Upsert one NHI identity record. Natural key: (deviceId, source, identityName).
+     *
+     * Behavior:
+     *   - first time we see this (device, file, secret-name): inserts a new doc
+     *     with firstSeenAt/createdAt/lastRotatedAt = now, status=ACTIVE, and the
+     *     incoming hash.
+     *   - same hash as last seen: just bumps lastSeenAt + updatedAt + display fields
+     *     (prefix/suffix/risk/etc.) — does NOT touch lastRotatedAt or previousHash.
+     *   - hash changed: rotation. Stores the prior hash in previousHash and updates
+     *     lastRotatedAt; this is what the dashboard surfaces as "rotated".
+     *
+     * Compatibility notes (dashboard ↔ cyborg co-write the same collection):
+     *   - status is ONLY written on insert. Dashboard's disableNhiIdentity sets
+     *     status="INACTIVE"; the scanner must not silently re-enable on next scan.
+     *   - createdBy is setOnInsert only; updatedBy is refreshed every scan so the
+     *     dashboard can tell user-edits apart from automated scans.
+     *   - lastRotatedAt matches the dashboard's field name (same semantics).
+     *
+     * The raw secret is never written; only the redaction tuple (prefix, suffix, hash).
+     */
+    public static void upsertNhiIdentity(NhiIdentity identity) {
+        if (identity == null
+            || StringUtils.isBlank(identity.getIdentityName())
+            || StringUtils.isBlank(identity.getDeviceId())
+            || StringUtils.isBlank(identity.getSource())
+            || StringUtils.isBlank(identity.getHash())) {
+            loggerMaker.errorAndAddToDb("upsertNhiIdentity: missing required field, dropping record");
+            return;
+        }
+        NhiIdentityDao.instance.createIndicesIfAbsent();
+        int now = Context.now();
+        final String scannerActor = "endpoint-shield-scanner";
+
+        Bson filter = Filters.and(
+            Filters.eq(NhiIdentity.DEVICE_ID, identity.getDeviceId()),
+            Filters.eq(NhiIdentity.SOURCE, identity.getSource()),
+            Filters.eq(NhiIdentity.IDENTITY_NAME, identity.getIdentityName())
+        );
+
+        NhiIdentity existing = NhiIdentityDao.instance.findOne(filter);
+        boolean rotated = existing != null
+            && existing.getHash() != null
+            && !existing.getHash().equals(identity.getHash());
+
+        List<Bson> updates = new ArrayList<>();
+        // immutable on insert
+        updates.add(Updates.setOnInsert(NhiIdentity.IDENTITY_NAME, identity.getIdentityName()));
+        updates.add(Updates.setOnInsert(NhiIdentity.DEVICE_ID, identity.getDeviceId()));
+        updates.add(Updates.setOnInsert(NhiIdentity.SOURCE, identity.getSource()));
+        updates.add(Updates.setOnInsert(NhiIdentity.FIRST_SEEN_AT, now));
+        updates.add(Updates.setOnInsert(NhiIdentity.CREATED_AT, now));
+        updates.add(Updates.setOnInsert(NhiIdentity.CREATED_BY, scannerActor));
+        // status is ONLY set on insert — never overwrite dashboard's "INACTIVE".
+        updates.add(Updates.setOnInsert(NhiIdentity.STATUS, "ACTIVE"));
+
+        // always refreshed
+        updates.add(Updates.set(NhiIdentity.LAST_SEEN_AT, now));
+        updates.add(Updates.set(NhiIdentity.UPDATED_AT, now));
+        updates.add(Updates.set(NhiIdentity.UPDATED_BY, scannerActor));
+        updates.add(Updates.set(NhiIdentity.HASH, identity.getHash()));
+        if (StringUtils.isNotBlank(identity.getPrefix())) {
+            updates.add(Updates.set(NhiIdentity.PREFIX, identity.getPrefix()));
+        }
+        if (StringUtils.isNotBlank(identity.getSuffix())) {
+            updates.add(Updates.set(NhiIdentity.SUFFIX, identity.getSuffix()));
+        }
+        if (StringUtils.isNotBlank(identity.getIdentityType())) {
+            updates.add(Updates.set(NhiIdentity.IDENTITY_TYPE, identity.getIdentityType()));
+        }
+        if (StringUtils.isNotBlank(identity.getContextSource())) {
+            updates.add(Updates.set(NhiIdentity.CONTEXT_SOURCE, identity.getContextSource()));
+        }
+        if (StringUtils.isNotBlank(identity.getAgentName())) {
+            updates.add(Updates.set(NhiIdentity.AGENT_NAME, identity.getAgentName()));
+        }
+        if (StringUtils.isNotBlank(identity.getAgentType())) {
+            updates.add(Updates.set(NhiIdentity.AGENT_TYPE, identity.getAgentType()));
+        }
+        if (StringUtils.isNotBlank(identity.getRiskLevel())) {
+            updates.add(Updates.set(NhiIdentity.RISK_LEVEL, identity.getRiskLevel()));
+        }
+        if (StringUtils.isNotBlank(identity.getSourceType())) {
+            updates.add(Updates.set(NhiIdentity.SOURCE_TYPE, identity.getSourceType()));
+        }
+        if (StringUtils.isNotBlank(identity.getDeviceLabel())) {
+            updates.add(Updates.set(NhiIdentity.DEVICE_LABEL, identity.getDeviceLabel()));
+        }
+        if (identity.getMetadata() != null && !identity.getMetadata().isEmpty()) {
+            updates.add(Updates.set(NhiIdentity.METADATA, identity.getMetadata()));
+        }
+
+        if (rotated) {
+            updates.add(Updates.set(NhiIdentity.PREVIOUS_HASH, existing.getHash()));
+            updates.add(Updates.set(NhiIdentity.LAST_ROTATED_AT, now));
+        } else if (existing == null) {
+            updates.add(Updates.setOnInsert(NhiIdentity.LAST_ROTATED_AT, now));
+        }
+
+        // Owner: inferred from deviceLabel. Set on insert; backfill for older records
+        // that were created before this field was populated (owner == null).
+        if (StringUtils.isNotBlank(identity.getDeviceLabel())) {
+            if (existing == null) {
+                com.akto.dto.nhi_governance.NhiIdentity.Owner o = new com.akto.dto.nhi_governance.NhiIdentity.Owner();
+                o.setName(identity.getDeviceLabel());
+                updates.add(Updates.setOnInsert(NhiIdentity.OWNER, o));
+            } else if (existing.getOwner() == null) {
+                com.akto.dto.nhi_governance.NhiIdentity.Owner o = new com.akto.dto.nhi_governance.NhiIdentity.Owner();
+                o.setName(identity.getDeviceLabel());
+                updates.add(Updates.set(NhiIdentity.OWNER, o));
+            }
+        }
+
+        // Always mirror the scanner's expiryDate: positive means the scanner extracted
+        // a real exp claim (JWT); 0 means opaque token with no known expiry.
+        // Using set (not setOnInsert) so stale fake values written by older code are cleared.
+        updates.add(Updates.set(NhiIdentity.EXPIRY_DATE, identity.getExpiryDate()));
+
+        NhiIdentityDao.instance.updateOne(filter, Updates.combine(updates));
+
+        // Evaluate policies inline so violations appear immediately after each upsert.
+        try {
+            com.akto.dto.nhi_governance.NhiIdentity evaled =
+                    NhiIdentityDao.instance.findOne(filter);
+            if (evaled != null) {
+                com.akto.utils.nhi_governance.NhiPolicyEvaluator.evaluate(evaled);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "upsertNhiIdentity: policy eval failed: " + e.getMessage());
         }
     }
 }
