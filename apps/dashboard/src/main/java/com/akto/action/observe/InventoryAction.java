@@ -112,10 +112,10 @@ public class InventoryAction extends UserAction {
         if (AccountSettingsDao.isEndpointInfoViewEnabled()) {
             long t = System.currentTimeMillis();
             Bson filter = Filters.empty();
-            ApiStats endStats = EndpointInfoViewDao.instance.buildApiStats(filter, 0, endTimestamp);
+            ApiStats endStats = EndpointInfoViewDao.instance.buildApiStatsForEndpointCount(filter, endTimestamp);
             if (endStats.getTotalAPIs() > 0) {
                 newCount = endStats.getTotalAPIs();
-                ApiStats startStats = EndpointInfoViewDao.instance.buildApiStats(filter, 0, startTimestamp);
+                ApiStats startStats = EndpointInfoViewDao.instance.buildApiStatsForEndpointCount(filter, startTimestamp);
                 oldCount = startStats.getTotalAPIs();
                 loggerMaker.infoAndAddToDb("[fetchEndpointsCount] view query took " + (System.currentTimeMillis() - t) + "ms, newCount=" + newCount + ", oldCount=" + oldCount);
                 return SUCCESS.toUpperCase();

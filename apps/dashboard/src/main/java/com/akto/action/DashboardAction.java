@@ -483,11 +483,12 @@ public class DashboardAction extends UserAction {
     public String fetchAPIInfosForMissingData(){
         response = new BasicDBObject();
         if (AccountSettingsDao.isEndpointInfoViewEnabled()) {
+            Map<String, Integer> missing = EndpointInfoViewDao.instance.countMissingFields(this.endTimeStamp);
             response.put("totalMissing", 0);
-            response.put("apiTypeMissing", 0);
-            response.put("authNotCalculated", 0);
-            response.put("accessTypeNotCalculated", 0);
             response.put("redundantApiInfoKeys", 0);
+            response.put("authNotCalculated", missing.getOrDefault("authNotCalculated", 0));
+            response.put("accessTypeNotCalculated", missing.getOrDefault("accessTypeNotCalculated", 0));
+            response.put("apiTypeMissing", missing.getOrDefault("apiTypeMissing", 0));
             return Action.SUCCESS.toUpperCase();
         }
         Bson filter = UsageMetricCalculator.excludeDemosAndDeactivated(Constants.ID);

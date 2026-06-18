@@ -28,6 +28,10 @@ public class EndpointInfoViewCron {
     private static final int ACTIVITY_LOOKBACK = 3 * 24 * 60 * 60;
     private static final int STI_FULL_REBUILD_INTERVAL = 24 * 60 * 60;
 
+    private static final String TEMP_COLL = EndpointInfoViewTempDao.instance.getCollName();
+    private static final String LIVE_COLL = EndpointInfoViewDao.instance.getCollName();
+    private static final String API_COLLECTIONS_COLL = "api_collections";
+
     public void setUpEndpointInfoViewCronScheduler() {
         scheduler.scheduleAtFixedRate(() -> {
             AccountTask.instance.executeTask(new Consumer<Account>() {
@@ -40,10 +44,13 @@ public class EndpointInfoViewCron {
                     }
                 }
             }, "endpoint-stat-view-cron");
-        }, 0, 30, TimeUnit.MINUTES);
+        }, 0, 10, TimeUnit.MINUTES);
     }
 
     public static void refreshView() {
+        AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        if (settings == null || !settings.isEnableEndpointInfoView()) return;
+
         int threshold = isAccountActiveRecently() ? ACTIVE_THRESHOLD : INACTIVE_THRESHOLD;
         if (!tryAcquire(threshold)) return;
 
@@ -80,28 +87,30 @@ public class EndpointInfoViewCron {
         boolean needsFullRebuild = stiLastFullRebuildTs == 0
                 || (Context.now() - stiLastFullRebuildTs > STI_FULL_REBUILD_INTERVAL);
 
+        int viewCount;
         if (needsFullRebuild) {
-            long stiStart = System.currentTimeMillis();
-            int maxTs = buildStiSummaryFull(excludedIds, sensitiveTypes);
-            stiLastIncrementalTs = maxTs;
-            logger.warnAndAddToDb("EndpointInfoView STI full rebuild took "
-                    + (System.currentTimeMillis() - stiStart) + "ms, account=" + accountId);
+            long rebuildStart = System.currentTimeMillis();
+            viewCount = fullRebuild(excludedIds, outOfScopeIds, sensitiveTypes);
+            stiLastIncrementalTs = getMaxStiTimestamp(excludedIds);
+            logger.warnAndAddToDb("EndpointInfoView fullRebuild took "
+                    + (System.currentTimeMillis() - rebuildStart) + "ms, count=" + viewCount
+                    + ", account=" + accountId);
         } else {
             long stiStart = System.currentTimeMillis();
-            int maxTs = stiIncrementalSync(stiLastIncrementalTs, excludedIds, sensitiveTypes);
+            incrementalStiMerge(stiLastIncrementalTs, excludedIds, sensitiveTypes);
+            int maxTs = getMaxStiTimestampSince(stiLastIncrementalTs, excludedIds);
             if (maxTs > stiLastIncrementalTs) {
                 stiLastIncrementalTs = maxTs;
             }
-            logger.warnAndAddToDb("EndpointInfoView STI incremental took "
+            logger.warnAndAddToDb("EndpointInfoView incrementalStiMerge took "
                     + (System.currentTimeMillis() - stiStart) + "ms, account=" + accountId);
-        }
 
-        // View build: single pipeline ApiInfo -> $lookup sti_unique_endpoints -> $out temp -> rename
-        long viewStart = System.currentTimeMillis();
-        int viewCount = buildView(excludedIds, outOfScopeIds);
-        long viewTime = System.currentTimeMillis() - viewStart;
-        logger.warnAndAddToDb("EndpointInfoView buildView took "
-                + viewTime + "ms, count=" + viewCount + ", account=" + accountId);
+            long viewStart = System.currentTimeMillis();
+            viewCount = refreshApiInfoData(excludedIds, outOfScopeIds);
+            logger.warnAndAddToDb("EndpointInfoView refreshApiInfoData took "
+                    + (System.currentTimeMillis() - viewStart) + "ms, count=" + viewCount
+                    + ", account=" + accountId);
+        }
 
         // Persist STI state
         List<Bson> updates = new ArrayList<>();
@@ -113,70 +122,169 @@ public class EndpointInfoViewCron {
 
         long totalTime = System.currentTimeMillis() - startMs;
         logger.warnAndAddToDb("EndpointInfoView refreshed: " + viewCount + " endpoints, account=" + accountId
-                + ", total=" + totalTime + "ms (view=" + viewTime + "ms)");
+                + ", total=" + totalTime + "ms");
     }
 
     /**
-     * Full STI summary rebuild. Groups all STI docs by endpoint into sti_unique_endpoints
-     * with string _id = "method|apiCollectionId|url". Returns max timestamp seen.
+     * Full rebuild (every 24h):
+     * Phase 1: STIs -> $group -> $lookup api_collections -> set flags -> $out temp
+     * Phase 2: Create unique index on temp {apiCollectionId, url, method}
+     * Phase 3: api_info -> extract top-level fields -> $merge into temp (sets api_info fields + derived fields)
+     * Phase 4: Rename temp -> live
      */
-    private static int buildStiSummaryFull(Set<Integer> excludedIds, List<String> sensitiveTypes) {
-        Document concatId = new Document("$concat", Arrays.asList(
-                "$" + SingleTypeInfo._METHOD, "|",
-                new Document("$toString", "$" + SingleTypeInfo._API_COLLECTION_ID), "|",
-                "$" + SingleTypeInfo._URL));
+    private static int fullRebuild(Set<Integer> excludedIds, List<Integer> outOfScopeIds, List<String> sensitiveTypes) {
+        EndpointInfoViewTempDao.instance.getMCollection().drop();
 
-        Document sensitiveCondition = new Document("$cond", Arrays.asList(
-                new Document("$in", Arrays.asList("$" + SingleTypeInfo.SUB_TYPE, sensitiveTypes)),
-                "$" + SingleTypeInfo.SUB_TYPE,
-                "$$REMOVE"));
+        // Phase 1: STIs -> group -> api_collections lookup -> $out temp
+        long phase1Start = System.currentTimeMillis();
+        runStiGroupPipeline(excludedIds, outOfScopeIds, sensitiveTypes);
+        logger.warnAndAddToDb("EndpointInfoView fullRebuild phase1 (STI group) took "
+                + (System.currentTimeMillis() - phase1Start) + "ms");
+
+        // Phase 2: Create unique index for $merge matching
+        long phase2Start = System.currentTimeMillis();
+        createMergeKeyIndex();
+        logger.warnAndAddToDb("EndpointInfoView fullRebuild phase2 (create index) took "
+                + (System.currentTimeMillis() - phase2Start) + "ms");
+
+        // Phase 3: api_info -> $merge into temp
+        long phase3Start = System.currentTimeMillis();
+        runApiInfoMerge(excludedIds, TEMP_COLL);
+        logger.warnAndAddToDb("EndpointInfoView fullRebuild phase3 (api_info merge) took "
+                + (System.currentTimeMillis() - phase3Start) + "ms");
+
+        // Phase 4: Rename temp -> live
+        return swapTempToLive();
+    }
+
+    /**
+     * Phase 1: STIs -> $group by endpoint -> $lookup api_collections -> set flags -> $out temp
+     */
+    private static void runStiGroupPipeline(Set<Integer> excludedIds, List<Integer> outOfScopeIds, List<String> sensitiveTypes) {
+        Document compoundId = buildCompoundId();
+        Document sensitiveCondition = buildSensitiveCondition(sensitiveTypes);
+        Document hasHostHeaderCondition = buildHasHostHeaderCondition();
 
         List<Bson> pipeline = Arrays.asList(
                 Aggregates.match(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, excludedIds)),
-                Aggregates.group(concatId,
+                Aggregates.group(compoundId,
                         Accumulators.addToSet("sensitiveSubTypes", sensitiveCondition),
                         Accumulators.sum("paramCount", 1),
-                        Accumulators.max("maxTs", "$timestamp"),
-                        Accumulators.first("method", "$" + SingleTypeInfo._METHOD),
-                        Accumulators.first("apiCollectionId", "$" + SingleTypeInfo._API_COLLECTION_ID),
-                        Accumulators.first("url", "$" + SingleTypeInfo._URL)),
-                Aggregates.out(StiUniqueEndpointsDao.instance.getCollName())
+                        Accumulators.max("hasHostHeader", hasHostHeaderCondition),
+                        Accumulators.min("discoveredTimestamp", "$timestamp"),
+                        Accumulators.max("lastSeen", "$timestamp")),
+                // Extract top-level fields and convert hasHostHeader to boolean
+                Aggregates.addFields(
+                        new Field<>("apiCollectionId", "$_id.apiCollectionId"),
+                        new Field<>("url", "$_id.url"),
+                        new Field<>("method", "$_id.method"),
+                        new Field<>("hasHostHeader", new Document("$cond", Arrays.asList(
+                                "$hasHostHeader", true, false)))),
+                // Lookup api_collections for isHostCollection flag
+                Aggregates.lookup(API_COLLECTIONS_COLL, "_id.apiCollectionId", "_id", "_apiColl"),
+                Aggregates.addFields(
+                        new Field<>("isHostCollection", new Document("$cond", Arrays.asList(
+                                new Document("$ifNull", Arrays.asList(
+                                        new Document("$arrayElemAt", Arrays.asList("$_apiColl.hostName", 0)),
+                                        false)),
+                                true, false))),
+                        new Field<>("isOutOfTestingScope",
+                                new Document("$in", Arrays.asList("$_id.apiCollectionId", outOfScopeIds))),
+                        // Set api_info defaults (will be overwritten by $merge for matched endpoints)
+                        new Field<>("riskScore", 0),
+                        new Field<>("severityScore", 0),
+                        new Field<>("lastTested", 0),
+                        new Field<>("actualAuthType", Collections.emptyList()),
+                        new Field<>("actualAccessType", Collections.emptyList()),
+                        new Field<>("severity", null)),
+                Aggregates.project(Projections.exclude("_apiColl")),
+                Aggregates.out(TEMP_COLL)
         );
 
         SingleTypeInfoDao.instance.getMCollection()
                 .aggregate(pipeline, Document.class).allowDiskUse(true).first();
-
-        Document maxDoc = StiUniqueEndpointsDao.instance.getMCollection()
-                .find().sort(new Document("maxTs", -1)).limit(1)
-                .projection(Projections.include("maxTs")).first();
-        return maxDoc != null ? ((Number) maxDoc.get("maxTs")).intValue() : 0;
     }
 
     /**
-     * Incremental STI sync. Processes only STIs newer than lastTs.
-     * Uses $merge with pipeline to union sensitiveSubTypes correctly.
+     * Create unique index on temp for $merge matching on {apiCollectionId, url, method}.
      */
-    private static int stiIncrementalSync(int lastTs, Set<Integer> excludedIds, List<String> sensitiveTypes) {
-        Document concatId = new Document("$concat", Arrays.asList(
-                "$" + SingleTypeInfo._METHOD, "|",
-                new Document("$toString", "$" + SingleTypeInfo._API_COLLECTION_ID), "|",
-                "$" + SingleTypeInfo._URL));
+    private static void createMergeKeyIndex() {
+        MCollection.createIndexIfAbsent(
+                EndpointInfoViewTempDao.instance.getDBName(), TEMP_COLL,
+                Indexes.ascending("apiCollectionId", "url", "method"),
+                new IndexOptions().name("merge_key_unique").unique(true));
+    }
 
-        Document sensitiveCondition = new Document("$cond", Arrays.asList(
-                new Document("$in", Arrays.asList("$" + SingleTypeInfo.SUB_TYPE, sensitiveTypes)),
-                "$" + SingleTypeInfo.SUB_TYPE,
-                "$$REMOVE"));
+    /**
+     * Phase 3: api_info -> extract top-level fields -> $merge into target collection.
+     * Sets api_info fields + derived fields on matching docs. Discards api_info-only endpoints.
+     */
+    private static void runApiInfoMerge(Set<Integer> excludedIds, String targetColl) {
+        // Build the whenMatched pipeline: set api_info fields + compute derived fields
+        Document whenMatchedSet = new Document()
+                .append("riskScore", ifNull("$$new.riskScore", "$riskScore"))
+                .append("severityScore", ifNull("$$new.severityScore", "$severityScore"))
+                .append("lastTested", ifNull("$$new.lastTested", "$lastTested"))
+                .append("lastSeen", ifNull("$$new.lastSeen", "$lastSeen"))
+                .append("discoveredTimestamp", ifNull("$$new.discoveredTimestamp", "$discoveredTimestamp"))
+                .append("apiType", ifNull("$$new.apiType", "$apiType"))
+                .append("actualAuthType", "$$new.actualAuthType")
+                .append("actualAccessType", "$$new.actualAccessType")
+                .append("severity", ifNull("$$new.severity", "$severity"));
 
-        // $merge with pipeline: union sensitiveSubTypes, take max timestamp
         Document mergeStage = new Document("$merge", new Document()
-                .append("into", StiUniqueEndpointsDao.instance.getCollName())
-                .append("on", "_id")
+                .append("into", targetColl)
+                .append("on", Arrays.asList("apiCollectionId", "url", "method"))
+                .append("whenMatched", Arrays.asList(new Document("$set", whenMatchedSet)))
+                .append("whenNotMatched", "discard"));
+
+        List<Bson> pipeline = Arrays.asList(
+                Aggregates.match(Filters.nin("_id.apiCollectionId", excludedIds)),
+                // Extract top-level fields from compound _id
+                Aggregates.addFields(
+                        new Field<>("apiCollectionId", "$_id.apiCollectionId"),
+                        new Field<>("url", "$_id.url"),
+                        new Field<>("method", "$_id.method"),
+                        // Flatten allAuthTypesFound
+                        new Field<>("actualAuthType", buildActualAuthTypeExpr()),
+                        new Field<>("actualAccessType", buildActualAccessTypeExpr()),
+                        new Field<>("severity", buildSeverityExpr())),
+                // Keep only the fields we need for the merge
+                Aggregates.project(Projections.fields(
+                        Projections.excludeId(),
+                        Projections.include("apiCollectionId", "url", "method",
+                                "riskScore", "severityScore", "lastTested", "lastSeen",
+                                "discoveredTimestamp", "apiType",
+                                "actualAuthType", "actualAccessType", "severity"))),
+                mergeStage
+        );
+
+        ApiInfoDao.instance.getMCollection()
+                .aggregate(pipeline, Document.class).allowDiskUse(true).first();
+    }
+
+    /**
+     * Incremental STI merge: processes only STIs newer than lastTs,
+     * groups by endpoint, and merges STI fields directly into the live view.
+     */
+    private static void incrementalStiMerge(int lastTs, Set<Integer> excludedIds, List<String> sensitiveTypes) {
+        Document compoundId = buildCompoundId();
+        Document sensitiveCondition = buildSensitiveCondition(sensitiveTypes);
+        Document hasHostHeaderCondition = buildHasHostHeaderCondition();
+
+        Document mergeStage = new Document("$merge", new Document()
+                .append("into", LIVE_COLL)
+                .append("on", Arrays.asList("apiCollectionId", "url", "method"))
                 .append("whenMatched", Arrays.asList(
                         new Document("$set", new Document()
                                 .append("sensitiveSubTypes", new Document("$setUnion", Arrays.asList(
                                         new Document("$ifNull", Arrays.asList("$sensitiveSubTypes", Collections.emptyList())),
                                         "$$new.sensitiveSubTypes")))
-                                .append("maxTs", new Document("$max", Arrays.asList("$maxTs", "$$new.maxTs"))))
+                                .append("hasHostHeader", new Document("$cond", Arrays.asList(
+                                        new Document("$or", Arrays.asList(
+                                                new Document("$eq", Arrays.asList("$hasHostHeader", true)),
+                                                new Document("$eq", Arrays.asList("$$new.hasHostHeader", true)))),
+                                        true, false))))
                 ))
                 .append("whenNotMatched", "insert"));
 
@@ -184,90 +292,111 @@ public class EndpointInfoViewCron {
                 Aggregates.match(Filters.and(
                         Filters.gt("timestamp", lastTs),
                         Filters.nin(SingleTypeInfo._API_COLLECTION_ID, excludedIds))),
-                Aggregates.group(concatId,
+                Aggregates.group(compoundId,
                         Accumulators.addToSet("sensitiveSubTypes", sensitiveCondition),
                         Accumulators.sum("paramCount", 1),
-                        Accumulators.max("maxTs", "$timestamp"),
-                        Accumulators.first("method", "$" + SingleTypeInfo._METHOD),
-                        Accumulators.first("apiCollectionId", "$" + SingleTypeInfo._API_COLLECTION_ID),
-                        Accumulators.first("url", "$" + SingleTypeInfo._URL)),
+                        Accumulators.max("hasHostHeader", hasHostHeaderCondition)),
+                Aggregates.addFields(
+                        new Field<>("apiCollectionId", "$_id.apiCollectionId"),
+                        new Field<>("url", "$_id.url"),
+                        new Field<>("method", "$_id.method"),
+                        new Field<>("hasHostHeader", new Document("$cond", Arrays.asList(
+                                "$hasHostHeader", true, false)))),
                 mergeStage
         );
 
         SingleTypeInfoDao.instance.getMCollection()
                 .aggregate(pipeline, Document.class).allowDiskUse(true).first();
-
-        Document maxDoc = StiUniqueEndpointsDao.instance.getMCollection()
-                .find(Filters.gt("maxTs", lastTs))
-                .sort(new Document("maxTs", -1)).limit(1)
-                .projection(Projections.include("maxTs")).first();
-        return maxDoc != null ? ((Number) maxDoc.get("maxTs")).intValue() : lastTs;
     }
 
     /**
-     * View build. Single pipeline: ApiInfo -> compute string key -> $lookup sti_unique_endpoints
-     * -> filter orphans -> enrich with STI data + scope -> $out into temp collection.
-     * Then create indexes on temp and atomic rename to replace the live view.
+     * Refresh api_info data (every 30 min on incremental cycles):
+     * Copies live view to temp, creates merge index, merges api_info, swaps.
      */
-    private static int buildView(Set<Integer> excludedIds, List<Integer> outOfScopeIds) {
-        String stiCollName = StiUniqueEndpointsDao.instance.getCollName();
-        String tempCollName = EndpointInfoViewTempDao.instance.getCollName();
-
-        // Drop any leftover temp collection from a previous crashed run
+    private static int refreshApiInfoData(Set<Integer> excludedIds, List<Integer> outOfScopeIds) {
         EndpointInfoViewTempDao.instance.getMCollection().drop();
 
-        List<Bson> pipeline = Arrays.asList(
-                Aggregates.match(Filters.nin("_id.apiCollectionId", excludedIds)),
-                // Compute string key for STI lookup
-                Aggregates.addFields(new Field<>("_stiKey", new Document("$concat", Arrays.asList(
-                        "$_id.method", "|",
-                        new Document("$toString", "$_id.apiCollectionId"), "|",
-                        "$_id.url")))),
-                // Lookup STI summary
-                Aggregates.lookup(stiCollName, "_stiKey", "_id", "_sti"),
-                // Exclude orphans
-                Aggregates.match(Filters.ne("_sti", Collections.emptyList())),
-                // Enrich with STI data, scope, top-level keys for filters/indexes
+        // Copy live view to temp (also refresh api_collections flags)
+        List<Bson> copyPipeline = Arrays.asList(
+                Aggregates.lookup(API_COLLECTIONS_COLL, "apiCollectionId", "_id", "_apiColl"),
                 Aggregates.addFields(
-                        new Field<>("sensitiveSubTypes",
-                                new Document("$arrayElemAt", Arrays.asList("$_sti.sensitiveSubTypes", 0))),
-                        new Field<>("paramCount",
-                                new Document("$arrayElemAt", Arrays.asList("$_sti.paramCount", 0))),
+                        new Field<>("isHostCollection", new Document("$cond", Arrays.asList(
+                                new Document("$ifNull", Arrays.asList(
+                                        new Document("$arrayElemAt", Arrays.asList("$_apiColl.hostName", 0)),
+                                        false)),
+                                true, false))),
                         new Field<>("isOutOfTestingScope",
-                                new Document("$in", Arrays.asList("$_id.apiCollectionId", outOfScopeIds))),
-                        new Field<>("discoveredTimestamp",
-                                new Document("$ifNull", Arrays.asList("$discoveredTimestamp", 0))),
-                        new Field<>("apiCollectionId", "$_id.apiCollectionId"),
-                        new Field<>("url", "$_id.url"),
-                        new Field<>("method", "$_id.method"),
-                        new Field<>("actualAuthType", buildActualAuthTypeExpr()),
-                        new Field<>("actualAccessType", buildActualAccessTypeExpr()),
-                        new Field<>("severity", buildSeverityExpr())),
-                // Remove temp and unwanted fields
-                Aggregates.project(Projections.exclude(
-                        "_stiKey", "_sti", "collectionIds", "responseCodes",
-                        "violations", "parentMcpToolNames", "lastCalculatedSubTypes",
-                        "allAuthTypesFound", "apiAccessTypes")),
-                Aggregates.out(tempCollName)
+                                new Document("$in", Arrays.asList("$apiCollectionId", outOfScopeIds)))),
+                Aggregates.project(Projections.exclude("_apiColl")),
+                Aggregates.out(TEMP_COLL)
         );
 
-        ApiInfoDao.instance.getMCollection()
-                .aggregate(pipeline, Document.class).allowDiskUse(true).first();
+        EndpointInfoViewDao.instance.getMCollection()
+                .aggregate(copyPipeline, Document.class).allowDiskUse(true).first();
 
+        // Create merge index + merge api_info
+        createMergeKeyIndex();
+        runApiInfoMerge(excludedIds, TEMP_COLL);
+
+        return swapTempToLive();
+    }
+
+    // --- Shared pipeline helpers ---
+
+    private static Document buildCompoundId() {
+        return new Document()
+                .append("method", "$" + SingleTypeInfo._METHOD)
+                .append("url", "$" + SingleTypeInfo._URL)
+                .append("apiCollectionId", "$" + SingleTypeInfo._API_COLLECTION_ID);
+    }
+
+    private static Document buildSensitiveCondition(List<String> sensitiveTypes) {
+        return new Document("$cond", Arrays.asList(
+                new Document("$in", Arrays.asList("$" + SingleTypeInfo.SUB_TYPE, sensitiveTypes)),
+                "$" + SingleTypeInfo.SUB_TYPE,
+                "$$REMOVE"));
+    }
+
+    private static Document buildHasHostHeaderCondition() {
+        return new Document("$cond", Arrays.asList(
+                new Document("$and", Arrays.asList(
+                        new Document("$eq", Arrays.asList("$" + SingleTypeInfo._PARAM, "host")),
+                        new Document("$eq", Arrays.asList("$" + SingleTypeInfo._IS_HEADER, true)),
+                        new Document("$eq", Arrays.asList("$" + SingleTypeInfo._RESPONSE_CODE, -1)))),
+                1, 0));
+    }
+
+    private static int swapTempToLive() {
         int viewCount = (int) EndpointInfoViewTempDao.instance.getMCollection().countDocuments();
-
-        // Create indexes on temp before swap
         EndpointInfoViewTempDao.instance.createIndicesIfAbsent();
-
-        // Atomic swap: rename temp -> live (drops old live collection)
         EndpointInfoViewTempDao.instance.renameCollection(
                 EndpointInfoViewDao.instance.getCollName());
-
         return viewCount;
     }
 
+    private static int getMaxStiTimestamp(Set<Integer> excludedIds) {
+        SingleTypeInfo doc = SingleTypeInfoDao.instance.getMCollection()
+                .find(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, excludedIds))
+                .sort(Sorts.descending("timestamp")).limit(1)
+                .projection(Projections.include("timestamp")).first();
+        return doc != null ? doc.getTimestamp() : 0;
+    }
+
+    private static int getMaxStiTimestampSince(int lastTs, Set<Integer> excludedIds) {
+        SingleTypeInfo doc = SingleTypeInfoDao.instance.getMCollection()
+                .find(Filters.and(
+                        Filters.gt("timestamp", lastTs),
+                        Filters.nin(SingleTypeInfo._API_COLLECTION_ID, excludedIds)))
+                .sort(Sorts.descending("timestamp")).limit(1)
+                .projection(Projections.include("timestamp")).first();
+        return doc != null ? doc.getTimestamp() : lastTs;
+    }
+
+    private static Document ifNull(String expr, String fallback) {
+        return new Document("$ifNull", Arrays.asList(expr, fallback));
+    }
+
     private static Document buildActualAuthTypeExpr() {
-        // Flatten allAuthTypesFound (Set<Set<String>>) into a flat array
         return new Document("$reduce", new Document()
                 .append("input", new Document("$ifNull", Arrays.asList("$allAuthTypesFound", Collections.emptyList())))
                 .append("initialValue", Collections.emptyList())
@@ -275,7 +404,6 @@ public class EndpointInfoViewCron {
     }
 
     private static Document buildActualAccessTypeExpr() {
-        // Pass through apiAccessTypes as-is (already a flat array)
         return new Document("$ifNull", Arrays.asList("$apiAccessTypes", Collections.emptyList()));
     }
 

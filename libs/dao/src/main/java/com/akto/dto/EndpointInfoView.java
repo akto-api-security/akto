@@ -55,6 +55,12 @@ public class EndpointInfoView {
     public static final String ACTUAL_ACCESS_TYPE = "actualAccessType";
     private List<String> actualAccessType;
 
+    public static final String HAS_HOST_HEADER = "hasHostHeader";
+    private boolean hasHostHeader;
+
+    public static final String IS_HOST_COLLECTION = "isHostCollection";
+    private boolean isHostCollection;
+
     public static final String SEVERITY = "severity";
     private String severity;
 
@@ -171,6 +177,22 @@ public class EndpointInfoView {
 
     public void setParamCount(int paramCount) {
         this.paramCount = paramCount;
+    }
+
+    public boolean getHasHostHeader() {
+        return hasHostHeader;
+    }
+
+    public void setHasHostHeader(boolean hasHostHeader) {
+        this.hasHostHeader = hasHostHeader;
+    }
+
+    public boolean getIsHostCollection() {
+        return isHostCollection;
+    }
+
+    public void setIsHostCollection(boolean isHostCollection) {
+        this.isHostCollection = isHostCollection;
     }
 
     public String findSeverity() {

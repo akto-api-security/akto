@@ -16,9 +16,11 @@ public class EndpointInfoViewDao extends AccountsContextDao<EndpointInfoView> {
     public static final EndpointInfoViewDao instance = new EndpointInfoViewDao();
 
     public void createIndicesIfAbsent() {
-        // Compound index for RBAC $in on apiCollectionId + discoveredTimestamp range scan
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[]{EndpointInfoView.API_COLLECTION_ID, EndpointInfoView.DISCOVERED_TIMESTAMP}, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                Indexes.ascending(EndpointInfoView.API_COLLECTION_ID, EndpointInfoView.URL, EndpointInfoView.METHOD),
+                new IndexOptions().name("merge_key_unique").unique(true));
     }
 
     @Override
@@ -33,6 +35,15 @@ public class EndpointInfoViewDao extends AccountsContextDao<EndpointInfoView> {
 
     public ApiStats buildApiStats(Bson baseFilter, int startTimestamp, int endTimestamp) {
         Bson filter = appendRbacFilter(appendTimeFilter(baseFilter, endTimestamp));
+        return aggregateWithFacet(filter);
+    }
+
+    public ApiStats buildApiStatsForEndpointCount(Bson baseFilter, int endTimestamp) {
+        Bson hostFilter = Filters.or(
+                Filters.eq(EndpointInfoView.IS_HOST_COLLECTION, false),
+                Filters.eq(EndpointInfoView.HAS_HOST_HEADER, true));
+        Bson filter = appendRbacFilter(appendTimeFilter(
+                Filters.and(baseFilter, hostFilter), endTimestamp));
         return aggregateWithFacet(filter);
     }
 
@@ -62,9 +73,13 @@ public class EndpointInfoViewDao extends AccountsContextDao<EndpointInfoView> {
         Bson inScopeFilter = Filters.eq(EndpointInfoView.IS_OUT_OF_TESTING_SCOPE, false);
         Bson testedFilter = Filters.and(inScopeFilter, Filters.gt(EndpointInfoView.LAST_TESTED, lookBack));
 
-        // Priority-pick from pre-flattened actualAuthType array
+        // Pick auth type: UNAUTHENTICATED always wins, then first standard type, else CUSTOM
+        Document stdFilter = new Document("$filter", new Document()
+                .append("input", "$$auth")
+                .append("cond", new Document("$in", Arrays.asList("$$this", STANDARD_AUTH_TYPES))));
         Document authTypeExpr = new Document("$let", new Document()
-                .append("vars", new Document("auth", "$" + EndpointInfoView.ACTUAL_AUTH_TYPE))
+                .append("vars", new Document()
+                        .append("auth", "$" + EndpointInfoView.ACTUAL_AUTH_TYPE))
                 .append("in", new Document("$cond", Arrays.asList(
                         new Document("$or", Arrays.asList(
                                 new Document("$eq", Arrays.asList("$$auth", null)),
@@ -74,10 +89,10 @@ public class EndpointInfoViewDao extends AccountsContextDao<EndpointInfoView> {
                                 new Document("$in", Arrays.asList("UNAUTHENTICATED", "$$auth")),
                                 "UNAUTHENTICATED",
                                 new Document("$let", new Document()
-                                        .append("vars", new Document("first", new Document("$arrayElemAt", Arrays.asList("$$auth", 0))))
+                                        .append("vars", new Document("std", stdFilter))
                                         .append("in", new Document("$cond", Arrays.asList(
-                                                new Document("$in", Arrays.asList("$$first", STANDARD_AUTH_TYPES)),
-                                                "$$first",
+                                                new Document("$gt", Arrays.asList(new Document("$size", "$$std"), 0)),
+                                                new Document("$arrayElemAt", Arrays.asList("$$std", 0)),
                                                 "CUSTOM"))))))))));
 
         // Priority-pick from actualAccessType array
@@ -201,5 +216,21 @@ public class EndpointInfoViewDao extends AccountsContextDao<EndpointInfoView> {
             Object id = doc.get("_id");
             if (id != null) map.put(((Number) id).intValue(), doc.getInteger("count", 0));
         }
+    }
+
+    public Map<String, Integer> countMissingFields(int endTimestamp) {
+        Bson filter = appendRbacFilter(appendTimeFilter(Filters.empty(), endTimestamp));
+        long authMissing = instance.getMCollection().countDocuments(
+                Filters.and(filter, Filters.eq(EndpointInfoView.ACTUAL_AUTH_TYPE, Collections.emptyList())));
+        long accessMissing = instance.getMCollection().countDocuments(
+                Filters.and(filter, Filters.eq(EndpointInfoView.ACTUAL_ACCESS_TYPE, Collections.emptyList())));
+        long apiTypeMissing = instance.getMCollection().countDocuments(
+                Filters.and(filter, Filters.eq(EndpointInfoView.API_TYPE, null)));
+
+        Map<String, Integer> counts = new HashMap<>();
+        counts.put("authNotCalculated", (int) authMissing);
+        counts.put("accessTypeNotCalculated", (int) accessMissing);
+        counts.put("apiTypeMissing", (int) apiTypeMissing);
+        return counts;
     }
 }
