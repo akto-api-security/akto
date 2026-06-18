@@ -96,6 +96,9 @@ public class CrawlerRun {
     public static final String SCREENCAST_ENABLED = "screencastEnabled";
     private Boolean screencastEnabled;
 
+    public static final String STRICT_HOST_SCOPE = "strictHostScope";
+    private Boolean strictHostScope;
+
     public CrawlerRun() {
     }
 
