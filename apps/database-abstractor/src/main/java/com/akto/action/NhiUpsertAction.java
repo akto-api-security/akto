@@ -1,10 +1,10 @@
 package com.akto.action;
 
+import com.akto.dao.nhi_governance.NhiIdentityDao;
+import com.akto.dao.nhi_governance.NhiIdentityDao.BatchResult;
 import com.akto.dto.nhi_governance.NhiIdentity;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.utils.nhi_governance.NhiIdentityUpsertService;
-import com.akto.utils.nhi_governance.NhiIdentityUpsertService.BatchResult;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 import lombok.Getter;
@@ -28,17 +28,13 @@ public class NhiUpsertAction extends ActionSupport {
     @Getter
     private int skippedCount;
 
-    @Getter
-    private boolean success = false;
-
     public String upsertNhiIdentity() {
         if (nhiIdentity == null) {
             addActionError("nhiIdentity is required");
             return Action.ERROR.toUpperCase();
         }
         try {
-            NhiIdentityUpsertService.upsertOne(nhiIdentity);
-            success = true;
+            NhiIdentityDao.instance.upsertOne(nhiIdentity);
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.errorAndAddToDb("upsertNhiIdentity failed: " + e.getMessage());
@@ -53,10 +49,9 @@ public class NhiUpsertAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         try {
-            BatchResult r = NhiIdentityUpsertService.upsertMany(nhiIdentities);
+            BatchResult r = NhiIdentityDao.instance.upsertMany(nhiIdentities);
             this.upsertedCount = r.upserted;
             this.skippedCount = r.skipped;
-            success = true;
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.errorAndAddToDb("upsertNhiIdentities failed: " + e.getMessage());

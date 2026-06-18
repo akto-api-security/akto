@@ -236,7 +236,7 @@ public class Crons {
                     public void accept(Account t) {
                         try {
                             List<NhiIdentity> identities = NhiIdentityDao.instance.findAll(
-                                com.mongodb.client.model.Filters.eq(NhiIdentity.STATUS, "ACTIVE")
+                                Filters.eq(NhiIdentity.STATUS, "ACTIVE")
                             );
                             for (NhiIdentity identity : identities) {
                                 try {
