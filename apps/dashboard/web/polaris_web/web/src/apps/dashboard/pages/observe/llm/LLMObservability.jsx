@@ -6,7 +6,6 @@ import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import AgenticStatsCard from "../agentic/AgenticStatsCard";
 import AgenticTopListCard from "../agentic/AgenticTopListCard";
-import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import func from "@/util/func";
 import values from "@/util/values";
 import PersistStore from "@/apps/main/PersistStore";
@@ -19,6 +18,7 @@ import { ARGUS_TRACE_COL_DEFS } from "./columns";
 import SessionsView from "./SessionsView";
 import SessionFlyout from "./SessionFlyout";
 import ArgusTraceFlyout from "./ArgusTraceFlyout";
+import MessagesView from "./MessagesView";
 
 const SERVICE_COLORS = ["#9642FC", "#4285F4", "#10A37F", "#EAB308", "#F97316", "#DC2626"];
 
@@ -354,24 +354,7 @@ export default function LLMObservability() {
                 components={[
                     topCards,
                     isArgus ? (
-                        <AgGridTable
-                            key="traces-table"
-                            rowData={traces}
-                            columnDefs={ARGUS_TRACE_COL_DEFS}
-                            defaultColDef={{ resizable: true, sortable: true, filter: false }}
-                            searchPlaceholder="Search traces..."
-                            rowHeight={44}
-                            headerHeight={40}
-                            rowSelection="single"
-                            pagination
-                            paginationPageSize={20}
-                            paginationPageSizeSelector={[20, 50, 100]}
-                            animateRows
-                            suppressCellFocus
-                            getRowStyle={() => ({ cursor: "pointer" })}
-                            onRowClicked={p => p.data && setSelectedTrace(p.data)}
-                            sideBar={{ toolPanels: ["columns", "filters"] }}
-                        />
+                        <MessagesView key="traces-table" currDateRange={currDateRange} columnDefs={ARGUS_TRACE_COL_DEFS} onRowClicked={p => p.data && setSelectedTrace(p.data)} />
                     ) : (
                         <SessionsView key="sessions-table" rowData={sessions} onOpenSession={openSession} />
                     ),

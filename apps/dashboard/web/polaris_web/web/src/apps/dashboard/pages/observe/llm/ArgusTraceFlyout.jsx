@@ -5,7 +5,7 @@ import FlyoutBreadcrumb from "../agentic/FlyoutBreadcrumb";
 import AiChatSection from "../agentic/AiChatSection";
 import { buildAgenticObserveChatMetadata } from "../agentic/agenticObserveApi";
 import ConversationHistory from "../../testing/TestRunResultPage/components/ConversationHistory";
-import { formatCost, formatCompact, formatDurationMs, parsePromptText, parseResponseText, truncate } from "./constants";
+import { formatCost, formatCompact, parsePromptText, parseResponseText, truncate } from "./constants";
 import api from "./api";
 
 
@@ -22,35 +22,39 @@ export default function ArgusTraceFlyout({ trace, onClose }) {
     const [conversations, setConversations] = useState([]);
 
     useEffect(() => {
-        if (!trace?.traceId) { setConversations([]); return; }
+        const traceKey = trace?.traceId || trace?.id;
+        if (!traceKey) { setConversations([]); return; }
         let cancelled = false;
 
-        // Seed immediately from the trace-level row so something shows while spans load
+        // Seed from the row's own payloads — works even when traceId is absent
+        const promptText   = trace._promptText   || parsePromptText(trace.queryPayload)      || "";
+        const responseText = trace._responseText || parseResponseText(trace.responsePayload) || "";
+        const ts = trace.latestTimestamp || trace.timestamp;
         const seed = [];
-        if (trace._promptText)   seed.push({ role: "user",      message: trace._promptText,   customLabel: "User prompt",        creationTimestamp: trace.latestTimestamp });
-        if (trace._responseText) seed.push({ role: "assistant", message: trace._responseText, customLabel: "AI agent response",  creationTimestamp: trace.latestTimestamp });
+        if (promptText)   seed.push({ role: "user",      message: promptText,   customLabel: "User prompt",       creationTimestamp: ts });
+        if (responseText) seed.push({ role: "assistant", message: responseText, customLabel: "AI agent response", creationTimestamp: ts });
         setConversations(seed);
 
-        // Fetch span-level rows — these carry the actual responsePayload
-        api.fetchTraceDetail(trace.traceId).then(spans => {
-            if (cancelled || !spans?.length) return;
-            const msgs = [];
-            spans.forEach(span => {
-                const prompt   = parsePromptText(span.queryPayload)      || span._promptText   || "";
-                const response = parseResponseText(span.responsePayload) || span._responseText || "";
-                // Span 2+ in a tool-use trace re-includes the original question in queryPayload.
-                // Only push the user message when it differs from the last one seen.
-                const lastUserMsg = [...msgs].reverse().find(m => m.role === "user");
-                if (prompt && prompt !== lastUserMsg?.message) {
-                    msgs.push({ role: "user",      message: prompt,   customLabel: "User prompt",       creationTimestamp: span.timestamp });
-                }
-                if (response) msgs.push({ role: "assistant", message: response, customLabel: "AI agent response", creationTimestamp: span.timestamp });
+        // If a real traceId exists, fetch span-level rows for richer detail
+        if (trace.traceId) {
+            api.fetchTraceDetail(trace.traceId).then(spans => {
+                if (cancelled || !spans?.length) return;
+                const msgs = [];
+                spans.forEach(span => {
+                    const prompt   = parsePromptText(span.queryPayload)      || span._promptText   || "";
+                    const response = parseResponseText(span.responsePayload) || span._responseText || "";
+                    const lastUserMsg = [...msgs].reverse().find(m => m.role === "user");
+                    if (prompt && prompt !== lastUserMsg?.message) {
+                        msgs.push({ role: "user",      message: prompt,   customLabel: "User prompt",       creationTimestamp: span.timestamp });
+                    }
+                    if (response) msgs.push({ role: "assistant", message: response, customLabel: "AI agent response", creationTimestamp: span.timestamp });
+                });
+                if (msgs.length) setConversations(msgs);
             });
-            if (msgs.length) setConversations(msgs);
-        });
+        }
 
         return () => { cancelled = true; };
-    }, [trace?.traceId]);
+    }, [trace]);
 
     const chatMetadata = useMemo(() => {
         if (!trace) return null;
@@ -67,7 +71,6 @@ export default function ArgusTraceFlyout({ trace, onClose }) {
     const totalTokens = (Number(trace._inputTokens) || 0) + (Number(trace._outputTokens) || 0);
 
     const stats = [
-        { label: "Duration",      value: formatDurationMs(trace.durationMs) },
         { label: "Total tokens",  value: formatCompact(totalTokens) },
         { label: "Est. cost",     value: formatCost(trace._inputTokens || 0, trace._outputTokens || 0) },
         { label: "Tokens in/out", value: `${(trace._inputTokens || 0).toLocaleString("en-US")} / ${(trace._outputTokens || 0).toLocaleString("en-US")}` },
