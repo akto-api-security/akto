@@ -87,9 +87,9 @@ const headings = [
         maxWidth: '100px',
         type: CellType.TEXT,
     },
-    {
+    ...(!isEndpointSecurityCategory() ? [{
         text: 'Access Type',
-        value: 'access_type', 
+        value: 'access_type',
         title:"Access Type",
         showFilter: true,
         type: CellType.TEXT,
@@ -102,7 +102,7 @@ const headings = [
         showFilter: true,
         textValue: 'authTypeTag',
         tooltipContent: "Authentication type of the API."
-    },
+    }] : []),
     {
         text: 'Sensitive params in response',
         title: 'Sensitive params',
