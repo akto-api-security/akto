@@ -31,6 +31,11 @@ public class FileInspectionResult {
     public static final String ERROR_MESSAGE = "errorMessage";
     public static final String MATCHES = "matches";
 
+    public enum Status {
+        OK,
+        PARTIAL,    // hit a server-side cap before exhausting (e.g. >200 children)
+        ERROR
+    }
 
     @Getter
     @Setter
@@ -71,7 +76,7 @@ public class FileInspectionResult {
     private String deviceId;
     private String deviceLabel;
     private int executedAt;
-    private String status;
+    private Status status;
     private String errorMessage;
     private List<Match> matches;
 }

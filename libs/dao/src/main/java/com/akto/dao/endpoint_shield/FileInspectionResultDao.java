@@ -4,12 +4,17 @@ import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.endpoint_shield.FileInspectionResult;
+import com.akto.util.DbMode;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.CreateCollectionOptions;
 
 public class FileInspectionResultDao extends AccountsContextDao<FileInspectionResult> {
 
     public static final FileInspectionResultDao instance = new FileInspectionResultDao();
     public static final String COLLECTION_NAME = "file_inspection_results";
+
+    public static final int maxDocuments = 200_000;
+    public static final long sizeInBytes = 200_000_000L;
 
     public void createIndicesIfAbsent() {
         boolean exists = false;
@@ -22,12 +27,17 @@ public class FileInspectionResultDao extends AccountsContextDao<FileInspectionRe
             }
         }
         if (!exists) {
-            db.createCollection(getCollName());
+            if (DbMode.allowCappedCollections()) {
+                db.createCollection(getCollName(),
+                    new CreateCollectionOptions().capped(true).maxDocuments(maxDocuments).sizeInBytes(sizeInBytes));
+            } else {
+                db.createCollection(getCollName());
+            }
         }
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{FileInspectionResult.RULE_ID, FileInspectionResult.EXECUTED_AT}, false);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{FileInspectionResult.DEVICE_ID, FileInspectionResult.EXECUTED_AT}, false);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{FileInspectionResult.DEVICE_ID, FileInspectionResult.RULE_ID}, true);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{FileInspectionResult.DEVICE_ID, FileInspectionResult.RULE_ID}, false);
     }
 
     @Override

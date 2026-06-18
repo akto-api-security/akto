@@ -108,6 +108,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import com.akto.dto.nhi_governance.NhiIdentity;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -6384,13 +6385,10 @@ public class DbAction extends ActionSupport {
     }
 
     @Getter @Setter
-    private com.akto.dto.nhi_governance.NhiIdentity nhiIdentity;
+    private NhiIdentity nhiIdentity;
 
     @Getter @Setter
-    private java.util.List<com.akto.dto.nhi_governance.NhiIdentity> nhiIdentities;
-
-    @Getter @Setter
-    private boolean nhiSuccess;
+    private List<NhiIdentity> nhiIdentities;
 
     @Getter @Setter
     private int nhiUpsertedCount;
@@ -6399,15 +6397,12 @@ public class DbAction extends ActionSupport {
         try {
             if (nhiIdentity == null) {
                 addActionError("nhiIdentity is required");
-                nhiSuccess = false;
                 return Action.ERROR.toUpperCase();
             }
             DbLayer.upsertNhiIdentity(nhiIdentity);
             nhiUpsertedCount = 1;
-            nhiSuccess = true;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in upsertNhiIdentity: " + e.toString());
-            nhiSuccess = false;
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -6416,7 +6411,6 @@ public class DbAction extends ActionSupport {
     public String upsertNhiIdentities() {
         if (nhiIdentities == null || nhiIdentities.isEmpty()) {
             addActionError("nhiIdentities is required");
-            nhiSuccess = false;
             return Action.ERROR.toUpperCase();
         }
         // Per-record try/catch: one malformed identity must not fail the whole
@@ -6424,7 +6418,7 @@ public class DbAction extends ActionSupport {
         // the batch means losing a whole device's data until the next tick.
         int ok = 0;
         int failed = 0;
-        for (com.akto.dto.nhi_governance.NhiIdentity i : nhiIdentities) {
+        for (NhiIdentity i : nhiIdentities) {
             try {
                 DbLayer.upsertNhiIdentity(i);
                 ok++;
@@ -6434,7 +6428,6 @@ public class DbAction extends ActionSupport {
             }
         }
         nhiUpsertedCount = ok;
-        nhiSuccess = true;
         if (failed > 0) {
             loggerMaker.errorAndAddToDb("upsertNhiIdentities: " + failed + "/" + nhiIdentities.size() + " records failed");
         }
