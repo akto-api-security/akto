@@ -53,106 +53,106 @@ public class ModifyHeaderRegexReplaceTest {
         return regexReplace;
     }
 
-    // --- Filter 1: service.(dev|prod|prd)-api.tapestry.com -> service.qa-api.tapestry.com ---
+    // --- Filter 1: service.(dev|prod|prd)-api.example.com -> service.qa-api.example.com ---
 
     @Test
     public void testDevApiToQaApi() {
-        RawApi rawApi = buildRawApi("https://empdiscount.dev-api.tapestry.com/api/test",
-                makeHeaders("host", "empdiscount.dev-api.tapestry.com"));
+        RawApi rawApi = buildRawApi("https://catalog.dev-api.example.com/api/test",
+                makeHeaders("host", "catalog.dev-api.example.com"));
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("(dev|prod|prd)-api\\.", "qa-api."),
                 new HashMap<>(), dummyApiInfoKey());
 
-        assertEquals("empdiscount.qa-api.tapestry.com", rawApi.fetchReqHeaders().get("host").get(0));
+        assertEquals("catalog.qa-api.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
 
     @Test
     public void testProdApiToQaApi() {
-        RawApi rawApi = buildRawApi("https://fiscalcalendar.prod-api.tapestry.com/",
-                makeHeaders("host", "fiscalcalendar.prod-api.tapestry.com"));
+        RawApi rawApi = buildRawApi("https://inventory.prod-api.example.com/",
+                makeHeaders("host", "inventory.prod-api.example.com"));
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("(dev|prod|prd)-api\\.", "qa-api."),
                 new HashMap<>(), dummyApiInfoKey());
 
-        assertEquals("fiscalcalendar.qa-api.tapestry.com", rawApi.fetchReqHeaders().get("host").get(0));
+        assertEquals("inventory.qa-api.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
 
     @Test
     public void testPrdApiToQaApi() {
-        RawApi rawApi = buildRawApi("https://storedetails.prd-api.tapestry.com/",
-                makeHeaders("host", "storedetails.prd-api.tapestry.com"));
+        RawApi rawApi = buildRawApi("https://orders.prd-api.example.com/",
+                makeHeaders("host", "orders.prd-api.example.com"));
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("(dev|prod|prd)-api\\.", "qa-api."),
                 new HashMap<>(), dummyApiInfoKey());
 
-        assertEquals("storedetails.qa-api.tapestry.com", rawApi.fetchReqHeaders().get("host").get(0));
+        assertEquals("orders.qa-api.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
 
     @Test
     public void testSpiDevApiToSpiQaApi() {
-        RawApi rawApi = buildRawApi("https://membership-admin-auth.spidev-api.tapestry.com/",
-                makeHeaders("host", "membership-admin-auth.spidev-api.tapestry.com"));
+        RawApi rawApi = buildRawApi("https://auth.spidev-api.example.com/",
+                makeHeaders("host", "auth.spidev-api.example.com"));
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("(dev|prod|prd)-api\\.", "qa-api."),
                 new HashMap<>(), dummyApiInfoKey());
 
-        assertEquals("membership-admin-auth.spiqa-api.tapestry.com", rawApi.fetchReqHeaders().get("host").get(0));
+        assertEquals("auth.spiqa-api.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
 
     // --- Filter 2: x-(dev|prd|prod)(.|-)  ->  x-qa(.|-)  ---
 
     @Test
     public void testPrdSuffixToQa() {
-        RawApi rawApi = buildRawApi("https://api-prd.ods.tapestry.com/aptosCOH",
-                makeHeaders("host", "api-prd.ods.tapestry.com"));
+        RawApi rawApi = buildRawApi("https://api-prd.internal.example.com/api/endpoint",
+                makeHeaders("host", "api-prd.internal.example.com"));
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("-(dev|prd|prod)([.-])", "-qa$2"),
                 new HashMap<>(), dummyApiInfoKey());
 
-        assertEquals("api-qa.ods.tapestry.com", rawApi.fetchReqHeaders().get("host").get(0));
+        assertEquals("api-qa.internal.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
 
     @Test
     public void testDevSuffixToQa() {
-        RawApi rawApi = buildRawApi("https://app.scan-dev.coach.com/proxy/sfcc",
-                makeHeaders("host", "app.scan-dev.coach.com"));
+        RawApi rawApi = buildRawApi("https://app.search-dev.example.com/api/endpoint",
+                makeHeaders("host", "app.search-dev.example.com"));
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("-(dev|prd|prod)([.-])", "-qa$2"),
                 new HashMap<>(), dummyApiInfoKey());
 
-        assertEquals("app.scan-qa.coach.com", rawApi.fetchReqHeaders().get("host").get(0));
+        assertEquals("app.search-qa.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
 
     @Test
     public void testDevMiddleToQa() {
-        RawApi rawApi = buildRawApi("https://subspace-dev-us-west-2.ods.tapestry.com/",
-                makeHeaders("host", "subspace-dev-us-west-2.ods.tapestry.com"));
+        RawApi rawApi = buildRawApi("https://worker-dev-us-west-2.internal.example.com/",
+                makeHeaders("host", "worker-dev-us-west-2.internal.example.com"));
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("-(dev|prd|prod)([.-])", "-qa$2"),
                 new HashMap<>(), dummyApiInfoKey());
 
-        assertEquals("subspace-qa-us-west-2.ods.tapestry.com", rawApi.fetchReqHeaders().get("host").get(0));
+        assertEquals("worker-qa-us-west-2.internal.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
 
     // --- Edge cases ---
 
     @Test
     public void testQaHostUnchanged() {
-        RawApi rawApi = buildRawApi("https://empdiscount.qa-api.tapestry.com/",
-                makeHeaders("host", "empdiscount.qa-api.tapestry.com"));
+        RawApi rawApi = buildRawApi("https://catalog.qa-api.example.com/",
+                makeHeaders("host", "catalog.qa-api.example.com"));
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "host",
                 buildRegexReplace("(dev|prod|prd)-api\\.", "qa-api."),
                 new HashMap<>(), dummyApiInfoKey());
 
-        assertEquals("empdiscount.qa-api.tapestry.com", rawApi.fetchReqHeaders().get("host").get(0));
+        assertEquals("catalog.qa-api.example.com", rawApi.fetchReqHeaders().get("host").get(0));
     }
 
     @Test
@@ -181,13 +181,13 @@ public class ModifyHeaderRegexReplaceTest {
     @Test
     public void testRegexReplaceOnCustomHeader() {
         RawApi rawApi = buildRawApi("https://example.com/",
-                makeHeaders("x-forwarded-host", "service.dev-api.tapestry.com"));
+                makeHeaders("x-forwarded-host", "service.dev-api.example.com"));
 
         Utils.modifySampleDataUtil("modify_header", rawApi, "x-forwarded-host",
                 buildRegexReplace("(dev|prod|prd)-api\\.", "qa-api."),
                 new HashMap<>(), dummyApiInfoKey());
 
-        assertEquals("service.qa-api.tapestry.com", rawApi.fetchReqHeaders().get("x-forwarded-host").get(0));
+        assertEquals("service.qa-api.example.com", rawApi.fetchReqHeaders().get("x-forwarded-host").get(0));
     }
 
     // --- End-to-end: YAML -> parse -> executor nodes -> execute on RawApi ---
@@ -215,7 +215,7 @@ public class ModifyHeaderRegexReplaceTest {
             "      key:\n" +
             "        eq: host\n" +
             "      value:\n" +
-            "        regex: \"\\\\.(spi)?(dev|prod|prd)-api\\\\.tapestry\\\\.com$\"\n" +
+            "        regex: \"\\\\.(spi)?(dev|prod|prd)-api\\\\.example\\\\.com$\"\n" +
             "execute:\n" +
             "  type: single\n" +
             "  requests:\n" +
@@ -247,51 +247,51 @@ public class ModifyHeaderRegexReplaceTest {
 
     @Test
     public void testEndToEnd_Filter1_DevApiToQaApi() throws Exception {
-        RawApi rawApi = buildRawApi("https://empdiscount.dev-api.tapestry.com/",
-                makeHeaders("host", "empdiscount.dev-api.tapestry.com"));
+        RawApi rawApi = buildRawApi("https://catalog.dev-api.example.com/",
+                makeHeaders("host", "catalog.dev-api.example.com"));
 
         RawApi result = executeYamlFilterOnRawApi(FILTER1_YAML, rawApi);
 
-        assertEquals("empdiscount.qa-api.tapestry.com", result.fetchReqHeaders().get("host").get(0));
+        assertEquals("catalog.qa-api.example.com", result.fetchReqHeaders().get("host").get(0));
     }
 
     @Test
     public void testEndToEnd_Filter1_ProdApiToQaApi() throws Exception {
-        RawApi rawApi = buildRawApi("https://fiscalcalendar.prod-api.tapestry.com/",
-                makeHeaders("host", "fiscalcalendar.prod-api.tapestry.com"));
+        RawApi rawApi = buildRawApi("https://inventory.prod-api.example.com/",
+                makeHeaders("host", "inventory.prod-api.example.com"));
 
         RawApi result = executeYamlFilterOnRawApi(FILTER1_YAML, rawApi);
 
-        assertEquals("fiscalcalendar.qa-api.tapestry.com", result.fetchReqHeaders().get("host").get(0));
+        assertEquals("inventory.qa-api.example.com", result.fetchReqHeaders().get("host").get(0));
     }
 
     @Test
     public void testEndToEnd_Filter1_SpiDevToSpiQa() throws Exception {
-        RawApi rawApi = buildRawApi("https://membership-admin-auth.spidev-api.tapestry.com/",
-                makeHeaders("host", "membership-admin-auth.spidev-api.tapestry.com"));
+        RawApi rawApi = buildRawApi("https://auth.spidev-api.example.com/",
+                makeHeaders("host", "auth.spidev-api.example.com"));
 
         RawApi result = executeYamlFilterOnRawApi(FILTER1_YAML, rawApi);
 
-        assertEquals("membership-admin-auth.spiqa-api.tapestry.com", result.fetchReqHeaders().get("host").get(0));
+        assertEquals("auth.spiqa-api.example.com", result.fetchReqHeaders().get("host").get(0));
     }
 
     @Test
     public void testEndToEnd_Filter2_PrdDotToQaDot() throws Exception {
-        RawApi rawApi = buildRawApi("https://api-prd.ods.tapestry.com/",
-                makeHeaders("host", "api-prd.ods.tapestry.com"));
+        RawApi rawApi = buildRawApi("https://api-prd.internal.example.com/",
+                makeHeaders("host", "api-prd.internal.example.com"));
 
         RawApi result = executeYamlFilterOnRawApi(FILTER2_YAML, rawApi);
 
-        assertEquals("api-qa.ods.tapestry.com", result.fetchReqHeaders().get("host").get(0));
+        assertEquals("api-qa.internal.example.com", result.fetchReqHeaders().get("host").get(0));
     }
 
     @Test
     public void testEndToEnd_Filter2_DevDashToQaDash() throws Exception {
-        RawApi rawApi = buildRawApi("https://subspace-dev-us-west-2.ods.tapestry.com/",
-                makeHeaders("host", "subspace-dev-us-west-2.ods.tapestry.com"));
+        RawApi rawApi = buildRawApi("https://worker-dev-us-west-2.internal.example.com/",
+                makeHeaders("host", "worker-dev-us-west-2.internal.example.com"));
 
         RawApi result = executeYamlFilterOnRawApi(FILTER2_YAML, rawApi);
 
-        assertEquals("subspace-qa-us-west-2.ods.tapestry.com", result.fetchReqHeaders().get("host").get(0));
+        assertEquals("worker-qa-us-west-2.internal.example.com", result.fetchReqHeaders().get("host").get(0));
     }
 }
