@@ -16,7 +16,7 @@ public class FilterConfigYamlParserTest {
             "      key:\n" +
             "        eq: host\n" +
             "      value:\n" +
-            "        regex: \"\\\\.(spi)?(dev|prod|prd)-api\\\\.tapestry\\\\.com$\"\n" +
+            "        regex: \"\\\\.(spi)?(dev|prod|prd)-api\\\\.example\\\\.com$\"\n" +
             "execute:\n" +
             "  type: single\n" +
             "  requests:\n" +
