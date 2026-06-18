@@ -263,16 +263,16 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_inventory",
                     }]),
-                    ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && func.isDemoAccount() ? [{
-                        label: "Traces",
-                        badge: <Badge status="info">Beta</Badge>,
-                        onClick: () => {
-                            navigate("/dashboard/observe/llm-observability");
-                            handleSelect("dashboard_observe_llm_observability");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_observe_llm_observability",
-                    }] : []),
+                    // ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && func.isDemoAccount() ? [{
+                    //     label: "Traces",
+                    //     badge: <Badge status="info">Beta</Badge>,
+                    //     onClick: () => {
+                    //         navigate("/dashboard/observe/llm-observability");
+                    //         handleSelect("dashboard_observe_llm_observability");
+                    //         setActive("active");
+                    //     },
+                    //     selected: leftNavSelected === "dashboard_observe_llm_observability",
+                    // }] : []),
                     ...(!(func.isDemoAccount() && (dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security")) ? [
                     {
                         label: "Recent Changes",

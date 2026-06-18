@@ -42,7 +42,7 @@ function ConversationHistory({ conversations, isInventory = false, testResults =
                             type={isUser ? 'request' : 'response'}
                             content={msg.message}
                             timestamp={msg.creationTimestamp} // Normalize then convert to seconds for ChatMessage
-                            customLabel={isInventory ? label : isUser ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE}
+                            customLabel={msg.customLabel || (isInventory ? label : isUser ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE)}
                             isVulnerable={msg.validation}
                             isCode={false}
                             onOpenAttempt={hasAttemptData ? () => handleOpenAttempt(index) : null}

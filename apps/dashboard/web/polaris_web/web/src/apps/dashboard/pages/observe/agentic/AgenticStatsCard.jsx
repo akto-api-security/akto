@@ -1,9 +1,11 @@
 import React from "react";
 import {
+    Badge,
     Box,
     Card,
     HorizontalStack,
     Text,
+    Tooltip,
     VerticalStack,
 } from "@shopify/polaris";
 import SmoothAreaChart from "@/apps/dashboard/pages/dashboard/new_components/SmoothChart";
@@ -81,11 +83,11 @@ export default function AgenticStatsCard({
                 <VerticalStack gap="2">
                     {breakdown.length > 0 && <SegmentBar segments={breakdown} />}
                     {breakdown.length > 0 && (
-                        <HorizontalStack gap="1" wrap>
-                            {breakdown.map((b) => {
+                        <HorizontalStack gap="1" wrap={false}>
+                            {breakdown.slice(0, 2).map((b) => {
                                 const active = activeFilter?.has(b.key ?? b.label);
                                 return (
-                                    <div
+                                    <Box
                                         key={b.label}
                                         onClick={() => onFilterClick?.(b.key ?? b.label)}
                                         className={active ? "agentic-chip agentic-chip--active" : "agentic-chip"}
@@ -93,12 +95,32 @@ export default function AgenticStatsCard({
                                         <HorizontalStack gap="1" blockAlign="center">
                                             <LegendDot color={b.color} />
                                             <Text variant="bodySm" color="subdued">
-                                                {b.label} ({b.count})
+                                                {b.label} ({typeof b.count === "number" ? b.count.toLocaleString("en-US") : b.count})
                                             </Text>
                                         </HorizontalStack>
-                                    </div>
+                                    </Box>
                                 );
                             })}
+                            {breakdown.length > 2 && (
+                                <Tooltip
+                                    content={
+                                        <VerticalStack gap="1">
+                                            {breakdown.slice(2).map(b => (
+                                                <HorizontalStack key={b.label} gap="1" blockAlign="center">
+                                                    <LegendDot color={b.color} />
+                                                    <Text variant="bodySm">
+                                                        {b.label} ({typeof b.count === "number" ? b.count.toLocaleString("en-US") : b.count})
+                                                    </Text>
+                                                </HorizontalStack>
+                                            ))}
+                                        </VerticalStack>
+                                    }
+                                >
+                                    <Box className="cursor-pointer">
+                                        <Badge size="small">+{breakdown.length - 2}</Badge>
+                                    </Box>
+                                </Tooltip>
+                            )}
                         </HorizontalStack>
                     )}
                 </VerticalStack>
