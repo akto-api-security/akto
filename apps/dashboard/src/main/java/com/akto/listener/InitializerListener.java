@@ -337,6 +337,7 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 4, TimeUnit.HOURS);
     }
 
+
     private static void raiseMixpanelEvent() {
 
         int now = Context.now();
@@ -2621,6 +2622,8 @@ public class InitializerListener implements ServletContextListener {
 
 
                         EmptyCollectionCleanupJob.emptyCollectionCleanupJobRunner();
+                        crons.seedNhiDefaultPoliciesScheduler();
+                        crons.evaluateNhiPoliciesScheduler();
 
                         // CleanInventory.cleanInventoryJobRunner();
 
