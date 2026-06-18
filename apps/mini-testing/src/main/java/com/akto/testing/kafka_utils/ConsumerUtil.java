@@ -51,7 +51,7 @@ public class ConsumerUtil {
     private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null;
     private static final LoggerMaker loggerMaker = new LoggerMaker(ConsumerUtil.class, LogDb.TESTING);
     public static ExecutorService executor = Executors.newFixedThreadPool(150);
-    private static final int maxRunTimeForTests = 10 * 60;
+    private static final int maxRunTimeForTests = 5 * 60;
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     private static final ConcurrentHashMap<ApiInfoKey, Integer> testedApisMap = new ConcurrentHashMap<>();
@@ -67,7 +67,7 @@ public class ConsumerUtil {
         return new SingleTestPayload(testingRunId, testingRunResultSummaryId, apiInfoKey, subcategory, testLogs, accountId);
     }
 
-    public void runTestFromMessage(String message, AtomicBoolean persistResult){
+    public void runTestFromMessage(String message){
         SingleTestPayload singleTestPayload = parseTestMessage(message);
         Context.accountId.set(singleTestPayload.getAccountId());
         TestExecutor executor = new TestExecutor();
@@ -84,25 +84,12 @@ public class ConsumerUtil {
             String sample = messagesList.get(messagesList.size() - 1);
             loggerMaker.infoAndAddToDb("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
             TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
-            // Consumer timeout may have already persisted TEST_TIMED_OUT; only one result per Kafka job.
-            if (!persistResult.compareAndSet(true, false)) {
-                loggerMaker.infoAndAddToDb("Skipping result insert for " + apiInfoKey + " subcategory " + subCategory + " — already timed out or persisted");
-                return;
-            }
             executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
 
             testedApisMap.put(apiInfoKey, Context.now());
 
             loggerMaker.insertImportantTestingLog("Test completed for: " + apiInfoKey + " with subcategory: " + subCategory + " in " + (Context.now() - timeNow) + " seconds");
         }
-    }
-
-    private boolean persistTimedOutResult(String message, AtomicBoolean persistResult) {
-        if (!persistResult.compareAndSet(true, false)) {
-            return false;
-        }
-        createTimedOutResultFromMessage(message);
-        return true;
     }
 
     private void createTimedOutResultFromMessage(String message){
@@ -195,15 +182,14 @@ public class ConsumerUtil {
                 loggerMaker.infoAndAddToDb("Thread [" + threadName + "] picked up record recordId=" + recordId + " " + message);
                 try {
                     if(!executor.isShutdown()){
-                        AtomicBoolean persistResult = new AtomicBoolean(true);
-                        Future<?> future = executor.submit(() -> runTestFromMessage(message, persistResult));
+                        Future<?> future = executor.submit(() -> runTestFromMessage(message));
                         firstRecordRead.set(true);
                         try {
                             future.get(maxRunTimeForTests, TimeUnit.SECONDS); 
                         } catch (InterruptedException | TimeoutException e) {
                             loggerMaker.errorAndAddToDb("Task timed out");
                             future.cancel(true);
-                            persistTimedOutResult(message, persistResult);
+                            createTimedOutResultFromMessage(message);
                         } catch(RejectedExecutionException e){
                             future.cancel(true);
                         } catch (Exception e) {

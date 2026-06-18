@@ -238,10 +238,7 @@ public class Executor {
                         // execute agentic test here
                         requestAttempted = true;
                         String testingRunResultSummaryIdHex = null;
-                        Object summaryIdFromVarMap = varMap.get("testRunResultSummaryId");
-                        if (summaryIdFromVarMap != null) {
-                            testingRunResultSummaryIdHex = summaryIdFromVarMap.toString();
-                        } else if (testingRunConfig != null && testingRunConfig.getTestRunResultSummaryId() != null) {
+                        if (testingRunConfig != null && testingRunConfig.getTestRunResultSummaryId() != null) {
                             testingRunResultSummaryIdHex = testingRunConfig.getTestRunResultSummaryId().toHexString();
                         }
                         agenticResults = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId(), testingRunResultSummaryIdHex);
