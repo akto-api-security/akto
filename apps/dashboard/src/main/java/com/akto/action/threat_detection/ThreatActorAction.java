@@ -4,7 +4,9 @@ import com.akto.ProtoMessageUtils;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dao.threat_detection.GuardrailComplianceInfosDao;
 import com.akto.dto.Config;
+import com.akto.dto.threat_detection.GuardrailComplianceInfo;
 import com.akto.dto.Config.AwsWafConfig;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
@@ -51,6 +53,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   List<DashboardThreatActor> actors;
   List<MaliciousPayloadsResponse> maliciousPayloadsResponses;
   List<ThreatActorPerCountry> actorsCountPerCountry;
+  List<BasicDBObject> guardrailComplianceInfos;
   int skip;
   static final int LIMIT = 50;
   long total;
@@ -768,5 +771,35 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public void setSort(Map<String, Integer> sort) {
     this.sort = sort;
+  }
+
+  public String fetchGuardrailComplianceInfos() {
+    try {
+      Bson emptyFilter = Filters.empty();
+      List<GuardrailComplianceInfo> guardrailComplianceList = GuardrailComplianceInfosDao.instance.findAll(emptyFilter);
+
+      this.guardrailComplianceInfos = new ArrayList<>();
+      for (GuardrailComplianceInfo guardrailCompliance : guardrailComplianceList) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put(Constants.ID, guardrailCompliance.getId());
+        obj.put(GuardrailComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, guardrailCompliance.getMapComplianceToListClauses());
+        obj.put(GuardrailComplianceInfo.AUTHOR, guardrailCompliance.getAuthor());
+        obj.put(GuardrailComplianceInfo.HASH, guardrailCompliance.getHash());
+        this.guardrailComplianceInfos.add(obj);
+      }
+
+      return SUCCESS.toUpperCase();
+    } catch (Exception e) {
+      loggerMaker.errorAndAddToDb(e, "Error while fetching guardrail compliance infos: " + e.getMessage(), LogDb.DASHBOARD);
+      return ERROR.toUpperCase();
+    }
+  }
+
+  public List<BasicDBObject> getGuardrailComplianceInfos() {
+    return guardrailComplianceInfos;
+  }
+
+  public void setGuardrailComplianceInfos(List<BasicDBObject> guardrailComplianceInfos) {
+    this.guardrailComplianceInfos = guardrailComplianceInfos;
   }
 }

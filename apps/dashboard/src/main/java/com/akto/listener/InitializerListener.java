@@ -47,6 +47,7 @@ import java.util.zip.ZipInputStream;
 import javax.servlet.ServletContextListener;
 
 import com.akto.dao.testing.*;
+import com.akto.dao.threat_detection.GuardrailComplianceInfosDao;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.EnumUtils;
@@ -164,6 +165,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.AllTestingEndpoints;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.ComplianceInfo;
+import com.akto.dto.threat_detection.GuardrailComplianceInfo;
 import com.akto.dto.testing.ComplianceMapping;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.RegexTestingEndpoints;
@@ -3773,10 +3775,16 @@ public class InitializerListener implements ServletContextListener {
                 try {
                     processRemedationFilesZip(testingTemplates);
                     processComplianceInfosFromZip(testingTemplates);
-                    
+
                 } catch (Exception e) {
                     e.printStackTrace();
                     logger.errorAndAddToDb("Unable to import remediations", LogDb.DASHBOARD);
+                }
+                try {
+                    processGuardrailComplianceInfosFromZip(testingTemplates);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    logger.errorAndAddToDb("Unable to import guardrail compliance", LogDb.DASHBOARD);
                 }
                 Map<String, ComplianceInfo> complianceCommonMap = getFromCommonDb();
                 Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(getAktoDefaultTestLibs());
@@ -4074,6 +4082,110 @@ public class InitializerListener implements ServletContextListener {
         } else {
             logger.debugAndAddToDb("Received null zip file");
         }        
+    }
+
+    private static Map<String, GuardrailComplianceInfo> getGuardrailComplianceFromDb() {
+        Bson emptyFilter = Filters.empty();
+        List<GuardrailComplianceInfo> guardrailComplianceInfosInDb = GuardrailComplianceInfosDao.instance.findAll(emptyFilter);
+        return guardrailComplianceInfosInDb.stream().collect(Collectors.toMap(GuardrailComplianceInfo::getId, Function.identity()));
+    }
+
+    public static void processGuardrailComplianceInfosFromZip(byte[] zipFile) {
+        if (zipFile != null) {
+            try (ByteArrayInputStream inputStream = new ByteArrayInputStream(zipFile);
+                    ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
+
+                ZipEntry entry;
+
+                int countUnchangedCompliances = 0;
+                int countTotalCompliances = 0;
+
+                Map<String, GuardrailComplianceInfo> mapIdToGuardrailComplianceInDb = getGuardrailComplianceFromDb();
+
+                while ((entry = zipInputStream.getNextEntry()) != null) {
+                    if (!entry.isDirectory()) {
+                        String entryName = entry.getName();
+
+                        boolean isGuardrailCompliance = entryName.contains("compliance/guardrails/");
+                        if (!isGuardrailCompliance) {
+                            logger.debugAndAddToDb(
+                                    String.format("%s not a guardrail compliance file, skipping", entryName),
+                                    LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        if (!entryName.endsWith(".conf")) {
+                            logger.debugAndAddToDb(
+                                    String.format("%s not a conf file, skipping", entryName),
+                                    LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        String[] filePathTokens = entryName.split("/");
+
+                        if (filePathTokens.length <= 1) {
+                            logger.debugAndAddToDb(
+                                String.format("%s has no directory pattern", entryName),
+                                LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        String fileSourceId = "guardrails/" + filePathTokens[filePathTokens.length - 1];
+
+                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[1024];
+                        int bytesRead;
+                        while ((bytesRead = zipInputStream.read(buffer)) != -1) {
+                            outputStream.write(buffer, 0, bytesRead);
+                        }
+
+                        String templateContent = new String(outputStream.toByteArray(), "UTF-8");
+
+                        if (templateContent.trim().isEmpty()) {
+                            logger.debugAndAddToDb(
+                                String.format("%s is empty, skipping", entryName),
+                                LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        int templateHashCode = templateContent.hashCode();
+
+                        Map<String, List<String>> contentMap = TestConfigYamlParser.parseComplianceTemplate(templateContent);
+
+                        GuardrailComplianceInfo guardrailComplianceInfoInDb = mapIdToGuardrailComplianceInDb.get(fileSourceId);
+                        countTotalCompliances++;
+
+                        if (guardrailComplianceInfoInDb == null) {
+                            GuardrailComplianceInfo newInfo = new GuardrailComplianceInfo(fileSourceId, contentMap, Constants._AKTO, templateHashCode, "");
+                            logger.debugAndAddToDb("Inserting guardrail compliance content: " + entryName, LogDb.DASHBOARD);
+                            GuardrailComplianceInfosDao.instance.insertOne(newInfo);
+                        } else if (guardrailComplianceInfoInDb.getHash() == templateHashCode) {
+                            countUnchangedCompliances++;
+                        } else {
+                            Bson updates = Updates.combine(
+                                Updates.set(GuardrailComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, contentMap),
+                                Updates.set(GuardrailComplianceInfo.HASH, templateHashCode));
+                            logger.debugAndAddToDb("Updating guardrail compliance content: " + entryName, LogDb.DASHBOARD);
+                            GuardrailComplianceInfosDao.instance.updateOne(Constants.ID, fileSourceId, updates);
+                        }
+                    }
+
+                    zipInputStream.closeEntry();
+                }
+
+                if (countTotalCompliances != countUnchangedCompliances) {
+                    logger.debugAndAddToDb(countUnchangedCompliances + "/" + countTotalCompliances + " guardrail compliances unchanged", LogDb.DASHBOARD);
+                }
+
+            } catch (Exception ex) {
+                cacheLoggerMaker.errorAndAddToDb(ex,
+                        String.format("Error while processing guardrail compliance files zip. Error %s", ex.getMessage()),
+                        LogDb.DASHBOARD);
+                ex.printStackTrace();
+            }
+        } else {
+            logger.debugAndAddToDb("Received null zip file for guardrail compliance");
+        }
     }
 
     public static void processTemplateFilesZip(byte[] zipFile, String author, String source, String repositoryUrl) {
