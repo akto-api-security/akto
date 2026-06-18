@@ -42,6 +42,8 @@ const AktoJax = () => {
     const [selectedMiniTestingService, setSelectedMiniTestingService] = useState('');
     const [enableAiJsDiscovery, setEnableAiJsDiscovery] = useState(false);
     const [collectionName, setCollectionName] = useState('');
+    const [userPrompt, setUserPrompt] = useState('');
+    const [crawlMode, setCrawlMode] = useState('DETERMINISTIC');
 
     const [availableModules, setAvailableModules] = useState([])
     const [selectedModule, setSelectedModule] = useState("")
@@ -87,7 +89,7 @@ const AktoJax = () => {
         });
 
         setLoading(true)
-        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls, crawlingTime, selectedModule, customHeadersMap, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages, collectionName, enableAiJsDiscovery).then((res) => {
+        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls, crawlingTime, selectedModule, customHeadersMap, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages, collectionName, enableAiJsDiscovery, userPrompt, crawlMode).then((res) => {
             func.setToast(true, false, "Crawler initiated successfully. Please check your dashboard for updates.")
         }).catch((err) => {
         }).finally(() => {
@@ -104,6 +106,8 @@ const AktoJax = () => {
             setApplicationPages('')
             setCollectionName('')
             setEnableAiJsDiscovery(false)
+            setUserPrompt('')
+            setCrawlMode('DETERMINISTIC')
         })
     }
 
@@ -140,6 +144,8 @@ const AktoJax = () => {
             setSelectedMiniTestingService(duplicateScanData.selectedMiniTestingService || '')
             setEnableAiJsDiscovery(duplicateScanData.enableAiJsDiscovery || false)
             setApiKey(duplicateScanData.apiKey || '')
+            setUserPrompt(duplicateScanData.userPrompt || '')
+            setCrawlMode(duplicateScanData.crawlMode || 'DETERMINISTIC')
             setCollectionName(duplicateScanData.collectionName || '')
 
             // Convert custom headers: object → array
@@ -195,6 +201,8 @@ const AktoJax = () => {
                 setSelectedMiniTestingService={setSelectedMiniTestingService}
                 enableAiJsDiscovery={enableAiJsDiscovery}
                 setEnableAiJsDiscovery={setEnableAiJsDiscovery}
+                crawlMode={crawlMode}
+                setCrawlMode={setCrawlMode}
             />
 
             <Box paddingBlockStart={3}><Divider /></Box>
@@ -203,6 +211,19 @@ const AktoJax = () => {
                 customHeaders={customHeaders}
                 setCustomHeaders={setCustomHeaders}
             />
+
+            {enableAiJsDiscovery && <>
+                <Box paddingBlockStart={3}><Divider /></Box>
+
+                <TextField
+                    label="Custom prompt for crawl (Optional)"
+                    value={userPrompt}
+                    onChange={(value) => setUserPrompt(value)}
+                    placeholder='E.g. Focus on crawling login and payment pages'
+                    helpText="This prompt will be used to guide the crawler to focus on specific areas of your application. It can help improve crawl efficiency and ensure critical paths are thoroughly tested."
+                    multiline={true}
+                />
+            </>}
 
             <Box paddingBlockStart={3}><Divider /></Box>
 

@@ -10,7 +10,9 @@ import {
     TimeCell,
     TitleCell,
     TokensCell,
+    UserCell,
 } from "./LLMCellRenderers";
+import { formatDurationMs } from "./constants";
 
 // AG Grid column definitions for the three LLM Observability tables. Kept in a .jsx
 // file (separate from constants.js) because they reference React cell renderers.
@@ -111,34 +113,43 @@ const countCol = (headerName, field, width = 90) => ({
 export const SESSION_COLUMN_DEFS = [
     titleCol("Session"),
     {
+        headerName: "User",
+        field: "userName",
+        width: 150,
+        cellRenderer: UserCell,
+        cellStyle: FLEX_CELL,
+        filter: "agSetColumnFilter",
+        sortable: true,
+    },
+    {
+        headerName: "Model",
+        field: "_models",
+        width: 200,
+        cellRenderer: ModelsCell,
+        cellStyle: FLEX_CELL,
+        ...NO_FILTER,
+    },
+    {
         headerName: "Application",
         field: "serviceId",
-        width: 190,
+        width: 160,
         cellRenderer: AppCell,
         cellStyle: FLEX_CELL,
         filter: "agSetColumnFilter",
         sortable: true,
     },
+    countCol("Traces", "messageCount", 85),
+    tokensCol,
+    costCol,
     {
-        headerName: "User",
-        field: "userName",
-        width: 130,
-        cellStyle: FLEX_CELL,
-        filter: "agSetColumnFilter",
-        sortable: true,
-    },
-    countCol("Traces", "messageCount", 80),
-    {
-        headerName: "Models",
-        field: "_models",
-        width: 180,
-        cellRenderer: ModelsCell,
-        cellStyle: FLEX_CELL,
+        // Session total duration can be hours — no alarming colour, plain text only.
+        headerName: "Duration",
+        field: "durationMs",
+        width: 110,
+        valueFormatter: p => formatDurationMs(p.value),
+        cellStyle: { ...FLEX_CELL, fontSize: 12, color: "#202223" },
         ...NO_FILTER,
     },
-    tokensCol,
-    durationCol,
-    costCol,
     timeCol("latestTimestamp", "Last activity"),
     idCol("Session ID", "sessionIdentifier"),
 ];
@@ -147,6 +158,7 @@ export const SESSION_COLUMN_DEFS = [
 // clickable session-id column when the table isn't already scoped to a session.
 export function getTraceColumnDefs({ showSession, onSessionClick } = {}) {
     return [
+        timeCol("latestTimestamp"),
         titleCol("Trace"),
         {
             headerName: "Application",
@@ -175,7 +187,6 @@ export function getTraceColumnDefs({ showSession, onSessionClick } = {}) {
         tokensCol,
         durationCol,
         costCol,
-        timeCol("latestTimestamp"),
         ...(showSession ? [{
             headerName: "Session",
             field: "sessionIdentifier",

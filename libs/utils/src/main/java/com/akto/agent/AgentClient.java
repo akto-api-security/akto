@@ -40,7 +40,7 @@ public class AgentClient {
     // Custom HTTP client with 2-minute timeout for agent requests
     private static final OkHttpClient agentHttpClient = CoreHTTPClient.client.newBuilder()
             .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS) // 2 minutes timeout
+            .readTimeout(600, TimeUnit.SECONDS) // 10 minutes timeout
             .writeTimeout(30, TimeUnit.SECONDS)
             .build();
     

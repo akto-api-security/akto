@@ -25,7 +25,7 @@ import LocalStore from "../../../main/LocalStorageStore";
 import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import JiraTicketDisplay from "../../components/shared/JiraTicketDisplay";
 import { getMethod } from "../observe/GetPrettifyEndpoint";
-import { getDashboardCategory, mapLabel, CATEGORY_API_SECURITY, CATEGORY_DAST } from "../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, CATEGORY_API_SECURITY, CATEGORY_DAST, isEndpointSecurityCategory } from "../../../main/labelHelper";
 import TooltipWithLink from "../../components/shared/TooltipWithLink";
 import { buildRunStatusCell } from "./TestRunsPage/runStatusUtils";
 
@@ -837,18 +837,23 @@ const transform = {
     if (category) {
       type = category;
     }
-    const resp = await this.getAllSubcategoriesData(false, type, setTestsLoaded)
+    let resp = {}
+    if(!isEndpointSecurityCategory()){
+      resp = await this.getAllSubcategoriesData(false, type, setTestsLoaded)
+    }else{
+      return;
+    }
     let subCategoryMap = {};
-    resp.subCategories.forEach((x) => {
+    resp?.subCategories.forEach((x) => {
       func.trimContentFromSubCategory(x)
       subCategoryMap[x.name] = x;
     });
     let subCategoryFromSourceConfigMap = {};
-    resp.testSourceConfigs.forEach((x_1) => {
+    resp?.testSourceConfigs.forEach((x_1) => {
       subCategoryFromSourceConfigMap[x_1.id] = x_1;
     });
     let categoryMap = {};
-    resp.categories.forEach((category) => {
+    resp?.categories.forEach((category) => {
       categoryMap[category.name] = category;
     });
     LocalStore.getState().setSubCategoryMap(subCategoryMap);

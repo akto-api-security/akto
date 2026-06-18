@@ -170,11 +170,11 @@ const api = {
         })
     },
 
-    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHexId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages, collectionName, enableAiJsDiscovery) {
+    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHexId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages, collectionName, enableAiJsDiscovery, userPrompt, crawlMode) {
         return request({
             url: '/api/initiateCrawler',
             method: 'post',
-            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHexId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages, collectionName, enableAiJsDiscovery},
+            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHexId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages, collectionName, enableAiJsDiscovery, userPrompt, crawlMode},
             timeout: 360000
         })
     },

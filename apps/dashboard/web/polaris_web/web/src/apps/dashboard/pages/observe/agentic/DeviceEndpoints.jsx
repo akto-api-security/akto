@@ -165,7 +165,7 @@ function TopSection({ summary }) {
 }
 
 // ─── OS icon helpers ──────────────────────────────────────────────────────────
-function OsIcon({ os }) {
+export function OsIcon({ os }) {
     if (os === "mac")     return <img src="/public/os-mac.svg"     width={15} height={15} alt="macOS" />;
     if (os === "windows") return <img src="/public/os-windows.svg" width={15} height={15} alt="Windows" />;
     return                       <img src="/public/os-linux.svg"   width={15} height={15} alt="Linux" />;
