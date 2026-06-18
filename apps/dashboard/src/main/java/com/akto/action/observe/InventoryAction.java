@@ -133,6 +133,7 @@ public class InventoryAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+
     public long getNewCount() {
         return newCount;
     }
