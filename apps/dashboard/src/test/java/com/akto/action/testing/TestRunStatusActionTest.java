@@ -57,6 +57,17 @@ public class TestRunStatusActionTest extends MongoBasedTest {
         TestingRunResultDao.instance.insertOne(runResult);
     }
 
+    // a result with no testResults => coalesced statusMessage resolves to null,
+    // which must not break the status-code aggregation for other rows
+    private void insertResultWithoutMessage(ObjectId summaryId) {
+        ApiInfo.ApiInfoKey key = new ApiInfo.ApiInfoKey(1, "/path" + (urlCounter++), URLMethods.Method.GET);
+        TestingRunResult runResult = new TestingRunResult(
+                new ObjectId(), key, "BOLA", "BOLA",
+                new ArrayList<>(), false, new ArrayList<SingleTypeInfo>(),
+                80, Context.now(), Context.now(), summaryId, null, new ArrayList<>());
+        TestingRunResultDao.instance.insertOne(runResult);
+    }
+
     private Map<String, Integer> fetchCounts(ObjectId summaryId) {
         TestRunStatusAction action = new TestRunStatusAction();
         action.setTestingRunResultSummaryHexIds(Collections.singletonList(summaryId.toHexString()));
@@ -66,6 +77,11 @@ public class TestRunStatusActionTest extends MongoBasedTest {
         assertNotNull(summaries);
         assertTrue(summaries.containsKey(summaryId.toHexString()));
         return summaries.get(summaryId.toHexString());
+    }
+
+    // status-code buckets are only present when count > 0, so read them null-safely
+    private int count(Map<String, Integer> counts, String key) {
+        return counts.getOrDefault(key, 0);
     }
 
     // ---------- input validation ----------
@@ -131,28 +147,83 @@ public class TestRunStatusActionTest extends MongoBasedTest {
     public void testHttp401() {
         ObjectId summaryId = new ObjectId();
         insertResult(summaryId, messageResult("{\"statusCode\": 401, \"body\": \"Unauthorized\"}"), false);
-        assertEquals(1, (int) fetchCounts(summaryId).get("http401"));
+        assertEquals(1, count(fetchCounts(summaryId), "http_401"));
     }
 
     @Test
     public void testHttp403() {
         ObjectId summaryId = new ObjectId();
         insertResult(summaryId, messageResult("{\"statusCode\": 403, \"body\": \"Forbidden\"}"), false);
-        assertEquals(1, (int) fetchCounts(summaryId).get("http403"));
+        assertEquals(1, count(fetchCounts(summaryId), "http_403"));
     }
 
     @Test
     public void testHttp5xx() {
         ObjectId summaryId = new ObjectId();
         insertResult(summaryId, messageResult("{\"statusCode\": 503, \"body\": \"Service Unavailable\"}"), false);
-        assertEquals(1, (int) fetchCounts(summaryId).get("http5xx"));
+        assertEquals(1, count(fetchCounts(summaryId), "http_503"));
     }
 
     @Test
     public void testHttp429() {
         ObjectId summaryId = new ObjectId();
         insertResult(summaryId, messageResult("{\"statusCode\": 429, \"body\": \"Too Many Requests\"}"), false);
-        assertEquals(1, (int) fetchCounts(summaryId).get("http429"));
+        assertEquals(1, count(fetchCounts(summaryId), "http_429"));
+    }
+
+    @Test
+    public void test404SurfacedByItsOwnCode() {
+        ObjectId summaryId = new ObjectId();
+        // a client error that is not specifically called out (404) must still be surfaced by its code
+        insertResult(summaryId, messageResult("{\"statusCode\": 404, \"body\": \"Not Found\"}"), false);
+        Map<String, Integer> counts = fetchCounts(summaryId);
+        assertEquals(1, count(counts, "http_404"));
+        assertEquals(0, count(counts, "http_403"));
+    }
+
+    @Test
+    public void testEachStatusCodeSurfacedSeparately() {
+        ObjectId summaryId = new ObjectId();
+        insertResult(summaryId, messageResult("{\"statusCode\": 429, \"body\": \"Too Many Requests\"}"), false);
+        insertResult(summaryId, messageResult("{\"statusCode\": 401, \"body\": \"Unauthorized\"}"), false);
+        insertResult(summaryId, messageResult("{\"statusCode\": 404, \"body\": \"Not Found\"}"), false);
+        Map<String, Integer> counts = fetchCounts(summaryId);
+        assertEquals(1, count(counts, "http_429"));
+        assertEquals(1, count(counts, "http_401"));
+        assertEquals(1, count(counts, "http_404"));
+    }
+
+    @Test
+    public void testDistinct5xxCodesSurfacedSeparately() {
+        ObjectId summaryId = new ObjectId();
+        insertResult(summaryId, messageResult("{\"statusCode\": 500, \"body\": \"Internal Server Error\"}"), false);
+        insertResult(summaryId, messageResult("{\"statusCode\": 502, \"body\": \"Bad Gateway\"}"), false);
+        insertResult(summaryId, messageResult("{\"statusCode\": 502, \"body\": \"Bad Gateway\"}"), false);
+        Map<String, Integer> counts = fetchCounts(summaryId);
+        assertEquals(1, count(counts, "http_500"));
+        assertEquals(2, count(counts, "http_502"));
+    }
+
+    @Test
+    public void test2xxResponsesNotCounted() {
+        ObjectId summaryId = new ObjectId();
+        insertResult(summaryId, messageResult("{\"statusCode\": 200, \"body\": \"OK\"}"), false);
+        Map<String, Integer> counts = fetchCounts(summaryId);
+        assertEquals(0, count(counts, "http_200"));
+    }
+
+    @Test
+    public void testNullMessageRowsDoNotBreakStatusCodeCounts() {
+        ObjectId summaryId = new ObjectId();
+        // rows whose coalesced message is null must be tolerated by the $regexFind aggregation
+        insertResultWithoutMessage(summaryId);
+        insertResultWithoutMessage(summaryId);
+        insertResult(summaryId, messageResult("{\"statusCode\": 403, \"body\": \"Forbidden\"}"), false);
+        insertResult(summaryId, messageResult("{\"statusCode\": 500, \"body\": \"Internal Server Error\"}"), false);
+
+        Map<String, Integer> counts = fetchCounts(summaryId);
+        assertEquals(1, count(counts, "http_403"));
+        assertEquals(1, count(counts, "http_500"));
     }
 
     @Test
@@ -171,7 +242,7 @@ public class TestRunStatusActionTest extends MongoBasedTest {
         ObjectId summaryId = new ObjectId();
         // vulnerable=true results are real findings (Issues column), not execution problems
         insertResult(summaryId, messageResult("{\"statusCode\": 403, \"body\": \"Forbidden\"}"), true);
-        assertEquals(0, (int) fetchCounts(summaryId).get("http403"));
+        assertEquals(0, count(fetchCounts(summaryId), "http_403"));
     }
 
     @Test
@@ -187,10 +258,10 @@ public class TestRunStatusActionTest extends MongoBasedTest {
         assertEquals("SUCCESS", action.fetchTestRunStatusSummaries());
 
         Map<String, Map<String, Integer>> summaries = action.getTestRunStatusSummaries();
-        assertEquals(1, (int) summaries.get(summaryA.toHexString()).get("http403"));
-        assertEquals(0, (int) summaries.get(summaryA.toHexString()).get("domainUnreachable"));
-        assertEquals(1, (int) summaries.get(summaryB.toHexString()).get("domainUnreachable"));
-        assertEquals(0, (int) summaries.get(summaryB.toHexString()).get("http403"));
+        assertEquals(1, count(summaries.get(summaryA.toHexString()), "http_403"));
+        assertEquals(0, count(summaries.get(summaryA.toHexString()), "domainUnreachable"));
+        assertEquals(1, count(summaries.get(summaryB.toHexString()), "domainUnreachable"));
+        assertEquals(0, count(summaries.get(summaryB.toHexString()), "http_403"));
     }
 
     @Test
@@ -202,9 +273,9 @@ public class TestRunStatusActionTest extends MongoBasedTest {
         insertResult(summaryId, configResult(), false);
 
         Map<String, Integer> counts = fetchCounts(summaryId);
-        assertEquals(1, (int) counts.get("domainUnreachable"));
-        assertEquals(1, (int) counts.get("http403"));
-        assertEquals(1, (int) counts.get("http5xx"));
-        assertEquals(1, (int) counts.get("needConfig"));
+        assertEquals(1, count(counts, "domainUnreachable"));
+        assertEquals(1, count(counts, "http_403"));
+        assertEquals(1, count(counts, "http_500"));
+        assertEquals(1, count(counts, "needConfig"));
     }
 }
