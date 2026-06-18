@@ -54,7 +54,17 @@ else:
 
 # ── Logging helpers ───────────────────────────────────────────────────────────
 
-LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", f"~/akto/{AKTO_CONNECTOR}-hooks/logs"))
+_CONNECTOR_LOG_DIR: Dict[str, str] = {
+    "claude_code_cli":  "~/.claude/akto/logs",
+    "claude_agent_sdk": "~/.claude/akto/logs",
+    "cursor":           "~/.cursor/akto/chat-logs",
+    "gemini_cli":       "~/.gemini/akto/chat-logs",
+    "codex_cli":        "~/.codex/akto/logs",
+    "github":           "~/akto/.github/akto/vscode/logs",
+    "opencode":         "~/.config/opencode/akto/logs",
+}
+_default_log_dir = _CONNECTOR_LOG_DIR.get(AKTO_CONNECTOR, f"~/akto/{AKTO_CONNECTOR}-hooks/logs")
+LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", _default_log_dir))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
 
@@ -272,6 +282,7 @@ def save_session_state(key: str, session_info: Dict[str, Any], logger: logging.L
         row = data.get(key, {}) if isinstance(data.get(key), dict) else {}
         row.update({k: v for k, v in session_info.items() if v is not None})
         data[key] = row
+        os.makedirs(os.path.dirname(SESSION_STATE_PATH), exist_ok=True)
         tmp_path = SESSION_STATE_PATH + ".tmp"
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(data, f)
