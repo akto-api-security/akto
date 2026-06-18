@@ -8,6 +8,8 @@ import lombok.Setter;
 
 import org.bson.types.ObjectId;
 
+import java.util.List;
+
 public class MetricData {
     private ObjectId id;
     private String metricId;
@@ -29,10 +31,40 @@ public class MetricData {
     }
 
     public enum MetricType {
-        LATENCY, SUM, MAX, GAUGE
+        LATENCY, SUM, MAX, GAUGE, TOP_N
     }
 
     private MetricType metricType;
+    private List<TopNItem> topItems;
+
+    public static class TopNItem {
+        private String key;
+        private float value;
+
+        public TopNItem() {
+        }
+
+        public TopNItem(String key, float value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        public String getKey() {
+            return key;
+        }
+
+        public void setKey(String key) {
+            this.key = key;
+        }
+
+        public float getValue() {
+            return value;
+        }
+
+        public void setValue(float value) {
+            this.value = value;
+        }
+    }
     public enum Name {
         // Runtime metrics
         RT_KAFKA_RECORD_COUNT("Kafka Records Count", "Number of records processed by runtime module"),
@@ -197,5 +229,13 @@ public class MetricData {
 
     public void setModuleType(String moduleType) {
         this.moduleType = moduleType;
+    }
+
+    public List<TopNItem> getTopItems() {
+        return topItems;
+    }
+
+    public void setTopItems(List<TopNItem> topItems) {
+        this.topItems = topItems;
     }
 } 
