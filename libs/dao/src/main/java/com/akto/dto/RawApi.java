@@ -264,7 +264,11 @@ public class RawApi {
     }
 
     public RawApi copy() {
-        return new RawApi(this.request.copy(), this.response.copy(), this.originalMessage);
+        RawApi copy = new RawApi(this.request.copy(), this.response.copy(), this.originalMessage);
+        if (this.conversationsList != null) {
+            copy.setConversationsList(new ArrayList<>(this.conversationsList));
+        }
+        return copy;
     }
 
     public RawApi() { }
