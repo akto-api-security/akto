@@ -6,6 +6,7 @@ import func from "@/util/func";
 import { useEffect, useState } from "react";
 import testingApi from "../../testing/api"
 import threatDetectionApi from "../api"
+import guardrailApi from "../../guardrails/api"
 import issuesApi from "../../issues/api"
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
 import TooltipText from "../../../components/shared/TooltipText";
@@ -72,6 +73,8 @@ function SampleDetails(props) {
     const [projectToWorkItemsMap, setProjectToWorkItemsMap] = useState({});
     const [projectId, setProjectId] = useState("");
     const [workItemType, setWorkItemType] = useState("");
+
+    const [guardrailPolicyNames, setGuardrailPolicyNames] = useState([]);
 
     const fetchRemediationInfo = async() => {
         if(moreInfoData?.templateId !== undefined){
@@ -601,8 +604,18 @@ function SampleDetails(props) {
         }
     }, [])
 
+    useEffect(() => {
+        if (!useGuardrailDescription) return;
+        guardrailApi.fetchGuardrailPolicies().then((resp) => {
+            const names = (resp?.guardrailPolicies || []).map((policy) => policy.name);
+            setGuardrailPolicyNames(names);
+        }).catch(() => {});
+    }, [])
+
     const openTest = (id) => {
-        const navigateUrl = window.location.origin + "/dashboard/protection/threat-policy?policy=" + id
+        const navigateUrl = useGuardrailDescription
+            ? window.location.origin + "/dashboard/guardrails/policies?policy=" + id
+            : window.location.origin + "/dashboard/protection/threat-policy?policy=" + id
         window.open(navigateUrl, "_blank")
     }
 
@@ -868,17 +881,24 @@ Reference URL: ${window.location.href}`.trim();
     }
 
     function TitleComponent () {
+        const templateId = moreInfoData?.templateId;
+        const isTitleClickable = !useGuardrailDescription || guardrailPolicyNames.includes(templateId);
+        const titleText = (
+            <Box maxWidth="180px">
+                <TooltipText tooltip={templateId} text={templateId} textProps={{variant: 'headingMd'}} />
+            </Box>
+        );
         return(
             <Box padding={"4"} paddingBlockStart={"0"} maxWidth="100%">
                 <HorizontalStack wrap={false} align="space-between" gap={"6"}>
                     <Box maxWidth="50%">
                         <VerticalStack gap={"2"}>
                             <HorizontalStack gap={"2"} align="start">
-                                <Button onClick={() => openTest(moreInfoData?.templateId)} removeUnderline plain monochrome>
-                                    <Box maxWidth="180px">
-                                        <TooltipText tooltip={moreInfoData?.templateId} text={moreInfoData?.templateId} textProps={{variant: 'headingMd'}}  />
-                                    </Box>
-                                </Button> 
+                                {isTitleClickable ? (
+                                    <Button onClick={() => openTest(templateId)} removeUnderline plain monochrome>
+                                        {titleText}
+                                    </Button>
+                                ) : titleText}
                                 <div className={`badge-wrapper-${severity}`}>
                                     <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                                 </div>

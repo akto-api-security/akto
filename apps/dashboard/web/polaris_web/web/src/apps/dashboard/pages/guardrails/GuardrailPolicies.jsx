@@ -129,11 +129,29 @@ function GuardrailPolicies() {
     const [loading, setLoading] = useState(false);
     const [editingPolicy, setEditingPolicy] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
+    const [pendingPolicyName, setPendingPolicyName] = useState(null);
 
     // Load guardrail policies on component mount
     useEffect(() => {
         fetchGuardrailPolicies();
     }, []);
+
+    useEffect(() => {
+        const policyName = new URLSearchParams(window.location.search).get("policy");
+        if (policyName) {
+            setPendingPolicyName(policyName);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!pendingPolicyName || policyData.length === 0) return;
+
+        const match = policyData.find((row) => row.originalData?.name === pendingPolicyName);
+        if (match) {
+            handleEditPolicy(match);
+        }
+        setPendingPolicyName(null);
+    }, [pendingPolicyName, policyData]);
 
     const fetchGuardrailPolicies = async () => {
         setLoading(true);
