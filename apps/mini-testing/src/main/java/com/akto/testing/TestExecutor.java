@@ -1093,32 +1093,12 @@ public class TestExecutor {
     }
 
     private static final ExecutorService legacyTestTimeoutExecutor = Executors.newCachedThreadPool();
-    private static final int MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS = 10 * 60;
+    private static final int MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS = 5 * 60;
 
     /**
      * Executes legacy testing approach (fallback mode)
      * @return TestingRunResult if test executed, null otherwise
      */
-    private static TestingRunConfig isolateTestingRunConfig(TestingRunConfig source, ObjectId testRunResultSummaryId) {
-        if (source == null) {
-            return null;
-        }
-        TestingRunConfig copy = new TestingRunConfig();
-        copy.setId(source.getId());
-        copy.setCollectionWiseApiInfoKey(source.getCollectionWiseApiInfoKey());
-        copy.setTestSubCategoryList(source.getTestSubCategoryList());
-        copy.setAuthMechanismId(source.getAuthMechanismId());
-        copy.setOverriddenTestAppUrl(source.getOverriddenTestAppUrl());
-        copy.setTestRoleId(source.getTestRoleId());
-        copy.setCleanUp(source.getCleanUp());
-        copy.setConfigsAdvancedSettings(source.getConfigsAdvancedSettings());
-        copy.setTestSuiteIds(source.getTestSuiteIds());
-        copy.setAutoTicketingDetails(source.getAutoTicketingDetails());
-        copy.setConversationId(source.getConversationId());
-        copy.setTestRunResultSummaryId(testRunResultSummaryId);
-        return copy;
-    }
-
     private TestingRunResult executeLegacyTesting(ApiInfo.ApiInfoKey apiInfoKey, ObjectId summaryId, 
             List<String> messages, TestConfig testConfig, List<TestingRunResult.TestLog> testLogs, 
             AtomicBoolean isApiInfoTested) {
@@ -1174,20 +1154,18 @@ public class TestExecutor {
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
         ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, String message) {
-            RawApi templateRawApi = TestingConfigurations.getInstance().getRawApiMap().get(apiInfoKey);
-            if (templateRawApi == null) {
-                templateRawApi = RawApi.buildFromMessage(message, true);
-                TestingConfigurations.getInstance().getRawApiMap().put(apiInfoKey, templateRawApi);
+            RawApi rawApi = TestingConfigurations.getInstance().getRawApiMap().get(apiInfoKey);
+            if (rawApi == null) {
+                rawApi = RawApi.buildFromMessage(message, true);
+                TestingConfigurations.getInstance().getRawApiMap().put(apiInfoKey, rawApi);
             }
-            // Kafka consumers run (api, subcategory) jobs in parallel; never mutate the cached RawApi.
-            RawApi rawApi = templateRawApi.copy();
-
+                     
             TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
             AuthMechanism attackerAuthMechanism = null;
             if (attackerTestRole == null) {
                 loggerMaker.infoAndAddToDb("ATTACKER_TOKEN_ALL test role not found");
             } else {
-                attackerAuthMechanism = attackerTestRole.findMatchingAuthMechanism(templateRawApi);
+                attackerAuthMechanism = attackerTestRole.findMatchingAuthMechanism(rawApi);
             }
             return runTestNew(apiInfoKey, testRunId, testingUtil.getSampleMessageStore(), attackerAuthMechanism, testingUtil.getCustomAuthTypes(), testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs, rawApi);
     }
@@ -1335,12 +1313,14 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
             testSubType + " logId " + testExecutionLogId);
 
-        TestingRunConfig perTestRunConfig = isolateTestingRunConfig(testingRunConfig, testRunResultSummaryId);
+        if (testingRunConfig != null && testRunResultSummaryId != null) {
+            testingRunConfig.setTestRunResultSummaryId(testRunResultSummaryId);
+        }
 
         com.akto.test_editor.execution.Executor executor = new Executor();
-        executor.overrideTestUrl(rawApi, perTestRunConfig);
+        executor.overrideTestUrl(rawApi, testingRunConfig);
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
-                rawApi, varMap, auth, attackerAuthMechanism, testExecutionLogId, perTestRunConfig, customAuthTypes, testConfig.getStrategy());
+                rawApi, varMap, auth, attackerAuthMechanism, testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
         YamlTestResult testResults = yamlTestTemplate.run(debug, testLogs);
         if (testResults == null || testResults.getTestResults().isEmpty()) {
             List<GenericTestResult> res = new ArrayList<>();
@@ -1385,10 +1365,10 @@ public class TestExecutor {
             }
         }
 
-        if (perTestRunConfig != null && perTestRunConfig.getCleanUp()) {
+        if (testingRunConfig!=null && testingRunConfig.getCleanUp()) {
             try {
                 loggerMaker.warnAndAddToDb("Initiating the cleanUp for apiInfoKey " + apiInfoKey + "test " + testSubType + " logId " + testExecutionLogId);
-                cleanUpTestArtifacts(Collections.singletonList(ret), apiInfoKey, sampleMessageStore, perTestRunConfig);
+                cleanUpTestArtifacts(Collections.singletonList(ret), apiInfoKey, sampleMessageStore, testingRunConfig);
             } catch(Exception e){
                 loggerMaker.errorAndAddToDb(e, "Error while cleaning up test artifacts: " + e.getMessage());
             }
