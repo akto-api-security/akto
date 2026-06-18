@@ -114,20 +114,24 @@ function UsersAndDevices() {
         [getRiskScoreStatus],
     );
 
-    const applyMaliciousBadgeToUsers = useCallback((maliciousSkillsSet, isMountedRef) => {
+    const applyMaliciousBadgeToUsers = useCallback((maliciousSkillsSet, misconfiguredCollectionIdsSet, isMountedRef) => {
         if (!isMountedRef.current) return;
         setData((prev) => ({
             ...prev,
             users: prev.users.map((row) => {
                 const skillNames = row.uniqueSkillNames || new Set();
                 const hasMalicious = [...skillNames].some((s) => maliciousSkillsSet.has(s));
-                const groupNameDisplay = hasMalicious ? (
+                const collectionIds = (row.collections || []).map((c) => c.id);
+                const hasMisconfigured = collectionIds.some((id) => misconfiguredCollectionIdsSet.has(id));
+                const badges = [];
+                if (hasMalicious) badges.push(<Badge key="malicious" size="small" status="critical">Malicious Skills</Badge>);
+                const groupNameDisplay = badges.length > 0 ? (
                     <HorizontalStack gap="2" align="start" wrap={false}>
                         <Text>{row.groupName}</Text>
-                        <Badge size="small" status="critical">Malicious Skills</Badge>
+                        {badges}
                     </HorizontalStack>
                 ) : row.groupName;
-                return { ...row, hasMaliciousSkill: hasMalicious, groupNameDisplay };
+                return { ...row, hasMaliciousSkill: hasMalicious, hasMisconfiguredConfig: hasMisconfigured, groupNameDisplay };
             }),
         }));
         setUserEnrichVersion((v) => v + 1);
@@ -142,10 +146,10 @@ function UsersAndDevices() {
         });
         if (!allCollectionIds.length) return;
 
-        const { maliciousSkills } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
+        const { maliciousSkills, misconfiguredCollectionIds } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
 
         if (!isMountedRef.current) return;
-        applyMaliciousBadgeToUsers(maliciousSkills, isMountedRef);
+        applyMaliciousBadgeToUsers(maliciousSkills, misconfiguredCollectionIds || new Set(), isMountedRef);
     }, [applyMaliciousBadgeToUsers]);
 
     async function fetchData(isMountedRef = { current: true }) {

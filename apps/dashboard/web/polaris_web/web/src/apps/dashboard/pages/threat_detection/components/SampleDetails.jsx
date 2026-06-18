@@ -19,6 +19,7 @@ import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import OwaspTag from "../../guardrails/components/OwaspTag";
+import ComplianceTags from "../../guardrails/components/ComplianceTags";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
@@ -145,6 +146,7 @@ function SampleDetails(props) {
                         )}
                     </div>
                 ))}
+                <ComplianceTags complianceMap={moreInfoData?.complianceMap} />
             </VerticalStack>
         </Box>
     ) : (
@@ -1014,8 +1016,8 @@ Reference URL: ${window.location.href}`.trim();
         <LayoutWithTabs
             key={`tabs-comp-${eventId || 'default'}`}
             tabs={ window.location.href.indexOf("guardrails") > -1
-                ? (showSessionContext ? [overviewTab, ValuesTab, sessionContextTab] : [overviewTab, ValuesTab])
-                : (showSessionContext ? [overviewTab, timelineTab, ValuesTab, sessionContextTab, remediationTab] : [overviewTab, timelineTab, ValuesTab, remediationTab])}
+                ? (showSessionContext ? [overviewTab, ValuesTab, sessionContextTab] : [overviewTab, ValuesTab]).filter(Boolean)
+                : (showSessionContext ? [overviewTab, timelineTab, ValuesTab, sessionContextTab, remediationTab] : [overviewTab, timelineTab, ValuesTab, remediationTab]).filter(Boolean)}
             currTab = {() => {}}
         />
     )

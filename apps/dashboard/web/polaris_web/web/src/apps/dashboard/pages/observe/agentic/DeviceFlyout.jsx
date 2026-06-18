@@ -52,6 +52,17 @@ function computeRiskFactors(device, agents) {
         });
     }
 
+    const misconfiguredSkills = agents.filter(a => a.isMisconfigured);
+    if (misconfiguredSkills.length > 0) {
+        const names = misconfiguredSkills.map(a => a.endpoint).join(", ");
+        factors.push({
+            severity: "high",
+            title: `${misconfiguredSkills.length} Misconfigured Skill${misconfiguredSkills.length > 1 ? "s" : ""}`,
+            description: `Contains misconfigured skill: ${names}`,
+            type: "misconfigured_config",
+        });
+    }
+
     return factors;
 }
 

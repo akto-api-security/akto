@@ -87,12 +87,14 @@ function Endpoints() {
         return groups.map((group) => {
             const showPersonal = group.hasPersonalAccount && group.rowType !== ROW_TYPES.SKILL;
             const showLocalMcp = group.hasLocalMcpServer && group.rowType !== ROW_TYPES.SKILL;
-            const groupNameDisplay = (showPersonal || showLocalMcp)
+            const showMisconfigured = group.hasMisconfiguredConfig && group.rowType !== ROW_TYPES.SKILL;
+            const groupNameDisplay = (showPersonal || showLocalMcp || showMisconfigured)
                 ? (
                     <HorizontalStack gap="2" align="start" wrap={false}>
                         <Text>{group.groupName}</Text>
                         {showPersonal && <Badge size="small" status="warning">Contains personal account</Badge>}
                         {showLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
+                        {showMisconfigured && <Badge size="small" status="attention">Misconfigured</Badge>}
                     </HorizontalStack>
                 )
                 : group.groupName;
@@ -116,16 +118,18 @@ function Endpoints() {
         });
     }, [getRiskScoreStatus]);
 
-    const applySkillRiskScores = useCallback((scoreMap, maliciousSkills, isMountedRef) => {
+    const applySkillRiskScores = useCallback((scoreMap, maliciousSkills, misconfiguredSkills, isMountedRef) => {
         if (!isMountedRef.current) return;
         setData((prev) => {
             const updatedSkills = prev.skills.map((row) => {
                 const riskScore = scoreMap[row.groupName] || 0;
                 const isMalicious = maliciousSkills.has(row.groupName);
+                const isMisconfigured = misconfiguredSkills.has(row.groupName);
                 const groupNameDisplay = (
                     <HorizontalStack gap="2" align="start" wrap={false}>
                         <Text>{row.groupName}</Text>
                         {isMalicious && <Badge size="small" status="critical">Malicious</Badge>}
+                        {isMisconfigured && <Badge size="small" status="attention">Misconfigured</Badge>}
                     </HorizontalStack>
                 );
                 return {
@@ -133,6 +137,7 @@ function Endpoints() {
                     riskScore,
                     maxRiskScore: riskScore,
                     isMalicious,
+                    isMisconfigured,
                     groupNameDisplay,
                     riskScoreComp: riskScore
                         ? <Badge status={getRiskScoreStatus(riskScore)} size="small">{riskScore}</Badge>
@@ -161,10 +166,10 @@ function Endpoints() {
             });
         });
 
-        const { skillScoreMap, maliciousSkills } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
+        const { skillScoreMap, maliciousSkills, misconfiguredSkills } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
 
         if (!isMountedRef.current) return;
-        applySkillRiskScores(skillScoreMap, maliciousSkills, isMountedRef);
+        applySkillRiskScores(skillScoreMap, maliciousSkills, misconfiguredSkills || new Set(), isMountedRef);
     }, [applySkillRiskScores]);
 
     async function fetchData(isMountedRef = { current: true }) {

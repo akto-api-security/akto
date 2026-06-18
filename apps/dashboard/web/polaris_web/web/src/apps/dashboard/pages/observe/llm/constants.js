@@ -1,7 +1,31 @@
+// Converts a currDateRange object (from the date range reducer) to epoch seconds.
+// Centralised here to avoid the same Math.floor/Date.parse expression in every view.
+export function getEpochsFromRange(currDateRange) {
+    return {
+        since: Math.floor(Date.parse(currDateRange.period.since) / 1000),
+        until: Math.floor(Date.parse(currDateRange.period.until) / 1000),
+    };
+}
+
 export function parsePromptText(queryPayload) {
     if (!queryPayload) return "";
     try {
         const obj = JSON.parse(queryPayload);
+        // OpenAI messages array — extract last user message as the display text
+        if (Array.isArray(obj.messages)) {
+            const userMsg = [...obj.messages].reverse().find(m => m.role === "user");
+            if (userMsg) {
+                if (typeof userMsg.content === "string") return userMsg.content;
+                if (Array.isArray(userMsg.content)) return userMsg.content.map(c => c.text || "").filter(Boolean).join(" ");
+            }
+            const last = obj.messages[obj.messages.length - 1];
+            if (last && typeof last.content === "string") return last.content;
+        }
+        // body messages array
+        if (obj.body && Array.isArray(obj.body.messages)) {
+            const userMsg = obj.body.messages.find(m => m.role === "user");
+            if (userMsg && typeof userMsg.content === "string") return userMsg.content;
+        }
         // body is a plain string — use it directly
         if (typeof obj.body === "string") return obj.body;
         // body is an object — check for tool call shape
@@ -18,7 +42,14 @@ export function parsePromptText(queryPayload) {
             const toolArgs = obj.toolArgs || obj.params || obj.arguments || {};
             return `[${obj.toolName}] ${JSON.stringify(toolArgs)}`;
         }
-        return obj.prompt || obj.message || obj.text || JSON.stringify(obj);
+        // OpenAI/Anthropic message format: {role, content}
+        if (obj.role && obj.content) {
+            if (typeof obj.content === "string") return obj.content;
+            if (Array.isArray(obj.content)) {
+                return obj.content.map(c => c.text || "").filter(Boolean).join(" ");
+            }
+        }
+        return obj.prompt || obj.message || obj.text || "";
     } catch (_) {
         return queryPayload;
     }
@@ -30,6 +61,18 @@ export function parseResponseText(responsePayload) {
         const obj = JSON.parse(responsePayload);
         // Empty object — nothing to show
         if (obj && typeof obj === "object" && Object.keys(obj).length === 0) return "";
+        // OpenAI format: { choices: [{ message: { role, content } }] }
+        if (Array.isArray(obj.choices) && obj.choices.length) {
+            const msg = obj.choices[0]?.message;
+            if (msg) {
+                if (msg.tool_calls?.length) {
+                    return msg.tool_calls
+                        .map(tc => `[${tc.function?.name}] ${tc.function?.arguments || ""}`)
+                        .join("\n");
+                }
+                if (typeof msg.content === "string") return msg.content;
+            }
+        }
         // body.result — tool call result
         if (obj.body && obj.body.result) {
             const result = obj.body.result;
@@ -68,8 +111,9 @@ export function parseTokens(row) {
         try {
             const obj = JSON.parse(row.responsePayload);
             const usage = obj.usage || {};
-            input = usage.input_tokens || 0;
-            output = usage.output_tokens || 0;
+            // Support both Anthropic (input_tokens) and OpenAI (prompt_tokens) formats
+            input = usage.input_tokens || usage.prompt_tokens || 0;
+            output = usage.output_tokens || usage.completion_tokens || 0;
         } catch (_) {}
     }
     return { input, output };
@@ -86,13 +130,16 @@ export function parseModel(row) {
 }
 
 export function formatCost(inputTokens, outputTokens) {
-    const cost = (inputTokens * 15 + outputTokens * 75) / 1e9;
-    return "$" + cost.toFixed(3);
+    const cost = (inputTokens * 15 + outputTokens * 75) / 1e6;
+    if (cost === 0) return "$0.00";
+    if (cost < 0.001) return "< $0.001";
+    if (cost < 0.01) return "$" + cost.toFixed(4);
+    return "$" + cost.toFixed(2);
 }
 
 export function truncate(str, len = 80) {
     if (!str) return "";
-    return str.length > len ? str.substring(0, len) + "…" : str;
+    return str.length > len ? str.substring(0, len) + "..." : str;
 }
 
 // Human-readable duration from a millisecond span.

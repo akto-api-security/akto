@@ -309,6 +309,9 @@ function ApiEndpoints(props) {
     const queryParams = new URLSearchParams(location.search);
     const selectedUrl = queryParams.get('selected_url')
     const selectedMethod = queryParams.get('selected_method')
+    // Scope an agentic collection's inventory to only config (/claude/config/*) or only
+    // skill (/skills/*) endpoints — config and skills share one collection.
+    const agenticView = queryParams.get('agentic_view')
     const [isEditing, setIsEditing] = useState(false);
     const [editableTitle, setEditableTitle] = useState(pageTitle);
     const [description, setDescription] = useState("");
@@ -318,14 +321,14 @@ function ApiEndpoints(props) {
     const hasAccessToDiscoveryAgent = func.checkForFeatureSaas('STATIC_DISCOVERY_AI_AGENTS');
 
 
-    const isSkillCollection = (apiInfoList || []).some(info => info?.id?.url?.startsWith('/skills/'))
+    const isSkillCollection = (apiInfoList || []).some(info => info?.id?.url?.includes('/skills/'))
 
     // the values used here are defined at the server.
     const baseTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Zombie'] )
     const definedTableTabs = isSkillCollection ? [...baseTableTabs, 'Blocked Skills'] : baseTableTabs
 
     const { tabsInfo } = useTable()
-    const blockedSkillsCount = (apiInfoList || []).filter(info => info?.id?.url?.startsWith('/skills/') && info.isSkillBlocked).length
+    const blockedSkillsCount = (apiInfoList || []).filter(info => info?.id?.url?.includes('/skills/') && info.isSkillBlocked).length
     const tableCountObj = { ...func.getTabsCount(definedTableTabs, endpointData), ...(isSkillCollection ? { blocked_skills: blockedSkillsCount } : {}) }
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
@@ -421,6 +424,7 @@ function ApiEndpoints(props) {
 
         apiEndpointsInCollection.forEach(apiEndpoint => {
             const key = apiEndpoint.method + " " + apiEndpoint.url + " " + apiEndpoint.apiCollectionId;
+            console.log("jey", key)
             const allSensitive = new Set(), sensitiveInResp = [], sensitiveInReq = [];
 
             sensitiveParamsMap[key]?.forEach(({ name, position }) => {
@@ -439,6 +443,14 @@ function ApiEndpoints(props) {
 
         let data = {}
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap,apiInfoSeverityMap)
+
+        // Scope to config-only or skills-only endpoints when navigated from the agent tree.
+        // Config and skill endpoints live in the same collection; this keeps the two views distinct.
+        if (agenticView === 'config') {
+            allEndpoints = allEndpoints.filter(e => e?.endpoint?.includes('/claude/config/'))
+        } else if (agenticView === 'skills') {
+            allEndpoints = allEndpoints.filter(e => e?.endpoint?.includes('/skills/'))
+        }
 
         // handle code analysis endpoints
         const codeAnalysisCollectionInfo = sourceCodeData.codeAnalysisCollectionInfo
@@ -805,7 +817,7 @@ function ApiEndpoints(props) {
         //     checkGptActive()
         // }
         fetchData()
-    }, [apiCollectionId, endpointListFromConditions])
+    }, [apiCollectionId, endpointListFromConditions, agenticView])
 
     useEffect(() => {
         if (pageTitle !== collectionsMap[apiCollectionId]) { 
@@ -1551,12 +1563,12 @@ function ApiEndpoints(props) {
         if (isSkillCollection) {
             const selectedSkillEndpoints = selectedResources.map(id =>
                 (endpointData["all"] || []).find(e => e.id === id)
-            ).filter(e => e?.endpoint?.startsWith('/skills/'))
+            ).filter(e => e?.endpoint?.includes('/skills/'))
 
             if (selectedSkillEndpoints.length > 0) {
                 const blockedUrlsSet = new Set(
                     (apiInfoList || [])
-                        .filter(i => i?.id?.url?.startsWith('/skills/') && i.isSkillBlocked)
+                        .filter(i => i?.id?.url?.includes('/skills/') && i.isSkillBlocked)
                         .map(i => i.id.url)
                 )
                 const hasUnblocked = selectedSkillEndpoints.some(e => !blockedUrlsSet.has(e.endpoint))
@@ -1590,7 +1602,7 @@ function ApiEndpoints(props) {
     async function handleBulkSkillBlock(selectedResources, block) {
         const selectedSkillEndpoints = selectedResources.map(id =>
             (endpointData["all"] || []).find(e => e.id === id)
-        ).filter(e => e?.endpoint?.startsWith('/skills/'))
+        ).filter(e => e?.endpoint?.includes('/skills/'))
 
         if (selectedSkillEndpoints.length === 0) return
 
@@ -1846,7 +1858,7 @@ function ApiEndpoints(props) {
     const blockedSkillsData = useMemo(() => {
         const blockedUrls = new Set(
             (apiInfoList || [])
-                .filter(info => info?.id?.url?.startsWith('/skills/') && info.isSkillBlocked)
+                .filter(info => info?.id?.url?.includes('/skills/') && info.isSkillBlocked)
                 .map(info => info.id.url)
         )
         return (endpointData['all'] || []).filter(e => blockedUrls.has(e.endpoint))
