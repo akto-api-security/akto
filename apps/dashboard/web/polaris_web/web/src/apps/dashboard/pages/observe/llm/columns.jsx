@@ -200,6 +200,47 @@ export function getTraceColumnDefs({ showSession, onSessionClick } = {}) {
     ];
 }
 
+// Argus traces table — no user/session/spans/traceId columns, short time format.
+export const ARGUS_TRACE_COL_DEFS = [
+    {
+        headerName: "Time",
+        field: "latestTimestamp",
+        width: 160,
+        sort: "desc",
+        cellStyle: FLEX_CELL,
+        valueFormatter: p => {
+            const ts = p.value;
+            if (!ts) return "-";
+            const ms = ts > 1e10 ? ts : ts * 1000;
+            return new Date(ms).toLocaleString("en-US", {
+                month: "numeric", day: "numeric", year: "2-digit",
+                hour: "numeric", minute: "2-digit", hour12: true,
+            });
+        },
+        ...NO_FILTER,
+    },
+    titleCol("Trace"),
+    {
+        headerName: "Application",
+        field: "serviceId",
+        width: 170,
+        cellRenderer: AppCell,
+        cellStyle: FLEX_CELL,
+        ...NO_FILTER,
+    },
+    // {
+    //     headerName: "Model",
+    //     field: "_model",
+    //     width: 170,
+    //     cellRenderer: ModelChipCellRenderer,
+    //     cellStyle: FLEX_CELL,
+    //     ...NO_FILTER,
+    // },
+    tokensCol,
+    durationCol,
+    costCol,
+];
+
 // Messages table — flat span-level rows.
 export const MESSAGE_FLAT_COLUMN_DEFS = [
     titleCol("Message"),

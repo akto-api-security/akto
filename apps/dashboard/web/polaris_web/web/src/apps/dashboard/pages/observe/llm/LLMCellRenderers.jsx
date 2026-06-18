@@ -3,6 +3,7 @@ import { HorizontalStack, Link, Text } from "@shopify/polaris";
 import func from "@/util/func";
 import { formatCost, formatDurationMs, latencyColor, truncate } from "./constants";
 import { OsIcon } from "../agentic/DeviceEndpoints";
+import AssetIcon from "../agentic/AssetIcon";
 
 export { OsIcon };
 
@@ -62,10 +63,15 @@ export function IdCell({ value }) {
     return <Text variant="bodySm" truncate>{value}</Text>;
 }
 
-// Application / service name (text only).
+// Application / service name with favicon icon.
 export function AppCell({ value }) {
     if (!value) return <Text variant="bodySm" color="subdued">{DASH}</Text>;
-    return <Text variant="bodySm" truncate>{value}</Text>;
+    return (
+        <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+            <AssetIcon type="Application" assetTagValue={value} size={20} />
+            <Text variant="bodySm" truncate>{value}</Text>
+        </HorizontalStack>
+    );
 }
 
 // Icon + name chip for a single model.
