@@ -23,6 +23,12 @@ _FIELDS = (
     "SLACK_WEBHOOK_URL", "DATABASE_ABSTRACTOR_SERVICE_URL",
     # Per-deployment cascade default modelMap (JSON). Empty → built-in default.
     "DEFAULT_MODEL_CONFIG_JSON",
+    # Per-scanner semantic cache (shadow mode). VECTORIZE is a binding (read off
+    # env directly), not a string field. Empty CACHE_SHADOW_ENABLED → disabled.
+    "CACHE_SHADOW_ENABLED", "CACHE_DISTANCE_THRESHOLD", "CACHE_TTL_SECONDS",
+    "EMBEDDER_URL",
+    # Separate webhook for shadow alerts so they don't share SLACK_WEBHOOK_URL.
+    "CACHE_SHADOW_SLACK_WEBHOOK_URL",
 )
 
 

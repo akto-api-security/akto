@@ -15,6 +15,7 @@ from pyodide.ffi import create_proxy
 from workers import Response, waitUntil
 
 import alerts
+import cache_shadow
 from constants import CASCADE_SCANNERS, LOCAL_SCANNERS, REMOTE_SCANNERS, SUPPORTED_SCANNERS, get_default_config
 from scanners import scan_local
 from settings import settings
@@ -90,6 +91,9 @@ async def _scan(payload: dict, env=None) -> dict:
             result = await scan_with_model_map(scanner_name, scanner_type, text, config,
                                                store_fn=store_fn)
             _schedule(alerts.post_slack(scanner_name, scanner_type, text, result))
+            # Per-scanner semantic cache, shadow mode: observe + alert, never serve.
+            if cache_shadow.enabled():
+                _schedule(cache_shadow.observe(scanner_name, scanner_type, text, config, result, env))
             return _shape(scanner_name, result["is_valid"], result["risk_score"],
                           text, result.get("details", {}))
         except Exception as exc:  # fail open — never block traffic on cascade failure

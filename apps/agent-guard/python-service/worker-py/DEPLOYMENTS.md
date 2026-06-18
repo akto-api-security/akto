@@ -37,6 +37,17 @@ source. One codebase, two thin wrangler configs.
   includes its own `DEFAULT_MODEL_CONFIG_JSON` (leave empty for the built-in
   default).
 
+## One-time setup — Vectorize index
+
+Both `wrangler*.jsonc` declare a `VECTORIZE` binding to an index named
+`guardrails-shadow-cache`, so the index **must exist before the first deploy** —
+`pywrangler deploy` fails on a binding to a missing index. Create it (and the
+embedder) per
+[embedder-container/DEPLOYMENTS.md](../embedder-container/DEPLOYMENTS.md).
+
+Provisioning only sets up the store; the cache stays **off** until you enable it
+per worker — see [Semantic cache](#semantic-cache-shadow-mode).
+
 ## Deploy — executor-v2
 
 ```bash
@@ -61,6 +72,52 @@ npx wrangler secret list --config wrangler-exec.jsonc
 > secrets **before** the first deploy so the first request works. A passing
 > cascade scan shows `is_valid` with the per-model `qwen`/`gemma` blocks
 > populated; an empty/`error` cascade means creds are missing.
+
+## Semantic cache (shadow mode)
+
+A per-scanner semantic cache runs in **shadow mode** on the cascade scanners: for
+each LLM scan it computes what a cache *would* have answered and Slack-alerts how
+that compares to the real verdict — but never serves the cached answer, so `/scan`
+behaviour is unchanged. Logic lives in `src/cache_shadow.py`.
+
+It's **off by default** and needs the Vectorize index + embedder provisioned per
+[embedder-container/DEPLOYMENTS.md](../embedder-container/DEPLOYMENTS.md). With
+those in place, turn shadow mode on per worker with the env vars below.
+
+### 1. Embedder service
+
+A **deployed** worker reaches the embedder through the **`ANONYMIZER_WORKER`
+service binding** — the sibling worker hosts both containers and routes `/embed`
+to the embedder. (A Worker can't fetch another Worker over its public
+`workers.dev` URL, so the binding is mandatory in prod.) Nothing to configure
+beyond having that binding — already in `wrangler*.jsonc` — and the sibling worker
+deployed; provision it + the Vectorize index per
+[embedder-container/DEPLOYMENTS.md](../embedder-container/DEPLOYMENTS.md).
+
+`EMBEDDER_URL` is only a **local-dev fallback** (e.g. `http://localhost:8094`,
+used when the binding isn't reachable under `wrangler dev`); leave it unset in
+prod.
+
+### 2. Enable per worker
+
+Add to the worker's vars file (`.dev.vars` / `.dev.vars.exec`) and re-seed secrets
+(`./scripts/set-secrets.sh .dev.vars` / `… .dev.vars.exec -c wrangler-exec.jsonc`):
+
+```
+CACHE_SHADOW_ENABLED=true
+CACHE_DISTANCE_THRESHOLD=0.15
+CACHE_TTL_SECONDS=21600
+EMBEDDER_URL=                          # local-dev only; prod uses the ANONYMIZER_WORKER binding
+CACHE_SHADOW_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+```
+
+`CACHE_SHADOW_SLACK_WEBHOOK_URL` is a **separate** webhook from `SLACK_WEBHOOK_URL`
+on purpose, so shadow noise stays out of the production scan-alert channel; unset →
+no shadow alerts. Leave `CACHE_SHADOW_ENABLED` empty to keep the feature off.
+
+> Shadow work is fire-and-forget (`waitUntil`), so it never adds to the `/scan`
+> response latency. Watch the miss / hit-match / hit-mismatch mix in the shadow
+> channel and tune `CACHE_DISTANCE_THRESHOLD` before ever wiring it to serve.
 
 ## Local dev
 
@@ -97,3 +154,11 @@ deploys use Worker secrets seeded by `scripts/set-secrets.sh`.
 | `DEFAULT_MODEL_CONFIG_JSON` | cascade fallback | per-deployment modelMap JSON; empty → built-in default |
 | `SLACK_WEBHOOK_URL` | alerts | optional; alerts no-op when unset |
 | `DATABASE_ABSTRACTOR_SERVICE_URL` | alerts (storeAllResults) | optional |
+| `CACHE_SHADOW_ENABLED` | semantic cache | `true`/`1` enables shadow mode; empty → off |
+| `CACHE_DISTANCE_THRESHOLD` | semantic cache | cosine-distance hit threshold (default `0.15`) |
+| `CACHE_TTL_SECONDS` | semantic cache | entry expiry, enforced on read (default `21600` = 6h) |
+| `EMBEDDER_URL` | semantic cache | local-dev fallback only (e.g. `http://localhost:8094`); prod uses the `ANONYMIZER_WORKER` binding |
+| `CACHE_SHADOW_SLACK_WEBHOOK_URL` | semantic cache | separate webhook for shadow alerts; unset → none |
+
+> `VECTORIZE` is a **binding** (in `wrangler*.jsonc`), not a secret — it ships with
+> the worker config, not via `set-secrets.sh`.
