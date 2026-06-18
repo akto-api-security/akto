@@ -5,6 +5,8 @@ import com.akto.action.waf.CloudflareWafAction;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dao.threat_detection.GuardrailComplianceInfosDao;
+import com.akto.dto.threat_detection.GuardrailComplianceInfo;
 import com.akto.dto.Config;
 import com.akto.threat_utils.CloudflareWafUtils;
 import com.akto.dto.Config.AwsWafConfig;
@@ -364,20 +366,19 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   public String fetchGuardrailComplianceInfos() {
     try {
       Bson emptyFilter = Filters.empty();
-      List<com.akto.dto.threat_detection.GuardrailComplianceInfo> guardrailComplianceList =
-          com.akto.dao.threat_detection.GuardrailComplianceInfosDao.instance.findAll(emptyFilter);
+      List<GuardrailComplianceInfo> guardrailComplianceList =
+          GuardrailComplianceInfosDao.instance.findAll(emptyFilter);
 
       this.guardrailComplianceInfos = new ArrayList<>();
-      for (com.akto.dto.threat_detection.GuardrailComplianceInfo guardrailCompliance : guardrailComplianceList) {
+      for (GuardrailComplianceInfo guardrailCompliance : guardrailComplianceList) {
         BasicDBObject obj = new BasicDBObject();
         obj.put(Constants.ID, guardrailCompliance.getId());
-        obj.put("mapComplianceToListClauses", guardrailCompliance.getMapComplianceToListClauses());
-        obj.put("author", guardrailCompliance.getAuthor());
-        obj.put("hash", guardrailCompliance.getHash());
+        obj.put(GuardrailComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, guardrailCompliance.getMapComplianceToListClauses());
+        obj.put(GuardrailComplianceInfo.AUTHOR, guardrailCompliance.getAuthor());
+        obj.put(GuardrailComplianceInfo.HASH, guardrailCompliance.getHash());
         this.guardrailComplianceInfos.add(obj);
       }
 
-      loggerMaker.info("Fetched " + this.guardrailComplianceInfos.size() + " guardrail compliance infos", LogDb.DASHBOARD);
       return SUCCESS.toUpperCase();
     } catch (Exception e) {
       loggerMaker.errorAndAddToDb(e, "Error while fetching guardrail compliance infos: " + e.getMessage(), LogDb.DASHBOARD);
