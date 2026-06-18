@@ -202,6 +202,8 @@ public class GuardrailPolicies {
         private String topic;
         private String description;
         private List<String> samplePhrases;
+        private Map<String, List<String>> compliance;
+        private List<String> complianceFrameworks;
 
         public DeniedTopic(String topic, String description, List<String> samplePhrases) {
             this.topic = topic;
@@ -281,6 +283,8 @@ public class GuardrailPolicies {
         private boolean enabled;
         private String userPrompt;
         private double confidenceScore;
+        private Map<String, List<String>> compliance;
+        private List<String> complianceFrameworks;
 
         public LLMRule(boolean enabled, String userPrompt, double confidenceScore) {
             this.enabled = enabled;

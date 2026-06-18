@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     VerticalStack,
     Text,
@@ -9,13 +9,15 @@ import {
     Button,
     TextField,
     Tag,
-    FormLayout
+    FormLayout,
+    Tooltip
 } from "@shopify/polaris";
 import { PlusMinor, EditMinor, DeleteMinor } from "@shopify/polaris-icons";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
 import func from "@/util/func";
+import guardrailApi from "../../api";
 
 export const ContentPolicyConfig = {
     number: 2,
@@ -70,17 +72,57 @@ const ContentPolicyStep = ({
     });
     const [newPhraseInput, setNewPhraseInput] = useState("");
 
+    // Per-topic compliance suggestions: { [index]: { loading, suggested, accepted } }
+    const [topicComplianceSuggestions, setTopicComplianceSuggestions] = useState({});
+    // Per-topic LLM compliance toggle: { [index]: boolean }
+    const [enableLlmCompliance, setEnableLlmCompliance] = useState({});
+
+    // Initialize compliance suggestions from existing deniedTopics (for edit mode)
+    useEffect(() => {
+        const suggestions = {};
+        deniedTopics.forEach((topic, index) => {
+            if (topic.complianceFrameworks && topic.complianceFrameworks.length > 0) {
+                const accepted = topic.complianceFrameworks.reduce((acc, fw) => {
+                    acc[fw] = true;
+                    return acc;
+                }, {});
+                suggestions[index] = {
+                    suggested: topic.complianceFrameworks.reduce((acc, fw) => {
+                        acc[fw] = [];
+                        return acc;
+                    }, {}),
+                    accepted
+                };
+            }
+        });
+        if (Object.keys(suggestions).length > 0) {
+            setTopicComplianceSuggestions(suggestions);
+        }
+    }, []);
+
     // Denied topics functions
     const startAdding = () => {
         setEditingIndex(deniedTopics.length);
         setEditFormData({ topic: "", description: "", samplePhrases: [] });
         setNewPhraseInput("");
+        // Initialize LLM compliance toggle for new topic
+        setEnableLlmCompliance(prev => ({
+            ...prev,
+            [deniedTopics.length]: true
+        }));
     };
 
     const startEditing = (index) => {
         setEditingIndex(index);
         setEditFormData({ ...deniedTopics[index] });
         setNewPhraseInput("");
+        // Clear stale suggestion while editing
+        setTopicComplianceSuggestions(prev => ({ ...prev, [index]: null }));
+        // Initialize LLM compliance toggle for this topic
+        setEnableLlmCompliance(prev => ({
+            ...prev,
+            [index]: true
+        }));
     };
 
     const cancelEditing = () => {
@@ -122,6 +164,7 @@ const ContentPolicyStep = ({
             samplePhrases: editFormData.samplePhrases
         };
 
+        const savedIndex = editingIndex;
         const updatedTopics = [...deniedTopics];
         if (editingIndex === deniedTopics.length) {
             updatedTopics.push(topicData);
@@ -130,11 +173,23 @@ const ContentPolicyStep = ({
         }
         setDeniedTopics(updatedTopics);
         cancelEditing();
+        // Only fetch compliance if checkbox is enabled
+        if (enableLlmCompliance[savedIndex]) {
+            fetchTopicCompliance(topicData, savedIndex);
+        }
     };
 
     const deleteRow = (index) => {
         const updatedTopics = deniedTopics.filter((_, i) => i !== index);
         setDeniedTopics(updatedTopics);
+        setTopicComplianceSuggestions(prev => {
+            const updated = {};
+            Object.keys(prev).forEach(k => {
+                const ki = parseInt(k);
+                if (ki !== index) updated[ki > index ? ki - 1 : ki] = prev[k];
+            });
+            return updated;
+        });
     };
 
     const addSamplePhrase = () => {
@@ -162,32 +217,117 @@ const ContentPolicyStep = ({
         }
     };
 
-    const renderViewRow = (topic, index) => (
-        <Box key={index} padding="4" borderColor="border" borderWidth="025" borderRadius="2">
-            <HorizontalStack align="space-between" blockAlign="start">
-                <Box style={{ flex: 1 }}>
-                    <VerticalStack gap="2">
-                        <Text variant="headingSm" fontWeight="semibold">{topic.topic}</Text>
-                        <Text variant="bodyMd" tone="subdued">{topic.description}</Text>
-                        {topic.samplePhrases.length > 0 && (
-                            <HorizontalStack gap="1">
-                                <Text variant="bodySm" tone="subdued">
-                                    {topic.samplePhrases.length} sample phrase{topic.samplePhrases.length !== 1 ? 's' : ''}
-                                </Text>
-                            </HorizontalStack>
-                        )}
-                    </VerticalStack>
-                </Box>
-                <HorizontalStack gap="2">
-                    <Button icon={EditMinor} onClick={() => startEditing(index)} accessibilityLabel="Edit topic" />
-                    <Button icon={DeleteMinor} onClick={() => deleteRow(index)} tone="critical" accessibilityLabel="Delete topic" />
-                </HorizontalStack>
-            </HorizontalStack>
-        </Box>
-    );
+    const fetchTopicCompliance = async (topicData, index) => {
+        try {
+            const resp = await guardrailApi.suggestGuardrailCompliance('denied_topic', {
+                topicName: topicData.topic,
+                topicDescription: topicData.description,
+                samplePhrases: topicData.samplePhrases
+            });
+            const suggested = resp?.response?.mapComplianceToListClauses || {};
+            // By default, accept all suggested frameworks
+            const accepted = Object.keys(suggested).reduce((acc, framework) => {
+                acc[framework] = true;
+                return acc;
+            }, {});
+            setTopicComplianceSuggestions(prev => ({
+                ...prev,
+                [index]: { suggested, accepted }
+            }));
+
+            // Update deniedTopics with the accepted frameworks
+            setDeniedTopics(prev => {
+                const updatedTopics = [...prev];
+                updatedTopics[index] = {
+                    ...updatedTopics[index],
+                    complianceFrameworks: Object.keys(accepted).length > 0 ? Object.keys(accepted) : undefined
+                };
+                return updatedTopics;
+            });
+        } catch (error) {
+            console.error('Error fetching compliance suggestions:', error);
+        }
+    };
+
+    const toggleFrameworkAcceptance = (topicIndex, framework) => {
+        // Get current accepted frameworks
+        const currentEntry = topicComplianceSuggestions[topicIndex] || { suggested: {}, accepted: {} };
+        const isAccepted = !!currentEntry.accepted[framework];
+        const newAccepted = { ...currentEntry.accepted };
+
+        if (isAccepted) {
+            delete newAccepted[framework];
+        } else {
+            newAccepted[framework] = true;
+        }
+
+        // Update suggestions state
+        setTopicComplianceSuggestions(prev => ({
+            ...prev,
+            [topicIndex]: { ...currentEntry, accepted: newAccepted }
+        }));
+
+        // Update deniedTopics with new compliance frameworks
+        setDeniedTopics(prev => {
+            const updatedTopics = [...prev];
+            updatedTopics[topicIndex] = {
+                ...updatedTopics[topicIndex],
+                complianceFrameworks: Object.keys(newAccepted).length > 0 ? Object.keys(newAccepted) : undefined
+            };
+            return updatedTopics;
+        });
+    };
+
+    const renderViewRow = (topic, index) => {
+        const suggestion = topicComplianceSuggestions[index];
+        const suggestedFrameworks = suggestion?.suggested ? Object.keys(suggestion.suggested) : [];
+        const acceptedFrameworks = suggestion?.accepted ? Object.keys(suggestion.accepted) : [];
+
+        return (
+            <Box key={index} padding="4" borderColor="border" borderWidth="1" borderRadius="2">
+                <VerticalStack gap="3">
+                    <HorizontalStack align="space-between" blockAlign="start">
+                        <Box style={{ flex: 1 }}>
+                            <VerticalStack gap="2">
+                                <Text variant="headingSm" fontWeight="semibold">{topic.topic}</Text>
+                                <Text variant="bodyMd" tone="subdued">{topic.description}</Text>
+                                {topic.samplePhrases.length > 0 && (
+                                    <Text variant="bodySm" tone="subdued">
+                                        {topic.samplePhrases.length} sample phrase{topic.samplePhrases.length !== 1 ? 's' : ''}
+                                    </Text>
+                                )}
+                            </VerticalStack>
+                        </Box>
+                        <HorizontalStack gap="2">
+                            <Button icon={EditMinor} onClick={() => startEditing(index)} accessibilityLabel="Edit topic" />
+                            <Button icon={DeleteMinor} onClick={() => deleteRow(index)} tone="critical" accessibilityLabel="Delete topic" />
+                        </HorizontalStack>
+                    </HorizontalStack>
+
+                    {suggestedFrameworks.length > 0 && (
+                        <Box>
+                            <VerticalStack gap="2">
+                                <Text variant="bodySm" fontWeight="medium">Compliance mappings:</Text>
+                                <HorizontalStack gap="2" wrap>
+                                    {acceptedFrameworks.map(framework => (
+                                        <Tag
+                                            key={framework}
+                                            onRemove={() => toggleFrameworkAcceptance(index, framework)}
+                                        >
+                                            {framework}
+                                        </Tag>
+                                    ))}
+                                </HorizontalStack>
+                            </VerticalStack>
+                        </Box>
+                    )}
+                </VerticalStack>
+            </Box>
+        );
+    };
 
     const renderEditRow = (isNew) => (
-        <Box key={isNew ? "new" : editingIndex} padding="4" borderColor="border" borderWidth="025" borderRadius="2" background="bg-surface-secondary">
+        <Box key={isNew ? "new" : editingIndex} padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface-secondary">
             <VerticalStack gap="4">
                 <TextField
                     label="Name"
@@ -237,6 +377,24 @@ const ContentPolicyStep = ({
                             </HorizontalStack>
                         )}
                     </VerticalStack>
+                </Box>
+                <Box>
+                    <Tooltip content="Automatically map this topic to relevant compliance frameworks (GDPR, HIPAA, PCI DSS, ISO 27001, etc.) using AI. This helps you understand which regulations and standards your guardrail policies help satisfy, making compliance audits and policy documentation easier.">
+                        <Checkbox
+                            label="Enable LLM-based compliance mapping"
+                            checked={enableLlmCompliance[editingIndex] ?? true}
+                            onChange={(checked) => {
+                                setEnableLlmCompliance(prev => ({
+                                    ...prev,
+                                    [editingIndex]: checked
+                                }));
+                                if (checked && editFormData.topic.trim() && editFormData.description.trim()) {
+                                    fetchTopicCompliance(editFormData.topic, editFormData.description);
+                                }
+                            }}
+                            helpText="AI will suggest which compliance frameworks this topic relates to"
+                        />
+                    </Tooltip>
                 </Box>
                 <HorizontalStack align="end" gap="2">
                     <Button onClick={cancelEditing}>Cancel</Button>

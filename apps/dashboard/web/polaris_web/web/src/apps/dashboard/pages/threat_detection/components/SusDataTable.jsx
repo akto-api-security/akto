@@ -17,6 +17,7 @@ import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "../../observe/api_collections/endpointShieldHelper";
 import IpReputationScore from "./IpReputationScore";
 import { getGuardrailCapabilityForRule } from "../constants/guardrailRuleDefinitions";
+import guardrailApi from "../../guardrails/api";
 
 const resourceName = {
   singular: "activity",
@@ -161,12 +162,36 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   useEffect(() => {
     if (!needsGuardrailCompliance) return;
-    api.fetchGuardrailComplianceInfos().then((resp) => {
+    Promise.all([
+      api.fetchGuardrailComplianceInfos(),
+      guardrailApi.fetchGuardrailPolicies()
+    ]).then(([complianceResp, policiesResp]) => {
       const capabilityMap = {};
-      (resp?.guardrailComplianceInfos || []).forEach((entry) => {
+
+      // Static compliance from guardrail_compliance_infos
+      (complianceResp?.guardrailComplianceInfos || []).forEach((entry) => {
         const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
         if (capability) capabilityMap[capability] = entry.mapComplianceToListClauses;
       });
+
+      // User-defined compliance from saved guardrail policies
+      (policiesResp?.guardrailPolicies || []).forEach((policy) => {
+        (policy.deniedTopics || []).forEach((topic) => {
+          if (topic.compliance && Object.keys(topic.compliance).length > 0) {
+            if (!capabilityMap["deniedTopics"]) capabilityMap["deniedTopics"] = {};
+            Object.entries(topic.compliance).forEach(([fw, clauses]) => {
+              capabilityMap["deniedTopics"][fw] = [...new Set([...(capabilityMap["deniedTopics"][fw] || []), ...clauses])];
+            });
+          }
+        });
+        if (policy.llmRule?.compliance && Object.keys(policy.llmRule.compliance).length > 0) {
+          if (!capabilityMap["llmRule"]) capabilityMap["llmRule"] = {};
+          Object.entries(policy.llmRule.compliance).forEach(([fw, clauses]) => {
+            capabilityMap["llmRule"][fw] = [...new Set([...(capabilityMap["llmRule"][fw] || []), ...clauses])];
+          });
+        }
+      });
+
       setGuardrailComplianceMap(capabilityMap);
     });
   }, [label]);

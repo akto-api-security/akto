@@ -118,6 +118,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableLlmPrompt, setEnableLlmPrompt] = useState(false);
     const [llmPrompt, setLlmPrompt] = useState("");
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
+    const [llmCompliance, setLlmCompliance] = useState({});
     const [enableExternalModel, setEnableExternalModel] = useState(false);
     const [url, setUrl] = useState("");
     const [confidenceScore, setConfidenceScore] = useState(25);
@@ -458,6 +459,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableLlmPrompt(false);
         setLlmPrompt("");
         setLlmConfidenceScore(0.5);
+        setLlmCompliance({});
         setEnableExternalModel(false);
         setUrl("");
         setConfidenceScore(25);
@@ -553,6 +555,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableLlmPrompt(policy.llmRule?.enabled && !!policy.llmRule?.userPrompt);
         setLlmPrompt(policy.llmRule?.userPrompt || "");
         setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
+        setLlmCompliance(policy.llmRule?.complianceFrameworks || []);
 
         // Base Prompt Based Validation (AI Agents)
         setEnableBasePromptRule(policy.basePromptRule?.enabled || false);
@@ -641,6 +644,31 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const handleSave = async () => {
         setLoading(true);
         try {
+            // Fetch compliance frameworks for any denied topics that don't have them yet
+            const deniedTopicsWithCompliance = await Promise.all(
+                deniedTopics.map(async (topic) => {
+                    if (topic.complianceFrameworks && topic.complianceFrameworks.length > 0) {
+                        return topic;
+                    }
+                    try {
+                        const resp = await guardrailApi.suggestGuardrailCompliance('denied_topic', {
+                            topicName: topic.topic,
+                            topicDescription: topic.description,
+                            samplePhrases: topic.samplePhrases || []
+                        });
+                        const suggested = resp?.response?.mapComplianceToListClauses || {};
+                        const frameworks = Object.keys(suggested);
+                        return {
+                            ...topic,
+                            complianceFrameworks: frameworks.length > 0 ? frameworks : undefined
+                        };
+                    } catch (error) {
+                        console.error('Error fetching compliance for topic:', topic.topic, error);
+                        return topic;
+                    }
+                })
+            );
+
             // Transform selectedMcpServers and selectedAgentServers to include both ID and name
             const transformedMcpServers = selectedMcpServers
                 .filter(serverId => serverId)
@@ -679,6 +707,15 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 .map(entry => ({ pattern: entry.pattern.trim() }));
 
             const b = normalizeBehaviourValue(policyBehaviour);
+
+            // Transform deniedTopics to include only compliance frameworks (no empty ones)
+            const transformedDeniedTopics = deniedTopicsWithCompliance.map(topic => ({
+                ...topic,
+                complianceFrameworks: topic.complianceFrameworks && topic.complianceFrameworks.length > 0
+                    ? topic.complianceFrameworks
+                    : undefined
+            }));
+
             const guardrailData = {
                 name,
                 description,
@@ -691,7 +728,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
                     code: enableCodeFilter ? { level: codeFilterLevel.toUpperCase() } : null
                 },
-                deniedTopics,
+                deniedTopics: transformedDeniedTopics,
                 wordFilters,
                 piiFilters: enablePiiTypes ? piiTypes : [],
                 regexPatterns: enableRegexPatterns ? regexPatterns
@@ -706,7 +743,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 llmRule: {
                     enabled: enableLlmPrompt && !!llmPrompt.trim(),
                     userPrompt: llmPrompt.trim(),
-                    confidenceScore: llmConfidenceScore
+                    confidenceScore: llmConfidenceScore,
+                    complianceFrameworks: Array.isArray(llmCompliance) && llmCompliance.length > 0 ? llmCompliance : undefined
                 },
                 basePromptRule: {
                     enabled: enableBasePromptRule,
@@ -866,6 +904,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setLlmRule={setLlmPrompt}
                         llmConfidenceScore={llmConfidenceScore}
                         setLlmConfidenceScore={setLlmConfidenceScore}
+                        llmCompliance={llmCompliance}
+                        setLlmCompliance={setLlmCompliance}
                         enableExternalModel={enableExternalModel}
                         setEnableExternalModel={setEnableExternalModel}
                         url={url}
@@ -980,7 +1020,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 llmRule: {
                     enabled: true,
                     userPrompt: llmPrompt.trim(),
-                    confidenceScore: llmConfidenceScore
+                    confidenceScore: llmConfidenceScore,
+                    complianceFrameworks: Array.isArray(llmCompliance) && llmCompliance.length > 0 ? llmCompliance : undefined
                 }
             } : {}),
             ...(enableBasePromptRule ? {
