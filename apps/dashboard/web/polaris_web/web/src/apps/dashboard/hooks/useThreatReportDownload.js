@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import api from '@/apps/dashboard/pages/threat_detection/api'
 import func from '@/util/func'
+import { getDashboardCategory, categoryToShortName } from '@/apps/main/labelHelper'
 
 function useThreatReportDownload({ startTimestamp, endTimestamp, additionalFilters, onComplete }) {
     const downloadThreatReport = useCallback(async () => {
@@ -16,7 +17,9 @@ function useThreatReportDownload({ startTimestamp, endTimestamp, additionalFilte
             const response = await api.generateThreatReport(filtersForReport, null)
             const reportId = response.generatedReportId
 
-            window.open(`/dashboard/threat-detection/report/${reportId}`, '_blank')
+            // Pass category so the PDF header can render an isolated title (API/Agentic/Endpoint)
+            const categoryShortName = categoryToShortName[getDashboardCategory()] || 'API'
+            window.open(`/dashboard/threat-detection/report/${reportId}?category=${categoryShortName}`, '_blank')
 
             func.setToast(true, false, "Opening threat report...")
 

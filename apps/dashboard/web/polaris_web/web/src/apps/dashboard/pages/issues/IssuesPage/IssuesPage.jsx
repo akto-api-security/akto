@@ -38,7 +38,7 @@ import testingApi from "../../testing/api.js"
 import { saveAs } from 'file-saver'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import IssuesGraphsGroup from "./IssuesGraphsGroup.jsx";
-import { getDashboardCategory, isAgenticSecurityCategory, mapLabel } from "../../../../main/labelHelper.js";
+import { getDashboardCategory, isAgenticSecurityCategory, mapLabel, categoryToShortName } from "../../../../main/labelHelper.js";
 import MarkdownReportGenerator from "../../../components/shared/MarkdownReportGenerator";
 import SeveritySelector from "../components/SeveritySelector";
 
@@ -765,8 +765,10 @@ function IssuesPage() {
     const openVulnerabilityReport = async (items = [], summaryMode = false) => {
         await testingApi.generatePDFReport(issuesFilters, items).then((res) => {
             const responseId = res.split("=")[1];
-            const summaryModeQueryParam = summaryMode === true ? 'summaryMode=true' : '';
-            const redirectUrl = `/dashboard/issues/summary/${responseId.split("}")[0]}?${summaryModeQueryParam}`;
+            const params = new URLSearchParams();
+            if (summaryMode) params.set('summaryMode', 'true');
+            params.set('category', categoryToShortName[getDashboardCategory()] || 'API');
+            const redirectUrl = `/dashboard/issues/summary/${responseId.split("}")[0]}?${params.toString()}`;
             window.open(redirectUrl, '_blank');
         })
 
