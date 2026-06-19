@@ -200,6 +200,11 @@ public class AccountSettings {
     @Setter
     private boolean enableEndpointInfoView;
 
+    public static final String VIEW_REFRESH_THRESHOLD_SECONDS = "viewRefreshThresholdSeconds";
+    @Getter
+    @Setter
+    private int viewRefreshThresholdSeconds;
+
     public static final String CHATTY_DOMAINS = "chattyDomains";
     @Getter
     @Setter
