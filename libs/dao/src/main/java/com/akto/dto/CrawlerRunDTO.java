@@ -28,7 +28,7 @@ public class CrawlerRunDTO {
     private Integer collectionId;
     private Integer accountId;
     private String errorMessage;
-    private Object cookies;
+    private String cookies;
     private Integer crawlingTime;
     private Map<String, String> customHeaders;
 

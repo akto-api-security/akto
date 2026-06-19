@@ -3920,6 +3920,10 @@ public class DbAction extends ActionSupport {
 
     public String updateDastJobStatus() {
         try {
+            if (status == null || status.isEmpty()) {
+                loggerMaker.errorAndAddToDb("updateDastJobStatus: missing status for crawlId=" + crawlId);
+                return Action.ERROR.toUpperCase();
+            }
             Bson updates = null;
             if (status.equals(CrawlerRun.CrawlerRunStatus.RUNNING.name())) {
                 updates = Updates.combine(
