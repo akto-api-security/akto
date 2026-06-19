@@ -90,7 +90,11 @@ const AktoJax = () => {
 
         setLoading(true)
         api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls, crawlingTime, selectedModule, customHeadersMap, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages, collectionName, enableAiJsDiscovery, userPrompt, crawlMode).then((res) => {
-            func.setToast(true, false, "Crawler initiated successfully. Please check your dashboard for updates.")
+            if (res?.errorMessage) {
+                func.setToast(true, true, res.errorMessage)
+            } else {
+                func.setToast(true, false, "Crawler initiated successfully. Please check your dashboard for updates.")
+            }
         }).catch((err) => {
         }).finally(() => {
             setLoading(false)
