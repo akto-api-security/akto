@@ -22,6 +22,10 @@ COPY --chmod=600 .netrc /root/.netrc
 # Copy go mod files from src directory
 COPY src/go.mod src/go.sum ./
 
+# Copy local replacement modules referenced by replace directives in go.mod
+# (required so `go mod download` can resolve them)
+COPY src/internal/stub/ ./internal/stub/
+
 # Download dependencies
 RUN go mod download
 
