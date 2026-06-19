@@ -10,6 +10,7 @@ import func from "../../../../../util/func"
 import transform from "./transform";
 import api from "../api"
 import { CellType } from "../../../components/tables/rows/GithubRow"
+import PersistStore from "../../../../main/PersistStore";
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper"
 
 
@@ -20,6 +21,7 @@ function TestSuite() {
     const [selectedTestSuite, setSelectedTestSuite] = useState({})
     const [createNewMode, setCreateNewMode] = useState(false)
     const localSubCategoryMap = LocalStore.getState().subCategoryMap
+    const dashboardCategory = PersistStore((state) => state.dashboardCategory)
 
     const { tabsInfo } = useTable()
     const [selected, setSelected] = useState(1)
@@ -77,13 +79,17 @@ function TestSuite() {
         const { activeSubCategoryMap: subCategoryMap } = await transform.getSubCategoryMap(LocalStore);
         let all = [], by_akto = [], custom = [];
 
-        // Get dashboard category using the existing helper function
-        const dashboardCategory = getDashboardCategory();
-
         const fetchedData = await api.fetchAllTestSuites();
 
         // Process default test suites from backend and filter based on account type
         fetchedData?.defaultTestSuites?.forEach((testSuiteItem) => {
+            if (!transform.hasTestsInSuite(testSuiteItem)) {
+                return;
+            }
+            if (!transform.shouldShowDefaultTestSuiteOnManagementPage(testSuiteItem.suiteType)) {
+                return;
+            }
+
             const categoriesCoveredList = [];
             const testSet = new Set(testSuiteItem?.subCategoryList||[]);
             Object.entries(subCategoryMap).forEach(([key, value]) => {
@@ -92,29 +98,17 @@ function TestSuite() {
                 }
             });
 
-            // Filter based on dashboard category using suiteType
-            let shouldInclude = false;
-
-            if (dashboardCategory === 'MCP Security') {
-                // For MCP Security, only show test suites with MCP_SECURITY suiteType
-                shouldInclude = testSuiteItem.suiteType === 'MCP_SECURITY';
-            } else if (dashboardCategory === 'Agentic Security') {
-                // For Agentic Security, show test suites with MCP_SECURITY, AI_AGENT_SECURITY, or ATTACK suiteTypes
-                shouldInclude = testSuiteItem.suiteType === 'MCP_SECURITY' || testSuiteItem.suiteType === 'AI_AGENT_SECURITY' || (testSuiteItem.suiteType && testSuiteItem.suiteType.includes('ATTACK'));
-            } else {
-                // For API Security, show test suites with OWASP suiteType (default API security)
-                shouldInclude = testSuiteItem.suiteType === 'OWASP';
-            }
-
-            if (shouldInclude) {
-                const aktoTestSuite = transform.getPrettifiedObj(testSuiteItem, categoriesCoveredList, true);
-                all.push(aktoTestSuite);
-                by_akto.push(aktoTestSuite);
-            }
+            const aktoTestSuite = transform.getPrettifiedObj(testSuiteItem, categoriesCoveredList, true);
+            all.push(aktoTestSuite);
+            by_akto.push(aktoTestSuite);
         });
 
 
         fetchedData?.testSuiteList?.forEach((testSuiteItem) => {
+            if (!transform.hasTestsInSuite(testSuiteItem)) {
+                return;
+            }
+
             const categoriesCoveredList = [];
             const testSet = new Set(testSuiteItem?.subCategoryList||[]);
             Object.entries(subCategoryMap).forEach(([key, value]) => {
@@ -142,7 +136,7 @@ function TestSuite() {
 
     useEffect(() => {
        fetchData()
-    }, [])
+    }, [dashboardCategory])
 
 
     const [tableLoading, setTableLoading] = useState(false)

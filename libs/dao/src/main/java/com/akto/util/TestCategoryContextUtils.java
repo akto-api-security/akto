@@ -1,5 +1,6 @@
 package com.akto.util;
 
+import com.akto.dto.testing.DefaultTestSuites.DefaultSuitesType;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.enums.GlobalEnums.TestCategory;
@@ -116,6 +117,43 @@ public class TestCategoryContextUtils {
                     .filter(category -> !Arrays.asList(mcpCategories).contains(category) && !Arrays.asList(llmCategories).contains(category)
                             && !Arrays.asList(apiAgenticCategories).contains(category))
                     .toArray(TestCategory[]::new);
+        }
+    }
+
+    public static boolean shouldIncludeDefaultTestSuite(CONTEXT_SOURCE contextSource, DefaultSuitesType suiteType) {
+        if (suiteType == null) {
+            return false;
+        }
+        if (contextSource == null) {
+            contextSource = CONTEXT_SOURCE.API;
+        }
+        switch (contextSource) {
+            case MCP:
+                return suiteType == DefaultSuitesType.MCP_SECURITY
+                        || suiteType == DefaultSuitesType.SEVERITY
+                        || suiteType == DefaultSuitesType.DURATION
+                        || suiteType == DefaultSuitesType.TESTING_METHODS;
+            case AGENTIC:
+                return suiteType == DefaultSuitesType.MCP_SECURITY
+                        || suiteType == DefaultSuitesType.AI_AGENT_SECURITY
+                        || suiteType == DefaultSuitesType.ATTACK_BASE_TECHNIQUE
+                        || suiteType == DefaultSuitesType.ATTACK_STRATEGY
+                        || suiteType == DefaultSuitesType.SEVERITY
+                        || suiteType == DefaultSuitesType.DURATION
+                        || suiteType == DefaultSuitesType.TESTING_METHODS;
+            case GEN_AI:
+                return suiteType == DefaultSuitesType.SEVERITY
+                        || suiteType == DefaultSuitesType.DURATION
+                        || suiteType == DefaultSuitesType.TESTING_METHODS;
+            case ENDPOINT:
+            case DAST:
+                return false;
+            case API:
+            default:
+                return suiteType == DefaultSuitesType.OWASP
+                        || suiteType == DefaultSuitesType.SEVERITY
+                        || suiteType == DefaultSuitesType.DURATION
+                        || suiteType == DefaultSuitesType.TESTING_METHODS;
         }
     }
 }

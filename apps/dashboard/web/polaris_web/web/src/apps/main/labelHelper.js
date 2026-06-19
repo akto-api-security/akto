@@ -45,9 +45,9 @@ export const getInitialDashboardCategory = () => {
 export function getDashboardCategory() {
   try {
     const category = PersistStore.getState().dashboardCategory
-    return category
+    return category || getInitialDashboardCategory()
   } catch(e){
-    return CATEGORY_API_SECURITY
+    return getInitialDashboardCategory()
   }
 }
 

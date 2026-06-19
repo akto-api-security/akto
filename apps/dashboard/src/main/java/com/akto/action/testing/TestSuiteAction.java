@@ -10,6 +10,7 @@ import com.akto.dto.User;
 import com.akto.dto.testing.DefaultTestSuites;
 import com.akto.dto.testing.config.TestSuites;
 import com.akto.util.Constants;
+import com.akto.util.TestCategoryContextUtils;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -127,7 +128,10 @@ public class TestSuiteAction extends UserAction {
             testSuite.setSubCategoryList(
                     TestSuiteDao.filterSubCategoriesForSuite(testSuite.getSubCategoryList(), contextSource, null, null));
         }
-        this.defaultTestSuites = DefaultTestSuitesDao.instance.findAll(Filters.empty());
+        this.defaultTestSuites = DefaultTestSuitesDao.instance.findAll(Filters.empty()).stream()
+                .filter(defaultTestSuite -> TestCategoryContextUtils.shouldIncludeDefaultTestSuite(
+                        contextSource, defaultTestSuite.getSuiteType()))
+                .collect(Collectors.toList());
         for (DefaultTestSuites defaultTestSuite : this.defaultTestSuites) {
             defaultTestSuite.setSubCategoryList(
                     TestSuiteDao.filterSubCategoriesForSuite(
