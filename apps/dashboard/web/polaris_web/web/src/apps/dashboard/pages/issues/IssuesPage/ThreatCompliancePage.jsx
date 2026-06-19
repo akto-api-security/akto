@@ -245,6 +245,10 @@ function ThreatCompliancePage() {
     ];
 
     const handleSelectedTab = (selectedIndex) => {
+        const tab = tableTabs[selectedIndex];
+        if (tab?.id) {
+            setCurrentTab(tab.id);
+        }
         setLoading(true);
         setSelected(selectedIndex);
         setTimeout(() => {

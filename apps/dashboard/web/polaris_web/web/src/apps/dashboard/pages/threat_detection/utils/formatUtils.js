@@ -46,7 +46,7 @@ export const extractRuleViolated = (metadata) => {
 export const resolveComplianceClauseMap = (event, isGuardrail, threatFiltersMap = {}, guardrailComplianceMap = {}) => {
   if (isGuardrail) {
     const capability = getGuardrailCapabilityForRule(extractRuleViolated(event?.metadata));
-    return guardrailComplianceMap[capability] || {};
+    return guardrailComplianceMap[capability] || guardrailComplianceMap[event?.filterId] || {};
   }
   return threatFiltersMap[event?.filterId]?.compliance?.mapComplianceToListClauses || {};
 };

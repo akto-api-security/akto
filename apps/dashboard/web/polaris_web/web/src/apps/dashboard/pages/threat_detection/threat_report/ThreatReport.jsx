@@ -123,6 +123,9 @@ const ThreatReport = () => {
             const savedCompliance = filters?.compliance || []
             setActiveComplianceFilters(savedCompliance)
 
+            const isApiSecurity = isApiSecurityCategory()
+            const isGuardrail = isAgenticSecurityCategory() || isEndpointSecurityCategory()
+
             const threatResponse = await api.fetchSuspectSampleData(
                 0,
                 savedIps,
@@ -135,7 +138,7 @@ const ThreatReport = () => {
                 [],
                 200,
                 undefined,
-                true,
+                isGuardrail ? undefined : true,
                 'THREAT',
                 savedHosts,
                 undefined
@@ -145,8 +148,6 @@ const ThreatReport = () => {
 
             // API Security: include only successful exploits. Guardrail (Agentic/Endpoint):
             // include all events — the backend skips the successfulExploit filter for these.
-            const isApiSecurity = isApiSecurityCategory()
-            const isGuardrail = isAgenticSecurityCategory() || isEndpointSecurityCategory()
             let filteredThreats = isApiSecurity
                 ? allThreats.filter(threat => threat.successfulExploit === true)
                 : allThreats
