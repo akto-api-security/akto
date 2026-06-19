@@ -75,12 +75,12 @@ export function getAgentLinkedComponents(asset, agenticTreeData = [], agenticFla
 }
 
 export function inferOsFromDeviceId(deviceId) {
-    if (!deviceId) return "mac";
+    if (!deviceId) return null;
     const upper = String(deviceId).toUpperCase();
     if (upper.includes("WIN")) return "windows";
     if (upper.includes("LIN") || upper.includes("LINUX")) return "linux";
     if (upper.includes("MAC")) return "mac";
-    return "mac";
+    return null;
 }
 
 // Collections reaching this UI are already scoped to agentic context-source, so we only

@@ -6,6 +6,7 @@ import HighchartsReact from "highcharts-react-official";
 import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Badge, Tooltip } from "@shopify/polaris";
 import MisconfiguredConfigIcon from "@/assets/MisconfiguredConfigIcon.svg";
 import PersonLockIcon from "@/assets/PersonLockIcon.svg";
+import LaptopIcon from "@/assets/Laptop.svg";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
@@ -168,7 +169,8 @@ function TopSection({ summary }) {
 export function OsIcon({ os }) {
     if (os === "mac")     return <img src="/public/os-mac.svg"     width={15} height={15} alt="macOS" />;
     if (os === "windows") return <img src="/public/os-windows.svg" width={15} height={15} alt="Windows" />;
-    return                       <img src="/public/os-linux.svg"   width={15} height={15} alt="Linux" />;
+    if (os === "linux")   return <img src="/public/os-linux.svg"   width={15} height={15} alt="Linux" />;
+    return                       <img src={LaptopIcon}             width={15} height={15} alt="Device" />;
 }
 
 // Marker icon shown next to a row label (matches the personal-account marker pattern in AgenticCellRenderers).
