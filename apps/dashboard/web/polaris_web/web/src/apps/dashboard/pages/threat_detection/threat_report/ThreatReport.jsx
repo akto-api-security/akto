@@ -261,7 +261,9 @@ const ThreatReport = () => {
                         <Text variant="bodySm">{currentDate}</Text>
                     </VerticalStack>
                     <HorizontalStack align="center" gap="4">
-                        <Button primary onClick={() => handleDownloadPF()} disabled={!pdfDownloadEnabled}>Download</Button>
+                        {(window.USER_NAME?.toLowerCase() === ("harshit@akto.io") || window.ACCOUNT_NAME?.toLowerCase()?.includes("advanced bank")) && (
+                            <Button primary onClick={() => handleDownloadPF()} disabled={!pdfDownloadEnabled}>Download</Button>
+                        )}
                         <img src='/public/white_logo.svg' alt="Logo" className='top-bar-logo' />
                     </HorizontalStack>
                 </HorizontalStack>
