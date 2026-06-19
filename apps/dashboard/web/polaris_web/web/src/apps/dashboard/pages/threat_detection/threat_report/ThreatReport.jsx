@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../api'
 import func from '@/util/func'
-import { isApiSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, shortNameToCategory } from '@/apps/main/labelHelper'
+import { isApiSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, shortNameToCategory, getReportCategoryShortName } from '@/apps/main/labelHelper'
 import PersistStore from '@/apps/main/PersistStore'
 import { resolveComplianceClauseMap } from '../utils/formatUtils'
 import ThreatReportHeader from './ThreatReportHeader'
@@ -21,7 +21,7 @@ import "./styles.css"
 // isAgenticSecurityCategory()/isEndpointSecurityCategory() calls in the data
 // fetch see the correct value. Puppeteer opens this page in a fresh session
 // where window.DASHBOARD_CATEGORY defaults to API_SECURITY.
-const categoryShortName = (new URLSearchParams(window.location.search).get('category') || '').toUpperCase()
+const categoryShortName = getReportCategoryShortName()
 const categoryOverride = shortNameToCategory[categoryShortName]
 if (categoryOverride) {
     PersistStore.getState().setDashboardCategory(categoryOverride)
