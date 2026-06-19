@@ -9,8 +9,7 @@ import {
     Button,
     TextField,
     Tag,
-    FormLayout,
-    Tooltip
+    FormLayout
 } from "@shopify/polaris";
 import { PlusMinor, EditMinor, DeleteMinor } from "@shopify/polaris-icons";
 import OwaspTag from "../OwaspTag";
@@ -18,6 +17,7 @@ import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
 import func from "@/util/func";
 import guardrailApi from "../../api";
+import LlmComplianceCheckbox from "../LlmComplianceCheckbox";
 
 export const ContentPolicyConfig = {
     number: 2,
@@ -378,24 +378,22 @@ const ContentPolicyStep = ({
                         )}
                     </VerticalStack>
                 </Box>
-                <Box>
-                    <Tooltip content="Automatically map this topic to relevant compliance frameworks (GDPR, HIPAA, PCI DSS, ISO 27001, etc.) using AI. This helps you understand which regulations and standards your guardrail policies help satisfy, making compliance audits and policy documentation easier.">
-                        <Checkbox
-                            label="Enable LLM-based compliance mapping"
-                            checked={enableLlmCompliance[editingIndex] ?? true}
-                            onChange={(checked) => {
-                                setEnableLlmCompliance(prev => ({
-                                    ...prev,
-                                    [editingIndex]: checked
-                                }));
-                                if (checked && editFormData.topic.trim() && editFormData.description.trim()) {
-                                    fetchTopicCompliance(editFormData.topic, editFormData.description);
-                                }
-                            }}
-                            helpText="AI will suggest which compliance frameworks this topic relates to"
-                        />
-                    </Tooltip>
-                </Box>
+                                <Box>
+                                    <LlmComplianceCheckbox
+                                        noun="topic"
+                                        checked={enableLlmCompliance[editingIndex] ?? true}
+                                        onChange={(checked) => {
+                                            setEnableLlmCompliance(prev => ({
+                                                ...prev,
+                                                [editingIndex]: checked
+                                            }));
+                                            if (checked && editFormData.topic.trim() && editFormData.description.trim()) {
+                                                fetchTopicCompliance(editFormData.topic, editFormData.description);
+                                            }
+                                        }}
+                                        helpText="AI will suggest which compliance frameworks this topic relates to"
+                                    />
+                                </Box>
                 <HorizontalStack align="end" gap="2">
                     <Button onClick={cancelEditing}>Cancel</Button>
                     <Button

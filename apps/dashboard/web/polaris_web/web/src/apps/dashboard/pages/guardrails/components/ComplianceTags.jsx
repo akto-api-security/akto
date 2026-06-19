@@ -22,7 +22,7 @@ const ComplianceTags = ({ complianceMap, showDivider = true }) => {
                                     />
                                     <Text variant="bodySm" fontWeight="medium">
                                         {clause ? `${framework} - ${clause}` : framework}
-                                    </Text>
+                                    </Text> 
                                 </HorizontalStack>
                             </Tag>
                         ));

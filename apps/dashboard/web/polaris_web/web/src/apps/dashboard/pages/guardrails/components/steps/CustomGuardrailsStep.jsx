@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
-import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox, HorizontalStack, Tag, Tooltip } from "@shopify/polaris";
+import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox, HorizontalStack, Tag } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
+import LlmComplianceCheckbox from "../LlmComplianceCheckbox";
 import guardrailApi from "../../api";
 
 // URL validation function
@@ -153,14 +154,10 @@ const CustomGuardrailsStep = ({
                                 />
 
                                 <Box>
-                                    <Tooltip content="Automatically map this rule to relevant compliance frameworks (GDPR, HIPAA, PCI DSS, ISO 27001, etc.) using AI. This helps you understand which regulations and standards your guardrail policies help satisfy, making compliance audits and policy documentation easier.">
-                                        <Checkbox
-                                            label="Enable LLM-based compliance mapping"
-                                            checked={enableLlmComplianceMapping}
-                                            onChange={setEnableLlmComplianceMapping}
-                                            helpText="AI will suggest which compliance frameworks this rule relates to"
-                                        />
-                                    </Tooltip>
+                                    <LlmComplianceCheckbox
+                                        checked={enableLlmComplianceMapping}
+                                        onChange={setEnableLlmComplianceMapping}
+                                    />
                                 </Box>
 
                                 {Object.keys(llmRuleCompliance.suggested).length > 0 && (
