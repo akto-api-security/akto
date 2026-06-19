@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack } from '@shopify/polaris';
+import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
@@ -10,6 +10,7 @@ import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import api from "./api";
 import { transformPolicyForBackend, SEVERITY, normalizeBehaviourValue } from "./utils";
+import GUARDRAIL_PRESETS from "./guardrailPresets";
 
 const resourceName = {
   singular: "policy",
@@ -129,6 +130,8 @@ function GuardrailPolicies() {
     const [loading, setLoading] = useState(false);
     const [editingPolicy, setEditingPolicy] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
+    const [isPreset, setIsPreset] = useState(false);
+    const [presetsPopoverActive, setPresetsPopoverActive] = useState(false);
     const [pendingPolicyName, setPendingPolicyName] = useState(null);
 
     const policyName = new URLSearchParams(window.location.search).get("policy");
@@ -420,6 +423,14 @@ function GuardrailPolicies() {
         setShowCreateModal(true);
     };
 
+    const handleSelectPreset = (presetData) => {
+        setPresetsPopoverActive(false);
+        setEditingPolicy(presetData);
+        setIsEditMode(false);
+        setIsPreset(true);
+        setShowCreateModal(true);
+    };
+
     const emptyStateMarkup = (
         <EmptySearchResult
           title={'No guardrail policy found'}
@@ -542,6 +553,7 @@ function GuardrailPolicies() {
             setShowCreateModal(false);
             setEditingPolicy(null);
             setIsEditMode(false);
+            setIsPreset(false);
             await fetchGuardrailPolicies();
         } catch (error) {
             func.setToast(true, true, isEditMode ? "Failed to update guardrail" : "Failed to create guardrail");
@@ -559,10 +571,12 @@ function GuardrailPolicies() {
                     setShowCreateModal(false);
                     setEditingPolicy(null);
                     setIsEditMode(false);
+                    setIsPreset(false);
                 }}
                 onSave={handleCreateGuardrail}
                 editingPolicy={editingPolicy}
                 isEditMode={isEditMode}
+                isPreset={isPreset}
             />
         );
     }
@@ -601,7 +615,30 @@ function GuardrailPolicies() {
                 />
             }
             isFirstPage={true}
-            primaryAction={<Button primary onClick={() => setShowCreateModal(true)}>Create Guardrail</Button>}
+            primaryAction={
+                <HorizontalStack gap="2">
+                    <Popover
+                        active={presetsPopoverActive}
+                        activator={
+                            <Button disclosure onClick={() => setPresetsPopoverActive(!presetsPopoverActive)}>
+                                Presets
+                            </Button>
+                        }
+                        onClose={() => setPresetsPopoverActive(false)}
+                    >
+                        <Popover.Pane fixed>
+                            <ActionList
+                                actionRole="menuitem"
+                                items={GUARDRAIL_PRESETS.map(preset => ({
+                                    content: preset.label,
+                                    onAction: () => handleSelectPreset(preset.data),
+                                }))}
+                            />
+                        </Popover.Pane>
+                    </Popover>
+                    <Button primary onClick={() => setShowCreateModal(true)}>Create Guardrail</Button>
+                </HorizontalStack>
+            }
             components={components}
         />
 }
