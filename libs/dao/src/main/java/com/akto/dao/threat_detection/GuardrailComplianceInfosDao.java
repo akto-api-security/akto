@@ -1,9 +1,9 @@
 package com.akto.dao.threat_detection;
 
-import com.akto.dao.AccountsContextDao;
+import com.akto.dao.CommonContextDao;
 import com.akto.dto.threat_detection.GuardrailComplianceInfo;
 
-public class GuardrailComplianceInfosDao extends AccountsContextDao<GuardrailComplianceInfo> {
+public class GuardrailComplianceInfosDao extends CommonContextDao<GuardrailComplianceInfo> {
 
     public static final GuardrailComplianceInfosDao instance = new GuardrailComplianceInfosDao();
 
