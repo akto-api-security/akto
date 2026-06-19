@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef, lazy, Suspense } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, Text, VerticalStack, HorizontalStack, Spinner, Box, Button, Divider, Tabs } from '@shopify/polaris';
 import { editor } from "monaco-editor/esm/vs/editor/editor.api";
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
@@ -7,8 +7,6 @@ import 'monaco-editor/esm/vs/editor/contrib/bracketMatching/browser/bracketMatch
 import 'monaco-editor/esm/vs/language/json/monaco.contribution';
 import SwaggerUI from 'swagger-ui-react';
 import 'swagger-ui-react/swagger-ui.css';
-import { Voyager, sdlToSchema } from 'graphql-voyager';
-import 'graphql-voyager/dist/voyager.css';
 import api from '../api';
 
 function SchemaView({ apiCollectionId }) {
@@ -59,16 +57,20 @@ function SchemaView({ apiCollectionId }) {
     const hasBoth = openApiSchema && graphqlSchema;
     const activeIsGraphql = hasBoth ? selectedTab === 1 : !!graphqlSchema;
 
-    // Dispose editor when switching away from OpenAPI raw view
     useEffect(() => {
-        if (activeIsGraphql && editorInstance) {
+        if (editorInstance) {
             editorInstance.dispose();
             setEditorInstance(null);
         }
     }, [activeIsGraphql]);
 
     useEffect(() => {
-        if (!loading && openApiSchema && !activeIsGraphql && editorRef.current && !editorInstance) {
+        if (!loading && editorRef.current && !editorInstance) {
+            const content = activeIsGraphql
+                ? (graphqlSchema || '')
+                : (openApiSchema ? JSON.stringify(openApiSchema, null, 2) : '');
+            const language = activeIsGraphql ? 'plaintext' : 'json';
+
             editor.defineTheme('schemaTheme', {
                 base: 'vs',
                 inherit: true,
@@ -87,8 +89,8 @@ function SchemaView({ apiCollectionId }) {
             });
 
             const instance = editor.create(editorRef.current, {
-                value: JSON.stringify(openApiSchema, null, 2),
-                language: 'json',
+                value: content,
+                language,
                 readOnly: true,
                 minimap: { enabled: true },
                 wordWrap: 'on',
@@ -111,7 +113,7 @@ function SchemaView({ apiCollectionId }) {
                 editorInstance.dispose();
             }
         };
-    }, [loading, openApiSchema, activeIsGraphql, editorInstance]);
+    }, [loading, activeIsGraphql, editorInstance]);
 
     const handleCollapseAll = () => {
         if (editorInstance) editorInstance.getAction('editor.foldAll').run();
@@ -157,15 +159,25 @@ function SchemaView({ apiCollectionId }) {
                 )}
 
                 {activeIsGraphql ? (
-                    <div style={{ height: 'calc(100vh - 200px)', minHeight: '600px' }}>
-                        <Voyager
-                            introspection={sdlToSchema(graphqlSchema)}
-                            hideSettings={false}
-                        />
-                    </div>
+                    <Card padding="0">
+                        <VerticalStack>
+                            <Box padding="2" background="bg-surface-secondary">
+                                <HorizontalStack gap="2">
+                                    <Text variant="headingSm" fontWeight="semibold">GraphQL Schema</Text>
+                                    <Box paddingInlineStart="4">
+                                        <HorizontalStack gap="2">
+                                            <Button size="slim" onClick={handleCollapseAll}>Collapse All</Button>
+                                            <Button size="slim" onClick={handleExpandAll}>Expand All</Button>
+                                        </HorizontalStack>
+                                    </Box>
+                                </HorizontalStack>
+                            </Box>
+                            <Divider />
+                            <div ref={editorRef} style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }} />
+                        </VerticalStack>
+                    </Card>
                 ) : (
                     <>
-                        {/* OpenAPI stats banner */}
                         <Card padding="4">
                             <VerticalStack gap="4">
                                 <Text variant="headingMd" fontWeight="semibold">API Schema Overview</Text>
@@ -190,7 +202,6 @@ function SchemaView({ apiCollectionId }) {
                             </VerticalStack>
                         </Card>
 
-                        {/* OpenAPI split view */}
                         <HorizontalStack gap="4" wrap={false}>
                             <Box width="50%">
                                 <Card padding="0">

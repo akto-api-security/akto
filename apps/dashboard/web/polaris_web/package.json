@@ -27,8 +27,6 @@
     "dayjs": "^1.11.5",
     "deep-diff": "^1.0.2",
     "file-saver": "^2.0.5",
-    "graphql": "^16.14.2",
-    "graphql-voyager": "^2.1.0",
     "hast-util-from-html": "^2.0.3",
     "hast-util-to-mdast": "^10.1.2",
     "highcharts": "^11.1.0",

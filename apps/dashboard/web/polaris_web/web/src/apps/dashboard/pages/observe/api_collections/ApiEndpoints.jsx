@@ -43,6 +43,7 @@ import AgentDiscoverGraph from "./AgentDiscoverGraph"
 import { dummyCollections } from "./AgentDiscoveryDummyData"
 import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges"
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent"
+import GraphqlTreeView from "../../../components/shared/treeView/GraphqlTreeView"
 
 const headings = [
     {
@@ -278,6 +279,7 @@ function ApiEndpoints(props) {
     const [showSequencesFlow, setShowSequencesFlow] = useState(false)
     const [showSwaggerDependenciesFlow, setShowSwaggerDependenciesFlow] = useState(false)
     const [showSchemaView, setShowSchemaView] = useState(false)
+    const [showGraphQLTreeView, setShowGraphQLTreeView] = useState(false)
 
     const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
@@ -297,6 +299,11 @@ function ApiEndpoints(props) {
     const [selectedEndpointForSchema, setSelectedEndpointForSchema] = useState(null)
     const [savingGuardrailSchema, setSavingGuardrailSchema] = useState(false)
     const [endpointTagsPopover, setEndpointTagsPopover] = useState(false)
+    const isGraphQLCollection = useMemo(() =>
+        (endpointData["all"] || []).some(ep => ep.apiType === "GRAPHQL"),
+        [endpointData]
+    )
+
     const endpointTagsMap = useMemo(() => {
         const map = {}
         ;(endpointData["all"] || []).forEach(ep => {
@@ -838,7 +845,6 @@ function ApiEndpoints(props) {
     }
 
     function handleRowClick(data) {
-        
         let tmp = { ...data, endpointComp: "", sensitiveTagsComp: "" }
         
         const sameRow = func.deepComparison(apiDetail, tmp);
@@ -1248,7 +1254,14 @@ function ApiEndpoints(props) {
             label: 'View Schema',
             state: showSchemaView,
             setState: setShowSchemaView,
-            condition: true 
+            condition: true
+        },
+        {
+            key: 'graphqlTree',
+            label: 'Display tree view',
+            state: showGraphQLTreeView,
+            setState: setShowGraphQLTreeView,
+            condition: isGraphQLCollection
         }
     ];
 
@@ -1978,6 +1991,23 @@ function ApiEndpoints(props) {
                 <SwaggerDependenciesFlow key="swagger-dependencies-flow" apiCollectionId={apiCollectionId}  />
             ] : showSchemaView ? [
                 <SchemaView key="schema-view" apiCollectionId={apiCollectionId} />
+            ] : showGraphQLTreeView ? [
+                <GraphqlTreeView
+                    key="graphql-tree-view"
+                    endpoints={endpointData["all"] || []}
+                    prettifyEndpoints={endpointData["all"]?._prettifyPageData}
+                    onTerminalClick={handleRowClick}
+                    tableHeaders={headers}
+                />,
+                <ApiDetails
+                    key="api-details"
+                    showDetails={showDetails && apiDetail && Object.keys(apiDetail).length > 0}
+                    setShowDetails={setShowDetails}
+                    apiDetail={apiDetail}
+                    headers={transform.getDetailsHeaders()}
+                    collectionIssuesData={collectionIssuesData}
+                    hasAccessToDiscoveryAgent={hasAccessToDiscoveryAgent}
+                />,
             ] : [
                 dummyAgenticGraph ? <AgentDiscoverGraphWithDummyData key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
                 // (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,

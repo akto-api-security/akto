@@ -87,8 +87,7 @@ module.exports = {
   },
   resolve: {
     alias: {
-      '@': resolve('/web/src'),
-      'graphql': path.resolve(__dirname, '../node_modules/graphql')
+      '@': resolve('/web/src')
     },
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.json', '*']
   },

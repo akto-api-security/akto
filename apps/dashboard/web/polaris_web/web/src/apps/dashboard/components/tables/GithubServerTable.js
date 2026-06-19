@@ -713,7 +713,8 @@ function GithubServerTable(props) {
           <div>
             <LegacyCard.Section flush>
               <span ref={filtersWrapRef}>
-                <IndexFilters
+                {props.hideFiltersBar ? null : (
+                  <IndexFilters
                   sortOptions={props.sortOptions}
                   sortSelected={sortSelected}
                   queryValue={queryValue}
@@ -740,7 +741,8 @@ function GithubServerTable(props) {
                   selected={props?.selected}
                   onSelect={(x) => handleTabChange(x)}
                   hideFilters={hideFilter}
-                />
+                  />
+                )}
               </span>
               {exportPortalTarget && data.length > 0 && createPortal(
                 <Tooltip content="Export as CSV" dismissOnMouseOut>
