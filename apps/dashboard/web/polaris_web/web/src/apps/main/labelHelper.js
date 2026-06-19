@@ -89,7 +89,7 @@ export function getReportCategoryShortName() {
 // Matches the logic in pdf.ts so the page title and PDF header are always in sync.
 export function getReportFindingsLabel() {
   const short = getReportCategoryShortName();
-  if (short === 'AGENTIC') return 'ARGUS Security Findings';
+  if (short === 'AGENTIC') return 'Agentic Security Findings';
   if (short === 'ENDPOINT') return 'ATLAS Security Findings';
   return 'API Security Findings';
 }
