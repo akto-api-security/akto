@@ -49,7 +49,7 @@ const statusBadge = (s) => <Badge status={STATUS_COLOR[s] || ""}>{s}</Badge>;
 // ── Transform API policy to table format ───────────────────────────────────────
 const STATUS_MAP = { ACTIVE: "Active", INACTIVE: "Inactive", DRAFT: "Draft" };
 
-function transformApiPolicy(apiPolicy, idx) {
+function transformApiPolicy(apiPolicy, idx, violCountByPolicy = {}) {
     const agents  = apiPolicy.scope?.agents  || [];
     const nhiIds  = apiPolicy.scope?.nhiIds  || [];
     const scope = agents.length === 0
@@ -57,24 +57,25 @@ function transformApiPolicy(apiPolicy, idx) {
         : { primary: agents[0], extra: Math.max(0, agents.length - 1), extras: agents.slice(1) };
 
     const status = STATUS_MAP[apiPolicy.status] || apiPolicy.status || "Active";
-    const totalViolations = apiPolicy.violationIds?.length || 0;
+    const policyId = apiPolicy.hexId;
+    const vc = violCountByPolicy[policyId] || { total: 0, critical: 0, high: 0, medium: 0, low: 0 };
 
     return {
         ...apiPolicy,
-        hexId: apiPolicy.hexId,
+        hexId: policyId,
         id: idx + 1,
         policyName: apiPolicy.policyName,
         agents,
         nhiIds,
         scope,
         status,
-        totalViolations,
-        violCrit: 0, violHigh: 0, violMed: 0, violLow: totalViolations,
+        totalViolations: vc.total,
+        violCrit: vc.critical, violHigh: vc.high, violMed: vc.medium, violLow: vc.low,
         lastTriggered: apiPolicy.lastTriggeredAt ? formatRelativeTime(apiPolicy.lastTriggeredAt) : "Never",
         lastModified: apiPolicy.updatedAt ? formatRelativeTime(apiPolicy.updatedAt) : "—",
         created: apiPolicy.createdAt ? formatRelativeTime(apiPolicy.createdAt) : "—",
         policyNameComp: <Text variant="bodyMd" fontWeight="medium">{apiPolicy.policyName}</Text>,
-        violationsComp: <ViolationBubbles critical={0} high={0} medium={0} low={totalViolations} />,
+        violationsComp: <ViolationBubbles critical={vc.critical} high={vc.high} medium={vc.medium} low={vc.low} />,
         scopeComp: <ScopeCell scope={scope} agents={agents} />,
         statusComp: statusBadge(status),
     };
@@ -113,6 +114,7 @@ export default function PoliciesPage() {
 
     // API state
     const [rawPolicies, setRawPolicies]   = useState([]);
+    const [rawViolations, setRawViolations] = useState([]);
     const [loading, setLoading]           = useState(true);
 
     // UI state
@@ -128,11 +130,16 @@ export default function PoliciesPage() {
     const fetchPolicies = async () => {
         try {
             setLoading(true);
-            const resp = await observeRequests.fetchNhiPolicies();
-            setRawPolicies(Array.isArray(resp) ? resp : []);
+            const [policiesResp, violationsResp] = await Promise.all([
+                observeRequests.fetchNhiPolicies(),
+                observeRequests.fetchAllNhiViolations(),
+            ]);
+            setRawPolicies(Array.isArray(policiesResp) ? policiesResp : []);
+            setRawViolations(Array.isArray(violationsResp) ? violationsResp : []);
         } catch (err) {
             console.error("Error fetching NHI policies:", err);
             setRawPolicies([]);
+            setRawViolations([]);
         } finally {
             setLoading(false);
         }
@@ -140,9 +147,25 @@ export default function PoliciesPage() {
 
     useEffect(() => { fetchPolicies(); }, []);
 
+    const violCountByPolicy = useMemo(() => {
+        const map = {};
+        rawViolations.forEach((v) => {
+            (v.policyIds || []).forEach((pId) => {
+                if (!map[pId]) map[pId] = { total: 0, critical: 0, high: 0, medium: 0, low: 0 };
+                map[pId].total++;
+                const sev = (v.severity || "").toLowerCase();
+                if (sev === "critical") map[pId].critical++;
+                else if (sev === "high") map[pId].high++;
+                else if (sev === "medium") map[pId].medium++;
+                else map[pId].low++;
+            });
+        });
+        return map;
+    }, [rawViolations]);
+
     const tableData = useMemo(
-        () => rawPolicies.map((p, i) => transformApiPolicy(p, i)),
-        [rawPolicies]
+        () => rawPolicies.map((p, i) => transformApiPolicy(p, i, violCountByPolicy)),
+        [rawPolicies, violCountByPolicy]
     );
 
     // Cross-page navigation: open edit modal for a specific policy

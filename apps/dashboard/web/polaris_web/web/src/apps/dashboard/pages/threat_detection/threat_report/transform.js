@@ -1,6 +1,5 @@
 import func from '@/util/func'
-import { getGuardrailCapabilityForRule } from '../constants/guardrailRuleDefinitions'
-import { extractRuleViolated } from '../utils/formatUtils'
+import { resolveComplianceClauseMap } from '../utils/formatUtils'
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from '@/apps/main/labelHelper'
 
 const transform = {
@@ -17,14 +16,7 @@ const transform = {
                 : ((localThreatFiltersMap[item?.filterId]?.severity || 'HIGH').toUpperCase())
             const normalizedSeverity = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(effectiveSeverity) ? effectiveSeverity : 'HIGH'
 
-            // Resolve compliance map for this event — matches SusDataTable logic exactly
-            let complianceMap
-            if (isGuardrail) {
-                const capability = getGuardrailCapabilityForRule(extractRuleViolated(item.metadata))
-                complianceMap = localGuardrailComplianceMap[capability] || {}
-            } else {
-                complianceMap = localThreatFiltersMap[item?.filterId]?.compliance?.mapComplianceToListClauses || {}
-            }
+            const complianceMap = resolveComplianceClauseMap(item, isGuardrail, localThreatFiltersMap, localGuardrailComplianceMap)
 
             const key = `${item?.filterId}|${normalizedSeverity}`
             const getDomain = (i) => {
@@ -85,6 +77,7 @@ const transform = {
     },
 
     processThreatsForReport(threats, threatFiltersMap = {}, guardrailComplianceMap = {}) {
+        const isGuardrail = isAgenticSecurityCategory() || isEndpointSecurityCategory()
         const severityCount = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
         const threatsByActor = {}
         const threatsByCategory = {}
@@ -129,13 +122,7 @@ const transform = {
             threatsByCategory[category].threats.push(threat)
 
             // Prepare table data
-            let complianceMap;
-            if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
-                const capability = getGuardrailCapabilityForRule(extractRuleViolated(threat.metadata));
-                complianceMap = guardrailComplianceMap[capability] || {};
-            } else {
-                complianceMap = threatFiltersMap[threat.filterId]?.compliance?.mapComplianceToListClauses || {};
-            }
+            const complianceMap = resolveComplianceClauseMap(threat, isGuardrail, threatFiltersMap, guardrailComplianceMap);
             threatsTableData.push({
                 id: threat.id || threat._id,
                 refId: threat.refId || '',

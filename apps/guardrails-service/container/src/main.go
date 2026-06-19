@@ -18,6 +18,8 @@ import (
 	"github.com/akto-api-security/guardrails-service/pkg/logsink"
 	"github.com/akto-api-security/guardrails-service/pkg/mediaprovider"
 	"github.com/akto-api-security/guardrails-service/pkg/metrics"
+	"github.com/akto-api-security/guardrails-service/pkg/nhi"
+	"github.com/akto-api-security/guardrails-service/pkg/nhi/source/endpointshield"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -81,6 +83,22 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 			}
 		}
 	}()
+
+	if cfg.NhiEnabled {
+		// One Publisher is shared by every Source. Adding new sources later
+		// (browser extension, AI agent proxy) is just another go-routine here.
+		publisher := nhi.NewPublisher(dbClient, logger)
+		sources := []nhi.Source{
+			endpointshield.NewSource(dbClient, publisher, logger,
+				time.Duration(cfg.NhiScanIntervalMin)*time.Minute),
+		}
+		nhiCtx := context.Background()
+		for _, src := range sources {
+			go src.Run(nhiCtx)
+		}
+	} else {
+		logger.Info("NHI sources disabled (NHI_ENABLED=false)")
+	}
 
 	validationHandler := handlers.NewValidationHandler(validatorService, logger, cfg, fileRegistry, acc)
 

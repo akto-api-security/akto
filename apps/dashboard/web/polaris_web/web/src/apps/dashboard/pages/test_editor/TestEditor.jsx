@@ -176,7 +176,7 @@ const TestEditor = () => {
 
     let defaultId = "REMOVE_TOKENS";
     if(isAgenticSecurityCategory()){
-        defaultId = "MCP_CONTEXT_BLEED";
+        defaultId = "BUSINESS_ALIGNMENT_COMPETITOR_CHECK_BASE64";
     }
 
     useEffect(() => {

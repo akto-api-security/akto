@@ -192,6 +192,7 @@ public class InitializerListener implements ServletContextListener {
     private static Map<String, String> piiFileMap;
     Crons crons = new Crons();
     TestingAlertsCron testingAlertsCron = new TestingAlertsCron();
+    EndpointInfoViewCron endpointStatViewCron = new EndpointInfoViewCron();
 
     public static String getDomain() {
         if (domain == null) {
@@ -335,6 +336,7 @@ public class InitializerListener implements ServletContextListener {
             }
         }, 0, 4, TimeUnit.HOURS);
     }
+
 
     private static void raiseMixpanelEvent() {
 
@@ -2560,6 +2562,8 @@ public class InitializerListener implements ServletContextListener {
 
                 int now = Context.now();
 
+                endpointStatViewCron.setUpEndpointInfoViewCronScheduler();
+
                 if (runJobFunctions > 0 || runJobFunctionsAnyway) {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
@@ -2618,6 +2622,8 @@ public class InitializerListener implements ServletContextListener {
 
 
                         EmptyCollectionCleanupJob.emptyCollectionCleanupJobRunner();
+                        crons.seedNhiDefaultPoliciesScheduler();
+                        crons.evaluateNhiPoliciesScheduler();
 
                         // CleanInventory.cleanInventoryJobRunner();
 
@@ -4120,7 +4126,6 @@ public class InitializerListener implements ServletContextListener {
                     if (!entry.isDirectory()) {
                         String entryName = entry.getName();
 
-                        // guardrail compliance has its own loader and collection, skip it here
                         boolean isCompliance = entryName.contains("compliance/") && !entryName.contains("compliance/guardrails/");
                         if (!isCompliance) {
                             logger.debugAndAddToDb(
@@ -4303,116 +4308,6 @@ public class InitializerListener implements ServletContextListener {
             }
         } else {
             logger.debugAndAddToDb("Received null zip file for threat compliance");
-        }
-    }
-
-    private static Map<String, com.akto.dto.threat_detection.GuardrailComplianceInfo> getGuardrailComplianceFromCommonDb() {
-        Bson emptyFilter = Filters.empty();
-        List<com.akto.dto.threat_detection.GuardrailComplianceInfo> guardrailComplianceInfosInDb =
-            com.akto.dao.threat_detection.GuardrailComplianceInfosDao.instance.findAll(emptyFilter);
-        return guardrailComplianceInfosInDb.stream().collect(
-            Collectors.toMap(com.akto.dto.threat_detection.GuardrailComplianceInfo::getId, Function.identity()));
-    }
-
-    public static void processGuardrailComplianceInfosFromZip(byte[] zipFile) {
-        if (zipFile != null) {
-            try (ByteArrayInputStream inputStream = new ByteArrayInputStream(zipFile);
-                    ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
-
-                ZipEntry entry;
-
-                int countUnchangedCompliances = 0;
-                int countTotalCompliances = 0;
-
-                Map<String, com.akto.dto.threat_detection.GuardrailComplianceInfo> mapIdToGuardrailComplianceInDb =
-                    getGuardrailComplianceFromCommonDb();
-
-                while ((entry = zipInputStream.getNextEntry()) != null) {
-                    if (!entry.isDirectory()) {
-                        String entryName = entry.getName();
-
-                        boolean isGuardrailCompliance = entryName.contains("compliance/guardrails/");
-                        if (!isGuardrailCompliance) {
-                            logger.debugAndAddToDb(
-                                    String.format("%s not a guardrail compliance file, skipping", entryName),
-                                    LogDb.DASHBOARD);
-                            continue;
-                        }
-
-                        if (!entryName.endsWith(".conf")) {
-                            logger.debugAndAddToDb(
-                                    String.format("%s not a conf file, skipping", entryName),
-                                    LogDb.DASHBOARD);
-                            continue;
-                        }
-
-                        String[] filePathTokens = entryName.split("/");
-
-                        if (filePathTokens.length <= 1) {
-                            logger.debugAndAddToDb(
-                                String.format("%s has no directory pattern", entryName),
-                                LogDb.DASHBOARD);
-                            continue;
-                        }
-
-                        String fileSourceId = "guardrails/" + filePathTokens[filePathTokens.length - 1];
-
-                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                        byte[] buffer = new byte[1024];
-                        int bytesRead;
-                        while ((bytesRead = zipInputStream.read(buffer)) != -1) {
-                            outputStream.write(buffer, 0, bytesRead);
-                        }
-
-                        String templateContent = new String(outputStream.toByteArray(), "UTF-8");
-
-                        if (templateContent == null || templateContent.trim().isEmpty()) {
-                            logger.debugAndAddToDb(
-                                String.format("%s is empty, skipping", entryName),
-                                LogDb.DASHBOARD);
-                            continue;
-                        }
-
-                        int templateHashCode = templateContent.hashCode();
-
-                        Map<String, List<String>> contentMap = TestConfigYamlParser.parseComplianceTemplate(templateContent);
-
-                        com.akto.dto.threat_detection.GuardrailComplianceInfo guardrailComplianceInfoInDb =
-                            mapIdToGuardrailComplianceInDb.get(fileSourceId);
-                        countTotalCompliances++;
-
-                        if (guardrailComplianceInfoInDb == null) {
-                            com.akto.dto.threat_detection.GuardrailComplianceInfo newInfo =
-                                new com.akto.dto.threat_detection.GuardrailComplianceInfo(fileSourceId, contentMap, Constants._AKTO, templateHashCode, "");
-                            logger.debugAndAddToDb("Inserting guardrail compliance content: " + entryName, LogDb.DASHBOARD);
-                            com.akto.dao.threat_detection.GuardrailComplianceInfosDao.instance.insertOne(newInfo);
-
-                        } else if (guardrailComplianceInfoInDb.getHash() == templateHashCode) {
-                            countUnchangedCompliances++;
-                        } else {
-                            Bson updates = Updates.combine(
-                                Updates.set(com.akto.dto.threat_detection.GuardrailComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, contentMap),
-                                Updates.set(com.akto.dto.threat_detection.GuardrailComplianceInfo.HASH, templateHashCode));
-                            logger.debugAndAddToDb("Updating guardrail compliance content: " + entryName, LogDb.DASHBOARD);
-                            com.akto.dao.threat_detection.GuardrailComplianceInfosDao.instance.updateOne(Constants.ID, fileSourceId, updates);
-                        }
-                    }
-
-                    zipInputStream.closeEntry();
-                }
-
-                if (countTotalCompliances != countUnchangedCompliances) {
-                    logger.debugAndAddToDb(countUnchangedCompliances + "/" + countTotalCompliances + " guardrail compliances unchanged", LogDb.DASHBOARD);
-                }
-
-            } catch (Exception ex) {
-                cacheLoggerMaker.errorAndAddToDb(ex,
-                        String.format("Error while processing guardrail compliance files zip. Error %s", ex.getMessage()),
-                        LogDb.DASHBOARD);
-                ex.printStackTrace();
-            }
-        } else {
-            logger.debugAndAddToDb("Received null zip file for guardrail compliance");
         }
     }
 

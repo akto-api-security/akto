@@ -3,6 +3,7 @@ import { ActionList, Badge, Box, Button, Divider, HorizontalStack, Link, Popover
 import FlyLayout from "../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
 import { IdentityIcon, AgentIcon, resolvePolicyName } from "./nhiViolationsData";
+import { getAllIdentityNames } from "./identityHelper";
 import func from "@/util/func";
 import observeRequests from "../observe/api";
 import JiraTicketCreationModal from "../../components/shared/JiraTicketCreationModal.jsx";
@@ -85,19 +86,29 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                         </Box>
                     </HorizontalStack>
                     <Box style={{ alignSelf: "flex-start" }}>
-                        <HorizontalStack gap="2" blockAlign="center">
-                            <Box style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                <IdentityIcon name={row.identity} />
-                                <Text variant="bodySm" color="subdued">{row.identity}</Text>
-                            </Box>
-                            <Text variant="bodySm" color="subdued">|</Text>
-                            <Box style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                <AgentIcon name={row.agent} />
-                                <Text variant="bodySm" color="subdued">{row.agent}</Text>
-                            </Box>
-                            <Text variant="bodySm" color="subdued">|</Text>
-                            <Text variant="bodySm" color="subdued">Last Seen {row.discovered}</Text>
-                        </HorizontalStack>
+                        {(() => {
+                            const names = getAllIdentityNames(row.identities);
+                            return (
+                            <HorizontalStack gap="2" blockAlign="center" wrap>
+                                {names.map((name, i) => (
+                                    <Box key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                        <IdentityIcon name={name} />
+                                        <Text variant="bodySm" color="subdued">{name}</Text>
+                                        {i < names.length - 1 && (
+                                            <Text variant="bodySm" color="subdued">&nbsp;·</Text>
+                                        )}
+                                    </Box>
+                                ))}
+                                <Text variant="bodySm" color="subdued">|</Text>
+                                <Box style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                    <AgentIcon name={row.agent} />
+                                    <Text variant="bodySm" color="subdued">{row.agent}</Text>
+                                </Box>
+                                <Text variant="bodySm" color="subdued">|</Text>
+                                <Text variant="bodySm" color="subdued">Last Seen {row.discovered}</Text>
+                            </HorizontalStack>
+                            );
+                        })()}
                     </Box>
                 </VerticalStack>
                 <Popover
@@ -143,6 +154,27 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                         <Text variant="bodyMd">{row.description}</Text>
                     </VerticalStack>
                     <Divider />
+                    {Array.isArray(row.identities) && row.identities.length > 1 && (
+                        <>
+                            <VerticalStack gap="2">
+                                <Text variant="headingSm" color="subdued">{`Involved NHI Identities (${row.identities.length})`}</Text>
+                                <VerticalStack gap="1">
+                                    {row.identities.map((identity, i) => {
+                                        const name = typeof identity === "object"
+                                            ? (identity.identityName || identity.name || "Unknown")
+                                            : identity;
+                                        return (
+                                            <HorizontalStack key={i} gap="2" blockAlign="center">
+                                                <IdentityIcon name={name} />
+                                                <Text variant="bodyMd" fontWeight="semibold">{name}</Text>
+                                            </HorizontalStack>
+                                        );
+                                    })}
+                                </VerticalStack>
+                            </VerticalStack>
+                            <Divider />
+                        </>
+                    )}
                     <HorizontalStack gap="8">
                         <Box style={{ alignSelf: "flex-start" }}>
                             <VerticalStack gap="1">

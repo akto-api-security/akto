@@ -58,4 +58,18 @@
     .threat-findings-table td {
         padding: 8px 6px !important;
     }
+
+    /* Prevent the findings table from overflowing the print page width */
+    #threat-report-findings .Polaris-IndexTable__Table {
+        table-layout: fixed !important;
+        width: 100% !important;
+        font-size: 10px !important;
+    }
+
+    #threat-report-findings .Polaris-IndexTable__Table th,
+    #threat-report-findings .Polaris-IndexTable__Table td {
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+        padding: 6px 4px !important;
+    }
 }

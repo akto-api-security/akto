@@ -2,15 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import api from "./api";
 import { MESSAGE_FLAT_COLUMN_DEFS } from "./columns";
-import PromptDetailModal from "./PromptDetailModal";
 
 // Messages tab — flat span-level rows, server-paginated via searchPrompts.
 // When traceFilter is set (drill-down from a trace flyout), passes traceId to the
 // backend so only that trace's spans are returned. The same server path handles both.
-export default function MessagesView({ currDateRange, traceFilter }) {
-    const [columnDefs, setColumnDefs] = useState(MESSAGE_FLAT_COLUMN_DEFS);
+export default function MessagesView({ currDateRange, traceFilter, onRowClicked, columnDefs: columnDefsProp, onRowsFetched }) {
+    const [columnDefs, setColumnDefs] = useState(columnDefsProp || MESSAGE_FLAT_COLUMN_DEFS);
     const [rows, setRows] = useState([]);
-    const [selectedPrompt, setSelectedPrompt] = useState(null);
 
     const getEpochs = useCallback(() => ({
         since: Math.floor(Date.parse(currDateRange.period.since) / 1000),
@@ -18,13 +16,14 @@ export default function MessagesView({ currDateRange, traceFilter }) {
     }), [currDateRange]);
 
     useEffect(() => {
+        if (columnDefsProp) return;
         const { since, until } = getEpochs();
         api.fetchFilterChoices(since, until)
             .then(choices => setColumnDefs(MESSAGE_FLAT_COLUMN_DEFS.map(col =>
                 col.filterAllowed ? { ...col, filterParams: { values: choices[col.field] || [] } } : col
             )))
             .catch(() => setColumnDefs(MESSAGE_FLAT_COLUMN_DEFS));
-    }, [getEpochs]);
+    }, [getEpochs, columnDefsProp]);
 
     const onServerFetch = useCallback(({ filters, sortKey, sortOrder, skip, limit, searchAfterJson, searchString }) => {
         const { since, until } = getEpochs();
@@ -32,8 +31,8 @@ export default function MessagesView({ currDateRange, traceFilter }) {
             startTime: since, endTime: until,
             traceId: traceFilter || "",
             filters, sortKey, sortOrder, skip, limit, searchAfterJson, searchString,
-        }).then(result => { setRows(result?.value || []); return result; });
-    }, [getEpochs, traceFilter]);
+        }).then(result => { setRows(result?.value || []); onRowsFetched?.(result?.value || []); return result; });
+    }, [getEpochs, traceFilter, onRowsFetched]);
 
     return (
         <>
@@ -51,9 +50,8 @@ export default function MessagesView({ currDateRange, traceFilter }) {
                 onServerFetch={onServerFetch}
                 filterStateUrl={window.location.pathname + "/llm-messages"}
                 getRowStyle={() => ({ cursor: "pointer" })}
-                onRowClicked={p => p.data && setSelectedPrompt(p.data)}
+                onRowClicked={onRowClicked}
             />
-            <PromptDetailModal prompt={selectedPrompt} onClose={() => setSelectedPrompt(null)} />
         </>
     );
 }

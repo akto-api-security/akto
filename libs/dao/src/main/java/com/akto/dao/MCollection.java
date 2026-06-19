@@ -395,6 +395,16 @@ public abstract class MCollection<T> {
         logger.info("Completed trimCappedCollections for " + this.getCollName() + " account " + this.getDBName() + " at " + Context.now());
     }
 
+    public void dropCollection() {
+        this.getMCollection().drop();
+    }
+
+    public void renameCollection(String newCollName) {
+        this.getMCollection().renameCollection(
+            new com.mongodb.MongoNamespace(getDBName(), newCollName),
+            new RenameCollectionOptions().dropTarget(true));
+    }
+
     public boolean dropCollectionWithCondition(long maxDocuments, long dropThreshold) {
         long count = this.getMCollection().estimatedDocumentCount();
         if (count <= maxDocuments)

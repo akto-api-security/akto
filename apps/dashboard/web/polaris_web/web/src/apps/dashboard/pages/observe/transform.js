@@ -780,6 +780,10 @@ const transform = {
     },
 
     getDetailsHeaders(){
+        // Hide Access Type and Auth Type for Endpoint Security / Atlas
+        if (isEndpointSecurityCategory()) {
+            return apiDetailsHeaders.filter(header => header.value !== 'access_type' && header.value !== 'auth_type')
+        }
         return apiDetailsHeaders
     },
 

@@ -489,7 +489,7 @@ function ApiDetails(props) {
             }
         }
         setSelectedSampleApi(apiKeyInfo)
-        const navUrl = window.location.origin + "/dashboard/test-editor/REMOVE_TOKENS"
+        const navUrl = window.location.origin + "/dashboard/test-editor"
         window.open(navUrl, "_blank")
     }
 

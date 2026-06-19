@@ -28,6 +28,10 @@ import com.akto.dto.traffic_metrics.TrafficAlerts;
 import com.akto.dto.traffic_metrics.TrafficAlerts.ALERT_TYPE;
 import com.akto.util.AccountTask;
 import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.dao.nhi_governance.NhiIdentityDao;
+import com.akto.dto.nhi_governance.NhiIdentity;
+import com.akto.utils.nhi_governance.NhiPolicyEvaluator;
+import com.akto.utils.nhi_governance.NhiPolicySeeder;
 import com.akto.utils.DeleteTestRunUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -207,5 +211,48 @@ public class Crons {
         return Duration.between(now, nextRun).toMillis();
     }
 
+    public void seedNhiDefaultPoliciesScheduler() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            NhiPolicySeeder.seedIfEmpty();
+                        } catch (Exception e) {
+                            logger.errorAndAddToDb("NHI policy seed failed: " + e.getMessage());
+                        }
+                    }
+                }, "seed-nhi-default-policies");
+            }
+        }, 0, 1, TimeUnit.DAYS);
+    }
+
+    public void evaluateNhiPoliciesScheduler() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            List<NhiIdentity> identities = NhiIdentityDao.instance.findAll(
+                                Filters.eq(NhiIdentity.STATUS, "ACTIVE")
+                            );
+                            for (NhiIdentity identity : identities) {
+                                try {
+                                    NhiPolicyEvaluator.evaluate(identity);
+                                } catch (Exception e) {
+                                    logger.errorAndAddToDb("NHI policy eval failed for '"
+                                            + identity.getIdentityName() + "': " + e.getMessage());
+                                }
+                            }
+                        } catch (Exception e) {
+                            logger.errorAndAddToDb("evaluateNhiPoliciesScheduler failed: " + e.getMessage());
+                        }
+                    }
+                }, "evaluate-nhi-policies");
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
 
 }
