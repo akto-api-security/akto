@@ -530,9 +530,18 @@ public class AktoJaxAction extends UserAction {
         loggerMaker.infoAndAddToDb("Internal DAST crawler request data: " + reqData);
 
         JsonNode node = ApiRequest.postRequest(new HashMap<>(), url, reqData);
-        String status = node.get("status").textValue();
+        String status = (node != null && node.get("status") != null) ? node.get("status").textValue() : null;
 
-        if (status.equalsIgnoreCase("success")) {
+        // A non-success (or empty/invalid) response means the crawl never started. Throw so the caller
+        // reports a clear error to the user instead of silently returning SUCCESS with no CrawlerRun created.
+        if (status == null || !status.equalsIgnoreCase("success")) {
+            loggerMaker.errorAndAddToDb("Internal DAST crawler did not start for crawlId=" + crawlId
+                    + ". Status: " + status + ", response: " + (node != null ? node.toString() : "null"));
+            throw new Exception("Internal DAST crawler service failed to start the crawl"
+                    + (status != null ? " (status: " + status + ")" : " (no/invalid response from service)") + ".");
+        }
+
+        {
             int currentTimestamp = Context.now();
             CrawlerRun crawlerRun = new CrawlerRun(
                     getSUser().getLogin(),
