@@ -99,6 +99,17 @@ public class CrawlerRun {
     public static final String STRICT_HOST_SCOPE = "strictHostScope";
     private Boolean strictHostScope;
 
+    // Set to true when the configured test role could not authenticate before the crawl.
+    public static final String TEST_ROLE_FAILED = "testRoleFailed";
+    private boolean testRoleFailed;
+
+    public static final String TEST_ROLE_ERROR = "testRoleError";
+    private String testRoleError;
+
+    // Mermaid flowchart source of the page-to-page navigation graph, uploaded at end of crawl.
+    public static final String NAVIGATION_GRAPH = "navigationGraph";
+    private String navigationGraph;
+
     public CrawlerRun() {
     }
 
@@ -125,7 +136,7 @@ public class CrawlerRun {
                 ", crawlId='" + crawlId + '\'' +
                 ", hostname='" + hostname + '\'' +
                 ", outScopeUrls=" + outScopeUrls +
-                ", status='" + status.name() + '\'' +
+                ", status='" + (status != null ? status.name() : "null") + '\'' +
                 ", moduleName='" + moduleName + '\'' +
                 ", runTestAfterCrawling='" + runTestAfterCrawling + '\'' +
                 '}';
