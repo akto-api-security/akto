@@ -45,6 +45,7 @@ import static com.akto.utils.Utils.calculateRiskValueForSeverity;
 import static com.akto.jobs.utils.Utils.getRiskScoreValueFromSeverityScore;
 public class RiskScoreOfCollections {
     private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreOfCollections.class, LogDb.DASHBOARD);
+    private static final Bson API_INFO_EXCLUDE_PROJECTION = Projections.exclude(ApiInfo.ALL_AUTH_TYPES_FOUND);
 
     private Map<ApiInfoKey, Float> getSeverityScoreMap(List<TestingRunIssues> issues){
         // Method to calculate severity Score for the apiInfo on the basis of HIGH, LOW, MEDIUM
@@ -163,7 +164,7 @@ public class RiskScoreOfCollections {
         if(severityScoreMap != null){
             severityScoreMap.forEach((apiInfoKey, severityScore)->{
                 Bson filter = ApiInfoDao.getFilter(apiInfoKey);
-                ApiInfo apiInfo = ApiInfoDao.instance.getMCollection().find(filter).first();
+                ApiInfo apiInfo = ApiInfoDao.instance.getMCollection().find(filter).projection(API_INFO_EXCLUDE_PROJECTION).first();
 
                 if (apiInfo == null) {
                     apiInfoNotFoundCount.incrementAndGet();
@@ -234,7 +235,7 @@ public class RiskScoreOfCollections {
                     Filters.eq("_id.method", ((BasicDBObject) basicDBObject.get("_id")).getString("method")),
                     Filters.eq("_id.url", ((BasicDBObject) basicDBObject.get("_id")).getString("url"))
                 );
-                ApiInfo apiInfo = ApiInfoDao.instance.findOne(filterQSampleData);
+                ApiInfo apiInfo = ApiInfoDao.instance.findOne(filterQSampleData, API_INFO_EXCLUDE_PROJECTION);
                 if(apiInfo == null){
                     continue;
                 }
