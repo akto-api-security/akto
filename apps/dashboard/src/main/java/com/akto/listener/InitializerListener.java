@@ -4100,37 +4100,31 @@ public class InitializerListener implements ServletContextListener {
                 int countUnchangedCompliances = 0;
                 int countTotalCompliances = 0;
 
+                Set<String> processedSourceIds = new HashSet<>();
+
                 Map<String, GuardrailComplianceInfo> mapIdToGuardrailComplianceInDb = getGuardrailComplianceFromDb();
 
                 while ((entry = zipInputStream.getNextEntry()) != null) {
-                    if (!entry.isDirectory()) {
-                        String entryName = entry.getName();
+                    if (entry.isDirectory()) {
+                        continue;
+                    }
 
-                        boolean isGuardrailCompliance = entryName.contains("compliance/guardrails/");
-                        if (!isGuardrailCompliance) {
-                            logger.debugAndAddToDb(
-                                    String.format("%s not a guardrail compliance file, skipping", entryName),
-                                    LogDb.DASHBOARD);
-                            continue;
-                        }
+                    String entryName = entry.getName();
 
-                        if (!entryName.endsWith(".conf")) {
-                            logger.debugAndAddToDb(
-                                    String.format("%s not a conf file, skipping", entryName),
-                                    LogDb.DASHBOARD);
-                            continue;
-                        }
+                    if (!entryName.contains("compliance/guardrails/") || !entryName.endsWith(".conf")) {
+                        continue;
+                    }
 
+
+                    try {
                         String[] filePathTokens = entryName.split("/");
-
                         if (filePathTokens.length <= 1) {
-                            logger.debugAndAddToDb(
-                                String.format("%s has no directory pattern", entryName),
-                                LogDb.DASHBOARD);
+                            logger.debugAndAddToDb(String.format("%s has no directory pattern, skipping", entryName), LogDb.DASHBOARD);
                             continue;
                         }
 
                         String fileSourceId = "guardrails/" + filePathTokens[filePathTokens.length - 1];
+                        processedSourceIds.add(fileSourceId);
 
                         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
                         byte[] buffer = new byte[1024];
@@ -4139,42 +4133,59 @@ public class InitializerListener implements ServletContextListener {
                             outputStream.write(buffer, 0, bytesRead);
                         }
 
-                        String templateContent = new String(outputStream.toByteArray(), "UTF-8");
-
+                        String templateContent = new String(outputStream.toByteArray(), StandardCharsets.UTF_8);
                         if (templateContent.trim().isEmpty()) {
-                            logger.debugAndAddToDb(
-                                String.format("%s is empty, skipping", entryName),
-                                LogDb.DASHBOARD);
+                            logger.debugAndAddToDb(String.format("%s is empty, skipping", entryName), LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        Map<String, List<String>> contentMap = TestConfigYamlParser.parseComplianceTemplate(templateContent);
+                        if (contentMap == null || contentMap.isEmpty()) {
+                            logger.debugAndAddToDb(String.format("%s has no compliance mappings, skipping", entryName), LogDb.DASHBOARD);
                             continue;
                         }
 
                         int templateHashCode = templateContent.hashCode();
-
-                        Map<String, List<String>> contentMap = TestConfigYamlParser.parseComplianceTemplate(templateContent);
-
-                        GuardrailComplianceInfo guardrailComplianceInfoInDb = mapIdToGuardrailComplianceInDb.get(fileSourceId);
                         countTotalCompliances++;
 
-                        if (guardrailComplianceInfoInDb == null) {
-                            GuardrailComplianceInfo newInfo = new GuardrailComplianceInfo(fileSourceId, contentMap, Constants._AKTO, templateHashCode, "");
-                            logger.debugAndAddToDb("Inserting guardrail compliance content: " + entryName, LogDb.DASHBOARD);
-                            GuardrailComplianceInfosDao.instance.insertOne(newInfo);
-                        } else if (guardrailComplianceInfoInDb.getHash() == templateHashCode) {
-                            countUnchangedCompliances++;
-                        } else {
-                            Bson updates = Updates.combine(
-                                Updates.set(GuardrailComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, contentMap),
-                                Updates.set(GuardrailComplianceInfo.HASH, templateHashCode));
-                            logger.debugAndAddToDb("Updating guardrail compliance content: " + entryName, LogDb.DASHBOARD);
-                            GuardrailComplianceInfosDao.instance.updateOne(Constants.ID, fileSourceId, updates);
-                        }
-                    }
+                        GuardrailComplianceInfo guardrailComplianceInfoInDb = mapIdToGuardrailComplianceInDb.get(fileSourceId);
 
-                    zipInputStream.closeEntry();
+                        if (guardrailComplianceInfoInDb != null && guardrailComplianceInfoInDb.getHash() == templateHashCode) {
+                            countUnchangedCompliances++;
+                            continue;
+                        }
+
+                        Bson updates = Updates.combine(
+                            Updates.set(GuardrailComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, contentMap),
+                            Updates.set(GuardrailComplianceInfo.HASH, templateHashCode),
+                            Updates.setOnInsert(GuardrailComplianceInfo.AUTHOR, Constants._AKTO));
+                        logger.debugAndAddToDb(
+                            (guardrailComplianceInfoInDb == null ? "Inserting" : "Updating") + " guardrail compliance content: " + entryName,
+                            LogDb.DASHBOARD);
+                        GuardrailComplianceInfosDao.instance.updateOne(Constants.ID, fileSourceId, updates);
+
+                    } catch (Exception e) {
+                        logger.errorAndAddToDb(e,
+                            String.format("Error processing guardrail compliance file %s: %s", entryName, e.getMessage()),
+                            LogDb.DASHBOARD);
+                    }
                 }
 
                 if (countTotalCompliances != countUnchangedCompliances) {
                     logger.debugAndAddToDb(countUnchangedCompliances + "/" + countTotalCompliances + " guardrail compliances unchanged", LogDb.DASHBOARD);
+                }
+
+                if (!processedSourceIds.isEmpty()) {
+                    List<String> staleSourceIds = new ArrayList<>();
+                    for (String existingSourceId : mapIdToGuardrailComplianceInDb.keySet()) {
+                        if (!processedSourceIds.contains(existingSourceId)) {
+                            staleSourceIds.add(existingSourceId);
+                        }
+                    }
+                    if (!staleSourceIds.isEmpty()) {
+                        logger.debugAndAddToDb("Deleting " + staleSourceIds.size() + " stale guardrail compliance infos", LogDb.DASHBOARD);
+                        GuardrailComplianceInfosDao.instance.deleteAll(Filters.in(Constants.ID, staleSourceIds));
+                    }
                 }
 
             } catch (Exception ex) {
