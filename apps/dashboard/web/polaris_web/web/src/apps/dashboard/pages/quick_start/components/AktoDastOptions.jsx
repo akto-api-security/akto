@@ -149,7 +149,7 @@ const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, s
                         }}
                     />
 
-                    {!window?.STIGG_FEATURE_WISE_ALLOWED?.AI_DAST?.isGranted && (
+                    {window?.STIGG_FEATURE_WISE_ALLOWED?.AI_DAST?.isGranted && (
                         <Checkbox
                             label="AI based crawling"
                             checked={enableAiJsDiscovery}
@@ -161,7 +161,7 @@ const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, s
                     )}
                 </HorizontalStack>
 
-                {!window?.STIGG_FEATURE_WISE_ALLOWED?.AI_DAST?.isGranted && enableAiJsDiscovery && (
+                {window?.STIGG_FEATURE_WISE_ALLOWED?.AI_DAST?.isGranted && enableAiJsDiscovery && (
                     <VerticalStack gap="1">
                         <Dropdown
                             label="Crawl mode"
