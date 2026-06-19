@@ -4,8 +4,6 @@ import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.nhi_governance.NhiIdentity;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.apache.commons.lang3.StringUtils;
@@ -18,8 +16,6 @@ import java.util.List;
 public class NhiIdentityDao extends AccountsContextDao<NhiIdentity> {
 
     public static NhiIdentityDao instance = new NhiIdentityDao();
-
-    private static final LoggerMaker logger = new LoggerMaker(NhiIdentityDao.class, LogDb.DASHBOARD);
 
     @Override
     public String getCollName() {
@@ -76,8 +72,9 @@ public class NhiIdentityDao extends AccountsContextDao<NhiIdentity> {
                 doUpsert(ni);
                 result.upserted++;
             } catch (Exception e) {
+                e.printStackTrace();
                 result.skipped++;
-                logger.errorAndAddToDb("NHI upsert: skipped identity '"
+                System.out.println("NHI upsert: skipped identity '"
                         + (ni == null ? "<null>" : ni.getIdentityName())
                         + "': " + e.getMessage());
             }
