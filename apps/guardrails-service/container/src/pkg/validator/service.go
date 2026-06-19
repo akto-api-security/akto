@@ -225,6 +225,37 @@ func (s *Service) filterPoliciesByMcpServer(policies []types.Policy, mcpServerNa
 	return filtered
 }
 
+// filterPoliciesByDeviceId filters policies by the device label embedded in the MCP server name.
+// The device label is the first dot-delimited segment of "{deviceLabel}.{clientType}.{host}".
+// Policies with an empty ApplyToDeviceIds list apply to all devices and always pass through.
+// If mcpServerName is empty or has no device prefix, all policies are returned unchanged.
+func (s *Service) filterPoliciesByDeviceId(policies []types.Policy, mcpServerName string) []types.Policy {
+	if mcpServerName == "" {
+		return policies
+	}
+	deviceLabel := ""
+	if i := strings.IndexByte(mcpServerName, '.'); i > 0 {
+		deviceLabel = mcpServerName[:i]
+	}
+	if deviceLabel == "" {
+		return policies
+	}
+	filtered := make([]types.Policy, 0, len(policies))
+	for _, p := range policies {
+		if len(p.ApplyToDeviceIds) == 0 {
+			filtered = append(filtered, p)
+			continue
+		}
+		for _, id := range p.ApplyToDeviceIds {
+			if id == deviceLabel {
+				filtered = append(filtered, p)
+				break
+			}
+		}
+	}
+	return filtered
+}
+
 func (s *Service) getMcpAllowedHostList() ([]types.McpAllowedList, error) {
 	refreshInterval := time.Duration(s.config.McpAllowedListRefreshIntervalMin) * time.Minute
 
@@ -939,6 +970,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Filter policies by MCP server name so all subsequent checks only fire for
 	// rules that belong to policies applicable to this server.
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
+	policies = s.filterPoliciesByDeviceId(policies, valCtx.McpServerName)
 
 	// Check account-type guardrail after server filtering so the policy's server
 	// selection is respected (a personal-account policy scoped to server A should
@@ -1106,6 +1138,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 
 	// Filter policies by MCP server name — policies with no server configured are skipped
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
+	policies = s.filterPoliciesByDeviceId(policies, valCtx.McpServerName)
 
 	s.logger.Info("ValidateResponse - calling ProcessResponse",
 		zap.String("path", params.Path),
@@ -1399,6 +1432,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 		// Filter policies by MCP server name for this specific batch item
 		itemPolicies := s.filterPoliciesByMcpServer(policies, mcpServerName)
+		itemPolicies = s.filterPoliciesByDeviceId(itemPolicies, mcpServerName)
 		s.logger.Debug("ValidateBatch - applicable policies for server",
 			zap.Int("index", i),
 			zap.String("mcpServerName", mcpServerName),

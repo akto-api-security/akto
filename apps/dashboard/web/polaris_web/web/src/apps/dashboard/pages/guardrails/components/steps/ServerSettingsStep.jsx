@@ -14,7 +14,7 @@ export const ServerSettingsConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ applyToAllServers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour }) => {
+    getSummary: ({ applyToAllServers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTeams, targetRoles }) => {
         const appSettings = (applyOnRequest || applyOnResponse) ?
             ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
         const behaviourSuffix = policyBehaviour ? `Rule behaviour: ${policyBehaviour}` : '';
@@ -57,6 +57,8 @@ export const ServerSettingsConfig = {
         if(applyToAllServers) {
             summary += ` All servers:  true`;
         }
+        if (targetTeams?.length > 0) summary += ` Teams: ${targetTeams.slice(0, 2).join(", ")}${targetTeams.length > 2 ? ` +${targetTeams.length - 2}` : ''}`;
+        if (targetRoles?.length > 0) summary += ` Roles: ${targetRoles.slice(0, 2).join(", ")}${targetRoles.length > 2 ? ` +${targetRoles.length - 2}` : ''}`;
         return summary;
     }
 };
@@ -79,7 +81,14 @@ const ServerSettingsStep = ({
     browserLlmServers,
     collectionsLoading,
     policyBehaviour,
-    setPolicyBehaviour
+    setPolicyBehaviour,
+    targetTeams,
+    setTargetTeams,
+    targetRoles,
+    setTargetRoles,
+    availableTeams,
+    availableRoles,
+    usersLoading,
 }) => {
     const [serverInfoPopoverActive, setServerInfoPopoverActive] = useState(false);
     const [serverSearchQuery, setServerSearchQuery] = useState('');
@@ -140,6 +149,7 @@ const ServerSettingsStep = ({
             }
         }
     }, [policyBehaviour]);
+
 
     const handleClosePopover = useCallback(() => {
         setServerInfoPopoverActive(false);
@@ -328,6 +338,64 @@ const ServerSettingsStep = ({
                         )}
                     </VerticalStack>
                 </Box>
+
+                {applyToAllServers && (
+                    <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
+                        <VerticalStack gap="3">
+                            <Text variant="headingSm">User targeting</Text>
+                            <DropdownSearch
+                                label="Teams"
+                                placeholder="Choose teams"
+                                optionsList={(availableTeams || []).map(t => ({ label: t, value: t }))}
+                                setSelected={setTargetTeams}
+                                preSelected={targetTeams}
+                                allowMultiple={true}
+                                disabled={usersLoading}
+                                value={targetTeams?.length > 0 ? `${targetTeams.length} team${targetTeams.length === 1 ? "" : "s"} selected` : undefined}
+                            />
+                            <DropdownSearch
+                                label="Roles"
+                                placeholder="Choose roles"
+                                optionsList={(availableRoles || []).map(r => ({ label: r, value: r }))}
+                                setSelected={setTargetRoles}
+                                preSelected={targetRoles}
+                                allowMultiple={true}
+                                disabled={usersLoading}
+                                value={targetRoles?.length > 0 ? `${targetRoles.length} role${targetRoles.length === 1 ? "" : "s"} selected` : undefined}
+                            />
+                            {(() => {
+                                const hasTeams = targetTeams?.length > 0;
+                                const hasRoles = targetRoles?.length > 0;
+                                if (!hasTeams && !hasRoles) {
+                                    return (
+                                        <Text variant="bodySm" tone="subdued">
+                                            No restriction — applies to all users across all servers.
+                                        </Text>
+                                    );
+                                }
+                                if (hasTeams && hasRoles) {
+                                    return (
+                                        <Text variant="bodySm" tone="subdued">
+                                            Applies to all servers, but only for users in the selected team(s) <strong>and</strong> with the selected role(s). Each selection narrows the target independently.
+                                        </Text>
+                                    );
+                                }
+                                if (hasTeams) {
+                                    return (
+                                        <Text variant="bodySm" tone="subdued">
+                                            Applies to all servers, but only for devices belonging to the selected team{targetTeams.length > 1 ? "s" : ""}.
+                                        </Text>
+                                    );
+                                }
+                                return (
+                                    <Text variant="bodySm" tone="subdued">
+                                        Applies to all servers, but only for devices belonging to users with the selected role{targetRoles.length > 1 ? "s" : ""}.
+                                    </Text>
+                                );
+                            })()}
+                        </VerticalStack>
+                    </Box>
+                )}
 
                 <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                     <VerticalStack gap="3">

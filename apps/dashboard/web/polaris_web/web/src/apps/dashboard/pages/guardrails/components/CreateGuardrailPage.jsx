@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
     Text,
     HorizontalStack,
@@ -15,6 +15,7 @@ import {
 import PersistStore from '../../../../main/PersistStore';
 import AgenticSearchInput from '../../agentic/components/AgenticSearchInput';
 import guardrailApi from '../api';
+import settingsApi from '../../settings/api';
 import {
     transformPolicyForBackend,
     SEVERITY,
@@ -146,6 +147,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [applyOnRequest, setApplyOnRequest] = useState(false);
     const [policyBehaviour, setPolicyBehaviour] = useState(GUARDRAIL_BEHAVIOUR.BLOCK);
 
+    // Step 12: User targeting
+    const [targetTeams, setTargetTeams] = useState([]);
+    const [targetRoles, setTargetRoles] = useState([]);
+    const [agenticUsers, setAgenticUsers] = useState([]);
+    const [usersLoading, setUsersLoading] = useState(false);
+
     // Collections data
     const [mcpServers, setMcpServers] = useState([]);
     const [agentServers, setAgentServers] = useState([]);
@@ -154,6 +161,18 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     // Get collections from PersistStore
     const allCollections = PersistStore(state => state.allCollections);
+
+    const availableTeams = useMemo(() => {
+        const teams = new Set();
+        (agenticUsers || []).forEach(u => { if (u.teamName) teams.add(u.teamName); });
+        return Array.from(teams).sort();
+    }, [agenticUsers]);
+
+    const availableRoles = useMemo(() => {
+        const roles = new Set();
+        (agenticUsers || []).forEach(u => { if (u.userRole) roles.add(u.userRole); });
+        return Array.from(roles).sort();
+    }, [agenticUsers]);
 
     // Create validation state object
     const getStoredStateData = () => ({
@@ -217,7 +236,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         browserLlmServers,
         applyOnRequest,
         applyOnResponse,
-        policyBehaviour
+        policyBehaviour,
+        // Step 12
+        targetTeams,
+        targetRoles
     });
 
     const getStepsWithSummary = () => {
@@ -330,6 +352,25 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 }
             } catch (error) {
                 console.error("Error fetching browser extension configs:", error);
+            }
+        })();
+        return () => { isActive = false; };
+    }, []);
+
+    // Fetch agentic users to populate team/role options
+    useEffect(() => {
+        let isActive = true;
+        (async () => {
+            setUsersLoading(true);
+            try {
+                const response = await settingsApi.fetchAgenticUsers({ devicesOnly: true });
+                if (isActive && response?.agenticUsers) {
+                    setAgenticUsers(response.agenticUsers);
+                }
+            } catch (error) {
+                console.error("Error fetching agentic users:", error);
+            } finally {
+                if (isActive) setUsersLoading(false);
             }
         })();
         return () => { isActive = false; };
@@ -475,6 +516,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyOnResponse(false);
         setApplyOnRequest(false);
         setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
+        setTargetTeams([]);
+        setTargetRoles([]);
     };
 
     const populateFormForEdit = (policy) => {
@@ -617,6 +660,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             pattern: entry.pattern || ""
         })));
         setBlockPersonalAccounts(policy.blockPersonalAccounts || false);
+
+        // User targeting
+        setTargetTeams(policy.targetTeams || []);
+        setTargetRoles(policy.targetRoles || []);
     };
 
     const handleClose = () => {
@@ -747,6 +794,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 blockPersonalAccounts,
                 applyOnResponse,
                 applyOnRequest,
+                targetTeams: applyToAllServers ? targetTeams : [],
+                targetRoles: applyToAllServers ? targetRoles : [],
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
 
@@ -935,6 +984,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         collectionsLoading={collectionsLoading}
                         policyBehaviour={policyBehaviour}
                         setPolicyBehaviour={setPolicyBehaviour}
+                        targetTeams={targetTeams}
+                        setTargetTeams={setTargetTeams}
+                        targetRoles={targetRoles}
+                        setTargetRoles={setTargetRoles}
+                        availableTeams={availableTeams}
+                        availableRoles={availableRoles}
+                        usersLoading={usersLoading}
                     />
                 );
             default:
