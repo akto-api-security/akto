@@ -120,6 +120,17 @@ public class WizSpecProcessor {
         return spec;
     }
 
+    /**
+     * Replaces the servers[0].url host in an OpenAPI spec JsonNode with a new host.
+     * Used to remap prod/dev gateway hosts to their QA equivalents before import.
+     */
+    public static JsonNode replaceSpecHost(JsonNode spec, String newHost) {
+        if (!(spec instanceof ObjectNode)) return spec;
+        ArrayNode servers = (ArrayNode) ((ObjectNode) spec).withArray("servers");
+        servers.removeAll().addObject().put("url", "https://" + newHost);
+        return spec;
+    }
+
     private static JsonNode normaliseServerUrl(JsonNode spec, String host) {
         if (!(spec instanceof ObjectNode)) return spec;
 

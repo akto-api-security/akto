@@ -43,7 +43,7 @@ public class WizApiClient {
                 ? String.format("{\"first\":%d}", ENDPOINT_META_FETCH_PAGE_SIZE)
                 : String.format("{\"first\":%d,\"after\":\"%s\"}", ENDPOINT_META_FETCH_PAGE_SIZE, cursor);
 
-            String graphqlQuery = "{\"query\":\"query($first: Int, $after: String) { apiEndpoints(first: $first, after: $after) { nodes { id updatedAt } pageInfo { endCursor hasNextPage } } }\",\"variables\":" + variablesPart + "}";
+            String graphqlQuery = "{\"query\":\"query($first: Int, $after: String) { apiEndpoints(first: $first, after: $after) { nodes { id updatedAt host relatedResources { name type } } pageInfo { endCursor hasNextPage } } }\",\"variables\":" + variablesPart + "}";
 
             loggerMaker.infoAndAddToDb(String.format("fetchAllEndpointMeta: page cursor=%s", cursor));
             BasicDBObject root = executeAndGetRoot(apiUrl, graphqlQuery, headers, "apiEndpoints");
@@ -78,7 +78,7 @@ public class WizApiClient {
 
         String variablesPart = String.format("{\"first\":%d,\"filterBy\":{\"id\":{\"equals\":%s}}}", ENDPOINT_FETCH_PAGE_SIZE, idsJson);
 
-        String graphqlQuery = "{\"query\":\"query APIEndpointsTable($first: Int, $filterBy: APIEndpointFilters) { apiEndpoints(first: $first, filterBy: $filterBy) { nodes { id host source authSchemes isAiGenerated createdAt updatedAt ... on HTTPRestAPIEndpoint { httpMethod pathname specification { string } } ... on HTTPGraphqlAPIEndpoint { operationType operationName } ... on HTTPGrpcAPIEndpoint { methodName } ... on HTTPSoapAPIEndpoint { methodName } ... on HTTPMcpAPIEndpoint { method name } } } }\",\"variables\":" + variablesPart + "}";
+        String graphqlQuery = "{\"query\":\"query APIEndpointsTable($first: Int, $filterBy: APIEndpointFilters) { apiEndpoints(first: $first, filterBy: $filterBy) { nodes { id host source authSchemes isAiGenerated createdAt updatedAt relatedResources { name type } ... on HTTPRestAPIEndpoint { httpMethod pathname specification { string } } ... on HTTPGraphqlAPIEndpoint { operationType operationName } ... on HTTPGrpcAPIEndpoint { methodName } ... on HTTPSoapAPIEndpoint { methodName } ... on HTTPMcpAPIEndpoint { method name } } } }\",\"variables\":" + variablesPart + "}";
 
         loggerMaker.infoAndAddToDb(String.format("fetchEndpointsPageByIds: %d ids", ids.size()));
         return executeAndGetRoot(apiUrl, graphqlQuery, buildHeaders(accessToken), "apiEndpoints");
