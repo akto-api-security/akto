@@ -54,6 +54,13 @@ public class Utils {
                     break;
                 case "apiNameFilter":
                     filterList.add(Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfoKey.URL, value));
+                    break;
+                case "responseCodeFilter":
+                    Bson responseCodeFilter = TestRunStatusHelper.responseCodeMessageFilter(value);
+                    if (!responseCodeFilter.equals(Filters.empty())) {
+                        filterList.add(responseCodeFilter);
+                    }
+                    break;
                 default:
                     break;
             }

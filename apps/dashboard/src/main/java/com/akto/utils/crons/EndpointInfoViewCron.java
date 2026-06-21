@@ -1,5 +1,6 @@
 package com.akto.utils.crons;
 
+import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -8,6 +9,9 @@ import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.AccountTask;
+import com.mongodb.ConnectionString;
+import com.mongodb.ReadPreference;
+import com.mongodb.WriteConcern;
 import com.mongodb.client.model.*;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -30,7 +34,6 @@ public class EndpointInfoViewCron {
 
     private static final String TEMP_COLL = EndpointInfoViewTempDao.instance.getCollName();
     private static final String LIVE_COLL = EndpointInfoViewDao.instance.getCollName();
-    private static final String API_COLLECTIONS_COLL = "api_collections";
 
     public void setUpEndpointInfoViewCronScheduler() {
         scheduler.scheduleAtFixedRate(() -> {
@@ -51,7 +54,9 @@ public class EndpointInfoViewCron {
         AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         if (settings == null || !settings.isEnableEndpointInfoView()) return;
 
-        int threshold = isAccountActiveRecently() ? ACTIVE_THRESHOLD : INACTIVE_THRESHOLD;
+        int configuredThreshold = settings.getViewRefreshThresholdSeconds();
+        int threshold = configuredThreshold > 0 ? configuredThreshold
+                : (isAccountActiveRecently() ? ACTIVE_THRESHOLD : INACTIVE_THRESHOLD);
         if (!tryAcquire(threshold)) return;
 
         try {
@@ -80,6 +85,8 @@ public class EndpointInfoViewCron {
         logger.warnAndAddToDb("EndpointInfoView buildSensitiveTypesList took "
                 + (System.currentTimeMillis() - ts) + "ms, account=" + accountId);
 
+        List<Integer> hostCollectionIds = buildHostCollectionIds(excludedIds);
+
         Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, accountId));
         int stiLastFullRebuildTs = account != null ? account.getStiLastFullRebuildTs() : 0;
         int stiLastIncrementalTs = account != null ? account.getStiLastIncrementalTs() : 0;
@@ -90,7 +97,7 @@ public class EndpointInfoViewCron {
         int viewCount;
         if (needsFullRebuild) {
             long rebuildStart = System.currentTimeMillis();
-            viewCount = fullRebuild(excludedIds, outOfScopeIds, sensitiveTypes);
+            viewCount = fullRebuild(excludedIds, outOfScopeIds, sensitiveTypes, hostCollectionIds);
             stiLastIncrementalTs = getMaxStiTimestamp(excludedIds);
             logger.warnAndAddToDb("EndpointInfoView fullRebuild took "
                     + (System.currentTimeMillis() - rebuildStart) + "ms, count=" + viewCount
@@ -106,7 +113,7 @@ public class EndpointInfoViewCron {
                     + (System.currentTimeMillis() - stiStart) + "ms, account=" + accountId);
 
             long viewStart = System.currentTimeMillis();
-            viewCount = refreshApiInfoData(excludedIds, outOfScopeIds);
+            viewCount = refreshApiInfoData(excludedIds, outOfScopeIds, hostCollectionIds);
             logger.warnAndAddToDb("EndpointInfoView refreshApiInfoData took "
                     + (System.currentTimeMillis() - viewStart) + "ms, count=" + viewCount
                     + ", account=" + accountId);
@@ -127,17 +134,17 @@ public class EndpointInfoViewCron {
 
     /**
      * Full rebuild (every 24h):
-     * Phase 1: STIs -> $group -> $lookup api_collections -> set flags -> $out temp
+     * Phase 1: STIs -> $group -> set flags -> $out temp
      * Phase 2: Create unique index on temp {apiCollectionId, url, method}
      * Phase 3: api_info -> extract top-level fields -> $merge into temp (sets api_info fields + derived fields)
      * Phase 4: Rename temp -> live
      */
-    private static int fullRebuild(Set<Integer> excludedIds, List<Integer> outOfScopeIds, List<String> sensitiveTypes) {
+    private static int fullRebuild(Set<Integer> excludedIds, List<Integer> outOfScopeIds, List<String> sensitiveTypes, List<Integer> hostCollectionIds) {
         EndpointInfoViewTempDao.instance.getMCollection().drop();
 
-        // Phase 1: STIs -> group -> api_collections lookup -> $out temp
+        // Phase 1: STIs -> group -> set flags -> $out temp
         long phase1Start = System.currentTimeMillis();
-        runStiGroupPipeline(excludedIds, outOfScopeIds, sensitiveTypes);
+        runStiGroupPipeline(excludedIds, outOfScopeIds, sensitiveTypes, hostCollectionIds);
         logger.warnAndAddToDb("EndpointInfoView fullRebuild phase1 (STI group) took "
                 + (System.currentTimeMillis() - phase1Start) + "ms");
 
@@ -158,9 +165,9 @@ public class EndpointInfoViewCron {
     }
 
     /**
-     * Phase 1: STIs -> $group by endpoint -> $lookup api_collections -> set flags -> $out temp
+     * Phase 1: STIs -> $group by endpoint -> set flags via precomputed lists -> $out temp
      */
-    private static void runStiGroupPipeline(Set<Integer> excludedIds, List<Integer> outOfScopeIds, List<String> sensitiveTypes) {
+    private static void runStiGroupPipeline(Set<Integer> excludedIds, List<Integer> outOfScopeIds, List<String> sensitiveTypes, List<Integer> hostCollectionIds) {
         Document compoundId = buildCompoundId();
         Document sensitiveCondition = buildSensitiveCondition(sensitiveTypes);
         Document hasHostHeaderCondition = buildHasHostHeaderCondition();
@@ -180,14 +187,9 @@ public class EndpointInfoViewCron {
                         new Field<>("method", "$_id.method"),
                         new Field<>("hasHostHeader", new Document("$cond", Arrays.asList(
                                 "$hasHostHeader", true, false)))),
-                // Lookup api_collections for isHostCollection flag
-                Aggregates.lookup(API_COLLECTIONS_COLL, "_id.apiCollectionId", "_id", "_apiColl"),
                 Aggregates.addFields(
-                        new Field<>("isHostCollection", new Document("$cond", Arrays.asList(
-                                new Document("$ifNull", Arrays.asList(
-                                        new Document("$arrayElemAt", Arrays.asList("$_apiColl.hostName", 0)),
-                                        false)),
-                                true, false))),
+                        new Field<>("isHostCollection",
+                                new Document("$in", Arrays.asList("$_id.apiCollectionId", hostCollectionIds))),
                         new Field<>("isOutOfTestingScope",
                                 new Document("$in", Arrays.asList("$_id.apiCollectionId", outOfScopeIds))),
                         // Set api_info defaults (will be overwritten by $merge for matched endpoints)
@@ -197,7 +199,6 @@ public class EndpointInfoViewCron {
                         new Field<>("actualAuthType", Collections.emptyList()),
                         new Field<>("actualAccessType", Collections.emptyList()),
                         new Field<>("severity", null)),
-                Aggregates.project(Projections.exclude("_apiColl")),
                 Aggregates.out(TEMP_COLL)
         );
 
@@ -313,21 +314,16 @@ public class EndpointInfoViewCron {
      * Refresh api_info data (every 30 min on incremental cycles):
      * Copies live view to temp, creates merge index, merges api_info, swaps.
      */
-    private static int refreshApiInfoData(Set<Integer> excludedIds, List<Integer> outOfScopeIds) {
+    private static int refreshApiInfoData(Set<Integer> excludedIds, List<Integer> outOfScopeIds, List<Integer> hostCollectionIds) {
         EndpointInfoViewTempDao.instance.getMCollection().drop();
 
-        // Copy live view to temp (also refresh api_collections flags)
+        // Copy live view to temp (refresh api_collections flags using precomputed lists)
         List<Bson> copyPipeline = Arrays.asList(
-                Aggregates.lookup(API_COLLECTIONS_COLL, "apiCollectionId", "_id", "_apiColl"),
                 Aggregates.addFields(
-                        new Field<>("isHostCollection", new Document("$cond", Arrays.asList(
-                                new Document("$ifNull", Arrays.asList(
-                                        new Document("$arrayElemAt", Arrays.asList("$_apiColl.hostName", 0)),
-                                        false)),
-                                true, false))),
+                        new Field<>("isHostCollection",
+                                new Document("$in", Arrays.asList("$apiCollectionId", hostCollectionIds))),
                         new Field<>("isOutOfTestingScope",
                                 new Document("$in", Arrays.asList("$apiCollectionId", outOfScopeIds)))),
-                Aggregates.project(Projections.exclude("_apiColl")),
                 Aggregates.out(TEMP_COLL)
         );
 
@@ -443,6 +439,13 @@ public class EndpointInfoViewCron {
                 Projections.include(Constants.ID));
         for (ApiCollection g : apiGroups) excluded.add(g.getId());
         return excluded;
+    }
+
+    private static List<Integer> buildHostCollectionIds(Set<Integer> excludedIds) {
+        return ApiCollectionsDao.instance.findAll(
+                Filters.ne(ApiCollection.HOST_NAME, null),
+                Projections.include(Constants.ID)
+        ).stream().map(ApiCollection::getId).filter(id -> !excludedIds.contains(id)).collect(Collectors.toList());
     }
 
     private static List<Integer> buildOutOfScopeIds(Set<Integer> excludedIds) {

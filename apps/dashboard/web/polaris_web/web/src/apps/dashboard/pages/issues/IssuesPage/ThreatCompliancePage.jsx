@@ -13,8 +13,7 @@ import values from "@/util/values";
 import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import threatDetectionApi from "../../threat_detection/api.js"
 import SessionStore from "../../../../main/SessionStore"
-import { getGuardrailCapabilityForRule } from "../../threat_detection/constants/guardrailRuleDefinitions"
-import { extractRuleViolated } from "../../threat_detection/utils/formatUtils"
+import { resolveComplianceClauseMap } from "../../threat_detection/utils/formatUtils"
 import ShowListInBadge from "../../../components/shared/ShowListInBadge";
 import { CellType } from "../../../components/tables/rows/GithubRow.js";
 import SampleDetails from "../../threat_detection/components/SampleDetails";
@@ -79,6 +78,7 @@ function ThreatCompliancePage() {
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
     const setThreatFiltersMap = SessionStore((state) => state.setThreatFiltersMap);
     const guardrailComplianceMap = SessionStore((state) => state.guardrailComplianceMap);
+    const setGuardrailComplianceMap = SessionStore((state) => state.setGuardrailComplianceMap);
     const needsGuardrailCompliance = isAgenticSecurityCategory() || isEndpointSecurityCategory();
 
     const { tabsInfo, selectItems } = useTable();
@@ -123,23 +123,18 @@ function ThreatCompliancePage() {
                     });
                 }
 
-                // Agentic/Endpoint Security: guardrails/{filterId}.conf
+                // Agentic/Endpoint Security: guardrails/{capability}.conf
                 if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
                     const guardrailComplianceResp = await threatDetectionApi.fetchGuardrailComplianceInfos();
                     if (guardrailComplianceResp?.guardrailComplianceInfos && Array.isArray(guardrailComplianceResp.guardrailComplianceInfos)) {
-                        const guardrailComplianceMap = {};
-                        guardrailComplianceResp.guardrailComplianceInfos.forEach((compliance) => {
-                            guardrailComplianceMap[compliance._id] = compliance;
+                        // Key by capability name (strip "guardrails/" prefix and ".conf" suffix)
+                        // so resolveComplianceClauseMap can look up by capability directly
+                        const capabilityKeyedMap = {};
+                        guardrailComplianceResp.guardrailComplianceInfos.forEach((entry) => {
+                            const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
+                            if (capability) capabilityKeyedMap[capability] = entry.mapComplianceToListClauses;
                         });
-                        Object.keys(updatedThreatFiltersMap).forEach((filterId) => {
-                            const compliance = guardrailComplianceMap[`guardrails/${filterId}.conf`];
-                            if (compliance) {
-                                updatedThreatFiltersMap[filterId] = {
-                                    ...updatedThreatFiltersMap[filterId],
-                                    compliance: { mapComplianceToListClauses: compliance.mapComplianceToListClauses }
-                                };
-                            }
-                        });
+                        setGuardrailComplianceMap(capabilityKeyedMap);
                     }
                 }
 
@@ -152,7 +147,7 @@ function ThreatCompliancePage() {
         };
 
         fetchThreatFiltersData();
-    }, []);
+    }, [setThreatFiltersMap, setGuardrailComplianceMap]);
 
     const resetResourcesSelected = () => {
         TableStore.getState().setSelectedItems([])
@@ -250,6 +245,10 @@ function ThreatCompliancePage() {
     ];
 
     const handleSelectedTab = (selectedIndex) => {
+        const tab = tableTabs[selectedIndex];
+        if (tab?.id) {
+            setCurrentTab(tab.id);
+        }
         setLoading(true);
         setSelected(selectedIndex);
         setTimeout(() => {
@@ -455,8 +454,7 @@ function ThreatCompliancePage() {
             setCurrentAppliedFilters(appliedFilters);
 
             const sort = sortKey && sortOrder ? { [sortKey]: sortOrder === -1 ? 1 : -1 } : {};
-            // Guardrail events (Agentic/Endpoint) are never successfulExploit=true — pass undefined
-            // so the backend returns all events regardless of exploit status
+            
             const successfulBool = needsGuardrailCompliance ? undefined : true;
 
             const res = await threatDetectionApi.fetchSuspectSampleData(
@@ -484,18 +482,10 @@ function ThreatCompliancePage() {
             (res?.maliciousEvents || []).forEach(item => {
                 const threatPolicy = threatFiltersMap[item?.filterId];
 
-                // For Agentic/Endpoint, compliance lives in guardrailComplianceMap keyed by capability.
-                // filterId IS the capability name (e.g. "banCodeDetection").
-                // For API Security, compliance is on the threat filter template.
-                let complianceData;
-                if (needsGuardrailCompliance) {
-                    const ruleViolated = extractRuleViolated(item?.metadata);
-                    const capability = getGuardrailCapabilityForRule(ruleViolated);
-                    complianceData = guardrailComplianceMap[capability] || {};
-                } else {
-                    if (!threatPolicy) return;
-                    complianceData = threatPolicy?.compliance?.mapComplianceToListClauses || {};
-                }
+                // Guardrail (Agentic/Endpoint): compliance keyed by capability derived from
+                // metadata.rule_violated. API Security: compliance on the threat filter template.
+                if (!needsGuardrailCompliance && !threatPolicy) return;
+                const complianceData = resolveComplianceClauseMap(item, needsGuardrailCompliance, threatFiltersMap, guardrailComplianceMap);
                 const availableCompliances = Object.keys(complianceData);
 
                 // If filter-bar compliance selections are active, use them (multi-select OR match).

@@ -432,6 +432,8 @@ func (s *Service) refreshCollectionTagsIfNeeded() {
 
 // getLoginUserEmailType looks up the host from request headers in the collection tag cache
 // and returns login-user-email-type, falling back to browser-llm-account-type.
+// The account type is resolved ONLY from the collection's tags; if the host is not
+// found in the collection cache, it returns "" (no fallback to the request tag).
 func (s *Service) getLoginUserEmailType(params *models.ValidateRequestParams) string {
 	var reqHeaders map[string]string
 	if params.RequestHeaders != "" {
@@ -454,34 +456,21 @@ func (s *Service) getLoginUserEmailType(params *models.ValidateRequestParams) st
 		zap.Int("cacheSize", cacheSize),
 		zap.Any("tags", tags))
 
-	if ok {
-		if v := tags["login-user-email-type"]; v != "" {
-			s.logger.Info("getLoginUserEmailType - returning login-user-email-type", zap.String("value", v))
-			return v
-		}
-		if v := tags["browser-llm-account-type"]; v != "" {
-			s.logger.Info("getLoginUserEmailType - returning browser-llm-account-type (cache)", zap.String("value", v))
-			return v
-		}
+	if !ok {
+		// Host has no matching collection — do not fall back to the request tag.
+		s.logger.Info("getLoginUserEmailType - collection not found, returning empty", zap.String("host", host))
+		return ""
 	}
 
-	// Cache miss or no account-type tag — fall back to the request tag.
-	// Browser extension traffic carries browser-llm-account-type; all other apps use login-user-email-type.
-	if params.Tag != "" {
-		var tagMap map[string]string
-		if err := json.Unmarshal([]byte(params.Tag), &tagMap); err == nil {
-			var tagKey string
-			if mcp.IsBrowserExtensionRequest(params.Tag) {
-				tagKey = "browser-llm-account-type"
-			} else {
-				tagKey = "login-user-email-type"
-			}
-			if v := tagMap[tagKey]; v != "" {
-				s.logger.Info("getLoginUserEmailType - returning from request tag", zap.String("key", tagKey), zap.String("value", v))
-				return v
-			}
-		}
+	if v := tags["login-user-email-type"]; v != "" {
+		s.logger.Info("getLoginUserEmailType - returning login-user-email-type", zap.String("value", v))
+		return v
 	}
+	if v := tags["browser-llm-account-type"]; v != "" {
+		s.logger.Info("getLoginUserEmailType - returning browser-llm-account-type (cache)", zap.String("value", v))
+		return v
+	}
+
 	return ""
 }
 

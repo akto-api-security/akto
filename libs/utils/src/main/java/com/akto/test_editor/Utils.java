@@ -596,7 +596,7 @@ public class Utils {
                 return urlModifierPayload;
             }
             String y[] = x[1].split("}}");
-            x[1] = y[0].toString() + "\"}}";
+            x[1] = (y.length > 0 ? y[0] : "") + "\"}}";
             payload = String.join("replace_with:\"", x);
             payload = payload.replace("\\", "\\\\");
             Map<String, Object> json = gson.fromJson(payload, Map.class);
@@ -1152,6 +1152,22 @@ public class Utils {
                 return Operations.addHeader(rawApi, key.toString(), value.toString());
             case "modify_header":
                 String keyStr = key.toString();
+                if (value instanceof Map) {
+                    Map<String, Map<String, String>> regexReplaceMap = (Map) value;
+                    Map<String, String> regexInfo = regexReplaceMap.get("regex_replace");
+                    if (regexInfo != null) {
+                        String regex = regexInfo.get("regex");
+                        String replaceWith = regexInfo.get("replace_with");
+                        Map<String, List<String>> headers = rawApi.fetchReqHeaders();
+                        List<String> headerValues = headers.get(keyStr);
+                        if (headerValues != null && !headerValues.isEmpty()) {
+                            String currentVal = headerValues.get(0);
+                            String newVal = Utils.applyRegexModifier(currentVal, regex, replaceWith);
+                            return Operations.modifyHeader(rawApi, keyStr, newVal);
+                        }
+                        return new ExecutorSingleOperationResp(true, "header key not present " + keyStr);
+                    }
+                }
                 String valStr = value.toString();
                 epochVal = Utils.getEpochTime(valStr);
                 if (epochVal != null) {

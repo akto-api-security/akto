@@ -65,6 +65,17 @@ export default {
         });
         return resp || {};
     },
+    async fetchDistinctResponseCodes(testingRunResultSummaryHexId) {
+        if (!testingRunResultSummaryHexId) {
+            return [];
+        }
+        const resp = await request({
+            url: '/api/fetchDistinctResponseCodes',
+            method: 'post',
+            data: { testingRunResultSummaryHexId },
+        });
+        return resp || [];
+    },
     async fetchRemediationInfo(testId) {
         const resp = await request({
             url: 'api/fetchRemediationInfo',

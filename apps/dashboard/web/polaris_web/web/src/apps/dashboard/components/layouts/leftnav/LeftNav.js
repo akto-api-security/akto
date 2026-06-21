@@ -121,7 +121,7 @@ export default function LeftNav() {
 
 
     // Allowed users to for NHI Data
-    const allowedNhiUsers = ["ankush@akto.io"];
+    const allowedNhiUsers = ["ankush@akto.io", "umesh@akto.io"];
     const isAllowedNhiUser = window.USER_NAME && allowedNhiUsers.includes(window.USER_NAME.toLowerCase());
 
     const navItems = useMemo(() => {
@@ -422,7 +422,7 @@ export default function LeftNav() {
                 ],
                 key: "5",
             }] : []),
-            ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && func.isDemoAccount() && isAllowedNhiUser  ? [{
+            ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && isAllowedNhiUser  ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
                         NHI Governance

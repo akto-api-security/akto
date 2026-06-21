@@ -155,7 +155,7 @@ const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, s
                             checked={enableAiJsDiscovery}
                             onChange={(checked) => {
                                 setEnableAiJsDiscovery(checked)
-                                if (!checked) setCrawlMode('DETERMINISTIC')
+                                setCrawlMode(checked ? 'AGENTIC' : 'DETERMINISTIC')
                             }}
                         />
                     )}
@@ -166,7 +166,6 @@ const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, s
                         <Dropdown
                             label="Crawl mode"
                             menuItems={[
-                                { label: 'Deterministic', value: 'DETERMINISTIC', id: 'DETERMINISTIC' },
                                 { label: 'AI Agentic', value: 'AGENTIC', id: 'AGENTIC' },
                                 { label: 'Hybrid', value: 'HYBRID', id: 'HYBRID' },
                             ]}
@@ -174,7 +173,6 @@ const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, s
                             selected={(value) => setCrawlMode(value)}
                         />
                         <Text variant="bodySm" color="subdued">
-                            DETERMINISTIC = rule-based crawl (default).<br />
                             AGENTIC = AI agent drives the browser.<br />
                             HYBRID = deterministic with AI on stuck pages.
                         </Text>

@@ -61,8 +61,12 @@ export function enrichRow(row) {
     // Normalize duration — backend may return duration / latency / duration_ms
     const durationMs = Number(row.durationMs || row.duration || row.latency || row.duration_ms || 0);
 
+    // Normalize latestTimestamp — some sources (e.g. flat prompt rows) only have timestamp
+    const latestTimestamp = row.latestTimestamp || row.timestamp || 0;
+
     return {
         ...row,
+        latestTimestamp,
         _promptText:   promptText,
         _responseText: responseText,
         _model:        resolvedModel,
