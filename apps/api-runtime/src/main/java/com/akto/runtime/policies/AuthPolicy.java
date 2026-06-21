@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.regex.Pattern;
 import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class AuthPolicy {
@@ -19,6 +20,13 @@ public class AuthPolicy {
     public static final String AUTHORIZATION_HEADER_NAME = "authorization";
     public static final String COOKIE_NAME = "cookie";
     private static final Logger logger = LoggerFactory.getLogger(AuthPolicy.class);
+
+    private static final Pattern API_KEY_PATTERN = Pattern.compile(".*(apikey|passkey).*");
+
+    private static boolean isApiKeyHeader(String headerName) {
+        String normalized = headerName.toLowerCase().replaceAll("[_-]", "");
+        return API_KEY_PATTERN.matcher(normalized).matches();
+    }
 
     private static List<String> findBearerBasicAuth(String header, String value){
         value = value.trim();
@@ -88,6 +96,9 @@ public class AuthPolicy {
         // find bearer or basic tokens in any header
         for (String header : headers.keySet()) {
             List<String> headerValues = headers.getOrDefault(header, new ArrayList<>());
+            if (isApiKeyHeader(header)) {
+                authTypes.add(ApiInfo.AuthType.API_KEY);
+            }
             if (!headerValues.isEmpty()) {
                 for (String value : headerValues) {
                     authTypes.addAll(findBearerBasicAuth(header, value));

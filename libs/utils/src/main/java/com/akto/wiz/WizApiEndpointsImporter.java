@@ -137,9 +137,11 @@ public class WizApiEndpointsImporter {
                         String path = node.getString("pathname");
                         String method = node.getString("httpMethod");
                         List<?> relatedResources = (List<?>) node.get("relatedResources");
+                        List<?> authSchemes = (List<?>) node.get("authSchemes");
                         try {
                             JsonNode spec = WizSpecProcessor.resolveSpec(node.get("specification"), host, path, method);
                             if (spec != null) {
+                                spec = WizSpecProcessor.injectMissingAuthScheme(spec, authSchemes);
                                 String qaHost = WizApiGatewayFilter.resolveQaHost(host, relatedResources, canonicalKeyToQaHost);
                                 if (qaHost != null) {
                                     spec = WizSpecProcessor.replaceSpecHost(spec, qaHost);

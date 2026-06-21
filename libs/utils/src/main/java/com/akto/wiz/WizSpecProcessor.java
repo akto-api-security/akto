@@ -131,6 +131,63 @@ public class WizSpecProcessor {
         return spec;
     }
 
+    /**
+     * Injects a synthetic security scheme when the spec declares none but the Wiz endpoint
+     * reports an auth scheme. Currently handles API_KEY only.
+     *
+     * Adds to components.securitySchemes (picked up by buildMergedSpec) and to the
+     * operation-level security array (picked up by the Akto OpenAPI parser).
+     */
+    public static JsonNode injectMissingAuthScheme(JsonNode spec, List<?> authSchemes) {
+        if (!(spec instanceof ObjectNode)) return spec;
+
+        ObjectNode specObj = (ObjectNode) spec;
+        JsonNode existingSchemes = spec.path("components").path("securitySchemes");
+        boolean hasExistingSchemes = !existingSchemes.isMissingNode() && existingSchemes.size() > 0;
+
+        if (!hasExistingSchemes) {
+            // No schemes defined at all — synthesise one from Wiz authSchemes if API_KEY is present.
+            if (authSchemes == null || authSchemes.isEmpty()) return spec;
+            for (Object scheme : authSchemes) {
+                if ("API_KEY".equals(scheme)) {
+                    ObjectNode components = specObj.has("components")
+                        ? (ObjectNode) specObj.get("components")
+                        : specObj.putObject("components");
+                    ObjectNode securitySchemes = components.has("securitySchemes")
+                        ? (ObjectNode) components.get("securitySchemes")
+                        : components.putObject("securitySchemes");
+                    securitySchemes.putObject("ApiKeyAuth")
+                        .put("type", "apiKey")
+                        .put("in", "header")
+                        .put("name", "x-api-key");
+                    existingSchemes = securitySchemes;
+                    break;
+                }
+            }
+            if (existingSchemes.isMissingNode() || existingSchemes.size() == 0) return spec;
+        }
+
+        // Schemes are defined (either pre-existing or just synthesised above).
+        // For any operation that has no security block, inject the first scheme
+        // from this spec's own components — keeping per-endpoint context intact.
+        String firstSchemeName = existingSchemes.fieldNames().next();
+        JsonNode paths = specObj.path("paths");
+        if (paths.isObject()) {
+            paths.fields().forEachRemaining(pathEntry -> {
+                if (!pathEntry.getValue().isObject()) return;
+                pathEntry.getValue().fields().forEachRemaining(methodEntry -> {
+                    JsonNode operation = methodEntry.getValue();
+                    if (operation.isObject() && !operation.has("security")) {
+                        ((ObjectNode) operation).putArray("security")
+                            .addObject().putArray(firstSchemeName);
+                    }
+                });
+            });
+        }
+
+        return spec;
+    }
+
     private static JsonNode normaliseServerUrl(JsonNode spec, String host) {
         if (!(spec instanceof ObjectNode)) return spec;
 
