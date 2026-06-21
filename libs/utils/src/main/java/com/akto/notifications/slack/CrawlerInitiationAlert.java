@@ -17,6 +17,8 @@ public class CrawlerInitiationAlert extends SlackAlerts {
     private final int timestamp;
     private final String username;
     private final boolean hasAuth;
+    // Non-null only when a test role was configured but failed to authenticate; the crawl then runs unauthenticated.
+    private final String testRoleError;
 
     public CrawlerInitiationAlert(
             String userEmail,
@@ -29,7 +31,8 @@ public class CrawlerInitiationAlert extends SlackAlerts {
             String crawlId,
             int timestamp,
             String username,
-            boolean hasAuth) {
+            boolean hasAuth,
+            String testRoleError) {
         super(SlackAlertType.CRAWLER_INITIATION_ALERT);
         this.userEmail = userEmail;
         this.hostname = hostname;
@@ -42,6 +45,7 @@ public class CrawlerInitiationAlert extends SlackAlerts {
         this.timestamp = timestamp;
         this.username = username;
         this.hasAuth = hasAuth;
+        this.testRoleError = testRoleError;
     }
 
     @Override
@@ -52,6 +56,11 @@ public class CrawlerInitiationAlert extends SlackAlerts {
 
         // Mentions
         blocks.add(createTextSection("<@U06MQ667K5G> <@U01U1NUG8D9>"));
+
+        if (testRoleError != null && !testRoleError.isEmpty()) {
+            blocks.add(createTextSection(
+                "⚠️ *Test role authentication failed* — the crawl is running *unauthenticated*. Reason: " + testRoleError));
+        }
 
         blocks.add(createDivider());
 

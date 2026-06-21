@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { Box, IndexFiltersMode, Text, HorizontalStack, Badge, Card, VerticalStack, Divider, Button } from "@shopify/polaris"
+import { Box, IndexFiltersMode, Text, HorizontalStack, Badge, Card, VerticalStack, Divider, Button, Banner } from "@shopify/polaris"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable"
 import func from "@/util/func"
 import api from "./api"
@@ -83,7 +83,9 @@ function DastProgressSingle() {
                 setScanMetadata({
                     moduleName: currentScan.moduleName || "Internal DAST (Akto)",
                     applicationPages: currentScan.applicationPages || "-",
-                    urlTemplatePatterns: currentScan.urlTemplatePatterns || "-"
+                    urlTemplatePatterns: currentScan.urlTemplatePatterns || "-",
+                    testRoleFailed: currentScan.testRoleFailed || false,
+                    testRoleError: currentScan.testRoleError || ""
                 })
                 setCrawlerStatus(currentScan.status)
             }
@@ -186,6 +188,16 @@ function DastProgressSingle() {
                 </Button>
             )}
             components={[
+                scanMetadata?.testRoleFailed && (
+                    <Box paddingBlockEnd="4" key="test-role-warning">
+                        <Banner status="warning" title="Test role authentication failed">
+                            <Text>
+                                This scan ran without authentication because the configured test role could not authenticate
+                                {scanMetadata.testRoleError ? `: ${scanMetadata.testRoleError}` : "."} Results may be incomplete.
+                            </Text>
+                        </Banner>
+                    </Box>
+                ),
                 crawlDetails && (
                     <Box paddingBlockEnd="4">
                         <Card>
