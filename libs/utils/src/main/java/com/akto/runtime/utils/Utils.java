@@ -215,10 +215,13 @@ public class Utils {
         boolean isPending = !isPendingStr.toLowerCase().equals("false");
         String sourceStr = (String) jsonObject.getOrDefault("source", HttpResponseParams.Source.OTHER.name());
         HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
-        
-        return new HttpResponseParams(
+        String tags = jsonObject.getString("tags");
+
+        HttpResponseParams httpResponseParams = new HttpResponseParams(
                 type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction
         );
+        httpResponseParams.setTags(tags);
+        return httpResponseParams;
     }
 
     public static Pattern createRegexPatternFromList(List<String> discardedUrlList){

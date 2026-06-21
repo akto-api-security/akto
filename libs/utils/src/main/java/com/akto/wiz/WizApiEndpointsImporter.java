@@ -17,6 +17,7 @@ import io.swagger.v3.parser.core.models.ParseOptions;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -120,6 +121,7 @@ public class WizApiEndpointsImporter {
                     int currentBatch = (i / batchSize) + 1;
 
                     List<JsonNode> pageSpecs = new ArrayList<>();
+                    Map<String, String> hostToGatewayName = new HashMap<>();
                     BasicDBObject root;
                     try {
                         root = WizApiClient.fetchEndpointsPageByIds(apiUrl, accessToken, batch);
@@ -137,12 +139,19 @@ public class WizApiEndpointsImporter {
                         String path = node.getString("pathname");
                         String method = node.getString("httpMethod");
                         List<?> relatedResources = (List<?>) node.get("relatedResources");
+                        List<?> authSchemes = (List<?>) node.get("authSchemes");
                         try {
                             JsonNode spec = WizSpecProcessor.resolveSpec(node.get("specification"), host, path, method);
                             if (spec != null) {
+                                spec = WizSpecProcessor.injectMissingAuthScheme(spec, authSchemes);
                                 String qaHost = WizApiGatewayFilter.resolveQaHost(host, relatedResources, canonicalKeyToQaHost);
                                 if (qaHost != null) {
                                     spec = WizSpecProcessor.replaceSpecHost(spec, qaHost);
+                                }
+                                String effectiveHost = qaHost != null ? qaHost : host;
+                                String gatewayName = WizApiGatewayFilter.extractGatewayName(relatedResources);
+                                if (gatewayName != null) {
+                                    hostToGatewayName.putIfAbsent(effectiveHost, gatewayName);
                                 }
                                 pageSpecs.add(spec);
                             }
@@ -170,6 +179,7 @@ public class WizApiEndpointsImporter {
                                     if (aktoFormat != null) {
                                         BasicDBObject msg = BasicDBObject.parse(aktoFormat);
                                         msg.put("source", HttpResponseParams.Source.WIZ.name());
+                                        msg.put("tags", WizApiGatewayFilter.buildWizTagsJson(msg.getString("requestHeaders"), hostToGatewayName));
                                         log.setAktoFormat(msg.toJson());
                                     }
                                 }
