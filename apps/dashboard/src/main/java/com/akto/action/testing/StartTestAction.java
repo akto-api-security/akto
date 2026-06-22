@@ -9,6 +9,7 @@ import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.*;
+import com.akto.testing_utils.TestingUtils;
 import com.akto.utils.CategoryWiseStatsUtils;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -1601,75 +1602,6 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    // Recounts open issues for a single summary and updates its countIssues + isIgnoredResult flags.
-    // Shared by handleRefreshTableCount (manual refresh) and IssuesAction (ignore/reopen from issues page).
-    public static void recountAndUpdateSummaryCount(ObjectId summaryObjectId){
-        boolean isStoredInVulnerableCollection = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(summaryObjectId, true);
-        List<TestingRunResult> testingRunResults = VulnerableTestingRunResultDao.instance.findAll(
-            Filters.and(
-                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId),
-                vulnerableFilter
-            ),
-            Projections.include(TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE),
-            isStoredInVulnerableCollection
-        );
-
-        if(testingRunResults.isEmpty()){
-            return;
-        }
-
-        Set<TestingIssuesId> issuesIds = new HashSet<>();
-        Map<TestingIssuesId, ObjectId> mapIssueToResultId = new HashMap<>();
-        Set<ObjectId> ignoredResults = new HashSet<>();
-        for(TestingRunResult runResult: testingRunResults){
-            TestingIssuesId issuesId = getTestingIssueIdFromRunResult(runResult);
-            issuesIds.add(issuesId);
-            mapIssueToResultId.put(issuesId, runResult.getId());
-            ignoredResults.add(runResult.getId());
-        }
-
-        List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(
-            Filters.and(
-                Filters.in(Constants.ID, issuesIds),
-                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN)
-            ), Projections.include(TestingRunIssues.KEY_SEVERITY)
-        );
-
-        Map<String, Integer> totalCountIssues = new HashMap<>();
-        totalCountIssues.put("CRITICAL", 0);
-        totalCountIssues.put("HIGH", 0);
-        totalCountIssues.put("MEDIUM", 0);
-        totalCountIssues.put("LOW", 0);
-
-        for(TestingRunIssues runIssue: issues){
-            int initCount = totalCountIssues.getOrDefault(runIssue.getSeverity().name(), 0);
-            totalCountIssues.put(runIssue.getSeverity().name(), initCount + 1);
-            if(mapIssueToResultId.containsKey(runIssue.getId())){
-                ObjectId resId = mapIssueToResultId.get(runIssue.getId());
-                ignoredResults.remove(resId);
-            }
-        }
-
-        // update testing run result summary
-        TestingRunResultSummariesDao.instance.updateOne(
-            Filters.eq(Constants.ID, summaryObjectId),
-            Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
-        );
-
-        // update testing run results, by setting them isIgnored true
-        if(isStoredInVulnerableCollection){
-            VulnerableTestingRunResultDao.instance.updateMany(
-                Filters.in(Constants.ID, ignoredResults),
-                Updates.set(TestingRunResult.IS_IGNORED_RESULT, true)
-            );
-        }else{
-            TestingRunResultDao.instance.updateMany(
-                Filters.in(Constants.ID, ignoredResults),
-                Updates.set(TestingRunResult.IS_IGNORED_RESULT, true)
-            );
-        }
-    }
-
     public String handleRefreshTableCount(){
         if(this.testingRunResultSummaryHexId == null || this.testingRunResultSummaryHexId.isEmpty()){
             addActionError("Invalid summary id");
@@ -1680,7 +1612,7 @@ public class StartTestAction extends UserAction {
             public void run() {
                 Context.accountId.set(accountId);
                 try {
-                    recountAndUpdateSummaryCount(new ObjectId(testingRunResultSummaryHexId));
+                    TestingUtils.recountAndUpdateSummaryCount(new ObjectId(testingRunResultSummaryHexId));
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

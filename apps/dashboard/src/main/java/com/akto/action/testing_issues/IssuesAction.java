@@ -40,6 +40,7 @@ import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.util.ComplianceResolutionUtils;
+import com.akto.testing_utils.TestingUtils;
 import com.akto.utils.ApiInfoKeyResult;
 import com.akto.utils.TestTemplateUtils;
 import com.mongodb.BasicDBObject;
@@ -884,7 +885,7 @@ public class IssuesAction extends UserAction {
                             .filter(Objects::nonNull)
                             .collect(Collectors.toSet());
                         for (ObjectId summaryId : summaryIds) {
-                            StartTestAction.recountAndUpdateSummaryCount(summaryId);
+                            TestingUtils.recountAndUpdateSummaryCount(summaryId);
                         }
                         return;
                     }
