@@ -46,8 +46,11 @@ import {
     BlockedHostsStep,
     BlockedHostsConfig,
     ServerSettingsStep,
-    ServerSettingsConfig
+    ServerSettingsConfig,
+    EnterpriseLicenseComplianceStep,
+    EnterpriseLicenseComplianceConfig
 } from './steps';
+import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from "./enterpriseLicenseComplianceCatalog";
 import "./createGuardrailPage.css";
 
 const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false }) => {
@@ -152,6 +155,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [browserLlmServers, setBrowserLlmServers] = useState([]);
     const [collectionsLoading, setCollectionsLoading] = useState(false);
 
+    const [enterpriseLicenseComplianceCategories, setEnterpriseLicenseComplianceCategories] = useState([]);
+
     // Get collections from PersistStore
     const allCollections = PersistStore(state => state.allCollections);
 
@@ -217,7 +222,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         browserLlmServers,
         applyOnRequest,
         applyOnResponse,
-        policyBehaviour
+        policyBehaviour,
+        // Enterprise License Guardrails
+        enterpriseLicenseComplianceCategories,
     });
 
     const getStepsWithSummary = () => {
@@ -272,6 +279,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 title: AnomalyDetectionConfig.title,
                 summary: AnomalyDetectionConfig.getSummary(storedStateData),
                 ...AnomalyDetectionConfig.validate(storedStateData)
+            }, 
+            {
+                number: EnterpriseLicenseComplianceConfig.number,
+                title: EnterpriseLicenseComplianceConfig.title,
+                summary: EnterpriseLicenseComplianceConfig.getSummary(storedStateData),
+                ...EnterpriseLicenseComplianceConfig.validate(storedStateData)
             }
         ];
 
@@ -475,6 +488,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyOnResponse(false);
         setApplyOnRequest(false);
         setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
+        setEnterpriseLicenseComplianceCategories([]);
     };
 
     const populateFormForEdit = (policy) => {
@@ -516,10 +530,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             }
         }
 
-        // Denied topics
-        const hasDeniedTopics = policy.deniedTopics && policy.deniedTopics.length > 0;
-        setEnableDeniedTopics(hasDeniedTopics);
-        setDeniedTopics(policy.deniedTopics || []);
+
+        const userDeniedTopics = (policy.deniedTopics || []).filter(
+            (t) => t?.origin !== ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN
+        );
+        setEnableDeniedTopics(userDeniedTopics.length > 0);
+        setDeniedTopics(userDeniedTopics);
+        setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
 
         // Word filters
         setWordFilters({
@@ -747,7 +764,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 blockPersonalAccounts,
                 applyOnResponse,
                 applyOnRequest,
-                ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
+                ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {}),
+                enterpriseLicenseComplianceCategories,
             };
 
 
@@ -802,6 +820,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableBasePromptRule={setEnableBasePromptRule}
                         basePromptConfidenceScore={basePromptConfidenceScore}
                         setBasePromptConfidenceScore={setBasePromptConfidenceScore}
+                        enterpriseLicenseComplianceCategories={enterpriseLicenseComplianceCategories}
                     />
                 );
             case 3:
@@ -898,22 +917,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableToolNameDescriptionMismatch={setEnableToolNameDescriptionMismatch}
                     />
                 );
-            case 11: {
-                const hostSuggestions = Array.from(new Set([
-                    ...(browserConfigs || []).map(c => (c.host || "").trim()),
-                    ...(mcpServers || []).map(s => (s.label || "").trim()),
-                    ...(agentServers || []).map(s => (s.label || "").trim()),
-                ].filter(Boolean))).sort();
-                return (
-                    <BlockedHostsStep
-                        blockedHosts={blockedHosts}
-                        setBlockedHosts={setBlockedHosts}
-                        blockPersonalAccounts={blockPersonalAccounts}
-                        setBlockPersonalAccounts={setBlockPersonalAccounts}
-                        hostSuggestions={hostSuggestions}
-                    />
-                );
-            }
             case 10:
                 return (
                     <ServerSettingsStep
@@ -935,6 +938,29 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         collectionsLoading={collectionsLoading}
                         policyBehaviour={policyBehaviour}
                         setPolicyBehaviour={setPolicyBehaviour}
+                    />
+                );
+            case 11: {
+                const hostSuggestions = Array.from(new Set([
+                    ...(browserConfigs || []).map(c => (c.host || "").trim()),
+                    ...(mcpServers || []).map(s => (s.label || "").trim()),
+                    ...(agentServers || []).map(s => (s.label || "").trim()),
+                ].filter(Boolean))).sort();
+                return (
+                    <BlockedHostsStep
+                        blockedHosts={blockedHosts}
+                        setBlockedHosts={setBlockedHosts}
+                        blockPersonalAccounts={blockPersonalAccounts}
+                        setBlockPersonalAccounts={setBlockPersonalAccounts}
+                        hostSuggestions={hostSuggestions}
+                    />
+                );
+            }
+            case 12:
+                return (
+                    <EnterpriseLicenseComplianceStep
+                        enterpriseLicenseComplianceCategories={enterpriseLicenseComplianceCategories}
+                        setEnterpriseLicenseComplianceCategories={setEnterpriseLicenseComplianceCategories}
                     />
                 );
             default:
@@ -1005,7 +1031,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 .map(entry => ({ pattern: entry.pattern.trim() })),
             blockPersonalAccounts,
             applyOnResponse: applyOnResponse,
-            applyOnRequest: applyOnRequest
+            applyOnRequest: applyOnRequest,
+            enterpriseLicenseComplianceCategories: enterpriseLicenseComplianceCategories,
         };
     };
 

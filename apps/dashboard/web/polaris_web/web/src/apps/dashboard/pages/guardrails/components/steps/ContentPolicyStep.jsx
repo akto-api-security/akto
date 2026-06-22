@@ -59,7 +59,8 @@ const ContentPolicyStep = ({
     enableBasePromptRule,
     setEnableBasePromptRule,
     basePromptConfidenceScore,
-    setBasePromptConfidenceScore
+    setBasePromptConfidenceScore,
+    enterpriseLicenseComplianceCategories
 }) => {
     // Denied topics state
     const [editingIndex, setEditingIndex] = useState(null);
@@ -309,6 +310,13 @@ const ContentPolicyStep = ({
                         onChange={setEnableDeniedTopics}
                         helpText="Add up to 30 denied topics to block user inputs or model responses associated with the topic."
                     />
+                    {enterpriseLicenseComplianceCategories?.length > 0 && (
+                        <Box paddingBlockStart="2" paddingInlineStart="6">
+                            <Text variant="bodySm" tone="subdued">
+                                {enterpriseLicenseComplianceCategories.length} topic{enterpriseLicenseComplianceCategories.length !== 1 ? 's are' : ' is'} managed by Enterprise License Compliance.
+                            </Text>
+                        </Box>
+                    )}
                     {enableDeniedTopics && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
