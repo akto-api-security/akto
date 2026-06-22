@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList } from '@shopify/polaris';
+import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList, Scrollable, Avatar, Box } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
@@ -626,14 +626,25 @@ function GuardrailPolicies() {
                         }
                         onClose={() => setPresetsPopoverActive(false)}
                     >
-                        <Popover.Pane fixed>
-                            <ActionList
-                                actionRole="menuitem"
-                                items={GUARDRAIL_PRESETS.map(preset => ({
-                                    content: preset.label,
-                                    onAction: () => handleSelectPreset(preset.data),
-                                }))}
-                            />
+                        <Popover.Pane>
+                            <Scrollable style={{ maxHeight: "350px" }}>
+                                <ActionList
+                                    actionRole="menuitem"
+                                    items={GUARDRAIL_PRESETS.map(preset => ({
+                                        content: preset.label,
+                                        prefix: (
+                                            <Box>
+                                                <Avatar
+                                                    source={func.getComplianceIcon(preset.icon || preset.label)}
+                                                    shape="square"
+                                                    size="extraSmall"
+                                                />
+                                            </Box>
+                                        ),
+                                        onAction: () => handleSelectPreset(preset.data),
+                                    }))}
+                                />
+                            </Scrollable>
                         </Popover.Pane>
                     </Popover>
                     <Button primary onClick={() => setShowCreateModal(true)}>Create Guardrail</Button>
