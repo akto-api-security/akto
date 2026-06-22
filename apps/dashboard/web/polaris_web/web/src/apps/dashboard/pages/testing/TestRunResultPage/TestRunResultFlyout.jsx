@@ -779,7 +779,10 @@ function TestRunResultFlyout(props) {
                 setVulnerabilityAnalysisError(null);
 
                 const timeoutId = setTimeout(() => {
-                    const analysisPromises = selectedTestRunResult.testResults.map(async (result, idx) => {
+                    // Multi-exec tests only mark the last attempt as vulnerable; analyze that one only.
+                    const lastIdx = selectedTestRunResult.testResults.length - 1;
+                    const analysisPromises = [lastIdx].map(async (idx) => {
+                        const result = selectedTestRunResult.testResults[idx];
                         // Parse the message if it's a string
                         let messageObj = result.message;
                         if (typeof messageObj === 'string') {
