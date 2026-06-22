@@ -57,10 +57,9 @@ export default function LLMObservability() {
 
     const onArgusRowsFetched = useCallback((rows) => setTraces(rows), []);
 
-    const openSession = useCallback((sessionId) => {
-        const row = sessions.find(r => r.sessionIdentifier === sessionId);
-        setSelectedSession(row || { sessionIdentifier: sessionId });
-    }, [sessions]);
+    const openSession = useCallback((row) => {
+        setSelectedSession(row);
+    }, []);
 
     // ─── Atlas graph data (sessions) ─────────────────────────────────────────
 
@@ -350,7 +349,7 @@ export default function LLMObservability() {
                     isArgus ? (
                         <MessagesView key="traces-table" currDateRange={currDateRange} columnDefs={ARGUS_TRACE_COL_DEFS} onRowClicked={p => p.data && setSelectedTrace(p.data)} onRowsFetched={onArgusRowsFetched} />
                     ) : (
-                        <SessionsView key="sessions-table" rowData={sessions} onOpenSession={openSession} />
+                        <SessionsView key="sessions-table" currDateRange={currDateRange} onOpenSession={openSession} />
                     ),
                 ]}
             />
