@@ -64,24 +64,24 @@ function SampleDetails(props) {
         : undefined;
 
     const claudeSettingsSectionsToShow = claudeSettingsEntryEarly?.overview
-        ? [{ heading: claudeSettingsEntryEarly.title, description: claudeSettingsEntryEarly.description, subSections: claudeSettingsEntryEarly.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
+        ? [{ heading: claudeSettingsEntryEarly.title, description: null, subSections: claudeSettingsEntryEarly.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
         : [];
 
     // Get template object - either from hardcoded data or YAML templates
     let currentTemplateObj;
-    if (useGuardrailDescription) {
+    if (isClaudeSettingsRisk) {
+        // Claude settings risk takes priority — use per-field overview sections
+        currentTemplateObj = {
+            guardrailSections: claudeSettingsSectionsToShow,
+            testName: moreInfoData?.templateId || "Claude Settings Risk",
+            name: moreInfoData?.templateId || "Claude Settings Risk"
+        };
+    } else if (useGuardrailDescription) {
         // For Argus/Atlas guardrails, use structured content
         currentTemplateObj = {
             guardrailSections: guardrailSectionsToShow,
             testName: moreInfoData?.templateId || "Guardrail Policy",
             name: moreInfoData?.templateId || "Guardrail Policy"
-        };
-    } else if (isClaudeSettingsRisk) {
-        // For Claude settings risk, use the per-field overview sections
-        currentTemplateObj = {
-            guardrailSections: claudeSettingsSectionsToShow,
-            testName: moreInfoData?.templateId || "Claude Settings Risk",
-            name: moreInfoData?.templateId || "Claude Settings Risk"
         };
     } else {
         // Normal threat detection - use YAML templates
