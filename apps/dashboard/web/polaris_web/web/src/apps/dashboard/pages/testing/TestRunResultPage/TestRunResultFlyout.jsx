@@ -708,7 +708,7 @@ function TestRunResultFlyout(props) {
             // Check if vulnerability highlighting is enabled (use existing GPT feature flag)
             //const isVulnerabilityHighlightingEnabled = window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && 
             //    window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true;
-            const isVulnerabilityHighlightingEnabled = false;
+            const isVulnerabilityHighlightingEnabled = true;
 
             if (!hasAnalyzedRef.current && selectedTestRunResult?.vulnerable && selectedTestRunResult?.testResults && isVulnerabilityHighlightingEnabled) {
                 hasAnalyzedRef.current = true;

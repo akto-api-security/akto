@@ -157,37 +157,79 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
   }
 
   const textLength = text.length;
-  const isValidRange = (start, end) => Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end <= textLength && start < end;
+  const isWordChar = (ch) => typeof ch === 'string' && /[A-Za-z0-9_-]/.test(ch);
+
   const resolvePhrase = (segment) => {
-    if (typeof segment?.phrase === 'string' && segment.phrase.length > 0) {
-      return segment.phrase;
+    if (typeof segment?.phrase === 'string' && segment.phrase.trim().length > 0) {
+      return segment.phrase.trim();
     }
     if (typeof segment?.message === 'string' && segment.message.length > 0) {
-      return segment.message.replace(/\s*\[chars\s+\d+-\d+\]\s*$/, '');
+      return segment.message.replace(/\s*\[chars\s+\d+-\d+\]\s*$/, '').trim();
     }
     return undefined;
+  };
+
+  // Expand a [start, end) range outwards so we never highlight the middle of a word/token.
+  const snapToWordBoundaries = (start, end) => {
+    let s = start;
+    let e = end;
+    while (s > 0 && isWordChar(text[s - 1]) && isWordChar(text[s])) {
+      s--;
+    }
+    while (e < textLength && isWordChar(text[e - 1]) && isWordChar(text[e])) {
+      e++;
+    }
+    return [s, e];
+  };
+
+  // Find the best occurrence of `phrase`. Prefer whole-token matches (so "envoy"
+  // doesn't match inside "x-envoy-..."), and disambiguate using the LLM's hint.
+  const findPhraseRange = (phrase, hintStart) => {
+    if (!phrase) {
+      return null;
+    }
+    const matches = [];
+    let from = 0;
+    while (from <= textLength) {
+      const idx = text.indexOf(phrase, from);
+      if (idx === -1) {
+        break;
+      }
+      const endIdx = idx + phrase.length;
+      const boundedBefore = idx === 0 || !isWordChar(text[idx - 1]) || !isWordChar(phrase[0]);
+      const boundedAfter = endIdx >= textLength || !isWordChar(text[endIdx]) || !isWordChar(phrase[phrase.length - 1]);
+      matches.push({ start: idx, end: endIdx, wholeToken: boundedBefore && boundedAfter });
+      from = idx + 1;
+    }
+    if (matches.length === 0) {
+      return null;
+    }
+    const wholeTokenMatches = matches.filter((m) => m.wholeToken);
+    const candidates = wholeTokenMatches.length > 0 ? wholeTokenMatches : matches;
+    if (Number.isFinite(hintStart)) {
+      candidates.sort((a, b) => Math.abs(a.start - hintStart) - Math.abs(b.start - hintStart));
+    }
+    return candidates[0];
   };
 
   const decorations = [];
 
   vulnerabilitySegments.forEach((segment) => {
     try {
-      let start = Number(segment?.start);
-      let end = Number(segment?.end);
       const phrase = resolvePhrase(segment);
+      const hintStart = Number(segment?.start);
+      const hintEnd = Number(segment?.end);
 
-      if (phrase) {
-        const phraseMatchesProvidedRange = isValidRange(start, end) && text.slice(start, end) === phrase;
-        if (!phraseMatchesProvidedRange) {
-          const idx = text.indexOf(phrase);
-          if (idx >= 0) {
-            start = idx;
-            end = idx + phrase.length;
-          }
-        }
-      }
+      let start;
+      let end;
 
-      if (!isValidRange(start, end)) {
+      const phraseRange = findPhraseRange(phrase, hintStart);
+      if (phraseRange) {
+        start = phraseRange.start;
+        end = phraseRange.end;
+      } else if (Number.isFinite(hintStart) && Number.isFinite(hintEnd) && hintStart >= 0 && hintEnd <= textLength && hintStart < hintEnd) {
+        [start, end] = snapToWordBoundaries(hintStart, hintEnd);
+      } else {
         return;
       }
 
@@ -198,11 +240,20 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
         return;
       }
 
+      const reason = typeof segment?.reason === 'string' ? segment.reason.trim() : '';
+      const options = {
+        inlineClassName: "vulnerability-highlight"
+      };
+      if (reason) {
+        options.hoverMessage = [
+          { value: "**Evidence**" },
+          { value: reason }
+        ];
+      }
+
       decorations.push({
         range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
-        options: {
-          inlineClassName: "vulnerability-highlight"
-        }
+        options
       });
     } catch (error) {
       console.error('Error creating vulnerability highlight:', error, segment);
@@ -210,6 +261,9 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
   });
 
   if (decorations.length > 0) {
+    if (ref._vulnDecorations) {
+      ref._vulnDecorations.clear();
+    }
     ref._vulnDecorations = ref.createDecorationsCollection(decorations);
   }
 }
