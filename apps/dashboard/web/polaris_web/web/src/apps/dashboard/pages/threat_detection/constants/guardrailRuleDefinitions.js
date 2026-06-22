@@ -594,29 +594,20 @@ This event means the guardrail **successfully protected** the data - the sensiti
         overview: [
             {
                 heading: "What is this?",
-                body: "The agent tried to reach a host (domain or endpoint) that the blocked-hosts policy does not allow - either it is explicitly on the blocklist, or it falls outside the configured allowed set. The connection was stopped before any data left for that host."
+                body: "Someone tried to reach a host (domain or service) that your organisation has deliberately added to the blocked-hosts policy - for example an unsanctioned external AI service such as DeepSeek. This is an intentional policy block, not a detected attack: the request was stopped because company policy does not allow that destination."
             },
             {
-                heading: "Why is it dangerous?",
-                body: "Outbound network access is the main way data leaves an agent. If an agent can reach an arbitrary host, a prompt injection, a malicious skill, or a compromised tool can use it to exfiltrate secrets and conversation data, or to pull down a malicious payload. Restricting which hosts the agent may contact closes that exfiltration/download channel."
+                heading: "Why is it blocked?",
+                body: "Organisations block specific hosts to keep data away from unapproved third parties - unsanctioned AI tools, file-sharing sites, or services that fall outside data-governance and compliance requirements. Sending prompts or data to such a host would move it outside the company's control."
             }
         ],
-        remediation: `## What to do
+        remediation: `## No remediation needed
 
-### Right now
-1. **Find the host that was blocked** - check the Host / URL field on this event. That is the destination the agent attempted to reach.
-2. **Decide if it is legitimate** - is it a known service your agent is supposed to call, or an unfamiliar/unexpected domain?
+This is **working as intended**. The host was blocked on purpose by your organisation's policy (e.g. an external AI service the company does not permit), so there is no threat to fix and no action required - the block already did its job.
 
-### If the host is legitimate
-- Add it to the allowed hosts in the block-host policy (\`block_host_policy\`) so future requests succeed. Prefer an exact host/domain over a broad wildcard.
-
-### If the host is unknown or unexpected
-- Treat this as a possible exfiltration or malicious-download attempt. Investigate **why** the agent tried to reach it: review the session prompts for injection, and check whether a recently added skill or tool drove the request.
-- If a skill or tool is responsible, quarantine it and rotate any credentials that were reachable from the agent's host.
-
-### Stop it recurring
-- Run egress **default-deny**: allow only the specific hosts the agent needs, block everything else.
-- Alert on repeated blocked-host attempts from the same actor or session - a spike often indicates an active exfiltration attempt rather than a misconfiguration.
+### The only things worth doing
+- **If the host should actually be allowed** (it was blocked by mistake, or policy has changed), an administrator can add it to the allowed hosts in the block-host policy. Until then, requests to it will keep being blocked.
+- **If users keep hitting this block**, it usually means people are trying to use a tool the company has chosen not to allow - a reminder of the approved alternatives is more useful than any technical change.
 `
     },
 
