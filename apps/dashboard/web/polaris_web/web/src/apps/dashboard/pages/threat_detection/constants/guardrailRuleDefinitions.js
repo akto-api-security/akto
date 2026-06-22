@@ -586,6 +586,31 @@ This event means the guardrail **successfully protected** the data - the sensiti
 `
     },
 
+    // ─── Blocked Host ──────────────────────────────────────────────────────────
+    {
+        prefixes: ["BlockedHost", "blocked_host", "block_host", "BlockedHosts", "block_host_policy"],
+        capability: "blockedHosts",
+        heading: "Blocked Host",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "Someone tried to reach a host (domain or service) that your organisation has deliberately added to the blocked-hosts policy - for example an unsanctioned external AI service such as DeepSeek. This is an intentional policy block, not a detected attack: the request was stopped because company policy does not allow that destination."
+            },
+            {
+                heading: "Why is it blocked?",
+                body: "Organisations block specific hosts to keep data away from unapproved third parties - unsanctioned AI tools, file-sharing sites, or services that fall outside data-governance and compliance requirements. Sending prompts or data to such a host would move it outside the company's control."
+            }
+        ],
+        remediation: `## No remediation needed
+
+This is **working as intended**. The host was blocked on purpose by your organisation's policy (e.g. an external AI service the company does not permit), so there is no threat to fix and no action required - the block already did its job.
+
+### The only things worth doing
+- **If the host should actually be allowed** (it was blocked by mistake, or policy has changed), an administrator can add it to the allowed hosts in the block-host policy. Until then, requests to it will keep being blocked.
+- **If users keep hitting this block**, it usually means people are trying to use a tool the company has chosen not to allow - a reminder of the approved alternatives is more useful than any technical change.
+`
+    },
+
     // ─── Audit Controls (ComponentAccess, Approval, IP, Endpoint) ──────────────
     {
         prefixes: ["ComponentAccessRejected", "ApprovalConditionsNotDefined", "ApprovalExpired", "IPNotInAllowedList", "EndpointNotWhitelisted"],
@@ -621,7 +646,7 @@ Identify the specific rule from the \`ruleViolated\` field:
 
     // ─── Personal Account ──────────────────────────────────────────────────────
     {
-        prefixes: ["block_personal_account", "personal_account"],
+        prefixes: ["BlockPersonalAccounts", "block_personal_account", "personal_account", "personalaccount"],
         templateIdPrefixes: ["block-personal-account"],
         heading: "Personal Account Usage Blocked",
         overview: [
@@ -636,15 +661,12 @@ Identify the specific rule from the \`ruleViolated\` field:
         ],
         remediation: `## What to do
 
-### Immediate
-- Identify the personal account detected and the user/session associated with it.
-- Determine whether this was an accidental misconfiguration or an intentional bypass.
+### For the user
+**Use your company account instead of a personal one.** This is a deliberate policy block - the request used a personal account (e.g. a personal Gmail), which the organisation does not allow for work. Sign in with your organisational / SSO account and retry; the request will go through.
 
-### Structural fixes
-1. **Enforce enterprise SSO** - require SAML/OIDC single sign-on for all AI pipeline access. Block direct personal account authentication at the identity provider level.
-2. **Audit existing service connections** - review all connected integrations and tool authorisations for personal account usage. Migrate to scoped service accounts with the minimum required permissions.
-3. **Communicate policy to users** - notify users of the enterprise account requirement with clear migration instructions. Provide a self-service path to convert connections to enterprise accounts.
-4. **Monitor for repeat bypass attempts** - set up alerts for repeated personal account usage. Distinguish accidental misuse from intentional policy circumvention.
+### For an administrator
+- If this account *should* be allowed (it was blocked by mistake, or it is actually a valid work account), update the personal-accounts policy to permit it.
+- If the same user keeps hitting this block, it usually means they need a reminder to switch to their company account rather than any technical change.
 `
     }
 ];
