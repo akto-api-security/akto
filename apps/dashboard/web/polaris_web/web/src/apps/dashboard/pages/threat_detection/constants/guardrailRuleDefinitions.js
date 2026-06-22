@@ -661,15 +661,12 @@ Identify the specific rule from the \`ruleViolated\` field:
         ],
         remediation: `## What to do
 
-### Immediate
-- Identify the personal account detected and the user/session associated with it.
-- Determine whether this was an accidental misconfiguration or an intentional bypass.
+### For the user
+**Use your company account instead of a personal one.** This is a deliberate policy block - the request used a personal account (e.g. a personal Gmail), which the organisation does not allow for work. Sign in with your organisational / SSO account and retry; the request will go through.
 
-### Structural fixes
-1. **Enforce enterprise SSO** - require SAML/OIDC single sign-on for all AI pipeline access. Block direct personal account authentication at the identity provider level.
-2. **Audit existing service connections** - review all connected integrations and tool authorisations for personal account usage. Migrate to scoped service accounts with the minimum required permissions.
-3. **Communicate policy to users** - notify users of the enterprise account requirement with clear migration instructions. Provide a self-service path to convert connections to enterprise accounts.
-4. **Monitor for repeat bypass attempts** - set up alerts for repeated personal account usage. Distinguish accidental misuse from intentional policy circumvention.
+### For an administrator
+- If this account *should* be allowed (it was blocked by mistake, or it is actually a valid work account), update the personal-accounts policy to permit it.
+- If the same user keeps hitting this block, it usually means they need a reminder to switch to their company account rather than any technical change.
 `
     }
 ];
