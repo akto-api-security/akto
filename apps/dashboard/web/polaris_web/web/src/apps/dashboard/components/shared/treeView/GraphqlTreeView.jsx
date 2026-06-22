@@ -2,11 +2,14 @@ import React, { useMemo, useState } from 'react'
 import { Box, Button, Card, Text, VerticalStack } from '@shopify/polaris'
 import { buildGraphQLFlatRows } from './graphqlTransform'
 import AgGridTable from '../../tables/AgGridTable'
+import transform from '../../../pages/observe/transform'
+import { RiskPill } from '../../../pages/observe/agentic/AgenticCellRenderers'
+import '../../../components/layouts/style.css'
 
 // Columns whose value field is a React element — AG Grid can't render them directly.
 // We skip them and use textValue (the raw scalar) instead.
 const COMP_COLUMNS = new Set([
-    'riskScoreComp', 'issuesComp', 'sensitiveTagsComp', 'tagsComp',
+    'sensitiveTagsComp', 'tagsComp',
     'sourceLocationComp', 'descriptionComp', 'lastTestedComp',
     'componentRiskAnalysisComp', 'methodComp', 'endpointComp',
 ])
@@ -15,6 +18,7 @@ const COMP_COLUMNS = new Set([
 const SKIP_COLUMNS = new Set([
     'sourceLocationComp', 'descriptionComp', 'lastTestedComp',
     'componentRiskAnalysisComp', 'methodComp', 'endpointComp',
+    'sensitiveInReq', 'responseCodes',
 ])
 
 function GraphqlTreeView({ endpoints, prettifyEndpoints, onTerminalClick, tableHeaders }) {
@@ -35,9 +39,51 @@ function GraphqlTreeView({ endpoints, prettifyEndpoints, onTerminalClick, tableH
         return tableHeaders
             .filter(h => h.value && !SKIP_COLUMNS.has(h.value))
             .map(h => {
-                // For *Comp columns, use the textValue field (raw scalar) instead
-                const field = COMP_COLUMNS.has(h.value) ? (h.textValue || h.value) : h.value
                 const headerName = typeof h.title === 'string' ? h.title : (h.text || h.value || '')
+
+                // Issues: render severity badges via getIssuesList (same as ApiEndpoints)
+                if (h.value === 'issuesComp') {
+                    return {
+                        field: 'severityObj',
+                        headerName,
+                        flex: 1,
+                        minWidth: 120,
+                        cellRenderer: ({ data }) => {
+                            const obj = data?.severityObj
+                            if (!obj || Object.keys(obj).length === 0) return '-'
+                            return transform.getIssuesList(obj)
+                        },
+                    }
+                }
+
+                // Risk score: render colored Badge via RiskPill (same as DeviceEndpoints)
+                if (h.value === 'riskScoreComp') {
+                    return {
+                        field: 'riskScore',
+                        headerName,
+                        flex: 1,
+                        minWidth: 120,
+                        cellRenderer: ({ value }) => value != null ? <RiskPill score={value} /> : null,
+                    }
+                }
+
+                // Sensitive params: render icons via prettifySubtypes
+                if (h.value === 'sensitiveTagsComp') {
+                    return {
+                        field: 'sensitiveTags',
+                        headerName,
+                        flex: 1,
+                        minWidth: 140,
+                        cellRenderer: (params) => {
+                            const tags = params.data?.sensitiveTags
+                            if (!tags || tags.length === 0) return null
+                            return transform.prettifySubtypes(tags)
+                        },
+                    }
+                }
+
+                // For other *Comp columns, use the textValue field (raw scalar)
+                const field = COMP_COLUMNS.has(h.value) ? (h.textValue || h.value) : h.value
                 return {
                     field,
                     headerName,
@@ -52,17 +98,19 @@ function GraphqlTreeView({ endpoints, prettifyEndpoints, onTerminalClick, tableH
     // - Group rows: show the segment name (default AG Grid behaviour)
     const autoGroupColumnDef = useMemo(() => ({
         headerName: 'Endpoint',
-        minWidth: 360,
-        flex: 2,
+        minWidth: 560,
+        flex: 3,
+        cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'flex-start' },
         cellRenderer: 'agGroupCellRenderer',
         cellRendererParams: {
-            suppressCount: false,
+            suppressCount: true,
+            padding: 10,
             innerRenderer: (params) => {
                 if (!params.node.group) {
-                    // endpointComp is a React element set by prettifyEndpoints
                     return params.data?.endpointComp || params.value || ''
                 }
-                return params.value || ''
+                const directChildCount = params.node.childrenAfterGroup?.length ?? 0
+                return `${params.value} (${directChildCount})`
             },
         },
     }), [])
@@ -109,6 +157,7 @@ function GraphqlTreeView({ endpoints, prettifyEndpoints, onTerminalClick, tableH
                 </VerticalStack>
             </Card>
             <AgGridTable
+                defaultColDef={{ cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'flex-start' } }}
                 treeData={true}
                 getDataPath={(row) => row.path}
                 autoGroupColumnDef={autoGroupColumnDef}
