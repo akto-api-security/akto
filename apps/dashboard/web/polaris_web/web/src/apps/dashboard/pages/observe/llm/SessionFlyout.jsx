@@ -10,7 +10,7 @@ import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import TraceDetailView from "./LLMTraceDetail";
 import api from "./api";
 import { enrichRow } from "./utils";
-import { getTraceColumnDefs } from "./columns";
+import { getTraceColumnDefs, MESSAGE_FLAT_COLUMN_DEFS } from "./columns";
 import { formatCost, formatCompact, formatDurationMs, truncate } from "./constants";
 
 const TAB_OVERVIEW = 0;
@@ -93,7 +93,8 @@ function OverviewContent({ session }) {
 const TRACE_COL_DEFS = getTraceColumnDefs({ showSession: false });
 
 function SessionTracesTable({ sessionId, currDateRange, onTraceClick }) {
-    const [rows, setRows] = useState([]);
+    const [rows, setRows]       = useState([]);
+    const [colDefs, setColDefs] = useState(TRACE_COL_DEFS);
 
     useEffect(() => {
         if (!sessionId) return;
@@ -101,7 +102,22 @@ function SessionTracesTable({ sessionId, currDateRange, onTraceClick }) {
         const since = Math.floor(Date.parse(currDateRange.period.since) / 1000);
         const until = Math.floor(Date.parse(currDateRange.period.until) / 1000);
         api.fetchMessages(since, until, { sessionId })
-            .then(data => { if (!cancelled) setRows((data || []).map(enrichRow)); });
+            .then(data => {
+                if (cancelled) return;
+                const traces = (data || []).map(enrichRow);
+                if (traces.length > 0) {
+                    setColDefs(TRACE_COL_DEFS);
+                    setRows(traces);
+                    return;
+                }
+                // Old records without traceId — fall back to flat spans as a preview.
+                return api.searchPrompts({ startTime: since, endTime: until, sessionId, limit: 5, skip: 0 })
+                    .then(result => {
+                        if (cancelled) return;
+                        setColDefs(MESSAGE_FLAT_COLUMN_DEFS);
+                        setRows(result?.value || []);
+                    });
+            });
         return () => { cancelled = true; };
     }, [sessionId, currDateRange]);
 
@@ -110,7 +126,7 @@ function SessionTracesTable({ sessionId, currDateRange, onTraceClick }) {
     return (
         <AgGridTable
             rowData={rows}
-            columnDefs={TRACE_COL_DEFS}
+            columnDefs={colDefs}
             defaultColDef={{ resizable: true, sortable: true, filter: false }}
             searchPlaceholder="Search traces..."
             rowHeight={44}
