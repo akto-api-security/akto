@@ -1,11 +1,12 @@
 import React from "react";
-import { Box, HorizontalGrid, HorizontalStack, VerticalStack, Text, Tooltip } from "@shopify/polaris";
+import { Box, HorizontalGrid, HorizontalStack, Link, VerticalStack, Text, Tooltip } from "@shopify/polaris";
 
 export default function DetailGrid({ heading, items = [], columns = 1, labelWidth = "140px" }) {
     const cell = (d) => {
+        const display = d.value || "-";
         const textNode = (
             <Text variant="bodySm" fontWeight="semibold" color={d.isWarning ? "warning" : undefined} truncate>
-                {d.value || "-"}
+                {d.href && d.value ? <Link url={d.href} external={d.external !== false}>{display}</Link> : display}
             </Text>
         );
         if (d.tooltip) {

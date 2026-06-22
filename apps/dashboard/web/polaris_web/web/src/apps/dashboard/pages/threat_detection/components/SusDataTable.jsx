@@ -10,12 +10,13 @@ import { Badge, IndexFiltersMode, Avatar, Box, HorizontalStack, Text } from "@sh
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
-import { formatActorId, extractRuleViolated } from "../utils/formatUtils";
+import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "../../observe/api_collections/endpointShieldHelper";
 import IpReputationScore from "./IpReputationScore";
+import { getGuardrailCapabilityForRule } from "../constants/guardrailRuleDefinitions";
 
 const resourceName = {
   singular: "activity",
@@ -74,6 +75,12 @@ const getHeaders = () => {
       title: "Rule Violated",
       maxWidth: "200px",
     });
+    baseHeaders.push({
+      text: "Behaviour",
+      value: "behaviour",
+      title: "Behaviour",
+      maxWidth: "120px",
+    });
   }
   baseHeaders.push(
     {
@@ -131,6 +138,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const [loading, setLoading] = useState(true);
   const collectionsMap = PersistStore((state) => state.collectionsMap);
   const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
+  const guardrailComplianceMap = SessionStore((state) => state.guardrailComplianceMap);
+  const setGuardrailComplianceMap = SessionStore((state) => state.setGuardrailComplianceMap);
+  const needsGuardrailCompliance = label === LABELS.GUARDRAIL || isAgenticSecurityCategory() || isEndpointSecurityCategory();
   const tabIndexMap = { active: 0, under_review: 1, ignored: 2, training: 3 };
   const resolvedInitialTab = initialTab || 'active';
   const [currentTab, setCurrentTab] = useState(resolvedInitialTab);
@@ -148,6 +158,18 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       });
     }
   }, []);
+
+  useEffect(() => {
+    if (!needsGuardrailCompliance) return;
+    api.fetchGuardrailComplianceInfos().then((resp) => {
+      const capabilityMap = {};
+      (resp?.guardrailComplianceInfos || []).forEach((entry) => {
+        const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
+        if (capability) capabilityMap[capability] = entry.mapComplianceToListClauses;
+      });
+      setGuardrailComplianceMap(capabilityMap);
+    });
+  }, [label]);
 
   const baseTabs = [
     {
@@ -538,8 +560,17 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         : (x?.severity || threatFiltersMap[x?.filterId]?.severity || "HIGH")
 
       const filterTemplate = threatFiltersMap[x?.filterId];
-      const complianceMap = filterTemplate?.compliance?.mapComplianceToListClauses || {};
-      const complianceList = Object.keys(complianceMap);
+      let complianceList;
+      let complianceMapData = {};
+      if (needsGuardrailCompliance) {
+        const ruleViolated = extractRuleViolated(x?.metadata);
+        const capability = getGuardrailCapabilityForRule(ruleViolated);
+        complianceMapData = guardrailComplianceMap[capability] || {};
+        complianceList = Object.keys(complianceMapData);
+      } else {
+        complianceMapData = filterTemplate?.compliance?.mapComplianceToListClauses || {};
+        complianceList = Object.keys(complianceMapData);
+      }
 
       // Determine if this is session-based by checking if sessionId is present and not empty
       const isSessionBased = x?.sessionId && x.sessionId !== '';
@@ -591,7 +622,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
               {isSessionBased ? 'Session' : 'Single Prompt'}
             </Badge>
           ),
-          ruleViolated: extractRuleViolated(x?.metadata)
+          ruleViolated: extractRuleViolated(x?.metadata),
+          behaviour: (() => {
+            const b = extractBehaviour(x?.metadata);
+            return b ? <Badge tone={getBehaviourTone(b)}>{func.toSentenceCase(b)}</Badge> : '-';
+          })(),
         }),
         compliance: complianceList.length > 0 ? (
           <HorizontalStack wrap={false} gap={1}>
@@ -610,7 +645,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
             )}
           </HorizontalStack>
         ) : <Text color="subdued">-</Text>,
-        nextUrl: nextUrl
+        nextUrl: nextUrl,
+        complianceMapData: complianceMapData
       };
 
       if (func.shouldShowIpReputation()) {
@@ -715,7 +751,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     }
   }
 
-  const key = startTimestamp + endTimestamp + (usernameMapLoaded ? '_u' : '');
+  // Recompute rows once the async guardrail compliance map has loaded (same pattern as usernameMapLoaded).
+  const guardrailComplianceLoaded = !needsGuardrailCompliance || Object.keys(guardrailComplianceMap).length > 0;
+  const key = startTimestamp + endTimestamp + (usernameMapLoaded ? '_u' : '') + (guardrailComplianceLoaded ? '_gc' : '');
   const headers = getHeaders();
 
   return (

@@ -6,7 +6,7 @@ import AgenticFlyoutShell from "./AgenticFlyoutShell";
 import AiChatSection from "./AiChatSection";
 import { getAgentLinkedComponents } from "./agenticPageBuilders";
 import { RiskScoreCellRenderer } from "./AgenticCellRenderers";
-import agenticObserveApi, { buildAgenticObserveChatMetadata } from "./agenticObserveApi";
+import agenticObserveApi, { buildAgenticObserveChatMetadata, selectConfigViolationRows, summarizeViolations } from "./agenticObserveApi";
 import OverviewTab from "./OverviewTab";
 import ViolationsTab from "./ViolationsTab";
 import McpComponentsView from "./McpComponentsView";
@@ -56,7 +56,7 @@ function DevicesTab({ asset, assetDevices = {} }) {
             searchPlaceholder="Search devices..."
             pagination
             paginationPageSize={20}
-            sideBar={false}
+            sideBar={{ toolPanels: ["columns", "filters"], defaultToolPanel: null }}
             domLayout="normal"
         />
     );
@@ -64,9 +64,9 @@ function DevicesTab({ asset, assetDevices = {} }) {
 
 // ─── Components tab router ────────────────────────────────────────────────────
 
-function AgenticComponentsTab({ asset, onNavChange, onNavigateToAsset, agenticFlatData = [] }) {
+function AgenticComponentsTab({ asset, onNavChange, onNavigateToAsset, agenticFlatData = [], configViolations, configRows }) {
     if (asset.type === "MCP Server") return <McpComponentsView asset={asset} onNavChange={onNavChange} />;
-    if (asset.type === "AI Agent")   return <AgentComponentsView asset={asset} onNavChange={onNavChange} onNavigateToAsset={onNavigateToAsset} agenticFlatData={agenticFlatData} />;
+    if (asset.type === "AI Agent")   return <AgentComponentsView asset={asset} onNavChange={onNavChange} onNavigateToAsset={onNavigateToAsset} agenticFlatData={agenticFlatData} configViolations={configViolations} configRows={configRows} />;
     // Skills: fetch from parent collections then show the skill's own traffic
     if (asset.type === "Skill") return <SkillComponentsView asset={asset} />;
     // LLMs: their collectionIds are their own collections — show actual LLM API endpoints
@@ -84,6 +84,10 @@ export default function AgenticAssetFlyout({
     agenticTreeData = [],
     agenticFlatData = [],
     assetDevices = {},
+    collections = [],
+    agenticViolationRows = [],
+    startTimestamp,
+    endTimestamp,
 }) {
     const [selectedTab,    setSelectedTab]    = useState(0);
     const [topNav,         setTopNav]         = useState(null);
@@ -134,6 +138,17 @@ export default function AgenticAssetFlyout({
         });
     }, [asset]);
 
+    // Claude config/settings violations attributed to this asset's devices (host-matched, not the
+    // agent total). Drives the accurate "Claude Settings" row count + its threat-activity deep link.
+    const configRows = useMemo(
+        () => (asset?.type === "AI Agent" ? selectConfigViolationRows(agenticViolationRows, asset, collections) : []),
+        [asset, agenticViolationRows, collections],
+    );
+    const configViolations = useMemo(() => {
+        const summary = summarizeViolations(configRows);
+        return summary.total > 0 ? summary : null;
+    }, [configRows]);
+
     const handleTabSelect = useCallback((tab) => {
         setSelectedTab(tab);
         setTopNav(null);
@@ -152,7 +167,7 @@ export default function AgenticAssetFlyout({
         let componentCount = 0;
         if (asset.type === "AI Agent") {
             const children = getAgentLinkedComponents(asset, agenticTreeData, agenticFlatData);
-            componentCount = children.length + (asset.skillCount || 0);
+            componentCount = children.length + (asset.skillCount || 0) + (configViolations ? 1 : 0);
         } else if (asset.type === "MCP Server") {
             componentCount = mcpComponentCount;
         }
@@ -162,7 +177,7 @@ export default function AgenticAssetFlyout({
             { id: "violations", content: `Violations (${totalV})` },
             { id: "devices",    content: `Devices (${devCount})` },
         ];
-    }, [asset, assetDevices, agenticTreeData, agenticFlatData, mcpComponentCount]);
+    }, [asset, assetDevices, agenticTreeData, agenticFlatData, mcpComponentCount, configViolations]);
 
     if (!asset) return null;
 
@@ -223,10 +238,12 @@ export default function AgenticAssetFlyout({
                             onNavChange={handleNavChange}
                             onNavigateToAsset={onNavigateToAsset}
                             agenticFlatData={agenticFlatData}
+                            configViolations={configViolations}
+                            configRows={configRows}
                         />
                     </div>
                 )}
-                {selectedTab === 2 && <ViolationsTab asset={asset} />}
+                {selectedTab === 2 && <ViolationsTab asset={asset} collections={collections} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onViolationClick={asset?.type === "Skill" ? () => handleTabSelect(1) : undefined} />}
                 {selectedTab === 3 && <DevicesTab asset={asset} assetDevices={assetDevices} />}
             </Box>
         </AgenticFlyoutShell>

@@ -91,9 +91,9 @@ function TestRoleSettings() {
     let cancelled = false
     ;(async () => {
       try {
-        const { accountSettingsDetails } = await settingFunctions.fetchAdminInfo()
+        const accountConfig = await settingFunctions.fetchAccountConfig()
         if (cancelled) return
-        const hybrid = !!accountSettingsDetails?.hybridTestingEnabled
+        const hybrid = !!accountConfig?.hybridTestingEnabled
         setHybridTestingEnabled(hybrid)
         if (hybrid) {
           const { miniTestingServiceNames } = await api.fetchMiniTestingServiceNames()

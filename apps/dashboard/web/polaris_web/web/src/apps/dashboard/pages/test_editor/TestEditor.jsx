@@ -20,7 +20,7 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import LocalStore from "../../../main/LocalStorageStore"
 import func from "../../../../util/func"
 import transform from "../testing/transform"
-import { getDashboardCategory, mapLabel } from "../../../main/labelHelper"
+import { getDashboardCategory, isAgenticSecurityCategory, mapLabel } from "../../../main/labelHelper"
 
 const TestEditor = () => {
     const navigate = useNavigate()
@@ -174,7 +174,10 @@ const TestEditor = () => {
    
 
 
-    const defaultId = "REMOVE_TOKENS";
+    let defaultId = "REMOVE_TOKENS";
+    if(isAgenticSecurityCategory()){
+        defaultId = "BUSINESS_ALIGNMENT_COMPETITOR_CHECK_BASE64";
+    }
 
     useEffect(() => {
         const path = window.location.pathname;

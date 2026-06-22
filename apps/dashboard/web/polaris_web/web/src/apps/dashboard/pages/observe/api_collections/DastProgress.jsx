@@ -100,7 +100,7 @@ const resourceName = {
 }
 
 function getActions(item, fetchAllDastScans, navigate, setDuplicateScanData) {
-    const isStopDisabled = item.status === "STOPPED" || item.status === "STOP_REQUESTED"
+    const isStopDisabled = item.status === "COMPLETED" || item.status === "FAILED" || item.status === "STOPPED" || !item.status
     const run = item.runData
     const canDuplicate = run && !(run.cookies && !run.testRoleHexId)
     return [
@@ -138,7 +138,10 @@ function getActions(item, fetchAllDastScans, navigate, setDuplicateScanData) {
                             urlTemplatePatterns: run.urlTemplatePatterns ?? '',
                             applicationPages: run.applicationPages ?? '',
                             apiKey: run.apiKey ?? '',
-                            collectionName: run.collectionName ?? ''
+                            collectionName: run.collectionName ?? '',
+                            userPrompt: run.userPrompt ?? '',
+                            crawlMode: run.crawlMode ?? 'DETERMINISTIC',
+                            enableAiJsDiscovery: run.enableAiJsDiscovery ?? false
                         })
 
                         // Navigate to QuickStart with DAST connector

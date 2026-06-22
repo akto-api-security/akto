@@ -1,7 +1,7 @@
-import { HorizontalStack, VerticalStack, Text, Box } from "@shopify/polaris";
+import { HorizontalStack, VerticalStack, Text, Box, Banner } from "@shopify/polaris";
 import Dropdown from "../../../components/layouts/Dropdown";
 import GuardrailEnforcementInfoIcon from "./GuardrailEnforcementInfoIcon";
-import { GUARDRAIL_BEHAVIOUR_OPTIONS, normalizeBehaviourValue } from "../utils";
+import { GUARDRAIL_BEHAVIOUR, GUARDRAIL_BEHAVIOUR_OPTIONS, normalizeBehaviourValue } from "../utils";
 
 export default function RuleEnforcementDropdown({
     id,
@@ -12,6 +12,7 @@ export default function RuleEnforcementDropdown({
 }) {
     const initial = normalizeBehaviourValue(value);
     const showLabelRow = typeof label === "string" && label.trim().length > 0;
+    const showEndpointOnlyNote = initial === GUARDRAIL_BEHAVIOUR.WARN || initial === GUARDRAIL_BEHAVIOUR.ALERT;
 
     return (
         <VerticalStack gap="2">
@@ -32,6 +33,13 @@ export default function RuleEnforcementDropdown({
                     selected={onChange}
                 />
             </Box>
+            {showEndpointOnlyNote && (
+                <Banner tone="info">
+                    <Text variant="bodyMd">
+                        In the browser extension, <Text as="span" fontWeight="bold">Warn</Text> and <Text as="span" fontWeight="bold">Alert</Text> behave the same as <Text as="span" fontWeight="bold">Block</Text>.
+                    </Text>
+                </Banner>
+            )}
         </VerticalStack>
     );
 }

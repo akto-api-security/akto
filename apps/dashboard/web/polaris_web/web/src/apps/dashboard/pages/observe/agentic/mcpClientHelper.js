@@ -17,6 +17,7 @@ const KNOWN_CLIENTS = {
     claude2: { displayName: 'Claude CLI', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
     chatgpt: { displayName: 'ChatGPT', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     openai: { displayName: 'OpenAI', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
+    gpt: { displayName: 'GPT', domain: 'openai.com', agentType: CLIENT_TYPES.LLM },
     codex: { displayName: 'Codex', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     gemini: { displayName: 'Gemini', domain: 'gemini.google.com', agentType: CLIENT_TYPES.LLM },
     copilot: { displayName: 'Copilot', domain: 'copilot.microsoft.com', agentType: CLIENT_TYPES.AI_AGENT },
@@ -184,6 +185,16 @@ const hasLocalMcpServerTag = (envType) => {
     });
 };
 
+const hasMisconfiguredConfigTag = (envType) => {
+    if (!Array.isArray(envType)) return false;
+    return envType.some((tag) => {
+        if (typeof tag === 'string') {
+            return tag === 'misconfigured-config=true';
+        }
+        return (tag.keyName === 'misconfigured-config' || tag.key === 'misconfigured-config') && tag.value === 'true';
+    });
+};
+
 export {
     formatDisplayName,
     getDomainForFavicon,
@@ -196,6 +207,7 @@ export {
     getAgenticCategoryLabel,
     hasPersonalAccountTag,
     hasLocalMcpServerTag,
+    hasMisconfiguredConfigTag,
     CLIENT_TYPES,
     TYPE_TAG_KEYS,
     ASSET_TAG_KEYS,

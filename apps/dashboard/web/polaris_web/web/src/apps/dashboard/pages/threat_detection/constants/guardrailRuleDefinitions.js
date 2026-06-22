@@ -17,6 +17,7 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── Prompt Injection ──────────────────────────────────────────────────────
     {
         prefixes: ["PromptInjection", "prompt_injection"],
+        capability: "promptAttacks",
         heading: "Prompt Injection Attack",
         overview: [
             {
@@ -49,6 +50,7 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── Harmful Categories / Toxicity ─────────────────────────────────────────
     {
         prefixes: ["Toxicity", "HarmfulCategories", "harmful"],
+        capability: "harmfulCategories",
         heading: "Harmful Content Detected",
         overview: [
             {
@@ -132,6 +134,7 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── PII ───────────────────────────────────────────────────────────────────
     {
         prefixes: ["PII-", "PII_", "pii"],
+        capability: "piiTypes",
         heading: "Personally Identifiable Information (PII) Detected",
         overview: [
             {
@@ -188,6 +191,7 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── Secrets Detection ─────────────────────────────────────────────────────
     {
         prefixes: ["Secrets", "SecretsDetection", "secret"],
+        capability: "secretsDetection",
         heading: "Secret or Credential Detected",
         overview: [
             {
@@ -216,6 +220,7 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── Anonymize ─────────────────────────────────────────────────────────────
     {
         prefixes: ["Anonymize", "anonymize"],
+        capability: "anonymizeDetection",
         heading: "Data Anonymization Applied",
         overview: [
             {
@@ -272,6 +277,7 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── Gibberish ─────────────────────────────────────────────────────────────
     {
         prefixes: ["Gibberish", "gibberish"],
+        capability: "gibberishDetection",
         heading: "Gibberish Input Detected",
         overview: [
             {
@@ -298,6 +304,7 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── Sentiment ─────────────────────────────────────────────────────────────
     {
         prefixes: ["Sentiment", "sentiment"],
+        capability: "sentimentDetection",
         heading: "Abusive Sentiment Detected",
         overview: [
             {
@@ -601,6 +608,24 @@ export function getGuardrailRuleInfo(ruleViolated, templateId) {
         for (const def of GUARDRAIL_RULE_DEFINITIONS) {
             if (def.templateIdPrefixes && matches(templateId, def.templateIdPrefixes)) return def;
         }
+    }
+    return null;
+}
+
+// Capabilities without a detail-dialog entry above. capability === guardrails/<capability>.conf filename.
+const EXTRA_CAPABILITY_PREFIXES = [
+    { prefixes: ["ContextPoisoning", "context_poisoning"], capability: "contextPoisoning" },
+    { prefixes: ["BlockedHosts", "blocked_host", "EndpointNotWhitelisted"], capability: "blockedHosts" },
+];
+
+// Maps an event's rule_violated to its compliance capability (e.g. "PII_EMAIL" -> "piiTypes").
+export function getGuardrailCapabilityForRule(ruleViolated) {
+    if (!ruleViolated || ruleViolated === '-') return null;
+    const v = ruleViolated.trim().toLowerCase();
+    const matches = (prefixes) => prefixes.some(p => v.startsWith(p.toLowerCase()) || v.includes(p.toLowerCase()));
+
+    for (const def of [...GUARDRAIL_RULE_DEFINITIONS, ...EXTRA_CAPABILITY_PREFIXES]) {
+        if (def.capability && matches(def.prefixes)) return def.capability;
     }
     return null;
 }

@@ -40,7 +40,10 @@ const AktoJax = () => {
     const [customHeaders, setCustomHeaders] = useState([]);
     const [runTestAfterCrawling, setRunTestAfterCrawling] = useState(false);
     const [selectedMiniTestingService, setSelectedMiniTestingService] = useState('');
+    const [enableAiJsDiscovery, setEnableAiJsDiscovery] = useState(false);
     const [collectionName, setCollectionName] = useState('');
+    const [userPrompt, setUserPrompt] = useState('');
+    const [crawlMode, setCrawlMode] = useState('DETERMINISTIC');
 
     const [availableModules, setAvailableModules] = useState([])
     const [selectedModule, setSelectedModule] = useState("")
@@ -86,8 +89,12 @@ const AktoJax = () => {
         });
 
         setLoading(true)
-        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls, crawlingTime, selectedModule, customHeadersMap, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages, collectionName).then((res) => {
-            func.setToast(true, false, "Crawler initiated successfully. Please check your dashboard for updates.")
+        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls, crawlingTime, selectedModule, customHeadersMap, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages, collectionName, enableAiJsDiscovery, userPrompt, crawlMode).then((res) => {
+            if (res?.errorMessage) {
+                func.setToast(true, true, res.errorMessage)
+            } else {
+                func.setToast(true, false, "Crawler initiated successfully. Please check your dashboard for updates.")
+            }
         }).catch((err) => {
         }).finally(() => {
             setLoading(false)
@@ -102,6 +109,9 @@ const AktoJax = () => {
             setUrlTemplatePatterns('')
             setApplicationPages('')
             setCollectionName('')
+            setEnableAiJsDiscovery(false)
+            setUserPrompt('')
+            setCrawlMode('DETERMINISTIC')
         })
     }
 
@@ -136,7 +146,10 @@ const AktoJax = () => {
             setApplicationPages(duplicateScanData.applicationPages || '')
             setRunTestAfterCrawling(duplicateScanData.runTestAfterCrawling || false)
             setSelectedMiniTestingService(duplicateScanData.selectedMiniTestingService || '')
+            setEnableAiJsDiscovery(duplicateScanData.enableAiJsDiscovery || false)
             setApiKey(duplicateScanData.apiKey || '')
+            setUserPrompt(duplicateScanData.userPrompt || '')
+            setCrawlMode(duplicateScanData.crawlMode || 'DETERMINISTIC')
             setCollectionName(duplicateScanData.collectionName || '')
 
             // Convert custom headers: object → array
@@ -190,6 +203,10 @@ const AktoJax = () => {
                 setRunTestAfterCrawling={setRunTestAfterCrawling}
                 selectedMiniTestingService={selectedMiniTestingService}
                 setSelectedMiniTestingService={setSelectedMiniTestingService}
+                enableAiJsDiscovery={enableAiJsDiscovery}
+                setEnableAiJsDiscovery={setEnableAiJsDiscovery}
+                crawlMode={crawlMode}
+                setCrawlMode={setCrawlMode}
             />
 
             <Box paddingBlockStart={3}><Divider /></Box>
@@ -198,6 +215,19 @@ const AktoJax = () => {
                 customHeaders={customHeaders}
                 setCustomHeaders={setCustomHeaders}
             />
+
+            {enableAiJsDiscovery && <>
+                <Box paddingBlockStart={3}><Divider /></Box>
+
+                <TextField
+                    label="Custom prompt for crawl (Optional)"
+                    value={userPrompt}
+                    onChange={(value) => setUserPrompt(value)}
+                    placeholder='E.g. Focus on crawling login and payment pages'
+                    helpText="This prompt will be used to guide the crawler to focus on specific areas of your application. It can help improve crawl efficiency and ensure critical paths are thoroughly tested."
+                    multiline={true}
+                />
+            </>}
 
             <Box paddingBlockStart={3}><Divider /></Box>
 

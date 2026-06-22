@@ -145,6 +145,13 @@ const settingRequests = {
             data: {}
         })
     },
+    fetchAccountConfig() {
+        return request({
+            url: '/api/fetchAccountConfig',
+            method: 'post',
+            data: {}
+        })
+    },
     fetchTrafficMetricsDesciptions() {
         return request({
             url: '/api/fetchTrafficMetricsDesciptions',
@@ -1091,6 +1098,20 @@ const settingRequests = {
     removeWizIntegration() {
         return request({
             url: '/api/removeWizIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addWizTrafficSource() {
+        return request({
+            url: '/api/addWizTrafficSource',
+            method: 'post',
+            data: {}
+        })
+    },
+    removeWizTrafficSource() {
+        return request({
+            url: '/api/removeWizTrafficSource',
             method: 'post',
             data: {}
         })

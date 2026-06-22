@@ -762,7 +762,7 @@ const transform = {
                 auth_type: url.auth_type,
                 displayMethod: func.getEndpointMethodForDisplay({ method: url.method, url: url.endpoint, apiType: url.apiType }),
                 methodComp: <MethodBox method={url.method} url={url.endpoint} apiType={url.apiType} methodBoxWidth="48px" />,
-                endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} apiType={url.apiType} isNew={this.isNewEndpoint(url.lastSeenTs)} guardrailEnabled={guardrailEnabled} isMalicious={url.isMalicious || false} />,
+                endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} apiType={url.apiType} isNew={this.isNewEndpoint(url.lastSeenTs)} guardrailEnabled={guardrailEnabled} isMalicious={url.isMalicious || false} isMisconfigured={url.isMisconfigured || false} />,
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
                 riskScoreComp: <Badge status={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
                 isNew: this.isNewEndpoint(url.lastSeenTs),
@@ -780,6 +780,10 @@ const transform = {
     },
 
     getDetailsHeaders(){
+        // Hide Access Type and Auth Type for Endpoint Security / Atlas
+        if (isEndpointSecurityCategory()) {
+            return apiDetailsHeaders.filter(header => header.value !== 'access_type' && header.value !== 'auth_type')
+        }
         return apiDetailsHeaders
     },
 

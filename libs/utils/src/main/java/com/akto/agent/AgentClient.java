@@ -40,7 +40,7 @@ public class AgentClient {
     // Custom HTTP client with 2-minute timeout for agent requests
     private static final OkHttpClient agentHttpClient = CoreHTTPClient.client.newBuilder()
             .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS) // 2 minutes timeout
+            .readTimeout(600, TimeUnit.SECONDS) // 10 minutes timeout
             .writeTimeout(30, TimeUnit.SECONDS)
             .build();
     
@@ -61,7 +61,7 @@ public class AgentClient {
         String testMode = getTestModeFromRole();
 
         ApiCollection col = ApiCollectionsDao.instance.getMeta(apiCollectionId);
-        boolean isCopilot = isCopilotBotCollection(col);
+        boolean isCopilot = col != null && col.isCopilotBotCollection();
         loggerMaker.infoAndAddToDb("executeAgenticTest: starting conversationId=" + conversationId + " apiCollectionId=" + apiCollectionId + " prompts=" + promptsList.size() + " copilot=" + isCopilot);
 
         try {
@@ -269,23 +269,6 @@ public class AgentClient {
     public static boolean isRawApiValidForAgenticTest(RawApi rawApi) {
         List<String> temp = rawApi.getConversationsList();
         return (temp != null && !temp.isEmpty());
-    }
-
-    public static boolean isCopilotBotCollection(int apiCollectionId) {
-        ApiCollection col = ApiCollectionsDao.instance.getMeta(apiCollectionId);
-        return isCopilotBotCollection(col);
-    }
-
-    public static boolean isCopilotBotCollection(ApiCollection col) {
-        if (col == null || col.getTagsList() == null) {
-            loggerMaker.infoAndAddToDb("isCopilotBotCollection: collection not found or has no tags");
-            return false;
-        }
-        List<CollectionTags> tags = col.getTagsList();
-        loggerMaker.infoAndAddToDb("isCopilotBotCollection: collection " + col.getId() + " tags=" + tags.stream().map(t -> t.getKeyName() + "=" + t.getValue()).collect(java.util.stream.Collectors.joining(", ")));
-        boolean hasSource  = tags.stream().anyMatch(t -> Constants.AKTO_ENDPOINT_SOURCE_TAG.equals(t.getKeyName()) && Constants.AKTO_COPILOT_SOURCE_VALUE.equals(t.getValue()));
-        boolean hasBotName = tags.stream().anyMatch(t -> Constants.AKTO_COPILOT_BOT_NAME_TAG.equals(t.getKeyName()));
-        return hasSource && hasBotName;
     }
 
     private static String getTagValue(List<CollectionTags> tags, String keyName) {

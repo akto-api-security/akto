@@ -1,182 +1,76 @@
-import { useCallback, useEffect, useState } from "react";
-import { Badge, Box, DataTable, HorizontalStack, Link, Text, VerticalStack } from "@shopify/polaris";
-import func from "@/util/func";
-import api from "./api";
-import { enrichRow } from "./utils";
-import { MESSAGE_COLUMN_DEFS } from "./constants";
-import SpansPanelModal from "./SpansPanelModal";
-import GridRows from "../../../components/shared/GridRows";
-import observeFunc from "../transform";
-import LLMFilterBar from "./LLMFilterBar";
-import SpinnerCentered from "../../../components/progress/SpinnerCentered";
+import { useCallback, useRef, useState } from "react";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
+import { SESSION_COLUMN_DEFS } from "./columns";
+import api from "./api";
 
-function RowComp({ cardObj }) {
-    const { title, value } = cardObj;
-    return (
-        <Box width="140px">
-            <VerticalStack gap="1">
-                <Text variant="bodySm" fontWeight="semibold">{title}</Text>
-                <Text variant="bodySm" color="subdued">{value}</Text>
-            </VerticalStack>
-        </Box>
-    );
-}
+const DEFAULT_COL_DEF = { sortable: true, resizable: true, filter: false };
 
-export default function SessionsView({ currDateRange }) {
-    const [sessions, setSessions] = useState([]);
-    const [selectedSession, setSelectedSession] = useState(null);
+export default function SessionsView({ currDateRange, onOpenSession }) {
+    const [rows, setRows] = useState([]);
 
-    const [messages, setMessages] = useState([]);
-    const [messagesLoading, setMessagesLoading] = useState(false);
-
-    const [sessionInput, setSessionInput] = useState("");
-    const [enumFilters, setEnumFilters] = useState({ userName: "", deviceId: "", serviceId: "" });
-
-    const [spansModalOpen, setSpansModalOpen] = useState(false);
-    const [spansModalTraceId, setSpansModalTraceId] = useState(null);
+    // Maps { filterKey → { pageNum → afterKey } } so each unique filter combination
+    // has its own cursor chain and stale cursors are never used across filter changes.
+    const cursorRegistry = useRef({});
 
     const getEpochs = useCallback(() => ({
         since: Math.floor(Date.parse(currDateRange.period.since) / 1000),
         until: Math.floor(Date.parse(currDateRange.period.until) / 1000),
     }), [currDateRange]);
 
-    const loadSessions = useCallback(async () => {
+    const onServerFetch = useCallback(({ filters, skip, limit }) => {
+        const pageSize  = limit || 20;
+        const page      = Math.floor(skip / pageSize);
+        const filterKey = JSON.stringify(filters || {});
+
+        // Reset cursor chain for this filter combo when landing on page 0 (new filter or sort).
+        if (page === 0) cursorRegistry.current[filterKey] = { 0: null };
+        if (!cursorRegistry.current[filterKey]) cursorRegistry.current[filterKey] = { 0: null };
+
+        const afterKey = cursorRegistry.current[filterKey][page] || null;
         const { since, until } = getEpochs();
-        setSelectedSession(null);
-        try {
-            const rows = await api.fetchSessions(since, until, {
-                sessionId: sessionInput.trim(),
-                userName:  enumFilters.userName,
-                deviceId:  enumFilters.deviceId,
-                serviceId: enumFilters.serviceId,
-            });
-            setSessions((rows || []).map(enrichRow));
-        } finally {
-        }
-    }, [getEpochs, sessionInput, enumFilters]);
 
-    useEffect(() => { loadSessions(); }, [loadSessions]);
+        return api.fetchSessionsPaged({
+            startTime: since, endTime: until,
+            limit: pageSize, afterKey, filters,
+        }).then(result => {
+            if (result.nextAfterKey) {
+                cursorRegistry.current[filterKey][page + 1] = result.nextAfterKey;
+            }
+            setRows(result.sessions);
+            return { value: result.sessions, total: result.total };
+        });
+    }, [getEpochs]);
 
-    useEffect(() => {
-        if (!selectedSession) { setMessages([]); return; }
-        const { since, until } = getEpochs();
-        let cancelled = false;
-        setMessagesLoading(true);
-        api.fetchMessages(since, until, { sessionId: selectedSession.sessionIdentifier })
-            .then(rows => { if (!cancelled) setMessages((rows || []).map(enrichRow)); })
-            .finally(() => { if (!cancelled) setMessagesLoading(false); });
-        return () => { cancelled = true; };
-    }, [selectedSession, getEpochs]);
+    const handleRowClick = useCallback(
+        p => p.data && onOpenSession?.(p.data),
+        [onOpenSession]
+    );
 
-    const getRowItemsForSessions = (s) => [{
-        title: "Session ID",
-        value: s.sessionIdentifier,
-    }, {
-        title: "Service ID",
-        value: s.serviceId || null,
-    }, {
-        title: "User",
-        value: s.userName || null,
-    }, {
-        title: "Messages",
-        value: s.messageCount,
-    }, {
-        title: "Tokens",
-        value: observeFunc.formatNumberWithCommas(s.totalTokens),
-    }, {
-        title: "Last active",
-        value: func.prettifyEpoch(Math.floor((s.latestTimestamp || 0) / 1000)),
-    }];
+    const getRowStyle = useCallback(() => ({ cursor: "pointer" }), []);
 
-    const handleRowClicked = (p) => {
-        setSpansModalTraceId(p.data.traceId);
-        setSpansModalOpen(true);
-    };
-
-    const rightPanel = () => {
-        if (!selectedSession) {
-            return (
-                <Box padding="8">
-                    <Text tone="subdued" variant="bodyMd">Select a session to view its messages</Text>
-                </Box>
-            );
-        }
-
-        if (messagesLoading) {
-            return <SpinnerCentered />;
-        }
-
-        return (
-            <Box padding="3">
-                <VerticalStack gap="4">
-                    <GridRows columns={3} items={getRowItemsForSessions(selectedSession)} CardComponent={RowComp} verticalGap="1" horizontalGap="2" />
-                    <AgGridTable
-                        rowData={messages}
-                        columnDefs={MESSAGE_COLUMN_DEFS}
-                        defaultColDef={{ resizable: true, sortable: false, filter: false }}
-                        rowSelection="single"
-                        pagination={true}
-                        noOuterBorder
-                        onRowClicked={handleRowClicked}
-                        sideBar={false}
-                    />
-                </VerticalStack>
-            </Box>
-        );
-    };
-
-    const renderSessionRow = (s) => [
-        <Link
-            removeUnderline plain monochrome onClick={() => setSelectedSession(s)}>
-            <Text variant="bodyMd" fontWeight="semibold" alignment="start">{s.queryPayload}</Text>
-        </Link>,
-        <Text variant="bodyMd" color="subdued" alignment="start">{func.prettifyEpoch(Math.floor((s.latestTimestamp || 0) / 1000)) || ""}</Text>
-    ];
+    // Re-key on date range change so AgGridTable remounts, resets its page to 0,
+    // and triggers a fresh fetch with the new time window.
+    const tableKey = `${currDateRange.period.since}~${currDateRange.period.until}`;
 
     return (
-        <div style={{ maxHeight: "calc(100vh - 220px)", minHeight: 0, display: "flex", gap: 12 }}>
-            <Box
-                minWidth="480px"
-                maxWidth="480px"
-                padding="3"
-            >
-                <VerticalStack gap="3">
-                    <HorizontalStack gap="3" wrap={false} align="space-between" blockAlign="start">
-                        <HorizontalStack gap="1" wrap={false}>
-                            <Text variant="headingSm">Sessions</Text>
-                            {sessions.length > 0 &&
-                                <Badge status="info">{String(sessions.length)}</Badge>}
-                        </HorizontalStack>
-                        <LLMFilterBar
-                            currDateRange={currDateRange}
-                            sessionValue={sessionInput}
-                            onSessionChange={setSessionInput}
-                            filters={enumFilters}
-                            onFiltersChange={setEnumFilters}
-                            queryPlaceholder="Search by Session ID"
-                        />
-                    </HorizontalStack>
-                    <DataTable
-                        headings={[]}
-                        columnContentTypes={[
-                            'text',
-                            'numeric'
-                        ]}
-                        rows={sessions.map(renderSessionRow)}
-                        hoverable
-                    />
-                </VerticalStack>
-            </Box>
-            <Box style={{ flex: 1 }}>
-                {rightPanel()}
-            </Box>
-
-            <SpansPanelModal
-                open={spansModalOpen}
-                onClose={() => setSpansModalOpen(false)}
-                traceId={spansModalTraceId}
-            />
-        </div>
+        <AgGridTable
+            key={tableKey}
+            rowData={rows}
+            columnDefs={SESSION_COLUMN_DEFS}
+            defaultColDef={DEFAULT_COL_DEF}
+            height={500}
+            domLayout="normal"
+            rowHeight={44}
+            headerHeight={40}
+            searchPlaceholder="Search sessions..."
+            rowSelection="single"
+            paginationPageSize={20}
+            animateRows
+            suppressCellFocus
+            getRowStyle={getRowStyle}
+            onRowClicked={handleRowClick}
+            sideBar={{ toolPanels: ["columns", "filters"] }}
+            onServerFetch={onServerFetch}
+        />
     );
 }

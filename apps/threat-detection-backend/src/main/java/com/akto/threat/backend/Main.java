@@ -19,6 +19,7 @@ import com.akto.threat.backend.tasks.FlushMessagesToDB;
 import com.akto.threat.backend.cron.PercentilesCron;
 import com.akto.threat.backend.cron.ArchiveOldMaliciousEventsCron;
 import com.akto.threat.backend.cron.RiskScoreSyncCron;
+import com.akto.threat.backend.cron.ConfigRiskSyncCron;
 import com.akto.threat.backend.cron.SkillsRiskScoreSyncCron;
 import com.akto.threat.backend.cron.CloudflareWafSyncCron;
 import com.akto.dao.context.Context;
@@ -112,6 +113,9 @@ public class Main {
 
     SkillsRiskScoreSyncCron skillsRiskScoreSyncCron = new SkillsRiskScoreSyncCron();
     skillsRiskScoreSyncCron.setUp();
+
+    // ConfigRiskSyncCron configRiskSyncCron = new ConfigRiskSyncCron();
+    // configRiskSyncCron.setUp();
 
     CloudflareWafSyncCron cloudflareWafSyncCron = new CloudflareWafSyncCron();
     cloudflareWafSyncCron.setUpCloudflareWafSyncCronScheduler();

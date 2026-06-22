@@ -156,10 +156,18 @@ public class ConfigParser {
         }
 
         if (curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Data.toString()) && !( (values instanceof String) || (values instanceof Integer) || (values instanceof Boolean) )) {
-            if (values instanceof Map)
-            configParserValidationResult.setIsValid(false);
-            configParserValidationResult.setErrMsg("data should only have string value");
-            return configParserValidationResult;
+            if (values instanceof Map) {
+                Map<String, Object> mapVal = (Map) values;
+                if (!mapVal.containsKey("regex_replace")) {
+                    configParserValidationResult.setIsValid(false);
+                    configParserValidationResult.setErrMsg("data should only have string value or regex_replace map");
+                    return configParserValidationResult;
+                }
+            } else {
+                configParserValidationResult.setIsValid(false);
+                configParserValidationResult.setErrMsg("data should only have string value");
+                return configParserValidationResult;
+            }
         }
 
         return new ConfigParserValidationResult(true, "");

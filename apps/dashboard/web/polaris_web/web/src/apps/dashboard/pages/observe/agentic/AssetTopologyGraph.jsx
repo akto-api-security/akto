@@ -5,10 +5,6 @@ import { AutomationMajor, MagicMajor, CustomersMinor } from "@shopify/polaris-ic
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import { getAgentLinkedComponents } from "./agenticPageBuilders";
 
-// ─── Topology graph ───────────────────────────────────────────────────────────
-// ReactFlow node colours are category-driven (outside the Polaris token set) and the
-// fixed graph canvas size is a layout constant — inline styles are justified here.
-
 export function topoColors(category) {
     switch (category) {
         case "external": return { borderColor: "#3b82f6", backgroundColor: "#eff6ff" };
@@ -71,95 +67,108 @@ export function TopoNode({ data }) {
 
 export const TOPO_NODE_TYPES = { topoNode: TopoNode };
 
-const GRAPH_HEIGHT = 280;
-const NODE_H       = 84;
+const NODE_H = 84;
+const GRAPH_H = 300;
+
+// Returns parent AI Agent flat rows for an MCP/Skill asset.
+export function findParentAgents(asset, agenticFlatData = []) {
+    return agenticFlatData.filter((a) => {
+        if (a.type !== "AI Agent") return false;
+        if (asset.type === "MCP Server") {
+            return (a.mcpServers || []).some(m => m === asset.name || m.toLowerCase() === asset.name?.toLowerCase());
+        }
+        if (asset.type === "Skill") {
+            const assetIds = new Set((asset.collectionIds || []).map(Number));
+            return (a.collectionIds || []).some(id => assetIds.has(Number(id)));
+        }
+        return false;
+    });
+}
 
 export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], nodes: externalNodes, edges: externalEdges }) {
-    if (externalNodes && externalEdges) {
-        return (
-            <Box style={{ height: GRAPH_HEIGHT, borderRadius: 8, border: "1px solid #E1E5E9", overflow: "hidden", background: "#F8FAFC" }}>
-                <ReactFlow
-                    nodes={externalNodes}
-                    edges={externalEdges}
-                    nodeTypes={TOPO_NODE_TYPES}
-                    fitView
-                    fitViewOptions={{ padding: 0.2 }}
-                    onInit={api => api.fitView({ padding: 0.2 })}
-                    minZoom={0.2}
-                    maxZoom={4}
-                    nodesDraggable={true}
-                    nodesConnectable={false}
-                    elementsSelectable={false}
-                    zoomOnScroll
-                    zoomOnPinch
-                    panOnDrag
-                    preventScrolling={false}
-                >
-                    <Background color="#E1E5E9" gap={16} />
-                    <Controls showInteractive={false} />
-                </ReactFlow>
-            </Box>
-        );
-    }
+    const { nodes, edges, height } = useMemo(() => {
+        if (externalNodes && externalEdges) {
+            return { nodes: externalNodes, edges: externalEdges, height: GRAPH_H };
+        }
 
-    const { nodes, edges } = useMemo(() => {
         const devices = assetDevices[asset.id] || [];
+        const COL1 = 40, COL2 = 230, COL3 = 420;
 
         if (asset.type === "AI Agent") {
             const children = getAgentLinkedComponents(asset, agenticTreeData, agenticFlatData);
             const mcps = children.filter(c => c.type === "MCP Server");
             const llms = children.filter(c => c.type === "LLM");
-            const rightCount = mcps.length + llms.length;
-            const maxRows  = Math.max(devices.length, rightCount, 1);
-            const totalH   = maxRows * NODE_H;
-            const agentY   = (totalH - 44) / 2;
-            const devOffset = Math.max(0, (rightCount - devices.length) * NODE_H / 2);
+            const names = asset.skillNames || [];
+            const skillItems = names.map((name, i) => ({ id: `skl-${i}`, cat: "skill", type: "Skill", label: name, edgeColor: "#7C3AED" }));
+
+            // MCPs, LLMs, Skills all at col3 — same hierarchy level
+            const col3Items = [
+                ...mcps.map((m, i) => ({ id: `mcp-${i}`, cat: "mcp",      type: "MCP Server", label: m.name, edgeColor: "#4cbebb" })),
+                ...llms.map((l, i) => ({ id: `llm-${i}`, cat: "ai-model", type: "LLM",        label: l.name, edgeColor: "#ec4899" })),
+                ...skillItems,
+            ];
+
+            const maxRows   = Math.max(devices.length, col3Items.length, 1);
+            const totalH    = maxRows * NODE_H;
+            const agentY    = (totalH - 44) / 2;
+            const devOffset = Math.max(0, (col3Items.length - devices.length) * NODE_H / 2);
 
             return {
+                height: GRAPH_H,
                 nodes: [
-                    { id: "agent", type: "topoNode", draggable: false, position: { x: 270, y: agentY }, data: { component: { category: "agent",    type: "AI Agent",    label: asset.name } } },
-                    ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: 40,  y: devOffset + i * NODE_H          }, data: { component: { category: "external",  type: "User",        label: d.username || d.endpoint } } })),
-                    ...mcps.map((m, i)    => ({ id: `mcp-${i}`, type: "topoNode", draggable: false, position: { x: 500, y: i * NODE_H                       }, data: { component: { category: "mcp",       type: "MCP Server",  label: m.name     } } })),
-                    ...llms.map((l, i)    => ({ id: `llm-${i}`, type: "topoNode", draggable: false, position: { x: 500, y: (mcps.length + i) * NODE_H       }, data: { component: { category: "ai-model",  type: "LLM",         label: l.name     } } })),
+                    { id: "agent", type: "topoNode", draggable: false, position: { x: COL2, y: agentY }, data: { component: { category: "agent", type: "AI Agent", label: asset.name } } },
+                    ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: COL1, y: devOffset + i * NODE_H }, data: { component: { category: "external", type: "User", label: d.username || d.endpoint } } })),
+                    ...col3Items.map((item, i) => ({ id: item.id, type: "topoNode", draggable: false, position: { x: COL3, y: i * NODE_H }, data: { component: { category: item.cat, type: item.type, label: item.label } } })),
                 ],
                 edges: [
-                    ...devices.map((_, i) => ({ id: `e-d${i}-a`,  source: `dev-${i}`, target: "agent",   type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } })),
-                    ...mcps.map((_, i)    => ({ id: `e-a-m${i}`,  source: "agent",    target: `mcp-${i}`, type: "smoothstep", style: { stroke: "#4cbebb", strokeWidth: 1.5 } })),
-                    ...llms.map((_, i)    => ({ id: `e-a-l${i}`,  source: "agent",    target: `llm-${i}`, type: "smoothstep", style: { stroke: "#ec4899", strokeWidth: 1.5 } })),
+                    ...devices.map((_, i)   => ({ id: `e-d${i}-a`,     source: `dev-${i}`, target: "agent",   type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } })),
+                    ...col3Items.map(item   => ({ id: `e-a-${item.id}`, source: "agent",    target: item.id,  type: "smoothstep", style: { stroke: item.edgeColor, strokeWidth: 1.5 } })),
                 ],
             };
         }
 
-        if (asset.type === "Skill") {
-            // Devices (left, sources) → Skill (right, target)
-            const totalH  = Math.max(devices.length, 1) * NODE_H;
-            const skillY  = (totalH - 44) / 2;
+        // MCP / Skill / LLM: show Device → Parent Agent → This Asset
+        const parentAgents = findParentAgents(asset, agenticFlatData);
+        const cat     = asset.type === "MCP Server" ? "mcp" : asset.type === "Skill" ? "skill" : "ai-model";
+        const edgeCol = asset.type === "MCP Server" ? "#4cbebb" : asset.type === "Skill" ? "#7C3AED" : "#ec4899";
+
+        if (parentAgents.length > 0) {
+            const maxRows   = Math.max(devices.length, parentAgents.length, 1);
+            const totalH    = maxRows * NODE_H;
+            const assetY    = (totalH - 44) / 2;
+            const devOffset = Math.max(0, (parentAgents.length - devices.length) * NODE_H / 2);
+            const agOffset  = Math.max(0, (devices.length - parentAgents.length) * NODE_H / 2);
+
             return {
+                height: GRAPH_H,
                 nodes: [
-                    ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: 40,  y: i * NODE_H }, data: { component: { category: "external", type: "User", label: d.username || d.endpoint } } })),
-                    { id: "skill", type: "topoNode", draggable: false, position: { x: 380, y: skillY }, data: { component: { category: "skill", type: "Skill", label: asset.name } } },
+                    { id: "asset", type: "topoNode", draggable: false, position: { x: COL3, y: assetY }, data: { component: { category: cat, type: asset.type, label: asset.name } } },
+                    ...parentAgents.map((a, i) => ({ id: `agt-${i}`, type: "topoNode", draggable: false, position: { x: COL2, y: agOffset + i * NODE_H }, data: { component: { category: "agent", type: "AI Agent", label: a.name } } })),
+                    ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: COL1, y: devOffset + i * NODE_H }, data: { component: { category: "external", type: "User", label: d.username || d.endpoint } } })),
                 ],
-                edges: devices.map((_, i) => ({ id: `e-d${i}-s`, source: `dev-${i}`, target: "skill", type: "smoothstep", style: { stroke: "#7E22CE", strokeWidth: 1.5 } })),
+                edges: [
+                    ...devices.map((_, i) => ({ id: `e-d${i}-a0`, source: `dev-${i}`, target: "agt-0", type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } })),
+                    ...parentAgents.map((_, i) => ({ id: `e-a${i}-as`, source: `agt-${i}`, target: "asset", type: "smoothstep", style: { stroke: edgeCol, strokeWidth: 1.5 } })),
+                ],
             };
         }
 
-        // MCP Server & LLM: Devices (left) → Asset (right)
-        const totalH  = Math.max(devices.length, 1) * NODE_H;
+        // Fallback: Device → Asset
+        const maxRows = Math.max(devices.length, 1);
+        const totalH  = maxRows * NODE_H;
         const assetY  = (totalH - 44) / 2;
-        const cat     = asset.type === "MCP Server" ? "mcp" : "ai-model";
-        const edgeCol = asset.type === "MCP Server" ? "#4cbebb" : "#ec4899";
         return {
+            height: GRAPH_H,
             nodes: [
-                { id: "asset", type: "topoNode", draggable: false, position: { x: 310, y: assetY }, data: { component: { category: cat, type: asset.type, label: asset.name } } },
-                ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: 40, y: i * NODE_H }, data: { component: { category: "external", type: "User", label: d.username || d.endpoint } } })),
+                { id: "asset", type: "topoNode", draggable: false, position: { x: COL2, y: assetY }, data: { component: { category: cat, type: asset.type, label: asset.name } } },
+                ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: COL1, y: i * NODE_H }, data: { component: { category: "external", type: "User", label: d.username || d.endpoint } } })),
             ],
             edges: devices.map((_, i) => ({ id: `e-d${i}-a`, source: `dev-${i}`, target: "asset", type: "smoothstep", style: { stroke: edgeCol, strokeWidth: 1.5 } })),
         };
-    }, [asset, assetDevices, agenticTreeData, agenticFlatData]);
+    }, [asset, assetDevices, agenticTreeData, agenticFlatData, externalNodes, externalEdges]);
 
-    // Fixed-size container — ReactFlow's fitView + zoom handles overflow
     return (
-        <Box style={{ height: GRAPH_HEIGHT, borderRadius: 8, border: "1px solid #E1E5E9", overflow: "hidden", background: "#F8FAFC" }}>
+        <Box style={{ height, borderRadius: 8, border: "1px solid #E1E5E9", overflow: "hidden", background: "#F8FAFC" }}>
             <ReactFlow
                 nodes={nodes}
                 edges={edges}

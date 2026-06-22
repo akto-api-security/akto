@@ -16,6 +16,15 @@ public class Account {
 
     private int mergingInitiateTs = 0;
 
+    public static final String VIEW_REFRESH_INITIATE_TS = "viewRefreshInitiateTs";
+    private int viewRefreshInitiateTs = 0;
+
+    public static final String STI_LAST_INCREMENTAL_TS = "stiLastIncrementalTs";
+    private int stiLastIncrementalTs = 0;
+
+    public static final String STI_LAST_FULL_REBUILD_TS = "stiLastFullRebuildTs";
+    private int stiLastFullRebuildTs = 0;
+
     public static final String HYBRID_TESTING_ENABLED = "hybridTestingEnabled";
     private boolean hybridTestingEnabled;
 
@@ -104,5 +113,29 @@ public class Account {
 
     public void setHybridTestingEnabled(boolean hybridTestingEnabled) {
         this.hybridTestingEnabled = hybridTestingEnabled;
+    }
+
+    public int getViewRefreshInitiateTs() {
+        return viewRefreshInitiateTs;
+    }
+
+    public void setViewRefreshInitiateTs(int viewRefreshInitiateTs) {
+        this.viewRefreshInitiateTs = viewRefreshInitiateTs;
+    }
+
+    public int getStiLastIncrementalTs() {
+        return stiLastIncrementalTs;
+    }
+
+    public void setStiLastIncrementalTs(int stiLastIncrementalTs) {
+        this.stiLastIncrementalTs = stiLastIncrementalTs;
+    }
+
+    public int getStiLastFullRebuildTs() {
+        return stiLastFullRebuildTs;
+    }
+
+    public void setStiLastFullRebuildTs(int stiLastFullRebuildTs) {
+        this.stiLastFullRebuildTs = stiLastFullRebuildTs;
     }
 }

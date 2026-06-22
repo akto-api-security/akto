@@ -229,10 +229,11 @@ function ThreatDetectionPage() {
             actor: searchParams.get("actor"),
             filterId: searchParams.get("filterId"),
             status: statusValue,
+            severity: searchParams.get("severity") || '',
             hasQueryEvent: Boolean(
-                searchParams.get("refId") && 
-                searchParams.get("eventType") && 
-                searchParams.get("actor") && 
+                searchParams.get("refId") &&
+                searchParams.get("eventType") &&
+                searchParams.get("actor") &&
                 searchParams.get("filterId")
             )
         };
@@ -458,7 +459,8 @@ function ThreatDetectionPage() {
             jiraTicketUrl: data.jiraTicketUrl || '',
             severity: data.severity || '',
             sessionId: data.sessionId || '',
-            ruleViolated: data.ruleViolated || '-'
+            ruleViolated: data.ruleViolated || '-',
+            complianceMapData: data.complianceMapData || {}
         });
 
         setShowDetails(true);
@@ -474,7 +476,8 @@ function ThreatDetectionPage() {
                 templateId: data.filterId,
                 severity: data.severity || '',
                 sessionId: data.sessionId || '',
-                ruleViolated: data.ruleViolated || '-'
+                ruleViolated: data.ruleViolated || '-',
+                complianceMap: data.complianceMapData || {}
             },
             currentEventId: data.id || '',
             currentEventStatus: data.status || '',
@@ -655,9 +658,12 @@ function ThreatDetectionPage() {
               method: rowContext?.method || '',
               apiCollectionId: rowContext?.apiCollectionId,
               templateId: queryParams.filterId,
-              severity: rowContext?.severity || '',
+              // Prefer the row's severity (set by rowClicked or passed via ?severity= URL param),
+              // so deep-linked opens show the actual event severity, not the template default.
+              severity: rowContext?.severity || queryParams.severity || '',
               sessionId: rowContext?.sessionId || '',
-              ruleViolated: rowContext?.ruleViolated || '-'
+              ruleViolated: rowContext?.ruleViolated || '-',
+              complianceMap: rowContext?.complianceMapData || {}
             },
             currentEventId: rowContext?.eventId || '',
             currentEventStatus: queryParams.status || rowContext?.status || '',
@@ -720,6 +726,7 @@ function ThreatDetectionPage() {
             rowClicked={rowClicked}
             triggerRefresh={() => setTriggerTableRefresh(prev => prev + 1)}
             initialTab={queryParams.status ? queryParams.status.toLowerCase() : undefined}
+            label={LABELS.THREAT}
         />,
         !showNewTab ? <NormalSampleDetails
             title={"Attacker payload"}

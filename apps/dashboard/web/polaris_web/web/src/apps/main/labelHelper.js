@@ -78,3 +78,18 @@ export function isDastCategory() {
 export function isEndpointSecurityCategory() {
   return isCategory(CATEGORY_ENDPOINT_SECURITY);
 }
+
+// Reads the ?category= query param from the current URL (used by report pages opened in new tabs
+// where PersistStore session is unavailable).
+export function getReportCategoryShortName() {
+  return (new URLSearchParams(window.location.search).get('category') || '').toUpperCase();
+}
+
+// Returns the cover-page / PDF-header findings label for the current report URL.
+// Matches the logic in pdf.ts so the page title and PDF header are always in sync.
+export function getReportFindingsLabel() {
+  const short = getReportCategoryShortName();
+  if (short === 'AGENTIC') return 'Agentic Security Findings';
+  if (short === 'ENDPOINT') return 'ATLAS Security Findings';
+  return 'API Security Findings';
+}

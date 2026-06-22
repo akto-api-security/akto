@@ -3,7 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
-import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Badge } from "@shopify/polaris";
+import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Badge, Tooltip } from "@shopify/polaris";
+import MisconfiguredConfigIcon from "@/assets/MisconfiguredConfigIcon.svg";
+import PersonLockIcon from "@/assets/PersonLockIcon.svg";
+import LaptopIcon from "@/assets/Laptop.svg";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
@@ -15,7 +18,7 @@ import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentere
 import { SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import DonutChart from "../../../components/shared/DonutChart";
 import AgenticStatsCard from "./AgenticStatsCard";
-import agenticObserveApi, { aggregateViolationsByCollectionId } from "./agenticObserveApi";
+import agenticObserveApi, { aggregateViolationsByCollectionId, fetchAgenticViolations } from "./agenticObserveApi";
 import { buildDeviceEndpointsPageData } from "./agenticPageBuilders";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 import { groupCollectionsByUser } from "./constants";
@@ -166,7 +169,17 @@ function TopSection({ summary }) {
 export function OsIcon({ os, size = 16 }) {
     if (os === "mac")     return <img src="/public/os-mac.svg"     width={size} height={size} alt="macOS"   style={{ flexShrink: 0 }} />;
     if (os === "windows") return <img src="/public/os-windows.svg" width={size} height={size} alt="Windows" style={{ flexShrink: 0 }} />;
-    return                       <img src="/public/os-linux.svg"   width={size} height={size} alt="Linux"   style={{ flexShrink: 0 }} />;
+    if (os === "linux")   return <img src="/public/os-linux.svg"   width={size} height={size} alt="Linux"   style={{ flexShrink: 0 }} />;
+    return                       <img src={LaptopIcon}             width={size} height={size} alt="Device"  style={{ flexShrink: 0 }} />;
+}
+
+// Marker icon shown next to a row label (matches the personal-account marker pattern in AgenticCellRenderers).
+function MarkerIcon({ src, label, size = 16 }) {
+    return (
+        <Tooltip content={label} dismissOnMouseOut activatorWrapper="div">
+            <img src={src} width={size} height={size} alt={label} style={{ flexShrink: 0, display: "block" }} />
+        </Tooltip>
+    );
 }
 
 // ─── Cell renderers ───────────────────────────────────────────────────────────
@@ -234,6 +247,14 @@ function UsernameCellInner({ data, node }) {
             icon={<OsIcon os={data.os} />}
             label={username || "-"}
             isBold={!!username}
+            warning={
+                (data.hasPersonalAccount || data.hasMisconfiguredConfig) ? (
+                    <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+                        {data.hasPersonalAccount && <MarkerIcon src={PersonLockIcon} label="Contains personal account" size={24} />}
+                        {data.hasMisconfiguredConfig && <MarkerIcon src={MisconfiguredConfigIcon} label="Misconfigured config" size={24} />}
+                    </HorizontalStack>
+                ) : null
+            }
         />
     );
 }
@@ -329,9 +350,21 @@ const DEFAULT_COL_DEF = {
     cellStyle: { display: "flex", alignItems: "center", fontSize: 13, color: "#202223" },
 };
 
+function getCollectionIdsForDevice(deviceId, collections) {
+    if (!deviceId || !collections?.length) return [];
+    const prefix = deviceId + ".";
+    return collections.filter(c => c.hostName && c.hostName.startsWith(prefix)).map(c => c.id);
+}
+
+function getHostNamesForDevice(deviceId, collections) {
+    if (!deviceId || !collections?.length) return [];
+    const prefix = deviceId + ".";
+    return collections.filter(c => c.hostName && c.hostName.startsWith(prefix)).map(c => c.hostName);
+}
+
 // ─── Table section ────────────────────────────────────────────────────────────
 
-function TableSection({ deviceFlatData, agentRiskData }) {
+function TableSection({ deviceFlatData, agentRiskData, collections, startTimestamp, endTimestamp }) {
     const [selectedCount, setSelectedCount] = useState(0);
     const [deviceFlyout, setDeviceFlyout] = useState(null);
     const gridRef = useRef(null);
@@ -354,21 +387,21 @@ function TableSection({ deviceFlatData, agentRiskData }) {
         if (!deviceId) return;
         const device = findDeviceRow(deviceId);
         if (!device) return;
-        setDeviceFlyout({ device, agents: findAgentsForDevice(deviceId) });
-    }, [deviceFlatData, findDeviceRow, findAgentsForDevice]);
+        setDeviceFlyout({ device, agents: findAgentsForDevice(deviceId), hostNames: getHostNamesForDevice(deviceId, collections) });
+    }, [deviceFlatData, findDeviceRow, findAgentsForDevice, collections]);
 
     const handleDeviceClickFromFlyout = useCallback((device) => {
         const deviceId = device?.path?.[0];
         if (!deviceId) return;
-        setDeviceFlyout({ device, agents: findAgentsForDevice(deviceId) });
-    }, [findAgentsForDevice]);
+        setDeviceFlyout({ device, agents: findAgentsForDevice(deviceId), hostNames: getHostNamesForDevice(deviceId, collections) });
+    }, [findAgentsForDevice, collections]);
 
     const handleRowClick = useCallback((e) => {
         const { data, node } = e;
         if (!data) return;
         if (node.level === 0) {
             const deviceId = data.path[0];
-            setDeviceFlyout({ device: data, agents: findAgentsForDevice(deviceId) });
+            setDeviceFlyout({ device: data, agents: findAgentsForDevice(deviceId), hostNames: getHostNamesForDevice(deviceId, collections) });
             return;
         }
         // Child (agentic asset) rows — open on the Agentic Assets page with flyout pre-selected
@@ -420,9 +453,9 @@ function TableSection({ deviceFlatData, agentRiskData }) {
                 treeData
                 getDataPath={getDataPath}
                 groupDefaultExpanded={0}
-                height={800}
+                height={500}
+                domLayout="normal"
                 searchPlaceholder="Search..."
-                searchOffset={400}
                 bulkActionCount={selectedCount}
                 bulkActions={bulkActions}
                 onClearBulk={() => { gridRef.current?.api?.deselectAll(); setSelectedCount(0); }}
@@ -434,7 +467,7 @@ function TableSection({ deviceFlatData, agentRiskData }) {
                 pagination
                 paginationPageSize={20}
                 paginationPageSizeSelector={[20, 50, 100]}
-                sideBar={{ toolPanels: ["columns", "filters"] }}
+                sideBar={{ toolPanels: ["columns", "filters"], defaultToolPanel: null }}
             />
 
             <DeviceFlyout
@@ -443,6 +476,10 @@ function TableSection({ deviceFlatData, agentRiskData }) {
                 show={deviceFlyout !== null}
                 onClose={closeAll}
                 agentRiskData={agentRiskData}
+                deviceHostNames={deviceFlyout?.hostNames || []}
+                collections={collections}
+                startTimestamp={startTimestamp}
+                endTimestamp={endTimestamp}
             />
         </VerticalStack>
     );
@@ -456,6 +493,7 @@ export default function DeviceEndpoints() {
     const [deviceFlatData, setDeviceFlatData] = useState([]);
     const [agentRiskData, setAgentRiskData] = useState({});
     const [summary, setSummary] = useState({});
+    const [collections, setCollections] = useState([]);
     const newLayout = LocalStore((state) => state.agenticNewLayout);
     const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
 
@@ -488,15 +526,16 @@ export default function DeviceEndpoints() {
                     trafficInfoResp,
                     riskScoreResp,
                     shieldResult,
-                    violationRows,
+                    violationsResp,
                 ] = await Promise.all([
                     api.getAllCollectionsBasic(),
                     api.getLastTrafficSeen(),
                     api.getRiskScoreInfo(),
                     fetchEndpointShieldUserMetadata(),
-                    agenticObserveApi.fetchAgenticViolations({ startTimestamp, endTimestamp }),
+                    fetchAgenticViolations({ startTimestamp, endTimestamp }),
                 ]);
                 if (!isMountedRef.current) return;
+                const violationRows = violationsResp || [];
                 const { usernameMap = {}, userMetadataMap = {}, moduleInfos = [] } = shieldResult || {};
                 const collections = apiCollectionsResp?.apiCollections || [];
                 const pageData = buildDeviceEndpointsPageData(
@@ -506,7 +545,7 @@ export default function DeviceEndpoints() {
                     {
                         moduleInfos,
                         usernameMap,
-                        violationsByCollectionId: aggregateViolationsByCollectionId(violationRows),
+                        violationsByCollectionId: aggregateViolationsByCollectionId(violationRows, collections),
                         violationRows,
                         startTimestamp,
                         endTimestamp,
@@ -517,11 +556,13 @@ export default function DeviceEndpoints() {
                 setDeviceFlatData(pageData.deviceFlatData);
                 setAgentRiskData(pageData.agentRiskData);
                 setSummary(pageData.summary);
+                setCollections(collections);
             } catch {
                 if (isMountedRef.current) {
                     setDeviceFlatData([]);
                     setAgentRiskData({});
                     setSummary({});
+                    setCollections([]);
                 }
             } finally {
                 if (isMountedRef.current) setLoading(false);
@@ -570,6 +611,9 @@ export default function DeviceEndpoints() {
                     key="table"
                     deviceFlatData={deviceFlatData}
                     agentRiskData={agentRiskData}
+                    collections={collections}
+                    startTimestamp={startTimestamp}
+                    endTimestamp={endTimestamp}
                 />,
             ]}
         />

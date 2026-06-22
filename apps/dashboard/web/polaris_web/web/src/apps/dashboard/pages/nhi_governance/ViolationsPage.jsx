@@ -18,7 +18,7 @@ import ViolationDetailsPanel from "./ViolationDetailsPanel";
 import observeRequests from "../observe/api";
 import { formatRelativeTime } from "./nhiUtils";
 import SpinnerCentered from "../../components/progress/SpinnerCentered";
-import { extractIdentityName, getFirstIdentityName } from "./identityHelper";
+import { extractIdentityName, getFirstIdentityName, getAllIdentityNames } from "./identityHelper";
 
 const definedTableTabs = ["All", "Open", "Fixed"];
 const resourceName = { singular: "violation", plural: "violations" };
@@ -69,6 +69,8 @@ const transformApiViolations = (apiViolations) => {
 
             // Extract identity name from new format { id: ObjectId, identityName: "name" }
             const firstIdentityName = getFirstIdentityName(v.identities);
+            const allIdentityNames = getAllIdentityNames(v.identities);
+            const extraCount = allIdentityNames.length - 1;
 
             return {
                 ...v,
@@ -84,6 +86,9 @@ const transformApiViolations = (apiViolations) => {
                     <HorizontalStack gap="2" blockAlign="center" wrap={false}>
                         <IdentityIcon name={firstIdentityName} />
                         <Text variant="bodyMd">{firstIdentityName}</Text>
+                        {extraCount > 0 && (
+                            <Badge>{`+${extraCount}`}</Badge>
+                        )}
                     </HorizontalStack>
                 ),
                 agentComp: (

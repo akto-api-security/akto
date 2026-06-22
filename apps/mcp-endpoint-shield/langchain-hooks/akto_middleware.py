@@ -19,6 +19,7 @@ Environment variables:
     AKTO_DATA_INGESTION_URL  Akto service base URL (required)
     AKTO_SYNC_MODE           "true" to block on violation, "false" to log-only (default: "true")
     AKTO_TIMEOUT             HTTP timeout in seconds (default: "5")
+    AKTO_INSTANCE_IP         Source IP in proxy payloads (auto-detected if unset)
     LOG_LEVEL                Logging level (default: "INFO")
     LOG_PAYLOADS             Log full payloads, privacy-sensitive (default: "false")
 """
@@ -26,6 +27,7 @@ Environment variables:
 import json
 import logging
 import os
+import socket
 import time
 from typing import Any, Optional, Tuple
 
@@ -39,6 +41,7 @@ from langgraph.runtime import Runtime
 # ---------------------------------------------------------------------------
 
 AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL", "")
+AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -52,6 +55,35 @@ LANGCHAIN_API_PATH = os.getenv("LANGCHAIN_API_PATH", "/langchain/chat")
 logger = logging.getLogger(__name__)
 logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
+_instance_ip: Optional[str] = None
+
+
+def _get_instance_ip() -> str:
+    """Return this host's primary IP for Akto proxy payloads."""
+    global _instance_ip
+    if _instance_ip is not None:
+        return _instance_ip
+
+    configured = os.getenv("AKTO_INSTANCE_IP", "").strip()
+    if configured:
+        _instance_ip = configured
+        return _instance_ip
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("8.8.8.8", 80))
+            _instance_ip = sock.getsockname()[0]
+            return _instance_ip
+    except OSError:
+        pass
+
+    try:
+        _instance_ip = socket.gethostbyname(socket.gethostname())
+        return _instance_ip
+    except OSError:
+        _instance_ip = "127.0.0.1"
+        return _instance_ip
+
 
 # ---------------------------------------------------------------------------
 # Middleware class
@@ -63,7 +95,7 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
 
     In SYNC_MODE (default):
       - before_model: validates prompt; raises ValueError if blocked
-      - after_model: ingests completed interaction for audit
+      - after_model: validates LLM response; raises ValueError if blocked, then ingests
 
     In async mode (AKTO_SYNC_MODE=false):
       - All interactions are ingested after the fact (log-only)
@@ -72,9 +104,15 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
     def __init__(self, connector: str = AKTO_CONNECTOR) -> None:
         super().__init__()
         self._connector = connector
-        self._client = httpx.AsyncClient(
-            timeout=AKTO_TIMEOUT,
+        client_headers = {"Authorization": AKTO_API_TOKEN} if AKTO_API_TOKEN else {}
+        client_kwargs = {
+            "timeout": AKTO_TIMEOUT,
+            "headers": client_headers,
+        }
+        self._sync_client = httpx.Client(**client_kwargs)
+        self._async_client = httpx.AsyncClient(
             limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+            **client_kwargs,
         )
         logger.info(
             f"AktoGuardrailsMiddleware initialized | connector={connector} "
@@ -97,16 +135,8 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
         model = self._extract_model(runtime)
 
         if AKTO_SYNC_MODE:
-            import asyncio
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor() as pool:
-                        future = pool.submit(asyncio.run, self._validate_and_maybe_block(messages, model))
-                        future.result()
-                else:
-                    loop.run_until_complete(self._validate_and_maybe_block(messages, model))
+                self._validate_request_and_maybe_block_sync(messages, model)
             except ValueError:
                 raise
             except Exception as e:
@@ -115,7 +145,7 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
         return None
 
     def after_model(self, state: AgentState, runtime: Runtime) -> Optional[dict[str, Any]]:
-        """Ingest the completed model interaction for audit."""
+        """Validate LLM response against Akto guardrails, then ingest for audit."""
         if not AKTO_DATA_INGESTION_URL:
             return None
         if self._is_intermediate_tool_call_step(state):
@@ -124,21 +154,21 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
         messages = self._extract_messages(state)
         model = self._extract_model(runtime)
 
-        import asyncio
         try:
-            loop = asyncio.get_event_loop()
-            payload = self._build_model_payload(
-                messages=messages,
-                model=model,
-                response_body=None,
-                status_code="200",
-            )
-            if loop.is_running():
-                loop.create_task(self._ingest(payload))
+            if AKTO_SYNC_MODE:
+                self._validate_response_and_maybe_block_sync(messages, model)
             else:
-                loop.run_until_complete(self._ingest(payload))
+                payload = self._build_model_payload(
+                    messages=messages,
+                    model=model,
+                    response_body=None,
+                    status_code="200",
+                )
+                self._ingest_sync(payload)
+        except ValueError:
+            raise
         except Exception as e:
-            logger.error(f"after_model ingestion error: {e}")
+            logger.error(f"after_model guardrails error (fail-open): {e}")
 
         return None
 
@@ -156,7 +186,7 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
         model = self._extract_model(runtime)
         if AKTO_SYNC_MODE:
             try:
-                await self._validate_and_maybe_block(messages, model)
+                await self._validate_request_and_maybe_block(messages, model)
             except ValueError:
                 raise
             except Exception as e:
@@ -164,7 +194,7 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
         return None
 
     async def aafter_model(self, state: AgentState, runtime: Runtime) -> Optional[dict[str, Any]]:
-        """Async version of after_model — called when agent runs asynchronously."""
+        """Async version of after_model — validate response, then ingest."""
         if not AKTO_DATA_INGESTION_URL:
             return None
         if self._is_intermediate_tool_call_step(state):
@@ -172,31 +202,110 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
 
         messages = self._extract_messages(state)
         model = self._extract_model(runtime)
-        payload = self._build_model_payload(
-            messages=messages,
-            model=model,
-            response_body=None,
-            status_code="200",
-        )
         try:
-            await self._ingest(payload)
+            if AKTO_SYNC_MODE:
+                await self._validate_response_and_maybe_block(messages, model)
+            else:
+                payload = self._build_model_payload(
+                    messages=messages,
+                    model=model,
+                    response_body=None,
+                    status_code="200",
+                )
+                await self._ingest(payload)
+        except ValueError:
+            raise
         except Exception as e:
-            logger.error(f"aafter_model ingestion error: {e}")
+            logger.error(f"aafter_model guardrails error (fail-open): {e}")
         return None
 
     # ------------------------------------------------------------------
     # Core validation / ingestion helpers
     # ------------------------------------------------------------------
 
-    async def _validate_and_maybe_block(self, messages: list, model: str) -> None:
-        """Validate messages; raise ValueError if guardrails block."""
+    def _validate_request_and_maybe_block_sync(self, messages: list, model: str) -> None:
+        """Validate prompt synchronously; raise ValueError if guardrails block."""
         payload = self._build_model_payload(
             messages=messages,
             model=model,
             response_body=None,
             status_code="200",
         )
-        allowed, reason = await self._validate_guardrails(payload)
+        allowed, reason = self._validate_guardrails_sync(payload, phase="request")
+        if not allowed:
+            blocked_payload = self._build_model_payload(
+                messages=messages,
+                model=model,
+                response_body={"x-blocked-by": "Akto Proxy", "reason": reason},
+                status_code="403",
+            )
+            self._ingest_sync(blocked_payload)
+            raise ValueError(f"Blocked by Akto Guardrails: {reason or 'Policy violation'}")
+
+    def _validate_response_and_maybe_block_sync(self, messages: list, model: str) -> None:
+        """Validate LLM response synchronously; raise ValueError if guardrails block."""
+        payload = self._build_model_payload(
+            messages=messages,
+            model=model,
+            response_body=None,
+            status_code="200",
+        )
+        allowed, reason = self._validate_guardrails_sync(payload, phase="response")
+        if not allowed:
+            blocked_payload = self._build_model_payload(
+                messages=messages,
+                model=model,
+                response_body={"x-blocked-by": "Akto Proxy", "reason": reason},
+                status_code="403",
+            )
+            self._ingest_sync(blocked_payload)
+            raise ValueError(f"Blocked by Akto Guardrails: {reason or 'Policy violation'}")
+        self._ingest_sync(payload)
+
+    def _validate_guardrails_sync(self, payload: dict, phase: str = "request") -> Tuple[bool, str]:
+        """POST to Akto guardrails endpoint. Returns (allowed, reason). Fail-open."""
+        try:
+            url = self._build_http_proxy_url(
+                guardrails=phase == "request",
+                response_guardrails=phase == "response",
+                ingest_data=False,
+            )
+            result = self._post_to_akto_sync(url, payload)
+            return self._parse_guardrails_result(result, phase=phase)
+        except Exception as e:
+            logger.error(f"Guardrails validation error ({phase}, fail-open): {e}")
+            return True, ""
+
+    def _ingest_sync(self, payload: dict) -> None:
+        """POST to Akto with ingest_data=true. Swallows errors."""
+        try:
+            url = self._build_http_proxy_url(guardrails=False, ingest_data=True)
+            self._post_to_akto_sync(url, payload)
+        except Exception as e:
+            logger.error(f"Ingestion error: {e}")
+
+    def _post_to_akto_sync(self, url: str, payload: dict) -> dict:
+        """Send payload to Akto HTTP proxy endpoint (sync)."""
+        logger.info(f"POST {url}")
+        if LOG_PAYLOADS:
+            logger.debug(f"Payload: {json.dumps(payload, default=str)[:1000]}")
+
+        response = self._sync_client.post(url, json=payload)
+        logger.info(f"Response: {response.status_code}")
+        try:
+            return response.json()
+        except Exception:
+            return {}
+
+    async def _validate_request_and_maybe_block(self, messages: list, model: str) -> None:
+        """Validate prompt; raise ValueError if guardrails block."""
+        payload = self._build_model_payload(
+            messages=messages,
+            model=model,
+            response_body=None,
+            status_code="200",
+        )
+        allowed, reason = await self._validate_guardrails(payload, phase="request")
         if not allowed:
             blocked_payload = self._build_model_payload(
                 messages=messages,
@@ -207,14 +316,38 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
             await self._ingest(blocked_payload)
             raise ValueError(f"Blocked by Akto Guardrails: {reason or 'Policy violation'}")
 
-    async def _validate_guardrails(self, payload: dict) -> Tuple[bool, str]:
-        """POST to Akto with guardrails=true. Returns (allowed, reason). Fail-open."""
+    async def _validate_response_and_maybe_block(self, messages: list, model: str) -> None:
+        """Validate LLM response; raise ValueError if guardrails block."""
+        payload = self._build_model_payload(
+            messages=messages,
+            model=model,
+            response_body=None,
+            status_code="200",
+        )
+        allowed, reason = await self._validate_guardrails(payload, phase="response")
+        if not allowed:
+            blocked_payload = self._build_model_payload(
+                messages=messages,
+                model=model,
+                response_body={"x-blocked-by": "Akto Proxy", "reason": reason},
+                status_code="403",
+            )
+            await self._ingest(blocked_payload)
+            raise ValueError(f"Blocked by Akto Guardrails: {reason or 'Policy violation'}")
+        await self._ingest(payload)
+
+    async def _validate_guardrails(self, payload: dict, phase: str = "request") -> Tuple[bool, str]:
+        """POST to Akto guardrails endpoint. Returns (allowed, reason). Fail-open."""
         try:
-            url = self._build_http_proxy_url(guardrails=True, ingest_data=False)
+            url = self._build_http_proxy_url(
+                guardrails=phase == "request",
+                response_guardrails=phase == "response",
+                ingest_data=False,
+            )
             result = await self._post_to_akto(url, payload)
-            return self._parse_guardrails_result(result)
+            return self._parse_guardrails_result(result, phase=phase)
         except Exception as e:
-            logger.error(f"Guardrails validation error (fail-open): {e}")
+            logger.error(f"Guardrails validation error ({phase}, fail-open): {e}")
             return True, ""
 
     async def _ingest(self, payload: dict) -> None:
@@ -231,23 +364,29 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
         if LOG_PAYLOADS:
             logger.debug(f"Payload: {json.dumps(payload, default=str)[:1000]}")
 
-        response = await self._client.post(url, json=payload)
+        response = await self._async_client.post(url, json=payload)
         logger.info(f"Response: {response.status_code}")
-        if response.status_code == 200:
-            try:
-                return response.json()
-            except Exception:
-                pass
-        return {}
+        try:
+            return response.json()
+        except Exception:
+            return {}
 
     # ------------------------------------------------------------------
     # Payload builders (flat format matching github-cli-hooks)
     # ------------------------------------------------------------------
 
-    def _build_http_proxy_url(self, guardrails: bool, ingest_data: bool) -> str:
+    def _build_http_proxy_url(
+        self,
+        *,
+        guardrails: bool = False,
+        response_guardrails: bool = False,
+        ingest_data: bool = False,
+    ) -> str:
         params = [f"akto_connector={self._connector}"]
         if guardrails:
             params.append("guardrails=true")
+        if response_guardrails:
+            params.append("response_guardrails=true")
         if ingest_data:
             params.append("ingest_data=true")
         return f"{AKTO_DATA_INGESTION_URL}{HTTP_PROXY_PATH}?{'&'.join(params)}"
@@ -268,50 +407,25 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
         })
         response_headers = json.dumps({
             "x-langchain-hook": "after_model",
+            "content-type": "application/json",
         })
 
-        # requestPayload: human/user messages only
         user_messages = [
             {"role": m.get("type", m.get("role", "unknown")), "content": m.get("content", "")}
             for m in messages
             if m.get("type", m.get("role")) in ("human", "user")
         ]
-        request_payload = json.dumps({
-            "body": json.dumps({"model": model, "messages": user_messages}),
-        })
+        request_payload = json.dumps({"model": model, "messages": user_messages})
 
-        # responsePayload: blocked dict for 403, AI text if available, else tool results
         if isinstance(response_body, dict):
-            response_payload = json.dumps({
-                "body": json.dumps(response_body),
-            })
+            response_payload = self._serialize_response_payload(response_body)
         else:
-            # Prefer final AI text response
-            ai_content = None
-            for m in reversed(messages):
-                role = m.get("type", m.get("role"))
-                content = m.get("content", "")
-                if role in ("ai", "assistant") and content:
-                    ai_content = content
-                    break
-
-            if ai_content:
-                response_payload = json.dumps({
-                    "body": json.dumps({"model": model, "content": ai_content}),
-                })
-            else:
-                # Fall back to tool results
-                tool_messages = [
-                    {"role": m.get("type", m.get("role", "unknown")), "content": m.get("content", "")}
-                    for m in messages
-                    if m.get("type", m.get("role")) not in ("human", "user", "ai", "assistant")
-                ]
-                if tool_messages:
-                    response_payload = json.dumps({
-                        "body": json.dumps({"model": model, "messages": tool_messages}),
-                    })
-                else:
-                    response_payload = json.dumps({})
+            response_body_data = self._build_response_body(model, messages)
+            response_payload = (
+                self._serialize_response_payload(response_body_data)
+                if response_body_data is not None
+                else json.dumps({})
+            )
 
         return self._flat_payload(
             path=LANGCHAIN_API_PATH,
@@ -323,6 +437,30 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
             tags=tags,
         )
 
+    def _serialize_response_payload(self, body: dict[str, Any]) -> str:
+        """Akto mirrors LLM HTTP responses with a JSON body wrapper."""
+        return json.dumps({"body": json.dumps(body)})
+
+    def _build_response_body(self, model: str, messages: list) -> Optional[dict[str, Any]]:
+        for message in reversed(messages):
+            role = message.get("type", message.get("role"))
+            content = message.get("content", "")
+            if role in ("ai", "assistant") and content:
+                return {
+                    "model": model,
+                    "messages": [{"role": "ai", "content": content}],
+                }
+
+        tool_messages = [
+            {"role": m.get("type", m.get("role", "unknown")), "content": m.get("content", "")}
+            for m in messages
+            if m.get("type", m.get("role")) not in ("human", "user", "ai", "assistant")
+        ]
+        if tool_messages:
+            return {"model": model, "messages": tool_messages}
+
+        return None
+
     def _flat_payload(
         self,
         path: str,
@@ -333,6 +471,7 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
         status_code: str,
         tags: dict,
     ) -> dict:
+        instance_ip = _get_instance_ip()
         return {
             "path": path,
             "requestHeaders": request_headers,
@@ -340,8 +479,8 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
             "method": "POST",
             "requestPayload": request_payload,
             "responsePayload": response_payload,
-            "ip": "0.0.0.0",
-            "destIp": "127.0.0.1",
+            "ip": instance_ip,
+            "destIp": instance_ip,
             "time": str(int(time.time() * 1000)),
             "statusCode": status_code,
             "type": "HTTP/1.1",
@@ -364,16 +503,25 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
     # Result parsing
     # ------------------------------------------------------------------
 
-    def _parse_guardrails_result(self, result: Any) -> Tuple[bool, str]:
+    def _parse_guardrails_result(self, result: Any, phase: str = "request") -> Tuple[bool, str]:
         if not isinstance(result, dict):
             return True, ""
+
+        error = result.get("error")
+        if isinstance(error, dict):
+            error_data = error.get("data", {}) or {}
+            if error_data.get("behaviour") == "block":
+                reason = error.get("message") or error_data.get("reason") or "Policy violation"
+                logger.warning(f"✗ DENIED by guardrails ({phase}): {reason}")
+                return False, reason
+
         guardrails_result = result.get("data", {}).get("guardrailsResult", {}) or {}
         allowed = guardrails_result.get("Allowed", True)
         reason = guardrails_result.get("Reason", "")
         if allowed:
-            logger.info("✓ ALLOWED by guardrails")
+            logger.info(f"✓ ALLOWED by guardrails ({phase})")
         else:
-            logger.warning(f"✗ DENIED by guardrails: {reason}")
+            logger.warning(f"✗ DENIED by guardrails ({phase}): {reason}")
         return allowed, reason
 
     # ------------------------------------------------------------------
@@ -414,5 +562,6 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
             return os.getenv("LANGCHAIN_MODEL", "unknown")
 
     async def aclose(self) -> None:
-        """Close the underlying HTTP client."""
-        await self._client.aclose()
+        """Close the underlying HTTP clients."""
+        self._sync_client.close()
+        await self._async_client.aclose()

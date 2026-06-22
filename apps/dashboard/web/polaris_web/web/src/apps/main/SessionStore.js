@@ -3,6 +3,7 @@ import { devtools, persist, createJSONStorage } from "zustand/middleware"
 
 const initialState = {
     threatFiltersMap: {},
+    guardrailComplianceMap: {},
     accessToken: null,
     currentAgentConversationId: '',
     agentConversation: {},
@@ -22,6 +23,13 @@ let sessionStore = (set) => ({
             set({ threatFiltersMap });
         } catch (error) {
             console.error("Error setting threatFiltersMap:", error);
+        }
+    },
+    setGuardrailComplianceMap: (guardrailComplianceMap) => {
+        try {
+            set({ guardrailComplianceMap });
+        } catch (error) {
+            console.error("Error setting guardrailComplianceMap:", error);
         }
     },
     setCurrentAgentConversationId: (currentAgentConversationId) => {

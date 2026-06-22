@@ -17,10 +17,10 @@ public class NhiPolicy {
     public static final String POLICY_NAME = "policyName";
     public static final String DESCRIPTION = "description";
     public static final String STATUS = "status";
-    public static final String CONTEXT_SOURCE = "contextSource";
     public static final String SCOPE = "scope";
     public static final String TOKEN_SEGREGATION = "tokenSegregation";
     public static final String EXPIRATION_TRACKING = "expirationTracking";
+    public static final String ROTATION_ENFORCEMENT = "rotationEnforcement";
     public static final String CREATED_AT = "createdAt";
     public static final String CREATED_BY = "createdBy";
     public static final String UPDATED_AT = "updatedAt";
@@ -32,10 +32,10 @@ public class NhiPolicy {
     private String policyName;
     private String description;
     private String status;
-    private String contextSource;
     private Scope scope;
     private TokenSegregation tokenSegregation;
     private ExpirationTracking expirationTracking;
+    private RotationEnforcement rotationEnforcement;
     private int createdAt;
     private String createdBy;
     private int updatedAt;
@@ -43,11 +43,10 @@ public class NhiPolicy {
     private Integer lastTriggeredAt;
     private List<String> violationIds;
 
-    public NhiPolicy(String policyName, String description, String status, String contextSource) {
+    public NhiPolicy(String policyName, String description, String status) {
         this.policyName = policyName;
         this.description = description;
         this.status = status;
-        this.contextSource = contextSource;
     }
 
     @BsonIgnore
@@ -81,5 +80,14 @@ public class NhiPolicy {
         private boolean enabled;
         private int warningThresholdMonths;
         private boolean flagExpiredTokens;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class RotationEnforcement {
+        private boolean enabled;
+        private int maxAgeDays = 30;
+        private int warningDays = 7;
     }
 }

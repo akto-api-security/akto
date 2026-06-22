@@ -192,6 +192,7 @@ public class InitializerListener implements ServletContextListener {
     private static Map<String, String> piiFileMap;
     Crons crons = new Crons();
     TestingAlertsCron testingAlertsCron = new TestingAlertsCron();
+    EndpointInfoViewCron endpointStatViewCron = new EndpointInfoViewCron();
 
     public static String getDomain() {
         if (domain == null) {
@@ -335,6 +336,7 @@ public class InitializerListener implements ServletContextListener {
             }
         }, 0, 4, TimeUnit.HOURS);
     }
+
 
     private static void raiseMixpanelEvent() {
 
@@ -2560,6 +2562,8 @@ public class InitializerListener implements ServletContextListener {
 
                 int now = Context.now();
 
+                endpointStatViewCron.setUpEndpointInfoViewCronScheduler();
+
                 if (runJobFunctions > 0 || runJobFunctionsAnyway) {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
@@ -2618,6 +2622,8 @@ public class InitializerListener implements ServletContextListener {
 
 
                         EmptyCollectionCleanupJob.emptyCollectionCleanupJobRunner();
+                        crons.seedNhiDefaultPoliciesScheduler();
+                        crons.evaluateNhiPoliciesScheduler();
 
                         // CleanInventory.cleanInventoryJobRunner();
 
@@ -4120,7 +4126,7 @@ public class InitializerListener implements ServletContextListener {
                     if (!entry.isDirectory()) {
                         String entryName = entry.getName();
 
-                        boolean isCompliance = entryName.contains("compliance/");
+                        boolean isCompliance = entryName.contains("compliance/") && !entryName.contains("compliance/guardrails/");
                         if (!isCompliance) {
                             logger.debugAndAddToDb(
                                     String.format("%s not a compliance file, skipping", entryName),

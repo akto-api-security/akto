@@ -127,7 +127,7 @@ function About() {
     const isOnPrem = window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'on_prem'
 
     async function fetchDetails(){
-        const {arr, resp, accountSettingsDetails} = await settingFunctions.fetchAdminInfo()
+        const {arr, resp, accountSettingsDetails} = await settingFunctions.fetchAdminInfo(true)
         if(accountSettingsDetails?.timezone === 'Us/Pacific'){
             accountSettingsDetails.timezone = 'America/Los_Angeles';
         }

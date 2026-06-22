@@ -12,6 +12,7 @@ import {
     getAgentTypeFromValue,
     hasPersonalAccountTag,
     hasLocalMcpServerTag,
+    hasMisconfiguredConfigTag,
 } from "./mcpClientHelper";
 import func from "@/util/func";
 import {
@@ -31,8 +32,15 @@ export const SKILL_RISK_CACHE_TTL_MS = 2 * 60 * 1000;
 export const INVENTORY_PATH = '/dashboard/observe/inventory';
 export const INVENTORY_FILTER_KEY = '/dashboard/observe/inventory/';
 export const AGENTIC_ASSETS_PATH = '/dashboard/observe/agentic-assets';
+export const AGENTIC_ASSETS_LEGACY_PATH = '/dashboard/observe/agentic-assets-legacy';
 export const USERS_AND_DEVICES_PATH = '/dashboard/observe/users-and-devices';
-export const AGENTIC_OBSERVE_BACK_PATHS = [AGENTIC_ASSETS_PATH, USERS_AND_DEVICES_PATH];
+export const DEVICE_ENDPOINTS_PATH = '/dashboard/observe/endpoints';
+export const AGENTIC_OBSERVE_BACK_PATHS = [
+    AGENTIC_ASSETS_PATH,
+    AGENTIC_ASSETS_LEGACY_PATH,
+    USERS_AND_DEVICES_PATH,
+    DEVICE_ENDPOINTS_PATH,
+];
 export const ASSET_TAG_KEY_VALUES = Object.values(ASSET_TAG_KEYS);
 
 // Row ID prefixes for grouped data
@@ -153,16 +161,40 @@ export const extractEndpointId = (hostName) => {
     return parts[0];
 };
 
+// Well-known TLD/platform suffixes that are NOT meaningful service names.
+// If parts[2] is one of these the hostname is NOT device.agent.service format
+// (e.g. vulnerable-mcp-kong.akto.io → slice(2) = "io", meaningless).
+const SUFFIX_TLDS = new Set(['io', 'com', 'net', 'org', 'cloud', 'dev', 'app', 'ai', 'co']);
+
 // Extract service name from hostname format: <endpoint-id>.<source-id>.<service-name>
-// Service name can contain dots (e.g., mcp.razorpay.com)
-// Skip first 2 parts (endpoint-id, source-id) and join the rest
+// Service name can contain dots (e.g., mcp.razorpay.com, api.githubcopilot.com).
+// Falls back to the full hostname for short hostnames that don't follow the pattern.
 export const extractServiceName = (hostName) => {
     if (!hostName) return null;
     const parts = hostName.split('.');
-    // Need at least 3 parts: endpoint-id, source-id, and at least one part of service-name
     if (parts.length < 3) return hostName;
-    // Skip first 2 parts and join the rest as service name
+    // If the third segment is a bare TLD/platform suffix the hostname is NOT in
+    // device.agent.service format — use the full hostname as the service name so it
+    // groups as a distinct asset rather than collapsing under the bare TLD.
+    if (SUFFIX_TLDS.has(parts[2].toLowerCase())) return hostName;
     return parts.slice(2).join('.');
+};
+
+// Aliases: normalize variant agent tag values to a canonical key for grouping.
+// All Claude CLI variants collapse into claude2 (Claude CLI), Desktop into claude1 (Claude Desktop).
+const AGENT_KEY_ALIASES = {
+    // Claude CLI variants → claude2
+    'claude': 'claude2',
+    'claudecli': 'claude2',
+    'claude-cli': 'claude2',
+    'claude-cli-user': 'claude2',
+    'claude-cli-project': 'claude2',
+    'claude-cli-local': 'claude2',
+    'claude-cli-enterprise': 'claude2',
+    'claude-plugin': 'claude2',
+    'claude-code': 'claude2',
+    // Claude Desktop variants → claude1
+    'claude-desktop': 'claude1',
 };
 
 // Group collections by agent identification (mcp-client, ai-agent values)
@@ -170,40 +202,44 @@ export const extractServiceName = (hostName) => {
 // Note: browser-llm-agent is excluded from this grouping
 export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}) => {
     const agents = {};
-    
+
     collections.forEach((c) => {
         if (c.deactivated) return;
         const assetTag = findAssetTag(c.envType);
         if (!assetTag?.value) return; // Skip collections without agent tag
         if (assetTag.keyName === ASSET_TAG_KEYS.BROWSER_LLM_AGENT) return; // Skip browser-llm-agent rows
-        
-        const key = assetTag.value;
+
+        const key = AGENT_KEY_ALIASES[assetTag.value] ?? assetTag.value;
         const hostName = c.hostName || c.displayName || c.name;
         const endpointId = extractEndpointId(hostName);
         
         if (!agents[key]) {
             agents[key] = {
                 rowType: ROW_TYPES.AGENT,
-                groupName: formatDisplayName(assetTag.value),
+                groupName: formatDisplayName(key),
                 groupKey: key,
                 tagKey: assetTag.keyName,
-                tagValue: assetTag.value,
-                clientType: getAgentTypeFromValue(assetTag.value),
+                tagValue: key,
+                clientType: getAgentTypeFromValue(key),
                 collections: [],
                 firstCollection: null,
                 endpointIds: new Set(),
                 sensitiveTypes: new Set(),
+                rawTagValues: new Set(),
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
                 hasPersonalAccount: false,
                 hasLocalMcpServer: false,
+                hasMisconfiguredConfig: false,
             };
         }
 
+        agents[key].rawTagValues.add(assetTag.value);
         agents[key].collections.push(c);
         if (!agents[key].firstCollection) agents[key].firstCollection = c;
         if (hasPersonalAccountTag(c.envType)) agents[key].hasPersonalAccount = true;
         if (hasLocalMcpServerTag(c.envType)) agents[key].hasLocalMcpServer = true;
+        if (hasMisconfiguredConfigTag(c.envType)) agents[key].hasMisconfiguredConfig = true;
         
         // Track unique endpoint IDs
         if (endpointId) {
@@ -233,6 +269,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
         endpointsCount: g.endpointIds.size,
         sensitiveInRespTypes: Array.from(g.sensitiveTypes),
         sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
+        rawTagValues: Array.from(g.rawTagValues),
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore || null,
@@ -242,6 +279,8 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
 // Group collections by service name (extracted from hostname)
 // Hostname format: <endpoint-id>.<source-id>.<service-name>
 // Service name can contain dots (e.g., "mcp.razorpay.com" from "123.456.mcp.razorpay.com")
+const ASSET_TAG_KEYS_SET = new Set(Object.values(ASSET_TAG_KEYS));
+
 export const groupCollectionsByService = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}) => {
     const services = {};
     
@@ -249,8 +288,18 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
         if (c.deactivated) return;
         const typeTag = findTypeTag(c.envType);
         if (!typeTag) return; // Skip collections without type tag
-        // For gen-ai, the agent is the service — show only under agent grouping
-        if (typeTag.keyName === TYPE_TAG_KEYS.GEN_AI) return;
+        // gen-ai collections that also have an asset tag (ai-agent/mcp-client) or a connector
+        // agent tag (agent-name — older DEFENDER/ENDPOINT connector format) are already
+        // captured under agentGroups — skip them here to avoid double-counting.
+        // gen-ai collections WITHOUT any such tag are standalone assets that predate the
+        // tagging scheme and must still appear.
+        if (typeTag.keyName === TYPE_TAG_KEYS.GEN_AI) {
+            const tags = c.envType || [];
+            const hasAgentOwner = tags.some(t =>
+                ASSET_TAG_KEYS_SET.has(t.keyName) || t.keyName === "agent-name"
+            );
+            if (hasAgentOwner) return;
+        }
 
         const hostName = c.hostName || c.displayName || c.name;
         if (!hostName) return;
@@ -277,6 +326,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
                 maxRiskScore: 0,
                 hasPersonalAccount: false,
                 hasLocalMcpServer: false,
+                hasMisconfiguredConfig: false,
             };
         }
 
@@ -287,6 +337,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
         if (!services[key].firstCollection) services[key].firstCollection = c;
         if (hasPersonalAccountTag(c.envType)) services[key].hasPersonalAccount = true;
         if (hasLocalMcpServerTag(c.envType)) services[key].hasLocalMcpServer = true;
+        if (hasMisconfiguredConfigTag(c.envType)) services[key].hasMisconfiguredConfig = true;
         
         // Track unique endpoint IDs
         if (endpointId) {
@@ -519,8 +570,8 @@ export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMa
     });
 };
 
-export const createEnvTypeFilter = (values, negated = false) => ({
-    filters: [{ key: 'envType', label: func.convertToDisambiguateLabelObj(values, null, 2), value: { values, negated }, onRemove: () => {} }],
+export const createEnvTypeFilter = (values, negated = false, displayName = null) => ({
+    filters: [{ key: 'envType', label: func.convertToDisambiguateLabelObj(values, null, 2), value: { values, negated, displayName }, onRemove: () => {} }],
     sort: []
 });
 
@@ -532,8 +583,10 @@ export const createHostnameFilter = (hostnames, options = {}) => ({
 
 /** Filter payload for PersistStore when navigating from agentic grouped tables to inventory. */
 export const buildAgenticInventoryFilterForRow = (row) => {
-    if (row.rowType === ROW_TYPES.AGENT && row.tagKey && row.tagValue) {
-        return createEnvTypeFilter([`${row.tagKey}=${row.tagValue}`], false);
+    if (row.rowType === ROW_TYPES.AGENT && row.tagKey) {
+        const values = (row.rawTagValues?.length > 0 ? row.rawTagValues : [row.tagValue])
+            .map(v => `${row.tagKey}=${v}`);
+        return createEnvTypeFilter(values, false, row.groupName);
     }
     if (row.rowType === ROW_TYPES.SERVICE && row.hostNames?.length > 0) {
         return createHostnameFilter(row.hostNames, row.inventoryScopeLabel ? { inventoryScopeLabel: row.inventoryScopeLabel } : {});
@@ -756,6 +809,7 @@ export function buildAgenticAssetsPageData(
             lastSeenEpoch: lastSeen,
             hasPersonalAccount: group.hasPersonalAccount || false,
             hasLocalMcpServer: group.hasLocalMcpServer || false,
+            hasMisconfiguredConfig: group.hasMisconfiguredConfig || false,
         };
         if (aiInteractions) {
             treeRow.aiInteractions = aiInteractions.total;
@@ -779,9 +833,11 @@ export function buildAgenticAssetsPageData(
             lastSeen: lastSeen > 0 ? func.prettifyEpoch(lastSeen) : "",
             lastSeenEpoch: lastSeen,
             skillCount: skillNames.size,
+            skillNames: skillNames.size ? [...skillNames] : undefined,
             toolCount: 0,
             hasPersonalAccount: group.hasPersonalAccount || false,
             hasLocalMcpServer: group.hasLocalMcpServer || false,
+            hasMisconfiguredConfig: group.hasMisconfiguredConfig || false,
         };
         if (violations) flatRow.violations = violations;
         if (aiInteractions) {
@@ -793,10 +849,17 @@ export function buildAgenticAssetsPageData(
         }
         if (group.rowType === ROW_TYPES.AGENT && group.clientType === CLIENT_TYPES.AI_AGENT) {
             const mcpNames = new Set();
+            const agentKey = group.groupKey?.toLowerCase();
             (group.collections || []).forEach((c) => {
+                // Skip collections ingested via an external connector (e.g. MICROSOFT_DEFENDER /
+                // source=DEFENDER) — these represent the agent itself via the connector, not an MCP server.
+                const isConnectorIngested = (c.envType || []).some((t) =>
+                    t.keyName === "connector" || (t.keyName === "source" && t.value === "DEFENDER")
+                );
+                if (isConnectorIngested) return;
                 const hostName = c.hostName || c.displayName || c.name;
                 const serviceName = extractServiceName(hostName);
-                if (serviceName) mcpNames.add(serviceName);
+                if (serviceName && serviceName.toLowerCase() !== agentKey) mcpNames.add(serviceName);
             });
             if (mcpNames.size) flatRow.mcpServers = [...mcpNames];
         }
@@ -819,33 +882,43 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
     const cacheAge = Date.now() - (cached?.ts || 0);
 
     if (cacheAge <= SKILL_RISK_CACHE_TTL_MS && cached?.ts > 0) {
-        return { skillScoreMap: cached.data || {}, maliciousSkills: new Set(cached.maliciousSkills || []) };
+        return { skillScoreMap: cached.data || {}, maliciousSkills: new Set(cached.maliciousSkills || []), misconfiguredSkills: new Set(cached.misconfiguredSkills || []), misconfiguredCollectionIds: new Set(cached.misconfiguredCollectionIds || []) };
     }
 
     const results = await Promise.all(
         collectionIds.map(async (id) => {
             try {
                 const resp = await api.fetchApiInfosForCollection(id);
-                return resp?.apiInfoList || [];
+                return { id, infos: resp?.apiInfoList || [] };
             } catch {
-                return [];
+                return { id, infos: [] };
             }
         })
     );
 
     const skillScoreMap = {};
     const maliciousSkills = new Set();
-    results.forEach((infos) => {
+    const misconfiguredSkills = new Set();
+    const misconfiguredCollectionIds = new Set();
+    results.forEach(({ id: collectionId, infos }) => {
         infos.forEach((info) => {
-            const splits = info?.id?.url?.split("skills/");
+            const url = info?.id?.url || "";
+            const splits = url.split("skills/");
             const skillName = splits?.[1];
-            if (!skillName) return;
-            skillScoreMap[skillName] = info.riskScore || 0;
-            const isMalicious = (info.tagsList || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true");
-            if (isMalicious) maliciousSkills.add(skillName);
+            if (skillName) {
+                skillScoreMap[skillName] = info.riskScore || 0;
+                const isMalicious = (info.tagsList || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true");
+                if (isMalicious) maliciousSkills.add(skillName);
+                const isMisconfigured = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
+                if (isMisconfigured) misconfiguredSkills.add(skillName);
+            }
+            if (url.includes("/claude/config/")) {
+                const hasMisconfiguredTag = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
+                if (hasMisconfiguredTag) misconfiguredCollectionIds.add(collectionId);
+            }
         });
     });
 
-    PersistStore.getState().setSkillRiskScoreCache({ data: skillScoreMap, maliciousSkills: [...maliciousSkills], ts: Date.now() });
-    return { skillScoreMap, maliciousSkills };
+    PersistStore.getState().setSkillRiskScoreCache({ data: skillScoreMap, maliciousSkills: [...maliciousSkills], misconfiguredSkills: [...misconfiguredSkills], misconfiguredCollectionIds: [...misconfiguredCollectionIds], ts: Date.now() });
+    return { skillScoreMap, maliciousSkills, misconfiguredSkills, misconfiguredCollectionIds };
 }

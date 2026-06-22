@@ -106,14 +106,24 @@ public abstract class AzureOpenAIPromptHandler {
 
     protected abstract String getPrompt(BasicDBObject queryData);
 
+    // Overridable so lightweight handlers can cap output tokens / tune sampling
+    // without affecting other handlers that share the global defaults.
+    protected int getMaxTokens() {
+        return PromptHandler.max_tokens;
+    }
+
+    protected double getTemperature() {
+        return PromptHandler.temperature;
+    }
+
     protected String call(String prompt) throws Exception {
         MediaType mediaType = MediaType.parse("application/json");
         JSONObject payload = new JSONObject();
         
         // Set model parameters
-        payload.put("temperature", PromptHandler.temperature);
+        payload.put("temperature", getTemperature());
         payload.put("top_p", 0.9);
-        payload.put("max_tokens", PromptHandler.max_tokens);
+        payload.put("max_tokens", getMaxTokens());
         payload.put("frequency_penalty", 0);
         payload.put("presence_penalty", 0.6);
         

@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 logger = logging.getLogger(__name__)
 
 DATA_INGESTION_SERVICE_URL = os.getenv("DATA_INGESTION_SERVICE_URL")
+AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
 SYNC_MODE = os.getenv("SYNC_MODE", "true").lower() == "true"
 TIMEOUT = float(os.getenv("TIMEOUT", "5"))
 LITELLM_URL = os.getenv("LITELLM_URL", "http://localhost:4000")
@@ -28,6 +29,7 @@ class GuardrailsHandler(CustomLogger):
         self.client = httpx.AsyncClient(
             timeout=TIMEOUT,
             limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+            headers={"Authorization": AKTO_API_TOKEN} if AKTO_API_TOKEN else {},
         )
         logger.info(f"GuardrailsHandler initialized | sync_mode={SYNC_MODE}")
 

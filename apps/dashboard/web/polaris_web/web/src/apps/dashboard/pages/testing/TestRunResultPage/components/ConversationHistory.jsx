@@ -5,7 +5,7 @@ import ChatMessage from './ChatMessage';
 import { MESSAGE_LABELS } from './chatConstants';
 import ChatInfoModal from './ChatInfoModal';
 
-function ConversationHistory({ conversations, isInventory = false, testResults = [], highlights = [] }) {
+function ConversationHistory({ conversations, isInventory = false, testResults = [], highlights = [], staticMode = false }) {
     const label = isInventory ? MESSAGE_LABELS.INVENTORY_ANALYSIS : MESSAGE_LABELS.TESTED_INTERACTION;
 
     const [httpModalOpen, setHttpModalOpen] = useState(false);
@@ -50,6 +50,7 @@ function ConversationHistory({ conversations, isInventory = false, testResults =
                             originalPrompt={msg.originalPrompt}
                             toolsMetadata={isUser ? {} : (msg?.toolsMetadata || {})}
                             highlights={msg.validation ? highlights : []}
+                            staticMode={staticMode}
                         />
                     )
                 })}

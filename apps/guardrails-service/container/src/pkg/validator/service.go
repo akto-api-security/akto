@@ -196,11 +196,14 @@ func (s *Service) filterPoliciesByMcpServer(policies []types.Policy, mcpServerNa
 			continue
 		}
 		if policy.ApplyToAllServers {
-			if policy.Behaviour == "block" {
-				continue // block+applyToAll: backend resolves to explicit inline server list; skip here
-			}
 			filtered = append(filtered, policy)
 			continue
+			// if policy.Behaviour == "block" && (policy.ContextSource == "" || policy.ContextSource == "AGENTIC") {
+			// 	// block+applyToAll in AGENTIC context: Java resolves the server list — fall through to match
+			// } else {
+			// 	filtered = append(filtered, policy)
+			// 	continue
+			// }
 		}
 		combinedServers := make(map[string]struct{}, len(policy.SelectedMcpServers)+len(policy.SelectedAgentServers))
 		for k, v := range policy.SelectedMcpServers {
@@ -398,6 +401,8 @@ func (s *Service) refreshCollectionTagsIfNeeded() {
 
 // getLoginUserEmailType looks up the host from request headers in the collection tag cache
 // and returns login-user-email-type, falling back to browser-llm-account-type.
+// The account type is resolved ONLY from the collection's tags; if the host is not
+// found in the collection cache, it returns "" (no fallback to the request tag).
 func (s *Service) getLoginUserEmailType(params *models.ValidateRequestParams) string {
 	var reqHeaders map[string]string
 	if params.RequestHeaders != "" {
@@ -420,34 +425,21 @@ func (s *Service) getLoginUserEmailType(params *models.ValidateRequestParams) st
 		zap.Int("cacheSize", cacheSize),
 		zap.Any("tags", tags))
 
-	if ok {
-		if v := tags["login-user-email-type"]; v != "" {
-			s.logger.Info("getLoginUserEmailType - returning login-user-email-type", zap.String("value", v))
-			return v
-		}
-		if v := tags["browser-llm-account-type"]; v != "" {
-			s.logger.Info("getLoginUserEmailType - returning browser-llm-account-type (cache)", zap.String("value", v))
-			return v
-		}
+	if !ok {
+		// Host has no matching collection — do not fall back to the request tag.
+		s.logger.Info("getLoginUserEmailType - collection not found, returning empty", zap.String("host", host))
+		return ""
 	}
 
-	// Cache miss or no account-type tag — fall back to the request tag.
-	// Browser extension traffic carries browser-llm-account-type; all other apps use login-user-email-type.
-	if params.Tag != "" {
-		var tagMap map[string]string
-		if err := json.Unmarshal([]byte(params.Tag), &tagMap); err == nil {
-			var tagKey string
-			if mcp.IsBrowserExtensionRequest(params.Tag) {
-				tagKey = "browser-llm-account-type"
-			} else {
-				tagKey = "login-user-email-type"
-			}
-			if v := tagMap[tagKey]; v != "" {
-				s.logger.Info("getLoginUserEmailType - returning from request tag", zap.String("key", tagKey), zap.String("value", v))
-				return v
-			}
-		}
+	if v := tags["login-user-email-type"]; v != "" {
+		s.logger.Info("getLoginUserEmailType - returning login-user-email-type", zap.String("value", v))
+		return v
 	}
+	if v := tags["browser-llm-account-type"]; v != "" {
+		s.logger.Info("getLoginUserEmailType - returning browser-llm-account-type (cache)", zap.String("value", v))
+		return v
+	}
+
 	return ""
 }
 
@@ -490,6 +482,7 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 				types.ContextSource(params.ContextSource),
 				extractHostHeader(reqHeaders),
 				sessionID,
+				"block",
 			); err != nil {
 				s.logger.Warn("Failed to report threat for personal account block", zap.String("policyName", policyName), zap.Error(err))
 			}
@@ -589,6 +582,7 @@ func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCt
 				types.ContextSource(params.ContextSource),
 				extractHostHeader(valCtx.RequestHeaders),
 				sessionID,
+				"block",
 			); err != nil {
 				s.logger.Warn("Failed to report threat for blocked host", zap.Error(err))
 			}

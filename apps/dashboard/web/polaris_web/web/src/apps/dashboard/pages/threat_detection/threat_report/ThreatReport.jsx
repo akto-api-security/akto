@@ -3,16 +3,29 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../api'
 import func from '@/util/func'
-import { isApiSecurityCategory } from '@/apps/main/labelHelper'
+import { isApiSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, shortNameToCategory, getReportCategoryShortName } from '@/apps/main/labelHelper'
+import PersistStore from '@/apps/main/PersistStore'
+import { resolveComplianceClauseMap } from '../utils/formatUtils'
 import ThreatReportHeader from './ThreatReportHeader'
 import ThreatReportTOC from './ThreatReportTOC'
 import ThreatReportSummary from './ThreatReportSummary'
 import ThreatReportFindings from './ThreatReportFindings'
 import ThreatReportConclusion from './ThreatReportConclusion'
 import ThreatReportFooter from './ThreatReportFooter'
+import ThreatReportComplianceContext from './ThreatReportComplianceContext'
 import transform from './transform'
 import useReportPDFDownload from '@/apps/dashboard/components/shared/reports/useReportPDFDownload'
 import "./styles.css"
+
+// Apply ?category= override synchronously before first render so all
+// isAgenticSecurityCategory()/isEndpointSecurityCategory() calls in the data
+// fetch see the correct value. Puppeteer opens this page in a fresh session
+// where window.DASHBOARD_CATEGORY defaults to API_SECURITY.
+const categoryShortName = getReportCategoryShortName()
+const categoryOverride = shortNameToCategory[categoryShortName]
+if (categoryOverride) {
+    PersistStore.getState().setDashboardCategory(categoryOverride)
+}
 
 const ThreatReport = () => {
     const { reportId } = useParams()
@@ -23,8 +36,10 @@ const ThreatReport = () => {
     const [threatsByActor, setThreatsByActor] = useState([])
     const [threatsByCategory, setThreatsByCategory] = useState([])
     const [threatsTableData, setThreatsTableData] = useState([])
+    const [groupedThreatsData, setGroupedThreatsData] = useState([])
     const [topAttackedApis, setTopAttackedApis] = useState([])
     const [dateRange, setDateRange] = useState({ start: null, end: null })
+    const [activeComplianceFilters, setActiveComplianceFilters] = useState([])
     const [organizationName, setOrganizationName] = useState(func.capitalizeFirstLetter(window.ACCOUNT_NAME || ""))
     const [currentDate, setCurrentDate] = useState('-')
     const [userName, setUserName] = useState(func.capitalizeFirstLetter(window.USER_NAME.split('@')[0] || ""))
@@ -51,7 +66,11 @@ const ThreatReport = () => {
                 localThreatFiltersMap[x.id] = trimmed
             })
 
+            // guardrailComplianceMap: keyed by capability name (e.g. "banCodeDetection")
+            // used by transform.processThreatsForReport for Agentic/Endpoint rows
+            let localGuardrailComplianceMap = {}
             try {
+                // API Security: threat_compliance/{filterId}.conf
                 const complianceResp = await api.fetchThreatComplianceInfos()
                 if (complianceResp?.threatComplianceInfos && Array.isArray(complianceResp.threatComplianceInfos)) {
                     const threatComplianceMap = {}
@@ -59,8 +78,7 @@ const ThreatReport = () => {
                         threatComplianceMap[compliance._id] = compliance
                     })
                     Object.keys(localThreatFiltersMap).forEach((filterId) => {
-                        const complianceKey = `threat_compliance/${filterId}.conf`
-                        const compliance = threatComplianceMap[complianceKey]
+                        const compliance = threatComplianceMap[`threat_compliance/${filterId}.conf`]
                         if (compliance) {
                             localThreatFiltersMap[filterId] = {
                                 ...localThreatFiltersMap[filterId],
@@ -68,6 +86,17 @@ const ThreatReport = () => {
                             }
                         }
                     })
+                }
+
+                // Agentic/Endpoint Security: capability-keyed map for transform.js
+                if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+                    const guardrailComplianceResp = await api.fetchGuardrailComplianceInfos()
+                    if (guardrailComplianceResp?.guardrailComplianceInfos && Array.isArray(guardrailComplianceResp.guardrailComplianceInfos)) {
+                        guardrailComplianceResp.guardrailComplianceInfos.forEach((entry) => {
+                            const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '')
+                            if (capability) localGuardrailComplianceMap[capability] = entry.mapComplianceToListClauses
+                        })
+                    }
                 }
             } catch (e) {
                 console.error(`Failed to fetch and merge threat compliance: ${e?.message}`)
@@ -86,63 +115,117 @@ const ThreatReport = () => {
             const startTs = filters?.startTimestamp ? parseInt(filters.startTimestamp[0]) : undefined
             const endTs = filters?.endTimestamp ? parseInt(filters.endTimestamp[0]) : undefined
 
+            // Restore saved filters — compliance is client-side only, rest go to the backend call
+            const savedIps = filters?.actor || []
+            const savedUrls = filters?.url || []
+            const savedHosts = filters?.host || []
+            const savedTypes = filters?.type || []
+            const savedCompliance = filters?.compliance || []
+            setActiveComplianceFilters(savedCompliance)
+
+            const isApiSecurity = isApiSecurityCategory()
+            const isGuardrail = isAgenticSecurityCategory() || isEndpointSecurityCategory()
+
             const threatResponse = await api.fetchSuspectSampleData(
                 0,
+                savedIps,
                 [],
-                [],
-                [],
-                [],
+                savedUrls,
+                savedTypes,
                 { detectedAt: -1 },
                 startTs,
                 endTs,
                 [],
                 200,
                 undefined,
-                true,
+                isGuardrail ? undefined : true,
                 'THREAT',
-                undefined,
+                savedHosts,
                 undefined
             )
 
             const allThreats = threatResponse.maliciousEvents || []
 
-            // For API Security: Filter by successfulExploit === true
-            // For Agentic Security/MCP: Include all threats (successfulExploit field may be false for blocked attacks)
-            const isApiSecurity = isApiSecurityCategory()
+            // API Security: include only successful exploits. Guardrail (Agentic/Endpoint):
+            // include all events — the backend skips the successfulExploit filter for these.
             let filteredThreats = isApiSecurity
                 ? allThreats.filter(threat => threat.successfulExploit === true)
                 : allThreats
+
+            // Client-side compliance filter — backend has no compliance param
+            if (savedCompliance.length > 0) {
+                filteredThreats = filteredThreats.filter(threat => {
+                    const available = Object.keys(resolveComplianceClauseMap(threat, isGuardrail, localThreatFiltersMap, localGuardrailComplianceMap))
+                    return savedCompliance.some(selected =>
+                        available.some(c => c.toUpperCase() === selected.toUpperCase())
+                    )
+                })
+            }
 
             if (isApiSecurity && allThreats.length > filteredThreats.length) {
                 func.setToast(true, false, `Report shows ${filteredThreats.length} successful threats out of ${allThreats.length} total threats detected. Only successful exploits are included in this report.`)
             }
 
-            // Limit to 200 threats maximum for report (roughly 30 pages, ~6-7 threats per page)
-            const THREAT_LIMIT = 200
-            const totalFilteredThreats = filteredThreats.length
-            const hasMoreThreats = totalFilteredThreats > THREAT_LIMIT
+            // Grouped rows: for compliance context bar graph (clause counts per group)
+            const { groupedRows } =
+                transform.groupRawEventsForReport(filteredThreats, localThreatFiltersMap, localGuardrailComplianceMap)
 
-            if (hasMoreThreats) {
-                filteredThreats = filteredThreats.slice(0, THREAT_LIMIT)
-                func.setToast(true, false, `Report limited to ${THREAT_LIMIT} most recent threats out of ${totalFilteredThreats} total. Please use filters to narrow down results.`)
-            }
+            // Findings table: individual events (each raw event = one row), compliance-filtered
+            const findingsRows = filteredThreats.map(threat => {
+                const complianceMap = resolveComplianceClauseMap(threat, isGuardrail, localThreatFiltersMap, localGuardrailComplianceMap)
+                const effectiveSeverity = isGuardrail
+                    ? (threat.severity || 'HIGH').toUpperCase()
+                    : (localThreatFiltersMap[threat?.filterId]?.severity || 'HIGH').toUpperCase()
+                const normalizedSeverity = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(effectiveSeverity) ? effectiveSeverity : 'HIGH'
 
-            const threats = filteredThreats.map(threat => ({
-                ...threat,
-                detectedAt: threat.timestamp,
-                latestApiMethod: threat.method,
-                latestApiEndpoint: threat.url,
-                latestApiOrig: threat.payload,
-                severity: localThreatFiltersMap[threat?.filterId]?.severity || 'HIGH'
-            }))
+                return {
+                    id: threat.id || threat._id,
+                    refId: threat.refId || '',
+                    actor: threat.actor || 'Unknown',
+                    time: threat.timestamp ? new Date(threat.timestamp * 1000).toLocaleString() : '-',
+                    timestamp: threat.timestamp || 0,
+                    category: threat.filterId || 'Unknown',
+                    targetedApi: `${threat.method || ''} ${threat.url || ''}`.trim(),
+                    endpoint: threat.url || '',
+                    method: threat.method || '',
+                    severity: normalizedSeverity,
+                    filterId: threat.filterId || '',
+                    compliance: Object.keys(complianceMap),
+                    complianceWithClauses: complianceMap,
+                }
+            }).sort((a, b) => {
+                const order = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
+                const diff = order.indexOf(a.severity) - order.indexOf(b.severity)
+                return diff !== 0 ? diff : b.timestamp - a.timestamp
+            })
 
-            const transformedData = transform.processThreatsForReport(threats)
+            // All per-event counts from raw individual events
+            const actorMap = {}
+            const categoryMap = {}
+            filteredThreats.forEach(t => {
+                const actor = t.actor || 'Unknown'
+                if (!actorMap[actor]) actorMap[actor] = { actor, country: t.country || 'Unknown', count: 0 }
+                actorMap[actor].count++
 
-            setTotalThreats(transformedData.totalThreats)
-            setSeverityCount(transformedData.severityCount)
-            setThreatsByActor(transformedData.threatsByActor)
-            setThreatsByCategory(transformedData.threatsByCategory)
-            setThreatsTableData(transformedData.threatsTableData)
+                const cat = t.filterId || 'Unknown'
+                categoryMap[cat] = (categoryMap[cat] || 0) + 1
+            })
+            const sortedActors = Object.values(actorMap).sort((a, b) => b.count - a.count)
+            const sortedCategories = Object.entries(categoryMap)
+                .map(([category, count]) => ({ category, count }))
+                .sort((a, b) => b.count - a.count)
+
+            // Severity counts from individual rows (matches findings table row counts)
+            const findingsSeverityCount = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
+            findingsRows.forEach(r => { if (findingsSeverityCount[r.severity] !== undefined) findingsSeverityCount[r.severity]++ })
+
+            // totalThreats = individual event count (rows shown in findings table)
+            setTotalThreats(findingsRows.length)
+            setSeverityCount(findingsSeverityCount)
+            setThreatsByActor(sortedActors)
+            setThreatsByCategory(sortedCategories)
+            setThreatsTableData(findingsRows)
+            setGroupedThreatsData(groupedRows)
 
             try {
                 const topResponse = await api.fetchThreatTopNData(startTs, endTs, [], 5)
@@ -153,7 +236,7 @@ const ThreatReport = () => {
                 console.error('Error fetching top attacked APIs:', error)
             }
 
-            if (currentDate === '-' && threats.length > 0) {
+            if (currentDate === '-' && filteredThreats.length > 0) {
                 setCurrentDate(func.getFormattedDate(Date.now() / 1000))
             }
 
@@ -178,9 +261,9 @@ const ThreatReport = () => {
                         <Text variant="bodySm">{currentDate}</Text>
                     </VerticalStack>
                     <HorizontalStack align="center" gap="4">
-                        {(window.USER_NAME?.toLowerCase()?.includes("@akto.io") || window.ACCOUNT_NAME?.toLowerCase()?.includes("advanced bank")) &&
+                        {(window.USER_NAME?.toLowerCase()?.includes("@akto.io") || window.ACCOUNT_NAME?.toLowerCase()?.includes("advanced bank")) && (
                             <Button primary onClick={() => handleDownloadPF()} disabled={!pdfDownloadEnabled}>Download</Button>
-                        }
+                        )}
                         <img src='/public/white_logo.svg' alt="Logo" className='top-bar-logo' />
                     </HorizontalStack>
                 </HorizontalStack>
@@ -210,6 +293,7 @@ const ThreatReport = () => {
                         currentDate={currentDate}
                         userName={userName}
                         setUserName={setUserName}
+                        activeComplianceFilters={activeComplianceFilters}
                     />
                     <div className="report-page-break" />
                     <ThreatReportTOC
@@ -225,12 +309,24 @@ const ThreatReport = () => {
                         dateRange={dateRange}
                         organizationName={organizationName}
                         topAttackedApis={topAttackedApis}
+                        activeComplianceFilters={activeComplianceFilters}
+                        complianceContextSlot={
+                            (isAgenticSecurityCategory() || isEndpointSecurityCategory()) && activeComplianceFilters.length > 0
+                                ? <ThreatReportComplianceContext
+                                    activeComplianceFilters={activeComplianceFilters}
+                                    groupedThreatsData={groupedThreatsData}
+                                    threatsTableData={threatsTableData}
+                                  />
+                                : null
+                        }
                     />
                     <div className="report-page-break" />
                     <ThreatReportFindings
                         threatsTableData={threatsTableData}
                         severityCount={severityCount}
                         organizationName={organizationName}
+                        activeComplianceFilters={activeComplianceFilters}
+                        sectionNumber={2}
                     />
                     <div className="report-page-break" />
                     <ThreatReportConclusion />

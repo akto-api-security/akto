@@ -1273,6 +1273,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
   if(Object.keys(idToName).length === 0){
     idToName = func.mapCollectionIdToName(allCollections)
   }
+  const collectionEnvTypeMap = {}
+  allCollections.forEach(c => { collectionEnvTypeMap[c.id] = c.envType || [] })
 
   let ret = {}
   let apiInfoMap = {}
@@ -1361,6 +1363,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               agentProxyGuardrailEnabled: apiInfoMap[key] ? (apiInfoMap[key]["agentProxyGuardrailEnabled"] || false) : false,
               guardrailSchema: apiInfoMap[key] ? (apiInfoMap[key]["guardrailSchema"] || null) : null,
               isMalicious: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true") : false,
+              isMisconfigured: (apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true") : false) || (x.endpoint?.startsWith("/claude/config/") && (collectionEnvTypeMap[x.apiCollectionId] || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true")),
               tagsList: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []) : [],
               apiType,
           }
@@ -1785,11 +1788,15 @@ updateQueryParams(searchParams, setSearchParams, key, value) {
 },
  getComplianceIcon: (complianceName) => {
   if (!complianceName || typeof complianceName !== "string") return "";
-  const trimmed = complianceName.trim();
-  if (trimmed === "OWASP Agentic Top 10") {
-    return "/public/OWASP.svg";
-  }
-  return "/public/" + trimmed.toUpperCase() + ".svg";
+  const key = complianceName.trim().toUpperCase();
+  // Framework keys are upper-cased upstream; these icon files use mixed case, so map them explicitly.
+  const aliases = {
+    "OWASP AGENTIC TOP 10": "OWASP Agentic.svg",
+    "OWASP AGENTIC": "OWASP Agentic.svg",
+    "EU AI ACT": "EU AI Act.svg",
+    "NIST AI RISK MANAGEMENT FRAMEWORK": "NIST AI Risk Management Framework.svg",
+  };
+  return "/public/" + (aliases[key] || (key + ".svg"));
 },
 
  convertToDisambiguateLabel(value, convertFunc, maxAllowed){
@@ -2218,6 +2225,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return access;
   },
 
+  hasThreatAccess(){
+    return !['MEMBER', 'DEVELOPER', 'GUEST', 'NO_ACCESS'].includes(window.USER_ROLE)
+  },
   checkUserValidForIntegrations(){
     const rbacAccess = this.checkForRbacFeatureBasic();
     if(!rbacAccess){

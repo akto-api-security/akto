@@ -159,11 +159,11 @@ const useAgenticFilter = (normalData) => {
             const filterValues = envTypeFilter.value.values || [];
             const isNegated = envTypeFilter.value.negated;
 
-            if (!isNegated && filterValues.length === 1) {
+            if (!isNegated && filterValues.length >= 1) {
                 const parts = filterValues[0].split('=');
                 if (parts.length === 2) {
                     if (ASSET_TAG_KEY_VALUES.includes(parts[0])) {
-                        filterTitle = formatDisplayName(parts[1]);
+                        filterTitle = envTypeFilter.value.displayName || formatDisplayName(parts[1]);
                         if (parts[0] === ASSET_TAG_KEYS.BROWSER_LLM_AGENT) {
                             filterType = FILTER_TYPES.BROWSER_LLM;
                         } else if (parts[0] === ASSET_TAG_KEYS.AI_AGENT) {
@@ -172,7 +172,7 @@ const useAgenticFilter = (normalData) => {
                             filterType = FILTER_TYPES.AI_AGENT;
                         }
                     } else if (parts[0] === SKILL_TAG_KEY) {
-                        filterTitle = formatDisplayName(parts[1]);
+                        filterTitle = envTypeFilter.value.displayName || formatDisplayName(parts[1]);
                         filterType = FILTER_TYPES.SKILL;
                     }
                 }
@@ -181,21 +181,21 @@ const useAgenticFilter = (normalData) => {
             if (filterTitle && filterValues.length > 0) {
                 const eq = filterValues[0].indexOf('=');
                 const filterKey = eq >= 0 ? filterValues[0].slice(0, eq) : '';
-                const filterTagValue = eq >= 0 ? filterValues[0].slice(eq + 1) : '';
 
                 if (filterType === FILTER_TYPES.SKILL) {
+                    const skillValues = filterValues.map(fv => fv.slice(fv.indexOf('=') + 1));
                     filteredCollections = normalData.filter(collection =>
-                        Array.isArray(collection.skills) && collection.skills.includes(filterTagValue)
+                        Array.isArray(collection.skills) && skillValues.some(sv => collection.skills.includes(sv))
                     );
                 } else {
                     const matchBothAgentTags = AGENT_TAG_KEYS_FOR_FILTER.includes(filterKey);
-                    const matchingTags = matchBothAgentTags && filterTagValue
-                        ? AGENT_TAG_KEYS_FOR_FILTER.map(k => `${k}=${filterTagValue}`)
-                        : [filterValues[0]];
-                    filteredCollections = normalData.filter(collection => {
-                        const envTypeArr = getFormattedEnvType(collection);
-                        return envTypeArr.some(tag => tag === filterValues[0] || matchingTags.includes(tag));
-                    });
+                    const matchingTags = new Set(filterValues.flatMap(fv => {
+                        const fVal = fv.slice(fv.indexOf('=') + 1);
+                        return matchBothAgentTags ? AGENT_TAG_KEYS_FOR_FILTER.map(k => `${k}=${fVal}`) : [fv];
+                    }));
+                    filteredCollections = normalData.filter(collection =>
+                        getFormattedEnvType(collection).some(tag => matchingTags.has(tag))
+                    );
                 }
             }
         }

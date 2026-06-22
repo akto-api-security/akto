@@ -198,8 +198,8 @@ public class Kafka {
     try {
       producer.send(record).get();
       producerReady = true;
-    } catch (Exception ignored) {
-      logger.error("Producer not ready. Cannot send message.");
+    } catch (Exception e) {
+      logger.error("Producer not ready. Cannot send message. Cause: " + e.getClass().getName() + ": " + e.getMessage());
       close();
     }
   }

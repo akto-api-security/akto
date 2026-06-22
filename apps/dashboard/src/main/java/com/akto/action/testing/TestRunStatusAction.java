@@ -26,8 +26,30 @@ public class TestRunStatusAction extends UserAction {
     @Setter
     private List<String> testingRunResultSummaryHexIds;
 
+    @Setter
+    private String testingRunResultSummaryHexId;
+
     @Getter
     private Map<String, Map<String, Integer>> testRunStatusSummaries = new HashMap<>();
+
+    @Getter
+    private List<String> responseCodes = new ArrayList<>();
+
+    public String fetchDistinctResponseCodes() {
+        try {
+            if (testingRunResultSummaryHexId == null || testingRunResultSummaryHexId.trim().isEmpty()) {
+                addActionError("Missing required parameter: testingRunResultSummaryHexId");
+                return ERROR.toUpperCase();
+            }
+            ObjectId summaryId = new ObjectId(testingRunResultSummaryHexId.trim());
+            this.responseCodes = TestRunStatusHelper.fetchDistinctResponseCodes(Context.accountId.get(), summaryId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching distinct response codes: " + e.getMessage());
+            addActionError("Error fetching distinct response codes");
+            return ERROR.toUpperCase();
+        }
+        return SUCCESS.toUpperCase();
+    }
 
     public String fetchTestRunStatusSummaries() {
         try {

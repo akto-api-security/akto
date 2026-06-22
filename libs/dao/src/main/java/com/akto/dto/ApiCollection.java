@@ -585,6 +585,22 @@ public class ApiCollection {
         return false;
     }
 
+    public boolean isCopilotBotCollection() {
+        if (CollectionUtils.isEmpty(this.getTagsList())) return false;
+        List<CollectionTags> tags = this.getTagsList();
+        boolean hasSource = tags.stream().anyMatch(t ->
+            Constants.AKTO_ENDPOINT_SOURCE_TAG.equals(t.getKeyName()) &&
+            Constants.AKTO_COPILOT_SOURCE_VALUE.equals(t.getValue())
+        );
+        boolean hasBotName = tags.stream().anyMatch(t -> Constants.AKTO_COPILOT_BOT_NAME_TAG.equals(t.getKeyName()));
+        return hasSource && hasBotName;
+    }
+
+    public boolean isCopilotBotPublished() {
+        if (CollectionUtils.isEmpty(this.getTagsList())) return false;
+        return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_COPILOT_BOT_PUBLISHED_STATE_TAG.equals(t.getKeyName()));
+    }
+
     public String getSseCallbackUrl() {
         return sseCallbackUrl;
     }   

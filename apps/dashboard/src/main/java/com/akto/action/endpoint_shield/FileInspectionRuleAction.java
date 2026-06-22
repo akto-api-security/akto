@@ -17,6 +17,8 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import java.util.ArrayList;
+import java.util.List;
 
 import java.util.List;
 
@@ -30,6 +32,8 @@ public class FileInspectionRuleAction extends UserAction {
     @Setter private int maxDepth;        // 0 = immediate children, -1 = unlimited
     @Setter private String ruleId;       // used by delete + result-fetch
     @Setter private String sha256;       // used by getFileContent
+    @Setter private int sinceExecutedAt; // cursor for result-fetch pagination
+    @Setter private int limit;           // page size for result-fetch
 
     @Getter private FileInspectionRule rule;
     @Getter private List<FileInspectionRule> rules;
@@ -120,13 +124,26 @@ public class FileInspectionRuleAction extends UserAction {
     public String fetchFileInspectionResults() {
         try {
             FileInspectionResultDao.instance.createIndicesIfAbsent();
-            Bson filter = StringUtils.isBlank(ruleId)
-                ? Filters.empty()
-                : Filters.eq(FileInspectionResult.RULE_ID, ruleId);
+
+            List<Bson> clauses = new ArrayList<>();
+            if (StringUtils.isNotBlank(ruleId)) {
+                clauses.add(Filters.eq(FileInspectionResult.RULE_ID, ruleId));
+            }
+            if (sinceExecutedAt > 0) {
+                clauses.add(Filters.gt(FileInspectionResult.EXECUTED_AT, sinceExecutedAt));
+            }
+            Bson filter = clauses.isEmpty() ? Filters.empty() : Filters.and(clauses);
+
+            int effLimit = (limit > 0 && limit <= 1000) ? limit : 100;
+            // Cursor-mode (sinceExecutedAt > 0) needs ascending order so the
+            // caller can advance its cursor monotonically. UI mode (no cursor)
+            // keeps the existing descending "most recent first" behaviour.
+            Bson sort = sinceExecutedAt > 0
+                ? Sorts.ascending(FileInspectionResult.EXECUTED_AT)
+                : Sorts.descending(FileInspectionResult.EXECUTED_AT);
+
             this.recentResults = FileInspectionResultDao.instance.findAll(
-                filter,
-                0, 100,
-                Sorts.descending(FileInspectionResult.EXECUTED_AT)
+                filter, 0, effLimit, sort
             );
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {

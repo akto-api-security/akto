@@ -32,7 +32,7 @@ function ImpervaImport() {
     }
 
     const goToDocs = () => {
-        window.open("https://docs.akto.io/traffic-connector/manual/imperva", '_blank')
+        window.open("https://docs.akto.io/traffic-connector/third-party-software/imperva", '_blank')
     }
 
     return (

@@ -214,10 +214,10 @@ function TestRunResultFlyout(props) {
     useEffect(() => {
         const fetchCompulsorySettings = async () => {
             try {
-                const { resp } = await settingFunctions.fetchAdminInfo();
+                const accountConfig = await settingFunctions.fetchAccountConfig();
 
-                if (resp?.compulsoryDescription) {
-                    setCompulsorySettings(resp.compulsoryDescription);
+                if (accountConfig?.compulsoryDescription) {
+                    setCompulsorySettings(accountConfig.compulsoryDescription);
                 }
             } catch (error) {
 
@@ -698,24 +698,91 @@ function TestRunResultFlyout(props) {
     const dataStoreTime = 2 * 30 * 24 * 60 * 60;
     const dataExpired = func.timeNow() - (selectedTestRunResult?.endTimestamp || func.timeNow()) > dataStoreTime
 
-    // Move state outside to prevent reset on component recreation
-    const hasAnalyzedRef = useRef(false);
+    // Track which result id we've already analyzed so we analyze exactly once per
+    // result and never re-trigger the LLM call on re-renders / tab remounts.
+    const analyzedIdRef = useRef(null);
     const [vulnerabilityHighlights, setVulnerabilityHighlights] = useState({});
 
-    // Component that handles vulnerability analysis only when mounted
-    const ValuesTabContent = React.memo(({ isAgentic = false, runAutomatedTests = false } = {}) => {
-        useEffect(() => {
+    // Build deterministic evidence anchors when the model returns nothing but the
+    // test is already confirmed vulnerable. This guarantees a highlight + tooltip
+    // without depending on the LLM (common for authorization/access-control issues,
+    // where a single response looks normal in isolation).
+    const parseHeaders = (h) => {
+        if (!h) return {};
+        if (typeof h === 'object') return h;
+        if (typeof h === 'string') {
+            try { return JSON.parse(h); } catch (e) { return {}; }
+        }
+        return {};
+    };
+
+    const buildFallbackSegments = (messageObj) => {
+        const reason = issueDetails?.description
+            || selectedTestRunResult?.name
+            || 'This response was flagged as vulnerable for this test.';
+        const category = (selectedTestRunResult?.testCategoryId || selectedTestRunResult?.testCategory || '').toUpperCase();
+        const isAuthzLike = /AUTH|BOLA|ACCESS|IDOR|PRIVILEGE|ACCOUNT/.test(category);
+        const segments = [];
+
+        // Request-side anchor: the identity (auth token / cookie) used for the access.
+        if (isAuthzLike) {
+            const headers = parseHeaders(messageObj?.request?.headers);
+            const findHeader = (name) => {
+                const key = Object.keys(headers).find(k => k.toLowerCase() === name);
+                return key ? headers[key] : null;
+            };
+            const authVal = findHeader('authorization') || findHeader('cookie');
+            if (typeof authVal === 'string' && authVal.trim().length > 0) {
+                segments.push({
+                    phrase: authVal.trim().slice(0, 60),
+                    reason: 'Identity (auth token/cookie) used for this request - broken authorization is shown by this identity accessing data it should not.',
+                    location: 'REQUEST'
+                });
+            }
+        }
+
+        // Response-side anchor: a short body value, else the status code.
+        const body = messageObj?.response?.body;
+        const cleaned = typeof body === 'string'
+            ? body.trim().replace(/^[\s"'\[{]+|[\s"'\]},]+$/g, '')
+            : '';
+        if (cleaned.length > 0 && cleaned.length <= 60) {
+            segments.push({ phrase: cleaned, reason, location: 'RESPONSE' });
+        } else if (messageObj?.response?.statusCode) {
+            segments.push({
+                phrase: String(messageObj.response.statusCode),
+                reason: 'The request unexpectedly succeeded (returned data) when it should have been denied.',
+                location: 'RESPONSE'
+            });
+        }
+
+        return segments;
+    };
+
+    // Run vulnerability analysis at the flyout level so it re-triggers whenever a
+    // different result is selected on the same page. Keeping it here (instead of
+    // inside the memoized ValuesTabContent) avoids relying on the inner component
+    // remounting, which it does not always do when only the selected result changes
+    // while staying on the same tab.
+    useEffect(() => {
             // Check if vulnerability highlighting is enabled (use existing GPT feature flag)
             //const isVulnerabilityHighlightingEnabled = window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && 
             //    window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true;
-            const isVulnerabilityHighlightingEnabled = false;
+            const isVulnerabilityHighlightingEnabled = true;
+            const currentId = selectedTestRunResult?.id;
 
-            if (!hasAnalyzedRef.current && selectedTestRunResult?.vulnerable && selectedTestRunResult?.testResults && isVulnerabilityHighlightingEnabled) {
-                hasAnalyzedRef.current = true;
+            if (currentId && analyzedIdRef.current !== currentId && selectedTestRunResult?.vulnerable && selectedTestRunResult?.testResults && isVulnerabilityHighlightingEnabled) {
+                analyzedIdRef.current = currentId;
+                // Drop the previously viewed result's highlights so we never show
+                // stale/mismatched evidence while the new analysis runs.
+                setVulnerabilityHighlights({});
                 setVulnerabilityAnalysisError(null);
 
                 const timeoutId = setTimeout(() => {
-                    const analysisPromises = selectedTestRunResult.testResults.map(async (result, idx) => {
+                    // Multi-exec tests only mark the last attempt as vulnerable; analyze that one only.
+                    const lastIdx = selectedTestRunResult.testResults.length - 1;
+                    const analysisPromises = [lastIdx].map(async (idx) => {
+                        const result = selectedTestRunResult.testResults[idx];
                         // Parse the message if it's a string
                         let messageObj = result.message;
                         if (typeof messageObj === 'string') {
@@ -741,6 +808,11 @@ function TestRunResultFlyout(props) {
                                         method: messageObj.request?.method || 'GET',
                                         url: messageObj.request?.url || '',
                                         contentType: messageObj.request?.headers?.['content-type'] || 'application/json',
+                                        // Send the FULL request headers + body so evidence that lives
+                                        // in the request (e.g. a swapped auth token / cookie for broken
+                                        // authorization) is available to the model, not just response.
+                                        headers: messageObj.request?.headers || {},
+                                        body: messageObj.request?.body || '',
                                         authorization: messageObj.request?.headers?.['authorization'] || null,
                                         userAgent: messageObj.request?.headers?.['user-agent'] || null,
                                         xForwardedFor: messageObj.request?.headers?.['x-forwarded-for'] || null,
@@ -761,16 +833,30 @@ function TestRunResultFlyout(props) {
 
                                 const analysisData = response.analysisResult || response;
 
-                                if (analysisData?.vulnerableSegments?.length > 0) {
-                                    const enhancedSegments = analysisData.vulnerableSegments.map(segment => ({
-                                        ...segment,
-                                        vulnerabilityType: selectedTestRunResult?.testCategoryId || selectedTestRunResult?.testCategory || 'UNKNOWN',
-                                        severity: issueDetails?.severity || 'HIGH'
-                                    }));
+                                const baseMeta = {
+                                    vulnerabilityType: selectedTestRunResult?.testCategoryId || selectedTestRunResult?.testCategory || 'UNKNOWN',
+                                    severity: issueDetails?.severity || 'HIGH'
+                                };
 
+                                let segmentsToUse = [];
+                                if (analysisData?.vulnerableSegments?.length > 0) {
+                                    segmentsToUse = analysisData.vulnerableSegments.map(segment => ({
+                                        ...segment,
+                                        ...baseMeta
+                                    }));
+                                } else {
+                                    // Safety net: the test engine already flagged this result as
+                                    // vulnerable, but the model returned no segment (common for
+                                    // authorization/access-control issues where a single response
+                                    // looks normal in isolation). Deterministically anchor the
+                                    // request identity and the response as evidence.
+                                    segmentsToUse = buildFallbackSegments(messageObj).map(seg => ({ ...seg, ...baseMeta }));
+                                }
+
+                                if (segmentsToUse.length > 0) {
                                     setVulnerabilityHighlights(prev => ({
                                         ...prev,
-                                        [idx]: enhancedSegments
+                                        [idx]: segmentsToUse
                                     }));
                                     setTimeout(() => {
                                         setRefreshFlag(Date.now().toString());
@@ -796,8 +882,10 @@ function TestRunResultFlyout(props) {
 
                 return () => clearTimeout(timeoutId);
             }
-        }, [selectedTestRunResult?.id,]);
+        }, [selectedTestRunResult?.id]);
 
+    // Component that renders the request/response editors for the selected result.
+    const ValuesTabContent = React.memo(({ isAgentic = false, runAutomatedTests = false } = {}) => {
         if (dataExpired && !selectedTestRunResult?.vulnerable) {
             return dataExpiredComponent;
         }
