@@ -29,6 +29,8 @@ function SampleDetails(props) {
     // Determine if we should use hardcoded guardrail descriptions
     const useGuardrailDescription = isAgenticSecurityCategory() || isEndpointSecurityCategory();
 
+    const isClaudeSettingsRisk = moreInfoData?.templateId === 'claude_settings_risk';
+
     // For guardrail events, look up the specific rule info based on ruleViolated / templateId
     const guardrailRuleInfo = useGuardrailDescription
         ? getGuardrailRuleInfo(moreInfoData?.ruleViolated, moreInfoData?.templateId)
@@ -39,6 +41,32 @@ function SampleDetails(props) {
         ? [{ heading: guardrailRuleInfo.heading, description: null, subSections: guardrailRuleInfo.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
         : GUARDRAIL_SECTIONS;
 
+    // For claude_settings_risk, resolve the specific settings entry early so its overview can be used
+    const getClaudeSettingsKeyEarly = () => {
+        const stripArrayIndices = (key) => key?.replace(/\[\d+\]/g, '');
+        if (moreInfoData?.ruleViolated && moreInfoData.ruleViolated !== '-') {
+            return stripArrayIndices(moreInfoData.ruleViolated);
+        }
+        const prefix = '/claude/settings/';
+        const idx = moreInfoData?.url?.indexOf(prefix) ?? -1;
+        return idx !== -1 ? stripArrayIndices(moreInfoData.url.slice(idx + prefix.length)) : null;
+    };
+    const resolveClaudeSettingsEntryEarly = (key) => {
+        if (!key) return undefined;
+        if (CLAUDE_SETTINGS_RISK_MAP[key]) return CLAUDE_SETTINGS_RISK_MAP[key];
+        const bestMatch = Object.keys(CLAUDE_SETTINGS_RISK_MAP)
+            .filter(k => key.startsWith(k))
+            .sort((a, b) => b.length - a.length)[0];
+        return bestMatch ? CLAUDE_SETTINGS_RISK_MAP[bestMatch] : undefined;
+    };
+    const claudeSettingsEntryEarly = isClaudeSettingsRisk
+        ? resolveClaudeSettingsEntryEarly(getClaudeSettingsKeyEarly())
+        : undefined;
+
+    const claudeSettingsSectionsToShow = claudeSettingsEntryEarly?.overview
+        ? [{ heading: claudeSettingsEntryEarly.title, description: claudeSettingsEntryEarly.description, subSections: claudeSettingsEntryEarly.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
+        : [];
+
     // Get template object - either from hardcoded data or YAML templates
     let currentTemplateObj;
     if (useGuardrailDescription) {
@@ -47,6 +75,13 @@ function SampleDetails(props) {
             guardrailSections: guardrailSectionsToShow,
             testName: moreInfoData?.templateId || "Guardrail Policy",
             name: moreInfoData?.templateId || "Guardrail Policy"
+        };
+    } else if (isClaudeSettingsRisk) {
+        // For Claude settings risk, use the per-field overview sections
+        currentTemplateObj = {
+            guardrailSections: claudeSettingsSectionsToShow,
+            testName: moreInfoData?.templateId || "Claude Settings Risk",
+            name: moreInfoData?.templateId || "Claude Settings Risk"
         };
     } else {
         // Normal threat detection - use YAML templates
@@ -90,7 +125,7 @@ function SampleDetails(props) {
         ? getOwaspThreatsForRule(moreInfoData?.ruleViolated)
         : [];
 
-    const overviewComp = useGuardrailDescription ? (
+    const overviewComp = (useGuardrailDescription || isClaudeSettingsRisk) ? (
         // Structured view for Argus/Atlas guardrails - show all 7 sections with hierarchy
         <Box padding={"4"}>
             <VerticalStack gap={"5"}>
@@ -227,34 +262,8 @@ function SampleDetails(props) {
         component: <ActivityTracker latestActivity={latestActivity} />
     }
 
-    const isClaudeSettingsRisk = moreInfoData?.templateId === 'claude_settings_risk';
-
-    // Resolve the specific settings key from ruleViolated or URL path (e.g. "hooks.PreToolUse" from "/claude/settings/hooks.PreToolUse[0]")
-    // This is used to look up the per-field remediation text shown in the Remediation tab.
-    const getClaudeSettingsKey = () => {
-        const stripArrayIndices = (key) => key?.replace(/\[\d+\]/g, '');
-
-        if (moreInfoData?.ruleViolated && moreInfoData.ruleViolated !== '-') {
-            return stripArrayIndices(moreInfoData.ruleViolated);
-        }
-        const prefix = '/claude/settings/';
-        const idx = moreInfoData?.url?.indexOf(prefix) ?? -1;
-        return idx !== -1 ? stripArrayIndices(moreInfoData.url.slice(idx + prefix.length)) : null;
-    };
-
-    const resolveClaudeSettingsEntry = (key) => {
-        if (!key) return undefined;
-        if (CLAUDE_SETTINGS_RISK_MAP[key]) return CLAUDE_SETTINGS_RISK_MAP[key];
-        // Longest prefix match handles nested keys like "hooks.PreToolUse.hooks" -> "hooks"
-        const bestMatch = Object.keys(CLAUDE_SETTINGS_RISK_MAP)
-            .filter(k => key.startsWith(k))
-            .sort((a, b) => b.length - a.length)[0];
-        return bestMatch ? CLAUDE_SETTINGS_RISK_MAP[bestMatch] : undefined;
-    };
-
-    const claudeSettingsEntry = isClaudeSettingsRisk
-        ? resolveClaudeSettingsEntry(getClaudeSettingsKey())
-        : undefined;
+    // claudeSettingsEntry is resolved earlier as claudeSettingsEntryEarly (used for both overview and remediation)
+    const claudeSettingsEntry = claudeSettingsEntryEarly;
 
     const ValuesTab = data.length > 0 && {
         id: 'values',
