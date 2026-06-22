@@ -41,8 +41,8 @@ function SampleDetails(props) {
         ? [{ heading: guardrailRuleInfo.heading, description: null, subSections: guardrailRuleInfo.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
         : GUARDRAIL_SECTIONS;
 
-    // For claude_settings_risk, resolve the specific settings entry early so its overview can be used
-    const getClaudeSettingsKeyEarly = () => {
+    // Resolve the specific claude_settings_risk entry (used for both overview and remediation tabs)
+    const getClaudeSettingsKey = () => {
         const stripArrayIndices = (key) => key?.replace(/\[\d+\]/g, '');
         if (moreInfoData?.ruleViolated && moreInfoData.ruleViolated !== '-') {
             return stripArrayIndices(moreInfoData.ruleViolated);
@@ -51,7 +51,7 @@ function SampleDetails(props) {
         const idx = moreInfoData?.url?.indexOf(prefix) ?? -1;
         return idx !== -1 ? stripArrayIndices(moreInfoData.url.slice(idx + prefix.length)) : null;
     };
-    const resolveClaudeSettingsEntryEarly = (key) => {
+    const resolveClaudeSettingsEntry = (key) => {
         if (!key) return undefined;
         if (CLAUDE_SETTINGS_RISK_MAP[key]) return CLAUDE_SETTINGS_RISK_MAP[key];
         const bestMatch = Object.keys(CLAUDE_SETTINGS_RISK_MAP)
@@ -59,12 +59,12 @@ function SampleDetails(props) {
             .sort((a, b) => b.length - a.length)[0];
         return bestMatch ? CLAUDE_SETTINGS_RISK_MAP[bestMatch] : undefined;
     };
-    const claudeSettingsEntryEarly = isClaudeSettingsRisk
-        ? resolveClaudeSettingsEntryEarly(getClaudeSettingsKeyEarly())
+    const claudeSettingsEntry = isClaudeSettingsRisk
+        ? resolveClaudeSettingsEntry(getClaudeSettingsKey())
         : undefined;
 
-    const claudeSettingsSectionsToShow = claudeSettingsEntryEarly?.overview
-        ? [{ heading: claudeSettingsEntryEarly.title, description: null, subSections: claudeSettingsEntryEarly.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
+    const claudeSettingsSectionsToShow = claudeSettingsEntry?.overview
+        ? [{ heading: claudeSettingsEntry.title, description: null, subSections: claudeSettingsEntry.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
         : [];
 
     // Get template object - either from hardcoded data or YAML templates
@@ -261,9 +261,6 @@ function SampleDetails(props) {
         content: "Timeline",
         component: <ActivityTracker latestActivity={latestActivity} />
     }
-
-    // claudeSettingsEntry is resolved earlier as claudeSettingsEntryEarly (used for both overview and remediation)
-    const claudeSettingsEntry = claudeSettingsEntryEarly;
 
     const ValuesTab = data.length > 0 && {
         id: 'values',
