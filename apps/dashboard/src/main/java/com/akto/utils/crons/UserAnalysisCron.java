@@ -63,14 +63,21 @@ public class UserAnalysisCron {
         long endTs = nowMs - SLACK_SECONDS * 1000L;
         long startTs = resolveStartTs(settings);
 
-        // Rolling summaries accumulated in memory across the tick; individual record
-        // data (tokens, topics, harmful) is flushed to DB immediately per record.
         Map<AggregateKey, String> rollingSummaries = new HashMap<>();
         UserQueryTopicClassifier classifier = new UserQueryTopicClassifier();
+        List<ElasticSearchClient.TopicUpdate> topicUpdates = new ArrayList<>();
 
         ElasticSearchClient.instance().scrollQueryData(accountId, startTs, endTs, PAGE_SIZE,
             MAX_DOCS_PER_ACCOUNT_PER_TICK,
-            rec -> processRecord(rec, accountId, rollingSummaries, classifier));
+            rec -> processRecord(rec, accountId, rollingSummaries, classifier, topicUpdates));
+
+        if (!topicUpdates.isEmpty()) {
+            try {
+                ElasticSearchClient.instance().bulkUpdateTopics(topicUpdates);
+            } catch (Exception e) {
+                loggerMaker.error("UserAnalysisCron: bulkUpdateTopics failed for accountId " + accountId + ": " + e.getMessage());
+            }
+        }
 
         AccountSettingsDao.instance.updateOne(
             Filters.eq(Constants.ID, accountId),
@@ -87,7 +94,8 @@ public class UserAnalysisCron {
 
     private void processRecord(AgentQueryRecord rec, int accountId,
                                Map<AggregateKey, String> rollingSummaries,
-                               UserQueryTopicClassifier classifier) {
+                               UserQueryTopicClassifier classifier,
+                               List<ElasticSearchClient.TopicUpdate> topicUpdates) {
         if (rec.getServiceId() == null || rec.getServiceId().isEmpty()) return;
         if (rec.getDeviceId() == null || rec.getDeviceId().isEmpty()) return;
         if (rec.getQueryPayload() == null || rec.getQueryPayload().length() < MIN_QUERY_LENGTH) return;
@@ -111,6 +119,15 @@ public class UserAnalysisCron {
 
         Map<String, Integer> topicDeltas = new HashMap<>();
         applyTopics(result, topicDeltas);
+
+        // Write the primary topic back to the ES document.
+        Object topicsObj = result.get("topics");
+        if (topicsObj instanceof List && !((List<?>) topicsObj).isEmpty()) {
+            String primaryTopic = String.valueOf(((List<?>) topicsObj).get(0)).trim();
+            if (!primaryTopic.isEmpty() && rec.getDocId() != null && !rec.getDocId().isEmpty()) {
+                topicUpdates.add(new ElasticSearchClient.TopicUpdate(rec.getDocId(), primaryTopic));
+            }
+        }
 
         Map<String, Object> harmfulMerge = new HashMap<>();
         applyHarmful(result, rec.getTimeStampMs(), harmfulMerge);

@@ -42,9 +42,10 @@ public class LLMObservabilityAction extends UserAction {
     @Setter private String       serviceId;
 
     // Multi-value filter lists (used by MessagesView / PromptsView ag-grid set filters)
-    @Setter private List<String> userNames   = new ArrayList<>();
-    @Setter private List<String> serviceIds  = new ArrayList<>();
-    @Setter private List<String> sessionIds  = new ArrayList<>();
+    @Setter private List<String> userNames    = new ArrayList<>();
+    @Setter private List<String> serviceIds   = new ArrayList<>();
+    @Setter private List<String> sessionIds   = new ArrayList<>();
+    @Setter private List<String> topicFilters = new ArrayList<>();
 
     @Getter private List<Map<String, Object>>  sessions      = new ArrayList<>();
     @Getter private List<Map<String, Object>>  messages      = new ArrayList<>();
@@ -77,6 +78,7 @@ public class LLMObservabilityAction extends UserAction {
                 .put("inTokens",  new JSONObject().put("sum", new JSONObject().put("field", "inputTokens")))
                 .put("outTokens", new JSONObject().put("sum", new JSONObject().put("field", "outputTokens")))
                 .put("messageCount", new JSONObject().put("cardinality", new JSONObject().put("field", "traceId.keyword")))
+                .put("topicsAgg", new JSONObject().put("terms", new JSONObject().put("field", "topic.keyword").put("size", 10)))
                 .put("firstHit", new JSONObject().put("top_hits", new JSONObject()
                     .put("size", 1)
                     .put("sort", new JSONArray().put(new JSONObject().put("timestamp", new JSONObject().put("order", "asc"))))
@@ -114,6 +116,7 @@ public class LLMObservabilityAction extends UserAction {
                 .put("inTokens",  new JSONObject().put("sum", new JSONObject().put("field", "inputTokens")))
                 .put("outTokens", new JSONObject().put("sum", new JSONObject().put("field", "outputTokens")))
                 .put("spanCount", new JSONObject().put("value_count", new JSONObject().put("field", "spanId.keyword")))
+                .put("topicsAgg", new JSONObject().put("terms", new JSONObject().put("field", "topic.keyword").put("size", 10)))
                 .put("firstHit", new JSONObject().put("top_hits", new JSONObject()
                     .put("size", 1)
                     .put("sort", new JSONArray().put(new JSONObject().put("timestamp", new JSONObject().put("order", "asc"))))
@@ -188,13 +191,15 @@ public class LLMObservabilityAction extends UserAction {
             JSONObject aggs = new JSONObject()
                 .put("userName",  new JSONObject().put("terms", new JSONObject().put("field", "userName.keyword").put("size", 500)))
                 .put("deviceId",  new JSONObject().put("terms", new JSONObject().put("field", "deviceId.keyword").put("size", 500)))
-                .put("serviceId", new JSONObject().put("terms", new JSONObject().put("field", "serviceId.keyword").put("size", 500)));
+                .put("serviceId", new JSONObject().put("terms", new JSONObject().put("field", "serviceId.keyword").put("size", 500)))
+                .put("topic",     new JSONObject().put("terms", new JSONObject().put("field", "topic.keyword").put("size", 100)));
 
             JSONObject aggsResult = es.aggregate(query, aggs);
             filterChoices = new HashMap<>();
             filterChoices.put("userName",  extractBucketKeys(aggsResult, "userName"));
             filterChoices.put("deviceId",  extractBucketKeys(aggsResult, "deviceId"));
             filterChoices.put("serviceId", extractBucketKeys(aggsResult, "serviceId"));
+            filterChoices.put("topic",     extractBucketKeys(aggsResult, "topic"));
         } catch (Exception e) {
             filterChoices = new HashMap<>();
         }
@@ -258,6 +263,22 @@ public class LLMObservabilityAction extends UserAction {
             row.put("outputTokens",    outTokens);
             row.put("totalTokens",     inTokens + outTokens);
             row.put("messageCount",    subAggLong(bucket, "messageCount"));
+
+            JSONObject topicsAgg = bucket.optJSONObject("topicsAgg");
+            if (topicsAgg != null) {
+                JSONArray tbuckets = topicsAgg.optJSONArray("buckets");
+                if (tbuckets != null) {
+                    List<String> topicList = new ArrayList<>();
+                    for (int j = 0; j < tbuckets.length(); j++) {
+                        JSONObject tb = tbuckets.optJSONObject(j);
+                        if (tb != null) {
+                            String t = tb.optString("key", "");
+                            if (!t.isEmpty()) topicList.add(t);
+                        }
+                    }
+                    if (!topicList.isEmpty()) row.put("topics", topicList);
+                }
+            }
 
             JSONObject firstHitAgg = bucket.optJSONObject("firstHit");
             if (firstHitAgg != null) {
@@ -339,6 +360,9 @@ public class LLMObservabilityAction extends UserAction {
         // traceId — used when scoping Messages tab to a specific trace
         if (traceId != null && !traceId.trim().isEmpty())
             f.put("traceId.keyword", java.util.Collections.singletonList(traceId.trim()));
+        // topicFilters
+        List<String> topics = nonEmpty(topicFilters);
+        if (!topics.isEmpty()) f.put("topic.keyword", topics);
         // Atlas traffic filter: ENDPOINT context only shows Atlas-sourced records
         if (CONTEXT_SOURCE.ENDPOINT.equals(Context.contextSource.get()))
             f.put("isAtlasTraffic", java.util.Collections.singletonList("true"));

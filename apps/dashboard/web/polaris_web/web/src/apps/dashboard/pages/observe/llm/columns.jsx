@@ -10,6 +10,7 @@ import {
     TimeCell,
     TitleCell,
     TokensCell,
+    TopicChipCell,
     UserCell,
 } from "./LLMCellRenderers";
 import { formatDurationMs } from "./constants";
@@ -43,6 +44,15 @@ const userServiceCols = [
 ];
 
 const NO_FILTER = { filterAllowed: false, filter: false, sortable: false };
+
+const topicCol = {
+    headerName: "Topic",
+    field: "topics",
+    width: 180,
+    cellRenderer: TopicChipCell,
+    cellStyle: { ...{ display: "flex", alignItems: "center" }, paddingTop: 4, paddingBottom: 4 },
+    ...NO_FILTER,
+};
 
 const titleCol = (headerName) => ({
     headerName,
@@ -139,6 +149,7 @@ export const SESSION_COLUMN_DEFS = [
         sortable: true,
     },
     countCol("Traces", "messageCount", 85),
+    topicCol,
     tokensCol,
     costCol,
     {
@@ -184,6 +195,7 @@ export function getTraceColumnDefs({ showSession, onSessionClick } = {}) {
             ...NO_FILTER,
         },
         countCol("Spans", "spanCount", 80),
+        topicCol,
         tokensCol,
         durationCol,
         costCol,
@@ -253,6 +265,7 @@ export const MESSAGE_FLAT_COLUMN_DEFS = [
         cellStyle: FLEX_CELL,
         ...NO_FILTER,
     },
+    topicCol,
     tokensCol,
     timeCol("timestamp"),
     idCol("Trace ID", "traceId"),

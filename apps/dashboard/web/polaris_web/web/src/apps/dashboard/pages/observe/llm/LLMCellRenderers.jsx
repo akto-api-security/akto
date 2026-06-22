@@ -135,6 +135,38 @@ export function TimeCell({ value }) {
     return <Text variant="bodySm">{func.prettifyEpoch(Math.floor((value || 0) / 1000))}</Text>;
 }
 
+// Topic chips — renders a list of topic strings as inline pill badges.
+const TOPIC_COLORS = ["#EBF5FB", "#E8F8F5", "#FEF9E7", "#FDEDEC", "#F4ECF7", "#EAF4FB"];
+const TOPIC_TEXT_COLORS = ["#1A5276", "#0E6655", "#7D6608", "#922B21", "#6C3483", "#154360"];
+function topicColorIndex(topic) {
+    let h = 0;
+    for (let i = 0; i < topic.length; i++) h = (h * 31 + topic.charCodeAt(i)) >>> 0;
+    return h % TOPIC_COLORS.length;
+}
+export function TopicChipCell({ data }) {
+    const topics = Array.isArray(data?.topics) ? data.topics : (data?.topic ? [data.topic] : []);
+    if (!topics.length) return <Text variant="bodySm" color="subdued">-</Text>;
+    return (
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+            {topics.slice(0, 2).map(t => {
+                const idx = topicColorIndex(t);
+                return (
+                    <span key={t} style={{
+                        background: TOPIC_COLORS[idx],
+                        color: TOPIC_TEXT_COLORS[idx],
+                        borderRadius: 4,
+                        padding: "1px 7px",
+                        fontSize: 11,
+                        fontWeight: 500,
+                        lineHeight: "18px",
+                        whiteSpace: "nowrap",
+                    }}>{t}</span>
+                );
+            })}
+        </div>
+    );
+}
+
 // Clickable session id (used in unscoped Traces table).
 export function SessionLinkCell({ data, onSessionClick }) {
     const sid = data?.sessionIdentifier;
