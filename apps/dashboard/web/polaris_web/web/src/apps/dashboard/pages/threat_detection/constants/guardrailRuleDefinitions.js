@@ -586,6 +586,40 @@ This event means the guardrail **successfully protected** the data - the sensiti
 `
     },
 
+    // ─── Blocked Host ──────────────────────────────────────────────────────────
+    {
+        prefixes: ["BlockedHost", "blocked_host", "block_host", "BlockedHosts", "block_host_policy"],
+        capability: "blockedHosts",
+        heading: "Blocked Host",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "The agent tried to reach a host (domain or endpoint) that the blocked-hosts policy does not allow - either it is explicitly on the blocklist, or it falls outside the configured allowed set. The connection was stopped before any data left for that host."
+            },
+            {
+                heading: "Why is it dangerous?",
+                body: "Outbound network access is the main way data leaves an agent. If an agent can reach an arbitrary host, a prompt injection, a malicious skill, or a compromised tool can use it to exfiltrate secrets and conversation data, or to pull down a malicious payload. Restricting which hosts the agent may contact closes that exfiltration/download channel."
+            }
+        ],
+        remediation: `## What to do
+
+### Right now
+1. **Find the host that was blocked** - check the Host / URL field on this event. That is the destination the agent attempted to reach.
+2. **Decide if it is legitimate** - is it a known service your agent is supposed to call, or an unfamiliar/unexpected domain?
+
+### If the host is legitimate
+- Add it to the allowed hosts in the block-host policy (\`block_host_policy\`) so future requests succeed. Prefer an exact host/domain over a broad wildcard.
+
+### If the host is unknown or unexpected
+- Treat this as a possible exfiltration or malicious-download attempt. Investigate **why** the agent tried to reach it: review the session prompts for injection, and check whether a recently added skill or tool drove the request.
+- If a skill or tool is responsible, quarantine it and rotate any credentials that were reachable from the agent's host.
+
+### Stop it recurring
+- Run egress **default-deny**: allow only the specific hosts the agent needs, block everything else.
+- Alert on repeated blocked-host attempts from the same actor or session - a spike often indicates an active exfiltration attempt rather than a misconfiguration.
+`
+    },
+
     // ─── Audit Controls (ComponentAccess, Approval, IP, Endpoint) ──────────────
     {
         prefixes: ["ComponentAccessRejected", "ApprovalConditionsNotDefined", "ApprovalExpired", "IPNotInAllowedList", "EndpointNotWhitelisted"],
@@ -621,7 +655,7 @@ Identify the specific rule from the \`ruleViolated\` field:
 
     // ─── Personal Account ──────────────────────────────────────────────────────
     {
-        prefixes: ["block_personal_account", "personal_account"],
+        prefixes: ["BlockPersonalAccounts", "block_personal_account", "personal_account", "personalaccount"],
         templateIdPrefixes: ["block-personal-account"],
         heading: "Personal Account Usage Blocked",
         overview: [
