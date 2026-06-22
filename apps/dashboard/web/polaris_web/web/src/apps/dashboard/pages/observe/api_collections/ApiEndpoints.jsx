@@ -845,8 +845,16 @@ function ApiEndpoints(props) {
     }
 
     function handleRowClick(data) {
-        let tmp = { ...data, endpointComp: "", sensitiveTagsComp: "" }
-        
+        // Strip all React element fields (*Comp) and any non-serializable objects
+        // to prevent JSON.stringify circular reference errors in ApiDetails
+        const tmp = Object.fromEntries(
+            Object.entries(data).filter(([k, v]) => {
+                if (k.endsWith('Comp')) return false
+                if (v !== null && typeof v === 'object' && !Array.isArray(v)) return false
+                return true
+            })
+        )
+
         const sameRow = func.deepComparison(apiDetail, tmp);
         if (!sameRow) {
             setShowDetails(true)

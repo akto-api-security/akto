@@ -122,4 +122,31 @@ function buildGraphQLTree(endpoints, groupByOperation) {
     return roots
 }
 
-export { buildGraphQLTree, parseGraphQLUrl }
+/**
+ * Build a flat array of rows with `path` arrays for AG Grid treeData.
+ * path = [operationType, groupKey, leafKey] (3 levels)
+ *        or [operationType, segmentName] (2 levels, no operationName)
+ */
+function buildGraphQLFlatRows(endpoints, groupByOperation) {
+    const rows = []
+    endpoints.forEach(ep => {
+        const parsed = parseGraphQLUrl(ep.endpoint)
+        if (!parsed) return
+        const { operationType, operationName, segmentName } = parsed
+
+        let path
+        if (!operationName) {
+            // 3-part URL: /graphql/query/fieldName — no intermediate grouping
+            path = [operationType, segmentName]
+        } else if (groupByOperation) {
+            path = [operationType, operationName, segmentName]
+        } else {
+            path = [operationType, segmentName, operationName]
+        }
+
+        rows.push({ ...ep, path })
+    })
+    return rows
+}
+
+export { buildGraphQLTree, buildGraphQLFlatRows, parseGraphQLUrl }
