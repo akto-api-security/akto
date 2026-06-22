@@ -1,11 +1,11 @@
 package com.akto.dao.nhi_governance;
 
-import com.akto.dao.AccountsContextDaoWithContextSource;
+import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.nhi_governance.NhiPolicy;
 
-public class NhiPolicyDao extends AccountsContextDaoWithContextSource<NhiPolicy> {
+public class NhiPolicyDao extends AccountsContextDao<NhiPolicy> {
 
     public static NhiPolicyDao instance = new NhiPolicyDao();
 
@@ -32,16 +32,10 @@ public class NhiPolicyDao extends AccountsContextDaoWithContextSource<NhiPolicy>
             clients[0].getDatabase(Context.accountId.get() + "").createCollection(getCollName());
         }
 
-        String[] fieldNames = {NhiPolicy.CONTEXT_SOURCE};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
-
-        fieldNames = new String[]{NhiPolicy.STATUS};
+        String[] fieldNames = {NhiPolicy.STATUS};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
         fieldNames = new String[]{NhiPolicy.POLICY_NAME};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
-
-        fieldNames = new String[]{NhiPolicy.CONTEXT_SOURCE, NhiPolicy.STATUS};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 }

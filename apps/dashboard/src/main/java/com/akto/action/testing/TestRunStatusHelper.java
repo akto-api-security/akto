@@ -17,6 +17,7 @@ import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,7 @@ public final class TestRunStatusHelper {
     public static final String REGEX_403 = "\"statusCode\"\\s*:\\s*403";
 
     private static final int SAMPLE_LIMIT = 3000;
+    private static final String SINGLE_EXEC_MESSAGE_FIELD = TestingRunResult.TEST_RESULTS + "." + TestResult._MESSAGE;
     private static final String MULTI_EXEC_MESSAGE_FIELD = "testResults.nodeResultMap.x1.message";
     private static final String STATUS_MESSAGE = "statusMessage";
 
@@ -118,6 +120,50 @@ public final class TestRunStatusHelper {
     }
 
     /**
+     * Builds a filter that matches results whose response carried one of the given HTTP status
+     * codes. The code lives inside the result message JSON (e.g. {@code "statusCode": 403}), so we
+     * regex both the single-exec ({@code testResults.message}) and multi-exec
+     * ({@code testResults.nodeResultMap.x1.message}) message paths - the same paths used to surface
+     * the code in the scan run status column, keeping the filter consistent with what is displayed.
+     * Codes are validated to be exactly three digits to avoid regex injection.
+     */
+    public static Bson responseCodeMessageFilter(List<String> codes) {
+        List<Bson> orFilters = new ArrayList<>();
+        if (codes != null) {
+            for (String code : codes) {
+                if (code == null || !code.matches("\\d{3}")) {
+                    continue;
+                }
+                // negative lookahead so "403" does not match e.g. 4030
+                String regex = "\"statusCode\"\\s*:\\s*" + code + "(?![0-9])";
+                orFilters.add(Filters.regex(SINGLE_EXEC_MESSAGE_FIELD, regex));
+                orFilters.add(Filters.regex(MULTI_EXEC_MESSAGE_FIELD, regex));
+            }
+        }
+        return orFilters.isEmpty() ? Filters.empty() : Filters.or(orFilters);
+    }
+
+    /**
+     * Returns the distinct 4xx/5xx status codes present in a summary's results, used to populate
+     * the response-code filter with only codes that exist in the run (no static list of all
+     * possible HTTP codes). Derived from the already-cached per-code status counts so the filter
+     * stays consistent with the scan run status column and avoids a second heavy aggregation.
+     */
+    public static List<String> fetchDistinctResponseCodes(int accountId, ObjectId testingRunResultSummaryId) {
+        Map<String, Integer> counts = computeStatusCountsCached(accountId, testingRunResultSummaryId);
+        List<String> codes = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+            String key = entry.getKey();
+            Integer count = entry.getValue();
+            if (key.startsWith(HTTP_CODE_KEY_PREFIX) && count != null && count > 0) {
+                codes.add(key.substring(HTTP_CODE_KEY_PREFIX.length()));
+            }
+        }
+        codes.sort(Comparator.comparingInt(Integer::parseInt));
+        return codes;
+    }
+
+    /**
      * Counts results matching a single message pattern for a summary. Reuses the same
      * sampled, coalesced-message pipeline as {@link #countStatusCodesAndCloudflare(ObjectId)}
      * so the stats endpoint and the bulk status endpoint stay consistent.
@@ -147,23 +193,8 @@ public final class TestRunStatusHelper {
     private static Map<String, Integer> countStatusCodesAndCloudflare(ObjectId testingRunResultSummaryId) {
         List<Bson> pipeline = sampledMessagePipeline(testingRunResultSummaryId);
 
-        // $regexFind errors out unless "input" is a string. statusMessage can resolve to a
-        // non-string (e.g. an empty array when a result has no testResults, since the multi-exec
-        // fallback path is evaluated over the testResults array) which would fail the whole
-        // aggregation. Coerce any non-string to "" so it simply yields no match, mirroring the
-        // null/type-tolerant behaviour of the previous $match/$regex approach.
-        BasicDBObject statusMessageAsString = new BasicDBObject("$cond", Arrays.asList(
-                new BasicDBObject("$eq", Arrays.asList(
-                        new BasicDBObject("$type", "$" + STATUS_MESSAGE), "string")),
-                "$" + STATUS_MESSAGE,
-                ""));
-        BasicDBObject regexFind = new BasicDBObject("$regexFind",
-                new BasicDBObject("input", statusMessageAsString)
-                        .append("regex", STATUS_CODE_CAPTURE_REGEX)
-                        .append("options", "i"));
-
         Facet byCode = new Facet("byCode",
-                new BasicDBObject("$project", new BasicDBObject("codeMatch", regexFind)),
+                new BasicDBObject("$project", new BasicDBObject("codeMatch", statusCodeRegexFindExpr())),
                 new BasicDBObject("$match", new BasicDBObject("codeMatch", new BasicDBObject("$ne", null))),
                 new BasicDBObject("$project", new BasicDBObject("code",
                         new BasicDBObject("$arrayElemAt", Arrays.asList("$codeMatch.captures", 0)))),
@@ -219,13 +250,36 @@ public final class TestRunStatusHelper {
                 Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
                 Filters.eq(TestingRunResult.VULNERABLE, false))));
         pipeline.add(Aggregates.limit(SAMPLE_LIMIT));
-        pipeline.add(Aggregates.project(
+        pipeline.add(projectStatusMessageStage());
+        return pipeline;
+    }
+
+    private static Bson projectStatusMessageStage() {
+        return Aggregates.project(
                 Projections.computed(STATUS_MESSAGE,
                         new BasicDBObject("$ifNull", Arrays.asList(
                                 new BasicDBObject("$arrayElemAt",
                                         Arrays.asList("$testResults.message", -1)),
-                                "$" + MULTI_EXEC_MESSAGE_FIELD)))));
-        return pipeline;
+                                "$" + MULTI_EXEC_MESSAGE_FIELD))));
+    }
+
+    private static BasicDBObject statusCodeRegexFindExpr() {
+        return new BasicDBObject("$regexFind",
+                new BasicDBObject("input", statusMessageAsStringExpr())
+                        .append("regex", STATUS_CODE_CAPTURE_REGEX)
+                        .append("options", "i"));
+    }
+
+    /**
+     * $regexFind requires a string input; coalesced statusMessage can be a non-string (e.g. an
+     * empty array when a result has no testResults).
+     */
+    private static BasicDBObject statusMessageAsStringExpr() {
+        return new BasicDBObject("$cond", Arrays.asList(
+                new BasicDBObject("$eq", Arrays.asList(
+                        new BasicDBObject("$type", "$" + STATUS_MESSAGE), "string")),
+                "$" + STATUS_MESSAGE,
+                ""));
     }
 
     @AllArgsConstructor

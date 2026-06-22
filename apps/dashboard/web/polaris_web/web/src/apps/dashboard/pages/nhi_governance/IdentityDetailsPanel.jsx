@@ -195,10 +195,14 @@ export default function IdentityDetailsPanel({ row, show, setShow }) {
                     <VerticalStack gap="2">
                         <Text variant="headingSm" color="subdued">Description</Text>
                         <Text variant="bodyMd">
-                            {totalViolations > 0
-                                ? `This identity is actively used by ${row.agent} with ${row.access.toLowerCase()}-level access via ${row.type}. It currently has ${totalViolations} security violation${totalViolations > 1 ? "s" : ""} that increase the risk of misuse or unauthorized access.`
-                                : `This identity is actively used by ${row.agent} with ${row.access.toLowerCase()}-level access via ${row.type}. No active security violations detected.`
-                            }
+                            {(() => {
+                                const access = row.access ? `${row.access.toLowerCase()}-level access ` : "";
+                                const via = row.type ? `via ${row.type}` : "";
+                                const suffix = totalViolations > 0
+                                    ? `It currently has ${totalViolations} security violation${totalViolations > 1 ? "s" : ""} that increase the risk of misuse or unauthorized access.`
+                                    : "No active security violations detected.";
+                                return `This identity is actively used by ${row.agent || "an unknown agent"} with ${access}${via}. ${suffix}`.replace(/\s+/g, " ").trim();
+                            })()}
                         </Text>
                     </VerticalStack>
                 </VerticalStack>

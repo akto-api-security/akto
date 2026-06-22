@@ -10,10 +10,10 @@ export default function AssetIcon({ type, assetTagValue, size = 20 }) {
     if (type === "Skill")
         return <img src={SkillIcon} width={size} height={size} alt="" style={{ flexShrink: 0 }} />;
     if (type === "OS") {
-        const src = assetTagValue === "mac" ? "/public/os-mac.svg"
-            : assetTagValue === "windows" ? "/public/os-windows.svg"
-            : "/public/os-linux.svg";
-        return <img src={src} width={size} height={size} alt={assetTagValue || "OS"} style={{ flexShrink: 0 }} />;
+        if (assetTagValue === "mac")     return <img src="/public/os-mac.svg"     width={size} height={size} alt="macOS"   style={{ flexShrink: 0 }} />;
+        if (assetTagValue === "windows") return <img src="/public/os-windows.svg" width={size} height={size} alt="Windows" style={{ flexShrink: 0 }} />;
+        if (assetTagValue === "linux")   return <img src="/public/os-linux.svg"   width={size} height={size} alt="Linux"   style={{ flexShrink: 0 }} />;
+        return <img src={LaptopIcon} width={size} height={size} alt="Device" style={{ flexShrink: 0, opacity: 0.7 }} />;
     }
     const domain = getDomainForFavicon(assetTagValue);
     if (domain)

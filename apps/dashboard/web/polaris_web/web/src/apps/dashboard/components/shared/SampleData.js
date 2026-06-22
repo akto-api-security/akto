@@ -157,52 +157,157 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
   }
 
   const textLength = text.length;
-  const isValidRange = (start, end) => Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end <= textLength && start < end;
+  const isWordChar = (ch) => typeof ch === 'string' && /[A-Za-z0-9_-]/.test(ch);
+
   const resolvePhrase = (segment) => {
-    if (typeof segment?.phrase === 'string' && segment.phrase.length > 0) {
-      return segment.phrase;
+    if (typeof segment?.phrase === 'string' && segment.phrase.trim().length > 0) {
+      return segment.phrase.trim();
     }
     if (typeof segment?.message === 'string' && segment.message.length > 0) {
-      return segment.message.replace(/\s*\[chars\s+\d+-\d+\]\s*$/, '');
+      return segment.message.replace(/\s*\[chars\s+\d+-\d+\]\s*$/, '').trim();
     }
     return undefined;
   };
 
+  // The LLM's char offsets are computed against a different text layout than the
+  // editor renders, so they are unreliable. We anchor strictly to the phrase the
+  // LLM flagged. Build progressively looser candidates so we still match when the
+  // phrase is wrapped in quotes, given as a JSON "key":"value" pair (while the
+  // editor renders headers as "key: value"), or truncated mid-token.
+  const buildPhraseCandidates = (phrase) => {
+    const candidates = [];
+    const add = (p) => {
+      if (typeof p !== 'string') {
+        return;
+      }
+      const trimmed = p.trim().replace(/^[\s"'`]+|[\s"',`]+$/g, '');
+      if (trimmed.length >= 2 && !candidates.includes(trimmed)) {
+        candidates.push(trimmed);
+      }
+    };
+
+    add(phrase);
+    if (phrase) {
+      // JSON pair -> value only (handles `"authorization":"Bearer x"` vs editor `authorization: Bearer x`).
+      const colonIdx = phrase.indexOf(':');
+      if (colonIdx >= 0 && colonIdx < phrase.length - 1) {
+        add(phrase.slice(colonIdx + 1));
+      }
+    }
+    // For long tokens (e.g. JWTs) the LLM often truncates or the formatting
+    // differs; a unique prefix is enough to anchor the highlight.
+    candidates.slice().forEach((c) => {
+      if (c.length > 40) {
+        add(c.slice(0, 40));
+      }
+    });
+    return candidates;
+  };
+
+  // Exact occurrence, preferring whole-token matches so "envoy" doesn't match
+  // inside "x-envoy-..." and disambiguating with the LLM's hint position.
+  const findExactRange = (phrase, hintStart) => {
+    const matches = [];
+    let from = 0;
+    while (from <= textLength) {
+      const idx = text.indexOf(phrase, from);
+      if (idx === -1) {
+        break;
+      }
+      const endIdx = idx + phrase.length;
+      const boundedBefore = idx === 0 || !isWordChar(text[idx - 1]) || !isWordChar(phrase[0]);
+      const boundedAfter = endIdx >= textLength || !isWordChar(text[endIdx]) || !isWordChar(phrase[phrase.length - 1]);
+      matches.push({ start: idx, end: endIdx, wholeToken: boundedBefore && boundedAfter });
+      from = idx + 1;
+    }
+    if (matches.length === 0) {
+      return null;
+    }
+    const wholeTokenMatches = matches.filter((m) => m.wholeToken);
+    const candidates = wholeTokenMatches.length > 0 ? wholeTokenMatches : matches;
+    if (Number.isFinite(hintStart)) {
+      candidates.sort((a, b) => Math.abs(a.start - hintStart) - Math.abs(b.start - hintStart));
+    }
+    return candidates[0];
+  };
+
+  // Whitespace-tolerant, case-insensitive match for when the LLM collapses
+  // newlines/indentation or changes header-name casing.
+  const findFlexibleRange = (phrase) => {
+    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+    try {
+      const match = new RegExp(escaped, 'i').exec(text);
+      if (match) {
+        return { start: match.index, end: match.index + match[0].length };
+      }
+    } catch (e) {
+      // invalid regex, ignore
+    }
+    return null;
+  };
+
+  const locateSegment = (segment) => {
+    const phrase = resolvePhrase(segment);
+    if (!phrase) {
+      return null;
+    }
+    const hintStart = Number(segment?.start);
+    const candidates = buildPhraseCandidates(phrase);
+    for (const candidate of candidates) {
+      const range = findExactRange(candidate, hintStart);
+      if (range) {
+        return range;
+      }
+    }
+    for (const candidate of candidates) {
+      const range = findFlexibleRange(candidate);
+      if (range) {
+        return range;
+      }
+    }
+    return null;
+  };
+
   const decorations = [];
+  let firstStart = Infinity;
 
   vulnerabilitySegments.forEach((segment) => {
     try {
-      let start = Number(segment?.start);
-      let end = Number(segment?.end);
-      const phrase = resolvePhrase(segment);
-
-      if (phrase) {
-        const phraseMatchesProvidedRange = isValidRange(start, end) && text.slice(start, end) === phrase;
-        if (!phraseMatchesProvidedRange) {
-          const idx = text.indexOf(phrase);
-          if (idx >= 0) {
-            start = idx;
-            end = idx + phrase.length;
-          }
-        }
-      }
-
-      if (!isValidRange(start, end)) {
+      const range = locateSegment(segment);
+      // If we cannot locate the exact phrase, skip rather than highlight the
+      // wrong span using unreliable offsets.
+      if (!range) {
         return;
       }
 
-      const startPos = model.getPositionAt(start);
-      const endPos = model.getPositionAt(end);
+      const startPos = model.getPositionAt(range.start);
+      const endPos = model.getPositionAt(range.end);
 
       if (!startPos || !endPos) {
         return;
       }
 
+      firstStart = Math.min(firstStart, range.start);
+
+      const reason = typeof segment?.reason === 'string' ? segment.reason.trim() : '';
+      const options = {
+        inlineClassName: "vulnerability-highlight",
+        // Marker in the scrollbar so evidence is easy to find/jump to in large responses.
+        overviewRuler: {
+          color: "rgba(139, 69, 255, 0.8)",
+          position: monaco.editor.OverviewRulerLane.Right
+        }
+      };
+      if (reason) {
+        options.hoverMessage = [
+          { value: "**Evidence**" },
+          { value: reason }
+        ];
+      }
+
       decorations.push({
         range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
-        options: {
-          inlineClassName: "vulnerability-highlight"
-        }
+        options
       });
     } catch (error) {
       console.error('Error creating vulnerability highlight:', error, segment);
@@ -210,7 +315,19 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
   });
 
   if (decorations.length > 0) {
+    if (ref._vulnDecorations) {
+      ref._vulnDecorations.clear();
+    }
     ref._vulnDecorations = ref.createDecorationsCollection(decorations);
+
+    // Scroll the first piece of evidence into view so users don't have to hunt
+    // through a large response.
+    if (Number.isFinite(firstStart)) {
+      const pos = model.getPositionAt(firstStart);
+      if (pos) {
+        ref.revealLineInCenter(pos.lineNumber);
+      }
+    }
   }
 }
 

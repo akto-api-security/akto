@@ -1,4 +1,5 @@
 .idea/
+WEB-INF/
 **/target
 *.iml
 **/output

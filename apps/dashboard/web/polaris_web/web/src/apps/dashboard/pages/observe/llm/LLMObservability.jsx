@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import { Box, Card, Divider, HorizontalGrid, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import { Box, Card, Divider, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
 import { produce } from "immer";
 
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
@@ -48,20 +48,18 @@ export default function LLMObservability() {
 
     useEffect(() => {
         let cancelled = false;
-        if (isArgus) {
-            api.fetchMessages(epochs.since, epochs.until, {})
-                .then(rows => { if (!cancelled) setTraces((rows || []).map(enrichRow)); });
-        } else {
+        if (!isArgus) {
             api.fetchSessions(epochs.since, epochs.until, {})
                 .then(rows => { if (!cancelled) setSessions((rows || []).map(enrichRow)); });
         }
         return () => { cancelled = true; };
     }, [epochs, isArgus]);
 
-    const openSession = useCallback((sessionId) => {
-        const row = sessions.find(r => r.sessionIdentifier === sessionId);
-        setSelectedSession(row || { sessionIdentifier: sessionId });
-    }, [sessions]);
+    const onArgusRowsFetched = useCallback((rows) => setTraces(rows), []);
+
+    const openSession = useCallback((row) => {
+        setSelectedSession(row);
+    }, []);
 
     // ─── Atlas graph data (sessions) ─────────────────────────────────────────
 
@@ -95,11 +93,6 @@ export default function LLMObservability() {
             .slice(0, 3)
             .map(([label, count], i) => ({ label, count, color: SERVICE_COLORS[i] || "#D1D5DB" }));
     }, [sessions]);
-
-    const totalTracesCount = useMemo(
-        () => sessions.reduce((s, r) => s + (Number(r.messageCount) || 0), 0),
-        [sessions]
-    );
 
     const totalInputTokens = useMemo(
         () => sessions.reduce((s, r) => s + (Number(r._inputTokens) || 0), 0),
@@ -354,9 +347,9 @@ export default function LLMObservability() {
                 components={[
                     topCards,
                     isArgus ? (
-                        <MessagesView key="traces-table" currDateRange={currDateRange} columnDefs={ARGUS_TRACE_COL_DEFS} onRowClicked={p => p.data && setSelectedTrace(p.data)} />
+                        <MessagesView key="traces-table" currDateRange={currDateRange} columnDefs={ARGUS_TRACE_COL_DEFS} onRowClicked={p => p.data && setSelectedTrace(p.data)} onRowsFetched={onArgusRowsFetched} />
                     ) : (
-                        <SessionsView key="sessions-table" rowData={sessions} onOpenSession={openSession} />
+                        <SessionsView key="sessions-table" currDateRange={currDateRange} onOpenSession={openSession} />
                     ),
                 ]}
             />

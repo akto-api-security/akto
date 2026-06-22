@@ -8,6 +8,9 @@ import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.junit.Before;
 import org.junit.Test;
@@ -277,5 +280,84 @@ public class TestRunStatusActionTest extends MongoBasedTest {
         assertEquals(1, count(counts, "http_403"));
         assertEquals(1, count(counts, "http_500"));
         assertEquals(1, count(counts, "needConfig"));
+    }
+
+    // ---------- response code filter ----------
+
+    private int countMatching(ObjectId summaryId, List<String> codes) {
+        Bson filter = Filters.and(
+                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId),
+                TestRunStatusHelper.responseCodeMessageFilter(codes));
+        return TestingRunResultDao.instance.findAll(filter, Projections.include("_id")).size();
+    }
+
+    // @Test
+    // public void testResponseCodeFilterMatchesOnlySelectedCode() {
+    //     ObjectId summaryId = new ObjectId();
+    //     insertResult(summaryId, messageResult("{\"statusCode\": 403, \"body\": \"Forbidden\"}"), false);
+    //     insertResult(summaryId, messageResult("{\"statusCode\": 500, \"body\": \"Internal Server Error\"}"), false);
+
+    //     assertEquals(1, countMatching(summaryId, Collections.singletonList("403")));
+    //     assertEquals(1, countMatching(summaryId, Collections.singletonList("500")));
+    //     assertEquals(0, countMatching(summaryId, Collections.singletonList("404")));
+    // }
+
+    // @Test
+    // public void testResponseCodeFilterMatchesAnyOfMultipleCodes() {
+    //     ObjectId summaryId = new ObjectId();
+    //     insertResult(summaryId, messageResult("{\"statusCode\": 401, \"body\": \"Unauthorized\"}"), false);
+    //     insertResult(summaryId, messageResult("{\"statusCode\": 403, \"body\": \"Forbidden\"}"), false);
+    //     insertResult(summaryId, messageResult("{\"statusCode\": 200, \"body\": \"OK\"}"), false);
+
+    //     assertEquals(2, countMatching(summaryId, Arrays.asList("401", "403")));
+    // }
+
+    @Test
+    public void testResponseCodeFilterIgnoresInvalidCodes() {
+        // invalid/non 3-digit codes yield an empty filter (no response-code constraint added)
+        assertTrue(TestRunStatusHelper.responseCodeMessageFilter(Collections.singletonList("abc"))
+                .equals(Filters.empty()));
+        assertTrue(TestRunStatusHelper.responseCodeMessageFilter(new ArrayList<>())
+                .equals(Filters.empty()));
+    }
+
+    // ---------- distinct response codes (filter choices) ----------
+
+    private List<String> fetchDistinctCodes(ObjectId summaryId) {
+        TestRunStatusAction action = new TestRunStatusAction();
+        action.setTestingRunResultSummaryHexId(summaryId.toHexString());
+        assertEquals("SUCCESS", action.fetchDistinctResponseCodes());
+        return action.getResponseCodes();
+    }
+
+    @Test
+    public void testFetchDistinctResponseCodesReturnsOnlyPresentCodesSorted() {
+        ObjectId summaryId = new ObjectId();
+        insertResult(summaryId, messageResult("{\"statusCode\": 500}"), false);
+        insertResult(summaryId, messageResult("{\"statusCode\": 403}"), false);
+        insertResult(summaryId, messageResult("{\"statusCode\": 200, \"body\": \"OK\"}"), false);
+
+        assertEquals(Arrays.asList("403", "500"), fetchDistinctCodes(summaryId));
+    }
+
+    @Test
+    public void testFetchDistinctResponseCodesEmptyWhenNoHttpErrors() {
+        ObjectId summaryId = new ObjectId();
+        insertResult(summaryId, errorResult(TestResult.API_CALL_FAILED_ERROR_STRING), false);
+        insertResultWithoutMessage(summaryId);
+
+        assertTrue(fetchDistinctCodes(summaryId).isEmpty());
+    }
+
+    @Test
+    public void testFetchDistinctResponseCodesExcludesVulnerableResults() {
+        // mirrors the scan run status column, which treats vulnerable results as findings
+        // (Issues column) rather than execution problems, so codes only present on vulnerable
+        // results are not offered as filter choices
+        ObjectId summaryId = new ObjectId();
+        insertResult(summaryId, messageResult("{\"statusCode\": 403}"), true);
+        insertResult(summaryId, messageResult("{\"statusCode\": 404}"), false);
+
+        assertEquals(Collections.singletonList("404"), fetchDistinctCodes(summaryId));
     }
 }

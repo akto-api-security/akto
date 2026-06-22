@@ -34,6 +34,11 @@ public class LLMObservabilityAction extends UserAction {
     @Setter private int          sortOrder   = 1;
     @Setter private String       traceId;
     @Setter private String       searchAfterJson;
+    @Setter private String       sessionsAfterKey;
+    @Setter private int          sessionsLimit    = 20;
+
+    @Getter private String       nextAfterKey;
+    @Getter private long         totalSessions    = 0;
 
     // Single-value fields kept for backward-compat (session drill-down in SessionsView)
     @Setter private String       sessionId;
@@ -59,6 +64,12 @@ public class LLMObservabilityAction extends UserAction {
 
     // ── Per-session view ──────────────────────────────────────────────────────
 
+    /**
+     * Dual-mode session fetch on the same route:
+     *  - sessionsLimit == 0 (default): terms agg, top-500 by latest activity — used by summary cards.
+     *  - sessionsLimit  > 0           : composite agg with cursor pagination — used by the sessions table.
+     * Both modes always return { sessions, nextAfterKey, totalSessions }.
+     */
     public String fetchSessions() {
         try {
             ElasticSearchClient es = ElasticSearchClient.instance();
@@ -69,7 +80,6 @@ public class LLMObservabilityAction extends UserAction {
             JSONObject baseQ = es.buildBaseQueryMulti(accountId, startMs(), endMs(), extraFilters.isEmpty() ? null : extraFilters, null);
             JSONArray mustArr = baseQ.getJSONObject("bool").getJSONArray("must");
             mustArr.put(new JSONObject().put("exists", new JSONObject().put("field", "sessionIdentifier")));
-
             JSONObject filteredQuery = new JSONObject().put("bool", new JSONObject().put("must", mustArr));
 
             JSONObject subAggs = new JSONObject()
@@ -78,25 +88,66 @@ public class LLMObservabilityAction extends UserAction {
                 .put("inTokens",  new JSONObject().put("sum", new JSONObject().put("field", "inputTokens")))
                 .put("outTokens", new JSONObject().put("sum", new JSONObject().put("field", "outputTokens")))
                 .put("messageCount", new JSONObject().put("cardinality", new JSONObject().put("field", "traceId.keyword")))
-                .put("topicsAgg", new JSONObject().put("terms", new JSONObject().put("field", "topic.keyword").put("size", 10)))
+                .put("topicsAgg",    new JSONObject().put("terms", new JSONObject().put("field", "topic.keyword").put("size", 10)))
                 .put("firstHit", new JSONObject().put("top_hits", new JSONObject()
                     .put("size", 1)
                     .put("sort", new JSONArray().put(new JSONObject().put("timestamp", new JSONObject().put("order", "asc"))))
-                    .put("_source", new JSONArray().put("queryPayload").put("responsePayload").put("serviceId").put("userName").put("deviceId").put("sessionIdentifier"))));
+                    .put("_source", new JSONArray().put("queryPayload").put("responsePayload")
+                        .put("serviceId").put("userName").put("deviceId").put("sessionIdentifier"))));
 
-            JSONObject aggs = new JSONObject().put("groups", new JSONObject()
-                .put("terms", new JSONObject().put("field", "sessionIdentifier.keyword").put("size", 20)
-                    .put("order", new JSONObject().put("latestTimestamp", "desc")))
-                .put("aggs", subAggs));
+            if (sessionsLimit > 0) {
+                // ── Paginated path: composite aggregation ────────────────────────────
+                int pageSize = Math.min(sessionsLimit, 100);
+                JSONObject compositeSource = new JSONObject()
+                    .put("sessionIdentifier", new JSONObject()
+                        .put("terms", new JSONObject().put("field", "sessionIdentifier.keyword")));
+                JSONObject composite = new JSONObject()
+                    .put("size", pageSize)
+                    .put("sources", new JSONArray().put(compositeSource));
+                if (sessionsAfterKey != null && !sessionsAfterKey.trim().isEmpty()) {
+                    try { composite.put("after", new JSONObject(sessionsAfterKey)); }
+                    catch (JSONException ignored) {}
+                }
+                JSONObject aggs = new JSONObject()
+                    .put("groups", new JSONObject().put("composite", composite).put("aggs", subAggs))
+                    .put("totalSessions", new JSONObject()
+                        .put("cardinality", new JSONObject().put("field", "sessionIdentifier.keyword")));
 
-            JSONObject aggsResult = es.aggregate(filteredQuery, aggs);
-            sessions = parseBuckets(aggsResult, "sessionIdentifier");
+                JSONObject aggsResult = es.aggregate(filteredQuery, aggs);
+                sessions = parseBuckets(aggsResult, "sessionIdentifier");
+                sessions.sort((a, b) -> {
+                    long ta = a.get("latestTimestamp") instanceof Number ? ((Number) a.get("latestTimestamp")).longValue() : 0L;
+                    long tb = b.get("latestTimestamp") instanceof Number ? ((Number) b.get("latestTimestamp")).longValue() : 0L;
+                    return Long.compare(tb, ta);
+                });
+                if (aggsResult != null) {
+                    JSONObject groups = aggsResult.optJSONObject("groups");
+                    if (groups != null) {
+                        JSONObject afterKeyObj = groups.optJSONObject("after_key");
+                        JSONArray  buckets     = groups.optJSONArray("buckets");
+                        if (afterKeyObj != null && buckets != null && buckets.length() >= pageSize)
+                            nextAfterKey = afterKeyObj.toString();
+                    }
+                    JSONObject totalAgg = aggsResult.optJSONObject("totalSessions");
+                    if (totalAgg != null) totalSessions = (long) totalAgg.optDouble("value", 0);
+                }
+            } else {
+                // ── Summary path: terms aggregation, top-500 by latest activity ──────
+                JSONObject aggs = new JSONObject().put("groups", new JSONObject()
+                    .put("terms", new JSONObject().put("field", "sessionIdentifier.keyword").put("size", 500)
+                        .put("order", new JSONObject().put("latestTimestamp", "desc")))
+                    .put("aggs", subAggs));
+                JSONObject aggsResult = es.aggregate(filteredQuery, aggs);
+                sessions = parseBuckets(aggsResult, "sessionIdentifier");
+                totalSessions = sessions.size();
+            }
         } catch (Exception e) {
             logger.error("fetchSessions error: " + e.getMessage());
             sessions = new ArrayList<>();
         }
         return Action.SUCCESS.toUpperCase();
     }
+
     public String fetchMessages() {
         try {
             ElasticSearchClient es = ElasticSearchClient.instance();
@@ -249,12 +300,20 @@ public class LLMObservabilityAction extends UserAction {
         for (int i = 0; i < buckets.length(); i++) {
             JSONObject bucket = buckets.optJSONObject(i);
             if (bucket == null) continue;
+            // Terms agg: key is a plain string.
+            // Composite agg: key is a JSON object { keyField: value }.
+            Object rawKey  = bucket.opt("key");
+            String keyValue = (rawKey instanceof JSONObject)
+                ? ((JSONObject) rawKey).optString(keyField, "")
+                : (rawKey != null ? rawKey.toString() : "");
+            if (keyValue.isEmpty()) continue;
+
             Map<String, Object> row = new HashMap<>();
             long inTokens  = subAggLong(bucket, "inTokens");
             long outTokens = subAggLong(bucket, "outTokens");
             long latest    = subAggLong(bucket, "latestTimestamp");
             long first     = subAggLong(bucket, "firstTimestamp");
-            row.put(keyField, bucket.optString("key", ""));
+            row.put(keyField, keyValue);
             row.put("spanCount",       bucket.optLong("doc_count", 0));
             row.put("latestTimestamp", latest);
             row.put("firstTimestamp",  first);

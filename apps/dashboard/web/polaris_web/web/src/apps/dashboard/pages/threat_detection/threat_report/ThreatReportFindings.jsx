@@ -23,7 +23,7 @@ const ComplianceCell = ({ complianceWithClauses, activeComplianceFilters }) => {
             {frameworksToShow.map(([framework, clauses]) => (
                 <HorizontalStack key={framework} gap="1" blockAlign="center" wrap={true}>
                     <Avatar source={func.getComplianceIcon(framework)} shape="square" size="extraSmall" />
-                    <Text variant="bodySm" fontWeight="semibold">{framework}</Text>
+                    <Text variant="bodySm" fontWeight="semibold" breakWord>{framework}</Text>
                     {Array.isArray(clauses) && clauses.map((clause, i) => (
                         <Badge key={i} size="small" status="info">{clause}</Badge>
                     ))}

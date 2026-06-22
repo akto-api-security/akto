@@ -1,6 +1,6 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubServerTable from "../../../components/tables/GithubServerTable"
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import api from "../api"
 import Store from "../../../store";
 import func from "@/util/func";
@@ -38,7 +38,7 @@ import testingApi from "../../testing/api.js"
 import { saveAs } from 'file-saver'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import IssuesGraphsGroup from "./IssuesGraphsGroup.jsx";
-import { getDashboardCategory, isAgenticSecurityCategory, mapLabel } from "../../../../main/labelHelper.js";
+import { getDashboardCategory, isAgenticSecurityCategory, mapLabel, categoryToShortName } from "../../../../main/labelHelper.js";
 import MarkdownReportGenerator from "../../../components/shared/MarkdownReportGenerator";
 import SeveritySelector from "../components/SeveritySelector";
 
@@ -172,6 +172,7 @@ function IssuesPage() {
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
     const [issuesFilters, setIssuesFilters] = useState({})
     const [key, setKey] = useState(false);
+    const summaryHexIdsRef = useRef(new Set())
     const apiCollectionMap = PersistStore(state => state.collectionsMap);
     const [showEmptyScreen, setShowEmptyScreen] = useState(true)
     const [selectedTab, setSelectedTab] = useState("open")
@@ -538,6 +539,7 @@ function IssuesPage() {
                 setMandatoryDescription(description);
             }
             resetResourcesSelected();
+            summaryHexIdsRef.current.forEach(hexId => testingApi.handleRefreshTableCount(hexId));
         });
     };
 
@@ -563,6 +565,7 @@ function IssuesPage() {
             api.bulkUpdateIssueStatus(items, "OPEN", "").then((res) => {
                 setToast(true, false, `Issue${items.length == 1 ? "" : "s"} re-opened`)
                 resetResourcesSelected()
+                summaryHexIdsRef.current.forEach(hexId => testingApi.handleRefreshTableCount(hexId));
             })
         }
 
@@ -765,8 +768,10 @@ function IssuesPage() {
     const openVulnerabilityReport = async (items = [], summaryMode = false) => {
         await testingApi.generatePDFReport(issuesFilters, items).then((res) => {
             const responseId = res.split("=")[1];
-            const summaryModeQueryParam = summaryMode === true ? 'summaryMode=true' : '';
-            const redirectUrl = `/dashboard/issues/summary/${responseId.split("}")[0]}?${summaryModeQueryParam}`;
+            const params = new URLSearchParams();
+            if (summaryMode) params.set('summaryMode', 'true');
+            params.set('category', categoryToShortName[getDashboardCategory()] || 'API');
+            const redirectUrl = `/dashboard/issues/summary/${responseId.split("}")[0]}?${params.toString()}`;
             window.open(redirectUrl, '_blank');
         })
 
@@ -907,8 +912,11 @@ function IssuesPage() {
         let issueItem = []
 
         await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
+            summaryHexIdsRef.current = new Set()
             const uniqueIssuesMap = new Map()
             issuesDataRes.issues.forEach(item => {
+                const hexId = item?.latestTestingRunSummaryId?.$oid
+                if (hexId) summaryHexIdsRef.current.add(hexId)
                 const key = `${item?.id?.testSubCategory || ''}|${item?.severity || ''}|${item?.testRunIssueStatus || ''}`
                 if (!uniqueIssuesMap.has(key)) {
                     uniqueIssuesMap.set(key, {

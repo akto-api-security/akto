@@ -6,7 +6,7 @@ import { MESSAGE_FLAT_COLUMN_DEFS } from "./columns";
 // Messages tab — flat span-level rows, server-paginated via searchPrompts.
 // When traceFilter is set (drill-down from a trace flyout), passes traceId to the
 // backend so only that trace's spans are returned. The same server path handles both.
-export default function MessagesView({ currDateRange, traceFilter, onRowClicked, columnDefs: columnDefsProp }) {
+export default function MessagesView({ currDateRange, traceFilter, onRowClicked, columnDefs: columnDefsProp, onRowsFetched }) {
     const [columnDefs, setColumnDefs] = useState(columnDefsProp || MESSAGE_FLAT_COLUMN_DEFS);
     const [rows, setRows] = useState([]);
 
@@ -31,8 +31,8 @@ export default function MessagesView({ currDateRange, traceFilter, onRowClicked,
             startTime: since, endTime: until,
             traceId: traceFilter || "",
             filters, sortKey, sortOrder, skip, limit, searchAfterJson, searchString,
-        }).then(result => { setRows(result?.value || []); return result; });
-    }, [getEpochs, traceFilter]);
+        }).then(result => { setRows(result?.value || []); onRowsFetched?.(result?.value || []); return result; });
+    }, [getEpochs, traceFilter, onRowsFetched]);
 
     return (
         <>

@@ -9,12 +9,15 @@ const ThreatReportHeader = ({ activeComplianceFilters, ...props }) => {
 
     const reportTitle = complianceName
         ? `Akto ${complianceName} Guardrail Violations Report`
+        : `Akto ${mapLabel("Threat", dashboardCategory)} Detection Report`
+    const subtitleText = complianceName
+        ? `${complianceName} Guardrail Violations Report`
         : `${mapLabel("Threat", dashboardCategory)} Detection Report`
 
     return (
         <BaseReportHeader
             reportTitle={reportTitle}
-            subtitleText={reportTitle}
+            subtitleText={subtitleText}
             showDateInfo={true}
             {...props}
         />

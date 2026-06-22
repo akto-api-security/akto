@@ -6,18 +6,40 @@ function llmMessagesRequest(data) {
 }
 
 export default {
-    // Per-session summaries (grouped by sessionIdentifier).
+    // Per-session summaries (terms agg, top-500) — used by summary cards.
     fetchSessions(startTime, endTime, filters) {
         return request({
             url: "/api/fetchLLMSessions",
             method: "post",
             data: {
                 startTime, endTime,
+                sessionsLimit: 0,
                 userName:  filters?.userName  || "",
                 deviceId:  filters?.deviceId  || "",
                 serviceId: filters?.serviceId || "",
             },
-        }).then(r => Array.isArray(r) ? r : (r?.sessions ?? []));
+        }).then(r => r?.sessions ?? []);
+    },
+
+    // Cursor-paginated sessions (composite agg) — used by the sessions table.
+    // Returns { sessions, nextAfterKey, total }.
+    fetchSessionsPaged({ startTime, endTime, limit, afterKey, filters }) {
+        return request({
+            url: "/api/fetchLLMSessions",
+            method: "post",
+            data: {
+                startTime,
+                endTime,
+                sessionsLimit:    limit    || 20,
+                sessionsAfterKey: afterKey || "",
+                userNames:  filters?.userName  || [],
+                serviceIds: filters?.serviceId || [],
+            },
+        }).then(r => ({
+            sessions:     (r?.sessions ?? []).map(enrichRow),
+            nextAfterKey: r?.nextAfterKey || null,
+            total:        r?.totalSessions || 0,
+        }));
     },
 
     // Trace-level aggregations — one bucket per traceId. Optionally scoped to a session.
@@ -34,8 +56,9 @@ export default {
 
     // Paginated flat prompt/span rows for the Messages tab.
     // traceId: when set, scopes results to a single trace (backend filters by traceId.keyword).
+    // sessionId: when set, scopes results to a single session (backend filters by sessionIdentifier.keyword).
     // Returns: { value: [...enrichedRows], total: N }
-    searchPrompts({ startTime, endTime, traceId, sortKey, sortOrder, skip, limit, filters, searchAfterJson, searchString }) {
+    searchPrompts({ startTime, endTime, traceId, sessionId, sortKey, sortOrder, skip, limit, filters, searchAfterJson, searchString }) {
         return request({
             url: "/api/searchLLMPrompts",
             method: "post",
@@ -43,6 +66,7 @@ export default {
                 startTime,
                 endTime,
                 traceId:         traceId       || "",
+                sessionId:       sessionId     || "",
                 sortKey:         sortKey        || "timestamp",
                 sortOrder:       sortOrder === -1 ? -1 : 1,
                 skip:            skip           || 0,
