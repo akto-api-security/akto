@@ -313,7 +313,7 @@ const ContentPolicyStep = ({
                     {enterpriseLicenseComplianceCategories?.length > 0 && (
                         <Box paddingBlockStart="2" paddingInlineStart="6">
                             <Text variant="bodySm" tone="subdued">
-                                {enterpriseLicenseComplianceCategories.length} topic{enterpriseLicenseComplianceCategories.length !== 1 ? 's are' : ' is'} managed by Enterprise License Compliance.
+                                {enterpriseLicenseComplianceCategories.length} topic{enterpriseLicenseComplianceCategories.length !== 1 ? 's are' : ' is'} managed by Enterprise License Compliance Guardrails.
                             </Text>
                         </Box>
                     )}

@@ -298,9 +298,9 @@ function GuardrailPolicies() {
         // Enterprise license compliance topics
         const enterpriseTopics = (policy.deniedTopics || []).filter(t => t?.origin === ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN);
         if (enterpriseTopics.length > 0) {
-            const names = enterpriseTopics.map(t => t.topic || t.name).slice(0, 2);
-            const more = enterpriseTopics.length > 2 ? ` +${enterpriseTopics.length - 2} more` : '';
-            details.push({ label: "Enterprise License Compliance", value: `${names.join(", ")}${more}` });
+            const names = enterpriseTopics.map(t => t.topic || t.name).slice(0, 1);
+            const more = enterpriseTopics.length > 1 ? ` +${enterpriseTopics.length - 1} more` : '';
+            details.push({ label: "Enterprise License Compliance Filters", value: `${names.join(", ")}${more}` });
         }
 
         // Word filters
