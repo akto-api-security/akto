@@ -73,6 +73,8 @@ export default function LeftNav() {
         value: accountId
     }));
 
+    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
+
     let reportsSubNavigationItems = [
         {
             label: "Issues",
@@ -87,7 +89,7 @@ export default function LeftNav() {
 
     if (window.USER_NAME.indexOf("@akto.io")) {
         reportsSubNavigationItems.push({
-            label: "Compliance",
+            label: mapLabel("Compliance", dashboardCategory),
             onClick: () => {
                 navigate("/dashboard/reports/compliance");
                 handleSelect("dashboard_reports_compliance");
@@ -96,7 +98,7 @@ export default function LeftNav() {
             selected: leftNavSelected === "dashboard_reports_compliance",
         })
         reportsSubNavigationItems.push({
-            label: "Threat",
+            label: mapLabel("Threat", dashboardCategory),
             onClick: () => {
                 navigate("/dashboard/reports/threat");
                 handleSelect("dashboard_reports_tthreat");
@@ -105,8 +107,6 @@ export default function LeftNav() {
             selected: leftNavSelected === "dashboard_reports_tthreat",
         })
     }
-
-    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
 
     // Allowed users for Dashboard access
     const allowedDashboardUsers = [
@@ -514,7 +514,7 @@ export default function LeftNav() {
                 selected: leftNavSelected.includes("_reports"),
                 subNavigationItems: dashboardCategory === CATEGORY_ENDPOINT_SECURITY
                     ? [{
-                        label: "Threat",
+                        label: mapLabel("Threat", dashboardCategory),
                         onClick: () => {
                             navigate("/dashboard/reports/threat");
                             handleSelect("dashboard_reports_threat");
