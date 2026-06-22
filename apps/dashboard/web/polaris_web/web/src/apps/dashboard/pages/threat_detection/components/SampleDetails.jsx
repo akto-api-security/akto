@@ -31,27 +31,17 @@ function SampleDetails(props) {
 
     const isClaudeSettingsRisk = moreInfoData?.templateId === 'claude_settings_risk';
 
-    // For guardrail events, look up the specific rule info based on ruleViolated / templateId
-    const guardrailRuleInfo = useGuardrailDescription
-        ? getGuardrailRuleInfo(moreInfoData?.ruleViolated, moreInfoData?.templateId)
-        : null;
-
-    // Build guardrail sections: use matched rule's overview if found, else fall back to all generic sections
-    const guardrailSectionsToShow = guardrailRuleInfo
-        ? [{ heading: guardrailRuleInfo.heading, description: null, subSections: guardrailRuleInfo.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
-        : GUARDRAIL_SECTIONS;
-
-    // Resolve the specific claude_settings_risk entry (used for both overview and remediation tabs)
-    const getClaudeSettingsKey = () => {
+    // Resolve the specific claude_settings_risk entry from the URL / ruleViolated key
+    const resolveClaudeSettingsEntry = () => {
         const stripArrayIndices = (key) => key?.replace(/\[\d+\]/g, '');
+        let key;
         if (moreInfoData?.ruleViolated && moreInfoData.ruleViolated !== '-') {
-            return stripArrayIndices(moreInfoData.ruleViolated);
+            key = stripArrayIndices(moreInfoData.ruleViolated);
+        } else {
+            const prefix = '/claude/settings/';
+            const idx = moreInfoData?.url?.indexOf(prefix) ?? -1;
+            key = idx !== -1 ? stripArrayIndices(moreInfoData.url.slice(idx + prefix.length)) : null;
         }
-        const prefix = '/claude/settings/';
-        const idx = moreInfoData?.url?.indexOf(prefix) ?? -1;
-        return idx !== -1 ? stripArrayIndices(moreInfoData.url.slice(idx + prefix.length)) : null;
-    };
-    const resolveClaudeSettingsEntry = (key) => {
         if (!key) return undefined;
         if (CLAUDE_SETTINGS_RISK_MAP[key]) return CLAUDE_SETTINGS_RISK_MAP[key];
         const bestMatch = Object.keys(CLAUDE_SETTINGS_RISK_MAP)
@@ -59,29 +49,29 @@ function SampleDetails(props) {
             .sort((a, b) => b.length - a.length)[0];
         return bestMatch ? CLAUDE_SETTINGS_RISK_MAP[bestMatch] : undefined;
     };
-    const claudeSettingsEntry = isClaudeSettingsRisk
-        ? resolveClaudeSettingsEntry(getClaudeSettingsKey())
-        : undefined;
 
-    const claudeSettingsSectionsToShow = claudeSettingsEntry?.overview
-        ? [{ heading: claudeSettingsEntry.title, description: null, subSections: claudeSettingsEntry.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
-        : [];
+    // Both claude-settings entries and guardrail-rule entries share the same shape:
+    // { heading|title, overview: [{ heading, body }], remediation }. Resolve to one entry.
+    const claudeSettingsEntry = isClaudeSettingsRisk ? resolveClaudeSettingsEntry() : undefined;
+    const guardrailRuleInfo = useGuardrailDescription
+        ? getGuardrailRuleInfo(moreInfoData?.ruleViolated, moreInfoData?.templateId)
+        : null;
+    const hardcodedEntry = claudeSettingsEntry || guardrailRuleInfo;
+
+    // Turn a resolved entry's overview into the section shape the overview renderer expects.
+    const entryToSections = (entry) =>
+        entry?.overview
+            ? [{ heading: entry.heading || entry.title, description: null, subSections: entry.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
+            : null;
 
     // Get template object - either from hardcoded data or YAML templates
     let currentTemplateObj;
-    if (isClaudeSettingsRisk) {
-        // Claude settings risk takes priority — use per-field overview sections
+    if (isClaudeSettingsRisk || useGuardrailDescription) {
+        const fallbackName = isClaudeSettingsRisk ? "Claude Settings Risk" : "Guardrail Policy";
         currentTemplateObj = {
-            guardrailSections: claudeSettingsSectionsToShow,
-            testName: moreInfoData?.templateId || "Claude Settings Risk",
-            name: moreInfoData?.templateId || "Claude Settings Risk"
-        };
-    } else if (useGuardrailDescription) {
-        // For Argus/Atlas guardrails, use structured content
-        currentTemplateObj = {
-            guardrailSections: guardrailSectionsToShow,
-            testName: moreInfoData?.templateId || "Guardrail Policy",
-            name: moreInfoData?.templateId || "Guardrail Policy"
+            guardrailSections: entryToSections(hardcodedEntry) || (isClaudeSettingsRisk ? [] : GUARDRAIL_SECTIONS),
+            testName: moreInfoData?.templateId || fallbackName,
+            name: moreInfoData?.templateId || fallbackName
         };
     } else {
         // Normal threat detection - use YAML templates
@@ -282,19 +272,11 @@ function SampleDetails(props) {
     }
 
     const remediationTab = (() => {
-        if (isClaudeSettingsRisk) {
+        if (isClaudeSettingsRisk || useGuardrailDescription) {
             return {
                 id: "remediation",
                 content: "Remediation",
-                component: (<MarkdownViewer markdown={claudeSettingsEntry ? claudeSettingsEntry.remediation : GUARDRAIL_REMEDIATION_MARKDOWN} />)
-            };
-        }
-        if (useGuardrailDescription) {
-            const remediationMarkdown = guardrailRuleInfo?.remediation || GUARDRAIL_REMEDIATION_MARKDOWN;
-            return {
-                id: "remediation",
-                content: "Remediation",
-                component: (<MarkdownViewer markdown={remediationMarkdown} />)
+                component: (<MarkdownViewer markdown={hardcodedEntry?.remediation || GUARDRAIL_REMEDIATION_MARKDOWN} />)
             };
         }
         return remediationText.length > 0 && {
