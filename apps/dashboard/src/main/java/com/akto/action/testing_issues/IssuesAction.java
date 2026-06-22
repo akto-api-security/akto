@@ -866,7 +866,29 @@ public class IssuesAction extends UserAction {
                     // currently we change the summaries from result page only
                     // so only 1 result comes at a time
                     // Map<String,String> testingRunResultHexIdsMap has only 1 result.
-                    
+
+                    Set<String> resultHexIds = testingRunResultHexIdsMap == null ? new HashSet<>()
+                        : testingRunResultHexIdsMap.keySet().stream()
+                            .filter(k -> !"description".equals(k))
+                            .collect(Collectors.toSet());
+
+                    if (resultHexIds.isEmpty()) {
+                        // Find affected summaries via latestTestingRunSummaryId, then recount each
+                        // using the same logic as handleRefreshTableCount (source of truth).
+                        List<TestingRunIssues> affectedIssues = TestingRunIssuesDao.instance.findAll(
+                            Filters.in(ID, issueIdArray),
+                            Projections.include(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID)
+                        );
+                        Set<ObjectId> summaryIds = affectedIssues.stream()
+                            .map(TestingRunIssues::getLatestTestingRunSummaryId)
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toSet());
+                        for (ObjectId summaryId : summaryIds) {
+                            StartTestAction.recountAndUpdateSummaryCount(summaryId);
+                        }
+                        return;
+                    }
+
                     Map<ObjectId,String> mapSummaryToResultId = VulnerableTestingRunResultDao.instance.mapSummaryIdToTestingResultHexId(testingRunResultHexIdsMap.keySet());
                     if(mapSummaryToResultId.isEmpty()){
                         mapSummaryToResultId = TestingRunResultDao.instance.mapSummaryIdToTestingResultHexId(testingRunResultHexIdsMap.keySet());

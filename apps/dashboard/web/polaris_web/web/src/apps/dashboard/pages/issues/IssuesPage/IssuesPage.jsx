@@ -1,6 +1,6 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubServerTable from "../../../components/tables/GithubServerTable"
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import api from "../api"
 import Store from "../../../store";
 import func from "@/util/func";
@@ -172,7 +172,6 @@ function IssuesPage() {
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
     const [issuesFilters, setIssuesFilters] = useState({})
     const [key, setKey] = useState(false);
-    const summaryHexIdsRef = useRef(new Set())
     const apiCollectionMap = PersistStore(state => state.collectionsMap);
     const [showEmptyScreen, setShowEmptyScreen] = useState(true)
     const [selectedTab, setSelectedTab] = useState("open")
@@ -539,7 +538,6 @@ function IssuesPage() {
                 setMandatoryDescription(description);
             }
             resetResourcesSelected();
-            summaryHexIdsRef.current.forEach(hexId => testingApi.handleRefreshTableCount(hexId));
         });
     };
 
@@ -565,7 +563,6 @@ function IssuesPage() {
             api.bulkUpdateIssueStatus(items, "OPEN", "").then((res) => {
                 setToast(true, false, `Issue${items.length == 1 ? "" : "s"} re-opened`)
                 resetResourcesSelected()
-                summaryHexIdsRef.current.forEach(hexId => testingApi.handleRefreshTableCount(hexId));
             })
         }
 
@@ -912,11 +909,8 @@ function IssuesPage() {
         let issueItem = []
 
         await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
-            summaryHexIdsRef.current = new Set()
             const uniqueIssuesMap = new Map()
             issuesDataRes.issues.forEach(item => {
-                const hexId = item?.latestTestingRunSummaryId?.$oid
-                if (hexId) summaryHexIdsRef.current.add(hexId)
                 const key = `${item?.id?.testSubCategory || ''}|${item?.severity || ''}|${item?.testRunIssueStatus || ''}`
                 if (!uniqueIssuesMap.has(key)) {
                     uniqueIssuesMap.set(key, {
