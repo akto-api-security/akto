@@ -29,7 +29,7 @@ const CellType = {
 
 function GithubRow(props) {
 
-    const {dataObj, getNextUrl, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus, headings, popoverActive, setPopoverActive, preventRowClickOnActions } = props;
+    const {dataObj, getNextUrl, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus, headings, popoverActive, setPopoverActive, preventRowClickOnActions, expandAll, expandAllVersion } = props;
     const navigate = useNavigate();
     const [data, setData] = useState(dataObj);
     const [collapsibleActive, setCollapsibleActive] = useState("none")
@@ -50,6 +50,8 @@ function GithubRow(props) {
         }
     }
 
+    const rowId = data?.name ?? data?.key ?? data?.id;
+
     function handleRowClick(data){
 
         if(data.deactivated){
@@ -58,10 +60,10 @@ function GithubRow(props) {
 
         if(data?.collapsibleRow || (props?.treeView && data?.isTerminal !== true)){
             setCollapsibleActive((prev) => {
-                if(prev===data?.name){
+                if(prev===rowId){
                     return "none";
-                } 
-                return data?.name;
+                }
+                return rowId;
             })
         }
         else if(onRowClick){
@@ -79,6 +81,12 @@ function GithubRow(props) {
             return { ...dataObj };
         })
     }, [dataObj,collapsibleActive])
+
+    useEffect(() => {
+        if (expandAll === undefined || expandAllVersion === 0) return;
+        if (!dataObj?.collapsibleRow) return;
+        setCollapsibleActive(expandAll ? rowId : "none");
+    }, [expandAllVersion, expandAll])
 
     function OldCell(){
         return(
@@ -197,7 +205,7 @@ function GithubRow(props) {
 
     function CollapsibleCell(treeView, value, customKey) {
         let iconSource = ChevronRightMinor
-        if(collapsibleActive === data?.name){
+        if(collapsibleActive === rowId){
             iconSource = ChevronDownMinor
         }
         return (
@@ -265,7 +273,7 @@ function GithubRow(props) {
                 {props?.newRow ? <NewCell /> :<OldCell/>}   
             </IndexTable.Row>
             
-            {collapsibleActive === data?.name ? ( props?.treeView ? data?.makeTree(data) : data?.collapsibleRow) : null}
+            {collapsibleActive === rowId ? ( props?.treeView ? data?.makeTree(data) : data?.collapsibleRow) : null}
             
         </>
     )

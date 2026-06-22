@@ -15,7 +15,7 @@ import {
   Link,
   Button,
   Tooltip} from '@shopify/polaris';
-import { GithubRow} from './rows/GithubRow';
+import { GithubRow, CellType } from './rows/GithubRow';
 import { useState, useCallback, useEffect, useMemo, useRef, useReducer } from 'react';
 import { createPortal } from 'react-dom';
 import "./style.css"
@@ -213,7 +213,9 @@ function GithubServerTable(props) {
     tempData ? setData([...tempData.value]) : setData([])
     tempData ? setTotal(tempData.total) : setTotal(0)
     tempData ? setFullDataIds(tempData?.fullDataIds) : setFullDataIds([])
-    
+    setExpandAll(false);
+    setExpandAllVersion(prev => prev + 1);
+
     applyFilter(tempData.total)
     if (!performance.getEntriesByType('navigation')[0].type === 'reload') {
       setTableInitialState({
@@ -599,6 +601,9 @@ function GithubServerTable(props) {
   }
 
   const [popoverActive, setPopoverActive] = useState(-1);
+  const [expandAll, setExpandAll] = useState(false);
+  const [expandAllVersion, setExpandAllVersion] = useState(0);
+  const hasCollapsibleRows = useMemo(() => props.headers.some(h => h.type === CellType.COLLAPSIBLE), [props.headers]);
 
   // sending all data in case of simple table because the select-all state is controlled from the data.
   // not doing this affects bulk select functionality.
@@ -649,18 +654,22 @@ function GithubServerTable(props) {
             setPopoverActive={setPopoverActive}
             treeView={props?.treeView}
             preventRowClickOnActions={props?.preventRowClickOnActions || false}
+            expandAll={hasCollapsibleRows ? expandAll : undefined}
+            expandAllVersion={hasCollapsibleRows ? expandAllVersion : undefined}
           />
         );
       },
     );
-  }, [data, selectedResources, props, popoverActive, setPopoverActive]);
+  }, [data, selectedResources, props, popoverActive, setPopoverActive, expandAll, expandAllVersion, hasCollapsibleRows]);
 
   const onPageNext = () => {
     setPage((page) => (page + 1));
+    setExpandAll(false);
   }
 
   const onPagePrevious = () => {
     setPage((page) => (page - 1));
+    setExpandAll(false);
   }
 
   const handleTabChange = (x) => {
@@ -680,6 +689,11 @@ function GithubServerTable(props) {
     }
   }, [bulkActionResources, props.setSelectedResourcesForPrimaryAction])
 
+
+  const handleExpandAll = useCallback(() => {
+    setExpandAll(prev => !prev);
+    setExpandAllVersion(prev => prev + 1);
+  }, []);
 
   const handleExportCsv = useCallback(async () => {
     if (props.onExportCsv) return props.onExportCsv()
@@ -743,9 +757,16 @@ function GithubServerTable(props) {
                 />
               </span>
               {exportPortalTarget && data.length > 0 && createPortal(
-                <Tooltip content="Export as CSV" dismissOnMouseOut>
-                  <Button size="slim" icon={ImportMinor} onClick={handleExportCsv} accessibilityLabel="Export as CSV" />
-                </Tooltip>,
+                <HorizontalStack gap="1">
+                  {hasCollapsibleRows && (
+                    <Button size="slim" onClick={handleExpandAll}>
+                      {expandAll ? "Collapse all" : "Expand all"}
+                    </Button>
+                  )}
+                  <Tooltip content="Export as CSV" dismissOnMouseOut>
+                    <Button size="slim" icon={ImportMinor} onClick={handleExportCsv} accessibilityLabel="Export as CSV" />
+                  </Tooltip>
+                </HorizontalStack>,
                 exportPortalTarget
               )}
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
