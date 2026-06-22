@@ -876,8 +876,10 @@ public class IssuesAction extends UserAction {
                     if (resultHexIds.isEmpty()) {
                         // Find affected summaries via latestTestingRunSummaryId, then recount each
                         // using the same logic as handleRefreshTableCount (source of truth).
+                        // Reuse accessFilter so the recount scope matches the authorization scope
+                        // applied to the status update above.
                         List<TestingRunIssues> affectedIssues = TestingRunIssuesDao.instance.findAll(
-                            Filters.in(ID, issueIdArray),
+                            accessFilter,
                             Projections.include(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID)
                         );
                         Set<ObjectId> summaryIds = affectedIssues.stream()
