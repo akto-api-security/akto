@@ -58,6 +58,43 @@ function SchemaValidationError({ sampleData}) {
     )
 }
 
+function VulnerabilityEvidence({ segments }) {
+    if (!Array.isArray(segments) || segments.length === 0) {
+        return null;
+    }
+
+    return (
+        <Banner title="Evidence" status="warning">
+            <VerticalStack gap="2">
+                {segments.map((seg, index) => {
+                    const isRequest = String(seg?.location || 'RESPONSE').toUpperCase() === 'REQUEST';
+                    const reason = typeof seg?.reason === 'string' ? seg.reason : '';
+                    const phrase = typeof seg?.phrase === 'string' ? seg.phrase : '';
+                    return (
+                        <Box key={index}>
+                            <HorizontalStack gap="2" align="start" blockAlign="start" wrap={false}>
+                                <Box paddingBlockStart="05">
+                                    <Badge status={isRequest ? 'attention' : 'critical'}>
+                                        {isRequest ? 'Request' : 'Response'}
+                                    </Badge>
+                                </Box>
+                                <VerticalStack gap="0">
+                                    {reason ? <Text variant="bodyMd">{reason}</Text> : null}
+                                    {phrase ? (
+                                        <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#6B46C1', wordBreak: 'break-all' }}>
+                                            {phrase}
+                                        </span>
+                                    ) : null}
+                                </VerticalStack>
+                            </HorizontalStack>
+                        </Box>
+                    );
+                })}
+            </VerticalStack>
+        </Banner>
+    );
+}
+
 function SampleDataList(props) {
 
     const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp} = props;
@@ -76,6 +113,7 @@ function SampleDataList(props) {
     return (
       <VerticalStack gap="3">
          <SchemaValidationError sampleData={currentSample} />
+         <VulnerabilityEvidence segments={currentSample?.vulnerabilitySegments} />
         <HorizontalStack align='space-between'>
           <HorizontalStack gap="2">
             <Text variant='headingMd'>
