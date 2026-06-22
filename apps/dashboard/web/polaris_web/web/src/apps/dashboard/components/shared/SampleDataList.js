@@ -12,6 +12,8 @@ import ValidationReasonBanner from './ValidationReasonBanner';
 import func from '../../../../util/func';
 import { getDashboardCategory, mapLabel, isAgenticSecurityCategory, isEndpointSecurityCategory } from '../../../main/labelHelper';
 
+const SHOW_VULNERABILITY_EVIDENCE = false;
+
 function SchemaValidationError({ sampleData}) {
     const [expanded, setExpanded] = useState(false);
 
@@ -113,7 +115,9 @@ function SampleDataList(props) {
     return (
       <VerticalStack gap="3">
          <SchemaValidationError sampleData={currentSample} />
-         <VulnerabilityEvidence segments={currentSample?.vulnerabilitySegments} />
+         {SHOW_VULNERABILITY_EVIDENCE ? (
+           <VulnerabilityEvidence segments={currentSample?.vulnerabilitySegments} />
+         ) : null}
         <HorizontalStack align='space-between'>
           <HorizontalStack gap="2">
             <Text variant='headingMd'>
