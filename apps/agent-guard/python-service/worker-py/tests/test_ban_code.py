@@ -1,10 +1,30 @@
 """BanCode local scanner — pure logic, no network."""
 
+from constants import canonical_scanner
 from scanners import ban_code
 
 
 def run(text, **config):
     return ban_code.scan("prompt", text, config)
+
+
+def test_name_resolution_routes_all_code_spellings_to_bancode():
+    # Every code-detection spelling/case must resolve to the BanCode scanner.
+    assert canonical_scanner("BanCode") == "BanCode"
+    assert canonical_scanner("bancode") == "BanCode"
+    assert canonical_scanner("BANCODE") == "BanCode"
+    assert canonical_scanner("Code") == "BanCode"
+    assert canonical_scanner("code") == "BanCode"
+
+
+def test_name_resolution_is_case_insensitive_for_other_scanners():
+    assert canonical_scanner("promptinjection") == "PromptInjection"
+    assert canonical_scanner("Secrets") == "Secrets"
+
+
+def test_name_resolution_leaves_unknown_names_unchanged():
+    assert canonical_scanner("TotallyMadeUp") == "TotallyMadeUp"
+    assert canonical_scanner("") == ""
 
 
 def test_flags_python_function():

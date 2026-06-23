@@ -63,3 +63,27 @@ LOCAL_SCANNERS = {"BanCode", "BanSubstrings", "TokenLimit", "Secrets"}
 # torch, etc.) which Pyodide can't host.
 REMOTE_SCANNERS = {"Anonymize"}
 SUPPORTED_SCANNERS = CASCADE_SCANNERS | LOCAL_SCANNERS | REMOTE_SCANNERS
+
+# Caller-supplied scanner_name aliases → canonical name. The container exposes a
+# separate ML-based `Code` scanner (language classification); Pyodide can't host
+# that model, so here `Code` is served by the `BanCode` heuristic (code-presence
+# detection). Keys are lower-cased; matching is case-insensitive (see
+# canonical_scanner). All code-detection spellings therefore behave identically.
+SCANNER_ALIASES = {"code": "BanCode"}
+
+
+def canonical_scanner(name: str) -> str:
+    """Resolve a caller-supplied scanner_name to its canonical form.
+
+    Case-insensitive, so "bancode" / "BANCODE" match "BanCode". Applies
+    SCANNER_ALIASES (e.g. Code/code → BanCode) so equivalent names route to the
+    same scanner. Unknown names are returned unchanged for the caller's
+    unsupported-scanner handling.
+    """
+    if not name:
+        return name
+    lowered = name.lower()
+    for canonical in SUPPORTED_SCANNERS:
+        if canonical.lower() == lowered:
+            return canonical
+    return SCANNER_ALIASES.get(lowered, name)

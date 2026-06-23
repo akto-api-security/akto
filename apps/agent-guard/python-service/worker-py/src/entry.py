@@ -15,7 +15,7 @@ from pyodide.ffi import create_proxy
 from workers import Response, waitUntil
 
 import alerts
-from constants import CASCADE_SCANNERS, LOCAL_SCANNERS, REMOTE_SCANNERS, SUPPORTED_SCANNERS, get_default_config
+from constants import CASCADE_SCANNERS, LOCAL_SCANNERS, REMOTE_SCANNERS, SUPPORTED_SCANNERS, canonical_scanner, get_default_config
 from scanners import scan_local
 from settings import settings
 from llm_scanner import scan_with_model_map
@@ -63,7 +63,7 @@ def _shape(scanner_name, is_valid, risk_score, sanitized_text, details) -> dict:
 
 async def _scan(payload: dict, env=None) -> dict:
     """Run one scan and return the ScanResponse-shaped dict."""
-    scanner_name = payload.get("scanner_name", "")
+    scanner_name = canonical_scanner(payload.get("scanner_name", ""))
     scanner_type = payload.get("scanner_type", "prompt")
     text = payload.get("text", "")
     config = payload.get("config") or {}
