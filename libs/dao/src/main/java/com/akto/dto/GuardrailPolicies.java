@@ -91,6 +91,7 @@ public class GuardrailPolicies {
     private CONTEXT_SOURCE contextSource;
 
     private SecretsDetection secretsDetection;
+    private BanCodeDetection banCodeDetection;
     private boolean applyToAllServers;
 
     // applyToDeviceIds is resolved at fetch time (not stored) by the dashboard before serving to the enforcement layer.
@@ -368,6 +369,19 @@ public class GuardrailPolicies {
         private double confidenceScore;
 
         public SecretsDetection(boolean enabled, double confidenceScore) {
+            this.enabled = enabled;
+            this.confidenceScore = confidenceScore;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class BanCodeDetection {
+        private boolean enabled;
+        private double confidenceScore;
+
+        public BanCodeDetection(boolean enabled, double confidenceScore) {
             this.enabled = enabled;
             this.confidenceScore = confidenceScore;
         }
