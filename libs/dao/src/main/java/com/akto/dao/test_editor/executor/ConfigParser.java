@@ -163,10 +163,6 @@ public class ConfigParser {
                     configParserValidationResult.setErrMsg("data should only have string value or regex_replace map");
                     return configParserValidationResult;
                 }
-            } else {
-                configParserValidationResult.setIsValid(false);
-                configParserValidationResult.setErrMsg("data should only have string value");
-                return configParserValidationResult;
             }
         }
 
