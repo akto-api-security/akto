@@ -3077,6 +3077,15 @@ public class DbLayer {
         }
     }
 
+    public static List<String> findDeviceIdsByTeamsAndRoles(List<String> teams, List<String> roles) {
+        try {
+            return AgentUsersDao.instance.findDeviceIdsByTeamsAndRoles(teams, roles);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in findDeviceIdsByTeamsAndRoles: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
     public static void storeConversationResults(List<AgentConversationResult> conversationResults) {
         AgentConversationResultDao.instance.insertMany(conversationResults);
     }
