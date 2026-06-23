@@ -7,10 +7,11 @@ import DetailGrid from "../agentic/DetailGrid";
 import AiChatSection from "../agentic/AiChatSection";
 import { buildAgenticObserveChatMetadata } from "../agentic/agenticObserveApi";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import TraceDetailView from "./LLMTraceDetail";
 import api from "./api";
 import { enrichRow } from "./utils";
-import { getTraceColumnDefs, MESSAGE_FLAT_COLUMN_DEFS } from "./columns";
+import { getTraceColumnDefs } from "./columns";
 import { formatCost, formatCompact, formatDurationMs, truncate } from "./constants";
 
 const TAB_OVERVIEW = 0;
@@ -39,11 +40,11 @@ function SessionFlowGraph({ session }) {
 
 // ─── Overview ─────────────────────────────────────────────────────────────────
 
-function OverviewContent({ session }) {
+function OverviewContent({ session, traceCount }) {
     const totalTokens = (Number(session._inputTokens) || 0) + (Number(session._outputTokens) || 0);
 
     const stats = [
-        { label: "Traces",       value: session.messageCount || 0 },
+        { label: "Traces",       value: traceCount },
         { label: "Total tokens", value: formatCompact(totalTokens) },
         { label: "Duration",     value: formatDurationMs(session.durationMs) },
         { label: "Est. cost",    value: formatCost(session._inputTokens || 0, session._outputTokens || 0) },
@@ -88,45 +89,25 @@ function OverviewContent({ session }) {
     );
 }
 
-// ─── Session traces table ─────────────────────────────────────────────────────
+// ─── Session traces content ───────────────────────────────────────────────────
+// Pure presenter — data is fetched once at SessionFlyout level and passed down.
+// If records exist → shows a trace table (clicking a row opens TraceDetailView).
+// If empty (old records without traceId) → renders TraceDetailView directly,
+// which loads spans via searchPrompts scoped to the sessionIdentifier.
 
 const TRACE_COL_DEFS = getTraceColumnDefs({ showSession: false });
 
-function SessionTracesTable({ sessionId, currDateRange, onTraceClick }) {
-    const [rows, setRows]       = useState([]);
-    const [colDefs, setColDefs] = useState(TRACE_COL_DEFS);
-
-    useEffect(() => {
-        if (!sessionId) return;
-        let cancelled = false;
-        const since = Math.floor(Date.parse(currDateRange.period.since) / 1000);
-        const until = Math.floor(Date.parse(currDateRange.period.until) / 1000);
-        api.fetchMessages(since, until, { sessionId })
-            .then(data => {
-                if (cancelled) return;
-                const traces = (data || []).map(enrichRow);
-                if (traces.length > 0) {
-                    setColDefs(TRACE_COL_DEFS);
-                    setRows(traces);
-                    return;
-                }
-                // Old records without traceId — fall back to flat spans as a preview.
-                return api.searchPrompts({ startTime: since, endTime: until, sessionId, limit: 5, skip: 0 })
-                    .then(result => {
-                        if (cancelled) return;
-                        setColDefs(MESSAGE_FLAT_COLUMN_DEFS);
-                        setRows(result?.value || []);
-                    });
-            });
-        return () => { cancelled = true; };
-    }, [sessionId, currDateRange]);
-
+function SessionTracesContent({ rows, spanRows, loading, hasMessages, session, currDateRange, onTraceClick }) {
     const handleRowClick = useCallback(p => p.data && onTraceClick?.(p.data), [onTraceClick]);
+
+    if (loading || hasMessages === null) return <SpinnerCentered height="200px" />;
+
+    if (!hasMessages) return <TraceDetailView trace={session} currDateRange={currDateRange} initialSpans={spanRows} />;
 
     return (
         <AgGridTable
             rowData={rows}
-            columnDefs={colDefs}
+            columnDefs={TRACE_COL_DEFS}
             defaultColDef={{ resizable: true, sortable: true, filter: false }}
             searchPlaceholder="Search traces..."
             rowHeight={44}
@@ -150,13 +131,51 @@ function SessionTracesTable({ sessionId, currDateRange, onTraceClick }) {
 // ─── SessionFlyout ────────────────────────────────────────────────────────────
 
 export default function SessionFlyout({ session, currDateRange, onClose }) {
-    const [activeTab, setActiveTab] = useState(TAB_OVERVIEW);
-    const [topNav, setTopNav]       = useState(null);
+    const [activeTab, setActiveTab]     = useState(TAB_OVERVIEW);
+    const [topNav, setTopNav]           = useState(null);
+    const [traceRows, setTraceRows]       = useState([]);
+    const [spanRows, setSpanRows]         = useState([]);
+    const [traceLoading, setTraceLoading] = useState(false);
+    const [hasMessages, setHasMessages]   = useState(null);
 
     useEffect(() => {
         setActiveTab(TAB_OVERVIEW);
         setTopNav(null);
+        setTraceRows([]);
+        setSpanRows([]);
+        setHasMessages(null);
     }, [session?.sessionIdentifier]);
+
+    useEffect(() => {
+        if (!session?.sessionIdentifier || !currDateRange) return;
+        let cancelled = false;
+        setTraceLoading(true);
+        const since = Math.floor(Date.parse(currDateRange.period.since) / 1000);
+        const until = Math.floor(Date.parse(currDateRange.period.until) / 1000);
+        api.fetchMessages(since, until, { sessionId: session.sessionIdentifier })
+            .then(data => {
+                if (cancelled) return;
+                const traces = (data || []).map(enrichRow);
+                if (traces.length > 0) {
+                    setTraceRows(traces);
+                    setHasMessages(true);
+                    setTraceLoading(false);
+                } else {
+                    // Old records with no traceId — load spans directly so both the
+                    // Overview count and the Traces tab have data without a second fetch.
+                    return api.searchPrompts({ startTime: since, endTime: until, sessionId: session.sessionIdentifier, limit: 100 })
+                        .then(result => {
+                            if (!cancelled) {
+                                setSpanRows(result.value || []);
+                                setHasMessages(false);
+                                setTraceLoading(false);
+                            }
+                        });
+                }
+            })
+            .catch(() => { if (!cancelled) { setHasMessages(false); setTraceLoading(false); } });
+        return () => { cancelled = true; };
+    }, [session?.sessionIdentifier, currDateRange]);
 
     const chatMetadata = useMemo(() => {
         if (!session) return null;
@@ -172,18 +191,30 @@ export default function SessionFlyout({ session, currDateRange, onClose }) {
 
     const sessionLabel = session._promptText ? truncate(session._promptText, 32) : "Session";
     const openTrace    = (trace) => setTopNav({ label: trace._promptText ? truncate(trace._promptText, 28) : "Trace detail", trace });
+    // Accurate count once fetch resolves; fall back to stored agg value while loading.
+    const traceCount = hasMessages === true  ? traceRows.length
+                     : hasMessages === false ? spanRows.length
+                     : (session.messageCount || 0);
 
     function renderContent() {
         if (topNav) return <TraceDetailView trace={topNav.trace} currDateRange={currDateRange} />;
         switch (activeTab) {
             case TAB_OVERVIEW: return (
                 <Scrollable style={{ flex: 1 }}>
-                    <OverviewContent session={session} />
+                    <OverviewContent session={session} traceCount={traceCount} />
                 </Scrollable>
             );
             case TAB_TRACES: return (
                 <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-                    <SessionTracesTable sessionId={session.sessionIdentifier} currDateRange={currDateRange} onTraceClick={openTrace} />
+                    <SessionTracesContent
+                        rows={traceRows}
+                        spanRows={spanRows}
+                        loading={traceLoading}
+                        hasMessages={hasMessages}
+                        session={session}
+                        currDateRange={currDateRange}
+                        onTraceClick={openTrace}
+                    />
                 </div>
             );
             default: return null;

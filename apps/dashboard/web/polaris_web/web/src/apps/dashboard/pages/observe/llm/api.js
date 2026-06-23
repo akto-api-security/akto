@@ -83,6 +83,22 @@ export default {
         });
     },
 
+    // Aggregated stats for summary cards — accurate cardinality, token sums, top users.
+    // Returns { totalSessions, totalInputTokens, totalOutputTokens, topUsers, userBreakdown }.
+    fetchSessionStats(startTime, endTime) {
+        return request({
+            url: "/api/fetchLLMSessionStats",
+            method: "post",
+            data: { startTime, endTime },
+        }).then(r => ({
+            totalSessions:     r?.aggTotalSessions    || 0,
+            totalInputTokens:  r?.aggInputTokens      || 0,
+            totalOutputTokens: r?.aggOutputTokens     || 0,
+            topUsers:          r?.aggTopUsers         || [],
+            userBreakdown:     r?.aggUserBreakdown    || [],
+        }));
+    },
+
     // Distinct values for filterable columns (userName, deviceId, serviceId).
     fetchFilterChoices(startTime, endTime) {
         return request({
