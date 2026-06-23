@@ -999,7 +999,8 @@ export default {
         const resp = await request({
             url: '/api/fetchApiCallStats',
             method: 'post',
-            data: { apiCollectionId, url, method, startEpoch, endEpoch }
+            data: { apiCollectionId, url, method, startEpoch, endEpoch },
+            suppress403Toast: true
         })
         return resp
     },
@@ -1012,7 +1013,8 @@ export default {
         const resp = await request({
             url: '/api/fetchIpLevelApiCallStats',
             method: 'post',
-            data: {apiCollectionId, url, method, startWindow, endWindow }
+            data: {apiCollectionId, url, method, startWindow, endWindow },
+            suppress403Toast: true
         })
         return resp
     },
