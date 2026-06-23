@@ -1270,14 +1270,14 @@ function ApiEndpoints(props) {
             key: 'graphqlTree',
             label: 'Display GraphQL tree view',
             state: treeViewMode === 'graphql',
-            setState: (on) => setTreeViewMode(on ? 'graphql' : null),
+            setState: (on) => setTreeViewMode(prev => on ? 'graphql' : (prev === 'graphql' ? null : prev)),
             condition: isGraphQLCollection
         },
         {
             key: 'restTree',
             label: 'Display REST tree view',
             state: treeViewMode === 'rest',
-            setState: (on) => setTreeViewMode(on ? 'rest' : null),
+            setState: (on) => setTreeViewMode(prev => on ? 'rest' : (prev === 'rest' ? null : prev)),
             // isGraphQLCollection checks if any endpoint has apiType === "GRAPHQL".
             // Pure REST collections show this; mixed collections show the GraphQL tree
             // (REST endpoints in a mixed collection are silently excluded from that view).
