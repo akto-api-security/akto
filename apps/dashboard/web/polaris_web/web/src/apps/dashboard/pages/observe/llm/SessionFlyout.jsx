@@ -7,10 +7,11 @@ import DetailGrid from "../agentic/DetailGrid";
 import AiChatSection from "../agentic/AiChatSection";
 import { buildAgenticObserveChatMetadata } from "../agentic/agenticObserveApi";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import TraceDetailView from "./LLMTraceDetail";
 import api from "./api";
 import { enrichRow } from "./utils";
-import { getTraceColumnDefs, MESSAGE_FLAT_COLUMN_DEFS } from "./columns";
+import { getTraceColumnDefs } from "./columns";
 import { formatCost, formatCompact, formatDurationMs, truncate } from "./constants";
 
 const TAB_OVERVIEW = 0;
@@ -88,45 +89,48 @@ function OverviewContent({ session }) {
     );
 }
 
-// ─── Session traces table ─────────────────────────────────────────────────────
+// ─── Session traces content ───────────────────────────────────────────────────
+// Fetches message-level (traceId-grouped) data for the session.
+// If records exist → shows a trace table (clicking a row opens TraceDetailView).
+// If empty (old records without traceId) → renders TraceDetailView directly,
+// which loads spans via searchPrompts scoped to the sessionIdentifier.
 
 const TRACE_COL_DEFS = getTraceColumnDefs({ showSession: false });
 
-function SessionTracesTable({ sessionId, currDateRange, onTraceClick }) {
-    const [rows, setRows]       = useState([]);
-    const [colDefs, setColDefs] = useState(TRACE_COL_DEFS);
+function SessionTracesContent({ session, currDateRange, onTraceClick }) {
+    const [rows, setRows]           = useState([]);
+    const [loading, setLoading]     = useState(true);
+    const [hasMessages, setHasMessages] = useState(null);
 
     useEffect(() => {
-        if (!sessionId) return;
+        if (!session?.sessionIdentifier) { setLoading(false); return; }
         let cancelled = false;
+        setLoading(true);
+        setHasMessages(null);
         const since = Math.floor(Date.parse(currDateRange.period.since) / 1000);
         const until = Math.floor(Date.parse(currDateRange.period.until) / 1000);
-        api.fetchMessages(since, until, { sessionId })
+        api.fetchMessages(since, until, { sessionId: session.sessionIdentifier })
             .then(data => {
                 if (cancelled) return;
                 const traces = (data || []).map(enrichRow);
-                if (traces.length > 0) {
-                    setColDefs(TRACE_COL_DEFS);
-                    setRows(traces);
-                    return;
-                }
-                // Old records without traceId — fall back to flat spans as a preview.
-                return api.searchPrompts({ startTime: since, endTime: until, sessionId, limit: 5, skip: 0 })
-                    .then(result => {
-                        if (cancelled) return;
-                        setColDefs(MESSAGE_FLAT_COLUMN_DEFS);
-                        setRows(result?.value || []);
-                    });
-            });
+                setRows(traces);
+                setHasMessages(traces.length > 0);
+                setLoading(false);
+            })
+            .catch(() => { if (!cancelled) { setHasMessages(false); setLoading(false); } });
         return () => { cancelled = true; };
-    }, [sessionId, currDateRange]);
+    }, [session?.sessionIdentifier, currDateRange]);
 
     const handleRowClick = useCallback(p => p.data && onTraceClick?.(p.data), [onTraceClick]);
+
+    if (loading) return <SpinnerCentered height="200px" />;
+
+    if (!hasMessages) return <TraceDetailView trace={session} currDateRange={currDateRange} />;
 
     return (
         <AgGridTable
             rowData={rows}
-            columnDefs={colDefs}
+            columnDefs={TRACE_COL_DEFS}
             defaultColDef={{ resizable: true, sortable: true, filter: false }}
             searchPlaceholder="Search traces..."
             rowHeight={44}
@@ -183,7 +187,7 @@ export default function SessionFlyout({ session, currDateRange, onClose }) {
             );
             case TAB_TRACES: return (
                 <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-                    <SessionTracesTable sessionId={session.sessionIdentifier} currDateRange={currDateRange} onTraceClick={openTrace} />
+                    <SessionTracesContent session={session} currDateRange={currDateRange} onTraceClick={openTrace} />
                 </div>
             );
             default: return null;
