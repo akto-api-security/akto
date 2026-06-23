@@ -1793,6 +1793,7 @@ updateQueryParams(searchParams, setSearchParams, key, value) {
   const aliases = {
     "OWASP AGENTIC TOP 10": "OWASP Agentic.svg",
     "OWASP AGENTIC": "OWASP Agentic.svg",
+    "OWASP AGENTIC SKILLS TOP 10": "OWASP Agentic.svg",
     "EU AI ACT": "EU AI Act.svg",
     "NIST AI RISK MANAGEMENT FRAMEWORK": "NIST AI Risk Management Framework.svg",
   };
