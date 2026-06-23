@@ -74,6 +74,8 @@ const err = async (error) => {
           // Set persistent alert for NO_ACCESS errors
           window.SHOW_NO_ACCESS_ALERT = true;
           window.NO_ACCESS_ALERT_MESSAGE = message;
+        } else if (error?.config?.suppress403Toast) {
+          // Caller opted out of toast — page handles 403 via its own UI
         } else {
           func.setToast(true, true, message);
         }

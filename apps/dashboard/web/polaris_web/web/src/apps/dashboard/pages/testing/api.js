@@ -141,7 +141,8 @@ export default {
             method: 'post',
             data: {
                 testingRunResultHexId
-            }
+            },
+            suppress403Toast: true
         })
     },
     fetchIssueFromTestRunResultDetails(testingRunResultHexId) {
@@ -150,7 +151,8 @@ export default {
             method: 'post',
             data: {
                 testingRunResultHexId
-            }
+            },
+            suppress403Toast: true
         })
     },
     createJiraTicket(jiraMetaData, projId, issueType) {
@@ -603,7 +605,8 @@ export default {
         return request({
             url: '/api/fetchSeverityInfoForIssues',
             method: 'post',
-            data: {...filters, issueIds, endTimeStamp}
+            data: {...filters, issueIds, endTimeStamp},
+            suppress403Toast: true
         })
     },
     handleRefreshTableCount(testingRunResultSummaryHexId) {
