@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     VerticalStack,
     Text,
@@ -71,6 +71,19 @@ const ContentPolicyStep = ({
     // Denied topics state
     const [defaultPickerOpen, setDefaultPickerOpen] = useState(false);
     const [editingIndex, setEditingIndex] = useState(null);
+
+    // Auto-open the default picker when an existing policy is loaded with defaults already selected.
+    // Track the previous size to only trigger on a bulk load (size jump), not on individual checkbox toggles.
+    const prevDefaultKeySizeRef = useRef(selectedDefaultBlockKeys.size);
+    useEffect(() => {
+        const prev = prevDefaultKeySizeRef.current;
+        const curr = selectedDefaultBlockKeys.size;
+        prevDefaultKeySizeRef.current = curr;
+        // Jump of more than 1 means a policy was loaded (not a manual toggle)
+        if (curr > 1 && prev <= 1) {
+            setDefaultPickerOpen(true);
+        }
+    }, [selectedDefaultBlockKeys]);
     const [editFormData, setEditFormData] = useState({
         topic: "",
         description: "",
@@ -367,7 +380,7 @@ const ContentPolicyStep = ({
                                             fullWidth
                                             textAlign="left"
                                         >
-                                            Add Akto default topics
+                                            {`Add Akto default topics${selectedDefaultBlockKeys.size > 0 ? ` (${selectedDefaultBlockKeys.size} selected)` : ''}`}
                                         </Button>
                                     </VerticalStack>
                                 )}
