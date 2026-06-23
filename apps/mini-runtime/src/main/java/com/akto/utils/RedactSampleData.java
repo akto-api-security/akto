@@ -113,9 +113,9 @@ public class RedactSampleData {
     }
 
     private static void handleHeaders(Map<String, List<String>> responseHeaders, boolean redactAll) {
-        if (redactAll) {
+        if(redactAll){
             for (String header : responseHeaders.keySet()) {
-                if (header.equals(HOST)) {
+                if(header.equals(HOST)){
                     continue;
                 }
                 if (header.equalsIgnoreCase(AuthPolicy.COOKIE_NAME)) {
@@ -146,7 +146,6 @@ public class RedactSampleData {
                     }
                     responseHeaders.put(key, Collections.singletonList(redact(values.get(0))));
                 }
-
             }
         }
     }
