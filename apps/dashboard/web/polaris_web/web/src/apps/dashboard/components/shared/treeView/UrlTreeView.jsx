@@ -1,37 +1,41 @@
-import React, { useMemo } from 'react'
+import React, { useCallback, useMemo } from 'react'
 import AgGridTable from '../../tables/AgGridTable'
 import { buildTreeColumnDefs, buildTreeAutoGroupColumnDef } from './UrlTreeViewColumns'
 import '../../../components/layouts/style.css'
 
+const DEFAULT_COL_DEF = { cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'flex-start' } }
+const GET_DATA_PATH = (r) => r.path
+
+const AUTO_GROUP_INNER_RENDERER = (params) => {
+    if (!params.node.group) {
+        return params.data?.endpointComp || params.value || ''
+    }
+    const directChildCount = params.node.childrenAfterGroup?.length ?? 0
+    return `${params.value} (${directChildCount})`
+}
+
+const AUTO_GROUP_COL_DEF = buildTreeAutoGroupColumnDef({ minWidth: 560, innerRenderer: AUTO_GROUP_INNER_RENDERER })
+
 function UrlTreeView({ flatRows, tableHeaders, onRowClick, searchPlaceholder, groupDefaultExpanded }) {
     const columnDefs = useMemo(() => buildTreeColumnDefs(tableHeaders), [tableHeaders])
 
-    const autoGroupColumnDef = useMemo(() => {
-        const innerRenderer = (params) => {
-            if (!params.node.group) {
-                return params.data?.endpointComp || params.value || ''
-            }
-            const directChildCount = params.node.childrenAfterGroup?.length ?? 0
-            return `${params.value} (${directChildCount})`
+    const onRowClicked = useCallback((e) => {
+        if (!e.node.group) {
+            onRowClick?.(e.data)
         }
-        return buildTreeAutoGroupColumnDef({ minWidth: 560, innerRenderer })
-    }, [])
+    }, [onRowClick])
 
     return (
         <AgGridTable
-            defaultColDef={{ cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'flex-start' } }}
+            defaultColDef={DEFAULT_COL_DEF}
             treeData={true}
-            getDataPath={(r) => r.path}
-            autoGroupColumnDef={autoGroupColumnDef}
+            getDataPath={GET_DATA_PATH}
+            autoGroupColumnDef={AUTO_GROUP_COL_DEF}
             rowData={flatRows}
             columnDefs={columnDefs}
             groupDefaultExpanded={groupDefaultExpanded ?? 0}
             searchPlaceholder={searchPlaceholder}
-            onRowClicked={(e) => {
-                if (!e.node.group) {
-                    onRowClick?.(e.data)
-                }
-            }}
+            onRowClicked={onRowClicked}
             rowHeight={44}
             domLayout="autoHeight"
             pagination={false}

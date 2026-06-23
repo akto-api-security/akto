@@ -1,4 +1,5 @@
-// Regex patterns to detect parameterized segments
+import func from '@/util/func'
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const INT_RE = /^\d+$/
 const PARAM_RE = /^\{.+\}$/
@@ -8,25 +9,16 @@ function normalizeSegment(seg) {
     return seg
 }
 
-// Extract only the path portion — strips protocol+host for full URLs
-function getPathSegments(endpoint) {
-    try {
-        const url = new URL(endpoint)
-        return url.pathname.split('/').filter(Boolean)
-    } catch {
-        return endpoint.split('/').filter(Boolean)
-    }
-}
-
-// Build flat rows with path arrays for AG Grid treeData
-// Max depth: 4 segments. Params normalized to {param}.
 function buildRestFlatRows(endpoints) {
     return endpoints
         .map(ep => {
             if (!ep.endpoint) return null
-            const segments = getPathSegments(ep.endpoint).map(normalizeSegment)
-            if (segments.length === 0) return null
-            const path = segments.slice(0, 4)
+            const path = func.convertToRelativePath(ep.endpoint)
+                .split('/')
+                .filter(Boolean)
+                .map(normalizeSegment)
+                .slice(0, 4)
+            if (path.length === 0) return null
             return { ...ep, path }
         })
         .filter(Boolean)
