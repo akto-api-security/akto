@@ -12,11 +12,11 @@ import {
     FormLayout,
     Badge
 } from "@shopify/polaris";
-import { PlusMinor, EditMinor, DeleteMinor } from "@shopify/polaris-icons";
+import { PlusMinor, EditMinor, DeleteMinor, ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
-import { GENERAL_BLOCKS, toDeniedTopic } from "../../generalBlocks";
+import { GENERAL_BLOCKS, GENERAL_BLOCK_GROUPS, toDeniedTopic } from "../../generalBlocks";
 import func from "@/util/func";
 
 export const ContentPolicyConfig = {
@@ -69,6 +69,7 @@ const ContentPolicyStep = ({
     setBasePromptConfidenceScore
 }) => {
     // Denied topics state
+    const [defaultPickerOpen, setDefaultPickerOpen] = useState(false);
     const [editingIndex, setEditingIndex] = useState(null);
     const [editFormData, setEditFormData] = useState({
         topic: "",
@@ -358,7 +359,37 @@ const ContentPolicyStep = ({
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
                                 {editingIndex === null && (
-                                    <Button icon={PlusMinor} onClick={startAdding} fullWidth textAlign="left">Add denied topic</Button>
+                                    <VerticalStack gap="2">
+                                        <Button icon={PlusMinor} onClick={startAdding} fullWidth textAlign="left">Add denied topic</Button>
+                                        <Button
+                                            icon={defaultPickerOpen ? ChevronUpMinor : ChevronDownMinor}
+                                            onClick={() => setDefaultPickerOpen(o => !o)}
+                                            fullWidth
+                                            textAlign="left"
+                                        >
+                                            Add Akto default topics
+                                        </Button>
+                                    </VerticalStack>
+                                )}
+                                {defaultPickerOpen && (
+                                    <Box background="bg-surface-secondary" padding="3" borderRadius="2" borderWidth="1" borderColor="border">
+                                        <VerticalStack gap="4">
+                                            {Object.values(GENERAL_BLOCK_GROUPS).map(group => (
+                                                <VerticalStack key={group} gap="2">
+                                                    <Text variant="bodySm" fontWeight="semibold" tone="subdued">{group}</Text>
+                                                    {GENERAL_BLOCKS.filter(b => b.group === group).map(block => (
+                                                        <Checkbox
+                                                            key={block.key}
+                                                            label={block.label}
+                                                            helpText={block.description}
+                                                            checked={isBlockEnabled(block)}
+                                                            onChange={(checked) => toggleGeneralBlock(block, checked)}
+                                                        />
+                                                    ))}
+                                                </VerticalStack>
+                                            ))}
+                                        </VerticalStack>
+                                    </Box>
                                 )}
                                 {editingIndex === deniedTopics.length && renderEditRow(true)}
 
