@@ -2,7 +2,7 @@ import React, { useCallback, useMemo } from 'react'
 import AgGridTable from '../../tables/AgGridTable'
 import { buildTreeColumnDefs, buildTreeAutoGroupColumnDef } from './UrlTreeViewColumns'
 import '../../../components/layouts/style.css'
-import onboardingTransform from '../../../pages/observe/onboarding/transform'
+import onboardingTransform from '../../../pages/onboarding/transform'
 
 const DEFAULT_COL_DEF = { cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'flex-start' } }
 const GET_DATA_PATH = (r) => r.path
