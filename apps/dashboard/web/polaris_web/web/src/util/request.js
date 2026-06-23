@@ -18,6 +18,8 @@ const err = async (error) => {
   if (error?.config?.url && (
     error.config.url.includes('api/fetchTestResultsStatsCount')
     || error.config.url.includes('api/fetchTestRunStatusSummaries')
+    || error.config.url.includes('api/fetchOpenApiSchema')
+    || error.config.url.includes('api/fetchGraphQLSchema')
   )) {
     return Promise.reject(error)
   }

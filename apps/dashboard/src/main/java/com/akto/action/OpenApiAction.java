@@ -41,7 +41,9 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.InsertManyOptions;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UpdateOptions;
+import graphql.schema.idl.SchemaParser;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
 import io.swagger.parser.OpenAPIParser;
@@ -530,6 +532,64 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
     public void setSource(Source source) {
         this.source = source;
+    }
+
+    private String graphqlSchemaString;
+    private String graphqlSchema;
+
+    public String uploadGraphQLSchema() {
+        try {
+            if (graphqlSchemaString == null || graphqlSchemaString.isEmpty()) {
+                addActionError("GraphQL schema string is empty");
+                return ERROR.toUpperCase();
+            }
+            SchemaParser schemaParser = new SchemaParser();
+            schemaParser.parse(graphqlSchemaString);
+        } catch (Exception e) {
+            addActionError("Invalid GraphQL schema: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+
+        try {
+            File file = new File("GRAPHQL_SCHEMA", GzipUtils.zipString(graphqlSchemaString), apiCollectionId);
+            FilesDao.instance.insertOne(file);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "ERROR while uploading GraphQL schema " + e);
+            addActionError("Error uploading GraphQL schema: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchGraphQLSchema() {
+        try {
+            com.akto.dto.files.File file = FilesDao.instance.getMCollection()
+                .find(Filters.and(
+                    Filters.eq("type", "GRAPHQL_SCHEMA"),
+                    Filters.eq("collectionId", apiCollectionId)
+                ))
+                .sort(Sorts.descending("uploadTimestamp"))
+                .limit(1)
+                .first();
+            if (file == null) {
+                addActionError("No GraphQL schema found for collection ID: " + apiCollectionId);
+                return ERROR.toUpperCase();
+            }
+            graphqlSchema = GzipUtils.unzipString(file.getCompressedContent());
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "ERROR while fetching GraphQL schema " + e);
+            addActionError("Error fetching GraphQL schema: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String getGraphqlSchema() {
+        return graphqlSchema;
+    }
+
+    public void setGraphqlSchemaString(String graphqlSchemaString) {
+        this.graphqlSchemaString = graphqlSchemaString;
     }
 
     private String openApiSchema;
