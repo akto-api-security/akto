@@ -7,41 +7,30 @@ import onboardingTransform from '../../../pages/onboarding/transform'
 const DEFAULT_COL_DEF = { cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'flex-start' } }
 const GET_DATA_PATH = (r) => r.path
 
-// AG Grid adds an expand-arrow placeholder (~18px) before innerRenderer on every row,
-// but only group rows show the arrow. Leaf rows get the same empty space, visually
-// pushing them right relative to sibling group nodes at the same depth.
-// Fix: return a DOM element with marginLeft: -18px to cancel the arrow placeholder.
-function buildLeafCell(data) {
-    const wrapper = document.createElement('div')
-    wrapper.style.cssText = 'display:flex;align-items:center;gap:8px;margin-left:-18px'
-
-    const method = data?.method
-    const url = data?.endpoint || data?.url || ''
-
-    if (method) {
-        const methodEl = document.createElement('span')
-        methodEl.textContent = method
-        methodEl.style.cssText = `color:${onboardingTransform.getTextColor(method)};font-weight:500;font-size:13px;min-width:48px;text-align:right`
-        wrapper.appendChild(methodEl)
-    }
-
-    const urlEl = document.createElement('span')
-    urlEl.textContent = url
-    urlEl.style.cssText = 'font-size:13px;color:#202223'
-    wrapper.appendChild(urlEl)
-
-    return wrapper
-}
-
-const AUTO_GROUP_INNER_RENDERER = (params) => {
+// AG Grid React calls innerRenderer as a React component (props = AG Grid params).
+// Leaf rows get an 18px arrow-placeholder space that group rows fill with the expand icon.
+// Negative margin cancels it so leaves align with sibling group labels at the same depth.
+function AutoGroupInnerRenderer(params) {
     if (!params.node.group) {
-        return buildLeafCell(params.data)
+        const method = params.data?.method
+        const url = params.data?.endpoint || params.data?.url || ''
+        const color = method ? onboardingTransform.getTextColor(method) : undefined
+        return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: -18 }}>
+                {method && (
+                    <span style={{ color, fontWeight: 500, fontSize: 13, minWidth: 48, textAlign: 'right' }}>
+                        {method}
+                    </span>
+                )}
+                <span style={{ fontSize: 13, color: '#202223' }}>{url}</span>
+            </div>
+        )
     }
     const directChildCount = params.node.childrenAfterGroup?.length ?? 0
-    return `${params.value} (${directChildCount})`
+    return <span>{params.value} ({directChildCount})</span>
 }
 
-const AUTO_GROUP_COL_DEF = buildTreeAutoGroupColumnDef({ minWidth: 560, innerRenderer: AUTO_GROUP_INNER_RENDERER })
+const AUTO_GROUP_COL_DEF = buildTreeAutoGroupColumnDef({ minWidth: 560, innerRenderer: AutoGroupInnerRenderer })
 
 function UrlTreeView({ flatRows, tableHeaders, onRowClick, searchPlaceholder, groupDefaultExpanded }) {
     const columnDefs = useMemo(() => buildTreeColumnDefs(tableHeaders), [tableHeaders])
