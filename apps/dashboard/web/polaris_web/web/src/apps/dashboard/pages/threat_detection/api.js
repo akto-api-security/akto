@@ -5,7 +5,8 @@ const threatDetectionRequests = {
         return request({
             url: '/api/fetchFilterYamlTemplate',
             method: 'post',
-            data: {}
+            data: {},
+            suppress403Toast: true
         })
     },
     saveFilterYamlTemplate(content) {
@@ -60,7 +61,8 @@ const threatDetectionRequests = {
         return request({
             url: '/api/fetchFiltersThreatTable',
             method: 'post',
-            data: data
+            data: data,
+            suppress403Toast: true
         })
     },
     fetchThreatActors(skip, sort, latestAttack, country, startTs, endTs, actorId, host, cursor) {

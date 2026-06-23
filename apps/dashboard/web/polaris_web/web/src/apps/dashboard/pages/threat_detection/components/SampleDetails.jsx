@@ -6,6 +6,7 @@ import func from "@/util/func";
 import { useEffect, useState } from "react";
 import testingApi from "../../testing/api"
 import threatDetectionApi from "../api"
+import guardrailApi from "../../guardrails/api"
 import issuesApi from "../../issues/api"
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
 import TooltipText from "../../../components/shared/TooltipText";
@@ -28,6 +29,8 @@ function SampleDetails(props) {
     // Determine if we should use hardcoded guardrail descriptions
     const useGuardrailDescription = isAgenticSecurityCategory() || isEndpointSecurityCategory();
 
+    const isClaudeSettingsRisk = moreInfoData?.templateId === 'claude_settings_risk';
+
     // For guardrail events, look up the specific rule info based on ruleViolated / templateId
     const guardrailRuleInfo = useGuardrailDescription
         ? getGuardrailRuleInfo(moreInfoData?.ruleViolated, moreInfoData?.templateId)
@@ -38,9 +41,42 @@ function SampleDetails(props) {
         ? [{ heading: guardrailRuleInfo.heading, description: null, subSections: guardrailRuleInfo.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
         : GUARDRAIL_SECTIONS;
 
+    // Resolve the specific claude_settings_risk entry (used for both overview and remediation tabs)
+    const getClaudeSettingsKey = () => {
+        const stripArrayIndices = (key) => key?.replace(/\[\d+\]/g, '');
+        if (moreInfoData?.ruleViolated && moreInfoData.ruleViolated !== '-') {
+            return stripArrayIndices(moreInfoData.ruleViolated);
+        }
+        const prefix = '/claude/settings/';
+        const idx = moreInfoData?.url?.indexOf(prefix) ?? -1;
+        return idx !== -1 ? stripArrayIndices(moreInfoData.url.slice(idx + prefix.length)) : null;
+    };
+    const resolveClaudeSettingsEntry = (key) => {
+        if (!key) return undefined;
+        if (CLAUDE_SETTINGS_RISK_MAP[key]) return CLAUDE_SETTINGS_RISK_MAP[key];
+        const bestMatch = Object.keys(CLAUDE_SETTINGS_RISK_MAP)
+            .filter(k => key.startsWith(k))
+            .sort((a, b) => b.length - a.length)[0];
+        return bestMatch ? CLAUDE_SETTINGS_RISK_MAP[bestMatch] : undefined;
+    };
+    const claudeSettingsEntry = isClaudeSettingsRisk
+        ? resolveClaudeSettingsEntry(getClaudeSettingsKey())
+        : undefined;
+
+    const claudeSettingsSectionsToShow = claudeSettingsEntry?.overview
+        ? [{ heading: claudeSettingsEntry.title, description: null, subSections: claudeSettingsEntry.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
+        : [];
+
     // Get template object - either from hardcoded data or YAML templates
     let currentTemplateObj;
-    if (useGuardrailDescription) {
+    if (isClaudeSettingsRisk) {
+        // Claude settings risk takes priority — use per-field overview sections
+        currentTemplateObj = {
+            guardrailSections: claudeSettingsSectionsToShow,
+            testName: moreInfoData?.templateId || "Claude Settings Risk",
+            name: moreInfoData?.templateId || "Claude Settings Risk"
+        };
+    } else if (useGuardrailDescription) {
         // For Argus/Atlas guardrails, use structured content
         currentTemplateObj = {
             guardrailSections: guardrailSectionsToShow,
@@ -73,6 +109,8 @@ function SampleDetails(props) {
     const [projectId, setProjectId] = useState("");
     const [workItemType, setWorkItemType] = useState("");
 
+    const [guardrailPolicyNames, setGuardrailPolicyNames] = useState([]);
+
     const fetchRemediationInfo = async() => {
         if(moreInfoData?.templateId !== undefined){
             testingApi.fetchRemediationInfo(moreInfoData?.templateId).then((resp) => {
@@ -87,7 +125,7 @@ function SampleDetails(props) {
         ? getOwaspThreatsForRule(moreInfoData?.ruleViolated)
         : [];
 
-    const overviewComp = useGuardrailDescription ? (
+    const overviewComp = (useGuardrailDescription || isClaudeSettingsRisk) ? (
         // Structured view for Argus/Atlas guardrails - show all 7 sections with hierarchy
         <Box padding={"4"}>
             <VerticalStack gap={"5"}>
@@ -223,35 +261,6 @@ function SampleDetails(props) {
         content: "Timeline",
         component: <ActivityTracker latestActivity={latestActivity} />
     }
-
-    const isClaudeSettingsRisk = moreInfoData?.templateId === 'claude_settings_risk';
-
-    // Resolve the specific settings key from ruleViolated or URL path (e.g. "hooks.PreToolUse" from "/claude/settings/hooks.PreToolUse[0]")
-    // This is used to look up the per-field remediation text shown in the Remediation tab.
-    const getClaudeSettingsKey = () => {
-        const stripArrayIndices = (key) => key?.replace(/\[\d+\]/g, '');
-
-        if (moreInfoData?.ruleViolated && moreInfoData.ruleViolated !== '-') {
-            return stripArrayIndices(moreInfoData.ruleViolated);
-        }
-        const prefix = '/claude/settings/';
-        const idx = moreInfoData?.url?.indexOf(prefix) ?? -1;
-        return idx !== -1 ? stripArrayIndices(moreInfoData.url.slice(idx + prefix.length)) : null;
-    };
-
-    const resolveClaudeSettingsEntry = (key) => {
-        if (!key) return undefined;
-        if (CLAUDE_SETTINGS_RISK_MAP[key]) return CLAUDE_SETTINGS_RISK_MAP[key];
-        // Longest prefix match handles nested keys like "hooks.PreToolUse.hooks" -> "hooks"
-        const bestMatch = Object.keys(CLAUDE_SETTINGS_RISK_MAP)
-            .filter(k => key.startsWith(k))
-            .sort((a, b) => b.length - a.length)[0];
-        return bestMatch ? CLAUDE_SETTINGS_RISK_MAP[bestMatch] : undefined;
-    };
-
-    const claudeSettingsEntry = isClaudeSettingsRisk
-        ? resolveClaudeSettingsEntry(getClaudeSettingsKey())
-        : undefined;
 
     const ValuesTab = data.length > 0 && {
         id: 'values',
@@ -601,8 +610,18 @@ function SampleDetails(props) {
         }
     }, [])
 
+    useEffect(() => {
+        if (!useGuardrailDescription) return;
+        guardrailApi.fetchGuardrailPolicies().then((resp) => {
+            const names = (resp?.guardrailPolicies || []).map((policy) => policy.name);
+            setGuardrailPolicyNames(names);
+        }).catch(() => {});
+    }, [])
+
     const openTest = (id) => {
-        const navigateUrl = window.location.origin + "/dashboard/protection/threat-policy?policy=" + id
+        const navigateUrl = useGuardrailDescription
+            ? window.location.origin + "/dashboard/guardrails/policies?policy=" + id
+            : window.location.origin + "/dashboard/protection/threat-policy?policy=" + id
         window.open(navigateUrl, "_blank")
     }
 
@@ -868,17 +887,24 @@ Reference URL: ${window.location.href}`.trim();
     }
 
     function TitleComponent () {
+        const templateId = moreInfoData?.templateId;
+        const isTitleClickable = !useGuardrailDescription || guardrailPolicyNames.includes(templateId);
+        const titleText = (
+            <Box maxWidth="180px">
+                <TooltipText tooltip={templateId} text={templateId} textProps={{variant: 'headingMd'}} />
+            </Box>
+        );
         return(
             <Box padding={"4"} paddingBlockStart={"0"} maxWidth="100%">
                 <HorizontalStack wrap={false} align="space-between" gap={"6"}>
                     <Box maxWidth="50%">
                         <VerticalStack gap={"2"}>
                             <HorizontalStack gap={"2"} align="start">
-                                <Button onClick={() => openTest(moreInfoData?.templateId)} removeUnderline plain monochrome>
-                                    <Box maxWidth="180px">
-                                        <TooltipText tooltip={moreInfoData?.templateId} text={moreInfoData?.templateId} textProps={{variant: 'headingMd'}}  />
-                                    </Box>
-                                </Button> 
+                                {isTitleClickable ? (
+                                    <Button onClick={() => openTest(templateId)} removeUnderline plain monochrome>
+                                        {titleText}
+                                    </Button>
+                                ) : titleText}
                                 <div className={`badge-wrapper-${severity}`}>
                                     <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                                 </div>

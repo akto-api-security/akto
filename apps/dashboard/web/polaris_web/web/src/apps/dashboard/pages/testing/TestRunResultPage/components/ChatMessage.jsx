@@ -118,7 +118,22 @@ function extractPrettyJson(content) {
     }
 }
 
-function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt, toolsMetadata, isExternalAgentRequest = false }) {
+// Static, non-scrolling monospace block used in report/PDF rendering instead of the Monaco editor
+function StaticCodeBlock({ children }) {
+    return (
+        <Box paddingBlockStart="1">
+            <Box style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '13px', color: '#202223', margin: 0 }}>
+                {children}
+            </Box>
+        </Box>
+    );
+}
+
+StaticCodeBlock.propTypes = {
+    children: PropTypes.node,
+};
+
+function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt, toolsMetadata, isExternalAgentRequest = false, staticMode = false }) {
 
     const isRequest = type === MESSAGE_TYPES.REQUEST;
     // Icon
@@ -274,23 +289,31 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                         ) : prettyJson ? (
                             <VerticalStack gap="2">
                                 {beforeText && <MarkdownViewer markdown={beforeText} />}
+                                {staticMode ? (
+                                    <StaticCodeBlock>{prettyJson}</StaticCodeBlock>
+                                ) : (
+                                    <SampleDataComponent
+                                        type="response"
+                                        sampleData={{ message: prettyJson }}
+                                        minHeight="200px"
+                                        readOnly={true}
+                                        simpleJson={true}
+                                    />
+                                )}
+                                {afterText && <MarkdownViewer markdown={afterText} />}
+                            </VerticalStack>
+                        ) : decodedRawContent ? (
+                            staticMode ? (
+                                <StaticCodeBlock>{decodedRawContent}</StaticCodeBlock>
+                            ) : (
                                 <SampleDataComponent
                                     type="response"
-                                    sampleData={{ message: prettyJson }}
+                                    sampleData={{ message: decodedRawContent }}
                                     minHeight="200px"
                                     readOnly={true}
                                     simpleJson={true}
                                 />
-                                {afterText && <MarkdownViewer markdown={afterText} />}
-                            </VerticalStack>
-                        ) : decodedRawContent ? (
-                            <SampleDataComponent
-                                type="response"
-                                sampleData={{ message: decodedRawContent }}
-                                minHeight="200px"
-                                readOnly={true}
-                                simpleJson={true}
-                            />
+                            )
                         ) : (
                             <MarkdownViewer markdown={content} />
                         )}
@@ -328,6 +351,7 @@ ChatMessage.propTypes = {
     onOpenAttempt: PropTypes.func,
     originalPrompt: PropTypes.string,
     toolsMetadata: PropTypes.object,
+    staticMode: PropTypes.bool,
 };
 
 ChatMessage.defaultProps = {

@@ -17,9 +17,9 @@ public class FileInspectionResultDao extends AccountsContextDao<FileInspectionRe
     public static final long sizeInBytes = 200_000_000L;
 
     public void createIndicesIfAbsent() {
-        boolean exists = false;
         String dbName = Context.accountId.get() + "";
         MongoDatabase db = clients[0].getDatabase(dbName);
+        boolean exists = false;
         for (String col : db.listCollectionNames()) {
             if (getCollName().equalsIgnoreCase(col)) {
                 exists = true;
@@ -35,8 +35,12 @@ public class FileInspectionResultDao extends AccountsContextDao<FileInspectionRe
             }
         }
 
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{FileInspectionResult.RULE_ID, FileInspectionResult.EXECUTED_AT}, false);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{FileInspectionResult.DEVICE_ID, FileInspectionResult.EXECUTED_AT}, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[]{FileInspectionResult.RULE_ID, FileInspectionResult.EXECUTED_AT}, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[]{FileInspectionResult.DEVICE_ID, FileInspectionResult.EXECUTED_AT}, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[]{FileInspectionResult.DEVICE_ID, FileInspectionResult.RULE_ID}, false);
     }
 
     @Override

@@ -137,7 +137,8 @@ export default {
             method: 'post',
             data: {
                 url, apiCollectionId, method
-            }
+            },
+            suppress403Toast: true
         })
         return resp
     },
@@ -147,7 +148,8 @@ export default {
             method: 'post',
             data: {
                 url, apiCollectionId, method
-            }
+            },
+            suppress403Toast: true
         })
         return resp
     },
@@ -167,7 +169,8 @@ export default {
                 url,
                 method,
                 subType
-            }
+            },
+            suppress403Toast: true
         })
         return resp
     },
@@ -337,6 +340,25 @@ export default {
             }
         })
     },
+    uploadGraphQLSchema(apiCollectionId, graphqlSchemaString) {
+        return request({
+            url: '/api/uploadGraphQLSchema',
+            method: 'post',
+            data: {
+                apiCollectionId,
+                graphqlSchemaString
+            }
+        })
+    },
+    fetchGraphQLSchema(apiCollectionId) {
+        return request({
+            url: '/api/fetchGraphQLSchema',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
     exportToPostman(apiCollectionId) {
         return request({
             url: '/api/createPostmanApi',
@@ -468,7 +490,8 @@ export default {
         const resp = await request({
             url: '/api/fetchSensitiveParamsForEndpoints',
             method: 'post',
-            data: { urls }
+            data: { urls },
+            suppress403Toast: true
         })
         return resp
     },
@@ -951,7 +974,8 @@ export default {
         return request({
             url: "/api/fetchCountMapOfApis",
             method: "post",
-            data: {}
+            data: {},
+            suppress403Toast: true
         })
     },
     resetDataTypeRetro(name){

@@ -1,6 +1,5 @@
 package com.akto.action;
 
-import com.akto.dao.context.Context;
 import com.akto.dao.nhi_governance.NhiIdentityDao;
 import com.akto.dto.nhi_governance.NhiIdentity;
 import com.akto.log.LoggerMaker;
@@ -23,10 +22,6 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
     private List<NhiIdentity> identities;
 
     @Getter
-    @Setter
-    private NhiIdentity identity;
-
-    @Getter
     private boolean success = false;
 
     @Setter
@@ -36,7 +31,6 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
         try {
             identities = NhiIdentityDao.instance.findAll(Filters.empty());
             return Action.SUCCESS.toUpperCase();
-
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching NHI identities: " + e.getMessage());
             addActionError(e.getMessage());
@@ -65,7 +59,6 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
 
             success = true;
             return Action.SUCCESS.toUpperCase();
-
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error disabling NHI identity: " + e.getMessage());
             addActionError(e.getMessage());

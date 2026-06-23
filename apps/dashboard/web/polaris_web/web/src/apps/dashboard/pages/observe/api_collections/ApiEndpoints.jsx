@@ -43,6 +43,8 @@ import AgentDiscoverGraph from "./AgentDiscoverGraph"
 import { dummyCollections } from "./AgentDiscoveryDummyData"
 import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges"
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent"
+import GraphqlTreeView from "../../../components/shared/treeView/GraphqlTreeView"
+import RestTreeView from "../../../components/shared/treeView/RestTreeView"
 
 const headings = [
     {
@@ -87,9 +89,9 @@ const headings = [
         maxWidth: '100px',
         type: CellType.TEXT,
     },
-    {
+    ...(!isEndpointSecurityCategory() ? [{
         text: 'Access Type',
-        value: 'access_type', 
+        value: 'access_type',
         title:"Access Type",
         showFilter: true,
         type: CellType.TEXT,
@@ -102,7 +104,7 @@ const headings = [
         showFilter: true,
         textValue: 'authTypeTag',
         tooltipContent: "Authentication type of the API."
-    },
+    }] : []),
     {
         text: 'Sensitive params in response',
         title: 'Sensitive params',
@@ -242,6 +244,26 @@ function getRiskAnalysisForEndpoint(endpointUrl, resourceNameToRiskMap) {
     return componentName != null ? (resourceNameToRiskMap.get(componentName) ?? null) : null;
 }
 
+function makeUploadItem(fileFormat, tooltipText, label, onFileChanged) {
+    return {
+        content: '',
+        prefix: (
+            <UploadFile
+                fileFormat={fileFormat}
+                fileChanged={onFileChanged}
+                tooltipText={tooltipText}
+                label={(
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                        <Icon source={FileMinor} />
+                        <Text>{label}</Text>
+                    </div>
+                )}
+                primary={false}
+            />
+        )
+    }
+}
+
 function ApiEndpoints(props) {
     const { endpointListFromConditions, sensitiveParamsForQuery, isQueryPage } = props
     const params = useParams()
@@ -278,6 +300,8 @@ function ApiEndpoints(props) {
     const [showSequencesFlow, setShowSequencesFlow] = useState(false)
     const [showSwaggerDependenciesFlow, setShowSwaggerDependenciesFlow] = useState(false)
     const [showSchemaView, setShowSchemaView] = useState(false)
+    // 'graphql' | 'rest' | null — single state prevents both being active simultaneously
+    const [treeViewMode, setTreeViewMode] = useState(null)
 
     const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
@@ -297,6 +321,11 @@ function ApiEndpoints(props) {
     const [selectedEndpointForSchema, setSelectedEndpointForSchema] = useState(null)
     const [savingGuardrailSchema, setSavingGuardrailSchema] = useState(false)
     const [endpointTagsPopover, setEndpointTagsPopover] = useState(false)
+    const isGraphQLCollection = useMemo(() =>
+        (endpointData["all"] || []).some(ep => ep.apiType === "GRAPHQL"),
+        [endpointData]
+    )
+
     const endpointTagsMap = useMemo(() => {
         const map = {}
         ;(endpointData["all"] || []).forEach(ep => {
@@ -838,9 +867,16 @@ function ApiEndpoints(props) {
     }
 
     function handleRowClick(data) {
-        
-        let tmp = { ...data, endpointComp: "", sensitiveTagsComp: "" }
-        
+        // Strip all React element fields (*Comp) and any non-serializable objects
+        // to prevent JSON.stringify circular reference errors in ApiDetails
+        const tmp = Object.fromEntries(
+            Object.entries(data).filter(([k, v]) => {
+                if (k.endsWith('Comp')) return false
+                if (v !== null && typeof v === 'object' && !Array.isArray(v)) return false
+                return true
+            })
+        )
+
         const sameRow = func.deepComparison(apiDetail, tmp);
         if (!sameRow) {
             setShowDetails(true)
@@ -1032,6 +1068,19 @@ function ApiEndpoints(props) {
         } else {
             uploadOpenFileWithSource(null, file)
         }
+    }
+
+    function uploadGraphQLSchemaFile(file) {
+        const reader = new FileReader();
+        reader.readAsText(file);
+        reader.onload = async () => {
+            try {
+                await api.uploadGraphQLSchema(apiCollectionId, reader.result);
+                func.setToast(true, false, "GraphQL schema uploaded successfully");
+            } catch (e) {
+                func.setToast(true, true, "Failed to upload GraphQL schema: " + (e?.response?.data?.actionErrors?.[0] || e.message));
+            }
+        };
     }
 
     function uploadOpenFileWithSource(source, file, isAiAgent = false, skipLiveReplay = false) {
@@ -1235,7 +1284,24 @@ function ApiEndpoints(props) {
             label: 'View Schema',
             state: showSchemaView,
             setState: setShowSchemaView,
-            condition: true 
+            condition: true
+        },
+        {
+            key: 'graphqlTree',
+            label: 'Display GraphQL tree view',
+            state: treeViewMode === 'graphql',
+            setState: (on) => setTreeViewMode(prev => on ? 'graphql' : (prev === 'graphql' ? null : prev)),
+            condition: isGraphQLCollection
+        },
+        {
+            key: 'restTree',
+            label: 'Display REST tree view',
+            state: treeViewMode === 'rest',
+            setState: (on) => setTreeViewMode(prev => on ? 'rest' : (prev === 'rest' ? null : prev)),
+            // isGraphQLCollection checks if any endpoint has apiType === "GRAPHQL".
+            // Pure REST collections show this; mixed collections show the GraphQL tree
+            // (REST endpoints in a mixed collection are silently excluded from that view).
+            condition: !isGraphQLCollection
         }
     ];
 
@@ -1297,25 +1363,8 @@ function ApiEndpoints(props) {
                             {
                                 title: 'Upload',
                                 items: [
-                                    !isApiGroup &&{
-                                        content: '',
-                                        prefix: (<Box width="160px" >
-                                                    <UploadFile
-                                                        fileFormat=".json,.yaml,.yml"
-                                                        fileChanged={file => {uploadOpenApiFile(file); setExportOpen(false)}}
-                                                        tooltipText="Upload openapi file"
-                                                        label={(
-                                                            <div style={{ display: "flex", gap:'6px' }}>
-                                                                <Box>
-                                                                    <Icon source={FileMinor} />
-                                                                </Box>
-                                                                <Text>Upload OpenAPI file</Text>
-                                                            </div>
-                                                        )}
-                                                        primary={false} 
-                                                    />
-                                                </Box>)
-                                    },
+                                    !isApiGroup && !isGraphQLCollection && makeUploadItem('.json,.yaml,.yml', 'Upload OpenAPI file', 'Upload OpenAPI file', file => { uploadOpenApiFile(file); setExportOpen(false) }),
+                                    !isApiGroup && isGraphQLCollection && makeUploadItem('.graphql,.gql', 'Upload GraphQL schema', 'Upload GraphQL schema', file => { uploadGraphQLSchemaFile(file); setExportOpen(false) }),
                                     !isApiGroup && !(isHostnameCollection)  && {
                                         content: '',
                                         prefix:  (<Box width="160px" >
@@ -1946,6 +1995,31 @@ function ApiEndpoints(props) {
                 <SwaggerDependenciesFlow key="swagger-dependencies-flow" apiCollectionId={apiCollectionId}  />
             ] : showSchemaView ? [
                 <SchemaView key="schema-view" apiCollectionId={apiCollectionId} />
+            ] : treeViewMode ? [
+                treeViewMode === 'graphql'
+                    ? <GraphqlTreeView
+                        key="graphql-tree-view"
+                        endpoints={endpointData["all"] || []}
+                        prettifyEndpoints={endpointData["all"]?._prettifyPageData}
+                        onTerminalClick={handleRowClick}
+                        tableHeaders={headers}
+                      />
+                    : <RestTreeView
+                        key="rest-tree-view"
+                        endpoints={endpointData["all"] || []}
+                        prettifyEndpoints={endpointData["all"]?._prettifyPageData}
+                        onTerminalClick={handleRowClick}
+                        tableHeaders={headers}
+                      />,
+                <ApiDetails
+                    key="api-details"
+                    showDetails={showDetails && apiDetail && Object.keys(apiDetail).length > 0}
+                    setShowDetails={setShowDetails}
+                    apiDetail={apiDetail}
+                    headers={transform.getDetailsHeaders()}
+                    collectionIssuesData={collectionIssuesData}
+                    hasAccessToDiscoveryAgent={hasAccessToDiscoveryAgent}
+                />,
             ] : [
                 dummyAgenticGraph ? <AgentDiscoverGraphWithDummyData key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
                 // (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,

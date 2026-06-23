@@ -1,3 +1,5 @@
 .wrangler/
 .dev.vars
 .env.local
+container/src/guardrails-service
+guardrails-service

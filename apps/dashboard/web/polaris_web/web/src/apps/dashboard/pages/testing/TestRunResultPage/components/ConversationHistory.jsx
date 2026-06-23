@@ -5,7 +5,7 @@ import ChatMessage from './ChatMessage';
 import { MESSAGE_LABELS } from './chatConstants';
 import ChatInfoModal from './ChatInfoModal';
 
-function ConversationHistory({ conversations, isInventory = false, testResults = [] }) {
+function ConversationHistory({ conversations, isInventory = false, testResults = [], staticMode = false }) {
     const label = isInventory ? MESSAGE_LABELS.INVENTORY_ANALYSIS : MESSAGE_LABELS.TESTED_INTERACTION;
 
     const [httpModalOpen, setHttpModalOpen] = useState(false);
@@ -42,12 +42,13 @@ function ConversationHistory({ conversations, isInventory = false, testResults =
                             type={isUser ? 'request' : 'response'}
                             content={msg.message}
                             timestamp={msg.creationTimestamp} // Normalize then convert to seconds for ChatMessage
-                            customLabel={isInventory ? label : isUser ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE}
+                            customLabel={msg.customLabel || (isInventory ? label : isUser ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE)}
                             isVulnerable={msg.validation}
                             isCode={false}
                             onOpenAttempt={hasAttemptData ? () => handleOpenAttempt(index) : null}
                             originalPrompt={msg.originalPrompt}
                             toolsMetadata={isUser ? {} : (msg?.toolsMetadata || {})}
+                            staticMode={staticMode}
                         />
                     )
                 })}

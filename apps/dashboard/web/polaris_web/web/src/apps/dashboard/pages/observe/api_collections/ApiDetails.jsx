@@ -263,8 +263,11 @@ function ApiDetails(props) {
     };
 
     const isRBACError = (error) => {
-        const message = error?.response?.data?.actionErrors[0] || error?.message;
-        if(message?.includes("This role doesn't have access to the feature:") || message?.includes("This feature is not available in your plan.")) {
+        if (error?.response?.status === 403 || error?.status === 403) {
+            return true;
+        }
+        const message = error?.response?.data?.actionErrors?.[0] || error?.message;
+        if(message?.includes("does not have access") || message?.includes("not available in your plan")) {
             return true;
         }
         return false;
@@ -489,7 +492,7 @@ function ApiDetails(props) {
             }
         }
         setSelectedSampleApi(apiKeyInfo)
-        const navUrl = window.location.origin + "/dashboard/test-editor/REMOVE_TOKENS"
+        const navUrl = window.location.origin + "/dashboard/test-editor"
         window.open(navUrl, "_blank")
     }
 

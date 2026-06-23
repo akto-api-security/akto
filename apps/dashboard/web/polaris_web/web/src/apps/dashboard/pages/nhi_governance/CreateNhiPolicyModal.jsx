@@ -21,10 +21,25 @@ const WARNING_THRESHOLD_OPTIONS = [
     { label: "12 Months", value: "12" },
 ];
 
+const MAX_AGE_OPTIONS = [
+    { label: "7 days",  value: "7" },
+    { label: "14 days", value: "14" },
+    { label: "30 days", value: "30" },
+    { label: "60 days", value: "60" },
+    { label: "90 days", value: "90" },
+];
+
+const WARNING_DAYS_OPTIONS = [
+    { label: "3 days", value: "3" },
+    { label: "7 days", value: "7" },
+    { label: "14 days", value: "14" },
+];
+
 const STEPS = [
     { id: 1, label: "Policy details & Scope" },
     { id: 2, label: "Token Segregation" },
     { id: 3, label: "Expiration Tracking" },
+    { id: 4, label: "Rotation Enforcement" },
 ];
 
 const QUICK_PROMPTS = [
@@ -161,6 +176,48 @@ function ExpirationTrackingStep({ expiryEnabled, setExpiryEnabled, warningThresh
     );
 }
 
+// ── Step 4: Rotation Enforcement ──────────────────────────────────────────────
+function RotationEnforcementStep({ rotationEnabled, setRotationEnabled, maxAgeDays, setMaxAgeDays, warningDays, setWarningDays }) {
+    return (
+        <VerticalStack gap="5">
+            <VerticalStack gap="2">
+                <Checkbox
+                    label="Enable Rotation Enforcement"
+                    checked={rotationEnabled}
+                    onChange={setRotationEnabled}
+                />
+                <Box paddingInlineStart="6">
+                    <Text variant="bodySm" color="subdued">
+                        Require all API keys and tokens to be rotated within a set number of days. Keys past the deadline trigger a High-severity violation; keys approaching it trigger a Medium-severity reminder.
+                    </Text>
+                </Box>
+            </VerticalStack>
+            {rotationEnabled && (
+                <Box paddingInlineStart="6">
+                    <HorizontalStack gap="4" wrap={false}>
+                        <Box style={{ maxWidth: 180 }}>
+                            <Select
+                                label="Max credential age"
+                                options={MAX_AGE_OPTIONS}
+                                value={String(maxAgeDays)}
+                                onChange={(v) => setMaxAgeDays(Number(v))}
+                            />
+                        </Box>
+                        <Box style={{ maxWidth: 180 }}>
+                            <Select
+                                label="Warning threshold"
+                                options={WARNING_DAYS_OPTIONS}
+                                value={String(warningDays)}
+                                onChange={(v) => setWarningDays(Number(v))}
+                            />
+                        </Box>
+                    </HorizontalStack>
+                </Box>
+            )}
+        </VerticalStack>
+    );
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editingPolicy = null, isEditMode = false }) {
     const [currentStep, setCurrentStep]       = useState(1);
@@ -189,6 +246,11 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
     const [expiryEnabled, setExpiryEnabled]       = useState(true);
     const [warningThreshold, setWarningThreshold] = useState(3);
     const [flagExpired, setFlagExpired]           = useState(true);
+
+    // Step 4
+    const [rotationEnabled, setRotationEnabled] = useState(true);
+    const [maxAgeDays, setMaxAgeDays]           = useState(30);
+    const [warningDays, setWarningDays]         = useState(7);
 
     useBodyClass('guardrail-page-open');
 
@@ -236,13 +298,17 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
         setExpiryEnabled(p.expirationTracking?.enabled ?? true);
         setWarningThreshold(p.expirationTracking?.warningThresholdMonths || 3);
         setFlagExpired(p.expirationTracking?.flagExpiredTokens ?? true);
-        setCompletedSteps([1, 2]);
+        setRotationEnabled(p.rotationEnforcement?.enabled ?? true);
+        setMaxAgeDays(p.rotationEnforcement?.maxAgeDays || 30);
+        setWarningDays(p.rotationEnforcement?.warningDays || 7);
+        setCompletedSteps([1, 2, 3]);
         setCurrentStep(1);
     };
 
     const resetForm = () => {
         setName(""); setDescription(""); setSelectedAgents([]); setSelectedNhis([]);
         setTokenSegEnabled(true); setExpiryEnabled(true); setWarningThreshold(3); setFlagExpired(true);
+        setRotationEnabled(true); setMaxAgeDays(30); setWarningDays(7);
         setCompletedSteps([]); setCurrentStep(1);
         setPlaygroundMessages([]); setPlaygroundInput("");
     };
@@ -257,6 +323,7 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
         scope: { agents: selectedAgents, nhiIds: selectedNhis },
         tokenSegregation: { enabled: tokenSegEnabled },
         expirationTracking: { enabled: expiryEnabled, warningThresholdMonths: warningThreshold, flagExpiredTokens: flagExpired },
+        rotationEnforcement: { enabled: rotationEnabled, maxAgeDays, warningDays },
     });
 
     const handleSubmit = (status) => {
@@ -318,6 +385,14 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
                         expiryEnabled={expiryEnabled} setExpiryEnabled={setExpiryEnabled}
                         warningThreshold={warningThreshold} setWarningThreshold={setWarningThreshold}
                         flagExpired={flagExpired} setFlagExpired={setFlagExpired}
+                    />
+                );
+            case 4:
+                return (
+                    <RotationEnforcementStep
+                        rotationEnabled={rotationEnabled} setRotationEnabled={setRotationEnabled}
+                        maxAgeDays={maxAgeDays} setMaxAgeDays={setMaxAgeDays}
+                        warningDays={warningDays} setWarningDays={setWarningDays}
                     />
                 );
             default:

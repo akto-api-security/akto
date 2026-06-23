@@ -180,34 +180,52 @@ export const extractServiceName = (hostName) => {
     return parts.slice(2).join('.');
 };
 
+// Aliases: normalize variant agent tag values to a canonical key for grouping.
+// All Claude CLI variants collapse into claude2 (Claude CLI), Desktop into claude1 (Claude Desktop).
+const AGENT_KEY_ALIASES = {
+    // Claude CLI variants → claude2
+    'claude': 'claude2',
+    'claudecli': 'claude2',
+    'claude-cli': 'claude2',
+    'claude-cli-user': 'claude2',
+    'claude-cli-project': 'claude2',
+    'claude-cli-local': 'claude2',
+    'claude-cli-enterprise': 'claude2',
+    'claude-plugin': 'claude2',
+    'claude-code': 'claude2',
+    // Claude Desktop variants → claude1
+    'claude-desktop': 'claude1',
+};
+
 // Group collections by agent identification (mcp-client, ai-agent values)
 // These are the sources that discovered the services (cursor, litellm, etc.)
 // Note: browser-llm-agent is excluded from this grouping
 export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}) => {
     const agents = {};
-    
+
     collections.forEach((c) => {
         if (c.deactivated) return;
         const assetTag = findAssetTag(c.envType);
         if (!assetTag?.value) return; // Skip collections without agent tag
         if (assetTag.keyName === ASSET_TAG_KEYS.BROWSER_LLM_AGENT) return; // Skip browser-llm-agent rows
-        
-        const key = assetTag.value;
+
+        const key = AGENT_KEY_ALIASES[assetTag.value] ?? assetTag.value;
         const hostName = c.hostName || c.displayName || c.name;
         const endpointId = extractEndpointId(hostName);
         
         if (!agents[key]) {
             agents[key] = {
                 rowType: ROW_TYPES.AGENT,
-                groupName: formatDisplayName(assetTag.value),
+                groupName: formatDisplayName(key),
                 groupKey: key,
                 tagKey: assetTag.keyName,
-                tagValue: assetTag.value,
-                clientType: getAgentTypeFromValue(assetTag.value),
+                tagValue: key,
+                clientType: getAgentTypeFromValue(key),
                 collections: [],
                 firstCollection: null,
                 endpointIds: new Set(),
                 sensitiveTypes: new Set(),
+                rawTagValues: new Set(),
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
                 hasPersonalAccount: false,
@@ -216,6 +234,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
             };
         }
 
+        agents[key].rawTagValues.add(assetTag.value);
         agents[key].collections.push(c);
         if (!agents[key].firstCollection) agents[key].firstCollection = c;
         if (hasPersonalAccountTag(c.envType)) agents[key].hasPersonalAccount = true;
@@ -250,6 +269,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
         endpointsCount: g.endpointIds.size,
         sensitiveInRespTypes: Array.from(g.sensitiveTypes),
         sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
+        rawTagValues: Array.from(g.rawTagValues),
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore || null,
@@ -550,8 +570,8 @@ export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMa
     });
 };
 
-export const createEnvTypeFilter = (values, negated = false) => ({
-    filters: [{ key: 'envType', label: func.convertToDisambiguateLabelObj(values, null, 2), value: { values, negated }, onRemove: () => {} }],
+export const createEnvTypeFilter = (values, negated = false, displayName = null) => ({
+    filters: [{ key: 'envType', label: func.convertToDisambiguateLabelObj(values, null, 2), value: { values, negated, displayName }, onRemove: () => {} }],
     sort: []
 });
 
@@ -563,8 +583,10 @@ export const createHostnameFilter = (hostnames, options = {}) => ({
 
 /** Filter payload for PersistStore when navigating from agentic grouped tables to inventory. */
 export const buildAgenticInventoryFilterForRow = (row) => {
-    if (row.rowType === ROW_TYPES.AGENT && row.tagKey && row.tagValue) {
-        return createEnvTypeFilter([`${row.tagKey}=${row.tagValue}`], false);
+    if (row.rowType === ROW_TYPES.AGENT && row.tagKey) {
+        const values = (row.rawTagValues?.length > 0 ? row.rawTagValues : [row.tagValue])
+            .map(v => `${row.tagKey}=${v}`);
+        return createEnvTypeFilter(values, false, row.groupName);
     }
     if (row.rowType === ROW_TYPES.SERVICE && row.hostNames?.length > 0) {
         return createHostnameFilter(row.hostNames, row.inventoryScopeLabel ? { inventoryScopeLabel: row.inventoryScopeLabel } : {});

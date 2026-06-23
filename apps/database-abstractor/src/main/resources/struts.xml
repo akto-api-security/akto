@@ -531,6 +531,18 @@
             </result>
         </action>
 
+        <action name="api/saveFileInspectionResult" class="com.akto.action.FileInspectionResultAction" method="saveFileInspectionResult">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^success</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
     </package>
 
 </struts>

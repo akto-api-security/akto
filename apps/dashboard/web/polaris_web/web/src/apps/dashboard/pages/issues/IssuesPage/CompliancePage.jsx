@@ -30,7 +30,7 @@ import ComplianceMenu from "./ComplianceMenu.jsx";
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
-import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
+import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, mapLabel, getDashboardCategory, categoryToShortName } from "../../../../main/labelHelper";
 import testingApi from "../../testing/api.js"
 
 const sortOptions = [
@@ -627,8 +627,10 @@ function CompliancePage() {
     const openVulnerabilityReport = async (items = [], summaryMode = false) => {
         await testingApi.generatePDFReport(issuesFilters, items).then((res) => {
             const responseId = res.split("=")[1];
-            const summaryModeQueryParam = summaryMode === true ? 'summaryMode=true' : '';
-            const redirectUrl = `/dashboard/issues/summary/${responseId.split("}")[0]}?${summaryModeQueryParam}`;
+            const params = new URLSearchParams();
+            if (summaryMode) params.set('summaryMode', 'true');
+            params.set('category', categoryToShortName[getDashboardCategory()] || 'API');
+            const redirectUrl = `/dashboard/issues/summary/${responseId.split("}")[0]}?${params.toString()}`;
             window.open(redirectUrl, '_blank');
         })
 
@@ -728,7 +730,7 @@ function CompliancePage() {
                     uniqueIssuesMap.set(key, {
                         id: item?.id,
                         severity: func.toSentenceCase(item?.severity),
-                        compliance: Object.keys(subCategoryMap[item?.id?.testSubCategory].compliance?.mapComplianceToListClauses || {}),
+                        compliance: Object.keys(subCategoryMap[item?.id?.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
                         severityType: item?.severity,
                         issueName: item?.id?.testSubCategory,
                         category: item?.id?.testSubCategory,

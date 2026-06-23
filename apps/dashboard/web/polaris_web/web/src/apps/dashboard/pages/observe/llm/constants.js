@@ -71,6 +71,10 @@ export function parseResponseText(responsePayload) {
                         .join("\n");
                 }
                 if (typeof msg.content === "string") return msg.content;
+                // content can be an array of content blocks (Anthropic-style or multi-modal)
+                if (Array.isArray(msg.content) && msg.content.length > 0) {
+                    return msg.content.map(c => c.text || JSON.stringify(c)).join("\n");
+                }
             }
         }
         // body.result — tool call result
@@ -98,7 +102,7 @@ export function parseResponseText(responsePayload) {
         if (Array.isArray(content) && content.length > 0) {
             return content[0].text || "";
         }
-        return obj.text || obj.message || "";
+        return obj.text || obj.message || JSON.stringify(obj, null, 2);
     } catch (_) {
         return responsePayload;
     }

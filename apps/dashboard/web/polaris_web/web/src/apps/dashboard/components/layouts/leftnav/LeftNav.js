@@ -73,6 +73,8 @@ export default function LeftNav() {
         value: accountId
     }));
 
+    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
+
     let reportsSubNavigationItems = [
         {
             label: "Issues",
@@ -106,8 +108,6 @@ export default function LeftNav() {
         })
     }
 
-    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
-
     // Allowed users for Dashboard access
     const allowedDashboardUsers = [
         "ankush@akto.io",
@@ -121,7 +121,7 @@ export default function LeftNav() {
 
 
     // Allowed users to for NHI Data
-    const allowedNhiUsers = ["ankush@akto.io"];
+    const allowedNhiUsers = ["ankush@akto.io", "umesh@akto.io"];
     const isAllowedNhiUser = window.USER_NAME && allowedNhiUsers.includes(window.USER_NAME.toLowerCase());
 
     const navItems = useMemo(() => {
@@ -263,7 +263,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_inventory",
                     }]),
-                    ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && func.isDemoAccount() ? [{
+                    ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && window?.STIGG_FEATURE_WISE_ALLOWED?.AGENT_TRAFFIC_LOGS?.isGranted === true ? [{
                         label: "Traces",
                         badge: <Badge status="info">Beta</Badge>,
                         onClick: () => {
@@ -422,7 +422,7 @@ export default function LeftNav() {
                 ],
                 key: "5",
             }] : []),
-            ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && func.isDemoAccount() && isAllowedNhiUser  ? [{
+            ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && isAllowedNhiUser  ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
                         NHI Governance

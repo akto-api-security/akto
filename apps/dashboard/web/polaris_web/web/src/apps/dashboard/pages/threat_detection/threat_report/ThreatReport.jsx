@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../api'
 import func from '@/util/func'
-import { isApiSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory } from '@/apps/main/labelHelper'
-import { getGuardrailCapabilityForRule } from '../constants/guardrailRuleDefinitions'
-import { extractRuleViolated } from '../utils/formatUtils'
+import { isApiSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, shortNameToCategory, getReportCategoryShortName } from '@/apps/main/labelHelper'
+import PersistStore from '@/apps/main/PersistStore'
+import { resolveComplianceClauseMap } from '../utils/formatUtils'
 import ThreatReportHeader from './ThreatReportHeader'
 import ThreatReportTOC from './ThreatReportTOC'
 import ThreatReportSummary from './ThreatReportSummary'
@@ -16,6 +16,16 @@ import ThreatReportComplianceContext from './ThreatReportComplianceContext'
 import transform from './transform'
 import useReportPDFDownload from '@/apps/dashboard/components/shared/reports/useReportPDFDownload'
 import "./styles.css"
+
+// Apply ?category= override synchronously before first render so all
+// isAgenticSecurityCategory()/isEndpointSecurityCategory() calls in the data
+// fetch see the correct value. Puppeteer opens this page in a fresh session
+// where window.DASHBOARD_CATEGORY defaults to API_SECURITY.
+const categoryShortName = getReportCategoryShortName()
+const categoryOverride = shortNameToCategory[categoryShortName]
+if (categoryOverride) {
+    PersistStore.getState().setDashboardCategory(categoryOverride)
+}
 
 const ThreatReport = () => {
     const { reportId } = useParams()
@@ -113,6 +123,9 @@ const ThreatReport = () => {
             const savedCompliance = filters?.compliance || []
             setActiveComplianceFilters(savedCompliance)
 
+            const isApiSecurity = isApiSecurityCategory()
+            const isGuardrail = isAgenticSecurityCategory() || isEndpointSecurityCategory()
+
             const threatResponse = await api.fetchSuspectSampleData(
                 0,
                 savedIps,
@@ -125,7 +138,7 @@ const ThreatReport = () => {
                 [],
                 200,
                 undefined,
-                true,
+                isGuardrail ? undefined : true,
                 'THREAT',
                 savedHosts,
                 undefined
@@ -133,9 +146,8 @@ const ThreatReport = () => {
 
             const allThreats = threatResponse.maliciousEvents || []
 
-            // For API Security: Filter by successfulExploit === true
-            // For Agentic Security/MCP: Include all threats (successfulExploit field may be false for blocked attacks)
-            const isApiSecurity = isApiSecurityCategory()
+            // API Security: include only successful exploits. Guardrail (Agentic/Endpoint):
+            // include all events — the backend skips the successfulExploit filter for these.
             let filteredThreats = isApiSecurity
                 ? allThreats.filter(threat => threat.successfulExploit === true)
                 : allThreats
@@ -143,13 +155,7 @@ const ThreatReport = () => {
             // Client-side compliance filter — backend has no compliance param
             if (savedCompliance.length > 0) {
                 filteredThreats = filteredThreats.filter(threat => {
-                    let available
-                    if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
-                        const capability = getGuardrailCapabilityForRule(extractRuleViolated(threat.metadata))
-                        available = Object.keys(localGuardrailComplianceMap[capability] || {})
-                    } else {
-                        available = Object.keys(localThreatFiltersMap[threat.filterId]?.compliance?.mapComplianceToListClauses || {})
-                    }
+                    const available = Object.keys(resolveComplianceClauseMap(threat, isGuardrail, localThreatFiltersMap, localGuardrailComplianceMap))
                     return savedCompliance.some(selected =>
                         available.some(c => c.toUpperCase() === selected.toUpperCase())
                     )
@@ -165,15 +171,8 @@ const ThreatReport = () => {
                 transform.groupRawEventsForReport(filteredThreats, localThreatFiltersMap, localGuardrailComplianceMap)
 
             // Findings table: individual events (each raw event = one row), compliance-filtered
-            const isGuardrail = isAgenticSecurityCategory() || isEndpointSecurityCategory()
             const findingsRows = filteredThreats.map(threat => {
-                let complianceMap
-                if (isGuardrail) {
-                    const capability = getGuardrailCapabilityForRule(extractRuleViolated(threat.metadata))
-                    complianceMap = localGuardrailComplianceMap[capability] || {}
-                } else {
-                    complianceMap = localThreatFiltersMap[threat?.filterId]?.compliance?.mapComplianceToListClauses || {}
-                }
+                const complianceMap = resolveComplianceClauseMap(threat, isGuardrail, localThreatFiltersMap, localGuardrailComplianceMap)
                 const effectiveSeverity = isGuardrail
                     ? (threat.severity || 'HIGH').toUpperCase()
                     : (localThreatFiltersMap[threat?.filterId]?.severity || 'HIGH').toUpperCase()
@@ -262,9 +261,9 @@ const ThreatReport = () => {
                         <Text variant="bodySm">{currentDate}</Text>
                     </VerticalStack>
                     <HorizontalStack align="center" gap="4">
-                        {(window.USER_NAME?.toLowerCase()?.includes("@akto.io") || window.ACCOUNT_NAME?.toLowerCase()?.includes("advanced bank")) &&
+                        {(window.USER_NAME?.toLowerCase()?.includes("@akto.io") || window.ACCOUNT_NAME?.toLowerCase()?.includes("advanced bank")) && (
                             <Button primary onClick={() => handleDownloadPF()} disabled={!pdfDownloadEnabled}>Download</Button>
-                        }
+                        )}
                         <img src='/public/white_logo.svg' alt="Logo" className='top-bar-logo' />
                     </HorizontalStack>
                 </HorizontalStack>

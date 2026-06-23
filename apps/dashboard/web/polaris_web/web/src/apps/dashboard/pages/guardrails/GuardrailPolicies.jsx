@@ -126,14 +126,33 @@ const sortPinnedSystemPolicies = (systemRows) =>
 function GuardrailPolicies() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [policyData, setPolicyData] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [editingPolicy, setEditingPolicy] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
+    const [pendingPolicyName, setPendingPolicyName] = useState(null);
+
+    const policyName = new URLSearchParams(window.location.search).get("policy");
 
     // Load guardrail policies on component mount
     useEffect(() => {
         fetchGuardrailPolicies();
     }, []);
+
+    useEffect(() => {
+        if (policyName) {
+            setPendingPolicyName(policyName);
+        }
+    }, [policyName]);
+
+    useEffect(() => {
+        if (!pendingPolicyName || loading) return;
+
+        const match = policyData.find((row) => row.originalData?.name === pendingPolicyName);
+        if (match) {
+            handleEditPolicy(match);
+        }
+        setPendingPolicyName(null);
+    }, [pendingPolicyName, policyData, loading]);
 
     const fetchGuardrailPolicies = async () => {
         setLoading(true);
@@ -566,7 +585,8 @@ function GuardrailPolicies() {
             getActions={getActionsList}
             hasRowActions={true}
             hardCodedKey={true}
-            loading={loading}
+            loading={loading || Boolean(pendingPolicyName)}
+            loadingText={"Loading guardrail policies..."}
             selectable={true}
             promotedBulkActions={promotedBulkActions}
             {...(func.isDemoAccount() && { customFilters: true, modifyData })}

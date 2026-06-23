@@ -65,6 +65,17 @@ export default {
         });
         return resp || {};
     },
+    async fetchDistinctResponseCodes(testingRunResultSummaryHexId) {
+        if (!testingRunResultSummaryHexId) {
+            return [];
+        }
+        const resp = await request({
+            url: '/api/fetchDistinctResponseCodes',
+            method: 'post',
+            data: { testingRunResultSummaryHexId },
+        });
+        return resp || [];
+    },
     async fetchRemediationInfo(testId) {
         const resp = await request({
             url: 'api/fetchRemediationInfo',
@@ -130,7 +141,8 @@ export default {
             method: 'post',
             data: {
                 testingRunResultHexId
-            }
+            },
+            suppress403Toast: true
         })
     },
     fetchIssueFromTestRunResultDetails(testingRunResultHexId) {
@@ -139,7 +151,8 @@ export default {
             method: 'post',
             data: {
                 testingRunResultHexId
-            }
+            },
+            suppress403Toast: true
         })
     },
     createJiraTicket(jiraMetaData, projId, issueType) {
@@ -592,7 +605,8 @@ export default {
         return request({
             url: '/api/fetchSeverityInfoForIssues',
             method: 'post',
-            data: {...filters, issueIds, endTimeStamp}
+            data: {...filters, issueIds, endTimeStamp},
+            suppress403Toast: true
         })
     },
     handleRefreshTableCount(testingRunResultSummaryHexId) {

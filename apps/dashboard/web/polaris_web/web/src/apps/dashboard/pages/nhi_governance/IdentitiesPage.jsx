@@ -108,9 +108,7 @@ const headers = [
     { text: "Agentic Asset", value: "agentComp",      title: "Agentic Asset"                      },
     ...(isEndpointSecurityCategory() ? [{ text: "Owner", value: "owner", title: "Owner", type: CellType.TEXT }] : []),
     { text: "Type",          value: "typeComp",       title: "Type"                               },
-    { text: "Access",        value: "access",         title: "Access",      type: CellType.TEXT   },
     { text: "Violations",    value: "violationsComp", title: "Violations"                         },
-    { text: "Last Used",     value: "lastUsed",       title: "Last Used",   type: CellType.TEXT   },
     { text: "Expiry Status", value: "expiryComp",     title: "Expiry Status"                      },
 ];
 

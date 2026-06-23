@@ -42,6 +42,9 @@ type Config struct {
 	SessionSyncIntervalMin int
 	SessionEnabled         bool
 
+	NhiEnabled         bool
+	NhiScanIntervalMin int
+
 	File FileConfig
 }
 
@@ -74,32 +77,34 @@ type MediaConfig struct {
 func LoadConfig() *Config {
 	dbAbstractorToken := getEnv("DATABASE_ABSTRACTOR_SERVICE_TOKEN", "")
 	return &Config{
-		ServerPort:                       getEnvAsInt("SERVER_PORT", 8080),
-		DatabaseAbstractorURL:            getEnv("DATABASE_ABSTRACTOR_SERVICE_URL", "https://ultron.akto.io"),
-		DatabaseAbstractorToken:          dbAbstractorToken,
-		AgentGuardEngineURL:              getEnv("AGENT_GUARD_ENGINE_URL", "https://akto-agent-guard-engine.billing-53a.workers.dev"),
-		ThreatBackendURL:                 getEnv("THREAT_BACKEND_URL", "https://tbs.akto.io"),
-		ThreatBackendToken:               getEnv("THREAT_BACKEND_TOKEN", dbAbstractorToken),
-		LogLevel:                         getEnv("LOG_LEVEL", "info"),
-		AuthEnabled:                      getEnvAsBool("AKTO_GR_AUTHENTICATE", false),
-		RSAPublicKey:                     getEnv("RSA_PUBLIC_KEY", ""),
-		KafkaEnabled:                     getEnvAsBool("KAFKA_ENABLED", false),
-		KafkaBrokerURL:                   getEnv("KAFKA_BROKER_URL", "localhost:29092"),
-		KafkaTopic:                       getEnv("KAFKA_TOPIC", "akto.api.logs"),
-		KafkaGroupID:                     getEnv("KAFKA_GROUP_ID", "guardrails-service"),
-		KafkaUseTLS:                      getEnvAsBool("KAFKA_USE_TLS", false),
-		KafkaUsername:                    getEnv("KAFKA_USERNAME", ""),
-		KafkaPassword:                    getEnv("KAFKA_PASSWORD", ""),
-		KafkaBatchSize:                   getEnvAsInt("KAFKA_BATCH_SIZE", 100),
-		KafkaBatchLingerSec:              getEnvAsInt("KAFKA_BATCH_LINGER_SEC", 5),
-		KafkaMaxWaitSec:                  getEnvAsInt("KAFKA_MAX_WAIT_SEC", 1),
-		PolicyRefreshIntervalMin:         getEnvAsInt("POLICY_REFRESH_INTERVAL_MIN", 1),
-		FilterHost:                       getEnv("FILTER_HOST", ""),
-		FilterPath:                       getEnv("FILTER_PATH", ""),
-		SessionSyncIntervalMin:           getEnvAsInt("SESSION_SYNC_INTERVAL_MIN", 5),
-		SessionEnabled:                   getEnvAsBool("SESSION_ENABLED", true),
-		McpAllowedListRefreshIntervalMin: getEnvAsInt("MCP_ALLOWLIST_REFRESH_INTERVAL_MIN", 1),
-		CollectionRefreshIntervalMin:     getEnvAsInt("COLLECTION_REFRESH_INTERVAL_MIN", 5),
+		ServerPort:               	getEnvAsInt("SERVER_PORT", 8080),
+		DatabaseAbstractorURL:    	getEnv("DATABASE_ABSTRACTOR_SERVICE_URL", "https://ultron.akto.io"),
+		DatabaseAbstractorToken:  	dbAbstractorToken,
+		AgentGuardEngineURL:      	getEnv("AGENT_GUARD_ENGINE_URL", "https://akto-agent-guard-engine.billing-53a.workers.dev"),
+		ThreatBackendURL:         	getEnv("THREAT_BACKEND_URL", "https://tbs.akto.io"),
+		ThreatBackendToken:       	getEnv("THREAT_BACKEND_TOKEN", dbAbstractorToken),
+		LogLevel:                 	getEnv("LOG_LEVEL", "info"),
+		AuthEnabled:              	getEnvAsBool("AKTO_GR_AUTHENTICATE", false),
+		RSAPublicKey:				getEnv("RSA_PUBLIC_KEY", ""),
+		KafkaEnabled:             	getEnvAsBool("KAFKA_ENABLED", false),
+		KafkaBrokerURL:           	getEnv("KAFKA_BROKER_URL", "localhost:29092"),
+		KafkaTopic:               	getEnv("KAFKA_TOPIC", "akto.api.logs"),
+		KafkaGroupID:             	getEnv("KAFKA_GROUP_ID", "guardrails-service"),
+		KafkaUseTLS:              	getEnvAsBool("KAFKA_USE_TLS", false),
+		KafkaUsername:            	getEnv("KAFKA_USERNAME", ""),
+		KafkaPassword:            	getEnv("KAFKA_PASSWORD", ""),
+		KafkaBatchSize:           	getEnvAsInt("KAFKA_BATCH_SIZE", 100),
+		KafkaBatchLingerSec:      	getEnvAsInt("KAFKA_BATCH_LINGER_SEC", 5),
+		KafkaMaxWaitSec:          	getEnvAsInt("KAFKA_MAX_WAIT_SEC", 1),
+		PolicyRefreshIntervalMin: 	getEnvAsInt("POLICY_REFRESH_INTERVAL_MIN", 1),
+		FilterHost:               	getEnv("FILTER_HOST", ""),
+		FilterPath:               	getEnv("FILTER_PATH", ""),
+		SessionSyncIntervalMin:   	getEnvAsInt("SESSION_SYNC_INTERVAL_MIN", 5),
+		SessionEnabled:           	getEnvAsBool("SESSION_ENABLED", true),
+		McpAllowedListRefreshIntervalMin:   getEnvAsInt("MCP_ALLOWLIST_REFRESH_INTERVAL_MIN", 1),
+		CollectionRefreshIntervalMin:  		getEnvAsInt("COLLECTION_REFRESH_INTERVAL_MIN", 5),
+		NhiEnabled:                       	getEnvAsBool("NHI_ENABLED", true),
+		NhiScanIntervalMin:               	getEnvAsInt("NHI_SCAN_INTERVAL_MIN", 30),
 		File: FileConfig{
 			Enabled:          getEnvAsBool("FILE_VALIDATION_ENABLED", false),
 			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
