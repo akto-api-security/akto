@@ -1343,43 +1343,39 @@ function ApiEndpoints(props) {
                             {
                                 title: 'Upload',
                                 items: [
-                                    !isApiGroup &&{
+                                    !isApiGroup && !isGraphQLCollection && {
                                         content: '',
-                                        prefix: (<Box width="160px" >
-                                                    <UploadFile
-                                                        fileFormat=".json,.yaml,.yml"
-                                                        fileChanged={file => {uploadOpenApiFile(file); setExportOpen(false)}}
-                                                        tooltipText="Upload openapi file"
-                                                        label={(
-                                                            <div style={{ display: "flex", gap:'6px' }}>
-                                                                <Box>
-                                                                    <Icon source={FileMinor} />
-                                                                </Box>
-                                                                <Text>Upload OpenAPI file</Text>
-                                                            </div>
-                                                        )}
-                                                        primary={false}
-                                                    />
-                                                </Box>)
+                                        prefix: (
+                                            <UploadFile
+                                                fileFormat=".json,.yaml,.yml"
+                                                fileChanged={file => { uploadOpenApiFile(file); setExportOpen(false) }}
+                                                tooltipText="Upload OpenAPI file"
+                                                label={(
+                                                    <div style={{ display: "flex", gap: '6px', alignItems: 'center' }}>
+                                                        <Icon source={FileMinor} />
+                                                        <Text>Upload OpenAPI file</Text>
+                                                    </div>
+                                                )}
+                                                primary={false}
+                                            />
+                                        )
                                     },
-                                    !isApiGroup && {
+                                    !isApiGroup && isGraphQLCollection && {
                                         content: '',
-                                        prefix: (<Box width="160px">
-                                                    <UploadFile
-                                                        fileFormat=".graphql,.gql"
-                                                        fileChanged={file => { uploadGraphQLSchemaFile(file); setExportOpen(false) }}
-                                                        tooltipText="Upload GraphQL schema"
-                                                        label={(
-                                                            <div style={{ display: "flex", gap: '6px' }}>
-                                                                <Box>
-                                                                    <Icon source={FileMinor} />
-                                                                </Box>
-                                                                <Text>Upload GraphQL schema</Text>
-                                                            </div>
-                                                        )}
-                                                        primary={false}
-                                                    />
-                                                </Box>)
+                                        prefix: (
+                                            <UploadFile
+                                                fileFormat=".graphql,.gql"
+                                                fileChanged={file => { uploadGraphQLSchemaFile(file); setExportOpen(false) }}
+                                                tooltipText="Upload GraphQL schema"
+                                                label={(
+                                                    <div style={{ display: "flex", gap: '6px', alignItems: 'center' }}>
+                                                        <Icon source={FileMinor} />
+                                                        <Text>Upload GraphQL schema</Text>
+                                                    </div>
+                                                )}
+                                                primary={false}
+                                            />
+                                        )
                                     },
                                     !isApiGroup && !(isHostnameCollection)  && {
                                         content: '',
