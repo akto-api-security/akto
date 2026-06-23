@@ -40,6 +40,7 @@ import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.util.ComplianceResolutionUtils;
+import com.akto.testing_utils.TestingUtils;
 import com.akto.utils.ApiInfoKeyResult;
 import com.akto.utils.TestTemplateUtils;
 import com.mongodb.BasicDBObject;
@@ -866,7 +867,31 @@ public class IssuesAction extends UserAction {
                     // currently we change the summaries from result page only
                     // so only 1 result comes at a time
                     // Map<String,String> testingRunResultHexIdsMap has only 1 result.
-                    
+
+                    Set<String> resultHexIds = testingRunResultHexIdsMap == null ? new HashSet<>()
+                        : testingRunResultHexIdsMap.keySet().stream()
+                            .filter(k -> !"description".equals(k))
+                            .collect(Collectors.toSet());
+
+                    if (resultHexIds.isEmpty()) {
+                        // Find affected summaries via latestTestingRunSummaryId, then recount each
+                        // using the same logic as handleRefreshTableCount (source of truth).
+                        // Reuse accessFilter so the recount scope matches the authorization scope
+                        // applied to the status update above.
+                        List<TestingRunIssues> affectedIssues = TestingRunIssuesDao.instance.findAll(
+                            accessFilter,
+                            Projections.include(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID)
+                        );
+                        Set<ObjectId> summaryIds = affectedIssues.stream()
+                            .map(TestingRunIssues::getLatestTestingRunSummaryId)
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toSet());
+                        for (ObjectId summaryId : summaryIds) {
+                            TestingUtils.recountAndUpdateSummaryCount(summaryId);
+                        }
+                        return;
+                    }
+
                     Map<ObjectId,String> mapSummaryToResultId = VulnerableTestingRunResultDao.instance.mapSummaryIdToTestingResultHexId(testingRunResultHexIdsMap.keySet());
                     if(mapSummaryToResultId.isEmpty()){
                         mapSummaryToResultId = TestingRunResultDao.instance.mapSummaryIdToTestingResultHexId(testingRunResultHexIdsMap.keySet());

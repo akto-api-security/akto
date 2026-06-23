@@ -6,6 +6,7 @@ import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import AgenticStatsCard from "../agentic/AgenticStatsCard";
 import AgenticTopListCard from "../agentic/AgenticTopListCard";
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import func from "@/util/func";
 import values from "@/util/values";
 import PersistStore from "@/apps/main/PersistStore";
@@ -40,6 +41,10 @@ export default function LLMObservability() {
     const [selectedTrace, setSelectedTrace]     = useState(null);
     const [sessions, setSessions] = useState([]);
     const [traces, setTraces]     = useState([]);
+    // Aggregated stats from the dedicated endpoint (accurate, not 500-capped)
+    const [sessionStats, setSessionStats] = useState(null);
+    // Loading flag for the Atlas top-cards section
+    const [loading, setLoading] = useState(!isArgus);
 
     const epochs = useMemo(() => ({
         since: Math.floor(Date.parse(currDateRange.period.since) / 1000),
@@ -49,8 +54,20 @@ export default function LLMObservability() {
     useEffect(() => {
         let cancelled = false;
         if (!isArgus) {
-            api.fetchSessions(epochs.since, epochs.until, {})
-                .then(rows => { if (!cancelled) setSessions((rows || []).map(enrichRow)); });
+            setLoading(true);
+            Promise.allSettled([
+                api.fetchSessions(epochs.since, epochs.until, {}),
+                api.fetchSessionStats(epochs.since, epochs.until),
+            ]).then(([sessionResult, statsResult]) => {
+                if (cancelled) return;
+                if (sessionResult.status === "fulfilled") {
+                    setSessions((sessionResult.value || []).map(enrichRow));
+                }
+                if (statsResult.status === "fulfilled") {
+                    setSessionStats(statsResult.value);
+                }
+                setLoading(false);
+            });
         }
         return () => { cancelled = true; };
     }, [epochs, isArgus]);
@@ -82,55 +99,53 @@ export default function LLMObservability() {
         [epochs]
     );
 
+    // Breakdown by top 3 users (by session count) — comes from aggregated backend stats.
     const sessionBreakdown = useMemo(() => {
-        const byModel = {};
-        sessions.forEach(r => {
-            const m = r._model || "Unknown";
-            byModel[m] = (byModel[m] || 0) + 1;
-        });
-        return Object.entries(byModel)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 3)
-            .map(([label, count], i) => ({ label, count, color: SERVICE_COLORS[i] || "#D1D5DB" }));
-    }, [sessions]);
+        const breakdown = sessionStats?.userBreakdown || [];
+        return breakdown.map(({ label, count }, i) => ({
+            label,
+            count: Number(count),
+            color: SERVICE_COLORS[i] || "#D1D5DB",
+        }));
+    }, [sessionStats]);
 
+    // Token totals from accurate aggregated stats; fall back to sessions array while loading.
     const totalInputTokens = useMemo(
-        () => sessions.reduce((s, r) => s + (Number(r._inputTokens) || 0), 0),
-        [sessions]
+        () => sessionStats != null
+            ? sessionStats.totalInputTokens
+            : sessions.reduce((s, r) => s + (Number(r._inputTokens) || 0), 0),
+        [sessionStats, sessions]
     );
 
     const totalOutputTokens = useMemo(
-        () => sessions.reduce((s, r) => s + (Number(r._outputTokens) || 0), 0),
-        [sessions]
+        () => sessionStats != null
+            ? sessionStats.totalOutputTokens
+            : sessions.reduce((s, r) => s + (Number(r._outputTokens) || 0), 0),
+        [sessionStats, sessions]
     );
 
     const totalTokens = totalInputTokens + totalOutputTokens;
 
+    // Top users by token usage — from aggregated backend stats.
     const topUserRows = useMemo(() => {
-        const byUser = {};
-        sessions.forEach(r => {
-            const user = r.userName || "Unknown";
-            if (!byUser[user]) byUser[user] = { tokens: 0, os: r.os || "linux" };
-            byUser[user].tokens += (Number(r._inputTokens) || 0) + (Number(r._outputTokens) || 0);
-        });
-        return Object.entries(byUser)
-            .sort((a, b) => b[1].tokens - a[1].tokens)
-            .slice(0, 5)
-            .map(([userName, { tokens, os }]) => ({
-                id: userName,
-                name: userName,
-                type: "OS",
-                assetTagValue: os,
-                renderValue: () => (
-                    <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
-                        <Box minHeight="28px">
-                            <Text variant="bodyMd" alignment="end">{formatCompact(tokens)}</Text>
-                        </Box>
-                    </HorizontalStack>
-                ),
-            }));
-    }, [sessions]);
+        const topUsers = sessionStats?.topUsers || [];
+        return topUsers.slice(0, 5).map(({ userName, totalTokens: tokens }) => ({
+            id: userName,
+            name: userName,
+            type: "OS",
+            assetTagValue: "",
+            renderValue: () => (
+                <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
+                    <Box minHeight="28px">
+                        <Text variant="bodyMd" alignment="end">{formatCompact(tokens)}</Text>
+                    </Box>
+                </HorizontalStack>
+            ),
+        }));
+    }, [sessionStats]);
 
+    // Top models by session count — model is parsed from responsePayload, not a native ES field,
+    // so we compute from the sessions terms-agg data (inherits the 500-session cap).
     const topModelRows = useMemo(() => {
         const byModel = {};
         sessions.forEach(r => {
@@ -239,6 +254,8 @@ export default function LLMObservability() {
             });
     }, [traces, setSelectedTrace]);
 
+    const totalDisplaySessions = sessionStats?.totalSessions != null ? sessionStats.totalSessions : sessions.length;
+
     const topCards = useMemo(() => isArgus ? (
         <HorizontalGrid key="top-row-argus" columns={3} gap="4">
             <Card padding="0">
@@ -291,7 +308,7 @@ export default function LLMObservability() {
                     <Box className="agentic-stats-card-item">
                         <AgenticStatsCard
                             title="Total sessions"
-                            total={sessions.length}
+                            total={totalDisplaySessions}
                             sparklineCounts={sessionSpark}
                             sparklineColor="#9642FC"
                             sparklineLabels={sparklineLabels}
@@ -329,7 +346,7 @@ export default function LLMObservability() {
                 emptyStateText="No model data in this range."
             />
         </HorizontalGrid>
-    ), [isArgus, traces.length, argusTraceSpark, argusTraceBreakdown, argusTokenSpark, sparklineLabels, argusTotalTokens, argusInputTokens, argusOutputTokens, argusTopAppByCost, argusTopTraceByTokens, sessions.length, sessionSpark, sessionBreakdown, totalTokens, totalInputTokens, totalOutputTokens, tokenSpark, topUserRows, topModelRows]);
+    ), [isArgus, traces.length, argusTraceSpark, argusTraceBreakdown, argusTokenSpark, sparklineLabels, argusTotalTokens, argusInputTokens, argusOutputTokens, argusTopAppByCost, argusTopTraceByTokens, totalDisplaySessions, sessionSpark, sessionBreakdown, totalTokens, totalInputTokens, totalOutputTokens, tokenSpark, topUserRows, topModelRows]);
 
     return (
         <>
@@ -345,7 +362,11 @@ export default function LLMObservability() {
                     />
                 }
                 components={[
-                    topCards,
+                    loading ? (
+                        <Box key="top-cards-loading" padding="5">
+                            <SpinnerCentered height="200px" />
+                        </Box>
+                    ) : topCards,
                     isArgus ? (
                         <MessagesView key="traces-table" currDateRange={currDateRange} columnDefs={ARGUS_TRACE_COL_DEFS} onRowClicked={p => p.data && setSelectedTrace(p.data)} onRowsFetched={onArgusRowsFetched} />
                     ) : (

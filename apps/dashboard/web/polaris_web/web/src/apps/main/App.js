@@ -123,6 +123,7 @@ import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetec
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
 import GuardrailViolations from "../dashboard/pages/guardrails/violations/ViolationsPage";
 import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashboardPage";
+import ThreatProtectedLayout from "../dashboard/pages/threat_detection/ThreatProtectedLayout";
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
 import DastProgress from "../dashboard/pages/observe/api_collections/DastProgress.jsx";
 import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
@@ -217,7 +218,8 @@ const router = createBrowserRouter([
                         children: [
                             {
                                 path: "sensitive",
-                                element: <AllSensitiveData/>
+                                element: <ThreatProtectedLayout probeUrl="/api/fetchDataTypes" featureName="Sensitive Data"/>,
+                                children: [{ index: true, element: <AllSensitiveData/> }]
                             },
                             {
                                 path: "inventory",
@@ -320,6 +322,7 @@ const router = createBrowserRouter([
                     },
                     {
                         path: "protection",
+                        element: <ThreatProtectedLayout/>,
                         children: [
                             {
                                 path: "threat-dashboard",

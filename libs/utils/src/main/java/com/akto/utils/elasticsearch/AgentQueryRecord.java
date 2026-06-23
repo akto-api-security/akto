@@ -6,6 +6,27 @@ package com.akto.utils.elasticsearch;
  */
 public class AgentQueryRecord {
 
+    // Elasticsearch document field names. Use these instead of inline string literals
+    // when building queries or parsing results in action / service classes.
+    public static final String F_ACCOUNT_ID            = "accountId";
+    public static final String F_SERVICE_ID            = "serviceId";
+    public static final String F_SERVICE_ID_KW         = "serviceId.keyword";
+    public static final String F_DEVICE_ID             = "deviceId";
+    public static final String F_DEVICE_ID_KW          = "deviceId.keyword";
+    public static final String F_USER_NAME             = "userName";
+    public static final String F_USER_NAME_KW          = "userName.keyword";
+    public static final String F_SESSION_IDENTIFIER    = "sessionIdentifier";
+    public static final String F_SESSION_IDENTIFIER_KW = "sessionIdentifier.keyword";
+    public static final String F_QUERY_PAYLOAD         = "queryPayload";
+    public static final String F_RESPONSE_PAYLOAD      = "responsePayload";
+    public static final String F_TIMESTAMP             = "timestamp";
+    public static final String F_INPUT_TOKENS          = "inputTokens";
+    public static final String F_OUTPUT_TOKENS         = "outputTokens";
+    public static final String F_TRACE_ID              = "traceId";
+    public static final String F_TRACE_ID_KW           = "traceId.keyword";
+    public static final String F_SPAN_ID_KW            = "spanId.keyword";
+    public static final String F_IS_ATLAS_TRAFFIC      = "isAtlasTraffic";
+
     private final String docId;
     private final int accountId;
     private final String serviceId;
