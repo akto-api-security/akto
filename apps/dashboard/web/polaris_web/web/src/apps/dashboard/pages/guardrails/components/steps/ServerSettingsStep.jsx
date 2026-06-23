@@ -338,7 +338,7 @@ const ServerSettingsStep = ({
                                                 </FormLayout.Group>
                                             )}
                                             <Banner tone="info">
-                                                Some Agentic Assets are disabled, block mode requires servers running in inline (sync) mode.
+                                                Some agentic assets are disabled. Block mode requires servers running in inline (sync) mode.
                                             </Banner>
                                         </FormLayout>
                                     </Box>
