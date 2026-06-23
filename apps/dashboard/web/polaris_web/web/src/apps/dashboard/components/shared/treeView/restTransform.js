@@ -13,6 +13,8 @@ function buildRestFlatRows(endpoints) {
     return endpoints
         .map(ep => {
             if (!ep.endpoint) return null
+            // Max 4 segments — deeper paths (e.g. /a/b/{id}/c/d) are grouped
+            // under the 4th segment. Increase if collections have deeper nesting.
             const path = func.convertToRelativePath(ep.endpoint)
                 .split('/')
                 .filter(Boolean)

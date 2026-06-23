@@ -280,8 +280,8 @@ function ApiEndpoints(props) {
     const [showSequencesFlow, setShowSequencesFlow] = useState(false)
     const [showSwaggerDependenciesFlow, setShowSwaggerDependenciesFlow] = useState(false)
     const [showSchemaView, setShowSchemaView] = useState(false)
-    const [showGraphQLTreeView, setShowGraphQLTreeView] = useState(false)
-    const [showRestTreeView, setShowRestTreeView] = useState(false)
+    // 'graphql' | 'rest' | null — single state prevents both being active simultaneously
+    const [treeViewMode, setTreeViewMode] = useState(null)
 
     const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
@@ -1268,16 +1268,19 @@ function ApiEndpoints(props) {
         },
         {
             key: 'graphqlTree',
-            label: 'Display tree view',
-            state: showGraphQLTreeView,
-            setState: setShowGraphQLTreeView,
+            label: 'Display GraphQL tree view',
+            state: treeViewMode === 'graphql',
+            setState: (on) => setTreeViewMode(on ? 'graphql' : null),
             condition: isGraphQLCollection
         },
         {
             key: 'restTree',
-            label: 'Display tree view',
-            state: showRestTreeView,
-            setState: setShowRestTreeView,
+            label: 'Display REST tree view',
+            state: treeViewMode === 'rest',
+            setState: (on) => setTreeViewMode(on ? 'rest' : null),
+            // isGraphQLCollection checks if any endpoint has apiType === "GRAPHQL".
+            // Pure REST collections show this; mixed collections show the GraphQL tree
+            // (REST endpoints in a mixed collection are silently excluded from that view).
             condition: !isGraphQLCollection
         }
     ];
@@ -2008,31 +2011,22 @@ function ApiEndpoints(props) {
                 <SwaggerDependenciesFlow key="swagger-dependencies-flow" apiCollectionId={apiCollectionId}  />
             ] : showSchemaView ? [
                 <SchemaView key="schema-view" apiCollectionId={apiCollectionId} />
-            ] : showGraphQLTreeView ? [
-                <GraphqlTreeView
-                    key="graphql-tree-view"
-                    endpoints={endpointData["all"] || []}
-                    prettifyEndpoints={endpointData["all"]?._prettifyPageData}
-                    onTerminalClick={handleRowClick}
-                    tableHeaders={headers}
-                />,
-                <ApiDetails
-                    key="api-details"
-                    showDetails={showDetails && apiDetail && Object.keys(apiDetail).length > 0}
-                    setShowDetails={setShowDetails}
-                    apiDetail={apiDetail}
-                    headers={transform.getDetailsHeaders()}
-                    collectionIssuesData={collectionIssuesData}
-                    hasAccessToDiscoveryAgent={hasAccessToDiscoveryAgent}
-                />,
-            ] : showRestTreeView ? [
-                <RestTreeView
-                    key="rest-tree-view"
-                    endpoints={endpointData["all"] || []}
-                    prettifyEndpoints={endpointData["all"]?._prettifyPageData}
-                    onTerminalClick={handleRowClick}
-                    tableHeaders={headers}
-                />,
+            ] : treeViewMode ? [
+                treeViewMode === 'graphql'
+                    ? <GraphqlTreeView
+                        key="graphql-tree-view"
+                        endpoints={endpointData["all"] || []}
+                        prettifyEndpoints={endpointData["all"]?._prettifyPageData}
+                        onTerminalClick={handleRowClick}
+                        tableHeaders={headers}
+                      />
+                    : <RestTreeView
+                        key="rest-tree-view"
+                        endpoints={endpointData["all"] || []}
+                        prettifyEndpoints={endpointData["all"]?._prettifyPageData}
+                        onTerminalClick={handleRowClick}
+                        tableHeaders={headers}
+                      />,
                 <ApiDetails
                     key="api-details"
                     showDetails={showDetails && apiDetail && Object.keys(apiDetail).length > 0}
