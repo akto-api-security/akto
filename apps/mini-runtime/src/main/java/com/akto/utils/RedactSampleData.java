@@ -94,7 +94,7 @@ public class RedactSampleData {
         return finalUrl;
     }
 
-    private static void handleCookies(List<String> cookieList, Map<String, List<String>> responseHeaders) {
+   private static void handleCookies(List<String> cookieList, Map<String, List<String>> responseHeaders) {
         Map<String, String> cookieMap = AuthPolicy.parseCookie(cookieList);
         StringBuilder newCookie = new StringBuilder();
         for (Map.Entry<String, String> entry : cookieMap.entrySet()) {
@@ -148,7 +148,7 @@ public class RedactSampleData {
                 }
             }
         }
-    }
+    } 
 
     // never use this function directly. This alters the httpResponseParams
     public static String redact(HttpResponseParams httpResponseParams, final boolean redactAll) throws Exception {
@@ -190,7 +190,7 @@ public class RedactSampleData {
                 loggerMaker.errorAndAddToDb("Error in redacting original payloads for xml content type: " +e.getMessage());
             }
 
-
+            
         }
 
         handleHeaders(responseHeaders, redactAll);
@@ -259,7 +259,7 @@ public class RedactSampleData {
         }
         
 
-    }
+    }    
 
     public static void change(String parentName, JsonNode parent, boolean redactAll, boolean isGraphqlModified) {
         if (parent == null) return;
@@ -334,16 +334,16 @@ public class RedactSampleData {
         if (xmlString == null || xmlString.isEmpty()) {
             return xmlString;
         }
-
+        
         // Pattern to match XML tags and their content: <tagName>content</tagName>
         Pattern pattern = Pattern.compile("<([^>/]+)>([^<>]*)</\\1>");
         Matcher matcher = pattern.matcher(xmlString);
         StringBuffer result = new StringBuffer();
-
+        
         while (matcher.find()) {
             String tagName = matcher.group(1);
             String tagContent = matcher.group(2);
-
+            
             // Apply redaction based on conditions
             if (redactAll) {
                 // Redact all content
@@ -359,15 +359,15 @@ public class RedactSampleData {
                 }
             }
         }
-
+        
         matcher.appendTail(result);
-
+        
         // Process attributes if needed (simplified version)
         // Pattern to match attributes: tagName attribute="value"
         Pattern attrPattern = Pattern.compile("(\\w+)\\s*=\\s*\"([^\"]*)\"");
         matcher = attrPattern.matcher(result.toString());
         StringBuffer finalResult = new StringBuffer();
-
+        
         while (matcher.find()) {
             String attrName = matcher.group(1);
             String attrValue = matcher.group(2);
@@ -383,12 +383,12 @@ public class RedactSampleData {
                 }
             }
         }
-
+        
         if (finalResult.length() > 0) {
             matcher.appendTail(finalResult);
             return finalResult.toString();
         }
-
+        
         return result.toString();
     }
 
