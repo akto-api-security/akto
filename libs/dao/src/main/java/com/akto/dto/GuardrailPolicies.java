@@ -93,6 +93,13 @@ public class GuardrailPolicies {
     private SecretsDetection secretsDetection;
     private boolean applyToAllServers;
 
+    // applyToDeviceIds is resolved at fetch time (not stored) by the dashboard before serving to the enforcement layer.
+    private List<String> targetTeams;
+    private List<String> targetRoles;
+    @BsonIgnore
+    private List<String> applyToDeviceIds;
+    
+
     // Blocked host/path list — block-only glob patterns matched against the request host+path.
     // Object-shaped so it can be extended later without a data migration.
     private List<BlockedHostEntry> blockedHosts;

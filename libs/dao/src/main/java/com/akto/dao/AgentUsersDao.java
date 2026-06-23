@@ -5,6 +5,9 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
+import java.util.ArrayList;
+import java.util.List;
+import org.bson.conversions.Bson;
 
 public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
     public static final AgentUsersDao instance = new AgentUsersDao();
@@ -37,6 +40,38 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
             ),
             options
         );
+    }
+
+    /**
+     * Returns the flat list of device IDs belonging to users that match any of the
+     * given teams or roles. Pass empty/null lists to get an empty result (not all devices).
+     */
+    public List<String> findDeviceIdsByTeamsAndRoles(List<String> teams, List<String> roles) {
+        List<Bson> conditions = new ArrayList<>();
+        if (teams != null && !teams.isEmpty()) {
+            conditions.add(Filters.or(
+                Filters.and(Filters.eq(AgenticUsers.TEAM_SOURCE, AgenticUsers.SOURCE_MANUAL), Filters.in(AgenticUsers.TEAM_NAME, teams)),
+                Filters.and(Filters.ne(AgenticUsers.TEAM_SOURCE, AgenticUsers.SOURCE_MANUAL), Filters.in(AgenticUsers.SSO_TEAM_NAME, teams))
+            ));
+        }
+        if (roles != null && !roles.isEmpty()) {
+            conditions.add(Filters.or(
+                Filters.and(Filters.eq(AgenticUsers.ROLE_SOURCE, AgenticUsers.SOURCE_MANUAL), Filters.in(AgenticUsers.USER_ROLE, roles)),
+                Filters.and(Filters.ne(AgenticUsers.ROLE_SOURCE, AgenticUsers.SOURCE_MANUAL), Filters.in(AgenticUsers.SSO_USER_ROLE, roles))
+            ));
+        }
+        if (conditions.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        Bson userFilter = conditions.size() == 1 ? conditions.get(0) : Filters.and(conditions);
+        List<String> deviceIds = new ArrayList<>();
+        for (AgenticUsers user : instance.findAll(userFilter)) {
+            if (user.getDevices() != null) {
+                deviceIds.addAll(user.getDevices());
+            }
+        }
+        return deviceIds;
     }
 
     @Override
