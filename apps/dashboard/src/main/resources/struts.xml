@@ -796,6 +796,9 @@
                 <param name="featureLabel">LOGS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AGENT_TRAFFIC_LOGS</param>
+            </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -807,6 +810,11 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
         </action>
 
         <action name="api/searchLLMPrompts" class="com.akto.action.monitoring.LLMObservabilityAction" method="searchPrompts">
@@ -815,6 +823,9 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">LOGS</param>
                 <param name="accessType">READ</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AGENT_TRAFFIC_LOGS</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -828,6 +839,11 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
         </action>
 
         <action name="api/fetchLLMMessages" class="com.akto.action.monitoring.LLMObservabilityAction" method="fetchMessages">
@@ -836,6 +852,9 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">LOGS</param>
                 <param name="accessType">READ</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AGENT_TRAFFIC_LOGS</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -850,6 +869,11 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
         </action>
 
         <action name="api/fetchLLMTraceDetail" class="com.akto.action.monitoring.LLMObservabilityAction" method="fetchTraceDetail">
@@ -858,6 +882,9 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">LOGS</param>
                 <param name="accessType">READ</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AGENT_TRAFFIC_LOGS</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -872,11 +899,19 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
         </action>
 
         <action name="api/fetchLLMPromptFilters" class="com.akto.action.monitoring.LLMObservabilityAction" method="fetchPromptFilters">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AGENT_TRAFFIC_LOGS</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">LOGS</param>
                 <param name="accessType">READ</param>
@@ -894,6 +929,11 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
         </action>
 
         <action name="api/fetchLLMSessionStats" class="com.akto.action.monitoring.LLMObservabilityAction" method="fetchSessionAggStats">
@@ -902,6 +942,9 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">LOGS</param>
                 <param name="accessType">READ</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AGENT_TRAFFIC_LOGS</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -913,6 +956,11 @@
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 
