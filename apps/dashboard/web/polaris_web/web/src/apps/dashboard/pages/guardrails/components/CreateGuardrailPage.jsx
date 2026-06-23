@@ -394,7 +394,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         (async () => {
             setUsersLoading(true);
             try {
-                const response = await settingsApi.fetchAgenticUsers({ devicesOnly: true });
+                const response = await settingsApi.fetchAgenticUsers();
                 if (isActive && response?.agenticUsers) {
                     setAgenticUsers(response.agenticUsers);
                 }

@@ -54,9 +54,6 @@ public class ModuleInfoAction extends UserAction {
     @Getter
     private List<AgenticUsers> agenticUsers;
 
-    @Getter @Setter
-    private boolean devicesOnly;
-
     @Override
     public String execute() {
         return SUCCESS;
@@ -274,9 +271,7 @@ public class ModuleInfoAction extends UserAction {
     }
 
     public String fetchAgenticUsers() {
-        agenticUsers = devicesOnly
-                ? AgentUsersDao.instance.findUsersWithDevices()
-                : AgentUsersDao.instance.findAll(Filters.empty());
+        agenticUsers = AgentUsersDao.instance.findAll(Filters.empty());
         // Overwrite teamName/userRole with SSO values for users not manually pinned,
         // so callers always see a single consistent effective field.
         for (AgenticUsers u : agenticUsers) {

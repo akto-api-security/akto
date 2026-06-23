@@ -1,16 +1,13 @@
 package com.akto.dao;
 
 import com.akto.dao.context.Context;
-import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AgenticUsers;
-import com.akto.dto.monitoring.ModuleInfo;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
     public static final AgentUsersDao instance = new AgentUsersDao();
@@ -108,48 +105,9 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         instance.updateOne(Filters.eq(AgenticUsers.USER_NAME, trimmedName), Updates.combine(updates));
     }
 
-    /**
-     * Returns only the AgenticUsers records whose userName has at least one registered
-     * device in ModuleInfo (MCP_ENDPOINT_SHIELD). Used to populate team/role targeting
-     * dropdowns so admins can only target groups that have active devices.
-     */
-    public List<AgenticUsers> findUsersWithDevices() {
-        // Step 1: collect all usernames that have a registered device.
-        Bson moduleFilter = Filters.and(
-            Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD.toString()),
-            Filters.exists("additionalData.deviceId", true),
-            Filters.ne("additionalData.deviceId", "")
-        );
-        List<String> userNamesWithDevices = new ArrayList<>();
-        for (ModuleInfo module : ModuleInfoDao.instance.findAll(moduleFilter)) {
-            Map<String, Object> ad = module.getAdditionalData();
-            if (ad != null) {
-                Object username = ad.get("username");
-                if (username == null) username = ad.get("userName");
-                if (username instanceof String && !((String) username).isEmpty()) {
-                    userNamesWithDevices.add((String) username);
-                }
-            }
-        }
-        if (userNamesWithDevices.isEmpty()) {
-            return new ArrayList<>();
-        }
-        // Step 2: return only agent_users records for those usernames.
-        return instance.findAll(Filters.in(AgenticUsers.USER_NAME, userNamesWithDevices));
-    }
-
-    /**
-     * Returns device labels currently registered (via ModuleInfo) for users matching
-     * the given teams and roles. Uses ModuleInfo as the source of truth so the list is
-     * always current — no stale agent_users.devices needed.
-     *
-     * Returns an empty list (not null) when inputs are null/empty; callers that need to
-     * distinguish "no targeting" from "targeting but no devices" should check inputs first.
-     */
     public List<String> findDeviceIdsByTeamsAndRoles(List<String> teams, List<String> roles) {
         List<Bson> conditions = new ArrayList<>();
         if (teams != null && !teams.isEmpty()) {
-            // Manual-pinned users matched by teamName; SSO-managed by ssoTeamName.
             conditions.add(Filters.or(
                 Filters.and(Filters.eq(AgenticUsers.TEAM_SOURCE, AgenticUsers.SOURCE_MANUAL), Filters.in(AgenticUsers.TEAM_NAME, teams)),
                 Filters.and(Filters.ne(AgenticUsers.TEAM_SOURCE, AgenticUsers.SOURCE_MANUAL), Filters.in(AgenticUsers.SSO_TEAM_NAME, teams))
@@ -165,32 +123,11 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
             return new ArrayList<>();
         }
 
-        // Step 1: collect userNames of matching agentic users.
         Bson userFilter = conditions.size() == 1 ? conditions.get(0) : Filters.and(conditions);
-        List<String> userNames = new ArrayList<>();
-        for (AgenticUsers user : instance.findAll(userFilter)) {
-            if (user.getUserName() != null && !user.getUserName().isEmpty()) {
-                userNames.add(user.getUserName());
-            }
-        }
-        if (userNames.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        // Step 2: query ModuleInfo for current device IDs — always up-to-date regardless of
-        // when the user first logged in or when devices were registered.
         List<String> deviceIds = new ArrayList<>();
-        Bson moduleFilter = Filters.and(
-            Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD.toString()),
-            Filters.in("additionalData.username", userNames)
-        );
-        for (ModuleInfo module : ModuleInfoDao.instance.findAll(moduleFilter)) {
-            Map<String, Object> ad = module.getAdditionalData();
-            if (ad != null) {
-                Object deviceId = ad.get("deviceId");
-                if (deviceId instanceof String && !((String) deviceId).isEmpty()) {
-                    deviceIds.add((String) deviceId);
-                }
+        for (AgenticUsers user : instance.findAll(userFilter)) {
+            if (user.getDevices() != null) {
+                deviceIds.addAll(user.getDevices());
             }
         }
         return deviceIds;
