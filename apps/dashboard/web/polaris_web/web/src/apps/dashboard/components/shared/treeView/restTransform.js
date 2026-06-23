@@ -8,13 +8,23 @@ function normalizeSegment(seg) {
     return seg
 }
 
+// Extract only the path portion — strips protocol+host for full URLs
+function getPathSegments(endpoint) {
+    try {
+        const url = new URL(endpoint)
+        return url.pathname.split('/').filter(Boolean)
+    } catch {
+        return endpoint.split('/').filter(Boolean)
+    }
+}
+
 // Build flat rows with path arrays for AG Grid treeData
 // Max depth: 4 segments. Params normalized to {param}.
 function buildRestFlatRows(endpoints) {
     return endpoints
         .map(ep => {
             if (!ep.endpoint) return null
-            const segments = ep.endpoint.split('/').filter(Boolean).map(normalizeSegment)
+            const segments = getPathSegments(ep.endpoint).map(normalizeSegment)
             if (segments.length === 0) return null
             const path = segments.slice(0, 4)
             return { ...ep, path }

@@ -22,7 +22,7 @@ function RestTreeView({ endpoints, prettifyEndpoints, onTerminalClick, tableHead
                             </Text>
                             <Box background="bg-subdued" padding="3" borderRadius="2">
                                 <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.6', color: '#637381' }}>
-                                    {'/api/v1/users/123/orders\n/api/v1/users/456/orders\n\n→ api → v1 → users → {param} → orders'}
+                                    {'/api/v1/users/123/orders\n/api/v1/users/456/orders\n\n-> api -> v1 -> users -> {param} -> orders'}
                                 </pre>
                             </Box>
                         </VerticalStack>
