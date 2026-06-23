@@ -117,8 +117,8 @@ function WaterfallGraph({ spans }) {
 
 // ─── TraceDetailView ──────────────────────────────────────────────────────────
 
-export default function TraceDetailView({ trace, currDateRange }) {
-    const [spans, setSpans]     = useState([]);
+export default function TraceDetailView({ trace, currDateRange, initialSpans }) {
+    const [spans, setSpans]     = useState(initialSpans || []);
     const [loading, setLoading] = useState(false);
 
     // Compute the search window once. Prefer the parent's date range (same window
@@ -141,6 +141,8 @@ export default function TraceDetailView({ trace, currDateRange }) {
         const traceId   = trace?.traceId;
         const sessionId = trace?.sessionIdentifier;
         if (!traceId && !sessionId) { setSpans([]); return; }
+        // Spans pre-fetched by parent (session fallback) — nothing to do.
+        if (!traceId && sessionId && initialSpans?.length) return;
         let cancelled = false;
         setLoading(true);
 
@@ -176,7 +178,7 @@ export default function TraceDetailView({ trace, currDateRange }) {
         };
         loadSpans();
         return () => { cancelled = true; };
-    }, [trace?.traceId, trace?.sessionIdentifier, searchWindow]);
+    }, [trace?.traceId, trace?.sessionIdentifier, searchWindow, initialSpans]);
 
     const metaItems = [
         { label: "Application",     value: trace.serviceId },
