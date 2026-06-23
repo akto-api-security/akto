@@ -66,7 +66,7 @@ function SchemaView({ apiCollectionId }) {
 
     useEffect(() => {
         if (!loading && editorRef.current && !editorInstance) {
-            if (!editor.getLanguages().some(l => l.id === 'graphql')) {
+            if (!editor.languages.getLanguages().some(l => l.id === 'graphql')) {
                 editor.languages.register({ id: 'graphql' });
                 editor.languages.setMonarchTokensProvider('graphql', {
                     tokenizer: {
