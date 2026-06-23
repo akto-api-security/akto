@@ -89,6 +89,9 @@ public class AgentQueryRecord {
             String[] parts = host != null ? host.split("\\.", 3) : new String[0];
             deviceId  = parts.length >= 1 ? parts[0] : null;
             serviceId = parts.length >= 2 ? parts[1] : host;
+            if(serviceId.equals("ai-agent") && parts.length >=3){
+                serviceId = parts[2];
+            }
             if (deviceId == null || deviceUserMap == null || !deviceUserMap.containsKey(deviceId)) {
                 return null;
             }
