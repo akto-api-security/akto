@@ -1,12 +1,12 @@
 package com.akto.dto;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import java.util.List;
+import java.util.Map;
 
 @NoArgsConstructor
-@AllArgsConstructor
 public class ComponentRiskAnalysis {
 
     private boolean hasPrivilegedAccess;
@@ -15,6 +15,25 @@ public class ComponentRiskAnalysis {
     @Getter
     @Setter
     private String evidence;
+
+    // Each entry: { "id": "AST01", "name": "Malicious Skills", "severity": "CRITICAL", "confidence": "HIGH"|"MEDIUM" }
+    @Getter
+    @Setter
+    private List<Map<String, String>> owaspCategories;
+
+    public ComponentRiskAnalysis(boolean hasPrivilegedAccess, boolean isComponentMalicious, String evidence) {
+        this.hasPrivilegedAccess = hasPrivilegedAccess;
+        this.isComponentMalicious = isComponentMalicious;
+        this.evidence = evidence;
+    }
+
+    public ComponentRiskAnalysis(boolean hasPrivilegedAccess, boolean isComponentMalicious, String evidence,
+            List<Map<String, String>> owaspCategories) {
+        this.hasPrivilegedAccess = hasPrivilegedAccess;
+        this.isComponentMalicious = isComponentMalicious;
+        this.evidence = evidence;
+        this.owaspCategories = owaspCategories;
+    }
 
     public boolean getHasPrivilegedAccess() {
         return hasPrivilegedAccess;
