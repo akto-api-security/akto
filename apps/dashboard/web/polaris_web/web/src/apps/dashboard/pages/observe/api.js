@@ -340,6 +340,25 @@ export default {
             }
         })
     },
+    uploadGraphQLSchema(apiCollectionId, graphqlSchemaString) {
+        return request({
+            url: '/api/uploadGraphQLSchema',
+            method: 'post',
+            data: {
+                apiCollectionId,
+                graphqlSchemaString
+            }
+        })
+    },
+    fetchGraphQLSchema(apiCollectionId) {
+        return request({
+            url: '/api/fetchGraphQLSchema',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
     exportToPostman(apiCollectionId) {
         return request({
             url: '/api/createPostmanApi',
