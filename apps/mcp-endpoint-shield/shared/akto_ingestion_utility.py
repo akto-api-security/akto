@@ -40,7 +40,8 @@ _CONNECTOR_TAG: Dict[str, str] = {
     "vscode": "vscode",
     "gemini_cli": "geminicli",
     "github": "github",
-    "codex_cli": "codexcli"
+    "codex_cli": "codexcli",
+    "antigravity_cli": "antigravitycli",
 }
 TAG_NAME = _CONNECTOR_TAG.get(AKTO_CONNECTOR, AKTO_CONNECTOR)
 
@@ -62,6 +63,7 @@ _CONNECTOR_LOG_DIR: Dict[str, str] = {
     "codex_cli":        "~/.codex/akto/logs",
     "github":           "~/akto/.github/akto/vscode/logs",
     "opencode":         "~/.config/opencode/akto/logs",
+    "antigravity_cli":  "~/.gemini/antigravity/akto/logs",
 }
 _default_log_dir = _CONNECTOR_LOG_DIR.get(AKTO_CONNECTOR, f"~/akto/{AKTO_CONNECTOR}-hooks/logs")
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", _default_log_dir))
@@ -202,6 +204,17 @@ _SESSION_FIELD_MAP: Dict[str, Dict[str, Any]] = {
         "extra_fields": ("cwd", "hook_event_name"),
     },
     # NOTE: codex_cli not yet verified against docs; uses the default map until confirmed.
+    "antigravity_cli": {
+        # conversationId is Antigravity's session key (camelCase field name in hook input).
+        "session_id_field":    "conversationId",
+        "conversation_field":  None,
+        "message_id_field":    None,
+        "message_id_strategy": "turn_counter",
+        "state_key":           "conversationId",
+        # workspacePaths is an array; hooks extract the first element themselves before
+        # passing to the utility — not listed here so extract_session_info skips it.
+        "extra_fields":        ("transcriptPath", "hook_event_name"),
+    },
 }
 _DEFAULT_FIELD_MAP: Dict[str, Any] = {
     "session_id_field": "session_id",

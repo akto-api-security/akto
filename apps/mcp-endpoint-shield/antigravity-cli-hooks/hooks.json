@@ -1,0 +1,42 @@
+{
+  "akto-hooks": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "bash $HOME/.gemini/hooks/akto-validate-pre-invocation-wrapper.sh",
+        "timeout": 10
+      }
+    ],
+    "PostInvocation": [
+      {
+        "type": "command",
+        "command": "bash $HOME/.gemini/hooks/akto-validate-post-invocation-wrapper.sh",
+        "timeout": 10
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $HOME/.gemini/hooks/akto-validate-pre-tool-wrapper.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $HOME/.gemini/hooks/akto-validate-post-tool-wrapper.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
