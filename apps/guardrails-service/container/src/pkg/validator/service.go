@@ -189,6 +189,12 @@ func (s *Service) filterPoliciesByMcpServer(policies []types.Policy, mcpServerNa
 		return policies
 	}
 	mcpServerNameLower := strings.ToLower(mcpServerName)
+	// Service key = incoming name with deviceId prefix stripped ('macbook.cursor.time' → 'cursor.time').
+	// Atlas policies store the service key directly; this lets new devices match existing policies.
+	mcpServiceKey := ""
+	if i := strings.IndexByte(mcpServerNameLower, '.'); i > 0 {
+		mcpServiceKey = mcpServerNameLower[i+1:]
+	}
 	filtered := make([]types.Policy, 0, len(policies))
 	for _, policy := range policies {
 		if policy.IsYamlPolicy {
@@ -216,7 +222,15 @@ func (s *Service) filterPoliciesByMcpServer(policies []types.Policy, mcpServerNa
 			continue // Not configured for any server — skip
 		}
 		for serverName := range combinedServers {
-			if strings.ToLower(serverName) == mcpServerNameLower {
+			storedLower := strings.ToLower(serverName)
+			// Exact match (Argus: 'macbook.cursor.time' == 'macbook.cursor.time')
+			if storedLower == mcpServerNameLower {
+				filtered = append(filtered, policy)
+				break
+			}
+			// Service key match (Atlas: stored='cursor.time' == incoming service key 'cursor.time')
+			// Allows new devices to match policies created before they were added.
+			if mcpServiceKey != "" && storedLower == mcpServiceKey {
 				filtered = append(filtered, policy)
 				break
 			}

@@ -478,6 +478,8 @@ const finalizeHostGroupedRow = (g, idSegment) => {
         riskScore: g.maxRiskScore,
         team: g.team || '',
         userRole: g.userRole || '',
+        teamSource: g.teamSource || 'sso',
+        roleSource: g.roleSource || 'sso',
     };
 };
 

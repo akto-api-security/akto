@@ -374,7 +374,7 @@ function UsersAndDevices() {
         <Modal
             open={editTagModal.active}
             onClose={closeEditTagModal}
-            title={`Edit team & role — ${editTagModal.usernames?.length > 1 ? `${editTagModal.usernames.length} users` : (data.users.find((u) => editTagModal.usernames?.[0] === u.id)?.groupName || '')}`}
+            title={`Edit team & role \u2014 ${editTagModal.usernames?.length > 1 ? `${editTagModal.usernames.length} users` : (data.users.find((u) => editTagModal.usernames?.[0] === u.id)?.groupName || '')}`}
             primaryAction={{ content: 'Save', onAction: saveEditTag, loading: editTagModal.saving }}
             secondaryActions={[{ content: 'Cancel', onAction: closeEditTagModal }]}
         >

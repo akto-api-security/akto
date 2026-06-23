@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import {
     Text,
     HorizontalStack,
@@ -50,6 +51,35 @@ import {
     ServerSettingsConfig
 } from './steps';
 import "./createGuardrailPage.css";
+
+// Atlas: store service keys so new devices are covered automatically via service-key matching in enforcement.
+const expandGroupsToV2 = (selectedKeys) =>
+    (selectedKeys || []).map(key => ({ id: key, name: key }));
+
+// Reverse stored V2 entries back to service keys; handles old-format (numeric id) and new-format (service key as id).
+const reverseToServiceKeys = (v2Servers, allCollections) => {
+    const stripFirst = (s) => { const i = (s || '').indexOf('.'); return i > 0 ? s.slice(i + 1) : (s || ''); };
+    const keys = (v2Servers || []).map(s => {
+        const col = (allCollections || []).find(c => c.id?.toString() === s.id?.toString());
+        if (col) return stripFirst(col.displayName);
+        const sName = s.name || String(s.id || '');
+        return /^\d+$/.test(String(s.id || '')) ? stripFirst(sName) : sName;
+    });
+    return [...new Set(keys)];
+};
+
+// Returns service keys for all browser-llm collections, used to classify new-format V2 entries on load.
+const getLlmServiceKeySet = (allCollections) => {
+    const keys = new Set();
+    (allCollections || []).forEach(c => {
+        if (c.envType?.some(e => e.keyName === 'browser-llm')) {
+            const name = c.displayName || '';
+            const dotIdx = name.indexOf('.');
+            keys.add(dotIdx > 0 ? name.slice(dotIdx + 1) : name);
+        }
+    });
+    return keys;
+};
 
 const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false }) => {
     // Step management
@@ -148,6 +178,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [policyBehaviour, setPolicyBehaviour] = useState(GUARDRAIL_BEHAVIOUR.BLOCK);
 
     // Step 12: User targeting
+    const [applyToAllUsers, setApplyToAllUsers] = useState(true);
     const [targetTeams, setTargetTeams] = useState([]);
     const [targetRoles, setTargetRoles] = useState([]);
     const [agenticUsers, setAgenticUsers] = useState([]);
@@ -237,7 +268,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         applyOnRequest,
         applyOnResponse,
         policyBehaviour,
-        // Step 12
+        applyToAllUsers,
         targetTeams,
         targetRoles
     });
@@ -516,6 +547,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyOnResponse(false);
         setApplyOnRequest(false);
         setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
+        setApplyToAllUsers(true);
         setTargetTeams([]);
         setTargetRoles([]);
     };
@@ -626,31 +658,38 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setConfidenceScore(nearestCheckpoint);
 
         // Server settings
+        const isAtlas = isEndpointSecurityCategory();
+        const storedMcpV2 = policy.selectedMcpServersV2 || [];
         setSelectedMcpServers(
-            policy.selectedMcpServersV2?.length > 0
-                ? policy.selectedMcpServersV2.map(server => server.id)
+            storedMcpV2.length > 0
+                ? (isAtlas ? reverseToServiceKeys(storedMcpV2, allCollections) : storedMcpV2.map(s => s.id))
                 : policy.selectedMcpServers || []
         );
 
         // selectedAgentServersV2 stores both gen-ai and browser-llm entries.
-        // Split them back into their respective dropdowns using allCollections envType.
-        const rawAgentServers = policy.selectedAgentServersV2?.length > 0
-            ? policy.selectedAgentServersV2.map(server => server.id)
-            : policy.selectedAgentServers || [];
+        // Split them back into their respective dropdowns.
+        const rawAgentServersV2 = policy.selectedAgentServersV2?.length > 0
+            ? policy.selectedAgentServersV2
+            : (policy.selectedAgentServers || []).map(id => ({ id, name: id }));
 
-        const agentIds = [];
-        const browserLlmIds = [];
-        rawAgentServers.forEach(id => {
-            const col = allCollections?.find(c => c.id?.toString() === id?.toString());
-            const isBrowserLlm = col?.envType?.some(e => e.keyName === 'browser-llm');
-            if (isBrowserLlm) {
-                browserLlmIds.push(id);
-            } else {
-                agentIds.push(id);
-            }
+        const llmServiceKeySet = isAtlas ? getLlmServiceKeySet(allCollections) : null;
+        const rawAgentEntries = [];
+        const rawLlmEntries = [];
+        rawAgentServersV2.forEach(s => {
+            const col = allCollections?.find(c => c.id?.toString() === s.id?.toString());
+            const isBrowserLlm = col
+                ? col.envType?.some(e => e.keyName === 'browser-llm')
+                : isAtlas && llmServiceKeySet.has(s.name || '');
+            if (isBrowserLlm) rawLlmEntries.push(s);
+            else rawAgentEntries.push(s);
         });
-        setSelectedAgentServers(agentIds);
-        setSelectedBrowserLlms(browserLlmIds);
+
+        setSelectedAgentServers(isAtlas
+            ? reverseToServiceKeys(rawAgentEntries, allCollections)
+            : rawAgentEntries.map(s => s.id));
+        setSelectedBrowserLlms(isAtlas
+            ? reverseToServiceKeys(rawLlmEntries, allCollections)
+            : rawLlmEntries.map(s => s.id));
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
         setApplyToAllServers(policy.applyToAllServers ?? true);
@@ -661,7 +700,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         })));
         setBlockPersonalAccounts(policy.blockPersonalAccounts || false);
 
-        // User targeting
+        setApplyToAllUsers(!policy.targetTeams?.length && !policy.targetRoles?.length);
         setTargetTeams(policy.targetTeams || []);
         setTargetRoles(policy.targetRoles || []);
     };
@@ -688,37 +727,36 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const handleSave = async () => {
         setLoading(true);
         try {
-            // Transform selectedMcpServers and selectedAgentServers to include both ID and name
-            const transformedMcpServers = selectedMcpServers
-                .filter(serverId => serverId)
-                .map(serverId => {
-                    const server = mcpServers.find(s => s.value === serverId || s.value === serverId.toString());
-                    return {
-                        id: serverId.toString(),
-                        name: server ? server.label : serverId.toString()
-                    };
-                });
+            const isAtlas = isEndpointSecurityCategory();
 
-            const transformedAgentServers = [
-                ...selectedAgentServers
+            const transformedMcpServers = isAtlas
+                ? expandGroupsToV2(selectedMcpServers)
+                : selectedMcpServers
                     .filter(serverId => serverId)
                     .map(serverId => {
-                        const server = agentServers.find(s => s.value === serverId || s.value === serverId.toString());
-                        return {
-                            id: serverId.toString(),
-                            name: server ? server.label : serverId.toString()
-                        };
-                    }),
-                ...selectedBrowserLlms
-                    .filter(serverId => serverId)
-                    .map(serverId => {
-                        const server = browserLlmServers.find(s => s.value === serverId || s.value === serverId.toString());
-                        return {
-                            id: serverId.toString(),
-                            name: server ? server.label : serverId.toString()
-                        };
-                    })
-            ];
+                        const server = mcpServers.find(s => s.value === serverId || s.value === serverId.toString());
+                        return { id: serverId.toString(), name: server ? server.label : serverId.toString() };
+                    });
+
+            const transformedAgentServers = isAtlas
+                ? [
+                    ...expandGroupsToV2(selectedAgentServers),
+                    ...expandGroupsToV2(selectedBrowserLlms)
+                ]
+                : [
+                    ...selectedAgentServers
+                        .filter(serverId => serverId)
+                        .map(serverId => {
+                            const server = agentServers.find(s => s.value === serverId || s.value === serverId.toString());
+                            return { id: serverId.toString(), name: server ? server.label : serverId.toString() };
+                        }),
+                    ...selectedBrowserLlms
+                        .filter(serverId => serverId)
+                        .map(serverId => {
+                            const server = browserLlmServers.find(s => s.value === serverId || s.value === serverId.toString());
+                            return { id: serverId.toString(), name: server ? server.label : serverId.toString() };
+                        })
+                ];
 
             // Drop empty rows and normalize the glob patterns before persisting.
             const cleanedBlockedHosts = (blockedHosts || [])
@@ -794,8 +832,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 blockPersonalAccounts,
                 applyOnResponse,
                 applyOnRequest,
-                targetTeams: applyToAllServers ? targetTeams : [],
-                targetRoles: applyToAllServers ? targetRoles : [],
+                targetTeams: applyToAllUsers ? [] : targetTeams,
+                targetRoles: applyToAllUsers ? [] : targetRoles,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
 
@@ -991,6 +1029,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         availableTeams={availableTeams}
                         availableRoles={availableRoles}
                         usersLoading={usersLoading}
+                        applyToAllUsers={applyToAllUsers}
+                        setApplyToAllUsers={setApplyToAllUsers}
                     />
                 );
             default:
