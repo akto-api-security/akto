@@ -244,6 +244,26 @@ function getRiskAnalysisForEndpoint(endpointUrl, resourceNameToRiskMap) {
     return componentName != null ? (resourceNameToRiskMap.get(componentName) ?? null) : null;
 }
 
+function makeUploadItem(fileFormat, tooltipText, label, onFileChanged) {
+    return {
+        content: '',
+        prefix: (
+            <UploadFile
+                fileFormat={fileFormat}
+                fileChanged={onFileChanged}
+                tooltipText={tooltipText}
+                label={(
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <Icon source={FileMinor} />
+                        <Text>{label}</Text>
+                    </div>
+                )}
+                primary={false}
+            />
+        )
+    }
+}
+
 function ApiEndpoints(props) {
     const { endpointListFromConditions, sensitiveParamsForQuery, isQueryPage } = props
     const params = useParams()
@@ -1343,40 +1363,8 @@ function ApiEndpoints(props) {
                             {
                                 title: 'Upload',
                                 items: [
-                                    !isApiGroup && !isGraphQLCollection && {
-                                        content: '',
-                                        prefix: (
-                                            <UploadFile
-                                                fileFormat=".json,.yaml,.yml"
-                                                fileChanged={file => { uploadOpenApiFile(file); setExportOpen(false) }}
-                                                tooltipText="Upload OpenAPI file"
-                                                label={(
-                                                    <div style={{ display: "flex", gap: '6px', alignItems: 'center' }}>
-                                                        <Icon source={FileMinor} />
-                                                        <Text>Upload OpenAPI file</Text>
-                                                    </div>
-                                                )}
-                                                primary={false}
-                                            />
-                                        )
-                                    },
-                                    !isApiGroup && isGraphQLCollection && {
-                                        content: '',
-                                        prefix: (
-                                            <UploadFile
-                                                fileFormat=".graphql,.gql"
-                                                fileChanged={file => { uploadGraphQLSchemaFile(file); setExportOpen(false) }}
-                                                tooltipText="Upload GraphQL schema"
-                                                label={(
-                                                    <div style={{ display: "flex", gap: '6px', alignItems: 'center' }}>
-                                                        <Icon source={FileMinor} />
-                                                        <Text>Upload GraphQL schema</Text>
-                                                    </div>
-                                                )}
-                                                primary={false}
-                                            />
-                                        )
-                                    },
+                                    !isApiGroup && !isGraphQLCollection && makeUploadItem('.json,.yaml,.yml', 'Upload OpenAPI file', 'Upload OpenAPI file', file => { uploadOpenApiFile(file); setExportOpen(false) }),
+                                    !isApiGroup && isGraphQLCollection && makeUploadItem('.graphql,.gql', 'Upload GraphQL schema', 'Upload GraphQL schema', file => { uploadGraphQLSchemaFile(file); setExportOpen(false) }),
                                     !isApiGroup && !(isHostnameCollection)  && {
                                         content: '',
                                         prefix:  (<Box width="160px" >
