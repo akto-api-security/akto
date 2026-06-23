@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, Text, VerticalStack, HorizontalStack, Spinner, Box, Button, Divider, Tabs } from '@shopify/polaris';
-import { editor } from "monaco-editor/esm/vs/editor/editor.api";
+import { editor, languages } from "monaco-editor/esm/vs/editor/editor.api";
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
 import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
 import 'monaco-editor/esm/vs/editor/contrib/bracketMatching/browser/bracketMatching';
@@ -66,9 +66,9 @@ function SchemaView({ apiCollectionId }) {
 
     useEffect(() => {
         if (!loading && editorRef.current && !editorInstance) {
-            if (!editor.languages.getLanguages().some(l => l.id === 'graphql')) {
-                editor.languages.register({ id: 'graphql' });
-                editor.languages.setMonarchTokensProvider('graphql', {
+            if (!languages.getLanguages().some(l => l.id === 'graphql')) {
+                languages.register({ id: 'graphql' });
+                languages.setMonarchTokensProvider('graphql', {
                     tokenizer: {
                         root: [
                             [/#.*$/, 'comment'],
@@ -86,7 +86,7 @@ function SchemaView({ apiCollectionId }) {
                         ],
                     },
                 });
-                editor.languages.setLanguageConfiguration('graphql', {
+                languages.setLanguageConfiguration('graphql', {
                     brackets: [['{', '}'], ['(', ')'], ['[', ']']],
                     comments: { lineComment: '#' },
                 });
