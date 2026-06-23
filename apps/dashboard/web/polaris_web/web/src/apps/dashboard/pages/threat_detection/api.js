@@ -47,7 +47,8 @@ const threatDetectionRequests = {
                 ...(latestApiOrigRegex ? { latestApiOrigRegex } : {}),
                 method: method,
                 ...(typeof sortBySeverity === 'boolean' ? { sortBySeverity } : {})
-            }
+            },
+            suppress403Toast: true
         })
     },
     fetchFiltersThreatTable(startTimestamp, endTimestamp) {
@@ -306,7 +307,8 @@ const threatDetectionRequests = {
         return request({
             url: '/api/fetchThreatComplianceInfos',
             method: 'post',
-            data: {}
+            data: {},
+            suppress403Toast: true
         })
     },
     fetchGuardrailComplianceInfos() {
