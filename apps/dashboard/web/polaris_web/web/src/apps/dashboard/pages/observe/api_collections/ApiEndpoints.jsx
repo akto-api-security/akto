@@ -44,6 +44,7 @@ import { dummyCollections } from "./AgentDiscoveryDummyData"
 import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges"
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent"
 import GraphqlTreeView from "../../../components/shared/treeView/GraphqlTreeView"
+import RestTreeView from "../../../components/shared/treeView/RestTreeView"
 
 const headings = [
     {
@@ -280,6 +281,7 @@ function ApiEndpoints(props) {
     const [showSwaggerDependenciesFlow, setShowSwaggerDependenciesFlow] = useState(false)
     const [showSchemaView, setShowSchemaView] = useState(false)
     const [showGraphQLTreeView, setShowGraphQLTreeView] = useState(false)
+    const [showRestTreeView, setShowRestTreeView] = useState(false)
 
     const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
@@ -1270,6 +1272,13 @@ function ApiEndpoints(props) {
             state: showGraphQLTreeView,
             setState: setShowGraphQLTreeView,
             condition: isGraphQLCollection
+        },
+        {
+            key: 'restTree',
+            label: 'Display tree view',
+            state: showRestTreeView,
+            setState: setShowRestTreeView,
+            condition: !isGraphQLCollection
         }
     ];
 
@@ -2002,6 +2011,23 @@ function ApiEndpoints(props) {
             ] : showGraphQLTreeView ? [
                 <GraphqlTreeView
                     key="graphql-tree-view"
+                    endpoints={endpointData["all"] || []}
+                    prettifyEndpoints={endpointData["all"]?._prettifyPageData}
+                    onTerminalClick={handleRowClick}
+                    tableHeaders={headers}
+                />,
+                <ApiDetails
+                    key="api-details"
+                    showDetails={showDetails && apiDetail && Object.keys(apiDetail).length > 0}
+                    setShowDetails={setShowDetails}
+                    apiDetail={apiDetail}
+                    headers={transform.getDetailsHeaders()}
+                    collectionIssuesData={collectionIssuesData}
+                    hasAccessToDiscoveryAgent={hasAccessToDiscoveryAgent}
+                />,
+            ] : showRestTreeView ? [
+                <RestTreeView
+                    key="rest-tree-view"
                     endpoints={endpointData["all"] || []}
                     prettifyEndpoints={endpointData["all"]?._prettifyPageData}
                     onTerminalClick={handleRowClick}
