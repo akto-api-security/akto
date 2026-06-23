@@ -1,4 +1,3 @@
-import React from 'react'
 import transform from '../../../pages/observe/transform'
 import { RiskScoreCellRenderer } from '../../../pages/observe/agentic/AgenticCellRenderers'
 
@@ -68,10 +67,9 @@ function buildTreeAutoGroupColumnDef({ minWidth = 560, innerRenderer }) {
     return {
         headerName: 'Endpoint',
         minWidth,
-        flex: 3,
         cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'flex-start' },
         cellRenderer: 'agGroupCellRenderer',
-        cellRendererParams: { suppressCount: true, padding: 10, innerRenderer },
+        cellRendererParams: { suppressCount: true, innerRenderer },
     }
 }
 
