@@ -1,4 +1,5 @@
-import { VerticalStack, HorizontalStack, Text, FormLayout, Box, Checkbox, RadioButton, Divider, Popover, TextField, Link, Tag } from "@shopify/polaris";
+import { VerticalStack, HorizontalStack, Text, FormLayout, Box, Checkbox, RadioButton, Icon, Popover, TextField, Link, Tag, Banner, Badge } from "@shopify/polaris";
+import { InfoMinor } from "@shopify/polaris-icons";
 import { useState, useEffect } from "react";
 import DropdownSearch from "../../../../components/shared/DropdownSearch";
 import OwaspTag from "../OwaspTag";
@@ -72,7 +73,7 @@ const CountPopover = ({ count, label, items }) => {
             onClose={() => { setActive(false); setSearch(''); }}
         >
             <Popover.Pane fixed>
-                <Box padding="2" minWidth="240px">
+                <Box padding="2" minWidth="240px" maxWidth="320px">
                     <TextField
                         placeholder={`Search ${label}...`}
                         value={search}
@@ -82,7 +83,7 @@ const CountPopover = ({ count, label, items }) => {
                 </Box>
             </Popover.Pane>
             <Popover.Pane>
-                <Box padding="3">
+                <Box padding="3" maxWidth="320px">
                     {filtered.length === 0
                         ? <Text tone="subdued" variant="bodySm">No {label} found</Text>
                         : <HorizontalStack gap="2" wrap>
@@ -129,11 +130,18 @@ const ServerSettingsStep = ({
     const isBlockMode = policyBehaviour === 'block';
     const isAtlas = isEndpointSecurityCategory();
 
+    const isApplyToAll = isAtlas ? (applyToAllServers && applyToAllUsers) : applyToAllServers;
+
+    const handleScopeChange = (applyAll) => {
+        setApplyToAllServers(applyAll);
+        if (isAtlas) setApplyToAllUsers(applyAll);
+    };
+
     const compatibleMcpServers = isBlockMode ? (mcpServers || []).filter(s => s.isInline) : (mcpServers || []);
     const compatibleAgentServers = isBlockMode ? (agentServers || []).filter(s => s.isInline) : (agentServers || []);
     const compatibleBrowserLlmServers = isBlockMode ? (browserLlmServers || []).filter(s => s.isInline) : (browserLlmServers || []);
 
-    const hasIncompatibleServers = !isAtlas && isBlockMode && (
+    const hasIncompatibleServers = isBlockMode && (
         (mcpServers || []).some(s => !s.isInline) ||
         (agentServers || []).some(s => !s.isInline) ||
         (browserLlmServers || []).some(s => !s.isInline)
@@ -206,159 +214,146 @@ const ServerSettingsStep = ({
                 <Box borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                     <Box padding="4">
                         <VerticalStack gap="4">
+                            <Text variant="headingSm">Coverage</Text>
 
-                            {/* Agentic Assets section */}
-                            <VerticalStack gap="3">
-                                <Text variant="headingSm">Agentic Assets</Text>
-                                <VerticalStack gap="2">
-                                    <RadioButton
-                                        label="Apply to all"
-                                        checked={applyToAllServers === true}
-                                        id="apply_to_all_servers"
-                                        name="serverTargeting"
-                                        onChange={() => setApplyToAllServers(true)}
-                                        helpText={
+                            <VerticalStack gap="2">
+                                <RadioButton
+                                    label={
+                                        <HorizontalStack gap="2" blockAlign="center">
+                                            <Text variant="bodyMd">Apply to all</Text>
+                                            <Badge tone="success">Recommended</Badge>
+                                        </HorizontalStack>
+                                    }
+                                    checked={isApplyToAll}
+                                    id="apply_to_all"
+                                    name="scopeTargeting"
+                                    onChange={() => handleScopeChange(true)}
+                                    helpText={(() => {
+                                        const nonZeroItems = [
+                                            agentCountItems.length > 0 && { count: agentCountItems.length, label: "Agents", items: agentCountItems },
+                                            mcpCountItems.length > 0 && { count: mcpCountItems.length, label: "MCP Servers", items: mcpCountItems },
+                                            llmCountItems.length > 0 && { count: llmCountItems.length, label: "LLMs", items: llmCountItems },
+                                        ].filter(Boolean);
+                                        return (
                                             <HorizontalStack gap="1" blockAlign="center" wrap>
-                                                <Text variant="bodyMd" tone="subdued">This currently includes</Text>
-                                                <CountPopover count={agentCountItems.length} label="Agents" items={agentCountItems} />
-                                                <Text variant="bodyMd" tone="subdued">,</Text>
-                                                <CountPopover count={mcpCountItems.length} label="MCP Servers" items={mcpCountItems} />
-                                                <Text variant="bodyMd" tone="subdued">&amp;</Text>
-                                                <CountPopover count={llmCountItems.length} label="LLMs" items={llmCountItems} />
+                                                <Text variant="bodyMd" tone="subdued">This includes</Text>
+                                                {nonZeroItems.flatMap((item, i) => [
+                                                    <CountPopover key={item.label} count={item.count} label={item.label} items={item.items} />,
+                                                    i < nonZeroItems.length - 1 && (
+                                                        <Text key={`sep-${i}`} variant="bodyMd" tone="subdued">
+                                                            {i === nonZeroItems.length - 2 ? '&' : ','}
+                                                        </Text>
+                                                    )
+                                                ]).filter(Boolean)}
+                                                <Text variant="bodyMd" tone="subdued">.</Text>
                                             </HorizontalStack>
-                                        }
-                                    />
+                                        );
+                                    })()}
+                                />
 
-                                    <RadioButton
-                                        label="Select Agentic Assets"
-                                        checked={applyToAllServers === false}
-                                        id="edit_servers"
-                                        name="serverTargeting"
-                                        onChange={() => setApplyToAllServers(false)}
-                                        helpText={hasIncompatibleServers
-                                            ? "Some Agentic Assets are disabled, block mode requires servers running in inline (sync) mode."
-                                            : "Choose specific agents, MCP servers, or LLMs to apply this guardrail to."}
-                                    />
+                                <RadioButton
+                                    label="Advance Configuration"
+                                    checked={!isApplyToAll}
+                                    id="advance_configuration"
+                                    name="scopeTargeting"
+                                    onChange={() => handleScopeChange(false)}
+                                    helpText={isAtlas
+                                        ? "Choose specific Agents, MCP Servers, LLMs, Roles and Teams."
+                                        : "Choose specific Agents, MCP Servers, or LLMs to apply this guardrail to."}
+                                />
 
-                                    {applyToAllServers === false && (
-                                        <Box paddingInlineStart="6">
-                                            <FormLayout>
-                                                <FormLayout.Group>
-                                                    <DropdownSearch
-                                                        label="Select Agents"
-                                                        placeholder="Choose agents"
-                                                        optionsList={agentOptions}
-                                                        setSelected={setSelectedAgentServers}
-                                                        preSelected={selectedAgentServers}
-                                                        allowMultiple={true}
-                                                        showSelectAllMinOptions={isBlockMode && !isAtlas ? 99999 : 1}
-                                                        disabled={collectionsLoading}
-                                                        sliceMaxVal={Math.max(selectedAgentServers.length + 20, 20)}
-                                                        value={selectedAgentServers.length > 0 ? `${selectedAgentServers.length} Selected` : undefined}
-                                                    />
-                                                    <DropdownSearch
-                                                        label="Select MCP Servers"
-                                                        placeholder="Choose MCP servers"
-                                                        optionsList={mcpOptions}
-                                                        setSelected={setSelectedMcpServers}
-                                                        preSelected={selectedMcpServers}
-                                                        allowMultiple={true}
-                                                        showSelectAllMinOptions={isBlockMode && !isAtlas ? 99999 : 1}
-                                                        disabled={collectionsLoading}
-                                                        sliceMaxVal={Math.max(selectedMcpServers.length + 20, 20)}
-                                                        value={selectedMcpServers.length > 0 ? `${selectedMcpServers.length} Selected` : undefined}
-                                                    />
-                                                </FormLayout.Group>
+                                {!isApplyToAll && (
+                                    <Box paddingInlineStart="6">
+                                        <FormLayout>
+                                            <FormLayout.Group>
                                                 <DropdownSearch
+                                                    id="scope-agents"
+                                                    label="Select Agents"
+                                                    placeholder={agentOptions.length === 0 ? "Not available" : "Choose agents"}
+                                                    optionsList={agentOptions}
+                                                    setSelected={setSelectedAgentServers}
+                                                    preSelected={selectedAgentServers}
+                                                    allowMultiple={true}
+                                                    showSelectAllMinOptions={isBlockMode && !isAtlas ? 99999 : 1}
+                                                    disabled={collectionsLoading || agentOptions.length === 0}
+                                                    sliceMaxVal={Math.max(selectedAgentServers.length + 20, 20)}
+                                                    value={selectedAgentServers.length > 0 ? `${selectedAgentServers.length} Selected` : undefined}
+                                                />
+                                                <DropdownSearch
+                                                    id="scope-mcp-servers"
+                                                    label="Select MCP Servers"
+                                                    placeholder={mcpOptions.length === 0 ? "Not available" : "Choose MCP servers"}
+                                                    optionsList={mcpOptions}
+                                                    setSelected={setSelectedMcpServers}
+                                                    preSelected={selectedMcpServers}
+                                                    allowMultiple={true}
+                                                    showSelectAllMinOptions={isBlockMode && !isAtlas ? 99999 : 1}
+                                                    disabled={collectionsLoading || mcpOptions.length === 0}
+                                                    sliceMaxVal={Math.max(selectedMcpServers.length + 20, 20)}
+                                                    value={selectedMcpServers.length > 0 ? `${selectedMcpServers.length} Selected` : undefined}
+                                                />
+                                            </FormLayout.Group>
+                                            <FormLayout.Group>
+                                                <DropdownSearch
+                                                    id="scope-llms"
                                                     label="Select LLMs"
-                                                    placeholder="Choose LLMs"
+                                                    placeholder={llmOptions.length === 0 ? "Not available" : "Choose LLMs"}
                                                     optionsList={llmOptions}
                                                     setSelected={setSelectedBrowserLlms}
                                                     preSelected={selectedBrowserLlms}
                                                     allowMultiple={true}
                                                     showSelectAllMinOptions={isBlockMode && !isAtlas ? 99999 : 1}
-                                                    disabled={collectionsLoading}
+                                                    disabled={collectionsLoading || llmOptions.length === 0}
                                                     sliceMaxVal={Math.max(selectedBrowserLlms.length + 20, 20)}
                                                     value={selectedBrowserLlms.length > 0 ? `${selectedBrowserLlms.length} Selected` : undefined}
                                                 />
-                                            </FormLayout>
-                                        </Box>
-                                    )}
-                                </VerticalStack>
-                            </VerticalStack>
-
-                            {isAtlas && <Divider />}
-
-                            {/* Users & Roles section — Atlas only */}
-                            {isAtlas &&
-                            <VerticalStack gap="3">
-                                <Text variant="headingSm">Users & Roles</Text>
-                                <VerticalStack gap="2">
-                                    <RadioButton
-                                        label="Apply to all"
-                                        checked={applyToAllUsers === true}
-                                        id="apply_to_all_users"
-                                        name="userTargeting"
-                                        onChange={() => setApplyToAllUsers(true)}
-                                        helpText={
-                                            <HorizontalStack gap="1" blockAlign="center" wrap>
-                                                <Text variant="bodyMd" tone="subdued">This currently includes</Text>
-                                                <CountPopover count={(availableTeams || []).length} label="Teams" items={(availableTeams || []).map(t => ({ label: t, value: t }))} />
-                                                <Text variant="bodyMd" tone="subdued">&amp;</Text>
-                                                <CountPopover count={(availableRoles || []).length} label="Roles" items={(availableRoles || []).map(r => ({ label: r, value: r }))} />
-                                            </HorizontalStack>
-                                        }
-                                    />
-
-                                    <RadioButton
-                                        label="Select Users & Teams"
-                                        checked={applyToAllUsers === false}
-                                        id="select_users_teams"
-                                        name="userTargeting"
-                                        onChange={() => setApplyToAllUsers(false)}
-                                        helpText="Choose specific teams or roles to limit this guardrail to their members."
-                                    />
-
-                                    {applyToAllUsers === false && (
-                                        <Box paddingInlineStart="6">
-                                            <FormLayout>
-                                                <FormLayout.Group>
+                                                {isAtlas && (
                                                     <DropdownSearch
-                                                        label="Teams"
-                                                        placeholder="Choose teams"
-                                                        optionsList={(availableTeams || []).map(t => ({ label: t, value: t }))}
-                                                        setSelected={setTargetTeams}
-                                                        preSelected={targetTeams}
-                                                        allowMultiple={true}
-                                                        disabled={usersLoading}
-                                                        value={targetTeams?.length > 0 ? `${targetTeams.length} Selected` : undefined}
-                                                    />
-                                                    <DropdownSearch
+                                                        id="scope-roles"
                                                         label="Roles"
-                                                        placeholder="Choose roles"
+                                                        placeholder={(availableRoles || []).length === 0 ? "Not available" : "Choose roles"}
                                                         optionsList={(availableRoles || []).map(r => ({ label: r, value: r }))}
                                                         setSelected={setTargetRoles}
                                                         preSelected={targetRoles}
                                                         allowMultiple={true}
-                                                        disabled={usersLoading}
+                                                        disabled={usersLoading || (availableRoles || []).length === 0}
                                                         value={targetRoles?.length > 0 ? `${targetRoles.length} Selected` : undefined}
                                                     />
+                                                )}
+                                            </FormLayout.Group>
+                                            {isAtlas && (
+                                                <FormLayout.Group>
+                                                    <DropdownSearch
+                                                        id="scope-teams"
+                                                        label="Teams"
+                                                        placeholder={(availableTeams || []).length === 0 ? "Not available" : "Choose teams"}
+                                                        optionsList={(availableTeams || []).map(t => ({ label: t, value: t }))}
+                                                        setSelected={setTargetTeams}
+                                                        preSelected={targetTeams}
+                                                        allowMultiple={true}
+                                                        disabled={usersLoading || (availableTeams || []).length === 0}
+                                                        value={targetTeams?.length > 0 ? `${targetTeams.length} Selected` : undefined}
+                                                    />
+                                                    <Box />
                                                 </FormLayout.Group>
-                                            </FormLayout>
-                                        </Box>
-                                    )}
-                                </VerticalStack>
-                            </VerticalStack>}
-
+                                            )}
+                                            <Banner tone="info">
+                                                Some Agentic Assets are disabled, block mode requires servers running in inline (sync) mode.
+                                            </Banner>
+                                        </FormLayout>
+                                    </Box>
+                                )}
+                            </VerticalStack>
                         </VerticalStack>
                     </Box>
 
-                    {/* Scope footer */}
+                    {/* Scope footer — commented out for now
                     <Box background="bg-magic-subdued" borderColor="border-subdued" padding="3" borderRadiusEndStart="2" borderRadiusEndEnd="2">
                         <Text as="span" variant="bodySm" color="magic">
-                            This scope applies to {scopeAssetCount} agentic asset{scopeAssetCount !== 1 ? 's' : ''}{isAtlas && !applyToAllUsers && (targetTeams?.length > 0 || targetRoles?.length > 0) ? ` for selected users` : ''}.
+                            This scope applies to {scopeAssetCount} agentic asset{scopeAssetCount !== 1 ? 's' : ''}{isAtlas && !isApplyToAll && (targetTeams?.length > 0 || targetRoles?.length > 0) ? ` for selected users` : ''}.
                         </Text>
                     </Box>
+                    */}
                 </Box>
 
                 {/* Rule enforcement */}
