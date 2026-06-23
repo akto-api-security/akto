@@ -253,7 +253,7 @@ function makeUploadItem(fileFormat, tooltipText, label, onFileChanged) {
                 fileChanged={onFileChanged}
                 tooltipText={tooltipText}
                 label={(
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', whiteSpace: 'nowrap' }}>
                         <Icon source={FileMinor} />
                         <Text>{label}</Text>
                     </div>
