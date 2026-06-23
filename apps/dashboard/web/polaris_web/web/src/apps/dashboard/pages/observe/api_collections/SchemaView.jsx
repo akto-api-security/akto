@@ -66,19 +66,54 @@ function SchemaView({ apiCollectionId }) {
 
     useEffect(() => {
         if (!loading && editorRef.current && !editorInstance) {
+            if (!editor.getLanguages().some(l => l.id === 'graphql')) {
+                editor.languages.register({ id: 'graphql' });
+                editor.languages.setMonarchTokensProvider('graphql', {
+                    tokenizer: {
+                        root: [
+                            [/#.*$/, 'comment'],
+                            [/"""/, 'string', '@tripleString'],
+                            [/"([^"\\]|\\.)*"/, 'string'],
+                            [/@[a-zA-Z_]\w*/, 'annotation'],
+                            [/\b(query|mutation|subscription|fragment|on|schema|scalar|enum|input|interface|union|extend|directive|implements|type|repeatable|true|false|null)\b/, 'keyword'],
+                            [/[0-9]+(\.[0-9]+)?/, 'number'],
+                            [/[a-zA-Z_]\w*/, 'type.identifier'],
+                            [/[{}()\[\]:!|&]/, 'delimiter'],
+                        ],
+                        tripleString: [
+                            [/"""/, 'string', '@pop'],
+                            [/./, 'string'],
+                        ],
+                    },
+                });
+                editor.languages.setLanguageConfiguration('graphql', {
+                    brackets: [['{', '}'], ['(', ')'], ['[', ']']],
+                    comments: { lineComment: '#' },
+                });
+            }
+
             const content = activeIsGraphql
                 ? (graphqlSchema || '')
                 : (openApiSchema ? JSON.stringify(openApiSchema, null, 2) : '');
-            const language = activeIsGraphql ? 'plaintext' : 'json';
+            const language = activeIsGraphql ? 'graphql' : 'json';
 
             editor.defineTheme('schemaTheme', {
                 base: 'vs',
                 inherit: true,
                 rules: [
+                    // JSON tokens
                     { token: 'string.key.json', foreground: 'A31515' },
                     { token: 'string.value.json', foreground: '0451A5' },
                     { token: 'number', foreground: '098658' },
                     { token: 'keyword.json', foreground: '0000FF' },
+                    // GraphQL tokens
+                    { token: 'keyword', foreground: '0000FF', fontStyle: 'bold' },
+                    { token: 'type.identifier', foreground: '267F99' },
+                    { token: 'string', foreground: 'A31515' },
+                    { token: 'comment', foreground: '6A9955', fontStyle: 'italic' },
+                    { token: 'annotation', foreground: '795E26' },
+                    { token: 'number', foreground: '098658' },
+                    { token: 'delimiter', foreground: '666666' },
                 ],
                 colors: {
                     'editor.background': '#FAFBFB',
