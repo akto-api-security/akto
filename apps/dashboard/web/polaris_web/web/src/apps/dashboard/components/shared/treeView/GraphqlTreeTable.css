@@ -1,6 +1,0 @@
-/* Hide the checkbox selection column — we use selectable={true} only to
-   enable IndexTable.Row onClick, but don't want checkboxes visible. */
-.graphql-tree-table .Polaris-IndexTable__TableCell--first,
-.graphql-tree-table .Polaris-IndexTable__TableHeading--first {
-    display: none;
-}
