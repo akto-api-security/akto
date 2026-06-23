@@ -87,6 +87,8 @@ function AgentDetails({
     const [displayedLogs, setDisplayedLogs] = useState([]);
     const [isLogsExpanded, setIsLogsExpanded] = useState(true);
     const [logMode, setLogMode] = useState(LOG_MODES.HISTORICAL);
+    const [selectedLogSource, setSelectedLogSource] = useState('all');
+    const logSourceRef = useRef('all');
     const [description, setDescription] = useState("");
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState("");
@@ -100,7 +102,8 @@ function AgentDetails({
 
     const fetchAgentLogs = useCallback(async (agentId, startTime, endTime) => {
         try {
-            const logsResponse = await settingRequests.getAgentLogs(agentId, startTime, endTime);
+            const logKey = logSourceRef.current !== 'all' ? logSourceRef.current : null;
+            const logsResponse = await settingRequests.getAgentLogs(agentId, startTime, endTime, logKey);
             const transformedLogs = (logsResponse.agentLogs || []).map(log => ({
                 timestamp: log.timestamp,
                 level: log.level || 'INFO',
@@ -167,6 +170,21 @@ function AgentDetails({
         setIsLogsExpanded(wasExpanded);
     }, [logMode, selectedAgent, isLogsExpanded, startLiveFetching, stopLiveFetching, fetchAgentLogs, startTimestamp, endTimestamp]);
 
+    const handleSourceChange = useCallback(async (source) => {
+        if (logSourceRef.current === source) return;
+        setSelectedLogSource(source);
+        logSourceRef.current = source;
+        if (!selectedAgent) return;
+        setAgentLogs([]);
+        setDisplayedLogs([]);
+        if (logMode === LOG_MODES.CURRENT) {
+            await startLiveFetching(selectedAgent.agentId);
+        } else {
+            const logs = await fetchAgentLogs(selectedAgent.agentId, startTimestamp, endTimestamp);
+            setAgentLogs(logs);
+        }
+    }, [selectedAgent, logMode, startLiveFetching, fetchAgentLogs, startTimestamp, endTimestamp]);
+
     const handleSaveDescription = useCallback(() => {
         setDescription(editableDescription);
         setIsEditingDescription(false);
@@ -182,6 +200,8 @@ function AgentDetails({
         setAgentLogs([]);
         setDisplayedLogs([]);
         setLogMode(LOG_MODES.HISTORICAL);
+        setSelectedLogSource('all');
+        logSourceRef.current = 'all';
         setDescription("");
         setEditableDescription("");
         setIsEditingDescription(false);
@@ -307,21 +327,40 @@ function AgentDetails({
                             <Text as="dd">Agent</Text>
                         </HorizontalStack>
                     </Button>
-                    <HorizontalStack gap="1">
-                        <Button
-                            size="micro"
-                            pressed={logMode === LOG_MODES.CURRENT}
-                            onClick={(e) => { e.stopPropagation(); handleLogModeChange(LOG_MODES.CURRENT); }}
-                        >
-                            Live
-                        </Button>
-                        <Button
-                            size="micro"
-                            pressed={logMode === LOG_MODES.HISTORICAL}
-                            onClick={(e) => { e.stopPropagation(); handleLogModeChange(LOG_MODES.HISTORICAL); }}
-                        >
-                            All Time
-                        </Button>
+                    <HorizontalStack gap="3" wrap={false}>
+                        <HorizontalStack gap="1">
+                            <Button
+                                size="micro"
+                                pressed={logMode === LOG_MODES.CURRENT}
+                                onClick={(e) => { e.stopPropagation(); handleLogModeChange(LOG_MODES.CURRENT); }}
+                            >
+                                Live
+                            </Button>
+                            <Button
+                                size="micro"
+                                pressed={logMode === LOG_MODES.HISTORICAL}
+                                onClick={(e) => { e.stopPropagation(); handleLogModeChange(LOG_MODES.HISTORICAL); }}
+                            >
+                                All Time
+                            </Button>
+                        </HorizontalStack>
+                        <HorizontalStack gap="1">
+                            {[
+                                { label: 'All', value: 'all' },
+                                { label: 'Agent', value: 'agent-logs' },
+                                { label: 'Proxy', value: 'proxy-logs' },
+                                { label: 'Install', value: 'installation-logs' },
+                            ].map(({ label, value }) => (
+                                <Button
+                                    key={value}
+                                    size="micro"
+                                    pressed={selectedLogSource === value}
+                                    onClick={(e) => { e.stopPropagation(); handleSourceChange(value); }}
+                                >
+                                    {label}
+                                </Button>
+                            ))}
+                        </HorizontalStack>
                     </HorizontalStack>
                 </HorizontalStack>
 

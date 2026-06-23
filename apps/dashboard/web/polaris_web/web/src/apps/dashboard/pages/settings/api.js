@@ -984,14 +984,15 @@ const settingRequests = {
             }
         })
     },
-    getAgentLogs(agentId, startTime, endTime) {
+    getAgentLogs(agentId, startTime, endTime, logKey = null) {
         return request({
             url: '/api/getAgentLogs',
             method: 'post',
             data: {
                 agentId,
                 startTime,
-                endTime
+                endTime,
+                ...(logKey ? { logKey } : {})
             }
         })
     },

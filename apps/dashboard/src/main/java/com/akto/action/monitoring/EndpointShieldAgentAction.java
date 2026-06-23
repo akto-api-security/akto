@@ -29,6 +29,7 @@ public class EndpointShieldAgentAction extends UserAction {
     private List<Log> agentLogs;
     private int startTime;
     private int endTime;
+    private String logKey; // optional filter: "agent-logs", "proxy-logs", "installation-logs", etc.
 
     @Getter
     private UserAnalysisData userAnalysis;
@@ -200,12 +201,18 @@ public class EndpointShieldAgentAction extends UserAction {
             LoggerMaker loggerMaker = new LoggerMaker(EndpointShieldAgentAction.class, LogDb.ENDPOINT_SHIELD);
             agentLogs = loggerMaker.fetchLogRecords(startTime, endTime, LogDb.ENDPOINT_SHIELD);
             
-            // Filter logs by agentId and apply sorting with limit
+            // Filter logs by agentId (and optional logKey) and apply sorting with limit
             agentLogs = agentLogs.stream()
                 .filter(log -> {
                     if (log instanceof EndpointShieldLog) {
                         EndpointShieldLog esLog = (EndpointShieldLog) log;
-                        return agentId.equals(esLog.getAgentId());
+                        if (!agentId.equals(esLog.getAgentId())) {
+                            return false;
+                        }
+                        if (logKey != null && !logKey.isEmpty()) {
+                            return logKey.equals(esLog.getKey());
+                        }
+                        return true;
                     }
                     return false;
                 })
@@ -243,6 +250,14 @@ public class EndpointShieldAgentAction extends UserAction {
 
     public void setEndTime(int endTime) {
         this.endTime = endTime;
+    }
+
+    public String getLogKey() {
+        return logKey;
+    }
+
+    public void setLogKey(String logKey) {
+        this.logKey = logKey;
     }
 
     public String fetchUserAnalysis() {
