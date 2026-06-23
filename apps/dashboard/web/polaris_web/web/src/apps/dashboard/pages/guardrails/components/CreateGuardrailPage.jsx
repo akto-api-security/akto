@@ -987,7 +987,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             blockedMessage: blockedMessage || "",
             applyToResponses: applyToResponses,
             behaviour: b,
-            contentFiltering: {
+            contentFilters: {
                 harmfulCategories: enableHarmfulCategories ? harmfulCategoriesSettings : null,
                 promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
                 code: enableCodeFilter ? { level: codeFilterLevel.toUpperCase() } : null
