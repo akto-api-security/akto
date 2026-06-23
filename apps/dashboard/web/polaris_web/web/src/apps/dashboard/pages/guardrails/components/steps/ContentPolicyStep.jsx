@@ -9,12 +9,14 @@ import {
     Button,
     TextField,
     Tag,
-    FormLayout
+    FormLayout,
+    Badge
 } from "@shopify/polaris";
 import { PlusMinor, EditMinor, DeleteMinor } from "@shopify/polaris-icons";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
+import { GENERAL_BLOCKS, toDeniedTopic } from "../../generalBlocks";
 import func from "@/util/func";
 
 export const ContentPolicyConfig = {
@@ -25,11 +27,14 @@ export const ContentPolicyConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ enablePromptAttacks, enableContextPoisoning, enableDeniedTopics, deniedTopics, enableHarmfulCategories, enableBasePromptRule }) => {
+    getSummary: ({ enablePromptAttacks, enableContextPoisoning, enableDeniedTopics, deniedTopics, selectedDefaultBlockKeys, enableHarmfulCategories, enableBasePromptRule }) => {
         const filters = [];
         if (enablePromptAttacks) filters.push('Prompt attacks');
         if (func.isDemoAccount() && enableContextPoisoning) filters.push('Context poisoning');
-        if (enableDeniedTopics && deniedTopics?.length > 0) filters.push(`${deniedTopics.length} denied topic${deniedTopics.length !== 1 ? 's' : ''}`);
+        if (enableDeniedTopics) {
+            const total = (deniedTopics?.length || 0) + (selectedDefaultBlockKeys?.size || 0);
+            if (total > 0) filters.push(`${total} denied topic${total !== 1 ? 's' : ''}`);
+        }
         if (enableHarmfulCategories) filters.push('Harmful categories');
         if (enableBasePromptRule) filters.push('Intent verification');
         return filters.length > 0 ? filters.join(', ') : null;
@@ -48,6 +53,8 @@ const ContentPolicyStep = ({
     // Denied topics
     enableDeniedTopics,
     setEnableDeniedTopics,
+    selectedDefaultBlockKeys,
+    setSelectedDefaultBlockKeys,
     deniedTopics,
     setDeniedTopics,
     // Harmful categories
@@ -124,7 +131,7 @@ const ContentPolicyStep = ({
 
         const updatedTopics = [...deniedTopics];
         if (editingIndex === deniedTopics.length) {
-            updatedTopics.push(topicData);
+            updatedTopics.unshift(topicData); // new topics appear at the top
         } else {
             updatedTopics[editingIndex] = topicData;
         }
@@ -136,6 +143,25 @@ const ContentPolicyStep = ({
         const updatedTopics = deniedTopics.filter((_, i) => i !== index);
         setDeniedTopics(updatedTopics);
     };
+
+    // Akto default blocks are tracked by key in selectedDefaultBlockKeys (separate from custom deniedTopics).
+    const isBlockEnabled = (block) => selectedDefaultBlockKeys.has(block.key);
+
+    const toggleGeneralBlock = (block, checked) => {
+        const next = new Set(selectedDefaultBlockKeys);
+        if (checked) {
+            next.add(block.key);
+        } else {
+            next.delete(block.key);
+        }
+        setSelectedDefaultBlockKeys(next);
+    };
+
+    // Unified list for rendering: selected Akto defaults + user custom topics.
+    const activeDefaultTopics = GENERAL_BLOCKS
+        .filter(b => selectedDefaultBlockKeys.has(b.key))
+        .map(b => ({ ...toDeniedTopic(b), _isDefault: true, _key: b.key }));
+    const allActiveTopics = [...activeDefaultTopics, ...deniedTopics];
 
     const addSamplePhrase = () => {
         const trimmedPhrase = newPhraseInput.trim();
@@ -162,29 +188,48 @@ const ContentPolicyStep = ({
         }
     };
 
-    const renderViewRow = (topic, index) => (
-        <Box key={index} padding="4" borderColor="border" borderWidth="025" borderRadius="2">
-            <HorizontalStack align="space-between" blockAlign="start">
-                <Box style={{ flex: 1 }}>
-                    <VerticalStack gap="2">
-                        <Text variant="headingSm" fontWeight="semibold">{topic.topic}</Text>
-                        <Text variant="bodyMd" tone="subdued">{topic.description}</Text>
-                        {topic.samplePhrases.length > 0 && (
-                            <HorizontalStack gap="1">
-                                <Text variant="bodySm" tone="subdued">
-                                    {topic.samplePhrases.length} sample phrase{topic.samplePhrases.length !== 1 ? 's' : ''}
-                                </Text>
+    // One unified card for every active denied topic. Recommended (catalogue)
+    // topics get a "Recommended" badge and no edit action since they are predefined;
+    // custom topics get "Custom" and full edit/delete.
+    const renderViewRow = (topic, index) => {
+        const isDefault = topic._isDefault;
+        return (
+            <Box key={isDefault ? topic._key : index} padding="4" borderColor="border" borderWidth="025" borderRadius="2">
+                <HorizontalStack align="space-between" blockAlign="start">
+                    <Box style={{ flex: 1 }}>
+                        <VerticalStack gap="2">
+                            <HorizontalStack gap="2" blockAlign="center">
+                                <Text variant="headingSm" fontWeight="semibold">{topic.topic}</Text>
+                                <Badge tone={isDefault ? "info" : undefined}>{isDefault ? "Akto default" : "Custom"}</Badge>
                             </HorizontalStack>
+                            <Text variant="bodyMd" tone="subdued">{topic.description}</Text>
+                            {topic.samplePhrases.length > 0 && (
+                                <HorizontalStack gap="1">
+                                    <Text variant="bodySm" tone="subdued">
+                                        {topic.samplePhrases.length} sample phrase{topic.samplePhrases.length !== 1 ? 's' : ''}
+                                    </Text>
+                                </HorizontalStack>
+                            )}
+                        </VerticalStack>
+                    </Box>
+                    <HorizontalStack gap="2">
+                        {!isDefault && (
+                            <Button icon={EditMinor} onClick={() => startEditing(index)} accessibilityLabel="Edit topic" />
                         )}
-                    </VerticalStack>
-                </Box>
-                <HorizontalStack gap="2">
-                    <Button icon={EditMinor} onClick={() => startEditing(index)} accessibilityLabel="Edit topic" />
-                    <Button icon={DeleteMinor} onClick={() => deleteRow(index)} tone="critical" accessibilityLabel="Delete topic" />
+                        <Button
+                            icon={DeleteMinor}
+                            tone="critical"
+                            accessibilityLabel="Remove topic"
+                            onClick={() => isDefault
+                                ? toggleGeneralBlock(GENERAL_BLOCKS.find(b => b.key === topic._key), false)
+                                : deleteRow(index)
+                            }
+                        />
+                    </HorizontalStack>
                 </HorizontalStack>
-            </HorizontalStack>
-        </Box>
-    );
+            </Box>
+        );
+    };
 
     const renderEditRow = (isNew) => (
         <Box key={isNew ? "new" : editingIndex} padding="4" borderColor="border" borderWidth="025" borderRadius="2" background="bg-surface-secondary">
@@ -312,14 +357,20 @@ const ContentPolicyStep = ({
                     {enableDeniedTopics && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
-                                {deniedTopics.map((topic, index) => {
-                                    if (editingIndex === index) return renderEditRow(false);
-                                    return renderViewRow(topic, index);
-                                })}
-                                {editingIndex === deniedTopics.length && renderEditRow(true)}
                                 {editingIndex === null && (
                                     <Button icon={PlusMinor} onClick={startAdding} fullWidth textAlign="left">Add denied topic</Button>
                                 )}
+                                {editingIndex === deniedTopics.length && renderEditRow(true)}
+
+                                {/* Unified list: Akto defaults first, then custom topics */}
+                                {allActiveTopics.length > 0 && (
+                                    <Text variant="bodySm" tone="subdued">{allActiveTopics.length} denied topic{allActiveTopics.length !== 1 ? 's' : ''} active</Text>
+                                )}
+                                {allActiveTopics.map((topic) => {
+                                    const customIdx = topic._isDefault ? -1 : deniedTopics.indexOf(topic);
+                                    if (!topic._isDefault && editingIndex === customIdx) return renderEditRow(false);
+                                    return renderViewRow(topic, customIdx);
+                                })}
                             </VerticalStack>
                         </Box>
                     )}
