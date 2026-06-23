@@ -987,12 +987,17 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             blockedMessage: blockedMessage || "",
             applyToResponses: applyToResponses,
             behaviour: b,
-            contentFilters: {
+            contentFiltering: {
                 harmfulCategories: enableHarmfulCategories ? harmfulCategoriesSettings : null,
                 promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
                 code: enableCodeFilter ? { level: codeFilterLevel.toUpperCase() } : null
             },
-            deniedTopics: deniedTopics,
+            deniedTopics: enableDeniedTopics
+                ? [
+                    ...GENERAL_BLOCKS.filter(b => selectedDefaultBlockKeys.has(b.key)).map(toDeniedTopic),
+                    ...deniedTopics
+                  ]
+                : [],
             wordFilters: wordFilters,
             piiFilters: piiTypes,
             regexPatterns: regexPatterns
