@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
-import { Badge, Box, Collapsible, Divider, HorizontalGrid, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
-import { ChevronDownMinor, ChevronRightMinor, ChevronUpMinor } from "@shopify/polaris-icons";
+import { Badge, Box, Collapsible, Divider, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
+import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons";
 import { ModelChip } from "./LLMCellRenderers";
-import { formatCost, formatDurationMs, truncate } from "./constants";
+import { formatDurationMs, truncate } from "./constants";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -12,15 +12,6 @@ function roleLabel(role) { return ROLE_LABELS[role] || String(role || "").toUppe
 function tryFormatJson(str) {
     try { return JSON.stringify(JSON.parse(str), null, 2); }
     catch (_) { return str; }
-}
-
-function messagePreview(msg) {
-    if (msg.tool_calls?.length)
-        return msg.tool_calls.map(tc => tc.function?.name).filter(Boolean).join("  ·  ");
-    if (msg.role === "tool") return "tool result";
-    const raw = typeof msg.content === "string" ? msg.content
-        : Array.isArray(msg.content) ? msg.content.map(c => c.text || "").join(" ") : "";
-    return raw.replace(/\n+/g, " ").slice(0, 120);
 }
 
 // ─── Message content ──────────────────────────────────────────────────────────
@@ -90,7 +81,7 @@ function MessageRow({ msg, isLast, id }) {
 
 // ─── Input / Output section ───────────────────────────────────────────────────
 
-function InputOutputSection({ label, tokens, costStr, messages }) {
+function InputOutputSection({ label, tokens, messages }) {
     if (!messages.length) return null;
     return (
         <VerticalStack gap="2">
@@ -98,7 +89,7 @@ function InputOutputSection({ label, tokens, costStr, messages }) {
                 <Text variant="bodySm" fontWeight="semibold" color="subdued">{label}</Text>
                 {tokens > 0 && (
                     <Text variant="bodySm" color="subdued">
-                        {Number(tokens).toLocaleString("en-US")} tokens · {costStr}
+                        {Number(tokens).toLocaleString("en-US")} tokens
                     </Text>
                 )}
             </HorizontalStack>
@@ -163,7 +154,6 @@ export default function SpanSection({ span, index }) {
                     <HorizontalStack gap="2" blockAlign="center" wrap={false}>
                         <Text variant="bodySm" color="subdued">{formatDurationMs(span.durationMs)}</Text>
                         {span._model && <ModelChip model={span._model} />}
-                        <Text variant="bodySm" color="subdued">{formatCost(inputTok, outputTok)}</Text>
                         <Icon source={collapsed ? ChevronDownMinor : ChevronUpMinor} color="subdued" />
                     </HorizontalStack>
                 </HorizontalStack>
@@ -179,7 +169,6 @@ export default function SpanSection({ span, index }) {
                     <InputOutputSection
                         label="INPUT"
                         tokens={inputTok}
-                        costStr={formatCost(inputTok, 0)}
                         messages={inputMessages}
                     />
                 )}
@@ -187,7 +176,6 @@ export default function SpanSection({ span, index }) {
                     <InputOutputSection
                         label="OUTPUT"
                         tokens={outputTok}
-                        costStr={formatCost(0, outputTok)}
                         messages={outputMessages}
                     />
                 )}

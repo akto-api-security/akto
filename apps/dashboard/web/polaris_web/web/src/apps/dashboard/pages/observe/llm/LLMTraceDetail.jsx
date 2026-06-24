@@ -4,7 +4,7 @@ import DetailGrid from "../agentic/DetailGrid";
 import SpanSection from "./LLMSpanSection";
 import api from "./api";
 import { enrichRow } from "./utils";
-import { formatCost, formatDurationMs, truncate } from "./constants";
+import { formatDurationMs, truncate } from "./constants";
 
 // ─── Waterfall ────────────────────────────────────────────────────────────────
 
@@ -186,7 +186,6 @@ export default function TraceDetailView({ trace, currDateRange, initialSpans }) 
         { label: "User",            value: trace.userName },
         { label: "Duration",        value: formatDurationMs(trace.durationMs) },
         { label: "Tokens in / out", value: `${(trace._inputTokens || 0).toLocaleString("en-US")} / ${(trace._outputTokens || 0).toLocaleString("en-US")}` },
-        { label: "Cost",            value: formatCost(trace._inputTokens || 0, trace._outputTokens || 0) },
     ];
 
     return (

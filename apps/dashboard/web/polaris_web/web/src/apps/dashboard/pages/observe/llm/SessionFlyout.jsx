@@ -12,7 +12,7 @@ import TraceDetailView from "./LLMTraceDetail";
 import api from "./api";
 import { enrichRow } from "./utils";
 import { getTraceColumnDefs } from "./columns";
-import { formatCost, formatCompact, formatDurationMs, truncate } from "./constants";
+import { formatCompact, formatDurationMs, truncate } from "./constants";
 
 const TAB_OVERVIEW = 0;
 const TAB_TRACES   = 1;
@@ -47,7 +47,6 @@ function OverviewContent({ session, traceCount }) {
         { label: "Traces",       value: traceCount },
         { label: "Total tokens", value: formatCompact(totalTokens) },
         { label: "Duration",     value: formatDurationMs(session.durationMs) },
-        { label: "Est. cost",    value: formatCost(session._inputTokens || 0, session._outputTokens || 0) },
     ];
 
     const detailItems = [
@@ -55,7 +54,7 @@ function OverviewContent({ session, traceCount }) {
         { label: "Application", value: session.serviceId },
         { label: "Session ID",  value: truncate(session.sessionIdentifier, 36) },
         { label: "Models",      value: session._models?.length ? session._models.join(", ") : undefined },
-        { label: "Endpoint ID", value: session.endpointId, href: session.endpointId ? `/dashboard/observe/inventory/${session.endpointId}` : undefined },
+        { label: "Endpoint ID", value: session.deviceId, href: session.deviceId ? `/dashboard/observe/inventory/${session.deviceId}` : undefined },
     ];
 
     return (

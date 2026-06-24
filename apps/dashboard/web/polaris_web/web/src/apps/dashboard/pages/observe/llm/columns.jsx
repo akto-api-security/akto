@@ -1,6 +1,5 @@
 import {
     AppCell,
-    CostCell,
     CountCell,
     DurationCell,
     IdCell,
@@ -81,14 +80,6 @@ const durationCol = {
     ...NO_FILTER,
 };
 
-const costCol = {
-    headerName: "Cost",
-    field: "_cost",
-    width: 90,
-    cellRenderer: CostCell,
-    cellStyle: FLEX_CELL,
-    ...NO_FILTER,
-};
 
 const timeCol = (field, headerName = "Time") => ({
     headerName,
@@ -119,6 +110,7 @@ export const SESSION_COLUMN_DEFS = [
         cellRenderer: UserCell,
         cellStyle: FLEX_CELL,
         filter: "agSetColumnFilter",
+        filterAllowed: true,
         sortable: true,
     },
     {
@@ -136,11 +128,11 @@ export const SESSION_COLUMN_DEFS = [
         cellRenderer: AppCell,
         cellStyle: FLEX_CELL,
         filter: "agSetColumnFilter",
+        filterAllowed: true,
         sortable: true,
     },
     countCol("Traces", "messageCount", 85),
     tokensCol,
-    costCol,
     {
         // Session total duration can be hours — no alarming colour, plain text only.
         headerName: "Duration",
@@ -186,7 +178,6 @@ export function getTraceColumnDefs({ showSession, onSessionClick } = {}) {
         countCol("Spans", "spanCount", 80),
         tokensCol,
         durationCol,
-        costCol,
         ...(showSession ? [{
             headerName: "Session",
             field: "sessionIdentifier",
@@ -237,8 +228,7 @@ export const ARGUS_TRACE_COL_DEFS = [
     //     ...NO_FILTER,
     // },
     tokensCol,
-    durationCol,
-    costCol,
+    durationCol
 ];
 
 // Messages table — flat span-level rows.

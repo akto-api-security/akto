@@ -225,7 +225,7 @@ export default function AgGridTable({
         const searchAfterJson = (skip >= 9980 && lastSortValues.current)
             ? JSON.stringify(lastSortValues.current)
             : undefined;
-        const result = onServerFetch({ filters: query.filters, sortKey: query.sortKey, sortOrder: query.sortOrder, skip, limit: paginationPageSize, searchAfterJson, searchString: debouncedSearchValue.length > 3 ? debouncedSearchValue : "" });
+        const result = onServerFetch({ filters: query.filters, sortKey: query.sortKey, sortOrder: query.sortOrder, skip, limit: paginationPageSize, searchAfterJson, searchString: debouncedSearchValue.length >= 3 ? debouncedSearchValue : "" });
         if (result && typeof result.then === "function") {
             result.then(r => {
                 if (r?.total !== undefined) dispatchQuery({ type: "SET_TOTAL", total: r.total });
