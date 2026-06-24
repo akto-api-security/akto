@@ -134,7 +134,6 @@ function GithubServerTable(props) {
   }, [])
 
   useEffect(()=> {
-    if (props?.filterStateUrl) return;
     let queryFilters
     if (performance.getEntriesByType('navigation')[0].type === 'reload') {
       queryFilters = []
