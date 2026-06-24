@@ -107,6 +107,9 @@ public class AgentQueryRecord {
         }
 
         String sessionIdentifier = getFirstHeader(headers, HEADER_PREFIX + HEADER_SESSION_ID);
+        if (sessionIdentifier == null || sessionIdentifier.isEmpty()) {
+            sessionIdentifier = getFirstHeader(headers, HEADER_PREFIX + "akto_conversation_id");
+        }
         String traceId           = getFirstHeader(headers, HEADER_PREFIX + HEADER_TRACE_ID);
         String spanId = "span_" + UUID.randomUUID().toString();
 

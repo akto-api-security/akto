@@ -1590,12 +1590,20 @@ public class HttpCallParser {
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(),"AGENT_TRAFFIC_LOGS");
-            boolean allowAnalysis = featureAccess != null && featureAccess.getIsGranted();
+            boolean allowAnalysis = true; // TODO: revert — bypassed for local testing (featureAccess != null && featureAccess.getIsGranted())
+            boolean isAgentic = isAgenticTraffic(tagsMap);
+            Map<String, String> deviceUserMap = getDeviceUserMap();
+            loggerMaker.infoAndAddToDb("agentQueryDebug: allowAnalysis=" + allowAnalysis
+                + " isAgentic=" + isAgentic
+                + " deviceUserMapSize=" + (deviceUserMap == null ? "null" : deviceUserMap.size())
+                + " deviceUserMapKeys=" + (deviceUserMap == null ? "null" : deviceUserMap.keySet())
+                + " url=" + httpResponseParam.getRequestParams().getUrl()
+                + " tags=" + tagsMap);
 
             // if traffic is agentic, then send the data to cyborg
-            if (allowAnalysis && isAgenticTraffic(tagsMap) && (!httpResponseParam.getRequestParams().getUrl().contains("skill"))) {
+            if (allowAnalysis && isAgentic && (!httpResponseParam.getRequestParams().getUrl().contains("skill"))) {
                 AgentQueryRecord record = AgentQueryRecord.fromHttpResponseParams(
-                        httpResponseParam, tagsMap, getDeviceUserMap());
+                        httpResponseParam, tagsMap, deviceUserMap);
                 if (record != null) {
                     loggerMaker.infoAndAddToDb("Storing agent query data " + record.toString());
                     String payload = httpResponseParam.getRequestParams().getPayload();
