@@ -96,18 +96,13 @@ public class RedactSampleData {
 
    private static void handleCookies(List<String> cookieList, Map<String, List<String>> responseHeaders) {
         Map<String, String> cookieMap = AuthPolicy.parseCookie(cookieList);
-        StringBuilder newCookie = new StringBuilder();
+        StringJoiner newCookie = new StringJoiner(";");
         for (Map.Entry<String, String> entry : cookieMap.entrySet()) {
             String cookieName = entry.getKey();
             String cookieValue = entry.getValue();
             SingleTypeInfo.SubType subType = KeyTypes.findSubType(cookieValue, cookieName, null);
-            newCookie.append(cookieName).append("=");
-            if (SingleTypeInfo.isRedacted(subType.getName())) {
-                newCookie.append(redact(cookieValue));
-            } else {
-                newCookie.append(cookieValue);
-            }
-            newCookie.append(";");
+            String value = SingleTypeInfo.isRedacted(subType.getName()) ? redact(cookieValue) : cookieValue;
+            newCookie.add(cookieName + "=" + value);
         }
         responseHeaders.put(AuthPolicy.COOKIE_NAME, Collections.singletonList(newCookie.toString()));
     }
