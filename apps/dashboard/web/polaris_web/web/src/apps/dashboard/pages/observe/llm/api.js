@@ -97,6 +97,8 @@ export default {
             totalOutputTokens: r?.aggOutputTokens     || 0,
             topUsers:          r?.aggTopUsers         || [],
             userBreakdown:     r?.aggUserBreakdown    || [],
+            sessionSpark:      r?.aggSessionSpark?.length  ? r.aggSessionSpark  : [0],
+            sessionSparkTs:    r?.aggSessionSparkTs        || [],
         }));
     },
 
@@ -108,14 +110,15 @@ export default {
             method: "post",
             data: { startTime, endTime },
         }).then(r => ({
-            totalSpans:       r?.aggTotalSpans       || 0,
-            totalInputTokens: r?.aggInputTokens      || 0,
-            totalOutputTokens:r?.aggOutputTokens     || 0,
-            topApps:          r?.aggTopApps          || [],
-            appBreakdown:     r?.aggAppBreakdown     || [],
-            topTraces:        (r?.aggTopTraces       || []).map(enrichRow),
-            traceSpark:       r?.aggTraceSpark?.length ? r.aggTraceSpark : [0],
-            tokenSpark:       r?.aggTokenSpark?.length ? r.aggTokenSpark : [0],
+            totalSpans:        r?.aggTotalSpans        || 0,
+            totalInputTokens:  r?.aggInputTokens       || 0,
+            totalOutputTokens: r?.aggOutputTokens      || 0,
+            topApps:           r?.aggTopApps           || [],
+            appBreakdown:      r?.aggAppBreakdown      || [],
+            topTraces:         (r?.aggTopTraces        || []).map(enrichRow),
+            traceSpark:        r?.aggTraceSpark?.length  ? r.aggTraceSpark  : [0],
+            tokenSpark:        r?.aggTokenSpark?.length  ? r.aggTokenSpark  : [0],
+            traceSparkTs:      r?.aggTraceSparkTs       || [],
         }));
     },
 

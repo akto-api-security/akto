@@ -43,7 +43,8 @@ public class LLMObservabilityAction extends UserAction {
     private static final String AGG_TOTAL_SPANS         = "totalSpans";
     private static final String AGG_TOP_APPS            = "topApps";
     private static final String AGG_TOP_TRACES          = "topTraces";
-    private static final String AGG_TRACE_SPARK         = "traceSpark";
+    private static final String AGG_TRACE_SPARK          = "traceSpark";
+    private static final String AGG_SESSION_SPARK        = "sessionSpark";
 
     // ── Synthetic result-row keys (computed, not native ES doc fields) ─────────
     private static final String KEY_TOTAL_TOKENS  = "totalTokens";
@@ -90,6 +91,8 @@ public class LLMObservabilityAction extends UserAction {
     @Getter private long                       aggOutputTokens    = 0;
     @Getter private List<Map<String, Object>>  aggTopUsers        = new ArrayList<>();
     @Getter private List<Map<String, Object>>  aggUserBreakdown   = new ArrayList<>();
+    @Getter private List<Long>                 aggSessionSpark    = new ArrayList<>();
+    @Getter private List<Long>                 aggSessionSparkTs  = new ArrayList<>();
 
     // Argus aggregated stats (fetchArgusStats)
     @Getter private long                       aggTotalSpans      = 0;
@@ -98,6 +101,7 @@ public class LLMObservabilityAction extends UserAction {
     @Getter private List<Map<String, Object>>  aggTopTraces       = new ArrayList<>();
     @Getter private List<Long>                 aggTraceSpark      = new ArrayList<>();
     @Getter private List<Long>                 aggTokenSpark      = new ArrayList<>();
+    @Getter private List<Long>                 aggTraceSparkTs    = new ArrayList<>();
 
     private long startMs() { return (long) startTime * 1000L; }
     private long endMs()   { return (long) endTime   * 1000L; }
@@ -251,6 +255,8 @@ public class LLMObservabilityAction extends UserAction {
             mustArr.put(new JSONObject().put("exists", new JSONObject().put("field", AgentQueryRecord.F_SESSION_IDENTIFIER)));
             JSONObject filteredQuery = new JSONObject().put("bool", new JSONObject().put("must", mustArr));
 
+            String fixedInterval = Math.max(1000L, (endMs() - startMs()) / 12) + "ms";
+
             JSONObject aggs = new JSONObject()
                 .put(AGG_TOTAL_SESSIONS,      new JSONObject().put("cardinality", new JSONObject().put("field", AgentQueryRecord.F_SESSION_IDENTIFIER_KW)))
                 .put(AGG_TOTAL_INPUT_TOKENS,  sumAgg(AgentQueryRecord.F_INPUT_TOKENS))
@@ -259,7 +265,11 @@ public class LLMObservabilityAction extends UserAction {
                     .put("terms", new JSONObject().put("field", AgentQueryRecord.F_USER_NAME_KW).put("size", 10))
                     .put("aggs", tokenSubAggs()))
                 .put(AGG_USER_BREAKDOWN, new JSONObject()
-                    .put("terms", new JSONObject().put("field", AgentQueryRecord.F_USER_NAME_KW).put("size", 3)));
+                    .put("terms", new JSONObject().put("field", AgentQueryRecord.F_USER_NAME_KW).put("size", 3)))
+                .put(AGG_SESSION_SPARK, new JSONObject()
+                    .put("date_histogram", new JSONObject()
+                        .put("field", AgentQueryRecord.F_TIMESTAMP)
+                        .put("fixed_interval", fixedInterval)));
 
             JSONObject aggsResult = es.aggregate(filteredQuery, aggs);
             if (aggsResult == null) return Action.SUCCESS.toUpperCase();
@@ -275,6 +285,21 @@ public class LLMObservabilityAction extends UserAction {
                 aggTopUsers.add(row);
             }
             aggUserBreakdown.addAll(parseBreakdown(aggsResult, AGG_USER_BREAKDOWN, 3));
+
+            JSONObject sessionSparkAgg = aggsResult.optJSONObject(AGG_SESSION_SPARK);
+            if (sessionSparkAgg != null) {
+                JSONArray buckets = sessionSparkAgg.optJSONArray("buckets");
+                if (buckets != null) {
+                    int limit = Math.min(buckets.length(), 12);
+                    for (int i = 0; i < limit; i++) {
+                        JSONObject b = buckets.optJSONObject(i);
+                        if (b == null) continue;
+                        aggSessionSpark.add(b.optLong("doc_count", 0));
+                        aggSessionSparkTs.add(b.optLong("key") / 1000L);
+                    }
+                }
+            }
+            if (aggSessionSpark.isEmpty()) { aggSessionSpark.add(0L); aggSessionSparkTs.add(0L); }
         } catch (Exception e) {
             logger.error("fetchSessionAggStats error: " + e.getMessage());
         }
@@ -396,10 +421,11 @@ public class LLMObservabilityAction extends UserAction {
                         if (b == null) continue;
                         aggTraceSpark.add(b.optLong("doc_count", 0));
                         aggTokenSpark.add(subAggLong(b, AGG_IN_TOKENS) + subAggLong(b, AGG_OUT_TOKENS));
+                        aggTraceSparkTs.add(b.optLong("key") / 1000L);
                     }
                 }
             }
-            if (aggTraceSpark.isEmpty()) { aggTraceSpark.add(0L); aggTokenSpark.add(0L); }
+            if (aggTraceSpark.isEmpty()) { aggTraceSpark.add(0L); aggTokenSpark.add(0L); aggTraceSparkTs.add(0L); }
         } catch (Exception e) {
             logger.error("fetchArgusStats error: " + e.getMessage());
         }
