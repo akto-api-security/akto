@@ -73,6 +73,8 @@ export default function LeftNav() {
         value: accountId
     }));
 
+    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
+
     let reportsSubNavigationItems = [
         {
             label: "Issues",
@@ -105,8 +107,6 @@ export default function LeftNav() {
             selected: leftNavSelected === "dashboard_reports_tthreat",
         })
     }
-
-    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
 
     // Allowed users for Dashboard access
     const allowedDashboardUsers = [

@@ -6,10 +6,12 @@ ScanResponse-shaped fields: is_valid, risk_score, sanitized_text, details.
 
 from typing import Any, Dict
 
-from . import ban_substrings, secrets, token_limit
+from . import ban_code, ban_substrings, secrets, token_limit
 
 
 def scan_local(scanner_name: str, scanner_type: str, text: str, config: Dict[str, Any]) -> Dict[str, Any]:
+    if scanner_name == "BanCode":
+        return ban_code.scan(scanner_type, text, config)
     if scanner_name == "BanSubstrings":
         return ban_substrings.scan(scanner_type, text, config)
     if scanner_name == "Secrets":

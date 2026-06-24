@@ -117,8 +117,8 @@ function WaterfallGraph({ spans }) {
 
 // ─── TraceDetailView ──────────────────────────────────────────────────────────
 
-export default function TraceDetailView({ trace, currDateRange }) {
-    const [spans, setSpans]     = useState([]);
+export default function TraceDetailView({ trace, currDateRange, initialSpans }) {
+    const [spans, setSpans]     = useState(initialSpans || []);
     const [loading, setLoading] = useState(false);
 
     // Compute the search window once. Prefer the parent's date range (same window
@@ -138,23 +138,38 @@ export default function TraceDetailView({ trace, currDateRange }) {
     }, [currDateRange, trace?.latestTimestamp]);
 
     useEffect(() => {
-        if (!trace?.traceId) { setSpans([]); return; }
+        const traceId   = trace?.traceId;
+        const sessionId = trace?.sessionIdentifier;
+        if (!traceId && !sessionId) { setSpans([]); return; }
+        // Spans pre-fetched by parent (session fallback) — nothing to do.
+        if (!traceId && sessionId && initialSpans?.length) return;
         let cancelled = false;
         setLoading(true);
 
         const loadSpans = async () => {
             try {
-                // Primary: dedicated trace-detail endpoint
-                const rows = await api.fetchTraceDetail(trace.traceId);
-                if (!cancelled && rows.length > 0) { setSpans(rows.map(enrichRow)); return; }
-                // Fallback: searchPrompts scoped to traceId with the full selected date range
-                const result = await api.searchPrompts({
-                    startTime: searchWindow.startTime,
-                    endTime:   searchWindow.endTime,
-                    traceId:   trace.traceId,
-                    limit:     100,
-                });
-                if (!cancelled) setSpans(result.value || []);
+                if (traceId) {
+                    // Primary: dedicated trace-detail endpoint
+                    const rows = await api.fetchTraceDetail(traceId);
+                    if (!cancelled && rows.length > 0) { setSpans(rows.map(enrichRow)); return; }
+                    // Fallback: searchPrompts scoped to traceId with the full selected date range
+                    const result = await api.searchPrompts({
+                        startTime: searchWindow.startTime,
+                        endTime:   searchWindow.endTime,
+                        traceId,
+                        limit:     100,
+                    });
+                    if (!cancelled) setSpans(result.value || []);
+                } else {
+                    // No traceId — old records: load flat spans scoped to sessionIdentifier
+                    const result = await api.searchPrompts({
+                        startTime: searchWindow.startTime,
+                        endTime:   searchWindow.endTime,
+                        sessionId,
+                        limit:     100,
+                    });
+                    if (!cancelled) setSpans(result.value || []);
+                }
             } catch (_) {
                 if (!cancelled) setSpans([]);
             } finally {
@@ -163,7 +178,7 @@ export default function TraceDetailView({ trace, currDateRange }) {
         };
         loadSpans();
         return () => { cancelled = true; };
-    }, [trace?.traceId, searchWindow]);
+    }, [trace?.traceId, trace?.sessionIdentifier, searchWindow, initialSpans]);
 
     const metaItems = [
         { label: "Application",     value: trace.serviceId },

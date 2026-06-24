@@ -10,7 +10,7 @@ import { Badge, IndexFiltersMode, Avatar, Box, HorizontalStack, Text } from "@sh
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
-import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone } from "../utils/formatUtils";
+import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
@@ -560,17 +560,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         : (x?.severity || threatFiltersMap[x?.filterId]?.severity || "HIGH")
 
       const filterTemplate = threatFiltersMap[x?.filterId];
-      let complianceList;
-      let complianceMapData = {};
-      if (needsGuardrailCompliance) {
-        const ruleViolated = extractRuleViolated(x?.metadata);
-        const capability = getGuardrailCapabilityForRule(ruleViolated);
-        complianceMapData = guardrailComplianceMap[capability] || {};
-        complianceList = Object.keys(complianceMapData);
-      } else {
-        complianceMapData = filterTemplate?.compliance?.mapComplianceToListClauses || {};
-        complianceList = Object.keys(complianceMapData);
-      }
+      const complianceMapData = resolveComplianceClauseMap(x, needsGuardrailCompliance, threatFiltersMap, guardrailComplianceMap);
+      const complianceList = Object.keys(complianceMapData);
 
       // Determine if this is session-based by checking if sessionId is present and not empty
       const isSessionBased = x?.sessionId && x.sessionId !== '';
