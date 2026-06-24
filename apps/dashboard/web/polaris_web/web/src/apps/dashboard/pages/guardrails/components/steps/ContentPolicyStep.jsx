@@ -338,30 +338,27 @@ const ContentPolicyStep = ({
         const acceptedCompliance = buildComplianceMap(suggestion?.suggested || {}, suggestion?.accepted || {});
         return (
             <Box key={isDefault ? topic._key : index} padding="4" borderColor="border" borderWidth="025" borderRadius="2">
-                <VerticalStack gap="3">
-                    <HorizontalStack align="space-between" blockAlign="start">
-                        <Box style={{ flex: 1 }}>
-                            <VerticalStack gap="2">
-                                <HorizontalStack gap="2" blockAlign="center">
-                                    <Text variant="headingSm" fontWeight="semibold">{topic.topic}</Text>
-                                    <Badge tone={isDefault ? "info" : undefined}>{isDefault ? "Akto default" : "Custom"}</Badge>
-                                </HorizontalStack>
+                <VerticalStack gap="2">
+                    <Box style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: '12px' }}>
+                        <Box style={{ flex: 1, minWidth: 0 }}>
+                            <VerticalStack gap="1">
+                                <Text variant="headingSm" fontWeight="semibold">{topic.topic}</Text>
                                 <Text variant="bodyMd" tone="subdued">{topic.description}</Text>
                                 {topic.samplePhrases.length > 0 && (
-                                    <HorizontalStack gap="1">
-                                        <Text variant="bodySm" tone="subdued">
-                                            {topic.samplePhrases.length} sample phrase{topic.samplePhrases.length !== 1 ? 's' : ''}
-                                        </Text>
-                                    </HorizontalStack>
+                                    <Text variant="bodySm" tone="subdued">
+                                        {topic.samplePhrases.length} sample phrase{topic.samplePhrases.length !== 1 ? 's' : ''}
+                                    </Text>
                                 )}
                             </VerticalStack>
                         </Box>
-                        <HorizontalStack gap="2">
+                        <VerticalStack gap="2" inlineAlign="end">
+                            <Badge tone={isDefault ? "info" : undefined}>{isDefault ? "Akto default" : "Custom"}</Badge>
                             {!isDefault && (
-                                <Button icon={EditMinor} onClick={() => startEditing(index)} accessibilityLabel="Edit topic" />
+                                <Button icon={EditMinor} size="slim" onClick={() => startEditing(index)} accessibilityLabel="Edit topic" />
                             )}
                             <Button
                                 icon={DeleteMinor}
+                                size="slim"
                                 tone="critical"
                                 accessibilityLabel="Remove topic"
                                 onClick={() => isDefault
@@ -369,8 +366,8 @@ const ContentPolicyStep = ({
                                     : deleteRow(index)
                                 }
                             />
-                        </HorizontalStack>
-                    </HorizontalStack>
+                        </VerticalStack>
+                    </Box>
                     {!isDefault && (
                         <ComplianceMappingTags
                             loading={suggestion?.loading}
@@ -521,20 +518,27 @@ const ContentPolicyStep = ({
                         helpText="Add up to 30 denied topics to block user inputs or model responses associated with the topic."
                     />
                     {enableDeniedTopics && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
+                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px', overflowAnchor: 'none' }}>
                             <VerticalStack gap="3">
                                 {editingIndex === null && (
-                                    <VerticalStack gap="2">
-                                        <Button icon={PlusMinor} onClick={startAdding} fullWidth textAlign="left">Add denied topic</Button>
-                                        <Button
-                                            icon={defaultPickerOpen ? ChevronUpMinor : ChevronDownMinor}
-                                            onClick={() => setDefaultPickerOpen(o => !o)}
-                                            fullWidth
-                                            textAlign="left"
-                                        >
-                                            {`Add Akto default topics${selectedDefaultBlockKeys.size > 0 ? ` (${selectedDefaultBlockKeys.size} selected)` : ''}`}
-                                        </Button>
-                                    </VerticalStack>
+                                    <Button icon={PlusMinor} onClick={startAdding} fullWidth textAlign="left">Add denied topic</Button>
+                                )}
+                                {editingIndex === deniedTopics.length && renderEditRow(true)}
+                                {/* Custom topics */}
+                                {deniedTopics.map((topic, customIdx) => {
+                                    if (editingIndex === customIdx) return renderEditRow(false);
+                                    return renderViewRow(topic, customIdx);
+                                })}
+                                {/* Akto default topics toggle */}
+                                {editingIndex === null && (
+                                    <Button
+                                        icon={defaultPickerOpen ? ChevronUpMinor : ChevronDownMinor}
+                                        onClick={() => setDefaultPickerOpen(o => !o)}
+                                        fullWidth
+                                        textAlign="left"
+                                    >
+                                        {`Add Akto default topics${selectedDefaultBlockKeys.size > 0 ? ` (${selectedDefaultBlockKeys.size} selected)` : ''}`}
+                                    </Button>
                                 )}
                                 {defaultPickerOpen && (
                                     <Box background="bg-surface-secondary" padding="3" borderRadius="2" borderWidth="1" borderColor="border">
@@ -556,17 +560,11 @@ const ContentPolicyStep = ({
                                         </VerticalStack>
                                     </Box>
                                 )}
-                                {editingIndex === deniedTopics.length && renderEditRow(true)}
-
-                                {/* Unified list: Akto defaults first, then custom topics */}
+                                {/* Akto default topics */}
+                                {activeDefaultTopics.map((topic) => renderViewRow(topic, -1))}
                                 {allActiveTopics.length > 0 && (
                                     <Text variant="bodySm" tone="subdued">{allActiveTopics.length} denied topic{allActiveTopics.length !== 1 ? 's' : ''} active</Text>
                                 )}
-                                {allActiveTopics.map((topic) => {
-                                    const customIdx = topic._isDefault ? -1 : deniedTopics.indexOf(topic);
-                                    if (!topic._isDefault && editingIndex === customIdx) return renderEditRow(false);
-                                    return renderViewRow(topic, customIdx);
-                                })}
                             </VerticalStack>
                         </Box>
                     )}

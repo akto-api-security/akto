@@ -13,7 +13,6 @@ export const buildComplianceMap = (suggested, accepted) =>
 const ComplianceMappingTags = ({ loading, complianceMap = {}, onRemove, onAdd }) => {
     const [addActive, setAddActive] = useState(false);
     const [filterValue, setFilterValue] = useState("");
-    const [userEdited, setUserEdited] = useState(false);
 
     const frameworks = Object.keys(complianceMap);
 
@@ -43,7 +42,7 @@ const ComplianceMappingTags = ({ loading, complianceMap = {}, onRemove, onAdd })
                     )}
                     <HorizontalStack gap="2" wrap blockAlign="center">
                         {frameworks.map(frameworkName => (
-                            <Tag key={frameworkName} onRemove={onRemove ? () => { setUserEdited(true); onRemove(frameworkName); } : undefined}>
+                            <Tag key={frameworkName} onRemove={onRemove ? () => onRemove(frameworkName) : undefined}>
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <Avatar source={func.getComplianceIcon(frameworkName)} shape="square" size="extraSmall" />
                                     {frameworkName}
@@ -84,7 +83,7 @@ const ComplianceMappingTags = ({ loading, complianceMap = {}, onRemove, onAdd })
                             </Popover>
                         )}
                     </HorizontalStack>
-                    {frameworks.length > 0 && !userEdited && (
+                    {frameworks.length > 0 && (
                         <Text variant="bodySm" tone="subdued">
                             Compliance mappings are AI-generated suggestions and may not be fully accurate. Please review and validate them before relying on them for compliance.
                         </Text>

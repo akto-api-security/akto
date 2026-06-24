@@ -979,7 +979,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 large
             >
                 <Modal.Section>
-                    <Scrollable style={{ height: "600px" }}>
+                    <Scrollable style={{ height: "600px", overflowAnchor: 'none' }}>
                         {renderAllSteps()}
                             </Scrollable>
                 </Modal.Section>
