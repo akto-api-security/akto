@@ -247,7 +247,7 @@ public class IssuesAction extends UserAction {
             Filters.and(dashboardCountingFilter, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED.name())));
 
         for (TestingRunIssues runIssue : issues) {
-            if (runIssue.getId().getTestSubCategory().startsWith("http")) {
+            if (isSourceConfigTest(runIssue.getId().getTestSubCategory())) {
                 TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runIssue.getId().getTestCategoryFromSourceConfig());
                 runIssue.getId().setTestSourceConfig(config);
             }
@@ -315,18 +315,18 @@ public class IssuesAction extends UserAction {
             ignoredIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(
                     Filters.and(countFilter, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED.name())));
 
-            // Attach TestSourceConfig for custom http-based tests
+            // Attach TestSourceConfig for source-config tests (their testSubCategory is the YAML URL)
             for (TestingRunIssues runIssue : rawIssues) {
-                if (runIssue.getId().getTestSubCategory().startsWith("http")) {
+                if (isSourceConfigTest(runIssue.getId().getTestSubCategory())) {
                     runIssue.getId().setTestSourceConfig(TestSourceConfigsDao.instance
                             .getTestSourceConfig(runIssue.getId().getTestCategoryFromSourceConfig()));
                 }
             }
 
-            // Batch fetch YAML test info for all non-http subcategories
+            // Batch fetch YAML test info for Akto built-in and custom YAML tests (non-source-config)
             Set<String> subCategoryIds = rawIssues.stream()
                     .map(issue -> issue.getId().getTestSubCategory())
-                    .filter(sc -> !sc.startsWith("http"))
+                    .filter(sc -> !isSourceConfigTest(sc))
                     .collect(Collectors.toSet());
             Map<String, Info> infoMap = subCategoryIds.isEmpty() ? new HashMap<>()
                     : YamlTemplateDao.instance.fetchTestInfoMap(Filters.in("_id", new ArrayList<>(subCategoryIds)));
@@ -371,7 +371,7 @@ public class IssuesAction extends UserAction {
                 obj.put("creationTime", issue.getCreationTime());
                 obj.put("lastSeen", issue.getLastSeen());
                 if (issue.getLatestTestingRunSummaryId() != null && id.getApiInfoKey() != null) {
-                    String subType = id.getTestSubCategory().startsWith("http")
+                    String subType = isSourceConfigTest(id.getTestSubCategory())
                             ? id.getTestCategoryFromSourceConfig()
                             : id.getTestSubCategory();
                     String key = issue.getLatestTestingRunSummaryId().toHexString() + "|" + subType
@@ -669,7 +669,7 @@ public class IssuesAction extends UserAction {
         String testSubType = null;
         // ?? enum stored in db
         String subCategory = issue.getId().getTestSubCategory();
-        if (subCategory.startsWith("http")) {
+        if (isSourceConfigTest(subCategory)) {
             testSubType = issue.getId().getTestCategoryFromSourceConfig();
         } else {
             testSubType = issue.getId().getTestSubCategory();
@@ -698,6 +698,13 @@ public class IssuesAction extends UserAction {
     private List<VulnerableRequestForTemplate> vulnerableRequests;
     private TestCategory[] categories;
     private List<TestSourceConfig> testSourceConfigs;
+
+    /** Returns true when testSubCategory is a source-config test (its id is the URL of the YAML file).
+     *  These are stored in test_source_configs, NOT in yaml_templates. */
+    private static boolean isSourceConfigTest(String testSubCategory) {
+        return testSubCategory != null &&
+               (testSubCategory.startsWith("http://") || testSubCategory.startsWith("https://"));
+    }
 
     public static BasicDBObject createSubcategoriesInfoObj(TestConfig testConfig) {
         Info info = testConfig.getInfo();
@@ -761,21 +768,27 @@ public class IssuesAction extends UserAction {
             return SUCCESS.toUpperCase();
         }
 
-        // Mirror the issues path: external/source-config tests use http(s) ids, not template _ids.
+        // Source-config tests (uploaded via external URL) store the URL itself as testSubCategory.
+        // These are NOT in yaml_templates — they live in test_source_configs — so skip them.
+        // Akto built-in (source=AKTO_TEMPLATES) and custom YAML (source=CUSTOM) tests both have
+        // short human-readable _ids and are fetched correctly via Filters.in("_id", templateIds).
         List<String> templateIds = new ArrayList<>();
         for (String name : subCategoryNames) {
-            if (name != null && !name.startsWith("http")) {
+            if (!isSourceConfigTest(name)) {
                 templateIds.add(name);
             }
         }
 
-        if (templateIds.isEmpty()) {
+    if (templateIds.isEmpty()) {
             return SUCCESS.toUpperCase();
         }
 
+        // Apply skip/limit for pagination. limit=0 means fetch all matching ids in one shot.
+        int effectiveLimit = (limit > 0) ? limit : templateIds.size();
+
         Bson filter = Filters.in("_id", templateIds);
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(
-                false, fetchOnlyActive, 0, templateIds.size(), filter);
+                false, fetchOnlyActive, skip, effectiveLimit, filter);
 
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             try {
