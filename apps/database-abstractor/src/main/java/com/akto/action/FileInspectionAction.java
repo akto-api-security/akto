@@ -8,9 +8,11 @@ import com.akto.dto.endpoint_shield.FileInspectionRule;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.blob.AzureBlobClient;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.ActionSupport;
 import lombok.Getter;
 import lombok.Setter;
@@ -39,9 +41,11 @@ public class FileInspectionAction extends ActionSupport {
     private static final Pattern SHA256_RE = Pattern.compile("^[a-f0-9]{64}$");
     private static final int MAX_PATH_LENGTH = 1024;
     private static final int RESULTS_PAGE_MAX = 500;
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     @Setter private long updatedAfter;
-    @Setter private FileInspectionResult result;
+    @Setter private BasicDBObject result;
 
     @Setter private String path;
     @Setter private boolean existenceOnly;
@@ -80,41 +84,33 @@ public class FileInspectionAction extends ActionSupport {
                 addActionError("result is required");
                 return ERROR.toUpperCase();
             }
-            if (StringUtils.isBlank(result.getRuleId())) {
+            FileInspectionResult parsed = MAPPER.readValue(result.toJson(), FileInspectionResult.class);
+            if (StringUtils.isBlank(parsed.getRuleId())) {
                 addActionError("ruleId is required");
                 return ERROR.toUpperCase();
             }
-            if (StringUtils.isBlank(result.getDeviceId())) {
+            if (StringUtils.isBlank(parsed.getDeviceId())) {
                 addActionError("deviceId is required");
                 return ERROR.toUpperCase();
             }
             FileInspectionResultDao.instance.createIndicesIfAbsent();
-            result.setAccountId(Context.accountId.get());
-            if (result.getExecutedAt() == 0) {
-                result.setExecutedAt(Context.now());
+            parsed.setAccountId(Context.accountId.get());
+            if (parsed.getExecutedAt() == 0) {
+                parsed.setExecutedAt(Context.now());
             }
-            uploadMatchBlobs(result);
+            uploadMatchBlobs(parsed);
 
             Bson filter = Filters.and(
-                    Filters.eq(FileInspectionResult.RULE_ID, result.getRuleId()),
-                    Filters.eq(FileInspectionResult.DEVICE_ID, result.getDeviceId())
+                    Filters.eq(FileInspectionResult.RULE_ID, parsed.getRuleId()),
+                    Filters.eq(FileInspectionResult.DEVICE_ID, parsed.getDeviceId())
             );
-            Bson update = Updates.combine(
-                    Updates.set(FileInspectionResult.EXECUTED_AT,   result.getExecutedAt()),
-                    Updates.set(FileInspectionResult.ACCOUNT_ID,    result.getAccountId()),
-                    Updates.set(FileInspectionResult.AGENT_ID,      result.getAgentId()),
-                    Updates.set(FileInspectionResult.DEVICE_LABEL,  result.getDeviceLabel()),
-                    Updates.set(FileInspectionResult.STATUS,        result.getStatus()),
-                    Updates.set(FileInspectionResult.MATCHES,       result.getMatches()),
-                    Updates.set(FileInspectionResult.ERROR_MESSAGE, result.getErrorMessage())
-            );
-            long matched = FileInspectionResultDao.instance.getMCollection()
-                    .updateOne(filter, update)
-                    .getMatchedCount();
-            if (matched == 0) {
-                result.setId(new ObjectId());
-                FileInspectionResultDao.instance.insertOne(result);
+            FileInspectionResult existing = FileInspectionResultDao.instance.findOne(filter);
+            if (existing != null) {
+                parsed.setId(existing.getId());
+            } else {
+                parsed.setId(new ObjectId());
             }
+            FileInspectionResultDao.instance.replaceOne(filter, parsed);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("uploadFileInspectionResult failed: " + e.getMessage(), LogDb.DB_ABS);
