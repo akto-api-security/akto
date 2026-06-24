@@ -125,8 +125,11 @@ function SampleDataComponent(props) {
 
         // LLM analysis segments carry a location of REQUEST/RESPONSE so we can
         // highlight the evidence in the correct editor (default to RESPONSE).
-        const llmRequestSegments = baseSegments.filter(s => s?.location === 'REQUEST');
-        const llmResponseSegments = baseSegments.filter(s => s?.location !== 'REQUEST');
+        // Informational segments (e.g. missing headers) are panel-only - they
+        // describe something absent, so they never go to the editors.
+        const highlightableSegments = baseSegments.filter(s => s?.informational !== true);
+        const llmRequestSegments = highlightableSegments.filter(s => s?.location === 'REQUEST');
+        const llmResponseSegments = highlightableSegments.filter(s => s?.location !== 'REQUEST');
 
         if(isNewDiff){
             // Shared builder so the rendered text matches the verification contract.
