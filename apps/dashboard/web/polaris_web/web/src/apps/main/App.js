@@ -321,7 +321,6 @@ const router = createBrowserRouter([
                     },
                     {
                         path: "protection",
-                        element: <ThreatProtectedLayout/>,
                         children: [
                             {
                                 path: "threat-dashboard",
