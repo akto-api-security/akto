@@ -76,7 +76,10 @@ public class GuardrailPoliciesAction extends UserAction {
         try {
             this.guardrailPolicies  = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(0, 20);
             this.total = GuardrailPoliciesDao.instance.getTotalCount();
-            
+            for (GuardrailPolicies policy : this.guardrailPolicies) {
+                EnterpriseLicenseComplianceCatalog.applyToPolicy(policy);
+            }
+
             loggerMaker.info("Fetched " + guardrailPolicies.size() + " guardrail policies out of " + total + " total");
 
             return SUCCESS.toUpperCase();
