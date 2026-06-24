@@ -134,13 +134,14 @@ function GithubServerTable(props) {
   }, [])
 
   useEffect(()=> {
+    if (props?.filterStateUrl) return;
     let queryFilters
     if (performance.getEntriesByType('navigation')[0].type === 'reload') {
       queryFilters = []
     }else{
       queryFilters = tableFunc.getFiltersMapFromUrl(decodeURIComponent(searchParams.get("filters") || ""), props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey)
     }
-    const currentFilters = tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)    
+    const currentFilters = tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)
     setAppliedFilters((prev) => {
       if(func.deepComparison(prev, currentFilters)){
         return prev
@@ -162,9 +163,10 @@ function GithubServerTable(props) {
   }, [props.sortOptions])
 
   useEffect(() => {
+    if (props?.filterStateUrl) return;
     const tempFilters = appliedFilters.filter((filter) => !filter?.key?.includes("dateRange"))
     updateQueryParams("filters",tableFunc.getPrettifiedFilter(tempFilters))
-  },[appliedFilters])
+  },[appliedFilters, props?.filterStateUrl])
 
   // Initialize negation state from appliedFilters
   useEffect(() => {
