@@ -2,6 +2,7 @@ package com.akto.threat.detection.cache;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public interface CounterCache {
 
@@ -14,6 +15,12 @@ public interface CounterCache {
   boolean exists(String key);
 
   void reset(String key);
+
+  void addToSet(String key, String member);
+
+  Set<String> getSetMembers(String key);
+
+  void resetSet(String key);
 
   void addToSortedSet(String sortedSetKey, String member, long score);
 

@@ -3,6 +3,7 @@ package com.akto.dto.api_protection_parse_layer;
 public class Condition {
 
     private int matchCount;
+    private int distinctCount;
     private int windowThreshold;
     private String incrementFilter;
     private String thresholdBreachFilter;
@@ -26,6 +27,12 @@ public class Condition {
     }
     public void setWindowThreshold(int windowThreshold) {
         this.windowThreshold = windowThreshold;
+    }
+    public int getDistinctCount() {
+        return distinctCount;
+    }
+    public void setDistinctCount(int distinctCount) {
+        this.distinctCount = distinctCount;
     }
     public String getIncrementFilter() {
         return incrementFilter;

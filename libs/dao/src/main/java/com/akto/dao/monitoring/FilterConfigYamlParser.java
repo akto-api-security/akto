@@ -108,6 +108,17 @@ public class FilterConfigYamlParser {
             filterConfig.setIgnore(ignoreResult);
         }
 
+        // Parse identity_extraction if present
+        if (filterConfig != null && config.containsKey(FilterConfig.IDENTITY_EXTRACTION)) {
+            Object identityMap = config.get(FilterConfig.IDENTITY_EXTRACTION);
+            if (identityMap != null) {
+                ObjectMapper jsonMapper = new ObjectMapper();
+                FilterConfig.IdentityExtraction extraction = jsonMapper.convertValue(
+                    identityMap, FilterConfig.IdentityExtraction.class);
+                filterConfig.setIdentityExtraction(extraction);
+            }
+        }
+
         // Parse success_filter and failure_filter if present
         if (filterConfig != null) {
             Object successFilterMap = config.get(FilterConfig.SUCCESS_FILTER);

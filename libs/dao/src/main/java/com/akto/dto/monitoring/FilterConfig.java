@@ -42,6 +42,26 @@ public class FilterConfig {
     private ConfigParserResult failureFilter;
     public static final String FAILURE_FILTER = "failure_filter";
 
+    private IdentityExtraction identityExtraction;
+    public static final String IDENTITY_EXTRACTION = "identity_extraction";
+
+    public static class IdentityExtraction {
+        private String source; // "request_payload", "response_payload", "request_headers"
+        private String key;    // JSON key or header name
+
+        public IdentityExtraction() {}
+
+        public IdentityExtraction(String source, String key) {
+            this.source = source;
+            this.key = key;
+        }
+
+        public String getSource() { return source; }
+        public void setSource(String source) { this.source = source; }
+        public String getKey() { return key; }
+        public void setKey(String key) { this.key = key; }
+    }
+
     public FilterConfig(String id, ConfigParserResult filter, Map<String, List<String>> wordLists, AggregationRules aggregationRules) {
         this.id = id;
         this.filter = filter;
@@ -164,5 +184,13 @@ public class FilterConfig {
 
     public void setFailureFilter(ConfigParserResult failureFilter) {
         this.failureFilter = failureFilter;
+    }
+
+    public IdentityExtraction getIdentityExtraction() {
+        return identityExtraction;
+    }
+
+    public void setIdentityExtraction(IdentityExtraction identityExtraction) {
+        this.identityExtraction = identityExtraction;
     }
 }

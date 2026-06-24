@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import com.akto.dto.*;
+import com.akto.dto.monitoring.FilterConfig.IdentityExtraction;
 import com.akto.enums.RedactionType;
 import com.akto.threat.detection.cache.AccountConfig;
 import com.akto.threat.detection.cache.AccountConfigurationCache;
@@ -61,6 +62,7 @@ import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.rules.TestPlugin;
+import com.mongodb.BasicDBObject;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 
@@ -480,7 +482,13 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
             continue;
           }
 
-          shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule, shouldIncrement, breachFilterPassed);
+          // Extract identity for distinct count rules
+          String identity = null;
+          if (rule.getCondition().getDistinctCount() > 0) {
+            identity = extractIdentity(responseParam, apiFilter.getIdentityExtraction());
+          }
+
+          shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule, shouldIncrement, breachFilterPassed, identity);
 
           if (shouldNotify) {
             logger.debugAndAddToDb("aggregate condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
@@ -496,6 +504,35 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
     }
     }
     }
+
+  private String extractIdentity(HttpResponseParams responseParam, IdentityExtraction extraction) {
+    if (extraction == null || extraction.getKey() == null) return null;
+    try {
+      String payload;
+      switch (extraction.getSource()) {
+        case "request_payload":
+          payload = responseParam.getRequestParams().getPayload();
+          break;
+        case "response_payload":
+          payload = responseParam.getPayload();
+          break;
+        case "request_headers":
+          List<String> headerVals = responseParam.getRequestParams().getHeaders().get(extraction.getKey());
+          return (headerVals != null && !headerVals.isEmpty()) ? headerVals.get(0) : null;
+        default:
+          return null;
+      }
+      if (payload == null || payload.isEmpty()) return null;
+      BasicDBObject json = BasicDBObject.parse(payload);
+      Object val = json.get(extraction.getKey());
+      if (val != null) return val.toString();
+      // Leaf key search — walk nested objects for the first match
+      val = com.akto.util.JSONUtils.findLeafValue(json, extraction.getKey());
+      return val != null ? val.toString() : null;
+    } catch (Exception e) {
+      return null;
+    }
+  }
 
   private void checkSequenceAnomaly(String actor, int apiCollectionId, String urlForAggregation,
       URLMethods.Method method, HttpResponseParams responseParam) {

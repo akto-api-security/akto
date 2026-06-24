@@ -171,6 +171,27 @@ public class JSONUtils {
         }
     }
 
+    public static Object findLeafValue(BasicDBObject obj, String key) {
+        for (Map.Entry<String, Object> entry : obj.entrySet()) {
+            if (entry.getKey().equals(key)) return entry.getValue();
+            Object found = findLeafValueInner(entry.getValue(), key);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private static Object findLeafValueInner(Object obj, String key) {
+        if (obj instanceof BasicDBObject) {
+            return findLeafValue((BasicDBObject) obj, key);
+        } else if (obj instanceof BasicDBList) {
+            for (Object item : (BasicDBList) obj) {
+                Object found = findLeafValueInner(item, key);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
     public static String modify(String jsonBody, Set<String> values, PayloadModifier payloadModifier) {
         try {
             BasicDBObject payload = RequestTemplate.parseRequestPayload(jsonBody, null);
