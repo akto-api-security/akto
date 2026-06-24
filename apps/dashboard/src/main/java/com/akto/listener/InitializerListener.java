@@ -122,6 +122,7 @@ import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.AktoDataType;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo;
@@ -3602,6 +3603,19 @@ public class InitializerListener implements ServletContextListener {
     }
 
 
+    private static void removeRagDatabaseTag(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getRemoveRagDatabaseTag() == 0) {
+            ApiCollectionsDao.instance.updateMany(
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_RAG_DATABASE_TAG)),
+                Updates.pull(ApiCollection.TAGS_STRING, new BasicDBObject(CollectionTags.KEY_NAME, Constants.AKTO_RAG_DATABASE_TAG))
+            );
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.REMOVE_RAG_DATABASE_TAG, Context.now())
+            );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
@@ -3638,6 +3652,7 @@ public class InitializerListener implements ServletContextListener {
         addDefaultAdvancedFilters(backwardCompatibility);
         moveAzureSamlConfig(backwardCompatibility);
         moveOktaOidcSSO(backwardCompatibility);
+        removeRagDatabaseTag(backwardCompatibility);
     }
 
     public static void printMultipleHosts(int apiCollectionId) {

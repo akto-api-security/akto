@@ -123,6 +123,9 @@ public class BackwardCompatibility {
     public static final String MOVE_USER_DATA_FROM_MODULE_INFO_TO_AGENTIC_USERS = "moveUserDataFromModuleInfoToAgenticUsers";
     private int moveUserDataFromModuleInfoToAgenticUsers;
 
+    public static final String REMOVE_RAG_DATABASE_TAG = "removeRagDatabaseTag";
+    private int removeRagDatabaseTag;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -520,5 +523,13 @@ public class BackwardCompatibility {
 
     public void setMoveUserDataFromModuleInfoToAgenticUsers(int moveUserDataFromModuleInfoToAgenticUsers) {
         this.moveUserDataFromModuleInfoToAgenticUsers = moveUserDataFromModuleInfoToAgenticUsers;
+    }
+
+    public int getRemoveRagDatabaseTag() {
+        return removeRagDatabaseTag;
+    }
+
+    public void setRemoveRagDatabaseTag(int removeRagDatabaseTag) {
+        this.removeRagDatabaseTag = removeRagDatabaseTag;
     }
 }
