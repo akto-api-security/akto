@@ -749,6 +749,7 @@ public class DbAction extends ActionSupport {
                 String json = obj.toJson();
                 //loggerMaker.infoAndAddToDb("Fast-discovery: Converting JSON to ApiInfo: " + json);
                 ApiInfo apiInfo = objectMapper.readValue(json, ApiInfo.class);
+                applyConnectionStringFlag(apiInfo, obj);
                 //loggerMaker.infoAndAddToDb("Fast-discovery: ApiInfo after conversion - id=" + apiInfo.getId());
                 ApiInfoKey id = apiInfo.getId();
                 
@@ -790,6 +791,30 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private void applyConnectionStringFlag(ApiInfo apiInfo, BasicDBObject obj) {
+        if (apiInfo.getIsConnectionString()) {
+            return;
+        }
+
+        String type = obj.getString("type");
+        if (type == null || type.isEmpty()) {
+            type = apiInfo.getApiType();
+        }
+
+        int statusCode = 0;
+        Object statusCodeObj = obj.get("statusCode");
+        if (statusCodeObj instanceof Number) {
+            statusCode = ((Number) statusCodeObj).intValue();
+        } else if (apiInfo.getResponseCodes() != null && apiInfo.getResponseCodes().contains(101)) {
+            statusCode = 101;
+        }
+
+        String payload = obj.getString("payload");
+        if (HttpResponseParams.isWebSocketHandshake(type, statusCode, payload)) {
+            apiInfo.setIsConnectionString(true);
+        }
     }
 
     public String writeApiSequences() {
@@ -6241,6 +6266,14 @@ public class DbAction extends ActionSupport {
                 update.put("field", "collectionIds");
                 update.put("val", apiInfo.get("collectionIds"));  // Send as array
                 update.put("op", "setOnInsert");
+                updates.add(new Gson().toJson(update));
+            }
+
+            if (apiInfo.containsKey("isConnectionString") && Boolean.TRUE.equals(apiInfo.get("isConnectionString"))) {
+                Map<String, Object> update = new HashMap<>();
+                update.put("field", "isConnectionString");
+                update.put("val", true);
+                update.put("op", "set");
                 updates.add(new Gson().toJson(update));
             }
 
