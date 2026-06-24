@@ -888,11 +888,11 @@ const settingRequests = {
             data: { username, team, userRole }
         })
     },
-    async fetchAgenticUsers(params = {}) {
+    async fetchAgenticUsers() {
         return await request({
             url: '/api/fetchAgenticUsers',
             method: 'post',
-            data: params
+            data: {}
         })
     },
     async fetchCloudflareWafIntegration() {

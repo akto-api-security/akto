@@ -8,7 +8,6 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 
 import com.akto.dao.AccountsDao;
-import com.akto.dao.AgentUsersDao;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
@@ -595,7 +594,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             shouldLogin = "true";
             String resolvedRole = fetchOktaRole(oktaConfig, oktaUserId, accessToken);
-            enrichAgenticUserFromSso(username, email, extractOktaTeamName(oktaConfig, oktaUserId), resolvedRole, "okta");
             createUserAndRedirect(email, username, new SignupInfo.OktaSignupInfo(accessToken, username), accountId, Config.ConfigType.OKTA.toString(), resolvedRole, this.scopeRoleMapping);
             code = "";
         } catch (Exception e) {
@@ -713,31 +711,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         List<String> groupsFromApi = fetchOktaGroupsFromManagementApi(
                 oktaConfig.getManagementBaseUrl(), oktaConfig.getManagementApiToken(), oktaUserId);
         return resolveAktoRoleFromOktaGroupNames(groupsFromApi, oktaGroupToAktoUserRoleMap);
-    }
-
-    /**
-     * Extracts the organisational team name from Okta groups.
-     * Groups mapped to an Akto role in {@code oktaGroupToAktoUserRoleMap} are skipped —
-     * the first remaining group is the team.
-     */
-    private String extractOktaTeamName(Config.OktaConfig oktaConfig, String oktaUserId) {
-        if (StringUtils.isEmpty(oktaConfig.getManagementApiToken()) || oktaUserId == null) return "";
-        List<String> groups = fetchOktaGroupsFromManagementApi(
-                oktaConfig.getManagementBaseUrl(), oktaConfig.getManagementApiToken(), oktaUserId);
-        Map<String, String> roleMap = oktaConfig.getOktaGroupToAktoUserRoleMap();
-        return groups.stream()
-                .filter(g -> roleMap == null || !roleMap.containsKey(g))
-                .findFirst()
-                .orElse("");
-    }
-
-    /**
-     * Persists SSO-derived team/role into AgenticUsers.
-     * Respects manual dashboard overrides — fields pinned as "manual" are never overwritten.
-     * Call this from every {@code registerViaXxx} method that has team/role data.
-     */
-    private void enrichAgenticUserFromSso(String userName, String userEmail, String teamName, String userRole, String provider) {
-        AgentUsersDao.instance.upsertTagFromSso(userName, userEmail, teamName, userRole, provider);
     }
 
     private static List<String> extractOktaGroupNamesFromApiResponse(List<Map<String, Object>> groupsList) {
