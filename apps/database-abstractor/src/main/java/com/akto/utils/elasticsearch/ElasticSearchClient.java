@@ -76,7 +76,10 @@ public class ElasticSearchClient {
                     .put("timestamp",         r.getTimeStampMs())
                     .put("inputTokens",       r.getInputTokens())
                     .put("outputTokens",      r.getOutputTokens())
-                    .put("isAtlasTraffic",    r.isAtlasTraffic());
+                    .put("isAtlasTraffic",    r.isAtlasTraffic())
+                    .put("traceId",           r.getTraceId())
+                    .put("spanId",            r.getSpanId())
+                    .put("topicProcessed",    false);
                 ndjson.append(doc).append("\n");
             } catch (JSONException e) {
                 logger.error("Failed to serialize AgentQueryRecord: " + e.getMessage());
