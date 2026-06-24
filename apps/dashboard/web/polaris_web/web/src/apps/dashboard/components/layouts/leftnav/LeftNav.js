@@ -89,7 +89,7 @@ export default function LeftNav() {
 
     if (window.USER_NAME.indexOf("@akto.io")) {
         reportsSubNavigationItems.push({
-            label: mapLabel("Compliance", dashboardCategory),
+            label: "Compliance",
             onClick: () => {
                 navigate("/dashboard/reports/compliance");
                 handleSelect("dashboard_reports_compliance");
@@ -98,7 +98,7 @@ export default function LeftNav() {
             selected: leftNavSelected === "dashboard_reports_compliance",
         })
         reportsSubNavigationItems.push({
-            label: mapLabel("Threat", dashboardCategory),
+            label: "Threat",
             onClick: () => {
                 navigate("/dashboard/reports/threat");
                 handleSelect("dashboard_reports_tthreat");
@@ -514,7 +514,7 @@ export default function LeftNav() {
                 selected: leftNavSelected.includes("_reports"),
                 subNavigationItems: dashboardCategory === CATEGORY_ENDPOINT_SECURITY
                     ? [{
-                        label: mapLabel("Threat", dashboardCategory),
+                        label: "Threat",
                         onClick: () => {
                             navigate("/dashboard/reports/threat");
                             handleSelect("dashboard_reports_threat");

@@ -17,6 +17,8 @@ public class File {
 
     private String compressedContent;
 
+    private int collectionId;
+
     public File() {
     }
 
@@ -24,6 +26,13 @@ public class File {
         this.type = fileType;
         this.compressedContent = compressedContent;
         this.uploadTimestamp = Context.now();
+    }
+
+    public File(String fileType, String compressedContent, int collectionId) {
+        this.type = fileType;
+        this.compressedContent = compressedContent;
+        this.uploadTimestamp = Context.now();
+        this.collectionId = collectionId;
     }
 
     public File(ObjectId id, String uploadType, int uploadTimestamp, String compressedContent) {
@@ -63,5 +72,13 @@ public class File {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public int getCollectionId() {
+        return collectionId;
+    }
+
+    public void setCollectionId(int collectionId) {
+        this.collectionId = collectionId;
     }
 }

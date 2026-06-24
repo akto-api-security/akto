@@ -10,6 +10,8 @@ import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
+import com.akto.proto.generated.threat_detection.message.malicious_event.v1.OwaspCategory;
+import java.util.Collections;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
@@ -181,6 +183,15 @@ public class MaliciousEventService {
     // Set contextSource if available
     if (contextSource != null && !contextSource.isEmpty()) {
         builder.setContextSource(contextSource);
+    }
+
+    List<MaliciousEventDto.OwaspCategory> owaspCategories = evt.getOwaspCategoriesList()
+        .stream()
+        .map(o -> new MaliciousEventDto.OwaspCategory(
+            o.getId(), o.getName(), o.getSeverity(), o.getConfidence()))
+        .collect(Collectors.toList());
+    if (!owaspCategories.isEmpty()) {
+        builder.setOwaspCategories(owaspCategories);
     }
 
     MaliciousEventDto maliciousEventModel = builder.build();
@@ -580,6 +591,16 @@ public class MaliciousEventService {
                 .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
                 .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
                 .setSessionId(evt.getSessionId() != null && !evt.getSessionId().isEmpty() ? evt.getSessionId() : "")
+                .addAllOwaspCategories(evt.getOwaspCategories() != null
+                    ? evt.getOwaspCategories().stream()
+                        .map(o -> OwaspCategory.newBuilder()
+                            .setId(o.getId() != null ? o.getId() : "")
+                            .setName(o.getName() != null ? o.getName() : "")
+                            .setSeverity(o.getSeverity() != null ? o.getSeverity() : "")
+                            .setConfidence(o.getConfidence() != null ? o.getConfidence() : "")
+                            .build())
+                        .collect(Collectors.toList())
+                    : Collections.emptyList())
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()

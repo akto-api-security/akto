@@ -44,11 +44,18 @@ export const extractRuleViolated = (metadata) => {
  * Returns {} when nothing matches (callers do Object.keys() on it).
  */
 export const resolveComplianceClauseMap = (event, isGuardrail, threatFiltersMap = {}, guardrailComplianceMap = {}) => {
+  let base = {};
   if (isGuardrail) {
     const capability = getGuardrailCapabilityForRule(extractRuleViolated(event?.metadata));
-    return guardrailComplianceMap[capability] || guardrailComplianceMap[event?.filterId] || {};
+    base = guardrailComplianceMap[capability] || guardrailComplianceMap[event?.filterId] || {};
+  } else {
+    base = threatFiltersMap[event?.filterId]?.compliance?.mapComplianceToListClauses || {};
   }
-  return threatFiltersMap[event?.filterId]?.compliance?.mapComplianceToListClauses || {};
+
+  if (event?.owaspCategories?.length > 0) {
+    return { ...base, "OWASP Agentic Skills Top 10": event.owaspCategories.map(o => o.id) };
+  }
+  return base;
 };
 
 export const extractBehaviour = (metadata) => {
