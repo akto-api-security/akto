@@ -58,7 +58,7 @@ const ApiIssuesTab = ({ apiDetail, collectionIssuesData, isThreatEnabled }) => {
                         category: item?.id?.testSubCategory,
                         numberOfEndpoints: 1,
                         creationTime: item?.creationTime,
-                        issueStatus: (item?.unread ?? false).toString(),
+                        issueStatus: item?.unread.toString(),
                         testRunName: "Test Run",
                         domains: domain ? [domain] : [],
                         urls: [{
