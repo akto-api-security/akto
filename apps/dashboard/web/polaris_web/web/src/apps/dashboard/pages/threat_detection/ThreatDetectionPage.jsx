@@ -230,6 +230,9 @@ function ThreatDetectionPage() {
             filterId: searchParams.get("filterId"),
             status: statusValue,
             severity: searchParams.get("severity") || '',
+            url: searchParams.get("url") || '',
+            method: searchParams.get("method") || '',
+            ruleViolated: searchParams.get("ruleViolated") || '-',
             hasQueryEvent: Boolean(
                 searchParams.get("refId") &&
                 searchParams.get("eventType") &&
@@ -654,15 +657,15 @@ function ThreatDetectionPage() {
             currentRefId: queryParams.refId,
             rowDataList: maliciousPayloads,
             moreInfoData: {
-              url: rowContext?.url || '',
-              method: rowContext?.method || '',
+              url: rowContext?.url || queryParams.url || '',
+              method: rowContext?.method || queryParams.method || '',
               apiCollectionId: rowContext?.apiCollectionId,
               templateId: queryParams.filterId,
               // Prefer the row's severity (set by rowClicked or passed via ?severity= URL param),
               // so deep-linked opens show the actual event severity, not the template default.
               severity: rowContext?.severity || queryParams.severity || '',
               sessionId: rowContext?.sessionId || '',
-              ruleViolated: rowContext?.ruleViolated || '-',
+              ruleViolated: rowContext?.ruleViolated || queryParams.ruleViolated || '-',
               complianceMap: rowContext?.complianceMapData || {}
             },
             currentEventId: rowContext?.eventId || '',
