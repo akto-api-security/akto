@@ -92,7 +92,7 @@ public class ScriptActionTest extends MongoBasedTest {
 
             TestScriptsDao.instance.getMCollection().drop();
             Context.accountId.set(1000000);
-            ScriptAction action = createAction("test@akto.com");
+            ScriptAction action = createAction("test@akto.io");
             action.setTestScript(validTestScript());
 
             assertEquals("SUCCESS", action.addScript());
