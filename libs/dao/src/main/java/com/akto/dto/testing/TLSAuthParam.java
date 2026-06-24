@@ -37,7 +37,13 @@ public class TLSAuthParam extends AuthParam {
         ENG;
     }
 
+    @Override
     public boolean addAuthTokens(OriginalHttpRequest request) {
+        return addAuthTokens(request, false);
+    }
+
+    @Override
+    public boolean addAuthTokens(OriginalHttpRequest request, boolean forceApply) {
         request.setTlsAuthParam(this);
         return true;
     }

@@ -2,6 +2,11 @@ package com.akto.dto.testing;
 
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.OriginalHttpRequest;
+
+import lombok.Getter;
+import lombok.Setter;
+
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
@@ -19,6 +24,12 @@ public class AuthMechanism {
 
     private String uuid;
     private List<Integer> apiCollectionIds;
+
+    @BsonIgnore
+    @Getter
+    @Setter
+    private boolean forceApply;
+
     public AuthMechanism() {
     }
 
@@ -32,7 +43,12 @@ public class AuthMechanism {
 
     public boolean addAuthToRequest(OriginalHttpRequest request) {
         for (AuthParam authParamPair : authParams) {
-            boolean result = authParamPair.addAuthTokens(request);
+            boolean result;
+            if (forceApply || authParamPair.authTokenPresent(request)) {
+                result = authParamPair.addAuthTokens(request, forceApply);
+            } else {
+                result = authParamPair.addAuthTokens(request, false);
+            }
             if (!result) return false;
         }
         return true;

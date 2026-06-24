@@ -53,7 +53,12 @@ public class DigestAuthParam extends AuthParam {
 
     @Override
     public boolean addAuthTokens(OriginalHttpRequest request) {
-        return false;
+        return addAuthTokens(request, false);
+    }
+
+    @Override
+    public boolean addAuthTokens(OriginalHttpRequest request, boolean forceApply) {
+        return addAuthTokens(request);
     }
 
     @Override

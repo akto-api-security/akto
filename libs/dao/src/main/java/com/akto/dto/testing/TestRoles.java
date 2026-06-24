@@ -132,11 +132,19 @@ public class TestRoles {
         if(this.getAuthWithCondList() != null && !this.getAuthWithCondList().isEmpty()){
             for (AuthWithCond authWithCond : this.getAuthWithCondList()) {
                 if(authWithCond.getHeaderKVPairs() != null && authWithCond.getHeaderKVPairs().isEmpty()){
-                    return authWithCond.getAuthMechanism();
+                    return prepareAuthMechanism(authWithCond);
                 }
             }
         }
         return null;
+    }
+
+    private AuthMechanism prepareAuthMechanism(AuthWithCond authWithCond) {
+        AuthMechanism ret = authWithCond.getAuthMechanism();
+        if (ret != null) {
+            ret.setForceApply(authWithCond.isForceApply());
+        }
+        return ret;
     }
 
     public String getEndpointLogicalGroupIdHexId() {

@@ -62,7 +62,7 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
     public AuthMechanism fetchAttackerToken(int apiCollectionId) {
         TestRoles testRoles = TestRolesDao.instance.findOne(TestRoles.NAME, "ATTACKER_TOKEN_ALL");
         if (testRoles != null && testRoles.getAuthWithCondList().size() > 0) {
-            return testRoles.getAuthWithCondList().get(0).getAuthMechanism();
+            return authMechanismWithForceApply(testRoles.getAuthWithCondList().get(0));
         } else {
             // return AuthMechanismsDao.instance.findOne(new BasicDBObject());
             return null;
@@ -71,7 +71,7 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
 
     public AuthMechanism fetchAttackerToken(int apiCollectionId, TestRoles testRoles) {
         if (testRoles != null && testRoles.getAuthWithCondList().size() > 0) {
-            return testRoles.getAuthWithCondList().get(0).getAuthMechanism();
+            return authMechanismWithForceApply(testRoles.getAuthWithCondList().get(0));
         } else {
             // return AuthMechanismsDao.instance.findOne(new BasicDBObject());
             return null;
@@ -101,5 +101,13 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
 
         //AuthMechanismsDao.instance.findOneDocument(new BasicDBObject());
         return null;
+    }
+
+    private static AuthMechanism authMechanismWithForceApply(AuthWithCond authWithCond) {
+        AuthMechanism authMechanism = authWithCond.getAuthMechanism();
+        if (authMechanism != null) {
+            authMechanism.setForceApply(authWithCond.isForceApply());
+        }
+        return authMechanism;
     }
 }
