@@ -2,7 +2,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon } from "@shopify/polaris"
 import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import api from "../api"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, isValidElement } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {useLocation, useNavigate, useParams } from "react-router-dom"
@@ -469,7 +469,6 @@ function ApiEndpoints(props) {
         })
         apiInfoSeverityMap = func.getSeverityCountPerEndpointList(apiInfoSeverityMap)
 
-
         let data = {}
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap,apiInfoSeverityMap)
 
@@ -872,7 +871,7 @@ function ApiEndpoints(props) {
         const tmp = Object.fromEntries(
             Object.entries(data).filter(([k, v]) => {
                 if (k.endsWith('Comp')) return false
-                if (v !== null && typeof v === 'object' && !Array.isArray(v)) return false
+                if (isValidElement(v)) return false
                 return true
             })
         )
