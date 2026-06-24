@@ -67,16 +67,23 @@ export const mergePolicyComplianceMap = (capabilityMap, guardrailPolicies = []) 
 };
 
 export const resolveComplianceClauseMap = (event, isGuardrail, threatFiltersMap = {}, guardrailComplianceMap = {}) => {
+  let base = {};
   if (isGuardrail) {
     const ruleViolated = extractRuleViolated(event?.metadata);
     const dbCapability = getDbComplianceCapability(ruleViolated);
     if (dbCapability) {
-      return guardrailComplianceMap[dbComplianceKey(event?.filterId, dbCapability)] || {};
+      base = guardrailComplianceMap[dbComplianceKey(event?.filterId, dbCapability)] || {};
+    } else {
+      const capability = getGuardrailCapabilityForRule(ruleViolated);
+      base = guardrailComplianceMap[capability] || guardrailComplianceMap[event?.filterId] || {};
     }
-    const capability = getGuardrailCapabilityForRule(ruleViolated);
-    return guardrailComplianceMap[capability] || guardrailComplianceMap[event?.filterId] || {};
+  } else {
+    base = threatFiltersMap[event?.filterId]?.compliance?.mapComplianceToListClauses || {};
   }
-  return threatFiltersMap[event?.filterId]?.compliance?.mapComplianceToListClauses || {};
+  if (event?.owaspCategories?.length > 0) {
+    return { ...base, "OWASP Agentic Skills Top 10": event.owaspCategories.map(o => o.id) };
+  }
+  return base;
 };
 
 export const extractBehaviour = (metadata) => {

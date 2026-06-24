@@ -568,6 +568,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         ? (x?.severity || "HIGH")
         : (x?.severity || threatFiltersMap[x?.filterId]?.severity || "HIGH")
 
+      const filterTemplate = threatFiltersMap[x?.filterId];
       const complianceMapData = resolveComplianceClauseMap(x, needsGuardrailCompliance, threatFiltersMap, guardrailComplianceMap);
       const complianceList = Object.keys(complianceMapData);
 

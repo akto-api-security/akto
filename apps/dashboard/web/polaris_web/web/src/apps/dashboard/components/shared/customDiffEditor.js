@@ -1,3 +1,5 @@
+import func from "@/util/func";
+
 const transform = {
     formatJson(data){
         let allKeys = [];
@@ -237,6 +239,62 @@ const transform = {
             headersMap: {...jsonObj.headersMap, ...payloadObj.headersMap},
             updatedData: jsonObj.updatedData,
         }
+    },
+
+    // Shared "new diff" builder: takes the parsed request/response json objects
+    // (current + original) and produces the request/response data objects the
+    // editor renders. Used by both SampleDataComponent (rendering) and
+    // buildRenderedText (verification) so the rendered text is identical.
+    buildDiffData(requestJson, responseJson, originalRequestJson, originalResponseJson){
+        let lineReqObj = this.getFirstLine(originalRequestJson?.firstLine, requestJson?.firstLine)
+        let lineResObj = this.getFirstLine(originalResponseJson?.firstLine, responseJson?.firstLine)
+
+        let requestHeaderObj = this.compareJsonKeys(originalRequestJson?.json?.requestHeaders, requestJson?.json?.requestHeaders)
+        let responseHeaderObj = this.compareJsonKeys(originalResponseJson?.json?.responseHeaders, responseJson?.json?.responseHeaders)
+
+        let requestPayloadObj = this.getPayloadData(originalRequestJson?.json?.requestPayload, requestJson?.json?.requestPayload)
+        let responsePayloadObj = this.getPayloadData(originalResponseJson?.json?.responsePayload, responseJson?.json?.responsePayload)
+
+        return {
+            requestData: this.mergeDataObjs(lineReqObj, requestHeaderObj, requestPayloadObj),
+            responseData: this.mergeDataObjs(lineResObj, responseHeaderObj, responsePayloadObj),
+        }
+    },
+
+    // Reproduce EXACTLY the request/response text the Monaco editor renders for a
+    // given sample, so the verification contract (vulnerabilityEvidence.js) checks
+    // segments against the same text the user sees. Returns { requestText, responseText }.
+    buildRenderedText(sampleData, options = {}){
+        const { isNewDiff = false, redactHeaders = [], metadata, showResponse = true } = options
+        if (!sampleData) {
+            return { requestText: "", responseText: "" }
+        }
+
+        let parsed
+        try { parsed = JSON.parse(sampleData?.message) } catch { parsed = undefined }
+        let originalParsed
+        try { originalParsed = JSON.parse(sampleData?.originalMessage) } catch { originalParsed = undefined }
+
+        const highlightPaths = sampleData?.highlightPaths || []
+        const responseJson = func.responseJson(parsed, highlightPaths, metadata)
+        const requestJson = func.requestJson(parsed, highlightPaths, metadata)
+        const originalResponseJson = func.responseJson(originalParsed, highlightPaths)
+        const originalRequestJson = func.requestJson(originalParsed, highlightPaths)
+
+        if (isNewDiff) {
+            const { requestData, responseData } = this.buildDiffData(requestJson, responseJson, originalRequestJson, originalResponseJson)
+            return {
+                requestText: requestData?.message || "",
+                responseText: showResponse ? (responseData?.message || "") : "",
+            }
+        }
+
+        // Non-new-diff editors render data.original (when present) else data.message.
+        const requestText = this.formatData(originalRequestJson, "http", redactHeaders) || this.formatData(requestJson, "http", redactHeaders)
+        const responseText = showResponse
+            ? (this.formatData(originalResponseJson, "http", redactHeaders) || this.formatData(responseJson, "http", redactHeaders))
+            : ""
+        return { requestText: requestText || "", responseText: responseText || "" }
     },
     isGraphQLPayload(payload){
         if (!payload || typeof payload !== 'object') return false;

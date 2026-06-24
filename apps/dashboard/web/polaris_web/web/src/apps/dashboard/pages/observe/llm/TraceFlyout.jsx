@@ -4,7 +4,7 @@ import { CancelMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import api from "./api";
 import { enrichRow } from "./utils";
-import { classifySpan, durationColor, formatCost, formatDurationMs, SPAN_TYPE_LABEL, truncate } from "./constants";
+import { classifySpan, durationColor, formatDurationMs, SPAN_TYPE_LABEL, truncate } from "./constants";
 import { ModelChip } from "./LLMCellRenderers";
 import SpanBar from "./SpanBar";
 import AgenticFlyoutShell from "../agentic/AgenticFlyoutShell";
@@ -141,9 +141,6 @@ export default function TraceFlyout({ trace, onClose, onOpenSession, onViewMessa
                             </FlyoutMetaItem>
                             <FlyoutMetaItem label="Tokens in / out">
                                 <Text variant="bodySm">{(trace._inputTokens || 0).toLocaleString("en-US")} / {(trace._outputTokens || 0).toLocaleString("en-US")}</Text>
-                            </FlyoutMetaItem>
-                            <FlyoutMetaItem label="Cost">
-                                <Text variant="bodySm">{formatCost(trace._inputTokens || 0, trace._outputTokens || 0)}</Text>
                             </FlyoutMetaItem>
                         </HorizontalStack>
 

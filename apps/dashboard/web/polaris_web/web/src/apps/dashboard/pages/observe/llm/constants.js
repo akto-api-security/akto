@@ -7,51 +7,70 @@ export function getEpochsFromRange(currDateRange) {
     };
 }
 
+// ─── Content normalization ────────────────────────────────────────────────────
+// Single helper that converts ANY LLM content value to a plain string so
+// ChatMessage / ConversationHistory never receive an object.  Handles:
+//   • plain string
+//   • array of {text} / {type, text} blocks  (Anthropic, Bedrock, multi-modal)
+//   • tool_use / function_call blocks
+//   • anything else → JSON.stringify
+function extractContentText(content) {
+    if (typeof content === "string") return content;
+    if (Array.isArray(content)) {
+        return content.map(c => {
+            if (typeof c === "string") return c;
+            if (typeof c.text === "string") return c.text;
+            // Tool-call / tool_use blocks
+            const name = c.name || c.function?.name;
+            const args = c.input ?? c.function?.arguments ?? c.arguments ?? {};
+            if (c.type === "tool_use" || c.type === "tool_calls" || name) {
+                return `[${name || "tool"}] ${typeof args === "string" ? args : JSON.stringify(args)}`;
+            }
+            return JSON.stringify(c);
+        }).filter(Boolean).join("\n");
+    }
+    if (content !== null && typeof content === "object") return JSON.stringify(content);
+    return String(content ?? "");
+}
+
+// Returns the first array-valued messages field found across common provider keys.
+function findMessagesArray(obj) {
+    return (Array.isArray(obj.messages)       ? obj.messages       : null)
+        || (Array.isArray(obj.input)           ? obj.input           : null) // OpenAI Responses API
+        || (Array.isArray(obj.body?.messages)  ? obj.body.messages  : null)
+        || (Array.isArray(obj.body?.input)     ? obj.body.input     : null)
+        || null;
+}
+
 export function parsePromptText(queryPayload) {
     if (!queryPayload) return "";
     try {
         const obj = JSON.parse(queryPayload);
-        // OpenAI messages array — extract last user message as the display text
-        if (Array.isArray(obj.messages)) {
-            const userMsg = [...obj.messages].reverse().find(m => m.role === "user");
-            if (userMsg) {
-                if (typeof userMsg.content === "string") return userMsg.content;
-                if (Array.isArray(userMsg.content)) return userMsg.content.map(c => c.text || "").filter(Boolean).join(" ");
-            }
-            const last = obj.messages[obj.messages.length - 1];
-            if (last && typeof last.content === "string") return last.content;
+        // Any provider that uses a messages/input array (OpenAI, Anthropic, Bedrock, n8n, …)
+        const msgs = findMessagesArray(obj);
+        if (msgs?.length) {
+            const userMsg = [...msgs].reverse().find(m => m.role === "user");
+            if (userMsg) return extractContentText(userMsg.content);
+            const last = msgs[msgs.length - 1];
+            if (last?.content !== undefined) return extractContentText(last.content);
         }
-        // body messages array
-        if (obj.body && Array.isArray(obj.body.messages)) {
-            const userMsg = obj.body.messages.find(m => m.role === "user");
-            if (userMsg && typeof userMsg.content === "string") return userMsg.content;
+        // Tool call shape
+        const toolName = obj.toolName || obj.body?.toolName;
+        if (toolName) {
+            const args = obj.toolArgs ?? obj.params ?? obj.body?.toolArgs ?? obj.body?.arguments ?? obj.body ?? {};
+            return `[${toolName}] ${typeof args === "string" ? args : JSON.stringify(args)}`;
         }
-        // body is a plain string — use it directly
-        if (typeof obj.body === "string") return obj.body;
-        // body is an object — check for tool call shape
-        if (obj.body && typeof obj.body === "object") {
-            const toolName = obj.toolName || obj.body.toolName;
-            const toolArgs = obj.body.toolArgs || obj.body.arguments || obj.body;
-            if (toolName) {
-                return `[${toolName}] ${JSON.stringify(toolArgs)}`;
-            }
-            return JSON.stringify(obj.body);
-        }
-        // top-level toolName (toolArgs at root)
-        if (obj.toolName) {
-            const toolArgs = obj.toolArgs || obj.params || obj.arguments || {};
-            return `[${obj.toolName}] ${JSON.stringify(toolArgs)}`;
-        }
-        // OpenAI/Anthropic message format: {role, content}
-        if (obj.role && obj.content) {
-            if (typeof obj.content === "string") return obj.content;
-            if (Array.isArray(obj.content)) {
-                return obj.content.map(c => c.text || "").filter(Boolean).join(" ");
-            }
-        }
-        return obj.prompt || obj.message || obj.text || "";
+        // Single-message object: { role, content }
+        if (obj.role && obj.content !== undefined) return extractContentText(obj.content);
+        // Plain scalar fields — string-typed only to avoid returning objects
+        if (typeof obj.prompt  === "string") return obj.prompt;
+        if (typeof obj.message === "string") return obj.message;
+        if (typeof obj.text    === "string") return obj.text;
+        if (typeof obj.body    === "string") return obj.body;
+        // Final fallback — always a string
+        return JSON.stringify(obj, null, 2);
     } catch (_) {
-        return queryPayload;
+        return String(queryPayload);
     }
 }
 
@@ -59,9 +78,8 @@ export function parseResponseText(responsePayload) {
     if (!responsePayload) return "";
     try {
         const obj = JSON.parse(responsePayload);
-        // Empty object — nothing to show
-        if (obj && typeof obj === "object" && Object.keys(obj).length === 0) return "";
-        // OpenAI format: { choices: [{ message: { role, content } }] }
+        if (!obj || (typeof obj === "object" && Object.keys(obj).length === 0)) return "";
+        // OpenAI Chat Completions: { choices: [{ message }] }
         if (Array.isArray(obj.choices) && obj.choices.length) {
             const msg = obj.choices[0]?.message;
             if (msg) {
@@ -70,41 +88,47 @@ export function parseResponseText(responsePayload) {
                         .map(tc => `[${tc.function?.name}] ${tc.function?.arguments || ""}`)
                         .join("\n");
                 }
-                if (typeof msg.content === "string") return msg.content;
-                // content can be an array of content blocks (Anthropic-style or multi-modal)
-                if (Array.isArray(msg.content) && msg.content.length > 0) {
-                    return msg.content.map(c => c.text || JSON.stringify(c)).join("\n");
+                return extractContentText(msg.content);
+            }
+        }
+        // OpenAI Responses API: { output: [{ type: "message", content: [...] }] }
+        if (Array.isArray(obj.output)) {
+            for (const item of obj.output) {
+                if (item.type === "message" && item.content !== undefined) {
+                    const text = extractContentText(item.content);
+                    if (text) return text;
                 }
             }
         }
-        // body.result — tool call result
-        if (obj.body && obj.body.result) {
-            const result = obj.body.result;
-            // file read result
-            if (result.file && result.file.content) return result.file.content;
-            // bash/command stdout
-            if (result.stdout !== undefined) return result.stdout || result.stderr || "";
-            // generic text output
-            if (result.output) {
-                if (Array.isArray(result.output)) {
-                    return result.output.map(o => (typeof o === "object" ? o.text || JSON.stringify(o) : String(o))).join("\n");
-                }
-                return String(result.output);
-            }
-            return JSON.stringify(result);
+        // AWS Bedrock / providers wrapping: { output: { message: { content } } }
+        if (obj.output?.message?.content !== undefined) {
+            return extractContentText(obj.output.message.content);
         }
-        // body is a plain string
+        // Anthropic Messages API direct: { content: [...] }
+        if (Array.isArray(obj.content)) {
+            return extractContentText(obj.content);
+        }
+        // body.result — tool execution results (Argus agent spans)
+        if (obj.body?.result) {
+            const r = obj.body.result;
+            if (r.file?.content) return r.file.content;
+            if (r.stdout !== undefined) return r.stdout || r.stderr || "";
+            if (r.output !== undefined) {
+                return Array.isArray(r.output)
+                    ? r.output.map(o => (typeof o === "object" ? o.text || JSON.stringify(o) : String(o))).join("\n")
+                    : String(r.output);
+            }
+            return JSON.stringify(r);
+        }
         if (typeof obj.body === "string") return obj.body;
-        // body is a non-result object
         if (obj.body && typeof obj.body === "object") return JSON.stringify(obj.body);
-        // Standard shapes
-        const content = obj.content;
-        if (Array.isArray(content) && content.length > 0) {
-            return content[0].text || "";
-        }
-        return obj.text || obj.message || JSON.stringify(obj, null, 2);
+        // Plain scalar fields — string-typed only
+        if (typeof obj.text    === "string") return obj.text;
+        if (typeof obj.message === "string") return obj.message;
+        // Final fallback — always a string
+        return JSON.stringify(obj, null, 2);
     } catch (_) {
-        return responsePayload;
+        return String(responsePayload);
     }
 }
 
@@ -133,13 +157,6 @@ export function parseModel(row) {
     return row.model || "";
 }
 
-export function formatCost(inputTokens, outputTokens) {
-    const cost = (inputTokens * 15 + outputTokens * 75) / 1e6;
-    if (cost === 0) return "$0.00";
-    if (cost < 0.001) return "< $0.001";
-    if (cost < 0.01) return "$" + cost.toFixed(4);
-    return "$" + cost.toFixed(2);
-}
 
 export function truncate(str, len = 80) {
     if (!str) return "";
