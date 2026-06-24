@@ -70,6 +70,19 @@ const convertDataIntoTableFormat = (agentData) => ({
     lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed)
 });
 
+const deduplicateAgents = (agents) => {
+    const map = new Map();
+    for (const agent of agents) {
+        const key = agent.hostname || agent.deviceId;
+        if (!key) continue;
+        const existing = map.get(key);
+        if (!existing || agent.lastHeartbeat > existing.lastHeartbeat) {
+            map.set(key, agent);
+        }
+    }
+    return Array.from(map.values());
+};
+
 function EndpointShieldMetadata() {
 
     const [loading, setLoading] = useState(false);
@@ -111,7 +124,7 @@ function EndpointShieldMetadata() {
                 lastDeployed: module.startedTs || 0,
                 _moduleData: module
             }));
-            setEndpointShieldData({ agents });
+            setEndpointShieldData({ agents: deduplicateAgents(agents) });
         } catch (error) {
         }
     }, []);
@@ -136,7 +149,7 @@ function EndpointShieldMetadata() {
             lastDeployed: module.startedTs || 0,
             _moduleData: module
         }));
-        setEndpointShieldData({ agents });
+        setEndpointShieldData({ agents: deduplicateAgents(agents) });
         setSelectedAgent(prev => {
             if (!prev) return prev;
             const fresh = agents.find(a => a.agentId === prev.agentId);
