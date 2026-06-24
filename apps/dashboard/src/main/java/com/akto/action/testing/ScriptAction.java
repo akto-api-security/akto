@@ -28,7 +28,7 @@ public class ScriptAction extends UserAction {
     private TestScript testScript;
     private String scriptType;
 
-    private boolean aktoUser(){
+    boolean aktoUser(){
         User user = getSUser();
 
         if(user==null || user.getLogin()==null || user.getLogin().isEmpty()){
