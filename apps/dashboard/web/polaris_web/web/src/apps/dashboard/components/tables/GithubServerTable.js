@@ -162,10 +162,9 @@ function GithubServerTable(props) {
   }, [props.sortOptions])
 
   useEffect(() => {
-    if (props?.filterStateUrl) return;
     const tempFilters = appliedFilters.filter((filter) => !filter?.key?.includes("dateRange"))
     updateQueryParams("filters",tableFunc.getPrettifiedFilter(tempFilters))
-  },[appliedFilters, props?.filterStateUrl])
+  },[appliedFilters])
 
   // Initialize negation state from appliedFilters
   useEffect(() => {
