@@ -761,15 +761,9 @@ public class IssuesAction extends UserAction {
 
         int effectiveLimit = (limit > 0) ? limit : subCategoryNames.size();
 
-        // Built-in Akto templates have source=AKTO_TEMPLATES or null (field absent in older docs).
-        // CUSTOM templates are user-uploaded YAMLs; source-config tests don't exist in yaml_templates at all.
-        Bson filter = Filters.and(
-            Filters.in("_id", subCategoryNames),
-            Filters.or(
-                Filters.eq(YamlTemplate.SOURCE, GlobalEnums.YamlTemplateSource.AKTO_TEMPLATES.name()),
-                Filters.exists(YamlTemplate.SOURCE, false)
-            )
-        );
+        // Fetch all templates matching the requested IDs — includes AKTO_TEMPLATES and CUSTOM.
+        // Source-config (http-based) tests don't exist in yaml_templates so they're excluded naturally.
+        Bson filter = Filters.in("_id", subCategoryNames);
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(
                 false, fetchOnlyActive, skip, effectiveLimit, filter);
 
