@@ -296,7 +296,7 @@ const tableFunc = {
         const labelValue = key.includes("dateRange")
           ? obj.value
           : (obj.value.values !== undefined ? obj.value.values : (Array.isArray(obj.value) ? obj.value : []));
-        let label = labelFunc ? labelFunc(obj.key, labelValue) : '';
+        let label = labelFunc(obj.key, labelValue);
         
         // Add negation prefix if negated (only for non-dateRange filters)
         if (obj.value.negated && !key.includes("dateRange")) {
