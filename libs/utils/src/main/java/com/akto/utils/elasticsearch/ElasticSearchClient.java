@@ -58,6 +58,43 @@ public class ElasticSearchClient {
 
     public String getIndex() { return ES_INDEX; }
 
+    // ── Topic write-back (used by UserAnalysisCron) ───────────────────────────
+
+    public static final class TopicUpdate {
+        public final String docId;
+        public final String topic;
+        public TopicUpdate(String docId, String topic) { this.docId = docId; this.topic = topic; }
+    }
+
+    public void bulkUpdateTopics(List<TopicUpdate> updates) {
+        if (!isConfigured() || updates == null || updates.isEmpty()) return;
+        StringBuilder ndjson = new StringBuilder();
+        for (TopicUpdate u : updates) {
+            if (u.docId == null || u.docId.isEmpty()) continue;
+            try {
+                ndjson.append(new JSONObject().put("update", new JSONObject().put("_id", u.docId))).append("\n");
+                ndjson.append(new JSONObject().put("doc",
+                    new JSONObject().put("topic", u.topic).put("topicProcessed", true))).append("\n");
+            } catch (JSONException e) {
+                logger.error("bulkUpdateTopics: serialize error for docId=" + u.docId + ": " + e.getMessage());
+            }
+        }
+        if (ndjson.length() == 0) return;
+        String url = trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_bulk";
+        Request.Builder rb = new Request.Builder()
+            .url(url)
+            .method("POST", RequestBody.create(ndjson.toString(), MediaType.parse("application/x-ndjson")))
+            .addHeader("Content-Type", "application/x-ndjson");
+        addAuthHeader(rb);
+        try (Response resp = http.newCall(rb.build()).execute()) {
+            if (!resp.isSuccessful()) {
+                logger.error("bulkUpdateTopics failed (" + resp.code() + ")");
+            }
+        } catch (Exception e) {
+            logger.error("bulkUpdateTopics error: " + e.getMessage());
+        }
+    }
+
     // ── Scroll API (used by crons) ────────────────────────────────────────────
 
     public void scrollQueryData(int accountId, long startTsMs, long endTsMs, int pageSize,

@@ -73,9 +73,10 @@ public class LLMObservabilityAction extends UserAction {
     @Setter private String       serviceId;
 
     // Multi-value filter lists (used by MessagesView / PromptsView ag-grid set filters)
-    @Setter private List<String> userNames   = new ArrayList<>();
-    @Setter private List<String> serviceIds  = new ArrayList<>();
-    @Setter private List<String> sessionIds  = new ArrayList<>();
+    @Setter private List<String> userNames    = new ArrayList<>();
+    @Setter private List<String> serviceIds   = new ArrayList<>();
+    @Setter private List<String> sessionIds   = new ArrayList<>();
+    @Setter private List<String> topicFilters = new ArrayList<>();
 
     @Getter private List<Map<String, Object>>  sessions      = new ArrayList<>();
     @Getter private List<Map<String, Object>>  messages      = new ArrayList<>();
@@ -128,6 +129,7 @@ public class LLMObservabilityAction extends UserAction {
                 .put(AGG_IN_TOKENS,  new JSONObject().put("sum", new JSONObject().put("field", AgentQueryRecord.F_INPUT_TOKENS)))
                 .put(AGG_OUT_TOKENS, new JSONObject().put("sum", new JSONObject().put("field", AgentQueryRecord.F_OUTPUT_TOKENS)))
                 .put(AGG_MSG_COUNT,  new JSONObject().put("cardinality", new JSONObject().put("field", AgentQueryRecord.F_TRACE_ID_KW)))
+                .put("topicsAgg",    new JSONObject().put("terms", new JSONObject().put("field", "topic.keyword").put("size", 10)))
                 .put(AGG_FIRST_HIT, new JSONObject().put("top_hits", new JSONObject()
                     .put("size", 1)
                     .put("sort", new JSONArray().put(new JSONObject().put(AgentQueryRecord.F_TIMESTAMP, new JSONObject().put("order", "asc"))))
@@ -195,8 +197,10 @@ public class LLMObservabilityAction extends UserAction {
     public String fetchMessages() {
         try {
             ElasticSearchClient es = ElasticSearchClient.instance();
+            logger.info("fetchMessages: esConfigured=" + es.isConfigured() + " startTime=" + startTime + " endTime=" + endTime);
             if (!es.isConfigured()) return Action.SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
+            logger.info("fetchMessages: accountId=" + accountId + " startMs=" + startMs() + " endMs=" + endMs());
 
             Map<String, List<String>> extraFilters = buildMultiFilters(true);
             JSONObject baseQ = es.buildBaseQueryMulti(accountId, startMs(), endMs(), extraFilters.isEmpty() ? null : extraFilters, null);
@@ -211,6 +215,7 @@ public class LLMObservabilityAction extends UserAction {
                 .put(AGG_IN_TOKENS,  new JSONObject().put("sum",        new JSONObject().put("field", AgentQueryRecord.F_INPUT_TOKENS)))
                 .put(AGG_OUT_TOKENS, new JSONObject().put("sum",        new JSONObject().put("field", AgentQueryRecord.F_OUTPUT_TOKENS)))
                 .put(AGG_SPAN_COUNT, new JSONObject().put("value_count", new JSONObject().put("field", AgentQueryRecord.F_SPAN_ID_KW)))
+                .put("topicsAgg",    new JSONObject().put("terms", new JSONObject().put("field", "topic.keyword").put("size", 10)))
                 .put(AGG_FIRST_HIT, new JSONObject().put("top_hits", new JSONObject()
                     .put("size", 1)
                     .put("sort", new JSONArray().put(new JSONObject().put(AgentQueryRecord.F_TIMESTAMP, new JSONObject().put("order", "asc"))))
@@ -229,7 +234,9 @@ public class LLMObservabilityAction extends UserAction {
                 .put("aggs", subAggs));
 
             JSONObject aggsResult = es.aggregate(filteredQuery, aggs);
+            logger.info("fetchMessages: aggsResult=" + (aggsResult != null ? aggsResult.toString().substring(0, Math.min(200, aggsResult.toString().length())) : "null"));
             messages = parseBuckets(aggsResult, AgentQueryRecord.F_TRACE_ID);
+            logger.info("fetchMessages: messages.size=" + messages.size());
         } catch (Exception e) {
             logger.error("fetchMessages error: " + e.getMessage());
             messages = new ArrayList<>();
@@ -460,13 +467,15 @@ public class LLMObservabilityAction extends UserAction {
             JSONObject aggs = new JSONObject()
                 .put(AgentQueryRecord.F_USER_NAME,  new JSONObject().put("terms", new JSONObject().put("field", AgentQueryRecord.F_USER_NAME_KW).put("size", 500)))
                 .put(AgentQueryRecord.F_DEVICE_ID,  new JSONObject().put("terms", new JSONObject().put("field", AgentQueryRecord.F_DEVICE_ID_KW).put("size", 500)))
-                .put(AgentQueryRecord.F_SERVICE_ID, new JSONObject().put("terms", new JSONObject().put("field", AgentQueryRecord.F_SERVICE_ID_KW).put("size", 500)));
+                .put(AgentQueryRecord.F_SERVICE_ID, new JSONObject().put("terms", new JSONObject().put("field", AgentQueryRecord.F_SERVICE_ID_KW).put("size", 500)))
+                .put("topic",     new JSONObject().put("terms", new JSONObject().put("field", "topic.keyword").put("size", 100)));
 
             JSONObject aggsResult = es.aggregate(query, aggs);
             filterChoices = new HashMap<>();
             filterChoices.put(AgentQueryRecord.F_USER_NAME,  extractBucketKeys(aggsResult, AgentQueryRecord.F_USER_NAME));
             filterChoices.put(AgentQueryRecord.F_DEVICE_ID,  extractBucketKeys(aggsResult, AgentQueryRecord.F_DEVICE_ID));
             filterChoices.put(AgentQueryRecord.F_SERVICE_ID, extractBucketKeys(aggsResult, AgentQueryRecord.F_SERVICE_ID));
+            filterChoices.put("topic",     extractBucketKeys(aggsResult, "topic"));
         } catch (Exception e) {
             filterChoices = new HashMap<>();
         }
@@ -603,6 +612,22 @@ public class LLMObservabilityAction extends UserAction {
             row.put(KEY_TOTAL_TOKENS,                inTokens + outTokens);
             row.put(AGG_MSG_COUNT,                   subAggLong(bucket, AGG_MSG_COUNT));
 
+            JSONObject topicsAgg = bucket.optJSONObject("topicsAgg");
+            if (topicsAgg != null) {
+                JSONArray tbuckets = topicsAgg.optJSONArray("buckets");
+                if (tbuckets != null) {
+                    List<String> topicList = new ArrayList<>();
+                    for (int j = 0; j < tbuckets.length(); j++) {
+                        JSONObject tb = tbuckets.optJSONObject(j);
+                        if (tb != null) {
+                            String t = tb.optString("key", "");
+                            if (!t.isEmpty()) topicList.add(t);
+                        }
+                    }
+                    if (!topicList.isEmpty()) row.put("topics", topicList);
+                }
+            }
+
             JSONObject firstHitAgg = bucket.optJSONObject(AGG_FIRST_HIT);
             if (firstHitAgg != null) {
                 JSONArray topHits = firstHitAgg.optJSONObject("hits") != null
@@ -683,6 +708,9 @@ public class LLMObservabilityAction extends UserAction {
         // traceId — used when scoping Messages tab to a specific trace
         if (traceId != null && !traceId.trim().isEmpty())
             f.put(AgentQueryRecord.F_TRACE_ID_KW, java.util.Collections.singletonList(traceId.trim()));
+        // topicFilters
+        List<String> topics = nonEmpty(topicFilters);
+        if (!topics.isEmpty()) f.put("topic.keyword", topics);
         // Atlas traffic filter: ENDPOINT context only shows Atlas-sourced records
         if (CONTEXT_SOURCE.ENDPOINT.equals(Context.contextSource.get()))
             f.put(AgentQueryRecord.F_IS_ATLAS_TRAFFIC, java.util.Collections.singletonList("true"));
