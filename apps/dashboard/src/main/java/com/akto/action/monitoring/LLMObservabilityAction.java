@@ -185,8 +185,10 @@ public class LLMObservabilityAction extends UserAction {
     public String fetchMessages() {
         try {
             ElasticSearchClient es = ElasticSearchClient.instance();
+            logger.info("fetchMessages: esConfigured=" + es.isConfigured() + " startTime=" + startTime + " endTime=" + endTime);
             if (!es.isConfigured()) return Action.SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
+            logger.info("fetchMessages: accountId=" + accountId + " startMs=" + startMs() + " endMs=" + endMs());
 
             Map<String, List<String>> extraFilters = buildMultiFilters(true);
             JSONObject baseQ = es.buildBaseQueryMulti(accountId, startMs(), endMs(), extraFilters.isEmpty() ? null : extraFilters, null);
@@ -220,7 +222,9 @@ public class LLMObservabilityAction extends UserAction {
                 .put("aggs", subAggs));
 
             JSONObject aggsResult = es.aggregate(filteredQuery, aggs);
+            logger.info("fetchMessages: aggsResult=" + (aggsResult != null ? aggsResult.toString().substring(0, Math.min(200, aggsResult.toString().length())) : "null"));
             messages = parseBuckets(aggsResult, AgentQueryRecord.F_TRACE_ID);
+            logger.info("fetchMessages: messages.size=" + messages.size());
         } catch (Exception e) {
             logger.error("fetchMessages error: " + e.getMessage());
             messages = new ArrayList<>();
