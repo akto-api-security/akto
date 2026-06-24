@@ -238,6 +238,31 @@ const transform = {
             updatedData: jsonObj.updatedData,
         }
     },
+    isGraphQLPayload(payload){
+        if (!payload || typeof payload !== 'object') return false;
+        if (typeof payload.query !== 'string') return false;
+        if (typeof payload.operationName !== 'string') return false;
+        const trimmed = payload.query.trimStart();
+        const startsWithKeyword = /^(query|mutation|subscription|fragment)\s/.test(trimmed);
+        if (!startsWithKeyword) return false;
+        if (!trimmed.includes('{') || !trimmed.includes('}')) return false;
+        return true;
+    },
+    formatGraphQLPayload(payload){
+        // Format payload with the query field unescaped to multiple readable lines
+        const formatted = this.formatJson(payload);
+        // Replace the escaped \n inside the "query" string value with real newlines + indent
+        return formatted.replace(
+            /("query":\s*")((?:[^"\\]|\\[\s\S])*?)(")/,
+            (match, prefix, value, suffix) => {
+                const unescaped = value
+                    .replace(/\\n/g, '\n  ')
+                    .replace(/\\t/g, '  ')
+                    .replace(/\\"/g, '"');
+                return prefix + unescaped + suffix;
+            }
+        );
+    },
     formatData(data, style, redactHeaders = []){
         let localFirstLine = data?.firstLine
         let finalData = ""
@@ -261,7 +286,17 @@ const transform = {
             finalData = finalData.split("\n").sort().join("\n");
             const isPayloadEmpty = payLoad === null || Object.keys(payLoad).length === 0
             const isMultiformData = data?.json?.requestHeaders?.['content-type']?.includes('multipart/form-data') && (payLoad == null || Object.keys(payLoad).length === 0)
-            return (localFirstLine + "\n" + finalData + (finalData.trim().length === 0 || isPayloadEmpty ? "\n" : "\n\n") + (!isPayloadEmpty ? (isMultiformData ? payLoad : this.formatJson(payLoad)) : ''))
+            let formattedPayload = ''
+            if (!isPayloadEmpty) {
+                if (isMultiformData) {
+                    formattedPayload = payLoad
+                } else if (this.isGraphQLPayload(payLoad)) {
+                    formattedPayload = this.formatGraphQLPayload(payLoad)
+                } else {
+                    formattedPayload = this.formatJson(payLoad)
+                }
+            }
+            return (localFirstLine + "\n" + finalData + (finalData.trim().length === 0 || isPayloadEmpty ? "\n" : "\n\n") + formattedPayload)
         }
         return (data?.firstLine ? data?.firstLine + "\n" : "") + (data?.json && Object.keys(data?.json).length > 0 ? this.formatJson(data.json) : "");
       }  

@@ -23,6 +23,7 @@ import {
     normalizePiiTypesFromPolicy,
     resolveStoredPolicyBehaviour
 } from '../utils';
+import { getDefaultGeneralBlockTopics, GENERAL_BLOCKS, isGeneralBlockTopic, toDeniedTopic } from '../generalBlocks';
 import func from "@/util/func";
 import {
     PolicyDetailsStep,
@@ -73,6 +74,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [promptAttackLevel, setPromptAttackLevel] = useState("high");
     const [enableContextPoisoning, setEnableContextPoisoning] = useState(false);
     const [enableDeniedTopics, setEnableDeniedTopics] = useState(false);
+    // Akto default blocks tracked separately as a Set of keys (not mixed into deniedTopics).
+    // On save these are merged with custom topics; on load they are split back out.
+    const [selectedDefaultBlockKeys, setSelectedDefaultBlockKeys] = useState(
+        () => new Set(getDefaultGeneralBlockTopics().map(t => GENERAL_BLOCKS.find(b => b.topic === t.topic)?.key).filter(Boolean))
+    );
     const [deniedTopics, setDeniedTopics] = useState([]);
     const [enableHarmfulCategories, setEnableHarmfulCategories] = useState(false);
     const [harmfulCategoriesSettings, setHarmfulCategoriesSettings] = useState({
@@ -166,6 +172,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         promptAttackLevel,
         enableContextPoisoning,
         enableDeniedTopics,
+        selectedDefaultBlockKeys,
         deniedTopics,
         enableHarmfulCategories,
         harmfulCategoriesSettings,
@@ -421,6 +428,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setPromptAttackLevel("high");
         setEnableContextPoisoning(false);
         setEnableDeniedTopics(false);
+        setSelectedDefaultBlockKeys(new Set(getDefaultGeneralBlockTopics().map(t => GENERAL_BLOCKS.find(b => b.topic === t.topic)?.key).filter(Boolean)));
         setDeniedTopics([]);
         setEnableHarmfulCategories(false);
         setHarmfulCategoriesSettings({
@@ -516,10 +524,18 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             }
         }
 
-        // Denied topics
-        const hasDeniedTopics = policy.deniedTopics && policy.deniedTopics.length > 0;
-        setEnableDeniedTopics(hasDeniedTopics);
-        setDeniedTopics(policy.deniedTopics || []);
+        // Split saved denied topics back into Akto defaults and user-custom.
+        const loadedTopics = policy.deniedTopics || [];
+        const defaultKeys = new Set(
+            loadedTopics
+                .filter(t => isGeneralBlockTopic(t.topic))
+                .map(t => GENERAL_BLOCKS.find(b => b.topic === t.topic)?.key)
+                .filter(Boolean)
+        );
+        const customTopics = loadedTopics.filter(t => !isGeneralBlockTopic(t.topic));
+        setEnableDeniedTopics(loadedTopics.length > 0);
+        setSelectedDefaultBlockKeys(defaultKeys);
+        setDeniedTopics(customTopics);
 
         // Word filters
         setWordFilters({
@@ -691,7 +707,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
                     code: enableCodeFilter ? { level: codeFilterLevel.toUpperCase() } : null
                 },
-                deniedTopics,
+                deniedTopics: enableDeniedTopics
+                    ? [
+                        ...GENERAL_BLOCKS.filter(b => selectedDefaultBlockKeys.has(b.key)).map(toDeniedTopic),
+                        ...deniedTopics
+                      ]
+                    : [],
                 wordFilters,
                 piiFilters: enablePiiTypes ? piiTypes : [],
                 regexPatterns: enableRegexPatterns ? regexPatterns
@@ -792,6 +813,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableContextPoisoning={setEnableContextPoisoning}
                         enableDeniedTopics={enableDeniedTopics}
                         setEnableDeniedTopics={setEnableDeniedTopics}
+                        selectedDefaultBlockKeys={selectedDefaultBlockKeys}
+                        setSelectedDefaultBlockKeys={setSelectedDefaultBlockKeys}
                         deniedTopics={deniedTopics}
                         setDeniedTopics={setDeniedTopics}
                         enableHarmfulCategories={enableHarmfulCategories}
@@ -969,7 +992,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
                 code: enableCodeFilter ? { level: codeFilterLevel.toUpperCase() } : null
             },
-            deniedTopics: deniedTopics,
+            deniedTopics: enableDeniedTopics
+                ? [
+                    ...GENERAL_BLOCKS.filter(b => selectedDefaultBlockKeys.has(b.key)).map(toDeniedTopic),
+                    ...deniedTopics
+                  ]
+                : [],
             wordFilters: wordFilters,
             piiFilters: piiTypes,
             regexPatterns: regexPatterns
