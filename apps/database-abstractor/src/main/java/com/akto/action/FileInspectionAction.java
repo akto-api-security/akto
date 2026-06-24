@@ -10,7 +10,6 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.blob.AzureBlobClient;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.ActionSupport;
 import lombok.Getter;
 import lombok.Setter;
@@ -99,22 +98,13 @@ public class FileInspectionAction extends ActionSupport {
                     Filters.eq(FileInspectionResult.RULE_ID, result.getRuleId()),
                     Filters.eq(FileInspectionResult.DEVICE_ID, result.getDeviceId())
             );
-            Bson update = Updates.combine(
-                    Updates.set(FileInspectionResult.EXECUTED_AT,   result.getExecutedAt()),
-                    Updates.set(FileInspectionResult.ACCOUNT_ID,    result.getAccountId()),
-                    Updates.set(FileInspectionResult.AGENT_ID,      result.getAgentId()),
-                    Updates.set(FileInspectionResult.DEVICE_LABEL,  result.getDeviceLabel()),
-                    Updates.set(FileInspectionResult.STATUS,        result.getStatus()),
-                    Updates.set(FileInspectionResult.MATCHES,       result.getMatches()),
-                    Updates.set(FileInspectionResult.ERROR_MESSAGE, result.getErrorMessage())
-            );
-            long matched = FileInspectionResultDao.instance.getMCollection()
-                    .updateOne(filter, update)
-                    .getMatchedCount();
-            if (matched == 0) {
+            FileInspectionResult existing = FileInspectionResultDao.instance.findOne(filter);
+            if (existing != null) {
+                result.setId(existing.getId());
+            } else {
                 result.setId(new ObjectId());
-                FileInspectionResultDao.instance.insertOne(result);
             }
+            FileInspectionResultDao.instance.replaceOne(filter, result);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("uploadFileInspectionResult failed: " + e.getMessage(), LogDb.DB_ABS);
