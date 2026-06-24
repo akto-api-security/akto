@@ -247,7 +247,7 @@ public class IssuesAction extends UserAction {
             Filters.and(dashboardCountingFilter, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED.name())));
 
         for (TestingRunIssues runIssue : issues) {
-            if (isSourceConfigTest(runIssue.getId().getTestSubCategory())) {
+            if (runIssue.getId().getTestSubCategory().startsWith("http")) {
                 TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runIssue.getId().getTestCategoryFromSourceConfig());
                 runIssue.getId().setTestSourceConfig(config);
             }
@@ -315,18 +315,18 @@ public class IssuesAction extends UserAction {
             ignoredIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(
                     Filters.and(countFilter, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED.name())));
 
-            // Attach TestSourceConfig for source-config tests (their testSubCategory is the YAML URL)
+            // Attach TestSourceConfig for custom http-based tests
             for (TestingRunIssues runIssue : rawIssues) {
-                if (isSourceConfigTest(runIssue.getId().getTestSubCategory())) {
+                if (runIssue.getId().getTestSubCategory().startsWith("http")) {
                     runIssue.getId().setTestSourceConfig(TestSourceConfigsDao.instance
                             .getTestSourceConfig(runIssue.getId().getTestCategoryFromSourceConfig()));
                 }
             }
 
-            // Batch fetch YAML test info for Akto built-in and custom YAML tests (non-source-config)
+            // Batch fetch YAML test info for all non-http subcategories
             Set<String> subCategoryIds = rawIssues.stream()
                     .map(issue -> issue.getId().getTestSubCategory())
-                    .filter(sc -> !isSourceConfigTest(sc))
+                    .filter(sc -> !sc.startsWith("http"))
                     .collect(Collectors.toSet());
             Map<String, Info> infoMap = subCategoryIds.isEmpty() ? new HashMap<>()
                     : YamlTemplateDao.instance.fetchTestInfoMap(Filters.in("_id", new ArrayList<>(subCategoryIds)));
@@ -371,7 +371,7 @@ public class IssuesAction extends UserAction {
                 obj.put("creationTime", issue.getCreationTime());
                 obj.put("lastSeen", issue.getLastSeen());
                 if (issue.getLatestTestingRunSummaryId() != null && id.getApiInfoKey() != null) {
-                    String subType = isSourceConfigTest(id.getTestSubCategory())
+                    String subType = id.getTestSubCategory().startsWith("http")
                             ? id.getTestCategoryFromSourceConfig()
                             : id.getTestSubCategory();
                     String key = issue.getLatestTestingRunSummaryId().toHexString() + "|" + subType
@@ -669,7 +669,7 @@ public class IssuesAction extends UserAction {
         String testSubType = null;
         // ?? enum stored in db
         String subCategory = issue.getId().getTestSubCategory();
-        if (isSourceConfigTest(subCategory)) {
+        if (subCategory.startsWith("http")) {
             testSubType = issue.getId().getTestCategoryFromSourceConfig();
         } else {
             testSubType = issue.getId().getTestSubCategory();
@@ -698,13 +698,6 @@ public class IssuesAction extends UserAction {
     private List<VulnerableRequestForTemplate> vulnerableRequests;
     private TestCategory[] categories;
     private List<TestSourceConfig> testSourceConfigs;
-
-    /** Returns true when testSubCategory is a source-config test (its id is the URL of the YAML file).
-     *  These are stored in test_source_configs, NOT in yaml_templates. */
-    private static boolean isSourceConfigTest(String testSubCategory) {
-        return testSubCategory != null &&
-               (testSubCategory.startsWith("http://") || testSubCategory.startsWith("https://"));
-    }
 
     public static BasicDBObject createSubcategoriesInfoObj(TestConfig testConfig) {
         Info info = testConfig.getInfo();
@@ -758,8 +751,6 @@ public class IssuesAction extends UserAction {
     private String mode;
     private List<String> subCategoryNames;
 
-    // Used by report generation (incl. Puppeteer PDF) to fetch metadata only for the tests
-    // that actually have a finding, instead of paginating all ~4000 subcategories.
     public String fetchSubCategoriesByTestSubTypes() {
         subCategories = new ArrayList<>();
         categories = TestTemplateUtils.getAllTestCategoriesWithinContext(Context.contextSource.get());
@@ -768,25 +759,12 @@ public class IssuesAction extends UserAction {
             return SUCCESS.toUpperCase();
         }
 
-        // Source-config tests (uploaded via external URL) store the URL itself as testSubCategory.
-        // These are NOT in yaml_templates — they live in test_source_configs — so skip them.
-        // Akto built-in (source=AKTO_TEMPLATES) and custom YAML (source=CUSTOM) tests both have
-        // short human-readable _ids and are fetched correctly via Filters.in("_id", templateIds).
-        List<String> templateIds = new ArrayList<>();
-        for (String name : subCategoryNames) {
-            if (!isSourceConfigTest(name)) {
-                templateIds.add(name);
-            }
-        }
+        int effectiveLimit = (limit > 0) ? limit : subCategoryNames.size();
 
-    if (templateIds.isEmpty()) {
-            return SUCCESS.toUpperCase();
-        }
-
-        // Apply skip/limit for pagination. limit=0 means fetch all matching ids in one shot.
-        int effectiveLimit = (limit > 0) ? limit : templateIds.size();
-
-        Bson filter = Filters.in("_id", templateIds);
+        Bson filter = Filters.and(
+            Filters.in("_id", subCategoryNames),
+            Filters.eq(YamlTemplate.SOURCE, GlobalEnums.YamlTemplateSource.AKTO_TEMPLATES.name())
+        );
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(
                 false, fetchOnlyActive, skip, effectiveLimit, filter);
 
@@ -797,8 +775,7 @@ public class IssuesAction extends UserAction {
                     subCategories.add(infoObj);
                 }
             } catch (Exception e) {
-                String err = "Error while fetching subcategory for " + entry.getKey();
-                logger.errorAndAddToDb(e, err, LogDb.DASHBOARD);
+                logger.errorAndAddToDb(e, "Error while fetching subcategory for " + entry.getKey(), LogDb.DASHBOARD);
             }
         }
 
@@ -1700,10 +1677,6 @@ public class IssuesAction extends UserAction {
         return this.subCategories;
     }
 
-    public void setSubCategoryNames(List<String> subCategoryNames) {
-        this.subCategoryNames = subCategoryNames;
-    }
-
     public List<TestingRunIssues> getSimilarlyAffectedIssues() {
         return similarlyAffectedIssues;
     }
@@ -1762,6 +1735,10 @@ public class IssuesAction extends UserAction {
 
     public void setMode(String mode) {
         this.mode = mode;
+    }
+
+    public void setSubCategoryNames(List<String> subCategoryNames) {
+        this.subCategoryNames = subCategoryNames;
     }
 
     public void setStartEpoch(int startEpoch) {
