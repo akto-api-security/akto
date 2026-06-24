@@ -1,3 +1,5 @@
+export const TOKEN_ESTIMATE_TOOLTIP = "Approximate token count.";
+
 // Converts a currDateRange object (from the date range reducer) to epoch seconds.
 // Centralised here to avoid the same Math.floor/Date.parse expression in every view.
 export function getEpochsFromRange(currDateRange) {

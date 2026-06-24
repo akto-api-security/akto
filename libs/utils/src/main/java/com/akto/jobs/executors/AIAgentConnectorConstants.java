@@ -26,7 +26,9 @@ public final class AIAgentConnectorConstants {
             "databricks",
             "snowflake",
             "vertex_ai_custom_deployed_model",
-            "salesforce"
+            "salesforce",
+            "anthropic",
+            "openai"
         ))
     );
 
