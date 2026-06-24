@@ -129,17 +129,8 @@ function SampleDataComponent(props) {
         const llmResponseSegments = baseSegments.filter(s => s?.location !== 'REQUEST');
 
         if(isNewDiff){
-            let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine)
-            let lineResObj = transform.getFirstLine(originalResponseJson?.firstLine,responseJson?.firstLine)
-
-            let requestHeaderObj = transform.compareJsonKeys(originalRequestJson?.json?.requestHeaders,requestJson?.json?.requestHeaders)
-            let responseHeaderObj = transform.compareJsonKeys(originalResponseJson?.json?.responseHeaders,responseJson?.json?.responseHeaders)
-            
-            let requestPayloadObj = transform.getPayloadData(originalRequestJson?.json?.requestPayload,requestJson?.json?.requestPayload)
-            let responsePayloadObj = transform.getPayloadData(originalResponseJson?.json?.responsePayload,responseJson?.json?.responsePayload)
-            
-            const requestData = transform.mergeDataObjs(lineReqObj, requestHeaderObj, requestPayloadObj)
-            const responseData = transform.mergeDataObjs(lineResObj, responseHeaderObj, responsePayloadObj)
+            // Shared builder so the rendered text matches the verification contract.
+            const { requestData, responseData } = transform.buildDiffData(requestJson, responseJson, originalRequestJson, originalResponseJson)
 
             setSampleJsonData({
                 request: { ...requestData, vulnerabilitySegments: segmentsFromMetadata ? [] : llmRequestSegments },
