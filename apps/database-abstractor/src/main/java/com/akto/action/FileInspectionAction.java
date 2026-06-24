@@ -8,9 +8,6 @@ import com.akto.dto.endpoint_shield.FileInspectionRule;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.blob.AzureBlobClient;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import com.opensymphony.xwork2.ActionSupport;
@@ -41,11 +38,9 @@ public class FileInspectionAction extends ActionSupport {
     private static final Pattern SHA256_RE = Pattern.compile("^[a-f0-9]{64}$");
     private static final int MAX_PATH_LENGTH = 1024;
     private static final int RESULTS_PAGE_MAX = 500;
-    private static final ObjectMapper MAPPER = new ObjectMapper()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     @Setter private long updatedAfter;
-    @Setter private BasicDBObject result;
+    @Setter private FileInspectionResult result;
 
     @Setter private String path;
     @Setter private boolean existenceOnly;
@@ -84,33 +79,32 @@ public class FileInspectionAction extends ActionSupport {
                 addActionError("result is required");
                 return ERROR.toUpperCase();
             }
-            FileInspectionResult parsed = MAPPER.readValue(result.toJson(), FileInspectionResult.class);
-            if (StringUtils.isBlank(parsed.getRuleId())) {
+            if (StringUtils.isBlank(result.getRuleId())) {
                 addActionError("ruleId is required");
                 return ERROR.toUpperCase();
             }
-            if (StringUtils.isBlank(parsed.getDeviceId())) {
+            if (StringUtils.isBlank(result.getDeviceId())) {
                 addActionError("deviceId is required");
                 return ERROR.toUpperCase();
             }
             FileInspectionResultDao.instance.createIndicesIfAbsent();
-            parsed.setAccountId(Context.accountId.get());
-            if (parsed.getExecutedAt() == 0) {
-                parsed.setExecutedAt(Context.now());
+            result.setAccountId(Context.accountId.get());
+            if (result.getExecutedAt() == 0) {
+                result.setExecutedAt(Context.now());
             }
-            uploadMatchBlobs(parsed);
+            uploadMatchBlobs(result);
 
             Bson filter = Filters.and(
-                    Filters.eq(FileInspectionResult.RULE_ID, parsed.getRuleId()),
-                    Filters.eq(FileInspectionResult.DEVICE_ID, parsed.getDeviceId())
+                    Filters.eq(FileInspectionResult.RULE_ID, result.getRuleId()),
+                    Filters.eq(FileInspectionResult.DEVICE_ID, result.getDeviceId())
             );
             FileInspectionResult existing = FileInspectionResultDao.instance.findOne(filter);
             if (existing != null) {
-                parsed.setId(existing.getId());
+                result.setId(existing.getId());
             } else {
-                parsed.setId(new ObjectId());
+                result.setId(new ObjectId());
             }
-            FileInspectionResultDao.instance.replaceOne(filter, parsed);
+            FileInspectionResultDao.instance.replaceOne(filter, result);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("uploadFileInspectionResult failed: " + e.getMessage(), LogDb.DB_ABS);
