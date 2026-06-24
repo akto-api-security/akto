@@ -134,7 +134,9 @@ export default function LLMObservability() {
     // Top users by token usage — from aggregated backend stats.
     const topUserRows = useMemo(() => {
         const topUsers = sessionStats?.topUsers || [];
-        return topUsers.slice(0, 5).map(({ userName, totalTokens: tokens }) => ({
+        return topUsers
+            .sort((a, b) => (b.totalTokens || 0) - (a.totalTokens || 0))
+            .slice(0, 5).map(({ userName, totalTokens: tokens }) => ({
             id: userName,
             name: userName,
             type: "OS",
