@@ -115,7 +115,8 @@ function Dashboard() {
         if(((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)) && location.pathname !== "/dashboard/observe/inventory"){
             fetchAllCollections()
         }
-        if (!subCategoryMap || (Object.keys(subCategoryMap).length === 0)) {
+        const isReportPage = location.pathname.includes('/summary/') || location.pathname.includes('/report/')
+        if (!isReportPage && (!subCategoryMap || (Object.keys(subCategoryMap).length === 0))) {
             fetchMetadata();
         }
         if(Object.keys(threatFiltersMap).length === 0 && window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted){
