@@ -478,8 +478,6 @@ const finalizeHostGroupedRow = (g, idSegment) => {
         riskScore: g.maxRiskScore,
         team: g.team || '',
         userRole: g.userRole || '',
-        teamSource: g.teamSource || 'sso',
-        roleSource: g.roleSource || 'sso',
     };
 };
 
@@ -543,8 +541,6 @@ export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMa
                 nonSkillCollectionsCount: 0,
                 team: meta.team || '',
                 userRole: meta.userRole || '',
-                teamSource: meta.teamSource || 'sso',
-                roleSource: meta.roleSource || 'sso',
             };
         }
         const g = users[username];
