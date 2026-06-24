@@ -5,7 +5,7 @@ import FlyoutBreadcrumb from "../agentic/FlyoutBreadcrumb";
 import AiChatSection from "../agentic/AiChatSection";
 import { buildAgenticObserveChatMetadata } from "../agentic/agenticObserveApi";
 import ConversationHistory from "../../testing/TestRunResultPage/components/ConversationHistory";
-import { formatCost, formatCompact, parsePromptText, parseResponseText, truncate } from "./constants";
+import { formatCompact, parsePromptText, parseResponseText, truncate } from "./constants";
 import api from "./api";
 
 
@@ -72,7 +72,6 @@ export default function ArgusTraceFlyout({ trace, onClose }) {
 
     const stats = [
         { label: "Total tokens",  value: formatCompact(totalTokens) },
-        { label: "Est. cost",     value: formatCost(trace._inputTokens || 0, trace._outputTokens || 0) },
         { label: "Tokens in/out", value: `${(trace._inputTokens || 0).toLocaleString("en-US")} / ${(trace._outputTokens || 0).toLocaleString("en-US")}` },
     ];
 

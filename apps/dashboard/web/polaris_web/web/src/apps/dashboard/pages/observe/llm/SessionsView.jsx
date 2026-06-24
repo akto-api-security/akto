@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { SESSION_COLUMN_DEFS } from "./columns";
 import api from "./api";
@@ -7,6 +7,7 @@ const DEFAULT_COL_DEF = { sortable: true, resizable: true, filter: false };
 
 export default function SessionsView({ currDateRange, onOpenSession }) {
     const [rows, setRows] = useState([]);
+    const [columnDefs, setColumnDefs] = useState(SESSION_COLUMN_DEFS);
 
     // Maps { filterKey → { pageNum → afterKey } } so each unique filter combination
     // has its own cursor chain and stale cursors are never used across filter changes.
@@ -17,7 +18,16 @@ export default function SessionsView({ currDateRange, onOpenSession }) {
         until: Math.floor(Date.parse(currDateRange.period.until) / 1000),
     }), [currDateRange]);
 
-    const onServerFetch = useCallback(({ filters, skip, limit }) => {
+    useEffect(() => {
+        const { since, until } = getEpochs();
+        api.fetchFilterChoices(since, until)
+            .then(choices => setColumnDefs(SESSION_COLUMN_DEFS.map(col =>
+                col.filterAllowed ? { ...col, filterParams: { values: choices[col.field] || [] } } : col
+            )))
+            .catch(() => setColumnDefs(SESSION_COLUMN_DEFS));
+    }, [getEpochs]);
+
+    const onServerFetch = useCallback(({ filters, skip, limit, searchString }) => {
         const pageSize  = limit || 20;
         const page      = Math.floor(skip / pageSize);
         const filterKey = JSON.stringify(filters || {});
@@ -32,6 +42,7 @@ export default function SessionsView({ currDateRange, onOpenSession }) {
         return api.fetchSessionsPaged({
             startTime: since, endTime: until,
             limit: pageSize, afterKey, filters,
+            searchString: searchString
         }).then(result => {
             if (result.nextAfterKey) {
                 cursorRegistry.current[filterKey][page + 1] = result.nextAfterKey;
@@ -56,7 +67,7 @@ export default function SessionsView({ currDateRange, onOpenSession }) {
         <AgGridTable
             key={tableKey}
             rowData={rows}
-            columnDefs={SESSION_COLUMN_DEFS}
+            columnDefs={columnDefs}
             defaultColDef={DEFAULT_COL_DEF}
             height={500}
             domLayout="normal"

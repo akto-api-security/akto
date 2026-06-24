@@ -40,6 +40,10 @@ public class LLMObservabilityAction extends UserAction {
     private static final String AGG_TOTAL_OUTPUT_TOKENS = "totalOutputTokens";
     private static final String AGG_TOP_USERS           = "topUsersByTokens";
     private static final String AGG_USER_BREAKDOWN      = "userBreakdown";
+    private static final String AGG_TOTAL_SPANS         = "totalSpans";
+    private static final String AGG_TOP_APPS            = "topApps";
+    private static final String AGG_TOP_TRACES          = "topTraces";
+    private static final String AGG_TRACE_SPARK         = "traceSpark";
 
     // ── Synthetic result-row keys (computed, not native ES doc fields) ─────────
     private static final String KEY_TOTAL_TOKENS  = "totalTokens";
@@ -87,6 +91,14 @@ public class LLMObservabilityAction extends UserAction {
     @Getter private List<Map<String, Object>>  aggTopUsers        = new ArrayList<>();
     @Getter private List<Map<String, Object>>  aggUserBreakdown   = new ArrayList<>();
 
+    // Argus aggregated stats (fetchArgusStats)
+    @Getter private long                       aggTotalSpans      = 0;
+    @Getter private List<Map<String, Object>>  aggTopApps         = new ArrayList<>();
+    @Getter private List<Map<String, Object>>  aggAppBreakdown    = new ArrayList<>();
+    @Getter private List<Map<String, Object>>  aggTopTraces       = new ArrayList<>();
+    @Getter private List<Long>                 aggTraceSpark      = new ArrayList<>();
+    @Getter private List<Long>                 aggTokenSpark      = new ArrayList<>();
+
     private long startMs() { return (long) startTime * 1000L; }
     private long endMs()   { return (long) endTime   * 1000L; }
 
@@ -105,7 +117,7 @@ public class LLMObservabilityAction extends UserAction {
             int accountId = Context.accountId.get();
 
             Map<String, List<String>> extraFilters = buildMultiFilters(true);
-            JSONObject baseQ = es.buildBaseQueryMulti(accountId, startMs(), endMs(), extraFilters.isEmpty() ? null : extraFilters, null);
+            JSONObject baseQ = es.buildBaseQueryMulti(accountId, startMs(), endMs(), extraFilters.isEmpty() ? null : extraFilters, this.searchString);
             JSONArray mustArr = baseQ.getJSONObject("bool").getJSONArray("must");
             mustArr.put(new JSONObject().put("exists", new JSONObject().put("field", AgentQueryRecord.F_SESSION_IDENTIFIER)));
             JSONObject filteredQuery = new JSONObject().put("bool", new JSONObject().put("must", mustArr));
@@ -241,67 +253,155 @@ public class LLMObservabilityAction extends UserAction {
 
             JSONObject aggs = new JSONObject()
                 .put(AGG_TOTAL_SESSIONS,      new JSONObject().put("cardinality", new JSONObject().put("field", AgentQueryRecord.F_SESSION_IDENTIFIER_KW)))
-                .put(AGG_TOTAL_INPUT_TOKENS,  new JSONObject().put("sum",         new JSONObject().put("field", AgentQueryRecord.F_INPUT_TOKENS)))
-                .put(AGG_TOTAL_OUTPUT_TOKENS, new JSONObject().put("sum",         new JSONObject().put("field", AgentQueryRecord.F_OUTPUT_TOKENS)))
+                .put(AGG_TOTAL_INPUT_TOKENS,  sumAgg(AgentQueryRecord.F_INPUT_TOKENS))
+                .put(AGG_TOTAL_OUTPUT_TOKENS, sumAgg(AgentQueryRecord.F_OUTPUT_TOKENS))
                 .put(AGG_TOP_USERS, new JSONObject()
                     .put("terms", new JSONObject().put("field", AgentQueryRecord.F_USER_NAME_KW).put("size", 10))
-                    .put("aggs", new JSONObject()
-                        .put(AGG_IN_TOKENS,  new JSONObject().put("sum", new JSONObject().put("field", AgentQueryRecord.F_INPUT_TOKENS)))
-                        .put(AGG_OUT_TOKENS, new JSONObject().put("sum", new JSONObject().put("field", AgentQueryRecord.F_OUTPUT_TOKENS)))))
+                    .put("aggs", tokenSubAggs()))
                 .put(AGG_USER_BREAKDOWN, new JSONObject()
                     .put("terms", new JSONObject().put("field", AgentQueryRecord.F_USER_NAME_KW).put("size", 3)));
 
             JSONObject aggsResult = es.aggregate(filteredQuery, aggs);
             if (aggsResult == null) return Action.SUCCESS.toUpperCase();
 
-            JSONObject totalSessAgg = aggsResult.optJSONObject(AGG_TOTAL_SESSIONS);
-            if (totalSessAgg != null) aggTotalSessions = (long) totalSessAgg.optDouble("value", 0);
+            aggTotalSessions = subAggLong(aggsResult, AGG_TOTAL_SESSIONS);
+            aggInputTokens   = subAggLong(aggsResult, AGG_TOTAL_INPUT_TOKENS);
+            aggOutputTokens  = subAggLong(aggsResult, AGG_TOTAL_OUTPUT_TOKENS);
 
-            JSONObject inAgg = aggsResult.optJSONObject(AGG_TOTAL_INPUT_TOKENS);
-            if (inAgg != null) aggInputTokens = (long) inAgg.optDouble("value", 0);
+            for (Map<String, Object> row : parseTermsBuckets(aggsResult, AGG_TOP_USERS, AgentQueryRecord.F_USER_NAME)) {
+                long in  = ((Number) row.get(AgentQueryRecord.F_INPUT_TOKENS)).longValue();
+                long out = ((Number) row.get(AgentQueryRecord.F_OUTPUT_TOKENS)).longValue();
+                row.put(KEY_TOTAL_TOKENS, in + out);
+                aggTopUsers.add(row);
+            }
+            aggUserBreakdown.addAll(parseBreakdown(aggsResult, AGG_USER_BREAKDOWN, 3));
+        } catch (Exception e) {
+            logger.error("fetchSessionAggStats error: " + e.getMessage());
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
 
-            JSONObject outAgg = aggsResult.optJSONObject(AGG_TOTAL_OUTPUT_TOKENS);
-            if (outAgg != null) aggOutputTokens = (long) outAgg.optDouble("value", 0);
+    // ── Argus aggregated stats (total spans + token sums + top apps/traces + sparklines) ──
 
-            JSONObject topUsersAgg = aggsResult.optJSONObject(AGG_TOP_USERS);
-            if (topUsersAgg != null) {
-                JSONArray buckets = topUsersAgg.optJSONArray("buckets");
+    public String fetchArgusStats() {
+        try {
+            ElasticSearchClient es = ElasticSearchClient.instance();
+            if (!es.isConfigured()) return Action.SUCCESS.toUpperCase();
+            int accountId = Context.accountId.get();
+
+            // Base time-range + account query, then exclude Atlas traffic so the
+            // total here matches what the Argus paginated table reports.
+            JSONObject baseQ = es.buildBaseQuery(accountId, startMs(), endMs(), null, null);
+            JSONArray mustArr = baseQ.getJSONObject("bool").getJSONArray("must");
+            JSONObject filteredQuery = new JSONObject().put("bool", new JSONObject()
+                .put("must", mustArr)
+                .put("must_not", new JSONArray()
+                    .put(new JSONObject().put("term", new JSONObject()
+                        .put(AgentQueryRecord.F_IS_ATLAS_TRAFFIC, true)))));
+
+            // Sparkline: 12 fixed-width buckets across the requested time range.
+            long intervalMs   = Math.max(1000L, (endMs() - startMs()) / 12);
+            String fixedInterval = intervalMs + "ms";
+
+            JSONObject aggs = new JSONObject()
+                .put(AGG_TOTAL_SPANS,         new JSONObject().put("value_count", new JSONObject().put("field", AgentQueryRecord.F_TIMESTAMP)))
+                .put(AGG_TOTAL_INPUT_TOKENS,  sumAgg(AgentQueryRecord.F_INPUT_TOKENS))
+                .put(AGG_TOTAL_OUTPUT_TOKENS, sumAgg(AgentQueryRecord.F_OUTPUT_TOKENS))
+                .put(AGG_TOP_APPS, new JSONObject()
+                    .put("terms", new JSONObject()
+                        .put("field", AgentQueryRecord.F_SERVICE_ID_KW)
+                        .put("size", 10)
+                        .put("order", new JSONObject().put(AGG_IN_TOKENS, "desc")))
+                    .put("aggs", tokenSubAggs()))
+                .put(AGG_TOP_TRACES, new JSONObject()
+                    .put("terms", new JSONObject()
+                        .put("field", AgentQueryRecord.F_TRACE_ID_KW)
+                        .put("size", 10)
+                        .put("order", new JSONObject().put(AGG_IN_TOKENS, "desc")))
+                    .put("aggs", tokenSubAggs()
+                        .put(AGG_FIRST_HIT, new JSONObject().put("top_hits", new JSONObject()
+                            .put("size", 1)
+                            .put("sort", new JSONArray().put(new JSONObject().put(AgentQueryRecord.F_TIMESTAMP, new JSONObject().put("order", "asc"))))
+                            .put("_source", new JSONArray()
+                                .put(AgentQueryRecord.F_QUERY_PAYLOAD)
+                                .put(AgentQueryRecord.F_RESPONSE_PAYLOAD)
+                                .put(AgentQueryRecord.F_SERVICE_ID)
+                                .put(AgentQueryRecord.F_TRACE_ID))))))
+                .put(AGG_TRACE_SPARK, new JSONObject()
+                    .put("date_histogram", new JSONObject()
+                        .put("field", AgentQueryRecord.F_TIMESTAMP)
+                        .put("fixed_interval", fixedInterval))
+                    .put("aggs", tokenSubAggs()));
+
+            JSONObject aggsResult = es.aggregate(filteredQuery, aggs);
+            if (aggsResult == null) return Action.SUCCESS.toUpperCase();
+
+            aggTotalSpans   = subAggLong(aggsResult, AGG_TOTAL_SPANS);
+            aggInputTokens  = subAggLong(aggsResult, AGG_TOTAL_INPUT_TOKENS);
+            aggOutputTokens = subAggLong(aggsResult, AGG_TOTAL_OUTPUT_TOKENS);
+
+            aggTopApps.addAll(parseTermsBuckets(aggsResult, AGG_TOP_APPS, AgentQueryRecord.F_SERVICE_ID));
+
+            // First 3 apps (already sorted by input tokens desc) form the breakdown
+            for (int i = 0; i < Math.min(3, aggTopApps.size()); i++) {
+                Map<String, Object> app = aggTopApps.get(i);
+                Map<String, Object> entry = new HashMap<>();
+                entry.put(KEY_LABEL, app.get(AgentQueryRecord.F_SERVICE_ID));
+                entry.put(KEY_COUNT, ((Number) app.get(KEY_COUNT)).longValue());
+                aggAppBreakdown.add(entry);
+            }
+
+            // Top traces
+            JSONObject topTracesAgg = aggsResult.optJSONObject(AGG_TOP_TRACES);
+            if (topTracesAgg != null) {
+                JSONArray buckets = topTracesAgg.optJSONArray("buckets");
                 if (buckets != null) {
                     for (int i = 0; i < buckets.length(); i++) {
                         JSONObject b = buckets.optJSONObject(i);
                         if (b == null) continue;
-                        String user = b.optString("key", "");
-                        if (user.isEmpty()) continue;
-                        long input  = subAggLong(b, AGG_IN_TOKENS);
-                        long output = subAggLong(b, AGG_OUT_TOKENS);
+                        String tid = b.optString("key", "");
+                        if (tid.isEmpty()) continue;
+                        long in  = subAggLong(b, AGG_IN_TOKENS);
+                        long out = subAggLong(b, AGG_OUT_TOKENS);
                         Map<String, Object> row = new HashMap<>();
-                        row.put(AgentQueryRecord.F_USER_NAME,    user);
-                        row.put(AgentQueryRecord.F_INPUT_TOKENS,  input);
-                        row.put(AgentQueryRecord.F_OUTPUT_TOKENS, output);
-                        row.put(KEY_TOTAL_TOKENS,                 input + output);
-                        aggTopUsers.add(row);
+                        row.put(AgentQueryRecord.F_TRACE_ID,      tid);
+                        row.put(AgentQueryRecord.F_INPUT_TOKENS,  in);
+                        row.put(AgentQueryRecord.F_OUTPUT_TOKENS, out);
+                        JSONObject firstHitAgg = b.optJSONObject(AGG_FIRST_HIT);
+                        if (firstHitAgg != null) {
+                            JSONArray topHits = firstHitAgg.optJSONObject("hits") != null
+                                ? firstHitAgg.getJSONObject("hits").optJSONArray("hits") : null;
+                            if (topHits != null && topHits.length() > 0) {
+                                JSONObject src = topHits.getJSONObject(0).optJSONObject("_source");
+                                if (src != null) {
+                                    row.put(AgentQueryRecord.F_QUERY_PAYLOAD,    src.optString(AgentQueryRecord.F_QUERY_PAYLOAD,    ""));
+                                    row.put(AgentQueryRecord.F_RESPONSE_PAYLOAD, src.optString(AgentQueryRecord.F_RESPONSE_PAYLOAD, ""));
+                                    row.put(AgentQueryRecord.F_SERVICE_ID,       src.optString(AgentQueryRecord.F_SERVICE_ID,       ""));
+                                }
+                            }
+                        }
+                        aggTopTraces.add(row);
                     }
                 }
             }
 
-            JSONObject breakdownAgg = aggsResult.optJSONObject(AGG_USER_BREAKDOWN);
-            if (breakdownAgg != null) {
-                JSONArray buckets = breakdownAgg.optJSONArray("buckets");
+            // Sparklines — trim to 12 buckets maximum
+            JSONObject sparkAgg = aggsResult.optJSONObject(AGG_TRACE_SPARK);
+            if (sparkAgg != null) {
+                JSONArray buckets = sparkAgg.optJSONArray("buckets");
                 if (buckets != null) {
-                    for (int i = 0; i < Math.min(3, buckets.length()); i++) {
+                    int limit = Math.min(buckets.length(), 12);
+                    for (int i = 0; i < limit; i++) {
                         JSONObject b = buckets.optJSONObject(i);
                         if (b == null) continue;
-                        String user = b.optString("key", "");
-                        if (user.isEmpty()) continue;
-                        Map<String, Object> entry = new HashMap<>();
-                        entry.put(KEY_LABEL, user);
-                        entry.put(KEY_COUNT, b.optLong("doc_count", 0));
-                        aggUserBreakdown.add(entry);
+                        aggTraceSpark.add(b.optLong("doc_count", 0));
+                        aggTokenSpark.add(subAggLong(b, AGG_IN_TOKENS) + subAggLong(b, AGG_OUT_TOKENS));
                     }
                 }
             }
+            if (aggTraceSpark.isEmpty()) { aggTraceSpark.add(0L); aggTokenSpark.add(0L); }
         } catch (Exception e) {
-            logger.error("fetchSessionAggStats error: " + e.getMessage());
+            logger.error("fetchArgusStats error: " + e.getMessage());
         }
         return Action.SUCCESS.toUpperCase();
     }
@@ -404,6 +504,70 @@ public class LLMObservabilityAction extends UserAction {
     }
 
     // ── Shared helpers ────────────────────────────────────────────────────────
+
+    /** {"sum":{"field":field}} — building block for all token aggregations. */
+    private static JSONObject sumAgg(String field) throws JSONException {
+        return new JSONObject().put("sum", new JSONObject().put("field", field));
+    }
+
+    /** Shared {inTokens, outTokens} sub-aggregation used under every terms/date_histogram. */
+    private static JSONObject tokenSubAggs() throws JSONException {
+        return new JSONObject()
+            .put(AGG_IN_TOKENS,  sumAgg(AgentQueryRecord.F_INPUT_TOKENS))
+            .put(AGG_OUT_TOKENS, sumAgg(AgentQueryRecord.F_OUTPUT_TOKENS));
+    }
+
+    /**
+     * Iterates a named terms aggregation and returns one Map per bucket with:
+     * keyField, F_INPUT_TOKENS, F_OUTPUT_TOKENS, KEY_COUNT (doc_count).
+     * Buckets with an empty key are skipped.
+     */
+    private static List<Map<String, Object>> parseTermsBuckets(
+            JSONObject aggsResult, String aggName, String keyField) throws JSONException {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (aggsResult == null) return out;
+        JSONObject agg = aggsResult.optJSONObject(aggName);
+        if (agg == null) return out;
+        JSONArray buckets = agg.optJSONArray("buckets");
+        if (buckets == null) return out;
+        for (int i = 0; i < buckets.length(); i++) {
+            JSONObject b = buckets.optJSONObject(i);
+            if (b == null) continue;
+            String key = b.optString("key", "");
+            if (key.isEmpty()) continue;
+            Map<String, Object> row = new HashMap<>();
+            row.put(keyField,                         key);
+            row.put(AgentQueryRecord.F_INPUT_TOKENS,  subAggLong(b, AGG_IN_TOKENS));
+            row.put(AgentQueryRecord.F_OUTPUT_TOKENS, subAggLong(b, AGG_OUT_TOKENS));
+            row.put(KEY_COUNT,                        b.optLong("doc_count", 0));
+            out.add(row);
+        }
+        return out;
+    }
+
+    /**
+     * Extracts up to maxItems {label, count} entries from a plain terms aggregation (no sub-aggs).
+     */
+    private static List<Map<String, Object>> parseBreakdown(
+            JSONObject aggsResult, String aggName, int maxItems) throws JSONException {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (aggsResult == null) return out;
+        JSONObject agg = aggsResult.optJSONObject(aggName);
+        if (agg == null) return out;
+        JSONArray buckets = agg.optJSONArray("buckets");
+        if (buckets == null) return out;
+        for (int i = 0; i < Math.min(maxItems, buckets.length()); i++) {
+            JSONObject b = buckets.optJSONObject(i);
+            if (b == null) continue;
+            String key = b.optString("key", "");
+            if (key.isEmpty()) continue;
+            Map<String, Object> entry = new HashMap<>();
+            entry.put(KEY_LABEL, key);
+            entry.put(KEY_COUNT, b.optLong("doc_count", 0));
+            out.add(entry);
+        }
+        return out;
+    }
 
     private List<Map<String, Object>> parseBuckets(JSONObject aggsResult, String keyField) throws JSONException {
         List<Map<String, Object>> result = new ArrayList<>();

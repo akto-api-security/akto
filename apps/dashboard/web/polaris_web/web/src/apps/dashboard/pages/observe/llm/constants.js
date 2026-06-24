@@ -157,13 +157,6 @@ export function parseModel(row) {
     return row.model || "";
 }
 
-export function formatCost(inputTokens, outputTokens) {
-    const cost = (inputTokens * 15 + outputTokens * 75) / 1e6;
-    if (cost === 0) return "$0.00";
-    if (cost < 0.001) return "< $0.001";
-    if (cost < 0.01) return "$" + cost.toFixed(4);
-    return "$" + cost.toFixed(2);
-}
 
 export function truncate(str, len = 80) {
     if (!str) return "";

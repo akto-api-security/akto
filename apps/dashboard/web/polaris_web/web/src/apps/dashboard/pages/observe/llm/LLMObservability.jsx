@@ -39,12 +39,11 @@ export default function LLMObservability() {
     );
     const [selectedSession, setSelectedSession] = useState(null);
     const [selectedTrace, setSelectedTrace]     = useState(null);
-    const [sessions, setSessions] = useState([]);
-    const [traces, setTraces]     = useState([]);
+    const [sessions, setSessions]     = useState([]);
+    const [argusStats, setArgusStats] = useState(null);
     // Aggregated stats from the dedicated endpoint (accurate, not 500-capped)
     const [sessionStats, setSessionStats] = useState(null);
-    // Loading flag for the Atlas top-cards section
-    const [loading, setLoading] = useState(!isArgus);
+    const [loading, setLoading] = useState(true);
 
     const epochs = useMemo(() => ({
         since: Math.floor(Date.parse(currDateRange.period.since) / 1000),
@@ -53,8 +52,8 @@ export default function LLMObservability() {
 
     useEffect(() => {
         let cancelled = false;
+        setLoading(true);
         if (!isArgus) {
-            setLoading(true);
             Promise.allSettled([
                 api.fetchSessions(epochs.since, epochs.until, {}),
                 api.fetchSessionStats(epochs.since, epochs.until),
@@ -68,11 +67,17 @@ export default function LLMObservability() {
                 }
                 setLoading(false);
             });
+        } else {
+            api.fetchArgusStats(epochs.since, epochs.until)
+                .then(stats => {
+                    if (cancelled) return;
+                    setArgusStats(stats);
+                    setLoading(false);
+                })
+                .catch(() => { if (!cancelled) setLoading(false); });
         }
         return () => { cancelled = true; };
     }, [epochs, isArgus]);
-
-    const onArgusRowsFetched = useCallback((rows) => setTraces(rows), []);
 
     const openSession = useCallback((row) => {
         setSelectedSession(row);
@@ -172,51 +177,27 @@ export default function LLMObservability() {
             }));
     }, [sessions]);
 
-    // ─── Argus graph data (traces) ────────────────────────────────────────────
+    // ─── Argus graph data (from fetchArgusStats — accurate, not table-page-capped) ──
 
-    const argusTraceSpark = useMemo(
-        () => buildSparkline(traces, r => toEpochSec(r.latestTimestamp)),
-        [traces]
+    const argusTraceSpark    = useMemo(() => argusStats?.traceSpark  || [0], [argusStats]);
+    const argusTokenSpark    = useMemo(() => argusStats?.tokenSpark  || [0], [argusStats]);
+    const argusInputTokens   = useMemo(() => argusStats?.totalInputTokens  || 0, [argusStats]);
+    const argusOutputTokens  = useMemo(() => argusStats?.totalOutputTokens || 0, [argusStats]);
+    const argusTotalTokens   = argusInputTokens + argusOutputTokens;
+
+    const argusTraceBreakdown = useMemo(
+        () => (argusStats?.appBreakdown || []).map(({ label, count }, i) => ({
+            label, count, color: SERVICE_COLORS[i] || "#D1D5DB",
+        })),
+        [argusStats]
     );
 
-    const argusTokenSpark = useMemo(
-        () => buildWeightedSparkline(
-            traces,
-            r => toEpochSec(r.latestTimestamp),
-            r => (Number(r._inputTokens) || 0) + (Number(r._outputTokens) || 0)
-        ),
-        [traces]
-    );
-
-    const argusTraceBreakdown = useMemo(() => {
-        const byApp = {};
-        traces.forEach(r => {
-            const app = r.serviceId || "Unknown";
-            byApp[app] = (byApp[app] || 0) + 1;
-        });
-        return Object.entries(byApp)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 3)
-            .map(([label, count], i) => ({ label, count, color: SERVICE_COLORS[i] || "#D1D5DB" }));
-    }, [traces]);
-
-    const argusInputTokens  = useMemo(() => traces.reduce((s, r) => s + (Number(r._inputTokens)  || 0), 0), [traces]);
-    const argusOutputTokens = useMemo(() => traces.reduce((s, r) => s + (Number(r._outputTokens) || 0), 0), [traces]);
-    const argusTotalTokens  = argusInputTokens + argusOutputTokens;
-
-    const argusTopAppByCost = useMemo(() => {
-        const byApp = {};
-        traces.forEach(r => {
-            const app = r.serviceId || "Unknown";
-            if (!byApp[app]) byApp[app] = { input: 0, output: 0 };
-            byApp[app].input  += Number(r._inputTokens)  || 0;
-            byApp[app].output += Number(r._outputTokens) || 0;
-        });
-        return Object.entries(byApp)
-            .map(([app, { input, output }]) => ({ app, cost: (input * 15 + output * 75) / 1e6 }))
-            .sort((a, b) => b.cost - a.cost)
+    const argusTopAppByInputTokens = useMemo(() => {
+        return (argusStats?.topApps || [])
+            .map(({ serviceId, inputTokens: inp }) => ({ app: serviceId || "Unknown", inp: inp || 0 }))
+            .sort((a, b) => b.inp - a.inp)
             .slice(0, 5)
-            .map(({ app, cost }) => ({
+            .map(({ app, inp }) => ({
                 id: app,
                 name: app,
                 type: "Application",
@@ -224,35 +205,32 @@ export default function LLMObservability() {
                 renderValue: () => (
                     <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
                         <Box minHeight="28px">
-                            <Text variant="bodyMd" alignment="end">{cost < 0.001 ? "< $0.001" : `$${cost.toFixed(cost < 0.01 ? 4 : 2)}`}</Text>
+                            <Text variant="bodyMd" alignment="end">{formatCompact(inp)}</Text>
                         </Box>
                     </HorizontalStack>
                 ),
             }));
-    }, [traces]);
+    }, [argusStats]);
 
     const argusTopTraceByTokens = useMemo(() => {
-        return [...traces]
-            .sort((a, b) => ((Number(b._inputTokens) || 0) + (Number(b._outputTokens) || 0)) - ((Number(a._inputTokens) || 0) + (Number(a._outputTokens) || 0)))
-            .slice(0, 5)
-            .map((r, i) => {
-                const tokens = (Number(r._inputTokens) || 0) + (Number(r._outputTokens) || 0);
-                return {
-                    id: r.traceId || i,
-                    name: truncate(r._promptText || r.traceId || `Trace ${i + 1}`, 40),
-                    type: "LLM",
-                    assetTagValue: r._model,
-                    onClick: () => setSelectedTrace(r),
-                    renderValue: () => (
-                        <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
-                            <Box minHeight="28px">
-                                <Text variant="bodyMd" alignment="end">{formatCompact(tokens)}</Text>
-                            </Box>
-                        </HorizontalStack>
-                    ),
-                };
-            });
-    }, [traces, setSelectedTrace]);
+        return (argusStats?.topTraces || []).map((r, i) => {
+            const tokens = (Number(r._inputTokens) || 0) + (Number(r._outputTokens) || 0);
+            return {
+                id: r.traceId || i,
+                name: truncate(r._promptText || r.traceId || `Trace ${i + 1}`, 40),
+                type: "LLM",
+                assetTagValue: r._model,
+                onClick: () => setSelectedTrace(r),
+                renderValue: () => (
+                    <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
+                        <Box minHeight="28px">
+                            <Text variant="bodyMd" alignment="end">{formatCompact(tokens)}</Text>
+                        </Box>
+                    </HorizontalStack>
+                ),
+            };
+        });
+    }, [argusStats, setSelectedTrace]);
 
     const totalDisplaySessions = sessionStats?.totalSessions != null ? sessionStats.totalSessions : sessions.length;
 
@@ -263,7 +241,7 @@ export default function LLMObservability() {
                     <Box className="agentic-stats-card-item">
                         <AgenticStatsCard
                             title="Total traces"
-                            total={traces.length}
+                            total={argusStats?.totalSpans || 0}
                             sparklineCounts={argusTraceSpark}
                             sparklineColor="#9642FC"
                             sparklineLabels={sparklineLabels}
@@ -289,9 +267,9 @@ export default function LLMObservability() {
                 </Box>
             </Card>
             <AgenticTopListCard
-                title="Top application by cost"
-                columns={[{ label: "Application" }, { label: "Cost" }]}
-                rows={argusTopAppByCost}
+                title="Top application by input tokens"
+                columns={[{ label: "Application" }, { label: "Tokens" }]}
+                rows={argusTopAppByInputTokens}
                 emptyStateText="No application data in this range."
             />
             <AgenticTopListCard
@@ -346,7 +324,7 @@ export default function LLMObservability() {
                 emptyStateText="No model data in this range."
             />
         </HorizontalGrid>
-    ), [isArgus, traces.length, argusTraceSpark, argusTraceBreakdown, argusTokenSpark, sparklineLabels, argusTotalTokens, argusInputTokens, argusOutputTokens, argusTopAppByCost, argusTopTraceByTokens, totalDisplaySessions, sessionSpark, sessionBreakdown, totalTokens, totalInputTokens, totalOutputTokens, tokenSpark, topUserRows, topModelRows]);
+    ), [isArgus, argusStats, argusTraceSpark, argusTraceBreakdown, argusTokenSpark, sparklineLabels, argusTotalTokens, argusInputTokens, argusOutputTokens, argusTopAppByInputTokens, argusTopTraceByTokens, totalDisplaySessions, sessionSpark, sessionBreakdown, totalTokens, totalInputTokens, totalOutputTokens, tokenSpark, topUserRows, topModelRows]);
 
     return (
         <>
@@ -368,7 +346,7 @@ export default function LLMObservability() {
                         </Box>
                     ) : topCards,
                     isArgus ? (
-                        <MessagesView key="traces-table" currDateRange={currDateRange} columnDefs={ARGUS_TRACE_COL_DEFS} onRowClicked={p => p.data && setSelectedTrace(p.data)} onRowsFetched={onArgusRowsFetched} />
+                        <MessagesView key="traces-table" currDateRange={currDateRange} columnDefs={ARGUS_TRACE_COL_DEFS} onRowClicked={p => p.data && setSelectedTrace(p.data)} />
                     ) : (
                         <SessionsView key="sessions-table" currDateRange={currDateRange} onOpenSession={openSession} />
                     ),

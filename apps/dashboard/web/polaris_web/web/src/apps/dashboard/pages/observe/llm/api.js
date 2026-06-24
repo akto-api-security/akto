@@ -23,7 +23,7 @@ export default {
 
     // Cursor-paginated sessions (composite agg) — used by the sessions table.
     // Returns { sessions, nextAfterKey, total }.
-    fetchSessionsPaged({ startTime, endTime, limit, afterKey, filters }) {
+    fetchSessionsPaged({ startTime, endTime, limit, afterKey, filters, searchString }) {
         return request({
             url: "/api/fetchLLMSessions",
             method: "post",
@@ -34,6 +34,7 @@ export default {
                 sessionsAfterKey: afterKey || "",
                 userNames:  filters?.userName  || [],
                 serviceIds: filters?.serviceId || [],
+                searchString: searchString.length >= 3 ? searchString: ""
             },
         }).then(r => ({
             sessions:     (r?.sessions ?? []).map(enrichRow),
@@ -96,6 +97,25 @@ export default {
             totalOutputTokens: r?.aggOutputTokens     || 0,
             topUsers:          r?.aggTopUsers         || [],
             userBreakdown:     r?.aggUserBreakdown    || [],
+        }));
+    },
+
+    // Aggregated stats for the Argus top-cards — total span count (matches table footer),
+    // token sums, top apps, top traces, and pre-bucketed sparkline arrays.
+    fetchArgusStats(startTime, endTime) {
+        return request({
+            url: "/api/fetchArgusStats",
+            method: "post",
+            data: { startTime, endTime },
+        }).then(r => ({
+            totalSpans:       r?.aggTotalSpans       || 0,
+            totalInputTokens: r?.aggInputTokens      || 0,
+            totalOutputTokens:r?.aggOutputTokens     || 0,
+            topApps:          r?.aggTopApps          || [],
+            appBreakdown:     r?.aggAppBreakdown     || [],
+            topTraces:        (r?.aggTopTraces       || []).map(enrichRow),
+            traceSpark:       r?.aggTraceSpark?.length ? r.aggTraceSpark : [0],
+            tokenSpark:       r?.aggTokenSpark?.length ? r.aggTokenSpark : [0],
         }));
     },
 

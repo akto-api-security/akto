@@ -9,6 +9,7 @@ import {
     VerticalStack,
 } from "@shopify/polaris";
 import SmoothAreaChart from "@/apps/dashboard/pages/dashboard/new_components/SmoothChart";
+import observeFunc from "../transform"
 
 function SegmentBar({ segments }) {
     return (
@@ -65,9 +66,9 @@ export default function AgenticStatsCard({
                 <Text variant="headingSm" fontWeight="semibold">{title}</Text>
                 <HorizontalStack align="space-between" blockAlign="center" gap="3">
                     <HorizontalStack gap="2" blockAlign="baseline">
-                        <Text variant="heading2xl" as="p" color={totalColor}>{total}</Text>
-                        {delta > 0 && <Text variant="bodySm" color="subdued">+{delta}</Text>}
-                        {delta < 0 && <Text variant="bodySm" color="subdued">{delta}</Text>}
+                        <Text variant="heading2xl" as="p" color={totalColor}>{observeFunc.formatNumberWithCommas(total)}</Text>
+                        {delta > 0 && <Text variant="bodySm" color="subdued">+{observeFunc.formatNumberWithCommas(delta)}</Text>}
+                        {delta < 0 && <Text variant="bodySm" color="subdued">{observeFunc.formatNumberWithCommas(delta)}</Text>}
                     </HorizontalStack>
                     {sparklineCounts && (
                         <SmoothAreaChart

@@ -1,7 +1,7 @@
 import React from "react";
 import { HorizontalStack, Link, Text } from "@shopify/polaris";
 import func from "@/util/func";
-import { formatCost, formatDurationMs, latencyColor, truncate } from "./constants";
+import { formatDurationMs, latencyColor, truncate } from "./constants";
 import { OsIcon } from "../agentic/DeviceEndpoints";
 import AssetIcon from "../agentic/AssetIcon";
 
@@ -117,13 +117,6 @@ export function DurationCell({ value }) {
     return <Text variant="bodySm" color={latencyColor(value)}>{formatDurationMs(value)}</Text>;
 }
 
-// Derived cost from token counts.
-export function CostCell({ data }) {
-    if (!data) return null;
-    const input = Number(data._inputTokens ?? data.inputTokens ?? 0);
-    const output = Number(data._outputTokens ?? data.outputTokens ?? 0);
-    return <Text variant="bodySm">{formatCost(input, output)}</Text>;
-}
 
 // Plain numeric count (traces / spans).
 export function CountCell({ value }) {
