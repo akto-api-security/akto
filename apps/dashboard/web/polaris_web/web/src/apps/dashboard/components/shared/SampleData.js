@@ -8,6 +8,18 @@ import yamlEditorSetup from "../../pages/test_editor/components/editor_config/ed
 import keywords from "../../pages/test_editor/components/editor_config/keywords"
 import authTypesApi from "@/apps/dashboard/pages/settings/auth_types/api";
 import { locateSegment } from "./vulnerabilityEvidence";
+import { COOKIE_REDACT_PLACEHOLDER } from './customDiffEditor';
+
+function highlightRedactedCookies(ref) {
+  if (!func.isCookieRedactAccount()) return
+  const matches = ref.getModel().findMatches(COOKIE_REDACT_PLACEHOLDER, false, false, true, null, true)
+  matches.forEach((match) => {
+    ref.createDecorationsCollection([{
+      range: match.range,
+      options: { inlineClassName: "highlightOther" }
+    }])
+  })
+}
 
 function highlightPaths(highlightPathMap, ref){
   highlightPathMap && Object.keys(highlightPathMap).forEach((key) => {
@@ -395,6 +407,7 @@ function SampleData(props) {
         let message = data.original ? data.original : data?.message 
         instance.setValue(message)
         highlightPaths(data?.highlightPaths, instance);
+        highlightRedactedCookies(instance);
         if(data.headersMap){
           highlightHeaders(data, instance,getLineNumbers)
         }
