@@ -94,6 +94,19 @@ public class RedactSampleData {
         return finalUrl;
     }
 
+   private static void handleCookies(List<String> cookieList, Map<String, List<String>> responseHeaders) {
+        Map<String, String> cookieMap = AuthPolicy.parseCookie(cookieList);
+        StringJoiner newCookie = new StringJoiner(";");
+        for (Map.Entry<String, String> entry : cookieMap.entrySet()) {
+            String cookieName = entry.getKey();
+            String cookieValue = entry.getValue();
+            SingleTypeInfo.SubType subType = KeyTypes.findSubType(cookieValue, cookieName, null);
+            String value = SingleTypeInfo.isRedacted(subType.getName()) ? redact(cookieValue) : cookieValue;
+            newCookie.add(cookieName + "=" + value);
+        }
+        responseHeaders.put(AuthPolicy.COOKIE_NAME, Collections.singletonList(newCookie.toString()));
+    }
+
     private static void handleHeaders(Map<String, List<String>> responseHeaders, boolean redactAll) {
         if(redactAll){
             for (String header : responseHeaders.keySet()) {
@@ -117,20 +130,20 @@ public class RedactSampleData {
         for(Map.Entry<String, List<String>> entry : entries){
             String key = entry.getKey();
             List<String> values = entry.getValue();
-            SingleTypeInfo.SubType subType = KeyTypes.findSubType(values.get(0), key, null);
-            if(SingleTypeInfo.isRedacted(subType.getName())){
-                if(key.equals(HOST)){
-                    continue;
+
+            if (key.equals(AuthPolicy.COOKIE_NAME)) {
+                handleCookies(values, responseHeaders);
+            } else {
+                SingleTypeInfo.SubType subType = KeyTypes.findSubType(values.get(0), key, null);
+                if (SingleTypeInfo.isRedacted(subType.getName())) {
+                    if (key.equals(HOST)) {
+                        continue;
+                    }
+                    responseHeaders.put(key, Collections.singletonList(redact(values.get(0))));
                 }
-                if (key.equalsIgnoreCase(AuthPolicy.COOKIE_NAME)) {
-                    String cookie = redactCookie(responseHeaders, key);
-                    responseHeaders.put(key, Collections.singletonList(cookie));
-                    continue;
-                }
-                responseHeaders.put(key, Collections.singletonList(redact(values.get(0))));
             }
         }
-    }
+    } 
 
     // never use this function directly. This alters the httpResponseParams
     public static String redact(HttpResponseParams httpResponseParams, final boolean redactAll) throws Exception {
