@@ -194,7 +194,8 @@ public class ElasticSearchClient {
             source.optInt("outputTokens", 0),
             source.optString("traceId", ""),
             source.optString("spanId", ""),
-            source.optBoolean("isAtlasTraffic", false)
+            source.optBoolean("isAtlasTraffic", false),
+            source.optBoolean("topicProcessed", false)
 
         );
     }
