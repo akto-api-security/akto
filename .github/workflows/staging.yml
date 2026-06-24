@@ -7,10 +7,26 @@ on:
   pull_request_review:
     types: [ submitted ]
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'Build target (PR review always runs all)'
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - main
+          - guardrails-service
+          - agent-guard
+          - agent-guard-executor
+          - agent-guard-worker
+          - agent-guard-anonymizer
 
 jobs:
   build:
-    if: (github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') || (github.event_name == 'workflow_dispatch')
+    if: |
+      (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.target == 'all' || github.event.inputs.target == 'main'))
     runs-on: ubuntu-22.04
     outputs:
       IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
@@ -143,7 +159,9 @@ jobs:
           restore-keys: ${{ runner.os }}-m2
 
   build-guardrails-service:
-    if: (github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') || (github.event_name == 'workflow_dispatch')
+    if: |
+      (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.target == 'all' || github.event.inputs.target == 'guardrails-service'))
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
@@ -170,7 +188,9 @@ jobs:
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/guardrails-service:$IMAGE_TAG . --push
 
   build-agent-guard:
-    if: (github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') || (github.event_name == 'workflow_dispatch')
+    if: |
+      (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') ||
+      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["all","agent-guard","agent-guard-executor","agent-guard-worker","agent-guard-anonymizer"]'), github.event.inputs.target))
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
@@ -183,12 +203,36 @@ jobs:
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-      - name: Build and push agent-guard
+      - name: Prepare buildx
+        run: |
+          echo "${{ steps.docker_tag.outputs.IMAGE_TAG }}" >> $GITHUB_STEP_SUMMARY
+          docker buildx create --use
+      - name: Build and push agent-guard legacy executor (ONNX container)
+        if: github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-executor"]'), github.event.inputs.target)
         env:
           ECR_REGISTRY: aktosecurity
           IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
         run: |
-          echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
-          docker buildx create --use
-          cd apps/agent-guard/python-service/container
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-agent-guard-executor:$IMAGE_TAG . --push
+          docker buildx build --platform linux/arm64/v8,linux/amd64 \
+            -t $ECR_REGISTRY/akto-agent-guard-executor:$IMAGE_TAG \
+            apps/agent-guard/python-service/container --push
+
+      - name: Build and push agent-guard worker (portable FastAPI)
+        if: github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-worker"]'), github.event.inputs.target)
+        env:
+          ECR_REGISTRY: aktosecurity
+          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
+        run: |
+          docker buildx build --platform linux/arm64/v8,linux/amd64 \
+            -t $ECR_REGISTRY/akto-agent-guard-worker:$IMAGE_TAG \
+            apps/agent-guard/python-service/worker-py --push
+
+      - name: Build and push agent-guard anonymizer
+        if: github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-anonymizer"]'), github.event.inputs.target)
+        env:
+          ECR_REGISTRY: aktosecurity
+          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
+        run: |
+          docker buildx build --platform linux/arm64/v8,linux/amd64 \
+            -t $ECR_REGISTRY/akto-agent-guard-anonymizer:$IMAGE_TAG \
+            apps/agent-guard/python-service/anonymizer-container --push

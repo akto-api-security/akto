@@ -1,0 +1,19 @@
+# Anonymizer only — Presidio PII redaction service.
+services:
+  anonymizer:
+    image: aktosecurity/akto-agent-guard-anonymizer:${AGENT_GUARD_ANONYMIZER_TAG:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agent-guard-anonymizer
+    ports:
+      - "127.0.0.1:8093:8093"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8093
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8093/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s

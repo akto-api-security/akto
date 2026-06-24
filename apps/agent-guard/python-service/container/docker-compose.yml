@@ -1,0 +1,30 @@
+# ONNX executor only — see ../../PRODUCTION.md
+services:
+  executor:
+    image: aktosecurity/akto-agent-guard-executor:${AGENT_GUARD_EXECUTOR_TAG:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agent-guard-executor-legacy
+    ports:
+      - "127.0.0.1:8092:8092"
+    env_file:
+      - path: ../../.env
+        required: false
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PORT: "8092"
+      HF_HOME: /app/.cache/huggingface
+      SCANNER_LLM_PROVIDER: ${SCANNER_LLM_PROVIDER:-}
+      FORCE_LLM_MODE: ${FORCE_LLM_MODE:-}
+    volumes:
+      - model-cache:/app/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8092/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+volumes:
+  model-cache:

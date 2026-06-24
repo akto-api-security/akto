@@ -1,7 +1,7 @@
 [project]
 name = "akto-agent-guard-worker"
 version = "0.1.0"
-description = "Akto Agent Guard — single Cloudflare Python Worker (LLM cascade + local scanners)"
+description = "Akto Agent Guard — LLM cascade + local scanners (Cloudflare Worker or FastAPI)"
 requires-python = ">=3.12"
 dependencies = [
     # cascade auth + HTTP
@@ -11,6 +11,10 @@ dependencies = [
     # local scanners
     "detect-secrets",
     "tiktoken",
+    # portable HTTP server
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
 ]
 
 [dependency-groups]

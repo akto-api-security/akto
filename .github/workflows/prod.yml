@@ -400,7 +400,7 @@ jobs:
           mask-password: "true"
           registry-type: public
 
-      - name: Build and push to DockerHub and ECR
+      - name: Build and push legacy executor image (ONNX container)
         uses: docker/build-push-action@v4
         with:
           context: ./apps/agent-guard/python-service/container
@@ -411,8 +411,36 @@ jobs:
             aktosecurity/akto-agent-guard-executor:${{ github.event.inputs.release_version_agent_guard }}
             ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-executor:local
             ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-executor:${{ github.event.inputs.release_version_agent_guard }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=agent-guard-executor
+          cache-to: type=gha,mode=max,scope=agent-guard-executor
+
+      - name: Build and push worker image (portable FastAPI)
+        uses: docker/build-push-action@v4
+        with:
+          context: ./apps/agent-guard/python-service/worker-py
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            aktosecurity/akto-agent-guard-worker:local
+            aktosecurity/akto-agent-guard-worker:${{ github.event.inputs.release_version_agent_guard }}
+            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-worker:local
+            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-worker:${{ github.event.inputs.release_version_agent_guard }}
+          cache-from: type=gha,scope=agent-guard-worker
+          cache-to: type=gha,mode=max,scope=agent-guard-worker
+
+      - name: Build and push anonymizer image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./apps/agent-guard/python-service/anonymizer-container
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            aktosecurity/akto-agent-guard-anonymizer:local
+            aktosecurity/akto-agent-guard-anonymizer:${{ github.event.inputs.release_version_agent_guard }}
+            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-anonymizer:local
+            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-anonymizer:${{ github.event.inputs.release_version_agent_guard }}
+          cache-from: type=gha,scope=agent-guard-anonymizer
+          cache-to: type=gha,mode=max,scope=agent-guard-anonymizer
 
       - name: Push git tag
         id: tag_version
@@ -434,7 +462,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "🚀 Agent Guard v${{ github.event.inputs.release_version_agent_guard }} released and pushed to DockerHub & ECR!"
+              "text": "🚀 Agent Guard v${{ github.event.inputs.release_version_agent_guard }} released (executor + worker + anonymizer) and pushed to DockerHub & ECR!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
