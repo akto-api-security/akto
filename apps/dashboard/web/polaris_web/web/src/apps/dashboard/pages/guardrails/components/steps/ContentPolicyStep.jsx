@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     VerticalStack,
     Text,
@@ -17,7 +17,7 @@ import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
 import func from "@/util/func";
 import guardrailApi from "../../api";
-import LlmComplianceCheckbox from "../LlmComplianceCheckbox";
+import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
 
 export const ContentPolicyConfig = {
     number: 2,
@@ -63,7 +63,6 @@ const ContentPolicyStep = ({
     basePromptConfidenceScore,
     setBasePromptConfidenceScore
 }) => {
-    // Denied topics state
     const [editingIndex, setEditingIndex] = useState(null);
     const [editFormData, setEditFormData] = useState({
         topic: "",
@@ -71,28 +70,21 @@ const ContentPolicyStep = ({
         samplePhrases: []
     });
     const [newPhraseInput, setNewPhraseInput] = useState("");
-
-    // Per-topic compliance suggestions: { [index]: { loading, suggested, accepted } }
     const [topicComplianceSuggestions, setTopicComplianceSuggestions] = useState({});
-    // Per-topic LLM compliance toggle: { [index]: boolean }
-    const [enableLlmCompliance, setEnableLlmCompliance] = useState({});
+    const complianceTimerRef = useRef(null);
+    const complianceRequestIdRef = useRef({});
+    const editStartRef = useRef({ topic: '', description: '' });
 
-    // Initialize compliance suggestions from existing deniedTopics (for edit mode)
+    // Seed compliance suggestions from existing deniedTopics on mount (edit mode)
     useEffect(() => {
         const suggestions = {};
         deniedTopics.forEach((topic, index) => {
-            if (topic.complianceFrameworks && topic.complianceFrameworks.length > 0) {
-                const accepted = topic.complianceFrameworks.reduce((acc, fw) => {
-                    acc[fw] = true;
+            if (topic.compliance && Object.keys(topic.compliance).length > 0) {
+                const accepted = Object.keys(topic.compliance).reduce((acc, framework) => {
+                    acc[framework] = true;
                     return acc;
                 }, {});
-                suggestions[index] = {
-                    suggested: topic.complianceFrameworks.reduce((acc, fw) => {
-                        acc[fw] = [];
-                        return acc;
-                    }, {}),
-                    accepted
-                };
+                suggestions[index] = { suggested: topic.compliance, accepted };
             }
         });
         if (Object.keys(suggestions).length > 0) {
@@ -100,32 +92,39 @@ const ContentPolicyStep = ({
         }
     }, []);
 
-    // Denied topics functions
+    useEffect(() => {
+        if (editingIndex === null) return;
+        const { topic, description } = editFormData;
+        if (!topic.trim() || !description.trim()) return;
+        if (topic.trim() === editStartRef.current.topic.trim() && description.trim() === editStartRef.current.description.trim()) return;
+
+        clearTimeout(complianceTimerRef.current);
+        complianceTimerRef.current = setTimeout(() => {
+            fetchTopicCompliance(
+                { topic: topic.trim(), description: description.trim(), samplePhrases: editFormData.samplePhrases },
+                editingIndex
+            );
+        }, 1000);
+
+        return () => clearTimeout(complianceTimerRef.current);
+    }, [editFormData.description, editFormData.topic, editingIndex]);
+
     const startAdding = () => {
+        editStartRef.current = { topic: '', description: '' };
         setEditingIndex(deniedTopics.length);
         setEditFormData({ topic: "", description: "", samplePhrases: [] });
         setNewPhraseInput("");
-        // Initialize LLM compliance toggle for new topic
-        setEnableLlmCompliance(prev => ({
-            ...prev,
-            [deniedTopics.length]: true
-        }));
     };
 
     const startEditing = (index) => {
+        editStartRef.current = { topic: deniedTopics[index]?.topic || '', description: deniedTopics[index]?.description || '' };
         setEditingIndex(index);
         setEditFormData({ ...deniedTopics[index] });
         setNewPhraseInput("");
-        // Clear stale suggestion while editing
-        setTopicComplianceSuggestions(prev => ({ ...prev, [index]: null }));
-        // Initialize LLM compliance toggle for this topic
-        setEnableLlmCompliance(prev => ({
-            ...prev,
-            [index]: true
-        }));
     };
 
     const cancelEditing = () => {
+        clearTimeout(complianceTimerRef.current);
         setEditingIndex(null);
         setEditFormData({ topic: "", description: "", samplePhrases: [] });
         setNewPhraseInput("");
@@ -158,13 +157,17 @@ const ContentPolicyStep = ({
         const invalidPhrase = editFormData.samplePhrases.find(phrase => validateSamplePhrase(phrase));
         if (invalidPhrase) return;
 
+        const savedIndex = editingIndex;
+        const suggestion = topicComplianceSuggestions[savedIndex];
+        const compliance = suggestion ? buildComplianceMap(suggestion.suggested || {}, suggestion.accepted || {}) : null;
+
         const topicData = {
             topic: editFormData.topic.trim(),
             description: editFormData.description.trim(),
-            samplePhrases: editFormData.samplePhrases
+            samplePhrases: editFormData.samplePhrases,
+            ...(compliance && Object.keys(compliance).length > 0 ? { compliance } : {})
         };
 
-        const savedIndex = editingIndex;
         const updatedTopics = [...deniedTopics];
         if (editingIndex === deniedTopics.length) {
             updatedTopics.push(topicData);
@@ -173,8 +176,9 @@ const ContentPolicyStep = ({
         }
         setDeniedTopics(updatedTopics);
         cancelEditing();
-        // Only fetch compliance if checkbox is enabled
-        if (enableLlmCompliance[savedIndex]) {
+
+        // Final fetch if compliance not yet available (user saved before debounce fired)
+        if (!suggestion?.loading && (!suggestion?.suggested || Object.keys(suggestion.suggested).length === 0)) {
             fetchTopicCompliance(topicData, savedIndex);
         }
     };
@@ -190,6 +194,12 @@ const ContentPolicyStep = ({
             });
             return updated;
         });
+        const updatedRequestIds = {};
+        Object.keys(complianceRequestIdRef.current).forEach(k => {
+            const ki = parseInt(k);
+            if (ki !== index) updatedRequestIds[ki > index ? ki - 1 : ki] = complianceRequestIdRef.current[k];
+        });
+        complianceRequestIdRef.current = updatedRequestIds;
     };
 
     const addSamplePhrase = () => {
@@ -218,39 +228,43 @@ const ContentPolicyStep = ({
     };
 
     const fetchTopicCompliance = async (topicData, index) => {
+        const reqId = (complianceRequestIdRef.current[index] || 0) + 1;
+        complianceRequestIdRef.current = { ...complianceRequestIdRef.current, [index]: reqId };
+        setTopicComplianceSuggestions(prev => ({ ...prev, [index]: { ...prev[index], loading: true } }));
         try {
             const resp = await guardrailApi.suggestGuardrailCompliance('denied_topic', {
                 topicName: topicData.topic,
                 topicDescription: topicData.description,
                 samplePhrases: topicData.samplePhrases
             });
+            if (reqId !== complianceRequestIdRef.current[index]) return;
             const suggested = resp?.response?.mapComplianceToListClauses || {};
-            // By default, accept all suggested frameworks
             const accepted = Object.keys(suggested).reduce((acc, framework) => {
                 acc[framework] = true;
                 return acc;
             }, {});
             setTopicComplianceSuggestions(prev => ({
                 ...prev,
-                [index]: { suggested, accepted }
+                [index]: { suggested, accepted, loading: false }
             }));
 
-            // Update deniedTopics with the accepted frameworks
             setDeniedTopics(prev => {
                 const updatedTopics = [...prev];
+                const compliance = buildComplianceMap(suggested, accepted);
                 updatedTopics[index] = {
                     ...updatedTopics[index],
-                    complianceFrameworks: Object.keys(accepted).length > 0 ? Object.keys(accepted) : undefined
+                    compliance: Object.keys(compliance).length > 0 ? compliance : undefined
                 };
                 return updatedTopics;
             });
         } catch (error) {
+            if (reqId !== complianceRequestIdRef.current[index]) return;
             console.error('Error fetching compliance suggestions:', error);
+            setTopicComplianceSuggestions(prev => ({ ...prev, [index]: { ...prev[index], loading: false } }));
         }
     };
 
     const toggleFrameworkAcceptance = (topicIndex, framework) => {
-        // Get current accepted frameworks
         const currentEntry = topicComplianceSuggestions[topicIndex] || { suggested: {}, accepted: {} };
         const isAccepted = !!currentEntry.accepted[framework];
         const newAccepted = { ...currentEntry.accepted };
@@ -261,18 +275,17 @@ const ContentPolicyStep = ({
             newAccepted[framework] = true;
         }
 
-        // Update suggestions state
         setTopicComplianceSuggestions(prev => ({
             ...prev,
             [topicIndex]: { ...currentEntry, accepted: newAccepted }
         }));
 
-        // Update deniedTopics with new compliance frameworks
         setDeniedTopics(prev => {
             const updatedTopics = [...prev];
+            const compliance = buildComplianceMap(currentEntry.suggested, newAccepted);
             updatedTopics[topicIndex] = {
                 ...updatedTopics[topicIndex],
-                complianceFrameworks: Object.keys(newAccepted).length > 0 ? Object.keys(newAccepted) : undefined
+                compliance: Object.keys(compliance).length > 0 ? compliance : undefined
             };
             return updatedTopics;
         });
@@ -280,8 +293,7 @@ const ContentPolicyStep = ({
 
     const renderViewRow = (topic, index) => {
         const suggestion = topicComplianceSuggestions[index];
-        const suggestedFrameworks = suggestion?.suggested ? Object.keys(suggestion.suggested) : [];
-        const acceptedFrameworks = suggestion?.accepted ? Object.keys(suggestion.accepted) : [];
+        const acceptedCompliance = buildComplianceMap(suggestion?.suggested || {}, suggestion?.accepted || {});
 
         return (
             <Box key={index} padding="4" borderColor="border" borderWidth="1" borderRadius="2">
@@ -304,23 +316,14 @@ const ContentPolicyStep = ({
                         </HorizontalStack>
                     </HorizontalStack>
 
-                    {suggestedFrameworks.length > 0 && (
-                        <Box>
-                            <VerticalStack gap="2">
-                                <Text variant="bodySm" fontWeight="medium">Compliance mappings:</Text>
-                                <HorizontalStack gap="2" wrap>
-                                    {acceptedFrameworks.map(framework => (
-                                        <Tag
-                                            key={framework}
-                                            onRemove={() => toggleFrameworkAcceptance(index, framework)}
-                                        >
-                                            {framework}
-                                        </Tag>
-                                    ))}
-                                </HorizontalStack>
-                            </VerticalStack>
-                        </Box>
-                    )}
+                    <ComplianceMappingTags
+                        loading={suggestion?.loading}
+                        complianceMap={acceptedCompliance}
+                        onRemove={(framework) => toggleFrameworkAcceptance(index, framework)}
+                        onAdd={Object.keys(suggestion?.suggested || {}).length > 0
+                            ? (framework) => toggleFrameworkAcceptance(index, framework)
+                            : undefined}
+                    />
                 </VerticalStack>
             </Box>
         );
@@ -378,22 +381,17 @@ const ContentPolicyStep = ({
                         )}
                     </VerticalStack>
                 </Box>
-                                <Box>
-                                    <LlmComplianceCheckbox
-                                        noun="topic"
-                                        checked={enableLlmCompliance[editingIndex] ?? true}
-                                        onChange={(checked) => {
-                                            setEnableLlmCompliance(prev => ({
-                                                ...prev,
-                                                [editingIndex]: checked
-                                            }));
-                                            if (checked && editFormData.topic.trim() && editFormData.description.trim()) {
-                                                fetchTopicCompliance(editFormData.topic, editFormData.description);
-                                            }
-                                        }}
-                                        helpText="AI will suggest which compliance frameworks this topic relates to"
-                                    />
-                                </Box>
+                <ComplianceMappingTags
+                    loading={topicComplianceSuggestions[editingIndex]?.loading}
+                    complianceMap={buildComplianceMap(
+                        topicComplianceSuggestions[editingIndex]?.suggested || {},
+                        topicComplianceSuggestions[editingIndex]?.accepted || {}
+                    )}
+                    onRemove={(framework) => toggleFrameworkAcceptance(editingIndex, framework)}
+                    onAdd={Object.keys(topicComplianceSuggestions[editingIndex]?.suggested || {}).length > 0
+                        ? (framework) => toggleFrameworkAcceptance(editingIndex, framework)
+                        : undefined}
+                />
                 <HorizontalStack align="end" gap="2">
                     <Button onClick={cancelEditing}>Cancel</Button>
                     <Button

@@ -10,13 +10,12 @@ import { Badge, IndexFiltersMode, Avatar, Box, HorizontalStack, Text } from "@sh
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
-import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone } from "../utils/formatUtils";
+import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "../../observe/api_collections/endpointShieldHelper";
 import IpReputationScore from "./IpReputationScore";
-import { getGuardrailCapabilityForRule } from "../constants/guardrailRuleDefinitions";
 import guardrailApi from "../../guardrails/api";
 
 const resourceName = {
@@ -168,31 +167,16 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     ]).then(([complianceResp, policiesResp]) => {
       const capabilityMap = {};
 
-      // Static compliance from guardrail_compliance_infos
       (complianceResp?.guardrailComplianceInfos || []).forEach((entry) => {
         const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
         if (capability) capabilityMap[capability] = entry.mapComplianceToListClauses;
       });
 
-      // User-defined compliance from saved guardrail policies
-      (policiesResp?.guardrailPolicies || []).forEach((policy) => {
-        (policy.deniedTopics || []).forEach((topic) => {
-          if (topic.compliance && Object.keys(topic.compliance).length > 0) {
-            if (!capabilityMap["deniedTopics"]) capabilityMap["deniedTopics"] = {};
-            Object.entries(topic.compliance).forEach(([fw, clauses]) => {
-              capabilityMap["deniedTopics"][fw] = [...new Set([...(capabilityMap["deniedTopics"][fw] || []), ...clauses])];
-            });
-          }
-        });
-        if (policy.llmRule?.compliance && Object.keys(policy.llmRule.compliance).length > 0) {
-          if (!capabilityMap["llmRule"]) capabilityMap["llmRule"] = {};
-          Object.entries(policy.llmRule.compliance).forEach(([fw, clauses]) => {
-            capabilityMap["llmRule"][fw] = [...new Set([...(capabilityMap["llmRule"][fw] || []), ...clauses])];
-          });
-        }
-      });
+      mergePolicyComplianceMap(capabilityMap, policiesResp?.guardrailPolicies);
 
       setGuardrailComplianceMap(capabilityMap);
+    }).catch((error) => {
+      console.error('Error loading guardrail compliance:', error);
     });
   }, [label]);
 
@@ -584,18 +568,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         ? (x?.severity || "HIGH")
         : (x?.severity || threatFiltersMap[x?.filterId]?.severity || "HIGH")
 
-      const filterTemplate = threatFiltersMap[x?.filterId];
-      let complianceList;
-      let complianceMapData = {};
-      if (needsGuardrailCompliance) {
-        const ruleViolated = extractRuleViolated(x?.metadata);
-        const capability = getGuardrailCapabilityForRule(ruleViolated);
-        complianceMapData = guardrailComplianceMap[capability] || {};
-        complianceList = Object.keys(complianceMapData);
-      } else {
-        complianceMapData = filterTemplate?.compliance?.mapComplianceToListClauses || {};
-        complianceList = Object.keys(complianceMapData);
-      }
+      const complianceMapData = resolveComplianceClauseMap(x, needsGuardrailCompliance, threatFiltersMap, guardrailComplianceMap);
+      const complianceList = Object.keys(complianceMapData);
 
       // Determine if this is session-based by checking if sessionId is present and not empty
       const isSessionBased = x?.sessionId && x.sessionId !== '';

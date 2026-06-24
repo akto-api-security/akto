@@ -555,7 +555,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableLlmPrompt(policy.llmRule?.enabled && !!policy.llmRule?.userPrompt);
         setLlmPrompt(policy.llmRule?.userPrompt || "");
         setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
-        setLlmCompliance(policy.llmRule?.complianceFrameworks || []);
+        setLlmCompliance(policy.llmRule?.compliance || {});
 
         // Base Prompt Based Validation (AI Agents)
         setEnableBasePromptRule(policy.basePromptRule?.enabled || false);
@@ -644,31 +644,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const handleSave = async () => {
         setLoading(true);
         try {
-            // Fetch compliance frameworks for any denied topics that don't have them yet
-            const deniedTopicsWithCompliance = await Promise.all(
-                deniedTopics.map(async (topic) => {
-                    if (topic.complianceFrameworks && topic.complianceFrameworks.length > 0) {
-                        return topic;
-                    }
-                    try {
-                        const resp = await guardrailApi.suggestGuardrailCompliance('denied_topic', {
-                            topicName: topic.topic,
-                            topicDescription: topic.description,
-                            samplePhrases: topic.samplePhrases || []
-                        });
-                        const suggested = resp?.response?.mapComplianceToListClauses || {};
-                        const frameworks = Object.keys(suggested);
-                        return {
-                            ...topic,
-                            complianceFrameworks: frameworks.length > 0 ? frameworks : undefined
-                        };
-                    } catch (error) {
-                        console.error('Error fetching compliance for topic:', topic.topic, error);
-                        return topic;
-                    }
-                })
-            );
-
             // Transform selectedMcpServers and selectedAgentServers to include both ID and name
             const transformedMcpServers = selectedMcpServers
                 .filter(serverId => serverId)
@@ -708,11 +683,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
             const b = normalizeBehaviourValue(policyBehaviour);
 
-            // Transform deniedTopics to include only compliance frameworks (no empty ones)
-            const transformedDeniedTopics = deniedTopicsWithCompliance.map(topic => ({
+            const transformedDeniedTopics = deniedTopics.map(topic => ({
                 ...topic,
-                complianceFrameworks: topic.complianceFrameworks && topic.complianceFrameworks.length > 0
-                    ? topic.complianceFrameworks
+                compliance: topic.compliance && Object.keys(topic.compliance).length > 0
+                    ? topic.compliance
                     : undefined
             }));
 
@@ -744,7 +718,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     enabled: enableLlmPrompt && !!llmPrompt.trim(),
                     userPrompt: llmPrompt.trim(),
                     confidenceScore: llmConfidenceScore,
-                    complianceFrameworks: Array.isArray(llmCompliance) && llmCompliance.length > 0 ? llmCompliance : undefined
+                    compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 },
                 basePromptRule: {
                     enabled: enableBasePromptRule,
@@ -1021,7 +995,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     enabled: true,
                     userPrompt: llmPrompt.trim(),
                     confidenceScore: llmConfidenceScore,
-                    complianceFrameworks: Array.isArray(llmCompliance) && llmCompliance.length > 0 ? llmCompliance : undefined
+                    compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 }
             } : {}),
             ...(enableBasePromptRule ? {

@@ -1,7 +1,7 @@
-import { useState, useRef } from "react";
-import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox, HorizontalStack, Tag } from "@shopify/polaris";
+import { useState, useRef, useEffect } from "react";
+import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
-import LlmComplianceCheckbox from "../LlmComplianceCheckbox";
+import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
 import guardrailApi from "../../api";
 
 // URL validation function
@@ -36,6 +36,8 @@ export const CustomGuardrailsConfig = {
     }
 };
 
+const PROMPT_MIN_LENGTH = 10;
+
 const CustomGuardrailsStep = ({
     // LLM prompt based rule
     enableLlmPrompt,
@@ -57,36 +59,61 @@ const CustomGuardrailsStep = ({
 }) => {
     const [urlError, setUrlError] = useState("");
     const [llmRuleCompliance, setLlmRuleCompliance] = useState({ loading: false, suggested: {}, accepted: {} });
-    const [enableLlmComplianceMapping, setEnableLlmComplianceMapping] = useState(true);
-    const debounceRef = useRef(null);
+    const requestIdRef = useRef(0);
+    const debounceTimerRef = useRef(null);
+    const isInitialMount = useRef(true);
+
+    useEffect(() => {
+        if (llmCompliance && Object.keys(llmCompliance).length > 0) {
+            const accepted = Object.keys(llmCompliance).reduce((acc, framework) => { acc[framework] = true; return acc; }, {});
+            setLlmRuleCompliance({ loading: false, suggested: llmCompliance, accepted });
+        }
+    }, []);
+
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+        const rule = (llmRule || "").trim();
+        clearTimeout(debounceTimerRef.current);
+
+        if (rule.length < PROMPT_MIN_LENGTH) {
+            clearCompliance();
+            return;
+        }
+
+        debounceTimerRef.current = setTimeout(() => {
+            fetchLlmCompliance(rule);
+        }, 1000);
+
+        return () => clearTimeout(debounceTimerRef.current);
+    }, [llmRule]);
 
     const fetchLlmCompliance = async (rule) => {
+        const reqId = ++requestIdRef.current;
+        setLlmRuleCompliance(prev => ({ ...prev, loading: true }));
         try {
             const resp = await guardrailApi.suggestGuardrailCompliance('llm_rule', { llmRule: rule });
+            if (reqId !== requestIdRef.current) return;
             const suggested = resp?.response?.mapComplianceToListClauses || {};
-            // By default, accept all suggested frameworks
             const accepted = Object.keys(suggested).reduce((acc, framework) => {
                 acc[framework] = true;
                 return acc;
             }, {});
-            setLlmRuleCompliance({ suggested, accepted });
-            // Update parent llmCompliance with framework names only
-            const acceptedFrameworks = Object.keys(accepted);
-            setLlmCompliance(acceptedFrameworks.length > 0 ? acceptedFrameworks : []);
+            setLlmRuleCompliance({ loading: false, suggested, accepted });
+            setLlmCompliance(buildComplianceMap(suggested, accepted));
         } catch (error) {
+            if (reqId !== requestIdRef.current) return;
             console.error('Error fetching compliance suggestions:', error);
-            setLlmRuleCompliance({ suggested: {}, accepted: {} });
+            setLlmRuleCompliance({ loading: false, suggested: {}, accepted: {} });
         }
     };
 
-    const handleLlmRuleChange = (value) => {
-        setLlmRule(value);
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        if (!value || value.trim().length < 10 || !enableLlmComplianceMapping) {
-            setLlmRuleCompliance({ loading: false, suggested: {}, accepted: {} });
-            return;
-        }
-        debounceRef.current = setTimeout(() => fetchLlmCompliance(value.trim()), 1500);
+    const clearCompliance = () => {
+        requestIdRef.current++;
+        setLlmRuleCompliance({ loading: false, suggested: {}, accepted: {} });
+        setLlmCompliance({});
     };
 
     const toggleLlmFramework = (framework) => {
@@ -98,13 +125,10 @@ const CustomGuardrailsStep = ({
         } else {
             newAccepted[framework] = true;
         }
-        // Update compliance state
         setLlmRuleCompliance({ ...currentEntry, accepted: newAccepted });
-        // Update parent llmCompliance with framework names only
-        setLlmCompliance(Object.keys(newAccepted).length > 0 ? Object.keys(newAccepted) : []);
+        setLlmCompliance(buildComplianceMap(currentEntry.suggested, newAccepted));
     };
 
-    // Handle URL input with validation
     const handleUrlChange = (value) => {
         setUrl(value);
         if (value && value.trim() && !validateUrl(value.trim())) {
@@ -136,7 +160,7 @@ const CustomGuardrailsStep = ({
                                 <TextField
                                     label="Prompt"
                                     value={llmRule}
-                                    onChange={handleLlmRuleChange}
+                                    onChange={setLlmRule}
                                     multiline={4}
                                     placeholder="Enter your LLM evaluation prompt here..."
                                     helpText="This prompt will be used to evaluate whether content should be blocked. Be specific about what you want to detect."
@@ -153,30 +177,12 @@ const CustomGuardrailsStep = ({
                                     helpText="Content will be blocked if the LLM's confidence score exceeds this threshold"
                                 />
 
-                                <Box>
-                                    <LlmComplianceCheckbox
-                                        checked={enableLlmComplianceMapping}
-                                        onChange={setEnableLlmComplianceMapping}
-                                    />
-                                </Box>
-
-                                {Object.keys(llmRuleCompliance.suggested).length > 0 && (
-                                    <Box>
-                                        <VerticalStack gap="2">
-                                            <Text variant="bodySm" fontWeight="medium">Compliance mappings:</Text>
-                                            <HorizontalStack gap="2" wrap>
-                                                {Object.keys(llmRuleCompliance.accepted).map(framework => (
-                                                    <Tag
-                                                        key={framework}
-                                                        onRemove={() => toggleLlmFramework(framework)}
-                                                    >
-                                                        {framework}
-                                                    </Tag>
-                                                ))}
-                                            </HorizontalStack>
-                                        </VerticalStack>
-                                    </Box>
-                                )}
+                                <ComplianceMappingTags
+                                    loading={llmRuleCompliance.loading}
+                                    complianceMap={buildComplianceMap(llmRuleCompliance.suggested, llmRuleCompliance.accepted)}
+                                    onRemove={toggleLlmFramework}
+                                    onAdd={Object.keys(llmRuleCompliance.suggested).length > 0 ? toggleLlmFramework : undefined}
+                                />
                             </FormLayout>
                         </Box>
                     )}
