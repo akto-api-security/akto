@@ -749,6 +749,48 @@ public class IssuesAction extends UserAction {
 
     private boolean fetchOnlyActive;
     private String mode;
+    private List<String> subCategoryNames;
+
+    // Used by report generation (incl. Puppeteer PDF) to fetch metadata only for the tests
+    // that actually have a finding, instead of paginating all ~4000 subcategories.
+    public String fetchSubCategoriesByTestSubTypes() {
+        subCategories = new ArrayList<>();
+        categories = TestTemplateUtils.getAllTestCategoriesWithinContext(Context.contextSource.get());
+
+        if (subCategoryNames == null || subCategoryNames.isEmpty()) {
+            return SUCCESS.toUpperCase();
+        }
+
+        // Mirror the issues path: external/source-config tests use http(s) ids, not template _ids.
+        List<String> templateIds = new ArrayList<>();
+        for (String name : subCategoryNames) {
+            if (name != null && !name.startsWith("http")) {
+                templateIds.add(name);
+            }
+        }
+
+        if (templateIds.isEmpty()) {
+            return SUCCESS.toUpperCase();
+        }
+
+        Bson filter = Filters.in("_id", templateIds);
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(
+                false, fetchOnlyActive, 0, templateIds.size(), filter);
+
+        for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
+            try {
+                BasicDBObject infoObj = createSubcategoriesInfoObj(entry.getValue());
+                if (infoObj != null) {
+                    subCategories.add(infoObj);
+                }
+            } catch (Exception e) {
+                String err = "Error while fetching subcategory for " + entry.getKey();
+                logger.errorAndAddToDb(e, err, LogDb.DASHBOARD);
+            }
+        }
+
+        return SUCCESS.toUpperCase();
+    }
 
     public String fetchVulnerableRequests() {
         vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty(), skip, limit, Sorts.ascending("_id"));
@@ -1643,6 +1685,10 @@ public class IssuesAction extends UserAction {
 
     public ArrayList<BasicDBObject> getSubCategories() {
         return this.subCategories;
+    }
+
+    public void setSubCategoryNames(List<String> subCategoryNames) {
+        this.subCategoryNames = subCategoryNames;
     }
 
     public List<TestingRunIssues> getSimilarlyAffectedIssues() {
