@@ -120,10 +120,7 @@ public class WindowBasedThresholdNotifier {
     }
 
     if (distinctMembers.size() >= rule.getCondition().getDistinctCount()) {
-      // Reset all bin sets in window
-      for (int i = windowStart; i <= binId; i++) {
-        this.cache.resetSet(setKeyPrefix + "|" + i);
-      }
+      this.cache.resetSet(currentBinKey);
       return true;
     }
 

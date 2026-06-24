@@ -62,7 +62,6 @@ import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.rules.TestPlugin;
-import com.mongodb.BasicDBObject;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 
@@ -522,13 +521,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
         default:
           return null;
       }
-      if (payload == null || payload.isEmpty()) return null;
-      BasicDBObject json = BasicDBObject.parse(payload);
-      Object val = json.get(extraction.getKey());
-      if (val != null) return val.toString();
-      // Leaf key search — walk nested objects for the first match
-      val = com.akto.util.JSONUtils.findLeafValue(json, extraction.getKey());
-      return val != null ? val.toString() : null;
+      return com.akto.util.JSONUtils.extractValueForKey(payload, extraction.getKey());
     } catch (Exception e) {
       return null;
     }

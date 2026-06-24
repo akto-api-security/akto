@@ -171,25 +171,24 @@ public class JSONUtils {
         }
     }
 
-    public static Object findLeafValue(BasicDBObject obj, String key) {
-        for (Map.Entry<String, Object> entry : obj.entrySet()) {
-            if (entry.getKey().equals(key)) return entry.getValue();
-            Object found = findLeafValueInner(entry.getValue(), key);
-            if (found != null) return found;
-        }
-        return null;
-    }
 
-    private static Object findLeafValueInner(Object obj, String key) {
-        if (obj instanceof BasicDBObject) {
-            return findLeafValue((BasicDBObject) obj, key);
-        } else if (obj instanceof BasicDBList) {
-            for (Object item : (BasicDBList) obj) {
-                Object found = findLeafValueInner(item, key);
-                if (found != null) return found;
-            }
+    public static String extractValueForKey(String payload, String key) {
+        if (payload == null || payload.isEmpty() || key == null) return null;
+        String needle = "\"" + key + "\":";
+        int idx = payload.indexOf(needle);
+        if (idx == -1) return null;
+        int valueStart = idx + needle.length();
+        while (valueStart < payload.length() && payload.charAt(valueStart) == ' ') valueStart++;
+        if (valueStart >= payload.length()) return null;
+        char ch = payload.charAt(valueStart);
+        if (ch == '"') {
+            int valueEnd = payload.indexOf('"', valueStart + 1);
+            if (valueEnd == -1) return null;
+            return payload.substring(valueStart + 1, valueEnd);
         }
-        return null;
+        int valueEnd = valueStart;
+        while (valueEnd < payload.length() && payload.charAt(valueEnd) != ',' && payload.charAt(valueEnd) != '}') valueEnd++;
+        return payload.substring(valueStart, valueEnd);
     }
 
     public static String modify(String jsonBody, Set<String> values, PayloadModifier payloadModifier) {
