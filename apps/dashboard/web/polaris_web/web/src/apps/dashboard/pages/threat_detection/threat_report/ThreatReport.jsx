@@ -262,7 +262,7 @@ const ThreatReport = () => {
                     </VerticalStack>
                     <HorizontalStack align="center" gap="4">
                         {(window.USER_NAME?.toLowerCase()?.includes("@akto.io") || window.ACCOUNT_NAME?.toLowerCase()?.includes("advanced bank")) && (
-                            <Button primary onClick={() => handleDownloadPF()} disabled={!pdfDownloadEnabled}>Download</Button>
+                            <Button primary onClick={() => handleDownloadPF()} loading={!pdfDownloadEnabled} disabled={!pdfDownloadEnabled}>Download</Button>
                         )}
                         <img src='/public/white_logo.svg' alt="Logo" className='top-bar-logo' />
                     </HorizontalStack>
