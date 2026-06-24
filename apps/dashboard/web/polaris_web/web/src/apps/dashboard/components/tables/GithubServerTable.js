@@ -134,6 +134,7 @@ function GithubServerTable(props) {
   }, [])
 
   useEffect(()=> {
+    if (props?.skipUrlFilters) return;
     let queryFilters
     if (performance.getEntriesByType('navigation')[0].type === 'reload') {
       queryFilters = []
@@ -162,6 +163,7 @@ function GithubServerTable(props) {
   }, [props.sortOptions])
 
   useEffect(() => {
+    if (props?.skipUrlFilters) return;
     const tempFilters = appliedFilters.filter((filter) => !filter?.key?.includes("dateRange"))
     updateQueryParams("filters",tableFunc.getPrettifiedFilter(tempFilters))
   },[appliedFilters])
