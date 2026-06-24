@@ -2435,6 +2435,11 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
      return window.ACTIVE_ACCOUNT === 1669322524
   },
 
+  isCookieRedactAccount(){
+    const cookieRedactAccounts = [1758787662, 1662680463]
+    return cookieRedactAccounts.includes(window.ACTIVE_ACCOUNT)
+  },
+
   shouldShowIpReputation() {
     return this.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1745303931 || window.ACTIVE_ACCOUNT === 1758787662
   },

@@ -1,5 +1,16 @@
 import func from "@/util/func";
 
+const COOKIE_REDACT_PATTERNS = [/acornsweb_\w*token/i]
+export const COOKIE_REDACT_PLACEHOLDER = "AaaaAAAAAAAaaaaaaAAAAAA"
+
+function redactCookieValues(cookieString) {
+    return cookieString.replace(/([^;=\s]+)=([^;]*)/g, (match, cookieKey) => {
+        return COOKIE_REDACT_PATTERNS.some(p => p.test(cookieKey))
+            ? `${cookieKey}=${COOKIE_REDACT_PLACEHOLDER}`
+            : match
+    })
+}
+
 const transform = {
     formatJson(data){
         let allKeys = [];
@@ -332,7 +343,10 @@ const transform = {
                     if(element.includes("Header")){
                         if(data.json[element]){
                             Object.keys(data?.json[element]).forEach((key) => {
-                                const value = redactSet.has(key.toLowerCase()) ? '******' : data.json[element][key]
+                                let value = redactSet.has(key.toLowerCase()) ? '******' : data.json[element][key]
+                                if (key.toLowerCase() === 'cookie' && func.isCookieRedactAccount()) {
+                                    value = redactCookieValues(value)
+                                }
                                 finalData = finalData + key + ': ' + value + "\n"
                             })
                         }
