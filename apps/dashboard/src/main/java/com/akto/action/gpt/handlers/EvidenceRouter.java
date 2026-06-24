@@ -12,12 +12,10 @@ import java.util.List;
 public class EvidenceRouter {
 
     public enum Detector {
-        DATATYPE_RESPONSE_SCAN, // sensitive-data exposure: scan response for the data type
-        REQUEST_DIFF,           // injection/fuzzing/authz: the values the test changed
-        RESPONSE_HEADERS,       // CORS / security misconfig: a response header
+        RESPONSE_HEADERS,       // CORS / security misconfig: a precise response header
         RESPONSE_STATUS,        // broken auth / no-auth: 2xx returned after token removed
         CROSS_ATTEMPT,          // rate-limit / multi-account: proof spans attempts
-        LLM_SEMANTIC            // error/stack-trace disclosure, business logic
+        LLM_SEMANTIC            // everything else: LLM selects evidence, FE verifies it
     }
 
     public static class Route {
@@ -42,13 +40,22 @@ public class EvidenceRouter {
     public static Route route(String category) {
         String c = category == null ? "" : category.toUpperCase();
 
+        // Sensitive-data exposure: the data type is already known from the test
+        // sub-type (see edeDataType) and may surface in EITHER the response or the
+        // request (the test's own conditions decide where). We do not re-scan/re-
+        // classify here - the LLM is told the exact data type and asked to copy the
+        // value verbatim; the frontend then verifies it is actually highlightable.
         if (c.startsWith(EDE_PREFIX) || c.contains("EXCESSIVE_DATA") || c.equals("EDE")) {
             return new Route(
-                list("RESPONSE"),
-                list(Detector.DATATYPE_RESPONSE_SCAN),
-                "Evidence is the exposed value in the RESPONSE body or headers.");
+                list("RESPONSE", "REQUEST"),
+                list(Detector.LLM_SEMANTIC),
+                "Evidence is the exposed value of the data type named by this test, shown verbatim in the RESPONSE (or the REQUEST if that is where the sensitive value appears).");
         }
-        if (c.contains("CORS") || c.contains("SECURITY_HEADER") || c.contains("MISCONFIG") || c.contains("SSRF")) {
+        // Header-based misconfig ONLY (CORS / security headers). Keep this first
+        // check precise: SSRF is NOT a response-header finding (its proof is the
+        // injected URL in the request + the fetched content in the response), so it
+        // must not be routed here - it falls through to the request/response path.
+        if (c.contains("CORS") || c.contains("SECURITY_HEADER")) {
             return new Route(
                 list("RESPONSE"),
                 list(Detector.RESPONSE_HEADERS, Detector.LLM_SEMANTIC),
@@ -60,36 +67,58 @@ public class EvidenceRouter {
                 list(Detector.CROSS_ATTEMPT, Detector.LLM_SEMANTIC),
                 "Evidence spans attempts; cite the RESPONSE status that shows the limit was not enforced.");
         }
+        // Injection / fuzzing FIRST: a broad bucket like NO_AUTH can also contain
+        // SQLi / command-injection / SSTI / CRLF tests (especially custom ones).
+        // For those the proof is the injected REQUEST payload + the RESPONSE effect,
+        // NOT a "token was removed" 2xx - so match them before the broken-auth branch.
+        if (c.contains("INJECTION") || c.contains("SQL") || c.contains("SSTI")
+                || c.contains("CRLF") || c.contains("XSS") || c.contains("XXE")
+                || c.contains("TEMPLATE") || c.contains("LDAP") || c.contains("FUZZ")
+                || c.contains("SSRF")) {
+            return new Route(
+                list("REQUEST", "RESPONSE"),
+                list(Detector.LLM_SEMANTIC),
+                "Evidence is the injected REQUEST payload (the value the test added, listed in the test definition) and the RESPONSE proof that it executed/was reflected.");
+        }
         // Broken authentication / no-auth: the test removes or breaks the auth token
-        // and the server still returns 2xx. The evidence is response-side (the status
-        // + any data returned), NOT the request headers, so do not run request-diff.
+        // and the server still returns 2xx. Evidence is primarily response-side (the
+        // status + any data returned). We still run request-diff so that if the test
+        // actually injected a value (mislabeled under this bucket) it is highlighted.
         if (c.contains("NO_AUTH") || c.contains("ANY_USER") || c.contains("REMOVE_TOKEN")
                 || c.contains("REPLACE_AUTH") || c.contains("ADD_USER_TOKEN") || c.contains("AUTH_BYPASS")
-                || c.contains("BROKEN_AUTHENTICATION") || c.contains("AUTHENTICATION")) {
+                || c.contains("BROKEN_AUTHENTICATION")) {
             return new Route(
-                list("RESPONSE"),
+                list("REQUEST", "RESPONSE"),
                 list(Detector.RESPONSE_STATUS, Detector.LLM_SEMANTIC),
-                "The auth token was removed/invalidated; evidence is the 2xx RESPONSE status and any data the response returned. Do NOT cite the request's own auth token or headers.");
+                "Evidence is usually the 2xx RESPONSE status returned after the auth token was removed/invalidated, plus any data the response returned. If the test instead injected a payload (this broad bucket can include injection tests), the injected REQUEST value listed in the test definition is the evidence. Do NOT cite the caller's own auth token or transport headers.");
         }
         if (c.contains("BOLA") || c.contains("BFLA") || c.contains("IDOR") || c.contains("AUTH")
                 || c.contains("ACCESS") || c.contains("PRIVILEGE") || c.contains("ACCOUNT")) {
             return new Route(
                 list("REQUEST", "RESPONSE"),
-                list(Detector.REQUEST_DIFF, Detector.LLM_SEMANTIC),
-                "Evidence is the changed request object id/identity AND the RESPONSE data wrongly returned. Do NOT cite the caller's auth token.");
+                list(Detector.LLM_SEMANTIC),
+                "Evidence is the changed request object id/identity in the REQUEST, and the RESPONSE returning another user's/role's resource (its body closely matches the victim's by schema/percentage) when access should have been denied. Do NOT cite the caller's auth token.");
         }
         // default: injection / fuzzing / semantic
         return new Route(
             list("REQUEST", "RESPONSE"),
-            list(Detector.REQUEST_DIFF, Detector.LLM_SEMANTIC),
+            list(Detector.LLM_SEMANTIC),
             "Evidence is the injected REQUEST value and/or the RESPONSE proof.");
     }
 
     /**
-     * True when the category has a deterministic detector strong enough that we
-     * can skip the LLM entirely when that detector produced evidence.
+     * The sensitive data type a sensitive-data-exposure test targets (e.g.
+     * SENSITIVE_DATA_EXPOSURE_EMAIL -> EMAIL), or null if this is not an EDE
+     * category. Lets the prompt name the exact data type instead of re-scanning.
      */
-    public static boolean isDeterministicStrong(String category) {
-        return route(category).detectors.contains(Detector.DATATYPE_RESPONSE_SCAN);
+    public static String edeDataType(String category) {
+        if (category == null) {
+            return null;
+        }
+        String c = category.toUpperCase();
+        if (c.startsWith(EDE_PREFIX) && c.length() > EDE_PREFIX.length()) {
+            return c.substring(EDE_PREFIX.length());
+        }
+        return null;
     }
 }
