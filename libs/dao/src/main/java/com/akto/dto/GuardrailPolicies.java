@@ -45,6 +45,7 @@ public class GuardrailPolicies {
     
     // Step 3: Denied Topics
     private List<DeniedTopic> deniedTopics;
+    private List<String> enterpriseLicenseComplianceCategories;
     
     // Step 4: PII Detection
     private List<PiiType> piiTypes;
@@ -240,11 +241,13 @@ public class GuardrailPolicies {
         private String topic;
         private String description;
         private List<String> samplePhrases;
+        private String origin;
 
-        public DeniedTopic(String topic, String description, List<String> samplePhrases) {
+        public DeniedTopic(String topic, String description, List<String> samplePhrases, String origin) {
             this.topic = topic;
             this.description = description;
             this.samplePhrases = samplePhrases;
+            this.origin = origin;
         }
     }
 

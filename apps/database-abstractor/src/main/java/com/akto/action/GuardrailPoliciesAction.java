@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import com.akto.data_actor.DbLayer;
+import com.akto.dto.EnterpriseLicenseComplianceCatalog;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -29,6 +30,7 @@ public class GuardrailPoliciesAction extends ActionSupport {
             // Empty applyToDeviceIds = no targeting → apply to all devices.
             // Non-empty = apply only to listed device labels.
             for (GuardrailPolicies p : this.guardrailPolicies) {
+                EnterpriseLicenseComplianceCatalog.applyToPolicy(p);
                 boolean hasTargeting = (p.getTargetTeams() != null && !p.getTargetTeams().isEmpty())
                         || (p.getTargetRoles() != null && !p.getTargetRoles().isEmpty());
                 if (hasTargeting) {
