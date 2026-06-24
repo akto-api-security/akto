@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
-import { formatCompact } from "./constants";
+import { formatCompact, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
 import AgenticStatsCard from "../agentic/AgenticStatsCard";
 import AgenticTopListCard from "../agentic/AgenticTopListCard";
 import "../../../components/layouts/style.css";
@@ -74,6 +74,7 @@ export default function SummaryBand({ sessions, recent }) {
         <HorizontalGrid columns={2} gap="4">
             <AgenticStatsCard
                 title="Tokens used"
+                titleTooltip={TOKEN_ESTIMATE_TOOLTIP}
                 total={formatCompact(totalTokens)}
                 sparklineCounts={hasSpark ? spark : undefined}
                 sparklineColor="#9642FC"
