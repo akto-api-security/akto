@@ -14,7 +14,7 @@ import "../../../components/layouts/style.css";
 
 import api from "./api";
 import { buildSparkline, buildWeightedSparkline, buildSparklineLabels, enrichRow } from "./utils";
-import { formatCompact, truncate } from "./constants";
+import { formatCompact, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
 import { ARGUS_TRACE_COL_DEFS } from "./columns";
 import SessionsView from "./SessionsView";
 import SessionFlyout from "./SessionFlyout";
@@ -253,6 +253,7 @@ export default function LLMObservability() {
                     <Box className="agentic-stats-card-item">
                         <AgenticStatsCard
                             title="Total tokens"
+                            titleTooltip={TOKEN_ESTIMATE_TOOLTIP}
                             total={formatCompact(argusTotalTokens)}
                             sparklineCounts={argusTokenSpark}
                             sparklineColor="#4285F4"
@@ -298,6 +299,7 @@ export default function LLMObservability() {
                     <Box className="agentic-stats-card-item">
                         <AgenticStatsCard
                             title="Total tokens"
+                            titleTooltip={TOKEN_ESTIMATE_TOOLTIP}
                             total={formatCompact(totalTokens)}
                             sparklineCounts={tokenSpark}
                             sparklineColor="#4285F4"

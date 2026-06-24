@@ -8,6 +8,7 @@ import {
     Tooltip,
     VerticalStack,
 } from "@shopify/polaris";
+import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
 import SmoothAreaChart from "@/apps/dashboard/pages/dashboard/new_components/SmoothChart";
 import observeFunc from "../transform"
 
@@ -48,6 +49,7 @@ export { violationTotal };
 
 export default function AgenticStatsCard({
     title,
+    titleTooltip,
     total,
     totalColor,
     delta,
@@ -63,7 +65,10 @@ export default function AgenticStatsCard({
     const inner = (
         <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="4" paddingBlockEnd="3">
             <VerticalStack gap="2">
-                <Text variant="headingSm" fontWeight="semibold">{title}</Text>
+                <HorizontalStack gap="1" blockAlign="center">
+                    <Text variant="headingSm" fontWeight="semibold">{title}</Text>
+                    <InfoTooltipIcon content={titleTooltip} />
+                </HorizontalStack>
                 <HorizontalStack align="space-between" blockAlign="center" gap="3">
                     <HorizontalStack gap="2" blockAlign="baseline">
                         <Text variant="heading2xl" as="p" color={totalColor}>{observeFunc.formatNumberWithCommas(total)}</Text>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Box, Divider, HorizontalGrid, Scrollable, Tabs, Text, VerticalStack } from "@shopify/polaris";
+import { Box, Divider, HorizontalGrid, HorizontalStack, Scrollable, Tabs, Text, VerticalStack } from "@shopify/polaris";
+import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
 import AgenticFlyoutShell from "../agentic/AgenticFlyoutShell";
 import FlyoutBreadcrumb from "../agentic/FlyoutBreadcrumb";
 import AssetTopologyGraph from "../agentic/AssetTopologyGraph";
@@ -12,7 +13,7 @@ import TraceDetailView from "./LLMTraceDetail";
 import api from "./api";
 import { enrichRow } from "./utils";
 import { getTraceColumnDefs } from "./columns";
-import { formatCompact, formatDurationMs, truncate } from "./constants";
+import { formatCompact, formatDurationMs, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
 
 const TAB_OVERVIEW = 0;
 const TAB_TRACES   = 1;
@@ -45,7 +46,7 @@ function OverviewContent({ session, traceCount }) {
 
     const stats = [
         { label: "Traces",       value: traceCount },
-        { label: "Total tokens", value: formatCompact(totalTokens) },
+        { label: "Total tokens", value: formatCompact(totalTokens), tooltip: TOKEN_ESTIMATE_TOOLTIP },
         { label: "Duration",     value: formatDurationMs(session.durationMs) },
     ];
 
@@ -64,7 +65,10 @@ function OverviewContent({ session, traceCount }) {
                     {stats.map(s => (
                         <VerticalStack gap="1" key={s.label}>
                             <Text variant="heading2xl" as="p">{s.value}</Text>
-                            <Text variant="bodySm" color="subdued">{s.label}</Text>
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text variant="bodySm" color="subdued">{s.label}</Text>
+                                <InfoTooltipIcon content={s.tooltip} />
+                            </HorizontalStack>
                         </VerticalStack>
                     ))}
                 </HorizontalGrid>
