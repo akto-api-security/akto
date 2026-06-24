@@ -58,7 +58,7 @@ const ApiIssuesTab = ({ apiDetail, collectionIssuesData, isThreatEnabled }) => {
                         category: item?.id?.testSubCategory,
                         numberOfEndpoints: 1,
                         creationTime: item?.creationTime,
-                        issueStatus: item?.unread.toString(),
+                        issueStatus: (item?.unread ?? false).toString(),
                         testRunName: "Test Run",
                         domains: domain ? [domain] : [],
                         urls: [{
@@ -223,6 +223,7 @@ const ApiIssuesTab = ({ apiDetail, collectionIssuesData, isThreatEnabled }) => {
                         {totalThreatIssues > 10 && <Text variant="headingSm">Showing 10 issues out of {totalThreatIssues}</Text>}
                         <GithubSimpleTable
                             key="issues-table"
+                            filterStateUrl="api-issues-flyout"
                             data={filteredIssues}
                             resourceName={{ singular: "issue", plural: "issues" }}
                             headers={issuesHeaders}

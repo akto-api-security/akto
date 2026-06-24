@@ -2,6 +2,7 @@ package com.akto.dto.threat_detection_backend;
 
 import com.akto.dto.type.URLMethods;
 
+import java.util.List;
 import java.util.UUID;
 
 public class MaliciousEventDto {
@@ -31,6 +32,7 @@ public class MaliciousEventDto {
   private String jiraTicketUrl;
   private String contextSource;
   private String sessionId;
+  private List<OwaspCategory> owaspCategories;
 
   public enum EventType {
     SINGLE,
@@ -47,6 +49,31 @@ public class MaliciousEventDto {
   public enum Label {
     THREAT,
     GUARDRAIL
+  }
+
+  public static class OwaspCategory {
+    private String id;
+    private String name;
+    private String severity;
+    private String confidence;
+
+    public OwaspCategory() {}
+
+    public OwaspCategory(String id, String name, String severity, String confidence) {
+      this.id = id;
+      this.name = name;
+      this.severity = severity;
+      this.confidence = confidence;
+    }
+
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getSeverity() { return severity; }
+    public void setSeverity(String severity) { this.severity = severity; }
+    public String getConfidence() { return confidence; }
+    public void setConfidence(String confidence) { this.confidence = confidence; }
   }
 
   public MaliciousEventDto() {}
@@ -77,6 +104,7 @@ public class MaliciousEventDto {
     this.jiraTicketUrl = builder.jiraTicketUrl;
     this.contextSource = builder.contextSource;
     this.sessionId = builder.sessionId;
+    this.owaspCategories = builder.owaspCategories;
   }
 
   public static class Builder {
@@ -104,6 +132,7 @@ public class MaliciousEventDto {
     private String jiraTicketUrl;
     private String contextSource;
     private String sessionId;
+    private List<OwaspCategory> owaspCategories;
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
       return this;
@@ -221,6 +250,11 @@ public class MaliciousEventDto {
 
     public Builder setSessionId(String sessionId) {
       this.sessionId = sessionId;
+      return this;
+    }
+
+    public Builder setOwaspCategories(List<OwaspCategory> owaspCategories) {
+      this.owaspCategories = owaspCategories;
       return this;
     }
 
@@ -431,6 +465,14 @@ public class MaliciousEventDto {
 
   public void setSessionId(String sessionId) {
     this.sessionId = sessionId;
+  }
+
+  public List<OwaspCategory> getOwaspCategories() {
+    return owaspCategories;
+  }
+
+  public void setOwaspCategories(List<OwaspCategory> owaspCategories) {
+    this.owaspCategories = owaspCategories;
   }
 
 }

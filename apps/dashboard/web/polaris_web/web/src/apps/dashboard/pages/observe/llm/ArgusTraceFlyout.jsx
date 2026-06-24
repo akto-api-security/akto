@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Box, Divider, HorizontalGrid, HorizontalStack, Scrollable, Text, VerticalStack } from "@shopify/polaris";
+import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
 import AgenticFlyoutShell from "../agentic/AgenticFlyoutShell";
 import FlyoutBreadcrumb from "../agentic/FlyoutBreadcrumb";
 import AiChatSection from "../agentic/AiChatSection";
 import { buildAgenticObserveChatMetadata } from "../agentic/agenticObserveApi";
 import ConversationHistory from "../../testing/TestRunResultPage/components/ConversationHistory";
-import { formatCost, formatCompact, parsePromptText, parseResponseText, truncate } from "./constants";
+import { formatCompact, parsePromptText, parseResponseText, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
 import api from "./api";
 
 
@@ -71,9 +72,8 @@ export default function ArgusTraceFlyout({ trace, onClose }) {
     const totalTokens = (Number(trace._inputTokens) || 0) + (Number(trace._outputTokens) || 0);
 
     const stats = [
-        { label: "Total tokens",  value: formatCompact(totalTokens) },
-        { label: "Est. cost",     value: formatCost(trace._inputTokens || 0, trace._outputTokens || 0) },
-        { label: "Tokens in/out", value: `${(trace._inputTokens || 0).toLocaleString("en-US")} / ${(trace._outputTokens || 0).toLocaleString("en-US")}` },
+        { label: "Total tokens",  value: formatCompact(totalTokens),                                                                                         tooltip: TOKEN_ESTIMATE_TOOLTIP },
+        { label: "Tokens in/out", value: `${(trace._inputTokens || 0).toLocaleString("en-US")} / ${(trace._outputTokens || 0).toLocaleString("en-US")}`, tooltip: TOKEN_ESTIMATE_TOOLTIP },
     ];
 
     const metaItems = [
@@ -108,7 +108,10 @@ export default function ArgusTraceFlyout({ trace, onClose }) {
                             {stats.map(s => (
                                 <VerticalStack gap="1" key={s.label}>
                                     <Text variant="heading2xl" as="p">{s.value}</Text>
-                                    <Text variant="bodySm" color="subdued">{s.label}</Text>
+                                    <HorizontalStack gap="1" blockAlign="center">
+                                        <Text variant="bodySm" color="subdued">{s.label}</Text>
+                                        <InfoTooltipIcon content={s.tooltip} />
+                                    </HorizontalStack>
                                 </VerticalStack>
                             ))}
                         </HorizontalGrid>

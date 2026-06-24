@@ -44,7 +44,7 @@ const getCompliances = () => {
     const isEndpointSecurity = isEndpointSecurityCategory();
 
     if (isMCP || isAgenticSecurity || isGenAiSecurity ||  isEndpointSecurity) {
-        return ["OWASP Agentic Top 10", "OWASP LLM", "EU AI Act", "NIST AI Risk Management Framework", "CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP", "MITRE ATLAS"];
+        return ["OWASP Agentic Top 10", "OWASP Agentic Skills Top 10", "OWASP LLM", "EU AI Act", "NIST AI Risk Management Framework", "CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP", "MITRE ATLAS"];
     }
 
     return ["CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP"];

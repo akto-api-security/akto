@@ -51,7 +51,7 @@ import {
 } from './steps';
 import "./createGuardrailPage.css";
 
-const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false }) => {
+const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false }) => {
     // Step management
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
@@ -349,14 +349,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
     }, [playgroundMessages]);
 
-    // Populate form when editing
+    // Populate form when editing or loading a preset
     useEffect(() => {
-        if (isEditMode && editingPolicy) {
+        if ((isEditMode || isPreset) && editingPolicy) {
             populateFormForEdit(editingPolicy);
-        } else {
+        } else if (!editingPolicy) {
             resetForm();
         }
-    }, [isEditMode, editingPolicy]);
+    }, [isEditMode, isPreset, editingPolicy]);
 
     const isVisibilityOnly = (collection) =>
         collection.envType && collection.envType.some(tag =>
