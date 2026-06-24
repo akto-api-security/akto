@@ -81,9 +81,10 @@ public class EvidenceRouter {
                 "Evidence is the injected REQUEST payload (the value the test added, listed in the test definition) and the RESPONSE proof that it executed/was reflected.");
         }
         // Broken authentication / no-auth: the test removes or breaks the auth token
-        // and the server still returns 2xx. Evidence is primarily response-side (the
-        // status + any data returned). We still run request-diff so that if the test
-        // actually injected a value (mislabeled under this bucket) it is highlighted.
+        // and the server still returns 2xx, so the evidence is response-side (the
+        // status + any data returned). Injection tests that can also be filed under
+        // this broad bucket are already caught by the injection branch above; if one
+        // still lands here, LLM_SEMANTIC (told via the hint) picks the injected value.
         if (c.contains("NO_AUTH") || c.contains("ANY_USER") || c.contains("REMOVE_TOKEN")
                 || c.contains("REPLACE_AUTH") || c.contains("ADD_USER_TOKEN") || c.contains("AUTH_BYPASS")
                 || c.contains("BROKEN_AUTHENTICATION")) {
