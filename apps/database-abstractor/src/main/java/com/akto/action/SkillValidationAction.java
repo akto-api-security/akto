@@ -476,7 +476,7 @@ public class SkillValidationAction extends ActionSupport {
                 .url(THREAT_DETECTION_API_URL)
                 .method(Method.POST.name(), rb)
                 .addHeader("Content-Type", "application/json")
-                .addHeader("Authorization", token)
+                .addHeader("Authorization", "Bearer " + token)
                 .build();
 
         try (Response resp = httpClient.newCall(req).execute()) {
