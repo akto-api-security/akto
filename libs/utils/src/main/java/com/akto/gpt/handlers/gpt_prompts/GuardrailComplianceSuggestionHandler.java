@@ -3,6 +3,9 @@ package com.akto.gpt.handlers.gpt_prompts;
 import javax.validation.ValidationException;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -31,7 +34,22 @@ public class GuardrailComplianceSuggestionHandler extends AzureOpenAIPromptHandl
     private static final int MAX_TOPIC_NAME_CHARS = 500;
     private static final int MAX_TOPIC_DESCRIPTION_CHARS = 500;
     private static final int MAX_LLM_RULE_CHARS = 1000;
+    private static final int MAX_SAMPLE_PHRASES = 5;
+    private static final int MAX_SAMPLE_PHRASE_CHARS = 100;
     private static final int TOP_FRAMEWORKS = 4;
+
+    private static final Map<String, String> ALLOWED_FRAMEWORKS = new LinkedHashMap<>();
+    static {
+        for (String framework : new String[] {
+            "GDPR", "HIPAA", "PCI DSS", "NIST AI Risk Management Framework",
+            "OWASP LLM", "OWASP Agentic Skills Top 10", "EU AI Act", "ISO 27001"
+        }) {
+            ALLOWED_FRAMEWORKS.put(framework.toUpperCase(), framework);
+        }
+    }
+    private static final String FRAMEWORK_NAMES_LINE =
+        "Valid framework names (copy verbatim, use no others): "
+        + String.join(" | ", ALLOWED_FRAMEWORKS.values()) + "\n";
 
     private static final String FRAMEWORKS_CONTEXT =
         "COMPLIANCE FRAMEWORKS (use ONLY these exact names, do not invent or abbreviate others):\n" +
@@ -43,7 +61,7 @@ public class GuardrailComplianceSuggestionHandler extends AzureOpenAIPromptHandl
             "transparency, robustness and overall AI safety.\n" +
         "- OWASP LLM: Top 10 risks for LLM applications — prompt injection (LLM01), " +
             "insecure output handling (LLM02), sensitive information disclosure, excessive agency.\n" +
-        "- OWASP Agentic Top 10: Top 10 risks for agentic AI — agent goal hijack (ASI01), " +
+        "- OWASP Agentic Skills Top 10: Top 10 risks for agentic AI — agent goal hijack (ASI01), " +
             "tool misuse (ASI02), memory & context poisoning, insecure inter-agent communication.\n" +
         "- EU AI Act: EU regulation for AI systems — risk categorization, transparency, human oversight.\n" +
         "- ISO 27001: Information security management — risk management, access control, incident handling.\n";
@@ -53,13 +71,8 @@ public class GuardrailComplianceSuggestionHandler extends AzureOpenAIPromptHandl
         "MAPPING PRINCIPLES (be strict — over-mapping is worse than under-mapping):\n" +
         "- Map to what this guardrail's mechanism ACTUALLY enforces, not to the subject it mentions. " +
             "A blocked word/topic/phrase is a content-governance control; it is NOT proof that personal, health or payment data is protected.\n" +
-        "- A clause counts ONLY if this control DIRECTLY helps satisfy it. Do NOT map clauses that require extra process " +
-            "this control does not perform (e.g. human oversight/review, breach notification, data-subject rights, de-identification, audit logging).\n" +
-        "- Do NOT map privacy/data-protection clauses (e.g. HIPAA PHI uses & disclosures, GDPR special categories, PCI cardholder data) " +
-            "unless the guardrail actually detects or blocks identifiable personal or regulated data — not merely a topic related to that domain.\n" +
-        "- For generic keyword/topic/substring blocks, the honest mapping is usually policy governance and operational risk mitigation " +
-            "(e.g. NIST AI RMF GOVERN/MANAGE) — and often nothing more.\n" +
-        "- When unsure, OMIT. Returning {} or a single precise mapping is better than several loose ones.\n";
+        "- A framework counts ONLY if this control DIRECTLY helps satisfy it. Do NOT map frameworks that require extra process " +
+            "this control does not perform (human review, breach notification, data-subject rights, de-identification, audit logging). When unsure, omit.\n";
 
     private static final String CONTROL_TYPES =
         "CONTROL TYPES (pick exactly one for controlType):\n" +
@@ -78,7 +91,7 @@ public class GuardrailComplianceSuggestionHandler extends AzureOpenAIPromptHandl
         "DECISION RULES (hard constraints — these override any loose association):\n" +
         "- topic_restriction / keyword_blocklist: map ONLY to NIST AI Risk Management Framework (GOVERN, MANAGE); ISO 27001 A.5 is allowed. Nothing else.\n" +
         "- Map OWASP LLM ONLY if controlType is prompt_injection_detection (LLM01) or output_filtering (LLM02).\n" +
-        "- Map OWASP Agentic Top 10 ONLY if controlType is prompt_injection_detection (ASI01) or tool_authorization (ASI02).\n" +
+        "- Map OWASP Agentic Skills Top 10 ONLY if controlType is prompt_injection_detection (ASI01) or tool_authorization (ASI02).\n" +
         "- Map HIPAA ONLY if controlType is phi_detection (identifiable PHI is detected/blocked).\n" +
         "- Map GDPR ONLY if controlType is pii_detection (identifiable personal data is detected/blocked).\n" +
         "- Map PCI DSS ONLY if controlType is pci_detection.\n" +
@@ -88,11 +101,11 @@ public class GuardrailComplianceSuggestionHandler extends AzureOpenAIPromptHandl
     private static final String EXAMPLES =
         "EXAMPLES:\n" +
         "denied_topic 'finance' -> {\"controlType\":\"topic_restriction\",\"compliance\":[\"NIST AI Risk Management Framework\",\"ISO 27001\"]}\n" +
-        "llm_rule 'block prompts that say ignore previous instructions' -> {\"controlType\":\"prompt_injection_detection\",\"compliance\":[\"OWASP LLM\",\"OWASP Agentic Top 10\"]}\n" +
+        "llm_rule 'block prompts that say ignore previous instructions' -> {\"controlType\":\"prompt_injection_detection\",\"compliance\":[\"OWASP LLM\",\"OWASP Agentic Skills Top 10\"]}\n" +
         "llm_rule 'detect SSNs and customer names' -> {\"controlType\":\"pii_detection\",\"compliance\":[\"GDPR\"]}\n" +
         "llm_rule 'detect medical records and diagnoses in responses' -> {\"controlType\":\"phi_detection\",\"compliance\":[\"HIPAA\"]}\n" +
         "llm_rule 'block model responses containing harmful or unsafe content' -> {\"controlType\":\"output_filtering\",\"compliance\":[\"OWASP LLM\"]}\n" +
-        "llm_rule 'prevent agent from calling tools not in the approved list' -> {\"controlType\":\"tool_authorization\",\"compliance\":[\"OWASP Agentic Top 10\"]}\n" +
+        "llm_rule 'prevent agent from calling tools not in the approved list' -> {\"controlType\":\"tool_authorization\",\"compliance\":[\"OWASP Agentic Skills Top 10\"]}\n" +
         "llm_rule 'escalate high-risk decisions to a human reviewer' -> {\"controlType\":\"human_review\",\"compliance\":[\"EU AI Act\"]}\n";
 
     @Override
@@ -116,6 +129,24 @@ public class GuardrailComplianceSuggestionHandler extends AzureOpenAIPromptHandl
             }
             if (topicDescription.length() > MAX_TOPIC_DESCRIPTION_CHARS) {
                 throw new ValidationException(TOPIC_DESCRIPTION + " exceeds " + MAX_TOPIC_DESCRIPTION_CHARS + " characters");
+            }
+            Object samplePhrases = queryData.get(SAMPLE_PHRASES);
+            if (samplePhrases != null) {
+                if (!(samplePhrases instanceof List)) {
+                    throw new ValidationException(SAMPLE_PHRASES + " must be a list");
+                }
+                List<?> phrases = (List<?>) samplePhrases;
+                if (phrases.size() > MAX_SAMPLE_PHRASES) {
+                    throw new ValidationException(SAMPLE_PHRASES + " exceeds " + MAX_SAMPLE_PHRASES + " entries");
+                }
+                for (Object phrase : phrases) {
+                    if (!(phrase instanceof String)) {
+                        throw new ValidationException(SAMPLE_PHRASES + " entries must be strings");
+                    }
+                    if (((String) phrase).length() > MAX_SAMPLE_PHRASE_CHARS) {
+                        throw new ValidationException(SAMPLE_PHRASES + " entry exceeds " + MAX_SAMPLE_PHRASE_CHARS + " characters");
+                    }
+                }
             }
         } else {
             String llmRule = queryData.getString(LLM_RULE);
@@ -168,9 +199,10 @@ public class GuardrailComplianceSuggestionHandler extends AzureOpenAIPromptHandl
               .append("Return ONLY a JSON object (no prose, no markdown, no explanation):\n")
               .append("{\"").append(CONTROL_TYPE).append("\": \"<control_type>\", \"")
               .append(COMPLIANCE).append("\": [\"<framework_name>\", ...]}\n\n")
+              .append(FRAMEWORK_NAMES_LINE)
               .append("Rules:\n")
               .append("- Include a framework ONLY if this guardrail DIRECTLY and concretely helps satisfy a requirement of it (apply mapping principles and decision rules above).\n")
-              .append("- Use the EXACT framework names from the frameworks list; never invent, abbreviate or rename them.\n")
+              .append("- Use the EXACT framework names listed above; never invent, abbreviate or rename them. Any other name is discarded.\n")
               .append("- Return only the top ").append(TOP_FRAMEWORKS).append(" most relevant frameworks. If fewer apply, return fewer — NEVER pad the list.\n")
               .append("- Always set controlType. Use an empty compliance array if no framework clearly applies.\n");
 
@@ -195,16 +227,16 @@ public class GuardrailComplianceSuggestionHandler extends AzureOpenAIPromptHandl
                 JSONArray complianceArray = json.optJSONArray(COMPLIANCE);
                 if (complianceArray != null) {
                     for (int i = 0; i < complianceArray.length(); i++) {
-                        String frameworkName = complianceArray.optString(i, "").trim();
-                        if (!frameworkName.isEmpty()) {
-                            complianceMap.put(frameworkName, new ArrayList<>());
+                        String canonical = ALLOWED_FRAMEWORKS.get(complianceArray.optString(i, "").trim().toUpperCase());
+                        if (canonical != null && !complianceMap.containsField(canonical)) {
+                            complianceMap.put(canonical, new ArrayList<>());
                         }
                     }
                 }
             }
             result.put(MAP_COMPLIANCE_TO_LIST_CLAUSES, complianceMap);
         } catch (Exception e) {
-            logger.error("Failed to parse compliance suggestion response: " + cleaned);
+            logger.error("Failed to parse compliance suggestion response: " + cleaned, e);
             result.put(MAP_COMPLIANCE_TO_LIST_CLAUSES, new BasicDBObject());
         }
 

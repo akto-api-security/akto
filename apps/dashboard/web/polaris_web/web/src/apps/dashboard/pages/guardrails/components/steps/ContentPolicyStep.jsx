@@ -191,7 +191,8 @@ const ContentPolicyStep = ({
         };
 
         const updatedTopics = [...deniedTopics];
-        if (editingIndex === deniedTopics.length) {
+        const isNewTopic = editingIndex === deniedTopics.length;
+        if (isNewTopic) {
             updatedTopics.unshift(topicData); // new topics appear at the top
         } else {
             updatedTopics[editingIndex] = topicData;
@@ -201,7 +202,7 @@ const ContentPolicyStep = ({
 
         // Final fetch if compliance not yet available (user saved before debounce fired)
         if (!suggestion?.loading && (!suggestion?.suggested || Object.keys(suggestion.suggested).length === 0)) {
-            fetchTopicCompliance(topicData, savedIndex);
+            fetchTopicCompliance(topicData, isNewTopic ? 0 : savedIndex);
         }
     };
 
