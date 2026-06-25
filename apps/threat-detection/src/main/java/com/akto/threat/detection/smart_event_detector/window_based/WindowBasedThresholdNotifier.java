@@ -65,7 +65,7 @@ public class WindowBasedThresholdNotifier {
   public boolean shouldNotify(String aggKey, SampleMaliciousRequest maliciousEvent, Rule rule, boolean shouldIncrement, boolean breachFilterPassed, String identity) {
     int binId = (int) maliciousEvent.getTimestamp() / 60;
 
-    boolean isDistinctMode = rule.getCondition().getDistinctCount() > 0;
+    boolean isDistinctMode = rule.getCondition().getDistinctIdentifier() != null;
 
     if (isDistinctMode) {
       return shouldNotifyDistinct(aggKey, binId, rule, shouldIncrement, breachFilterPassed, identity);
@@ -119,7 +119,7 @@ public class WindowBasedThresholdNotifier {
       distinctMembers.addAll(members);
     }
 
-    if (distinctMembers.size() >= rule.getCondition().getDistinctCount()) {
+    if (distinctMembers.size() >= rule.getCondition().getDistinctIdentifier().getCount()) {
       this.cache.resetSet(currentBinKey);
       return true;
     }

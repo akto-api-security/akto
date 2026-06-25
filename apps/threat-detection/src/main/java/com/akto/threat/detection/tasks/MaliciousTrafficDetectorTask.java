@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import com.akto.dto.*;
-import com.akto.dto.monitoring.FilterConfig.IdentityExtraction;
+import com.akto.dto.api_protection_parse_layer.Condition.DistinctIdentifier;
 import com.akto.enums.RedactionType;
 import com.akto.threat.detection.cache.AccountConfig;
 import com.akto.threat.detection.cache.AccountConfigurationCache;
@@ -483,8 +483,8 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
 
           // Extract identity for distinct count rules
           String identity = null;
-          if (rule.getCondition().getDistinctCount() > 0) {
-            identity = extractIdentity(responseParam, apiFilter.getIdentityExtraction());
+          if (rule.getCondition().getDistinctIdentifier() != null) {
+            identity = extractIdentity(responseParam, rule.getCondition().getDistinctIdentifier());
           }
 
           shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule, shouldIncrement, breachFilterPassed, identity);
@@ -504,11 +504,11 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
     }
     }
 
-  private String extractIdentity(HttpResponseParams responseParam, IdentityExtraction extraction) {
-    if (extraction == null || extraction.getKey() == null) return null;
+  private String extractIdentity(HttpResponseParams responseParam, DistinctIdentifier identifier) {
+    if (identifier == null || identifier.getKey() == null) return null;
     try {
       String payload;
-      switch (extraction.getSource()) {
+      switch (identifier.getSource()) {
         case "request_payload":
           payload = responseParam.getRequestParams().getPayload();
           break;
@@ -516,12 +516,12 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
           payload = responseParam.getPayload();
           break;
         case "request_headers":
-          List<String> headerVals = responseParam.getRequestParams().getHeaders().get(extraction.getKey());
+          List<String> headerVals = responseParam.getRequestParams().getHeaders().get(identifier.getKey());
           return (headerVals != null && !headerVals.isEmpty()) ? headerVals.get(0) : null;
         default:
           return null;
       }
-      return com.akto.util.JSONUtils.extractValueForKey(payload, extraction.getKey());
+      return com.akto.util.JSONUtils.extractValueForKey(payload, identifier.getKey());
     } catch (Exception e) {
       return null;
     }
