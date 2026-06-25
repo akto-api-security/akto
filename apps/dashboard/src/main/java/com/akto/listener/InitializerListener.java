@@ -3204,26 +3204,27 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static void setOrganizationsInBilling(BackwardCompatibility backwardCompatibility) {
-        backwardCompatibility.setOrgsInBilling(0);
         if (backwardCompatibility.getOrgsInBilling() == 0) {
-            if (!executedOnce) {
-                logger.debugAndAddToDb("in execute setOrganizationsInBilling", LogDb.DASHBOARD);
-                OrganizationTask.instance.executeTask(new Consumer<Organization>() {
-                    @Override
-                    public void accept(Organization organization) {
-                        if (!organization.getSyncedWithAkto()) {
-                            logger.debugAndAddToDb("Syncing Akto billing for org: " + organization.getId(), LogDb.DASHBOARD);
+            logger.debugAndAddToDb("in execute setOrganizationsInBilling", LogDb.DASHBOARD);
+            OrganizationTask.instance.executeTask(new Consumer<Organization>() {
+                @Override
+                public void accept(Organization organization) {
+                    if (!organization.getSyncedWithAkto()) {
+                        logger.debugAndAddToDb("Syncing Akto billing for org: " + organization.getId(), LogDb.DASHBOARD);
+                        try {
                             syncOrganizationWithAkto(organization);
+                        } catch (Exception e) {
+                            e.printStackTrace();
                         }
+                        
                     }
-                }, "set-orgs-in-billing");
-
-                executedOnce = true;
-                BackwardCompatibilityDao.instance.updateOne(
-                        Filters.eq("_id", backwardCompatibility.getId()),
-                        Updates.set(BackwardCompatibility.ORGS_IN_BILLING, Context.now())
-                );
-            }
+                }
+            }, "set-orgs-in-billing");
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.ORGS_IN_BILLING, Context.now())
+            );
+            
         }
     }
 
@@ -3630,7 +3631,6 @@ public class InitializerListener implements ServletContextListener {
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             try {
-                initializeOrganizationAccountBelongsTo(backwardCompatibility);
                 setOrganizationsInBilling(backwardCompatibility);
             } catch (Exception e) {
                 e.printStackTrace();
