@@ -29,6 +29,25 @@ export const GUARDRAIL_SECTIONS = [
         ]
     },
     {
+        heading: "Enterprise License Compliance",
+        description: "These guardrails help ensure that requests comply with the restrictions defined in enterprise AI service agreements. They cover categories that AI providers do not allow across enterprise deployments, regardless of an organisation's own policy settings.",
+        subSections: [
+            {
+                subHeading: "Details",
+                description: "These checks identify requests related to categories that are prohibited by AI provider acceptable use policies, such as CSAM, malicious code generation, assistance related to weapons of mass destruction, violent extremism, hate speech, human trafficking, and non-consensual surveillance. Unlike custom guardrails, these protections are built into the enterprise offering and cannot be turned off."
+            },
+            {
+                subHeading: "Impact",
+                description: "Requests that fall into these categories may:",
+                items: [
+                    "Lead to enforcement actions from the AI service provider, including account restrictions or suspension.",
+                    "Create legal or regulatory obligations depending on the nature of the content.",
+                    "Expose the organisation to reputational and financial risks."
+                ]
+            }
+        ]
+    },
+    {
         heading: "Denied Topics",
         description: "A restrictive boundary that prevents the AI from engaging in discussion regarding specific, predefined subject matters.",
         subSections: [

@@ -749,6 +749,34 @@ public class IssuesAction extends UserAction {
 
     private boolean fetchOnlyActive;
     private String mode;
+    private List<String> subCategoryNames;
+
+    public String fetchSubCategoriesByTestSubTypes() {
+        subCategories = new ArrayList<>();
+        categories = TestTemplateUtils.getAllTestCategoriesWithinContext(Context.contextSource.get());
+
+        if (subCategoryNames == null || subCategoryNames.isEmpty()) {
+            return SUCCESS.toUpperCase();
+        }
+
+        // Fetch all templates matching the requested IDs — includes AKTO_TEMPLATES and CUSTOM.
+        Bson filter = Filters.in("_id", subCategoryNames);
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(
+                false, fetchOnlyActive, skip, limit, filter);
+
+        for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
+            try {
+                BasicDBObject infoObj = createSubcategoriesInfoObj(entry.getValue());
+                if (infoObj != null) {
+                    subCategories.add(infoObj);
+                }
+            } catch (Exception e) {
+                logger.errorAndAddToDb(e, "Error while fetching subcategory for " + entry.getKey(), LogDb.DASHBOARD);
+            }
+        }
+
+        return SUCCESS.toUpperCase();
+    }
 
     public String fetchVulnerableRequests() {
         vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty(), skip, limit, Sorts.ascending("_id"));
@@ -1703,6 +1731,10 @@ public class IssuesAction extends UserAction {
 
     public void setMode(String mode) {
         this.mode = mode;
+    }
+
+    public void setSubCategoryNames(List<String> subCategoryNames) {
+        this.subCategoryNames = subCategoryNames;
     }
 
     public void setStartEpoch(int startEpoch) {

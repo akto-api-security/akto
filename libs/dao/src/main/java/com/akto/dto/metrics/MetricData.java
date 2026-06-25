@@ -6,6 +6,7 @@ import com.akto.dto.monitoring.ModuleInfo;
 import lombok.Getter;
 import lombok.Setter;
 
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 public class MetricData {
@@ -33,6 +34,12 @@ public class MetricData {
     }
 
     private MetricType metricType;
+
+    @BsonIgnore
+    @Getter
+    @Setter
+    private Integer accountId;
+
     public enum Name {
         // Runtime metrics
         RT_KAFKA_RECORD_COUNT("Kafka Records Count", "Number of records processed by runtime module"),
@@ -86,7 +93,11 @@ public class MetricData {
         TC_MEMORY_USAGE("Traffic Collector Memory Used", "Memory used in MB by traffic collector modules"),
         TC_HOST_MEMORY_USED_MB("Traffic Collector Host Memory Used", "Host used memory (MB)"),
         TC_GOROUTINES("Traffic Collector Goroutines", "Number of goroutines"),
-        TC_SYSTEM_CPU_PERCENT("Traffic Collector System CPU Percent", "Host-level CPU usage percentage");
+        TC_SYSTEM_CPU_PERCENT("Traffic Collector System CPU Percent", "Host-level CPU usage percentage"),
+
+        // Guardrail metrics (Akto Agent Gateway)
+        GUARDRAIL_REQUEST_LATENCY("Guardrail Request Latency", "P95 latency for validating incoming requests through guardrails"),
+        GUARDRAIL_RESPONSE_LATENCY("Guardrail Response Latency", "P95 latency for validating outgoing responses through guardrails");
 
         private final String descriptionName;
         private final String description;

@@ -2,8 +2,34 @@ package com.akto.action.threat_detection;
 
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
+import java.util.List;
 
 public class DashboardMaliciousEvent {
+
+  public static class OwaspCategory {
+    private String id;
+    private String name;
+    private String severity;
+    private String confidence;
+
+    public OwaspCategory() {}
+
+    public OwaspCategory(String id, String name, String severity, String confidence) {
+      this.id = id;
+      this.name = name;
+      this.severity = severity;
+      this.confidence = confidence;
+    }
+
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getSeverity() { return severity; }
+    public void setSeverity(String severity) { this.severity = severity; }
+    public String getConfidence() { return confidence; }
+    public void setConfidence(String confidence) { this.confidence = confidence; }
+  }
   private String id;
   private String actor;
   private String filter_id;
@@ -28,6 +54,7 @@ public class DashboardMaliciousEvent {
   private String jiraTicketUrl;
   private String severity;
   private String sessionId;
+  private List<OwaspCategory> owaspCategories;
   public DashboardMaliciousEvent() {}
 
   public DashboardMaliciousEvent(
@@ -271,6 +298,14 @@ public class DashboardMaliciousEvent {
 
   public void setSessionId(String sessionId) {
     this.sessionId = sessionId;
+  }
+
+  public List<OwaspCategory> getOwaspCategories() {
+    return owaspCategories;
+  }
+
+  public void setOwaspCategories(List<OwaspCategory> owaspCategories) {
+    this.owaspCategories = owaspCategories;
   }
 
 }

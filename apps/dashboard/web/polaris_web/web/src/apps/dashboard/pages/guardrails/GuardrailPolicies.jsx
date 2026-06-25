@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack } from '@shopify/polaris';
+import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList, Scrollable, Avatar, Box } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
@@ -8,8 +8,10 @@ import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
+import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from "./components/enterpriseLicenseComplianceCatalog"
 import api from "./api";
 import { transformPolicyForBackend, SEVERITY, normalizeBehaviourValue } from "./utils";
+import GUARDRAIL_PRESETS from "./guardrailPresets";
 
 const resourceName = {
   singular: "policy",
@@ -129,6 +131,8 @@ function GuardrailPolicies() {
     const [loading, setLoading] = useState(true);
     const [editingPolicy, setEditingPolicy] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
+    const [isPreset, setIsPreset] = useState(false);
+    const [presetsPopoverActive, setPresetsPopoverActive] = useState(false);
     const [pendingPolicyName, setPendingPolicyName] = useState(null);
 
     const policyName = new URLSearchParams(window.location.search).get("policy");
@@ -286,14 +290,20 @@ function GuardrailPolicies() {
             details.push({ label: "Content Filters", value: filters.join(", ") });
         }
 
-        // Denied topics details
-        if (policy.deniedTopics?.length > 0) {
-            const topicNames = policy.deniedTopics.map(topic => topic.topic || topic.name).slice(0, 2);
-            const moreCount = policy.deniedTopics.length > 2 ? ` +${policy.deniedTopics.length - 2} more` : '';
-            details.push({ 
-                label: "Denied Topics", 
-                value: `${topicNames.join(", ")}${moreCount}` 
-            });
+        // User-defined denied topics (excluding enterprise derived ones)
+        const userDeniedTopics = (policy.deniedTopics || []).filter(t => t?.origin !== ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN);
+        if (userDeniedTopics.length > 0) {
+            const names = userDeniedTopics.map(t => t.topic || t.name).slice(0, 2);
+            const more = userDeniedTopics.length > 2 ? ` +${userDeniedTopics.length - 2} more` : '';
+            details.push({ label: "Denied Topics", value: `${names.join(", ")}${more}` });
+        }
+
+        // Enterprise license compliance topics
+        const enterpriseTopics = (policy.deniedTopics || []).filter(t => t?.origin === ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN);
+        if (enterpriseTopics.length > 0) {
+            const names = enterpriseTopics.map(t => t.topic || t.name).slice(0, 1);
+            const more = enterpriseTopics.length > 1 ? ` +${enterpriseTopics.length - 1} more` : '';
+            details.push({ label: "Enterprise License Compliance Filters", value: `${names.join(", ")}${more}` });
         }
 
         // Word filters
@@ -420,6 +430,14 @@ function GuardrailPolicies() {
         setShowCreateModal(true);
     };
 
+    const handleSelectPreset = (presetData) => {
+        setPresetsPopoverActive(false);
+        setEditingPolicy(presetData);
+        setIsEditMode(false);
+        setIsPreset(true);
+        setShowCreateModal(true);
+    };
+
     const emptyStateMarkup = (
         <EmptySearchResult
           title={'No guardrail policy found'}
@@ -497,6 +515,7 @@ function GuardrailPolicies() {
                 blockedHosts: guardrailData.blockedHosts || [],
                 blockPersonalAccounts: guardrailData.blockPersonalAccounts || false,
                 deniedTopics: guardrailData.deniedTopics || [],
+                enterpriseLicenseComplianceCategories: guardrailData.enterpriseLicenseComplianceCategories || [],
                 regexPatterns: guardrailData.regexPatterns || [],
                 // Add V2 field for enhanced regex data
                 regexPatternsV2: guardrailData.regexPatternsV2 || [],
@@ -542,6 +561,7 @@ function GuardrailPolicies() {
             setShowCreateModal(false);
             setEditingPolicy(null);
             setIsEditMode(false);
+            setIsPreset(false);
             await fetchGuardrailPolicies();
         } catch (error) {
             func.setToast(true, true, isEditMode ? "Failed to update guardrail" : "Failed to create guardrail");
@@ -559,10 +579,12 @@ function GuardrailPolicies() {
                     setShowCreateModal(false);
                     setEditingPolicy(null);
                     setIsEditMode(false);
+                    setIsPreset(false);
                 }}
                 onSave={handleCreateGuardrail}
                 editingPolicy={editingPolicy}
                 isEditMode={isEditMode}
+                isPreset={isPreset}
             />
         );
     }
@@ -602,7 +624,41 @@ function GuardrailPolicies() {
                 />
             }
             isFirstPage={true}
-            primaryAction={<Button primary onClick={() => setShowCreateModal(true)}>Create Guardrail</Button>}
+            primaryAction={
+                <HorizontalStack gap="2">
+                    <Popover
+                        active={presetsPopoverActive}
+                        activator={
+                            <Button disclosure onClick={() => setPresetsPopoverActive(!presetsPopoverActive)}>
+                                Presets
+                            </Button>
+                        }
+                        onClose={() => setPresetsPopoverActive(false)}
+                    >
+                        <Popover.Pane>
+                            <Scrollable style={{ maxHeight: "350px" }}>
+                                <ActionList
+                                    actionRole="menuitem"
+                                    items={GUARDRAIL_PRESETS.map(preset => ({
+                                        content: preset.label,
+                                        prefix: (
+                                            <Box>
+                                                <Avatar
+                                                    source={func.getComplianceIcon(preset.icon || preset.label)}
+                                                    shape="square"
+                                                    size="extraSmall"
+                                                />
+                                            </Box>
+                                        ),
+                                        onAction: () => handleSelectPreset(preset.data),
+                                    }))}
+                                />
+                            </Scrollable>
+                        </Popover.Pane>
+                    </Popover>
+                    <Button primary onClick={() => setShowCreateModal(true)}>Create Guardrail</Button>
+                </HorizontalStack>
+            }
             components={components}
         />
 }

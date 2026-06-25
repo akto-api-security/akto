@@ -15,7 +15,7 @@ from pyodide.ffi import create_proxy
 from workers import Response, waitUntil
 
 import alerts
-from constants import CASCADE_SCANNERS, LOCAL_SCANNERS, REMOTE_SCANNERS, SUPPORTED_SCANNERS, get_default_config
+from constants import CASCADE_SCANNERS, GEMMA_ONLY_SCANNERS, LOCAL_SCANNERS, REMOTE_SCANNERS, SUPPORTED_SCANNERS, canonical_scanner, get_default_config, strip_qwen_tier
 from scanners import scan_local
 from settings import settings
 from llm_scanner import scan_with_model_map
@@ -63,7 +63,7 @@ def _shape(scanner_name, is_valid, risk_score, sanitized_text, details) -> dict:
 
 async def _scan(payload: dict, env=None) -> dict:
     """Run one scan and return the ScanResponse-shaped dict."""
-    scanner_name = payload.get("scanner_name", "")
+    scanner_name = canonical_scanner(payload.get("scanner_name", ""))
     scanner_type = payload.get("scanner_type", "prompt")
     text = payload.get("text", "")
     config = payload.get("config") or {}
@@ -82,6 +82,10 @@ async def _scan(payload: dict, env=None) -> dict:
         if not config.get("modelConfigs"):
             default_cfg = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)
             config = {**default_cfg, **config, "modelConfigs": default_cfg["modelConfigs"]}
+        # Qwen3Guard can't judge code (safety verdict only); strip its tier so the
+        # Gemma arbiter decides instead of fast-passing benign code as "safe".
+        if scanner_name in GEMMA_ONLY_SCANNERS:
+            config = {**config, "modelConfigs": strip_qwen_tier(config.get("modelConfigs"))}
         # Persist every model's output when asked (scheduled, never blocks).
         store_fn = None
         if config.get("storeAllResults"):

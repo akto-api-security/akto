@@ -19,7 +19,7 @@ import InfoCard from "../dashboard/new_components/InfoCard";
 import BarGraph from "../../components/charts/BarGraph";
 import SessionStore from "../../../main/SessionStore";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
-import { getDashboardCategory, isApiSecurityCategory, isDastCategory, mapLabel } from "../../../main/labelHelper";
+import { getDashboardCategory, isApiSecurityCategory, isDastCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel } from "../../../main/labelHelper";
 import LineChart from "../../components/charts/LineChart";
 import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
 import { LABELS } from "./constants";
@@ -27,6 +27,7 @@ import useThreatReportDownload from "../../hooks/useThreatReportDownload";
 import WebhookIntegrationModal from "./components/WebhookIntegrationModal";
 import { updateThreatFiltersStore } from "./utils/threatFilters";
 import { redactSampleDataByKeywords } from "./utils/redactSampleData";
+import { resolveComplianceClauseMap } from "./utils/formatUtils";
 const convertToGraphData = (severityMap) => {
     let dataArr = []
     Object.keys(severityMap).forEach((x) => {
@@ -230,6 +231,9 @@ function ThreatDetectionPage() {
             filterId: searchParams.get("filterId"),
             status: statusValue,
             severity: searchParams.get("severity") || '',
+            url: searchParams.get("url") || '',
+            method: searchParams.get("method") || '',
+            ruleViolated: searchParams.get("ruleViolated") || '-',
             hasQueryEvent: Boolean(
                 searchParams.get("refId") &&
                 searchParams.get("eventType") &&
@@ -527,7 +531,7 @@ function ThreatDetectionPage() {
 
         const DEMO_ACCOUNT_ID = 1669322524;
         const activeAccount = Number(window.ACTIVE_ACCOUNT);
-        const isAktoUser = window.USER_NAME === 'umesh@akto.io';
+        const isAktoUser = window.USER_NAME?.includes('@akto.io');
 
         const fetchLatencyData = async () => {
             if (!isAktoUser) return;
@@ -598,12 +602,13 @@ function ThreatDetectionPage() {
                     latency = [];
                     for (let i = 0; i < raw.length; i += bucketSize) {
                         const bucket = raw.slice(i, i + bucketSize);
-                        const avg = field => bucket.reduce((sum, m) => sum + m[field], 0) / bucket.length;
+                        // Downsample long ranges by averaging the per-minute averages in each bucket.
+                        const avgOf = field => bucket.reduce((sum, x) => sum + x[field], 0) / bucket.length;
                         latency.push({
                             timestamp: bucket[Math.floor(bucket.length / 2)].timestamp,
-                            incomingRequestP95: avg('incomingRequestP95'),
-                            outputResultP95:    avg('outputResultP95'),
-                            totalP95:           avg('totalP95'),
+                            incomingRequestP95: avgOf('incomingRequestP95'),
+                            outputResultP95:    avgOf('outputResultP95'),
+                            totalP95:           avgOf('totalP95'),
                         });
                     }
                 }
@@ -654,16 +659,25 @@ function ThreatDetectionPage() {
             currentRefId: queryParams.refId,
             rowDataList: maliciousPayloads,
             moreInfoData: {
-              url: rowContext?.url || '',
-              method: rowContext?.method || '',
+              url: rowContext?.url || queryParams.url || '',
+              method: rowContext?.method || queryParams.method || '',
               apiCollectionId: rowContext?.apiCollectionId,
               templateId: queryParams.filterId,
               // Prefer the row's severity (set by rowClicked or passed via ?severity= URL param),
               // so deep-linked opens show the actual event severity, not the template default.
               severity: rowContext?.severity || queryParams.severity || '',
               sessionId: rowContext?.sessionId || '',
-              ruleViolated: rowContext?.ruleViolated || '-',
-              complianceMap: rowContext?.complianceMapData || {}
+              ruleViolated: rowContext?.ruleViolated || queryParams.ruleViolated || '-',
+              complianceMap: rowContext?.complianceMapData || (() => {
+                if (!queryParams.filterId) return {};
+                const { threatFiltersMap, guardrailComplianceMap } = SessionStore.getState();
+                const isGuardrail = isAgenticSecurityCategory() || isEndpointSecurityCategory();
+                const event = { filterId: queryParams.filterId };
+                if (queryParams.ruleViolated && queryParams.ruleViolated !== '-') {
+                  event.metadata = JSON.stringify({ rule_violated: queryParams.ruleViolated });
+                }
+                return resolveComplianceClauseMap(event, isGuardrail, threatFiltersMap, guardrailComplianceMap);
+              })()
             },
             currentEventId: rowContext?.eventId || '',
             currentEventStatus: queryParams.status || rowContext?.status || '',
@@ -710,7 +724,7 @@ function ThreatDetectionPage() {
     // Normal mode - show table, charts, and sidebar
     const components = [
         <ChartComponent subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
-        ...(window.USER_NAME === 'umesh@akto.io' ? [
+        ...((isEndpointSecurityCategory() || isAgenticSecurityCategory()) && window.USER_NAME?.includes('@akto.io') ? [
             <P95LatencyGraph
                 key="threat-detection-latency"
                 title={`${mapLabel("Threat", getDashboardCategory())} Detection Latency`}

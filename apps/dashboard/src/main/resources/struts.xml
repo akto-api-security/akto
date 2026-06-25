@@ -964,6 +964,34 @@
             </result>
         </action>
 
+        <action name="api/fetchArgusStats" class="com.akto.action.monitoring.LLMObservabilityAction" method="fetchArgusStats">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">LOGS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AGENT_TRAFFIC_LOGS</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="signup-email" class="com.akto.action.SignupAction" method="registerViaEmail">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -7006,6 +7034,29 @@
         </action>
 
         <action name="api/fetchAllSubCategories" class="com.akto.action.testing_issues.IssuesAction" method="fetchAllSubCategories">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ISSUES</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="enumAsBean">true</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchSubCategoriesByTestSubTypes" class="com.akto.action.testing_issues.IssuesAction" method="fetchSubCategoriesByTestSubTypes">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -16191,7 +16242,7 @@
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">NHI_GOVERNANCE</param>
+                <param name="featureLabel">ENDPOINT_SECURITY</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -16219,7 +16270,7 @@
                 <param name="accessType">READ_WRITE</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">NHI_GOVERNANCE</param>
+                <param name="featureLabel">ENDPOINT_SECURITY</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -16248,7 +16299,7 @@
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">NHI_GOVERNANCE</param>
+                <param name="featureLabel">ENDPOINT_SECURITY</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -16277,7 +16328,7 @@
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">NHI_GOVERNANCE</param>
+                <param name="featureLabel">ENDPOINT_SECURITY</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -16306,7 +16357,7 @@
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">NHI_GOVERNANCE</param>
+                <param name="featureLabel">ENDPOINT_SECURITY</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -16335,7 +16386,7 @@
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">NHI_GOVERNANCE</param>
+                <param name="featureLabel">ENDPOINT_SECURITY</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -16364,7 +16415,7 @@
                 <param name="accessType">READ_WRITE</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">NHI_GOVERNANCE</param>
+                <param name="featureLabel">ENDPOINT_SECURITY</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -16393,7 +16444,7 @@
                 <param name="accessType">READ_WRITE</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">NHI_GOVERNANCE</param>
+                <param name="featureLabel">ENDPOINT_SECURITY</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -16422,7 +16473,7 @@
                 <param name="accessType">READ_WRITE</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">NHI_GOVERNANCE</param>
+                <param name="featureLabel">ENDPOINT_SECURITY</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">

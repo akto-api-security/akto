@@ -16,13 +16,14 @@ from providers import LLMProvider, Qwen3GuardProvider, parse_qwen3guard_result
 
 logger = logging.getLogger(__name__)
 
-LLM_SUPPORTED_SCANNERS = {"PromptInjection", "BanTopics", "Toxicity", "Gibberish"}
+LLM_SUPPORTED_SCANNERS = {"PromptInjection", "BanTopics", "Toxicity", "Gibberish", "BanCode"}
 
 _SCANNER_FLAG_KEYS = {
     "PromptInjection": "isInjection",
     "BanTopics": "isBanned",
     "Toxicity": "isToxic",
     "Gibberish": "isGibberish",
+    "BanCode": "isCode",
 }
 
 

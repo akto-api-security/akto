@@ -7,6 +7,19 @@ import editorSetup from './customEditor';
 import yamlEditorSetup from "../../pages/test_editor/components/editor_config/editorSetup"
 import keywords from "../../pages/test_editor/components/editor_config/keywords"
 import authTypesApi from "@/apps/dashboard/pages/settings/auth_types/api";
+import { locateSegment } from "./vulnerabilityEvidence";
+import { COOKIE_REDACT_PLACEHOLDER } from './customDiffEditor';
+
+function highlightRedactedCookies(ref) {
+  if (!func.isCookieRedactAccount()) return
+  const matches = ref.getModel().findMatches(COOKIE_REDACT_PLACEHOLDER, false, false, true, null, true)
+  matches.forEach((match) => {
+    ref.createDecorationsCollection([{
+      range: match.range,
+      options: { inlineClassName: "highlightOther" }
+    }])
+  })
+}
 
 function highlightPaths(highlightPathMap, ref){
   highlightPathMap && Object.keys(highlightPathMap).forEach((key) => {
@@ -156,124 +169,19 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
     return;
   }
 
-  const textLength = text.length;
-  const isWordChar = (ch) => typeof ch === 'string' && /[A-Za-z0-9_-]/.test(ch);
-
-  const resolvePhrase = (segment) => {
-    if (typeof segment?.phrase === 'string' && segment.phrase.trim().length > 0) {
-      return segment.phrase.trim();
-    }
-    if (typeof segment?.message === 'string' && segment.message.length > 0) {
-      return segment.message.replace(/\s*\[chars\s+\d+-\d+\]\s*$/, '').trim();
-    }
-    return undefined;
-  };
-
-  // The LLM's char offsets are computed against a different text layout than the
-  // editor renders, so they are unreliable. We anchor strictly to the phrase the
-  // LLM flagged. Build progressively looser candidates so we still match when the
-  // phrase is wrapped in quotes, given as a JSON "key":"value" pair (while the
-  // editor renders headers as "key: value"), or truncated mid-token.
-  const buildPhraseCandidates = (phrase) => {
-    const candidates = [];
-    const add = (p) => {
-      if (typeof p !== 'string') {
-        return;
-      }
-      const trimmed = p.trim().replace(/^[\s"'`]+|[\s"',`]+$/g, '');
-      if (trimmed.length >= 2 && !candidates.includes(trimmed)) {
-        candidates.push(trimmed);
-      }
-    };
-
-    add(phrase);
-    if (phrase) {
-      // JSON pair -> value only (handles `"authorization":"Bearer x"` vs editor `authorization: Bearer x`).
-      const colonIdx = phrase.indexOf(':');
-      if (colonIdx >= 0 && colonIdx < phrase.length - 1) {
-        add(phrase.slice(colonIdx + 1));
-      }
-    }
-    // For long tokens (e.g. JWTs) the LLM often truncates or the formatting
-    // differs; a unique prefix is enough to anchor the highlight.
-    candidates.slice().forEach((c) => {
-      if (c.length > 40) {
-        add(c.slice(0, 40));
-      }
-    });
-    return candidates;
-  };
-
-  // Exact occurrence, preferring whole-token matches so "envoy" doesn't match
-  // inside "x-envoy-..." and disambiguating with the LLM's hint position.
-  const findExactRange = (phrase, hintStart) => {
-    const matches = [];
-    let from = 0;
-    while (from <= textLength) {
-      const idx = text.indexOf(phrase, from);
-      if (idx === -1) {
-        break;
-      }
-      const endIdx = idx + phrase.length;
-      const boundedBefore = idx === 0 || !isWordChar(text[idx - 1]) || !isWordChar(phrase[0]);
-      const boundedAfter = endIdx >= textLength || !isWordChar(text[endIdx]) || !isWordChar(phrase[phrase.length - 1]);
-      matches.push({ start: idx, end: endIdx, wholeToken: boundedBefore && boundedAfter });
-      from = idx + 1;
-    }
-    if (matches.length === 0) {
-      return null;
-    }
-    const wholeTokenMatches = matches.filter((m) => m.wholeToken);
-    const candidates = wholeTokenMatches.length > 0 ? wholeTokenMatches : matches;
-    if (Number.isFinite(hintStart)) {
-      candidates.sort((a, b) => Math.abs(a.start - hintStart) - Math.abs(b.start - hintStart));
-    }
-    return candidates[0];
-  };
-
-  // Whitespace-tolerant, case-insensitive match for when the LLM collapses
-  // newlines/indentation or changes header-name casing.
-  const findFlexibleRange = (phrase) => {
-    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
-    try {
-      const match = new RegExp(escaped, 'i').exec(text);
-      if (match) {
-        return { start: match.index, end: match.index + match[0].length };
-      }
-    } catch (e) {
-      // invalid regex, ignore
-    }
-    return null;
-  };
-
-  const locateSegment = (segment) => {
-    const phrase = resolvePhrase(segment);
-    if (!phrase) {
-      return null;
-    }
-    const hintStart = Number(segment?.start);
-    const candidates = buildPhraseCandidates(phrase);
-    for (const candidate of candidates) {
-      const range = findExactRange(candidate, hintStart);
-      if (range) {
-        return range;
-      }
-    }
-    for (const candidate of candidates) {
-      const range = findFlexibleRange(candidate);
-      if (range) {
-        return range;
-      }
-    }
-    return null;
-  };
-
   const decorations = [];
   let firstStart = Infinity;
 
   vulnerabilitySegments.forEach((segment) => {
     try {
-      const range = locateSegment(segment);
+      // Informational evidence (e.g. missing headers) describes something ABSENT,
+      // so there is nothing in the editor text to highlight - it is panel-only.
+      if (segment?.informational === true) {
+        return;
+      }
+      // Shared locator (see vulnerabilityEvidence.js) - the SAME contract the
+      // Evidence panel uses, so we never highlight what the panel can't show.
+      const range = locateSegment(segment, text);
       // If we cannot locate the exact phrase, skip rather than highlight the
       // wrong span using unreliable offsets.
       if (!range) {
@@ -504,6 +412,7 @@ function SampleData(props) {
         let message = data.original ? data.original : data?.message 
         instance.setValue(message)
         highlightPaths(data?.highlightPaths, instance);
+        highlightRedactedCookies(instance);
         if(data.headersMap){
           highlightHeaders(data, instance,getLineNumbers)
         }
