@@ -27,6 +27,7 @@ const headings = [
     createHeading("Hostname", "hostname"),
     createHeading("Device ID", "deviceId"),
     createHeading("Agent Version", "agentVersion"),
+    createHeading("OS", "osLabel", "os"),
     createHeading("Username", "username"),
     createHeading("Last Heartbeat", "lastHeartbeatComp", "lastHeartbeat"),
     createHeading("Last Deployed", "lastDeployedComp", "lastDeployed")
@@ -46,9 +47,10 @@ const sortOptions = [
     ...createSortOptions('Hostname', 'hostname', 2),
     ...createSortOptions('Device ID', 'deviceId', 3),
     ...createSortOptions('Agent Version', 'agentVersion', 4),
-    ...createSortOptions('Username', 'username', 5),
-    ...createSortOptions('Last Heartbeat', 'lastHeartbeat', 6, true),
-    ...createSortOptions('Last Deployed', 'lastDeployed', 7, true)
+    ...createSortOptions('OS', 'os', 5),
+    ...createSortOptions('Username', 'username', 6),
+    ...createSortOptions('Last Heartbeat', 'lastHeartbeat', 7, true),
+    ...createSortOptions('Last Deployed', 'lastDeployed', 8, true)
 ];
 
 const createFilter = (key, label) => ({
@@ -63,12 +65,20 @@ const resourceName = {
     plural: 'agents',
 };
 
-const convertDataIntoTableFormat = (agentData) => ({
-    ...agentData,
-    id: agentData?.agentId,
-    lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
-    lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed)
-});
+const convertDataIntoTableFormat = (agentData) => {
+    const os = agentData?.os;
+    const osVersion = agentData?.osVersion;
+    const osLabel = os && os !== DEFAULT_VALUE
+        ? `${os}${osVersion && osVersion !== DEFAULT_VALUE ? ` ${osVersion}` : ''}`.trim()
+        : DEFAULT_VALUE;
+    return {
+        ...agentData,
+        id: agentData?.agentId,
+        lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
+        lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed),
+        osLabel,
+    };
+};
 
 const deduplicateAgents = (agents) => {
     const map = new Map();
@@ -96,7 +106,8 @@ function EndpointShieldMetadata() {
     const [filters, setFilters] = useState([
         createFilter('username', 'Username'),
         createFilter('hostname', 'Hostname'),
-        createFilter('deviceId', 'Device ID')
+        createFilter('deviceId', 'Device ID'),
+        createFilter('os', 'OS')
     ]);
 
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
@@ -122,6 +133,16 @@ function EndpointShieldMetadata() {
                 username: module.additionalData?.username || DEFAULT_VALUE,
                 lastHeartbeat: module.lastHeartbeatReceived || 0,
                 lastDeployed: module.startedTs || 0,
+                os: module.additionalData?.os || DEFAULT_VALUE,
+                osVersion: module.additionalData?.osVersion || DEFAULT_VALUE,
+                arch: module.additionalData?.arch || DEFAULT_VALUE,
+                kernelVersion: module.additionalData?.kernelVersion || DEFAULT_VALUE,
+                totalRamGB: module.additionalData?.totalRamGB ?? DEFAULT_VALUE,
+                cpuCount: module.additionalData?.cpuCount ?? DEFAULT_VALUE,
+                isVM: module.additionalData?.isVM ?? null,
+                locale: module.additionalData?.locale || DEFAULT_VALUE,
+                timezone: module.additionalData?.timezone || DEFAULT_VALUE,
+                publicIP: module.additionalData?.publicIP || DEFAULT_VALUE,
                 _moduleData: module
             }));
             setEndpointShieldData({ agents: deduplicateAgents(agents) });
@@ -160,13 +181,15 @@ function EndpointShieldMetadata() {
     useEffect(() => {
         if (endpointShieldData?.agents) {
             const agentsData = endpointShieldData.agents;
-            const uniqueUsernames = [...new Set(agentsData.map(a => a.username).filter(Boolean))];
+            const uniqueUsernames = [...new Set(agentsData.map(a => a.username).filter(v => v && v !== DEFAULT_VALUE))];
             const uniqueHostnames = [...new Set(agentsData.map(a => a.hostname).filter(Boolean))];
-            const uniqueDeviceIds = [...new Set(agentsData.map(a => a.deviceId).filter(Boolean))];
+            const uniqueDeviceIds = [...new Set(agentsData.map(a => a.deviceId).filter(v => v && v !== DEFAULT_VALUE))];
+            const uniqueOSValues = [...new Set(agentsData.map(a => a.os).filter(v => v && v !== DEFAULT_VALUE))];
             setFilters([
                 { ...createFilter('username', 'Username'), choices: uniqueUsernames.map(u => ({ label: u, value: u })) },
                 { ...createFilter('hostname', 'Hostname'), choices: uniqueHostnames.map(h => ({ label: h, value: h })) },
-                { ...createFilter('deviceId', 'Device ID'), choices: uniqueDeviceIds.map(d => ({ label: d, value: d })) }
+                { ...createFilter('deviceId', 'Device ID'), choices: uniqueDeviceIds.map(d => ({ label: d, value: d })) },
+                { ...createFilter('os', 'OS'), choices: uniqueOSValues.map(o => ({ label: o, value: o })) }
             ]);
         }
     }, [endpointShieldData]);
@@ -182,6 +205,7 @@ function EndpointShieldMetadata() {
                 if (filters.username?.length > 0 && !filters.username.includes(agent.username)) return false;
                 if (filters.hostname?.length > 0 && !filters.hostname.includes(agent.hostname)) return false;
                 if (filters.deviceId?.length > 0 && !filters.deviceId.includes(agent.deviceId)) return false;
+                if (filters.os?.length > 0 && !filters.os.includes(agent.os)) return false;
                 if (queryValue) {
                     const q = queryValue.toLowerCase();
                     if (!agent.agentId?.toLowerCase().includes(q) &&
