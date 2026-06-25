@@ -407,7 +407,7 @@ function ApiEndpoints(props) {
                 apiPromises.push(api.fetchMcpAuditInfoByCollection(apiCollectionId));
             } else {
                 apiPromises.push(api.getSeveritiesCountPerCollection(apiCollectionId));
-                apiPromises.push(IssuesApi.fetchIssues(0, 1000, ["OPEN"], [apiCollectionId], null, null, null, null, null, null, true, null));
+                apiPromises.push(IssuesApi.fetchIssues(0, 2000, ["OPEN"], [apiCollectionId], null, null, null, null, null, null, true, null));
             }
 
             let results = await Promise.allSettled(apiPromises);
@@ -453,7 +453,6 @@ function ApiEndpoints(props) {
 
         apiEndpointsInCollection.forEach(apiEndpoint => {
             const key = apiEndpoint.method + " " + apiEndpoint.url + " " + apiEndpoint.apiCollectionId;
-            console.log("jey", key)
             const allSensitive = new Set(), sensitiveInResp = [], sensitiveInReq = [];
 
             sensitiveParamsMap[key]?.forEach(({ name, position }) => {

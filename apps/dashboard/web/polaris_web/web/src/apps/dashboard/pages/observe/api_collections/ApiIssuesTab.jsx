@@ -224,6 +224,7 @@ const ApiIssuesTab = ({ apiDetail, collectionIssuesData, isThreatEnabled }) => {
                         <GithubSimpleTable
                             key="issues-table"
                             filterStateUrl="api-issues-flyout"
+                            skipUrlFilters={true}
                             data={filteredIssues}
                             resourceName={{ singular: "issue", plural: "issues" }}
                             headers={issuesHeaders}
