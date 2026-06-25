@@ -115,6 +115,9 @@ function Dashboard() {
         if(((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)) && location.pathname !== "/dashboard/observe/inventory"){
             fetchAllCollections()
         }
+        // Report pages (testing/summary/:reportId, issues/summary/:reportId, threat-detection/report/:reportId)
+        // fetch their own subcategory data lazily via VulnerabilityReport/ThreatReport.
+        // Skipping fetchMetadata here avoids a redundant full fetchAllSubCategories call on those routes.
         const isReportPage = location.pathname.includes('/summary/') || location.pathname.includes('/report/')
         if (!isReportPage && (!subCategoryMap || (Object.keys(subCategoryMap).length === 0))) {
             fetchMetadata();
