@@ -2,7 +2,7 @@ import { Text, HorizontalStack, VerticalStack, Box, Badge, Button, Icon, Tooltip
 import { useRef, useMemo, useCallback, useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from 'framer-motion'
-import { CaretDownMinor, CodeMinor, DynamicSourceMinor, ClockMinor, CalendarMinor, ExportMinor, DesktopMajor, CodeMajor } from '@shopify/polaris-icons'
+import { CaretDownMinor, CodeMinor, DynamicSourceMinor, ClockMinor, CalendarMinor, ExportMinor } from '@shopify/polaris-icons'
 import InlineEditableText from "../../../components/shared/InlineEditableText"
 import func from "@/util/func"
 import FlyLayout from "../../../components/layouts/FlyLayout";
@@ -50,31 +50,21 @@ const MetadataField = ({ icon, tooltip, value }) => {
     );
 };
 
-const buildOsLabel = (agent) => {
-    const os = agent?.os;
-    const osVersion = agent?.osVersion;
-    if (!os || os === DEFAULT_VALUE) return null;
-    return osVersion && osVersion !== DEFAULT_VALUE ? `${os} ${osVersion}` : os;
-};
-
 const getMetadataFields = (agent) => [
     { icon: CodeMinor, tooltip: "Agent ID", value: agent.agentId },
     { icon: DynamicSourceMinor, tooltip: "Device ID", value: agent.deviceId },
     { icon: ClockMinor, tooltip: "Last Heartbeat", value: func.prettifyEpoch(agent.lastHeartbeat) },
     { icon: CalendarMinor, tooltip: "Last Deployed", value: func.prettifyEpoch(agent.lastDeployed) },
-    { icon: DesktopMajor, tooltip: "OS", value: buildOsLabel(agent) },
-    { icon: CodeMajor, tooltip: "Architecture", value: agent.arch !== DEFAULT_VALUE ? agent.arch : null },
 ];
 
 const DEVICE_INFO_FIELDS = [
-    { label: "OS", key: "os", format: (v, a) => buildOsLabel(a) },
+    { label: "OS", key: "os", format: (v) => (v && v !== DEFAULT_VALUE) ? v : null },
     { label: "Architecture", key: "arch" },
     { label: "Kernel", key: "kernelVersion" },
     { label: "RAM", key: "totalRamGB", format: (v) => (v != null && v !== DEFAULT_VALUE) ? `${v} GB` : null },
     { label: "CPU Cores", key: "cpuCount", format: (v) => (v != null && v !== DEFAULT_VALUE) ? String(v) : null },
     { label: "Virtual Machine", key: "isVM", isVM: true },
     { label: "Locale", key: "locale" },
-    { label: "Timezone", key: "timezone" },
     { label: "Public IP", key: "publicIP" },
     { label: "Shield Version", key: "agentVersion" },
 ];
@@ -664,7 +654,7 @@ function AgentDetails({
 
     const AgentLogsTab = {
         id: 'agent-logs',
-        content: 'Agent Logs',
+        content: 'Logs',
         component: (
             <Box paddingBlockStart={"4"}>
                 <VerticalStack gap="2">

@@ -67,10 +67,7 @@ const resourceName = {
 
 const convertDataIntoTableFormat = (agentData) => {
     const os = agentData?.os;
-    const osVersion = agentData?.osVersion;
-    const osLabel = os && os !== DEFAULT_VALUE
-        ? `${os}${osVersion && osVersion !== DEFAULT_VALUE ? ` ${osVersion}` : ''}`.trim()
-        : DEFAULT_VALUE;
+    const osLabel = os && os !== DEFAULT_VALUE ? os : DEFAULT_VALUE;
     return {
         ...agentData,
         id: agentData?.agentId,
