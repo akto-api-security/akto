@@ -373,11 +373,11 @@ public class GuardrailPolicies {
     @NoArgsConstructor
     public static class TokenLimitDetection {
         private boolean enabled;
-        private double confidenceScore;
+        private int threshold; // max allowed tokens per prompt
 
-        public TokenLimitDetection(boolean enabled, double confidenceScore) {
+        public TokenLimitDetection(boolean enabled, int threshold) {
             this.enabled = enabled;
-            this.confidenceScore = confidenceScore;
+            this.threshold = threshold;
         }
     }
 

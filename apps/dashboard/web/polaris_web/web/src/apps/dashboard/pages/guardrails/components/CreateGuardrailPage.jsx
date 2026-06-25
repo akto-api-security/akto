@@ -130,7 +130,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     // Step 7: Usage based Guardrails
     const [enableTokenLimit, setEnableTokenLimit] = useState(false);
-    const [tokenLimitConfidenceScore, setTokenLimitConfidenceScore] = useState(0.7);
+    const [tokenLimitThreshold, setTokenLimitThreshold] = useState(4096);
 
     // Step 9: Tools Guardrails
     const [enableToolMisuse, setEnableToolMisuse] = useState(true);
@@ -207,7 +207,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         confidenceScore,
         // Step 7
         enableTokenLimit,
-        tokenLimitConfidenceScore,
+        tokenLimitThreshold,
         // Step 9
         enableToolMisuse,
         enableMaliciousTools,
@@ -470,7 +470,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setUrl("");
         setConfidenceScore(25);
         setEnableTokenLimit(false);
-        setTokenLimitConfidenceScore(0.7);
+        setTokenLimitThreshold(4096);
         setEnableToolMisuse(true);
         setEnableMaliciousTools(true);
         setEnableToolNameDescriptionMismatch(true);
@@ -587,7 +587,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setScannerState(policy.banCodeDetection, setEnableBanCode, setBanCodeConfidenceScore);
         setScannerState(policy.secretsDetection, setEnableSecrets, setSecretsConfidenceScore);
         setScannerState(policy.sentimentDetection, setEnableSentiment, setSentimentConfidenceScore);
-        setScannerState(policy.tokenLimitDetection, setEnableTokenLimit, setTokenLimitConfidenceScore);
+        setEnableTokenLimit(policy.tokenLimitDetection?.enabled || false);
+        setTokenLimitThreshold(policy.tokenLimitDetection?.threshold || 4096);
 
         // External model based evaluation
         setEnableExternalModel(!!policy.url);
@@ -755,7 +756,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 },
                 tokenLimitDetection: {
                     enabled: enableTokenLimit,
-                    confidenceScore: tokenLimitConfidenceScore
+                    threshold: tokenLimitThreshold
                 },
                 url: enableExternalModel ? (url || null) : null,
                 confidenceScore: enableExternalModel ? confidenceScore : null,
@@ -902,8 +903,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     <UsageGuardrailsStep
                         enableTokenLimit={enableTokenLimit}
                         setEnableTokenLimit={setEnableTokenLimit}
-                        tokenLimitConfidenceScore={tokenLimitConfidenceScore}
-                        setTokenLimitConfidenceScore={setTokenLimitConfidenceScore}
+                        tokenLimitThreshold={tokenLimitThreshold}
+                        setTokenLimitThreshold={setTokenLimitThreshold}
                     />
                 );
             case 8:
@@ -1022,7 +1023,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             banCodeDetection: buildDetectionConfig(enableBanCode, banCodeConfidenceScore),
             secretsDetection: buildDetectionConfig(enableSecrets, secretsConfidenceScore),
             sentimentDetection: buildDetectionConfig(enableSentiment, sentimentConfidenceScore),
-            tokenLimitDetection: buildDetectionConfig(enableTokenLimit, tokenLimitConfidenceScore),
+            tokenLimitDetection: { enabled: enableTokenLimit, threshold: tokenLimitThreshold },
             url: enableExternalModel ? (url || null) : null,
             confidenceScore: enableExternalModel ? confidenceScore : null,
             applyToAllServers: applyToAllServers,
