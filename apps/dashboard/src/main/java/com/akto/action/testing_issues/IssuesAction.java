@@ -759,12 +759,10 @@ public class IssuesAction extends UserAction {
             return SUCCESS.toUpperCase();
         }
 
-        int effectiveLimit = (limit > 0) ? limit : subCategoryNames.size();
-
         // Fetch all templates matching the requested IDs — includes AKTO_TEMPLATES and CUSTOM.
         Bson filter = Filters.in("_id", subCategoryNames);
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(
-                false, fetchOnlyActive, skip, effectiveLimit, filter);
+                false, fetchOnlyActive, skip, limit, filter);
 
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             try {
