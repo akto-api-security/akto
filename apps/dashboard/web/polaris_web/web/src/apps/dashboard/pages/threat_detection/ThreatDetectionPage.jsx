@@ -602,12 +602,15 @@ function ThreatDetectionPage() {
                     latency = [];
                     for (let i = 0; i < raw.length; i += bucketSize) {
                         const bucket = raw.slice(i, i + bucketSize);
-                        const avg = field => bucket.reduce((sum, m) => sum + m[field], 0) / bucket.length;
+                        // Percentiles cannot be averaged; take the max P95 within each
+                        // bucket so every displayed point stays a real P95 value (the
+                        // worst-case P95 in that interval) rather than a fabricated mean.
+                        const maxOf = field => bucket.reduce((m, x) => Math.max(m, x[field]), 0);
                         latency.push({
                             timestamp: bucket[Math.floor(bucket.length / 2)].timestamp,
-                            incomingRequestP95: avg('incomingRequestP95'),
-                            outputResultP95:    avg('outputResultP95'),
-                            totalP95:           avg('totalP95'),
+                            incomingRequestP95: maxOf('incomingRequestP95'),
+                            outputResultP95:    maxOf('outputResultP95'),
+                            totalP95:           maxOf('totalP95'),
                         });
                     }
                 }
@@ -723,7 +726,7 @@ function ThreatDetectionPage() {
     // Normal mode - show table, charts, and sidebar
     const components = [
         <ChartComponent subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
-        ...(window.USER_NAME?.includes('@akto.io') ? [
+        ...((isEndpointSecurityCategory() || isAgenticSecurityCategory()) && window.USER_NAME?.includes('@akto.io') ? [
             <P95LatencyGraph
                 key="threat-detection-latency"
                 title={`${mapLabel("Threat", getDashboardCategory())} Detection Latency`}

@@ -36,12 +36,8 @@ const P95LatencyGraph = ({ title, subtitle, dataType = 'mcp-security', startTime
                 data: latencyData.map(item => item.outputResultP95),
                 events: { click: () => { if (onLatencyClick) onLatencyClick('output'); } }
             },
-            {
-                color: COLORMAP.total,
-                name: 'Total Latency P95',
-                data: latencyData.map(item => item.totalP95),
-                events: { click: () => { if (onLatencyClick) onLatencyClick('total'); } }
-            },
+            // Note: no combined "total" series — request and response are separate
+            // events, so P95(request) + P95(response) is not a real percentile.
         ];
 
         setSeriesData(series.filter(s => s.data.some(v => v > 0)));

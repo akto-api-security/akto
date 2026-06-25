@@ -17,24 +17,53 @@ type MetricData struct {
 	MetricType string  `json:"metricType"`
 	ModuleType string  `json:"moduleType"`
 	AccountId  int64   `json:"accountId,omitempty"`
+	// SampleCount is the number of samples the P95 was computed over. Internal
+	// only (not sent to the db-abstractor); used for observability logging.
+	SampleCount int `json:"-"`
+}
+
+// Adaptive-window P95: each flush computes the percentile over the last
+// windowSeconds (1 minute) for responsiveness, but if that minute holds fewer
+// than minSamples — too few for a stable P95, where one slow outlier dominates —
+// the window widens to the most recent minSamples we still retain (up to
+// maxLookbackSeconds). High traffic gets per-minute resolution; sparse traffic
+// gets a statistically meaningful value instead of a spiky one.
+const (
+	windowSeconds      = 60      // primary 1-minute window
+	maxLookbackSeconds = 300     // retain up to 5 minutes for the sparse fallback
+	minSamples         = 20      // minimum samples for a meaningful P95
+	maxSamples         = 100_000 // hard per-direction cap to bound memory
+)
+
+type sample struct {
+	ns int64
+	at int64 // unix seconds when recorded
 }
 
 type accountAccumulator struct {
 	mu              sync.Mutex
-	requestSamples  []int64
-	responseSamples []int64
+	requestSamples  []sample
+	responseSamples []sample
 }
 
-func (a *accountAccumulator) recordRequest(ms int64) {
+func (a *accountAccumulator) recordRequest(ns int64) {
 	a.mu.Lock()
-	a.requestSamples = append(a.requestSamples, ms)
+	a.requestSamples = appendCapped(a.requestSamples, ns)
 	a.mu.Unlock()
 }
 
-func (a *accountAccumulator) recordResponse(ms int64) {
+func (a *accountAccumulator) recordResponse(ns int64) {
 	a.mu.Lock()
-	a.responseSamples = append(a.responseSamples, ms)
+	a.responseSamples = appendCapped(a.responseSamples, ns)
 	a.mu.Unlock()
+}
+
+func appendCapped(s []sample, ns int64) []sample {
+	s = append(s, sample{ns: ns, at: time.Now().Unix()})
+	if len(s) > maxSamples {
+		s = s[len(s)-maxSamples:]
+	}
+	return s
 }
 
 // p95 returns the 95th-percentile of nanosecond samples converted to milliseconds.
@@ -48,21 +77,63 @@ func p95(samples []int64) float64 {
 }
 
 func (a *accountAccumulator) drain(accountId string) []MetricData {
+	now := time.Now().Unix()
+	retainCutoff := now - maxLookbackSeconds
+	windowCutoff := now - windowSeconds
 	a.mu.Lock()
-	reqSamples := a.requestSamples
-	a.requestSamples = nil
-	resSamples := a.responseSamples
-	a.responseSamples = nil
+	// Retain up to maxLookbackSeconds so the sparse-window fallback has history.
+	a.requestSamples = evictOlder(a.requestSamples, retainCutoff)
+	a.responseSamples = evictOlder(a.responseSamples, retainCutoff)
+	reqVals := windowSet(a.requestSamples, windowCutoff)
+	resVals := windowSet(a.responseSamples, windowCutoff)
 	a.mu.Unlock()
 
 	accIdInt, _ := strconv.ParseInt(accountId, 10, 64)
-	now := time.Now().Unix()
 	var out []MetricData
-	if len(reqSamples) > 0 {
-		out = append(out, MetricData{MetricId: "GUARDRAIL_REQUEST_LATENCY", Value: p95(reqSamples), Timestamp: now, MetricType: "LATENCY", ModuleType: "AKTO_AGENT_GATEWAY", AccountId: accIdInt})
+	if len(reqVals) > 0 {
+		out = append(out, MetricData{MetricId: "GUARDRAIL_REQUEST_LATENCY", Value: p95(reqVals), Timestamp: now, MetricType: "LATENCY", ModuleType: "AKTO_AGENT_GATEWAY", AccountId: accIdInt, SampleCount: len(reqVals)})
 	}
-	if len(resSamples) > 0 {
-		out = append(out, MetricData{MetricId: "GUARDRAIL_RESPONSE_LATENCY", Value: p95(resSamples), Timestamp: now, MetricType: "LATENCY", ModuleType: "AKTO_AGENT_GATEWAY", AccountId: accIdInt})
+	if len(resVals) > 0 {
+		out = append(out, MetricData{MetricId: "GUARDRAIL_RESPONSE_LATENCY", Value: p95(resVals), Timestamp: now, MetricType: "LATENCY", ModuleType: "AKTO_AGENT_GATEWAY", AccountId: accIdInt, SampleCount: len(resVals)})
+	}
+	return out
+}
+
+// evictOlder drops samples recorded before cutoff. Samples are appended in time
+// order, so the oldest are always in the prefix.
+func evictOlder(s []sample, cutoff int64) []sample {
+	i := 0
+	for i < len(s) && s[i].at < cutoff {
+		i++
+	}
+	return s[i:]
+}
+
+// windowSet returns the latency values to compute P95 over: samples within the
+// last windowSeconds (those at-or-after windowCutoff), or — if that minute holds
+// fewer than minSamples — the most recent minSamples we still retain, so a sparse
+// minute widens its lookback instead of producing a spiky, outlier-driven value.
+func windowSet(s []sample, windowCutoff int64) []int64 {
+	i := 0
+	for i < len(s) && s[i].at < windowCutoff {
+		i++
+	}
+	if len(s)-i < minSamples {
+		// Sparse window: widen to the most recent minSamples (bounded by retention).
+		i = len(s) - minSamples
+		if i < 0 {
+			i = 0
+		}
+	}
+	return latencies(s[i:])
+}
+
+// latencies copies the nanosecond values into a fresh slice so p95 can sort it
+// without disturbing the retained rolling window.
+func latencies(s []sample) []int64 {
+	out := make([]int64, len(s))
+	for i := range s {
+		out[i] = s[i].ns
 	}
 	return out
 }
@@ -94,8 +165,8 @@ func (a *Accumulator) get(accountId string) *accountAccumulator {
 	return acc
 }
 
-func (a *Accumulator) RecordRequest(accountId string, ms int64)  { a.get(accountId).recordRequest(ms) }
-func (a *Accumulator) RecordResponse(accountId string, ms int64) { a.get(accountId).recordResponse(ms) }
+func (a *Accumulator) RecordRequest(accountId string, ns int64)  { a.get(accountId).recordRequest(ns) }
+func (a *Accumulator) RecordResponse(accountId string, ns int64) { a.get(accountId).recordResponse(ns) }
 
 // DrainAll returns P95 latency metrics grouped by account and resets sample buffers.
 func (a *Accumulator) DrainAll() map[string][]MetricData {

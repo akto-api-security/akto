@@ -79,6 +79,16 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 				}
 				if err := dbClient.IngestMetrics(payload); err != nil {
 					logger.Error("Failed to flush guardrail metrics", zap.String("account", accountId), zap.Error(err))
+					continue
+				}
+				// Log the actual P95 values sent so the computed metric is observable.
+				for _, m := range batch {
+					logger.Info("Flushed guardrail P95 metric",
+						zap.String("account", accountId),
+						zap.String("metricId", m.MetricId),
+						zap.Float64("p95Ms", m.Value),
+						zap.Int("sampleCount", m.SampleCount),
+						zap.Int64("timestamp", m.Timestamp))
 				}
 			}
 		}
