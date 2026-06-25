@@ -16465,6 +16465,35 @@
             </result>
         </action>
 
+        <action name="api/reopenViolation" class="com.akto.action.NhiGovernanceViolationsAction" method="reopenViolation">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">NHI_DATA</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">NHI_GOVERNANCE</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/createJiraTicketFromViolation" class="com.akto.action.NhiGovernanceViolationsAction" method="createJiraTicketFromViolation">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
