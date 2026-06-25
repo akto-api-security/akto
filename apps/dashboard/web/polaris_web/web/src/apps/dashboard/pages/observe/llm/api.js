@@ -97,8 +97,9 @@ export default {
             totalOutputTokens: r?.aggOutputTokens     || 0,
             topUsers:          r?.aggTopUsers         || [],
             userBreakdown:     r?.aggUserBreakdown    || [],
-            sessionSpark:      r?.aggSessionSpark?.length  ? r.aggSessionSpark  : [0],
-            sessionSparkTs:    r?.aggSessionSparkTs        || [],
+            sessionSpark:      r?.aggSessionSpark?.length      ? r.aggSessionSpark      : [0],
+            sessionSparkTs:    r?.aggSessionSparkTs            || [],
+            tokenSpark:        r?.aggSessionTokenSpark?.length ? r.aggSessionTokenSpark : [0],
         }));
     },
 

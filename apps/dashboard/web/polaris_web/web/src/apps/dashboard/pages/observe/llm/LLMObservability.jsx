@@ -13,7 +13,7 @@ import PersistStore from "@/apps/main/PersistStore";
 import "../../../components/layouts/style.css";
 
 import api from "./api";
-import { buildWeightedSparkline, formatSparklineLabels, enrichRow } from "./utils";
+import { formatSparklineLabels, enrichRow } from "./utils";
 import { formatCompact, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
 import { ARGUS_TRACE_COL_DEFS } from "./columns";
 import SessionsView from "./SessionsView";
@@ -23,11 +23,6 @@ import MessagesView from "./MessagesView";
 
 const SERVICE_COLORS = ["#9642FC", "#4285F4", "#10A37F", "#EAB308", "#F97316", "#DC2626"];
 
-// Normalize latestTimestamp (could be ms or s) → epoch seconds.
-function toEpochSec(ts) {
-    if (!ts) return 0;
-    return ts > 1e10 ? Math.floor(ts / 1000) : ts;
-}
 
 export default function LLMObservability() {
     const dashboardCategory = PersistStore(state => state.dashboardCategory) || "API Security";
@@ -89,15 +84,8 @@ export default function LLMObservability() {
     const sessionSparkTs     = useMemo(() => sessionStats?.sessionSparkTs || [],  [sessionStats]);
     const sessionSparkLabels = useMemo(() => formatSparklineLabels(sessionSparkTs), [sessionSparkTs]);
 
-    const { counts: tokenSpark, timestamps: tokenSparkTs } = useMemo(
-        () => buildWeightedSparkline(
-            sessions,
-            r => toEpochSec(r.latestTimestamp),
-            r => (Number(r._inputTokens) || 0) + (Number(r._outputTokens) || 0)
-        ),
-        [sessions]
-    );
-    const tokenSparkLabels = useMemo(() => formatSparklineLabels(tokenSparkTs), [tokenSparkTs]);
+    const tokenSpark       = useMemo(() => sessionStats?.tokenSpark || [0], [sessionStats]);
+    const tokenSparkLabels = sessionSparkLabels;
 
     const argusTraceSparkLabels = useMemo(
         () => formatSparklineLabels(argusStats?.traceSparkTs || []),
