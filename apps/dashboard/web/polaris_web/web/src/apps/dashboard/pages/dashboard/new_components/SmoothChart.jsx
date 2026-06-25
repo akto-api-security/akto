@@ -1,6 +1,7 @@
 import React from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
+import transform from '../../observe/transform';
 
 function SmoothAreaChart({
     tickPositions,
@@ -48,7 +49,7 @@ function SmoothAreaChart({
                 style: { fontSize: '11px' },
                 formatter: function () {
                     const label = labels[this.point.index];
-                    return label ? `<b>${label}:</b> ${this.y}` : `<b>${this.y}</b>`;
+                    return label ? `<b>${label}:</b> ${transform.formatNumberWithCommas(this.y)}` : `<b>${transform.formatNumberWithCommas(this.y)}</b>`;
                 },
             }
             : { enabled: false },
