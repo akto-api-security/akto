@@ -16242,7 +16242,7 @@
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -16270,7 +16270,7 @@
                 <param name="accessType">READ_WRITE</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -16299,7 +16299,7 @@
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -16328,7 +16328,7 @@
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -16357,7 +16357,7 @@
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -16386,7 +16386,7 @@
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -16415,7 +16415,7 @@
                 <param name="accessType">READ_WRITE</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -16444,7 +16444,7 @@
                 <param name="accessType">READ_WRITE</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -16473,7 +16473,7 @@
                 <param name="accessType">READ_WRITE</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">NHI_GOVERNANCE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
