@@ -3604,19 +3604,26 @@ public class InitializerListener implements ServletContextListener {
 
 
     private static void removeRagDatabaseTag(BackwardCompatibility backwardCompatibility) {
+        int accountId = Context.accountId.get();
         if (backwardCompatibility.getRemoveRagDatabaseTag() == 0) {
+            logger.infoAndAddToDb("removeRagDatabaseTag: starting migration for accountId=" + accountId, LogDb.DASHBOARD);
             Bson ragTagFilter = Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_RAG_DATABASE_TAG));
             long count = ApiCollectionsDao.instance.getMCollection().countDocuments(ragTagFilter);
+            logger.infoAndAddToDb("removeRagDatabaseTag: found " + count + " collections with RAG database tag for accountId=" + accountId, LogDb.DASHBOARD);
             if (count > 0) {
                 ApiCollectionsDao.instance.updateMany(
                     ragTagFilter,
                     Updates.pull(ApiCollection.TAGS_STRING, new BasicDBObject(CollectionTags.KEY_NAME, Constants.AKTO_RAG_DATABASE_TAG))
                 );
+                logger.infoAndAddToDb("removeRagDatabaseTag: removed RAG database tag from " + count + " collections for accountId=" + accountId, LogDb.DASHBOARD);
             }
             BackwardCompatibilityDao.instance.updateOne(
                 Filters.eq("_id", backwardCompatibility.getId()),
                 Updates.set(BackwardCompatibility.REMOVE_RAG_DATABASE_TAG, Context.now())
             );
+            logger.infoAndAddToDb("removeRagDatabaseTag: migration complete for accountId=" + accountId, LogDb.DASHBOARD);
+        } else {
+            logger.infoAndAddToDb("removeRagDatabaseTag: already executed, skipping for accountId=" + accountId, LogDb.DASHBOARD);
         }
     }
 
@@ -3625,6 +3632,7 @@ public class InitializerListener implements ServletContextListener {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
             setOrganizationsInBilling(backwardCompatibility);
         }
+        removeRagDatabaseTag(backwardCompatibility);
         setAktoDefaultNewUI(backwardCompatibility);
         updateCustomDataTypeOperator(backwardCompatibility);
         markSummariesAsVulnerable(backwardCompatibility);
@@ -3656,7 +3664,6 @@ public class InitializerListener implements ServletContextListener {
         addDefaultAdvancedFilters(backwardCompatibility);
         moveAzureSamlConfig(backwardCompatibility);
         moveOktaOidcSSO(backwardCompatibility);
-        removeRagDatabaseTag(backwardCompatibility);
     }
 
     public static void printMultipleHosts(int apiCollectionId) {
