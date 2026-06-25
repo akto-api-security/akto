@@ -19,7 +19,7 @@ import InfoCard from "../dashboard/new_components/InfoCard";
 import BarGraph from "../../components/charts/BarGraph";
 import SessionStore from "../../../main/SessionStore";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
-import { getDashboardCategory, isApiSecurityCategory, isDastCategory, mapLabel } from "../../../main/labelHelper";
+import { getDashboardCategory, isApiSecurityCategory, isDastCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel } from "../../../main/labelHelper";
 import LineChart from "../../components/charts/LineChart";
 import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
 import { LABELS } from "./constants";
@@ -27,6 +27,7 @@ import useThreatReportDownload from "../../hooks/useThreatReportDownload";
 import WebhookIntegrationModal from "./components/WebhookIntegrationModal";
 import { updateThreatFiltersStore } from "./utils/threatFilters";
 import { redactSampleDataByKeywords } from "./utils/redactSampleData";
+import { resolveComplianceClauseMap } from "./utils/formatUtils";
 const convertToGraphData = (severityMap) => {
     let dataArr = []
     Object.keys(severityMap).forEach((x) => {
@@ -230,6 +231,9 @@ function ThreatDetectionPage() {
             filterId: searchParams.get("filterId"),
             status: statusValue,
             severity: searchParams.get("severity") || '',
+            url: searchParams.get("url") || '',
+            method: searchParams.get("method") || '',
+            ruleViolated: searchParams.get("ruleViolated") || '-',
             hasQueryEvent: Boolean(
                 searchParams.get("refId") &&
                 searchParams.get("eventType") &&
@@ -654,16 +658,25 @@ function ThreatDetectionPage() {
             currentRefId: queryParams.refId,
             rowDataList: maliciousPayloads,
             moreInfoData: {
-              url: rowContext?.url || '',
-              method: rowContext?.method || '',
+              url: rowContext?.url || queryParams.url || '',
+              method: rowContext?.method || queryParams.method || '',
               apiCollectionId: rowContext?.apiCollectionId,
               templateId: queryParams.filterId,
               // Prefer the row's severity (set by rowClicked or passed via ?severity= URL param),
               // so deep-linked opens show the actual event severity, not the template default.
               severity: rowContext?.severity || queryParams.severity || '',
               sessionId: rowContext?.sessionId || '',
-              ruleViolated: rowContext?.ruleViolated || '-',
-              complianceMap: rowContext?.complianceMapData || {}
+              ruleViolated: rowContext?.ruleViolated || queryParams.ruleViolated || '-',
+              complianceMap: rowContext?.complianceMapData || (() => {
+                if (!queryParams.filterId) return {};
+                const { threatFiltersMap, guardrailComplianceMap } = SessionStore.getState();
+                const isGuardrail = isAgenticSecurityCategory() || isEndpointSecurityCategory();
+                const event = { filterId: queryParams.filterId };
+                if (queryParams.ruleViolated && queryParams.ruleViolated !== '-') {
+                  event.metadata = JSON.stringify({ rule_violated: queryParams.ruleViolated });
+                }
+                return resolveComplianceClauseMap(event, isGuardrail, threatFiltersMap, guardrailComplianceMap);
+              })()
             },
             currentEventId: rowContext?.eventId || '',
             currentEventStatus: queryParams.status || rowContext?.status || '',

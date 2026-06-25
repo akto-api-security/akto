@@ -116,31 +116,25 @@ public abstract class AzureOpenAIPromptHandler {
         return PromptHandler.temperature;
     }
 
-    protected String call(String prompt) throws Exception {
+    private String extractRawContent(String prompt) throws Exception {
         MediaType mediaType = MediaType.parse("application/json");
         JSONObject payload = new JSONObject();
-        
-        // Set model parameters
+
         payload.put("temperature", getTemperature());
         payload.put("top_p", 0.9);
         payload.put("max_tokens", getMaxTokens());
         payload.put("frequency_penalty", 0);
         payload.put("presence_penalty", 0.6);
-        
-        // Create messages array
+
         JSONArray messages = new JSONArray();
         JSONObject systemMessage = new JSONObject();
         systemMessage.put("role", "system");
         systemMessage.put("content", prompt);
         messages.put(systemMessage);
-        
         payload.put("messages", messages);
 
         RequestBody body = RequestBody.create(payload.toString(), mediaType);
         String apiKey = AZURE_OPENAI_API_KEY;
-        if(apiKey == null || apiKey.isEmpty()){
-            apiKey = AZURE_OPENAI_API_KEY;
-        }
         Request request = new Request.Builder()
                 .url(getAzureOpenAIEndpoint())
                 .method("POST", body)
@@ -151,8 +145,7 @@ public abstract class AzureOpenAIPromptHandler {
                 .build();
 
         logger.warn("Calling ai with payload: " + payload.toString());
-        try (
-            Response response = client.newCall(request).execute()) {
+        try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 logger.error("Unexpected response code: " + response.code());
                 return null;
@@ -160,24 +153,25 @@ public abstract class AzureOpenAIPromptHandler {
             ResponseBody responseBody = response.body();
             String rawResponse = responseBody != null ? responseBody.string() : null;
             logger.warn("Response from ai: " + rawResponse);
-            
-            if (rawResponse == null) {
-                return null;
-            }
-            
-            // Extract content from Azure OpenAI response format
+            if (rawResponse == null) return null;
+
             JSONObject jsonResponse = new JSONObject(rawResponse);
             JSONArray choices = jsonResponse.getJSONArray("choices");
             JSONObject firstChoice = choices.getJSONObject(0);
             JSONObject message = firstChoice.getJSONObject("message");
-            String content = message.getString("content");
-            
-            // Clean the content like in PromptHandler
-            return cleanJSON(content);
+            return message.getString("content");
         } catch (IOException e) {
             logger.error("Error while executing request: " + e.getMessage());
             return null;
         }
+    }
+
+    protected String call(String prompt) throws Exception {
+        return cleanJSON(extractRawContent(prompt));
+    }
+
+    protected String callForArray(String prompt) throws Exception {
+        return cleanJSONArray(extractRawContent(prompt));
     }
     
     static String cleanJSON(String rawResponse) {
@@ -195,6 +189,21 @@ public abstract class AzureOpenAIPromptHandler {
         int firstBrace = rawResponse.indexOf('{');
         if (firstBrace != -1) {
             rawResponse = rawResponse.substring(firstBrace);
+        }
+        return rawResponse.trim();
+    }
+
+    static String cleanJSONArray(String rawResponse) {
+        if (rawResponse == null || rawResponse.isEmpty()) {
+            return "NOT_FOUND";
+        }
+        int lastBracket = rawResponse.lastIndexOf(']');
+        if (lastBracket != -1) {
+            rawResponse = rawResponse.substring(0, lastBracket + 1);
+        }
+        int firstBracket = rawResponse.indexOf('[');
+        if (firstBracket != -1) {
+            rawResponse = rawResponse.substring(firstBracket);
         }
         return rawResponse.trim();
     }

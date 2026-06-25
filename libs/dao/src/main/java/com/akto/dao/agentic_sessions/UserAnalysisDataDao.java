@@ -37,9 +37,14 @@ public class UserAnalysisDataDao extends AccountsContextDao<UserAnalysisData> {
             Updates.set(UserAnalysisData.USER_NAME, userName),
             Updates.set(UserAnalysisData.LAST_UPDATED_AT, now),
             Updates.inc(UserAnalysisData.TOTAL_INPUT_TOKENS, inputTokensDelta),
-            Updates.inc(UserAnalysisData.TOTAL_OUTPUT_TOKENS, outputTokensDelta),
-            Updates.set(UserAnalysisData.AI_SUMMARY, aiSummary)
+            Updates.inc(UserAnalysisData.TOTAL_OUTPUT_TOKENS, outputTokensDelta)
         );
+
+        // Only overwrite the summary when we have a freshly generated one; null means
+        // no AI classification ran this tick (all-cache-hit), so preserve existing value.
+        if (aiSummary != null) {
+            update = Updates.combine(update, Updates.set(UserAnalysisData.AI_SUMMARY, aiSummary));
+        }
 
         if (topicDeltas != null) {
             for (Map.Entry<String, Integer> e : topicDeltas.entrySet()) {

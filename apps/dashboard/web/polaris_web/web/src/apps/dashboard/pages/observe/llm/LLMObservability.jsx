@@ -13,7 +13,7 @@ import PersistStore from "@/apps/main/PersistStore";
 import "../../../components/layouts/style.css";
 
 import api from "./api";
-import { buildSparkline, buildWeightedSparkline, buildSparklineLabels, enrichRow } from "./utils";
+import { formatSparklineLabels, enrichRow } from "./utils";
 import { formatCompact, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
 import { ARGUS_TRACE_COL_DEFS } from "./columns";
 import SessionsView from "./SessionsView";
@@ -23,11 +23,6 @@ import MessagesView from "./MessagesView";
 
 const SERVICE_COLORS = ["#9642FC", "#4285F4", "#10A37F", "#EAB308", "#F97316", "#DC2626"];
 
-// Normalize latestTimestamp (could be ms or s) → epoch seconds.
-function toEpochSec(ts) {
-    if (!ts) return 0;
-    return ts > 1e10 ? Math.floor(ts / 1000) : ts;
-}
 
 export default function LLMObservability() {
     const dashboardCategory = PersistStore(state => state.dashboardCategory) || "API Security";
@@ -85,23 +80,16 @@ export default function LLMObservability() {
 
     // ─── Atlas graph data (sessions) ─────────────────────────────────────────
 
-    const sessionSpark = useMemo(
-        () => buildSparkline(sessions, r => toEpochSec(r.latestTimestamp)),
-        [sessions]
-    );
+    const sessionSpark       = useMemo(() => sessionStats?.sessionSpark  || [0], [sessionStats]);
+    const sessionSparkTs     = useMemo(() => sessionStats?.sessionSparkTs || [],  [sessionStats]);
+    const sessionSparkLabels = useMemo(() => formatSparklineLabels(sessionSparkTs), [sessionSparkTs]);
 
-    const tokenSpark = useMemo(
-        () => buildWeightedSparkline(
-            sessions,
-            r => toEpochSec(r.latestTimestamp),
-            r => (Number(r._inputTokens) || 0) + (Number(r._outputTokens) || 0)
-        ),
-        [sessions]
-    );
+    const tokenSpark       = useMemo(() => sessionStats?.tokenSpark || [0], [sessionStats]);
+    const tokenSparkLabels = sessionSparkLabels;
 
-    const sparklineLabels = useMemo(
-        () => buildSparklineLabels(epochs.since, epochs.until),
-        [epochs]
+    const argusTraceSparkLabels = useMemo(
+        () => formatSparklineLabels(argusStats?.traceSparkTs || []),
+        [argusStats]
     );
 
     // Breakdown by top 3 users (by session count) — comes from aggregated backend stats.
@@ -134,7 +122,9 @@ export default function LLMObservability() {
     // Top users by token usage — from aggregated backend stats.
     const topUserRows = useMemo(() => {
         const topUsers = sessionStats?.topUsers || [];
-        return topUsers.slice(0, 5).map(({ userName, totalTokens: tokens }) => ({
+        return topUsers
+            .sort((a, b) => (b.totalTokens || 0) - (a.totalTokens || 0))
+            .slice(0, 5).map(({ userName, totalTokens: tokens }) => ({
             id: userName,
             name: userName,
             type: "OS",
@@ -244,7 +234,7 @@ export default function LLMObservability() {
                             total={argusStats?.totalSpans || 0}
                             sparklineCounts={argusTraceSpark}
                             sparklineColor="#9642FC"
-                            sparklineLabels={sparklineLabels}
+                            sparklineLabels={argusTraceSparkLabels}
                             breakdown={argusTraceBreakdown}
                             noCard
                         />
@@ -257,7 +247,7 @@ export default function LLMObservability() {
                             total={formatCompact(argusTotalTokens)}
                             sparklineCounts={argusTokenSpark}
                             sparklineColor="#4285F4"
-                            sparklineLabels={sparklineLabels}
+                            sparklineLabels={argusTraceSparkLabels}
                             breakdown={[
                                 { label: `In: ${formatCompact(argusInputTokens)}`,  count: argusInputTokens,  color: "#4285F4" },
                                 { label: `Out: ${formatCompact(argusOutputTokens)}`, count: argusOutputTokens, color: "#10A37F" },
@@ -290,7 +280,7 @@ export default function LLMObservability() {
                             total={totalDisplaySessions}
                             sparklineCounts={sessionSpark}
                             sparklineColor="#9642FC"
-                            sparklineLabels={sparklineLabels}
+                            sparklineLabels={sessionSparkLabels}
                             breakdown={sessionBreakdown}
                             noCard
                         />
@@ -303,7 +293,7 @@ export default function LLMObservability() {
                             total={formatCompact(totalTokens)}
                             sparklineCounts={tokenSpark}
                             sparklineColor="#4285F4"
-                            sparklineLabels={sparklineLabels}
+                            sparklineLabels={tokenSparkLabels}
                             breakdown={[
                                 { label: `In: ${formatCompact(totalInputTokens)}`, count: totalInputTokens, color: "#4285F4" },
                                 { label: `Out: ${formatCompact(totalOutputTokens)}`, count: totalOutputTokens, color: "#10A37F" },
@@ -326,7 +316,7 @@ export default function LLMObservability() {
                 emptyStateText="No model data in this range."
             />
         </HorizontalGrid>
-    ), [isArgus, argusStats, argusTraceSpark, argusTraceBreakdown, argusTokenSpark, sparklineLabels, argusTotalTokens, argusInputTokens, argusOutputTokens, argusTopAppByInputTokens, argusTopTraceByTokens, totalDisplaySessions, sessionSpark, sessionBreakdown, totalTokens, totalInputTokens, totalOutputTokens, tokenSpark, topUserRows, topModelRows]);
+    ), [isArgus, argusStats, argusTraceSpark, argusTraceBreakdown, argusTokenSpark, argusTraceSparkLabels, argusTotalTokens, argusInputTokens, argusOutputTokens, argusTopAppByInputTokens, argusTopTraceByTokens, totalDisplaySessions, sessionSpark, sessionSparkLabels, sessionBreakdown, totalTokens, totalInputTokens, totalOutputTokens, tokenSpark, tokenSparkLabels, topUserRows, topModelRows]);
 
     return (
         <>
