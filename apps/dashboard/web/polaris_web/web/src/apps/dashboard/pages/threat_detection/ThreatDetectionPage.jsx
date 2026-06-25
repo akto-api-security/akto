@@ -19,7 +19,7 @@ import InfoCard from "../dashboard/new_components/InfoCard";
 import BarGraph from "../../components/charts/BarGraph";
 import SessionStore from "../../../main/SessionStore";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
-import { getDashboardCategory, isApiSecurityCategory, isDastCategory, mapLabel } from "../../../main/labelHelper";
+import { getDashboardCategory, isApiSecurityCategory, isDastCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel } from "../../../main/labelHelper";
 import LineChart from "../../components/charts/LineChart";
 import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
 import { LABELS } from "./constants";
@@ -27,6 +27,7 @@ import useThreatReportDownload from "../../hooks/useThreatReportDownload";
 import WebhookIntegrationModal from "./components/WebhookIntegrationModal";
 import { updateThreatFiltersStore } from "./utils/threatFilters";
 import { redactSampleDataByKeywords } from "./utils/redactSampleData";
+import { resolveComplianceClauseMap } from "./utils/formatUtils";
 const convertToGraphData = (severityMap) => {
     let dataArr = []
     Object.keys(severityMap).forEach((x) => {
@@ -666,7 +667,16 @@ function ThreatDetectionPage() {
               severity: rowContext?.severity || queryParams.severity || '',
               sessionId: rowContext?.sessionId || '',
               ruleViolated: rowContext?.ruleViolated || queryParams.ruleViolated || '-',
-              complianceMap: rowContext?.complianceMapData || {}
+              complianceMap: rowContext?.complianceMapData || (() => {
+                if (!queryParams.filterId) return {};
+                const { threatFiltersMap, guardrailComplianceMap } = SessionStore.getState();
+                const isGuardrail = isAgenticSecurityCategory() || isEndpointSecurityCategory();
+                const event = { filterId: queryParams.filterId };
+                if (queryParams.ruleViolated && queryParams.ruleViolated !== '-') {
+                  event.metadata = JSON.stringify({ rule_violated: queryParams.ruleViolated });
+                }
+                return resolveComplianceClauseMap(event, isGuardrail, threatFiltersMap, guardrailComplianceMap);
+              })()
             },
             currentEventId: rowContext?.eventId || '',
             currentEventStatus: queryParams.status || rowContext?.status || '',
