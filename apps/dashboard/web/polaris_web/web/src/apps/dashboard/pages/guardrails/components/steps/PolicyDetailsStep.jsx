@@ -1,5 +1,6 @@
-import { VerticalStack, Text, FormLayout, TextField, Checkbox, Select } from "@shopify/polaris";
+import { VerticalStack, Text, FormLayout, TextField, Select } from "@shopify/polaris";
 import { SEVERITY_OPTIONS } from "../../utils";
+import { ToggleRow } from "../ConfidenceDropdown";
 
 // Step metadata
 export const PolicyDetailsConfig = {
@@ -69,7 +70,7 @@ const PolicyDetailsStep = ({
                     helpText="Enter a message to display if your guardrail blocks the user prompt."
                     requiredIndicator
                 />
-                <Checkbox
+                <ToggleRow
                     label="Apply the same blocked message for responses"
                     checked={applyToResponses}
                     onChange={setApplyToResponses}

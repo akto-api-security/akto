@@ -1,4 +1,4 @@
-import { Box, Text, VerticalStack, HorizontalStack } from "@shopify/polaris";
+import { Box, Text, VerticalStack, HorizontalStack, Button, ButtonGroup } from "@shopify/polaris";
 import Dropdown from "../../../components/layouts/Dropdown";
 
 export const CONFIDENCE_OPTIONS = [
@@ -33,21 +33,31 @@ export const LEVEL_OPTIONS = [
     { label: "Trigger only if high confidence", helpText: "Fewest false alarms - blocks only when the system is very sure.", value: "low" },
 ];
 
+export const ENABLE_OPTIONS = [
+    { label: "Disable", value: "disable" },
+    { label: "Enable", value: "enable" },
+];
+
 const LEVELS = ["high", "medium", "low"];
 
 // Title/help on the left, dropdown on the right; children render below the row while active.
+// Title greys out (inherits the disabled text token) when the row is in the "disable" state.
 function DropdownShell({ title, helpText, id, options, current, onSelect, showChildren, children }) {
+    const off = current === "disable";
+    const currentLabel = (options.find(o => o.value === current) || {}).label;
     return (
         <VerticalStack gap="2">
             <HorizontalStack align="space-between" blockAlign="center" wrap={false} gap="4">
                 <Box style={{ flexGrow: 1, flexShrink: 1, minWidth: 0 }}>
                     <VerticalStack gap="1">
-                        {typeof title === "string" ? <Text as="span">{title}</Text> : title}
+                        <span style={off ? { color: "var(--p-color-text-disabled)" } : undefined}>
+                            {typeof title === "string" ? <Text as="span">{title}</Text> : title}
+                        </span>
                         {helpText && <Text as="span" color="subdued">{helpText}</Text>}
                     </VerticalStack>
                 </Box>
                 <Box style={{ flex: "0 0 auto", width: "260px" }}>
-                    <Dropdown id={id} menuItems={options} initial={current} selected={onSelect} />
+                    <Dropdown id={id} menuItems={options} initial={current} value={currentLabel} selected={onSelect} />
                 </Box>
             </HorizontalStack>
             {showChildren && children && (
@@ -76,9 +86,10 @@ function ConfidenceDropdown({ title, helpText, enabled, score, onChange, values 
 
 // With `enabled`: onChange({ enabled, level }). Without: onChange(level), "Disable" => "none".
 export function LevelDropdown({ title, helpText, level, enabled, onChange, id, children }) {
+    const norm = typeof level === "string" ? level.toLowerCase() : level;
     const hasEnable = enabled !== undefined;
-    const active = hasEnable ? !!enabled : level !== "none" && !!level;
-    const current = !active ? "disable" : (LEVELS.includes(level) ? level : "high");
+    const active = hasEnable ? !!enabled : norm !== "none" && !!norm;
+    const current = !active ? "disable" : (LEVELS.includes(norm) ? norm : "high");
     const onSelect = (value) => {
         if (hasEnable) onChange(value === "disable" ? { enabled: false } : { enabled: true, level: value });
         else onChange(value === "disable" ? "none" : value);
@@ -95,6 +106,41 @@ export function LevelDropdown({ title, helpText, level, enabled, onChange, id, c
         >
             {children}
         </DropdownShell>
+    );
+}
+
+// Binary Enable/Disable dropdown for features without confidence/level suboptions.
+// children render below the row while enabled (e.g. a builder panel).
+export function EnableDropdown({ title, helpText, enabled, onChange, id, children }) {
+    return (
+        <DropdownShell
+            id={id}
+            title={title}
+            helpText={helpText}
+            options={ENABLE_OPTIONS}
+            current={enabled ? "enable" : "disable"}
+            onSelect={(value) => onChange(value === "enable")}
+            showChildren={enabled}
+        >
+            {children}
+        </DropdownShell>
+    );
+}
+
+// On/Off segmented toggle row for boolean settings (label left, toggle right).
+export function ToggleRow({ label, checked, onChange }) {
+    return (
+        <HorizontalStack align="space-between" blockAlign="center" wrap={false} gap="4">
+            <Box style={{ flexGrow: 1, flexShrink: 1, minWidth: 0 }}>
+                <span style={!checked ? { color: "var(--p-color-text-disabled)" } : undefined}>
+                    {typeof label === "string" ? <Text as="span">{label}</Text> : label}
+                </span>
+            </Box>
+            <ButtonGroup segmented>
+                <Button size="slim" primary={checked === true} onClick={() => onChange(true)}>On</Button>
+                <Button size="slim" primary={!checked} onClick={() => onChange(false)}>Off</Button>
+            </ButtonGroup>
+        </HorizontalStack>
     );
 }
 

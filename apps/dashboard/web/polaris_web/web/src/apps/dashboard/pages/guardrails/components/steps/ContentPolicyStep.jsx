@@ -15,7 +15,7 @@ import { PlusMinor, EditMinor, DeleteMinor, ChevronDownMinor, ChevronUpMinor } f
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
-import ConfidenceDropdown, { LevelDropdown } from "../ConfidenceDropdown";
+import ConfidenceDropdown, { LevelDropdown, EnableDropdown, ToggleRow } from "../ConfidenceDropdown";
 import { GENERAL_BLOCKS, GENERAL_BLOCK_GROUPS, toDeniedTopic } from "../../generalBlocks";
 import func from "@/util/func";
 
@@ -334,26 +334,23 @@ const ContentPolicyStep = ({
 
                 {/* Context poisoning (demo only) */}
                 {func.isDemoAccount() && (
-                    <Box>
-                        <Checkbox
-                            label={<RuleLabelWithTag name="Enable context poisoning attacks" threats={RULE_OWASP_THREATS.contextPoisoning} />}
-                            checked={enableContextPoisoning ?? false}
-                            onChange={setEnableContextPoisoning}
-                            helpText="Detect and block attempts to poison agent memory or context."
-                        />
-                    </Box>
+                    <EnableDropdown
+                        id="context-poisoning"
+                        title={<RuleLabelWithTag name="Context poisoning attacks" threats={RULE_OWASP_THREATS.contextPoisoning} />}
+                        helpText="Detect and block attempts to poison agent memory or context."
+                        enabled={enableContextPoisoning ?? false}
+                        onChange={setEnableContextPoisoning}
+                    />
                 )}
 
                 {/* Denied Topics */}
-                <Box>
-                    <Checkbox
-                        label="Add denied topics"
-                        checked={enableDeniedTopics}
-                        onChange={setEnableDeniedTopics}
-                        helpText="Add up to 30 denied topics to block user inputs or model responses associated with the topic."
-                    />
-                    {enableDeniedTopics && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
+                <EnableDropdown
+                    id="denied-topics"
+                    title="Denied topics"
+                    helpText="Add up to 30 denied topics to block user inputs or model responses associated with the topic."
+                    enabled={enableDeniedTopics}
+                    onChange={setEnableDeniedTopics}
+                >
                             <VerticalStack gap="3">
                                 {editingIndex === null && (
                                     <VerticalStack gap="2">
@@ -400,62 +397,63 @@ const ContentPolicyStep = ({
                                     return renderViewRow(topic, customIdx);
                                 })}
                             </VerticalStack>
-                        </Box>
-                    )}
-                </Box>
+                </EnableDropdown>
 
                 {/* Harmful Categories */}
-                <Box>
-                    <Checkbox
-                        label="Enable harmful categories filters"
-                        checked={enableHarmfulCategories}
-                        onChange={setEnableHarmfulCategories}
-                        helpText="Detect and block harmful user inputs and model responses."
-                    />
-                    {enableHarmfulCategories && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="2">
-                                <HorizontalStack align="space-between" blockAlign="center">
-                                    <Text variant="headingSm">Filters for prompts</Text>
-                                    <Button variant="plain" onClick={() => {
-                                        const resetSettings = { ...harmfulCategoriesSettings };
-                                        Object.keys(resetSettings).forEach(key => {
-                                            if (key !== 'useForResponses') resetSettings[key] = 'none';
-                                        });
-                                        setHarmfulCategoriesSettings(resetSettings);
-                                    }}>Reset all</Button>
-                                </HorizontalStack>
-                                <Text as="span" color="subdued">Choose how aggressively each category is blocked. Lower confidence blocks more, but may flag borderline content.</Text>
-                                <Box paddingBlockStart="2">
-                                    {Object.entries(harmfulCategoriesSettings).map(([category, level]) => {
-                                        if (category === 'useForResponses') return null;
-                                        return (
-                                            <Box key={category}>
+                {(() => {
+                    const HARMFUL_CATEGORIES = ['hate', 'insults', 'sexual', 'violence', 'misconduct'];
+                    return (
+                        <Box>
+                            <EnableDropdown
+                                id="harmful-master"
+                                title="Harmful categories filters"
+                                helpText="Detect and block harmful user inputs and model responses. Set the sensitivity for each category below - or turn it off."
+                                enabled={enableHarmfulCategories}
+                                onChange={setEnableHarmfulCategories}
+                            />
+                            {enableHarmfulCategories && (
+                                <Box paddingBlockStart="4">
+                                    <Box style={{ borderInlineStart: '3px solid var(--akto-primary)', paddingInlineStart: '16px' }}>
+                                        <VerticalStack gap="2">
+                                            <HorizontalStack align="space-between" blockAlign="center">
+                                                <Text variant="headingXs" color="subdued">SENSITIVITY BY CATEGORY</Text>
+                                                <Button variant="plain" onClick={() => setHarmfulCategoriesSettings(prev => {
+                                                    const next = { ...prev };
+                                                    HARMFUL_CATEGORIES.forEach(c => { next[c] = 'medium'; });
+                                                    return next;
+                                                })}>Reset to recommended</Button>
+                                            </HorizontalStack>
+                                            <Text as="span" color="subdued">Set how aggressively each category is blocked. Each category is independent.</Text>
+                                            <Box paddingBlockStart="1">
+                                                {HARMFUL_CATEGORIES.map(category => (
+                                                    <Box key={category}>
+                                                        <Divider />
+                                                        <Box paddingBlockStart="3" paddingBlockEnd="3">
+                                                            <LevelDropdown
+                                                                id={`harmful-${category}`}
+                                                                title={<Text as="span" fontWeight="semibold" textTransform="capitalize">{category}</Text>}
+                                                                level={harmfulCategoriesSettings[category]}
+                                                                onChange={(newLevel) => setHarmfulCategoriesSettings(prev => ({ ...prev, [category]: newLevel }))}
+                                                            />
+                                                        </Box>
+                                                    </Box>
+                                                ))}
                                                 <Divider />
-                                                <Box paddingBlockStart="3" paddingBlockEnd="3">
-                                                    <LevelDropdown
-                                                        id={`harmful-${category}`}
-                                                        title={<Text as="span" fontWeight="semibold" textTransform="capitalize">{category}</Text>}
-                                                        level={level}
-                                                        onChange={(newLevel) => setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, [category]: newLevel })}
-                                                    />
-                                                </Box>
                                             </Box>
-                                        );
-                                    })}
-                                    <Divider />
+                                            <Box paddingBlockStart="2">
+                                                <ToggleRow
+                                                    label="Apply the same filters to model responses"
+                                                    checked={harmfulCategoriesSettings.useForResponses}
+                                                    onChange={(v) => setHarmfulCategoriesSettings(prev => ({ ...prev, useForResponses: v }))}
+                                                />
+                                            </Box>
+                                        </VerticalStack>
+                                    </Box>
                                 </Box>
-                                <Box paddingBlockStart="2">
-                                    <Checkbox
-                                        label="Use the same harmful categories filters for responses"
-                                        checked={harmfulCategoriesSettings.useForResponses}
-                                        onChange={(checked) => setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, useForResponses: checked })}
-                                    />
-                                </Box>
-                            </VerticalStack>
+                            )}
                         </Box>
-                    )}
-                </Box>
+                    );
+                })()}
 
                 {/* Intent Based Guardrails (Base Prompt) */}
                 <ConfidenceDropdown

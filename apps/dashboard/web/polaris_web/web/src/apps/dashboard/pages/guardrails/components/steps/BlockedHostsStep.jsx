@@ -7,9 +7,9 @@ import {
     Button,
     Badge,
     Autocomplete,
-    Checkbox,
 } from "@shopify/polaris";
 import { DeleteMajor } from "@shopify/polaris-icons";
+import { EnableDropdown } from "../ConfidenceDropdown";
 
 // Entry kept as an object so it can be extended later without breaking stored data.
 // `pattern` is a glob matched against "host+path" (e.g. "chatgpt.com/*", "*/v1/chat/completions").
@@ -221,9 +221,10 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts
                 title="Block personal accounts"
                 description="Prevent users with personal or consumer email accounts from accessing the AI agent. Enterprise accounts (company email domains) are allowed through."
             >
-                <Checkbox
-                    label="Enable personal account blocking"
-                    checked={!!blockPersonalAccounts}
+                <EnableDropdown
+                    id="personal-account-blocking"
+                    title="Personal account blocking"
+                    enabled={!!blockPersonalAccounts}
                     onChange={setBlockPersonalAccounts}
                 />
             </SectionCard>

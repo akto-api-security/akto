@@ -1,7 +1,7 @@
-import { VerticalStack, Text, Checkbox, HorizontalStack, Button, TextField, Box, DataTable } from "@shopify/polaris";
+import { VerticalStack, Text, HorizontalStack, Button, TextField, Box, DataTable } from "@shopify/polaris";
 import { DeleteMajor } from '@shopify/polaris-icons';
 import OwaspTag from "../OwaspTag";
-import ConfidenceDropdown from "../ConfidenceDropdown";
+import ConfidenceDropdown, { EnableDropdown } from "../ConfidenceDropdown";
 
 export const LanguageSafetyConfig = {
     number: 3,
@@ -73,15 +73,13 @@ const LanguageSafetyStep = ({
                 />
 
                 {/* Profanity */}
-                <Box>
-                    <Checkbox
-                        label="Profanity"
-                        checked={wordFilters.profanity}
-                        onChange={(checked) => setWordFilters({ ...wordFilters, profanity: checked })}
-                        helpText="Redacts profanity words that are considered offensive."
-                    />
-                    {wordFilters.profanity && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
+                <EnableDropdown
+                    id="profanity"
+                    title="Profanity"
+                    helpText="Redacts profanity words that are considered offensive."
+                    enabled={wordFilters.profanity}
+                    onChange={(checked) => setWordFilters({ ...wordFilters, profanity: checked })}
+                >
                             <VerticalStack gap="3">
                                 <Text variant="bodyMd" fontWeight="medium">Custom words</Text>
                                 <Text variant="bodySm" tone="subdued">
@@ -134,9 +132,7 @@ const LanguageSafetyStep = ({
                                     </Box>
                                 )}
                             </VerticalStack>
-                        </Box>
-                    )}
-                </Box>
+                </EnableDropdown>
             </VerticalStack>
         </VerticalStack>
     );

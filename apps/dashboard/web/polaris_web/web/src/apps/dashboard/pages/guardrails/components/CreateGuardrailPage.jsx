@@ -82,11 +82,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [deniedTopics, setDeniedTopics] = useState([]);
     const [enableHarmfulCategories, setEnableHarmfulCategories] = useState(false);
     const [harmfulCategoriesSettings, setHarmfulCategoriesSettings] = useState({
-        hate: "HIGH",
-        insults: "HIGH",
-        sexual: "HIGH",
-        violence: "HIGH",
-        misconduct: "HIGH",
+        hate: "medium",
+        insults: "medium",
+        sexual: "medium",
+        violence: "medium",
+        misconduct: "medium",
         useForResponses: false
     });
     const [enableBasePromptRule, setEnableBasePromptRule] = useState(false);
@@ -432,11 +432,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setDeniedTopics([]);
         setEnableHarmfulCategories(false);
         setHarmfulCategoriesSettings({
-            hate: "HIGH",
-            insults: "HIGH",
-            sexual: "HIGH",
-            violence: "HIGH",
-            misconduct: "HIGH",
+            hate: "medium",
+            insults: "medium",
+            sexual: "medium",
+            violence: "medium",
+            misconduct: "medium",
             useForResponses: false
         });
         setEnableBasePromptRule(false);
@@ -500,11 +500,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             if (policy.contentFiltering.harmfulCategories) {
                 setEnableHarmfulCategories(true);
                 setHarmfulCategoriesSettings({
-                    hate: policy.contentFiltering.harmfulCategories.hate || "HIGH",
-                    insults: policy.contentFiltering.harmfulCategories.insults || "HIGH",
-                    sexual: policy.contentFiltering.harmfulCategories.sexual || "HIGH",
-                    violence: policy.contentFiltering.harmfulCategories.violence || "HIGH",
-                    misconduct: policy.contentFiltering.harmfulCategories.misconduct || "HIGH",
+                    hate: policy.contentFiltering.harmfulCategories.hate || "medium",
+                    insults: policy.contentFiltering.harmfulCategories.insults || "medium",
+                    sexual: policy.contentFiltering.harmfulCategories.sexual || "medium",
+                    violence: policy.contentFiltering.harmfulCategories.violence || "medium",
+                    misconduct: policy.contentFiltering.harmfulCategories.misconduct || "medium",
                     useForResponses: policy.contentFiltering.harmfulCategories.useForResponses || false
                 });
             }

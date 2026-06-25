@@ -1,7 +1,8 @@
-import { VerticalStack, Text, FormLayout, Box, Checkbox, RadioButton, HorizontalStack, Button, Popover, TextField, Icon, Banner, Tag, Divider } from "@shopify/polaris";
+import { VerticalStack, Text, FormLayout, Box, RadioButton, HorizontalStack, Button, Popover, TextField, Icon, Banner, Tag, Divider } from "@shopify/polaris";
 import { SearchMinor } from "@shopify/polaris-icons";
 import { useState, useEffect, useCallback } from "react";
 import DropdownSearch from "../../../../components/shared/DropdownSearch";
+import { ToggleRow } from "../ConfidenceDropdown";
 import OwaspTag from "../OwaspTag";
 import RuleEnforcementDropdown from "../RuleEnforcementDropdown";
 import TitleWithInfo from "../../../../components/shared/TitleWithInfo";
@@ -346,19 +347,16 @@ const ServerSettingsStep = ({
                             Specify whether the guardrail should be applied to responses and/or requests.
                         </Text>
 
-                        <VerticalStack gap="2">
-                            <Checkbox
-                                label="Apply guardrail to responses"
+                        <VerticalStack gap="4">
+                            <ToggleRow
+                                label={<VerticalStack gap="1"><Text as="span">Apply guardrail to responses</Text><Text as="span" color="subdued">When enabled, this guardrail will filter and evaluate model responses before they're sent to users.</Text></VerticalStack>}
                                 checked={applyOnResponse}
                                 onChange={setApplyOnResponse}
-                                helpText="When enabled, this guardrail will filter and evaluate model responses before they're sent to users."
                             />
-
-                            <Checkbox
-                                label="Apply guardrail to requests"
+                            <ToggleRow
+                                label={<VerticalStack gap="1"><Text as="span">Apply guardrail to requests</Text><Text as="span" color="subdued">When enabled, this guardrail will filter and evaluate user inputs before they're processed by the model.</Text></VerticalStack>}
                                 checked={applyOnRequest}
                                 onChange={setApplyOnRequest}
-                                helpText="When enabled, this guardrail will filter and evaluate user inputs before they're processed by the model."
                             />
                         </VerticalStack>
                     </VerticalStack>

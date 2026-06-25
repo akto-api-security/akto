@@ -6,7 +6,6 @@ import {
     Button,
     TextField,
     HorizontalStack,
-    Checkbox,
     Spinner,
     Tooltip,
     Icon
@@ -19,7 +18,7 @@ import observeApi from "../../../observe/api";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
-import ConfidenceDropdown from "../ConfidenceDropdown";
+import ConfidenceDropdown, { EnableDropdown } from "../ConfidenceDropdown";
 
 const MIN_COUNT_TOOLTIP =
     "The guardrail applies only when the prompt has at least this many matches of this PII type. Example: 20 means 20 or more occurrences of that type.";
@@ -194,15 +193,13 @@ const SensitiveInfoStep = ({
 
             <VerticalStack gap="4">
                 {/* PII Types */}
-                <Box>
-                    <Checkbox
-                        label={<RuleLabelWithTag name="Personally Identifiable Information (PII) types" threats={RULE_OWASP_THREATS.pii} />}
-                        checked={enablePiiTypes}
-                        onChange={setEnablePiiTypes}
-                        helpText="Specify the types of PII to be filtered and the desired guardrail behavior."
-                    />
-                    {enablePiiTypes && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
+                <EnableDropdown
+                    id="pii-types"
+                    title={<RuleLabelWithTag name="Personally Identifiable Information (PII) types" threats={RULE_OWASP_THREATS.pii} />}
+                    helpText="Specify the types of PII to be filtered and the desired guardrail behavior."
+                    enabled={enablePiiTypes}
+                    onChange={setEnablePiiTypes}
+                >
                             <VerticalStack gap="3">
                                 {loadingPiiTypes ? (
                                     <HorizontalStack gap="2" blockAlign="center">
@@ -320,20 +317,16 @@ const SensitiveInfoStep = ({
                                     </Box>
                                 )}
                             </VerticalStack>
-                        </Box>
-                    )}
-                </Box>
+                </EnableDropdown>
 
                 {/* Regex Patterns */}
-                <Box>
-                    <Checkbox
-                        label={<RuleLabelWithTag name="Regex patterns" threats={RULE_OWASP_THREATS.regex} />}
-                        checked={enableRegexPatterns}
-                        onChange={setEnableRegexPatterns}
-                        helpText="Add up to 10 regex patterns to filter custom types of sensitive information for your specific use case."
-                    />
-                    {enableRegexPatterns && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
+                <EnableDropdown
+                    id="regex-patterns"
+                    title={<RuleLabelWithTag name="Regex patterns" threats={RULE_OWASP_THREATS.regex} />}
+                    helpText="Add up to 10 regex patterns to filter custom types of sensitive information for your specific use case."
+                    enabled={enableRegexPatterns}
+                    onChange={setEnableRegexPatterns}
+                >
                             <VerticalStack gap="3">
                                 <HorizontalStack gap="2">
                                     <Box style={{ flexGrow: 1 }}>
@@ -389,9 +382,7 @@ const SensitiveInfoStep = ({
                                     </Box>
                                 )}
                             </VerticalStack>
-                        </Box>
-                    )}
-                </Box>
+                </EnableDropdown>
 
                 {/* Secrets Detection */}
                 <ConfidenceDropdown
