@@ -602,15 +602,13 @@ function ThreatDetectionPage() {
                     latency = [];
                     for (let i = 0; i < raw.length; i += bucketSize) {
                         const bucket = raw.slice(i, i + bucketSize);
-                        // Percentiles cannot be averaged; take the max P95 within each
-                        // bucket so every displayed point stays a real P95 value (the
-                        // worst-case P95 in that interval) rather than a fabricated mean.
-                        const maxOf = field => bucket.reduce((m, x) => Math.max(m, x[field]), 0);
+                        // Downsample long ranges by averaging the per-minute averages in each bucket.
+                        const avgOf = field => bucket.reduce((sum, x) => sum + x[field], 0) / bucket.length;
                         latency.push({
                             timestamp: bucket[Math.floor(bucket.length / 2)].timestamp,
-                            incomingRequestP95: maxOf('incomingRequestP95'),
-                            outputResultP95:    maxOf('outputResultP95'),
-                            totalP95:           maxOf('totalP95'),
+                            incomingRequestP95: avgOf('incomingRequestP95'),
+                            outputResultP95:    avgOf('outputResultP95'),
+                            totalP95:           avgOf('totalP95'),
                         });
                     }
                 }
