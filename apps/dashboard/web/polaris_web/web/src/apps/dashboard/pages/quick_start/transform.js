@@ -2,6 +2,7 @@ import {Avatar, Badge} from "@shopify/polaris"
 import PostmanSource from "./components/PostmanSource"
 import BurpSource from "./components/BurpSource"
 import HybridSaasSource from "./components/HybridSaasSource"
+import DifyConnector from "./components/DifyConnector"
 import AgenticShield from "./components/AgenticShield"
 import AwsSource from "./components/AwsSource"
 import FargateSource from "./components/FargateSource"
@@ -1296,10 +1297,7 @@ const difyImportObj = {
     text: "Secure your Dify app inputs and outputs with Akto guardrails.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/dify',
     key: "DIFY",
-    component: <BannerComponent
-        content="Connect Dify's moderation extension to Akto guardrails."
-        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/dify'
-    />
+    component: <DifyConnector />
 }
 
 const claudeCodeCliHookObj = {
