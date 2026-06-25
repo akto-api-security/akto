@@ -6,6 +6,8 @@ import { CellType } from "../../components/tables/rows/GithubRow";
 import func from "@/util/func";
 import IconCacheService from "@/services/IconCacheService";
 import { getDomainForFavicon } from "../observe/agentic/mcpClientHelper";
+import { formatRelativeTime } from "./nhiUtils";
+import { getFirstIdentityName, getAllIdentityNames } from "./identityHelper";
 
 // ── Identity icon ──────────────────────────────────────────────────────────────
 const IDENTITY_DOMAIN_MAP = {
@@ -203,3 +205,49 @@ export const violationsSortOptions = [
     { label: "Severity", value: "severity asc",  directionLabel: "Critical first", sortKey: "severityOrder", columnIndex: 3 },
     { label: "Severity", value: "severity desc", directionLabel: "Low first",      sortKey: "severityOrder", columnIndex: 3 },
 ];
+
+export const transformApiViolations = (apiViolations) => {
+    return apiViolations
+        .sort((a, b) => SEV_ORD[b.severity] - SEV_ORD[a.severity])
+        .map((v) => {
+            const violationHexId = v.hexId || v.id;
+            const policyObj = v.policy && Array.isArray(v.policy)
+                ? {
+                    primary: v.policy[0] || "N/A",
+                    extra: Math.max(0, v.policy.length - 1),
+                    extras: v.policy.slice(1) || [],
+                  }
+                : v.policy;
+            const firstIdentityName = getFirstIdentityName(v.identities);
+            const allIdentityNames = getAllIdentityNames(v.identities);
+            const extraCount = allIdentityNames.length - 1;
+            return {
+                ...v,
+                id: violationHexId,
+                violation: v.violationType,
+                identity: firstIdentityName,
+                identities: v.identities,
+                discovered: formatRelativeTime(v.discoveredAt, "Unknown"),
+                severityOrder: SEV_ORD[v.severity] || 0,
+                policy: policyObj,
+                violationComp: <Text variant="bodyMd" fontWeight="medium">{v.violationType}</Text>,
+                identityComp: (
+                    <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                        <IdentityIcon name={firstIdentityName} />
+                        <Text variant="bodyMd">{firstIdentityName}</Text>
+                        {extraCount > 0 && (
+                            <Badge>{`+${extraCount}`}</Badge>
+                        )}
+                    </HorizontalStack>
+                ),
+                agentComp: (
+                    <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                        <AgentIcon name={v.agentName} />
+                        <Text variant="bodyMd">{v.agentName}</Text>
+                    </HorizontalStack>
+                ),
+                severityComp: sevBadge(v.severity),
+                policyComp: <PolicyCell policy={policyObj} />,
+            };
+        });
+};
