@@ -4,18 +4,18 @@ import {
     Text,
     Checkbox,
     Box,
-    RangeSlider,
     HorizontalStack,
     Button,
     TextField,
     Tag,
-    FormLayout,
-    Badge
+    Badge,
+    Divider
 } from "@shopify/polaris";
 import { PlusMinor, EditMinor, DeleteMinor, ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
+import ConfidenceDropdown, { LevelDropdown } from "../ConfidenceDropdown";
 import { GENERAL_BLOCKS, GENERAL_BLOCK_GROUPS, toDeniedTopic } from "../../generalBlocks";
 import func from "@/util/func";
 
@@ -320,33 +320,17 @@ const ContentPolicyStep = ({
 
             <VerticalStack gap="4">
                 {/* Prompt Injection Attacks */}
-                <Box>
-                    <Checkbox
-                        label={<RuleLabelWithTag name="Enable prompt injection attacks filter" threats={RULE_OWASP_THREATS.promptInjection} />}
-                        checked={enablePromptAttacks}
-                        onChange={setEnablePromptAttacks}
-                        helpText="Detect and block user inputs attempting to override system instructions."
-                    />
-                    {enablePromptAttacks && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Prompt Attack Level</Text>
-                                <RangeSlider
-                                    label=""
-                                    value={promptAttackLevel === 'none' ? 0 : promptAttackLevel === 'low' ? 1 : promptAttackLevel === 'medium' ? 2 : 3}
-                                    min={0}
-                                    max={3}
-                                    step={1}
-                                    output
-                                    onChange={(value) => {
-                                        const levels = ['none', 'low', 'medium', 'high'];
-                                        setPromptAttackLevel(levels[value]);
-                                    }}
-                                />
-                            </VerticalStack>
-                        </Box>
-                    )}
-                </Box>
+                <LevelDropdown
+                    id="prompt-attacks"
+                    title={<RuleLabelWithTag name="Prompt injection attacks filter" threats={RULE_OWASP_THREATS.promptInjection} />}
+                    helpText="Detect and block user inputs attempting to override system instructions."
+                    enabled={enablePromptAttacks}
+                    level={promptAttackLevel}
+                    onChange={({ enabled, level }) => {
+                        setEnablePromptAttacks(enabled);
+                        if (level != null) setPromptAttackLevel(level);
+                    }}
+                />
 
                 {/* Context poisoning (demo only) */}
                 {func.isDemoAccount() && (
@@ -430,8 +414,8 @@ const ContentPolicyStep = ({
                     />
                     {enableHarmfulCategories && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <HorizontalStack align="space-between">
+                            <VerticalStack gap="2">
+                                <HorizontalStack align="space-between" blockAlign="center">
                                     <Text variant="headingSm">Filters for prompts</Text>
                                     <Button variant="plain" onClick={() => {
                                         const resetSettings = { ...harmfulCategoriesSettings };
@@ -441,63 +425,50 @@ const ContentPolicyStep = ({
                                         setHarmfulCategoriesSettings(resetSettings);
                                     }}>Reset all</Button>
                                 </HorizontalStack>
-                                {Object.entries(harmfulCategoriesSettings).map(([category, level]) => {
-                                    if (category === 'useForResponses') return null;
-                                    return (
-                                        <Box key={category}>
-                                            <Text variant="bodyMd" fontWeight="medium" textTransform="capitalize">{category}</Text>
-                                            <Box paddingBlockStart="2">
-                                                <RangeSlider
-                                                    label=""
-                                                    value={level === 'none' ? 0 : level === 'low' ? 1 : level === 'medium' ? 2 : 3}
-                                                    min={0}
-                                                    max={3}
-                                                    step={1}
-                                                    output
-                                                    onChange={(value) => {
-                                                        const levels = ['none', 'low', 'medium', 'high'];
-                                                        setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, [category]: levels[value] });
-                                                    }}
-                                                />
+                                <Text as="span" color="subdued">Choose how aggressively each category is blocked. Lower confidence blocks more, but may flag borderline content.</Text>
+                                <Box paddingBlockStart="2">
+                                    {Object.entries(harmfulCategoriesSettings).map(([category, level]) => {
+                                        if (category === 'useForResponses') return null;
+                                        return (
+                                            <Box key={category}>
+                                                <Divider />
+                                                <Box paddingBlockStart="3" paddingBlockEnd="3">
+                                                    <LevelDropdown
+                                                        id={`harmful-${category}`}
+                                                        title={<Text as="span" fontWeight="semibold" textTransform="capitalize">{category}</Text>}
+                                                        level={level}
+                                                        onChange={(newLevel) => setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, [category]: newLevel })}
+                                                    />
+                                                </Box>
                                             </Box>
-                                        </Box>
-                                    );
-                                })}
-                                <Checkbox
-                                    label="Use the same harmful categories filters for responses"
-                                    checked={harmfulCategoriesSettings.useForResponses}
-                                    onChange={(checked) => setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, useForResponses: checked })}
-                                />
+                                        );
+                                    })}
+                                    <Divider />
+                                </Box>
+                                <Box paddingBlockStart="2">
+                                    <Checkbox
+                                        label="Use the same harmful categories filters for responses"
+                                        checked={harmfulCategoriesSettings.useForResponses}
+                                        onChange={(checked) => setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, useForResponses: checked })}
+                                    />
+                                </Box>
                             </VerticalStack>
                         </Box>
                     )}
                 </Box>
 
                 {/* Intent Based Guardrails (Base Prompt) */}
-                <Box>
-                    <Checkbox
-                        label={<RuleLabelWithTag name="Enable agent intent verification" threats={RULE_OWASP_THREATS.intentVerification} />}
-                        checked={enableBasePromptRule}
-                        onChange={setEnableBasePromptRule}
-                        helpText="Verify if agent requests match the intent of the base prompt. The base prompt is automatically detected from traffic, and user inputs filling placeholders like {var} or {} are checked against this intent."
-                    />
-                    {enableBasePromptRule && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <FormLayout>
-                                <RangeSlider
-                                    label="Confidence Threshold"
-                                    value={basePromptConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setBasePromptConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values require more confidence to block content."
-                                />
-                            </FormLayout>
-                        </Box>
-                    )}
-                </Box>
+                <ConfidenceDropdown
+                    id="base-prompt-rule"
+                    title={<RuleLabelWithTag name="Agent intent verification" threats={RULE_OWASP_THREATS.intentVerification} />}
+                    helpText="Verify if agent requests match the intent of the base prompt. The base prompt is automatically detected from traffic, and user inputs filling placeholders like {var} or {} are checked against this intent."
+                    enabled={enableBasePromptRule}
+                    score={basePromptConfidenceScore}
+                    onChange={({ enabled, confidenceScore }) => {
+                        setEnableBasePromptRule(enabled);
+                        if (confidenceScore != null) setBasePromptConfidenceScore(confidenceScore);
+                    }}
+                />
             </VerticalStack>
         </VerticalStack>
     );

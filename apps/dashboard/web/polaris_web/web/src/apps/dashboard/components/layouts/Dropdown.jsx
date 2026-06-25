@@ -44,7 +44,9 @@ function Dropdown(props) {
             });
 
             const selectedText = filteredSelected.map((selectedItem) => {
-                const matchedOption = options.find((option) => {
+                // Use the raw menuItems label (plain string), not the transformed JSX label.
+                const sourceList = Array.isArray(props.menuItems) ? props.menuItems : options;
+                const matchedOption = sourceList.find((option) => {
                     if (typeof option.value === "string")
                         return option.value.match(selectedItem);
                     else

@@ -1,7 +1,8 @@
-import { VerticalStack, Text, Checkbox, Box, RangeSlider } from "@shopify/polaris";
+import { VerticalStack, Text } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
+import ConfidenceDropdown from "../ConfidenceDropdown";
 
 export const UsageGuardrailsConfig = {
     number: 7,
@@ -34,31 +35,17 @@ const UsageGuardrailsStep = ({
             <OwaspTag stepNumber={7} />
 
             <VerticalStack gap="4">
-                <Box>
-                    <Checkbox
-                        label={<RuleLabelWithTag name="Enable token limit detection" threats={RULE_OWASP_THREATS.tokenLimit} />}
-                        checked={enableTokenLimit}
-                        onChange={setEnableTokenLimit}
-                        helpText="Detect when user inputs exceed token limits and block overly long inputs."
-                    />
-                    {enableTokenLimit && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
-                                <RangeSlider
-                                    label=""
-                                    value={tokenLimitConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setTokenLimitConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in enforcing token limits."
-                                />
-                            </VerticalStack>
-                        </Box>
-                    )}
-                </Box>
+                <ConfidenceDropdown
+                    id="token-limit-detection"
+                    title={<RuleLabelWithTag name="Token limit detection" threats={RULE_OWASP_THREATS.tokenLimit} />}
+                    helpText="Detect when user inputs exceed token limits and block overly long inputs."
+                    enabled={enableTokenLimit}
+                    score={tokenLimitConfidenceScore}
+                    onChange={({ enabled, confidenceScore }) => {
+                        setEnableTokenLimit(enabled);
+                        if (confidenceScore != null) setTokenLimitConfidenceScore(confidenceScore);
+                    }}
+                />
             </VerticalStack>
         </VerticalStack>
     );

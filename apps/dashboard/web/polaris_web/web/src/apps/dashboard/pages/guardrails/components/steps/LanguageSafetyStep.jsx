@@ -1,6 +1,7 @@
-import { VerticalStack, Text, Checkbox, HorizontalStack, Button, TextField, Box, DataTable, RangeSlider } from "@shopify/polaris";
+import { VerticalStack, Text, Checkbox, HorizontalStack, Button, TextField, Box, DataTable } from "@shopify/polaris";
 import { DeleteMajor } from '@shopify/polaris-icons';
 import OwaspTag from "../OwaspTag";
+import ConfidenceDropdown from "../ConfidenceDropdown";
 
 export const LanguageSafetyConfig = {
     number: 3,
@@ -46,58 +47,30 @@ const LanguageSafetyStep = ({
 
             <VerticalStack gap="4">
                 {/* Gibberish Detection */}
-                <Box>
-                    <Checkbox
-                        label="Enable gibberish detection"
-                        checked={enableGibberishDetection}
-                        onChange={setEnableGibberishDetection}
-                        helpText="Detect and block gibberish or nonsensical text in user inputs. This helps prevent meaningless prompts that could confuse the AI or be used as attack vectors."
-                    />
-                    {enableGibberishDetection && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
-                                <RangeSlider
-                                    label=""
-                                    value={gibberishConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setGibberishConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting gibberish."
-                                />
-                            </VerticalStack>
-                        </Box>
-                    )}
-                </Box>
+                <ConfidenceDropdown
+                    id="gibberish-detection"
+                    title="Gibberish detection"
+                    helpText="Detect and block gibberish or nonsensical text in user inputs. This helps prevent meaningless prompts that could confuse the AI or be used as attack vectors."
+                    enabled={enableGibberishDetection}
+                    score={gibberishConfidenceScore}
+                    onChange={({ enabled, confidenceScore }) => {
+                        setEnableGibberishDetection(enabled);
+                        if (confidenceScore != null) setGibberishConfidenceScore(confidenceScore);
+                    }}
+                />
 
                 {/* Sentiment Detection */}
-                <Box>
-                    <Checkbox
-                        label="Enable sentiment detection"
-                        checked={enableSentiment}
-                        onChange={setEnableSentiment}
-                        helpText="Analyze sentiment in user inputs to detect negative, toxic, or inappropriate emotional content."
-                    />
-                    {enableSentiment && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
-                                <RangeSlider
-                                    label=""
-                                    value={sentimentConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setSentimentConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting negative sentiment."
-                                />
-                            </VerticalStack>
-                        </Box>
-                    )}
-                </Box>
+                <ConfidenceDropdown
+                    id="sentiment-detection"
+                    title="Sentiment detection"
+                    helpText="Analyze sentiment in user inputs to detect negative, toxic, or inappropriate emotional content."
+                    enabled={enableSentiment}
+                    score={sentimentConfidenceScore}
+                    onChange={({ enabled, confidenceScore }) => {
+                        setEnableSentiment(enabled);
+                        if (confidenceScore != null) setSentimentConfidenceScore(confidenceScore);
+                    }}
+                />
 
                 {/* Profanity */}
                 <Box>

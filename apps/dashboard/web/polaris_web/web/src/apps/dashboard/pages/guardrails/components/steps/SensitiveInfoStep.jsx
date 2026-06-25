@@ -7,7 +7,6 @@ import {
     TextField,
     HorizontalStack,
     Checkbox,
-    RangeSlider,
     Spinner,
     Tooltip,
     Icon
@@ -20,6 +19,7 @@ import observeApi from "../../../observe/api";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
+import ConfidenceDropdown from "../ConfidenceDropdown";
 
 const MIN_COUNT_TOOLTIP =
     "The guardrail applies only when the prompt has at least this many matches of this PII type. Example: 20 means 20 or more occurrences of that type.";
@@ -394,58 +394,30 @@ const SensitiveInfoStep = ({
                 </Box>
 
                 {/* Secrets Detection */}
-                <Box>
-                    <Checkbox
-                        label={<RuleLabelWithTag name="Enable secrets detection" threats={RULE_OWASP_THREATS.secrets} />}
-                        checked={enableSecrets}
-                        onChange={setEnableSecrets}
-                        helpText="Detect and block secrets, API keys, passwords, and other sensitive information in user inputs."
-                    />
-                    {enableSecrets && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
-                                <RangeSlider
-                                    label=""
-                                    value={secretsConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setSecretsConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting secrets."
-                                />
-                            </VerticalStack>
-                        </Box>
-                    )}
-                </Box>
+                <ConfidenceDropdown
+                    id="secrets-detection"
+                    title={<RuleLabelWithTag name="Secrets detection" threats={RULE_OWASP_THREATS.secrets} />}
+                    helpText="Detect and block secrets, API keys, passwords, and other sensitive information in user inputs."
+                    enabled={enableSecrets}
+                    score={secretsConfidenceScore}
+                    onChange={({ enabled, confidenceScore }) => {
+                        setEnableSecrets(enabled);
+                        if (confidenceScore != null) setSecretsConfidenceScore(confidenceScore);
+                    }}
+                />
 
                 {/* Sensitive Data Anonymization */}
-                <Box>
-                    <Checkbox
-                        label={<RuleLabelWithTag name="Enable sensitive data anonymization" threats={RULE_OWASP_THREATS.anonymize} />}
-                        checked={enableAnonymize}
-                        onChange={setEnableAnonymize}
-                        helpText="Detect and automatically anonymize sensitive data (emails, credit cards, phone numbers, SSN, etc.) in user inputs by replacing them with placeholders like [REDACTED_EMAIL_1]. Original values are stored securely for later restoration if needed."
-                    />
-                    {enableAnonymize && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
-                                <RangeSlider
-                                    label=""
-                                    value={anonymizeConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setAnonymizeConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting sensitive data that should be anonymized."
-                                />
-                            </VerticalStack>
-                        </Box>
-                    )}
-                </Box>
+                <ConfidenceDropdown
+                    id="anonymize-detection"
+                    title={<RuleLabelWithTag name="Sensitive data anonymization" threats={RULE_OWASP_THREATS.anonymize} />}
+                    helpText="Detect and automatically anonymize sensitive data (emails, credit cards, phone numbers, SSN, etc.) in user inputs by replacing them with placeholders like [REDACTED_EMAIL_1]. Original values are stored securely for later restoration if needed."
+                    enabled={enableAnonymize}
+                    score={anonymizeConfidenceScore}
+                    onChange={({ enabled, confidenceScore }) => {
+                        setEnableAnonymize(enabled);
+                        if (confidenceScore != null) setAnonymizeConfidenceScore(confidenceScore);
+                    }}
+                />
             </VerticalStack>
         </VerticalStack>
     );

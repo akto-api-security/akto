@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox } from "@shopify/polaris";
+import { VerticalStack, Text, TextField } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
+import ConfidenceDropdown, { CONFIDENCE_VALUES_100 } from "../ConfidenceDropdown";
 
 // URL validation function
 const validateUrl = (url) => {
@@ -71,74 +72,49 @@ const CustomGuardrailsStep = ({
 
             <VerticalStack gap="4">
                 {/* LLM Prompt Based Rule */}
-                <Box>
-                    <Checkbox
-                        label="LLM prompt based rule"
-                        checked={enableLlmPrompt}
-                        onChange={setEnableLlmPrompt}
-                        helpText="Create a custom rule using a prompt that is evaluated against user inputs or model responses."
+                <ConfidenceDropdown
+                    id="llm-prompt-rule"
+                    title="LLM prompt based rule"
+                    helpText="Create a custom rule using a prompt that is evaluated against user inputs or model responses."
+                    enabled={enableLlmPrompt}
+                    score={llmConfidenceScore}
+                    onChange={({ enabled, confidenceScore }) => {
+                        setEnableLlmPrompt(enabled);
+                        if (confidenceScore != null) setLlmConfidenceScore(confidenceScore);
+                    }}
+                >
+                    <TextField
+                        label="Prompt"
+                        value={llmRule}
+                        onChange={setLlmRule}
+                        multiline={4}
+                        placeholder="Enter your LLM evaluation prompt here..."
+                        helpText="This prompt will be used to evaluate whether content should be blocked. Be specific about what you want to detect."
                     />
-                    {enableLlmPrompt && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <FormLayout>
-                                <TextField
-                                    label="Prompt"
-                                    value={llmRule}
-                                    onChange={setLlmRule}
-                                    multiline={4}
-                                    placeholder="Enter your LLM evaluation prompt here..."
-                                    helpText="This prompt will be used to evaluate whether content should be blocked. Be specific about what you want to detect."
-                                />
-
-                                <RangeSlider
-                                    label="Confidence score threshold"
-                                    value={llmConfidenceScore}
-                                    onChange={setLlmConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    helpText="Content will be blocked if the LLM's confidence score exceeds this threshold"
-                                />
-                            </FormLayout>
-                        </Box>
-                    )}
-                </Box>
+                </ConfidenceDropdown>
 
                 {/* External Model Based Evaluation */}
-                <Box>
-                    <Checkbox
-                        label="External model based evaluation"
-                        checked={enableExternalModel}
-                        onChange={setEnableExternalModel}
-                        helpText="Configure an external model endpoint to evaluate content against custom criteria."
+                <ConfidenceDropdown
+                    id="external-model"
+                    title="External model based evaluation"
+                    helpText="Configure an external model endpoint to evaluate content against custom criteria."
+                    enabled={enableExternalModel}
+                    score={confidenceScore}
+                    values={CONFIDENCE_VALUES_100}
+                    onChange={({ enabled, confidenceScore: cs }) => {
+                        setEnableExternalModel(enabled);
+                        if (cs != null) setConfidenceScore(cs);
+                    }}
+                >
+                    <TextField
+                        label="URL"
+                        value={url}
+                        onChange={handleUrlChange}
+                        placeholder="https://api.example.com/evaluate"
+                        helpText="The endpoint URL for your external evaluation model"
+                        error={urlError}
                     />
-                    {enableExternalModel && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <FormLayout>
-                                <TextField
-                                    label="URL"
-                                    value={url}
-                                    onChange={handleUrlChange}
-                                    placeholder="https://api.example.com/evaluate"
-                                    helpText="The endpoint URL for your external evaluation model"
-                                    error={urlError}
-                                />
-
-                                <RangeSlider
-                                    label="Confidence score threshold"
-                                    value={confidenceScore}
-                                    onChange={setConfidenceScore}
-                                    min={0}
-                                    max={100}
-                                    step={25}
-                                    output
-                                    helpText="Content will be blocked if the model's confidence score exceeds this threshold (0-100)"
-                                />
-                            </FormLayout>
-                        </Box>
-                    )}
-                </Box>
+                </ConfidenceDropdown>
             </VerticalStack>
         </VerticalStack>
     );
