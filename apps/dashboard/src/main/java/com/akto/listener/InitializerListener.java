@@ -3629,8 +3629,13 @@ public class InitializerListener implements ServletContextListener {
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
-            initializeOrganizationAccountBelongsTo(backwardCompatibility);
-            setOrganizationsInBilling(backwardCompatibility);
+            try {
+                initializeOrganizationAccountBelongsTo(backwardCompatibility);
+                setOrganizationsInBilling(backwardCompatibility);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            
         }
         removeRagDatabaseTag(backwardCompatibility);
         setAktoDefaultNewUI(backwardCompatibility);
