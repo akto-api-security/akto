@@ -376,14 +376,10 @@ public class GuardrailPolicies {
     @Getter
     @Setter
     @NoArgsConstructor
+    @AllArgsConstructor
     public static class TokenLimitDetection {
         private boolean enabled;
         private int threshold; // max allowed tokens per prompt
-
-        public TokenLimitDetection(boolean enabled, int threshold) {
-            this.enabled = enabled;
-            this.threshold = threshold;
-        }
     }
 
     public enum ModelRole {
