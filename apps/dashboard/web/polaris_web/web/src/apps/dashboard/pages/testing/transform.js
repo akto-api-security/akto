@@ -1565,7 +1565,7 @@ const transform = {
       sendMsTeamsAlert: testRun.sendMsTeamsAlert,
       recurringDaily: testRun.recurringDaily,
       continuousTesting: testRun.continuousTesting,
-      scheduleTimestamp: testRun?.hourlyLabel === 'Now' && ((testRun.startTimestamp - func.getStartOfTodayEpoch()) < 86400) ? 0 : testRun.startTimestamp,
+      scheduleTimestamp: testRun?.hourlyLabel === 'Now' && ((testRun.startTimestamp - func.getStartOfTodayEpoch()) < 86400) ? func.timeNow() : testRun.startTimestamp,
       recurringWeekly: testRun.recurringWeekly,
       recurringMonthly: testRun.recurringMonthly,
       miniTestingServiceName: testRun.miniTestingServiceName,
