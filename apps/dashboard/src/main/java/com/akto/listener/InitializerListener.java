@@ -1655,17 +1655,22 @@ public class InitializerListener implements ServletContextListener {
                                 logger.infoAndAddToDb("removeRagDatabaseTagCron: version >=1.70.8 for accountId=" + accountId + ", skipping tag removal", LogDb.DASHBOARD);
                                 return;
                             }
-                            logger.infoAndAddToDb("removeRagDatabaseTagCron: version <1.70.8 for accountId=" + accountId + ", removing RAG database tag", LogDb.DASHBOARD);
+                            String moduleVersions = liveModules.stream().map(ModuleInfo::getCurrentVersion).collect(java.util.stream.Collectors.joining(", "));
+                            logger.infoAndAddToDb("removeRagDatabaseTagCron: version <1.70.8 for accountId=" + accountId + " versions=[" + moduleVersions + "], removing RAG database tag", LogDb.DASHBOARD);
                             Bson ragTagFilter = Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_RAG_DATABASE_TAG));
-                            long count = ApiCollectionsDao.instance.getMCollection().countDocuments(ragTagFilter);
-                            if (count > 0) {
+                            List<ApiCollection> taggedCollections = ApiCollectionsDao.instance.findAll(ragTagFilter, Projections.include(Constants.ID, ApiCollection.NAME));
+                            if (taggedCollections == null || taggedCollections.isEmpty()) {
+                                logger.infoAndAddToDb("removeRagDatabaseTagCron: no collections with RAG database tag found for accountId=" + accountId, LogDb.DASHBOARD);
+                            } else {
+                                String collectionDetails = taggedCollections.stream()
+                                    .map(c -> "id=" + c.getId() + " name=" + c.getName())
+                                    .collect(java.util.stream.Collectors.joining(", "));
+                                logger.infoAndAddToDb("removeRagDatabaseTagCron: found " + taggedCollections.size() + " collections with RAG tag for accountId=" + accountId + ": [" + collectionDetails + "]", LogDb.DASHBOARD);
                                 ApiCollectionsDao.instance.updateMany(
                                     ragTagFilter,
                                     Updates.pull(ApiCollection.TAGS_STRING, new BasicDBObject(CollectionTags.KEY_NAME, Constants.AKTO_RAG_DATABASE_TAG))
                                 );
-                                logger.infoAndAddToDb("removeRagDatabaseTagCron: removed RAG database tag from " + count + " collections for accountId=" + accountId, LogDb.DASHBOARD);
-                            } else {
-                                logger.infoAndAddToDb("removeRagDatabaseTagCron: no collections with RAG database tag found for accountId=" + accountId, LogDb.DASHBOARD);
+                                logger.infoAndAddToDb("removeRagDatabaseTagCron: removed RAG database tag from " + taggedCollections.size() + " collections for accountId=" + accountId, LogDb.DASHBOARD);
                             }
                         } catch (Exception e) {
                             logger.errorAndAddToDb(e, "removeRagDatabaseTagCron: error - " + e.getMessage(), LogDb.DASHBOARD);
@@ -3661,37 +3666,11 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-
-    private static void removeRagDatabaseTag(BackwardCompatibility backwardCompatibility) {
-        int accountId = Context.accountId.get();
-        if (backwardCompatibility.getRemoveRagDatabaseTag() == 0) {
-            logger.infoAndAddToDb("removeRagDatabaseTag: starting migration for accountId=" + accountId, LogDb.DASHBOARD);
-            Bson ragTagFilter = Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_RAG_DATABASE_TAG));
-            long count = ApiCollectionsDao.instance.getMCollection().countDocuments(ragTagFilter);
-            logger.infoAndAddToDb("removeRagDatabaseTag: found " + count + " collections with RAG database tag for accountId=" + accountId, LogDb.DASHBOARD);
-            if (count > 0) {
-                ApiCollectionsDao.instance.updateMany(
-                    ragTagFilter,
-                    Updates.pull(ApiCollection.TAGS_STRING, new BasicDBObject(CollectionTags.KEY_NAME, Constants.AKTO_RAG_DATABASE_TAG))
-                );
-                logger.infoAndAddToDb("removeRagDatabaseTag: removed RAG database tag from " + count + " collections for accountId=" + accountId, LogDb.DASHBOARD);
-            }
-            BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.REMOVE_RAG_DATABASE_TAG, Context.now())
-            );
-            logger.infoAndAddToDb("removeRagDatabaseTag: migration complete for accountId=" + accountId, LogDb.DASHBOARD);
-        } else {
-            logger.infoAndAddToDb("removeRagDatabaseTag: already executed, skipping for accountId=" + accountId, LogDb.DASHBOARD);
-        }
-    }
-
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
             setOrganizationsInBilling(backwardCompatibility);
         }
-        removeRagDatabaseTag(backwardCompatibility);
         setAktoDefaultNewUI(backwardCompatibility);
         updateCustomDataTypeOperator(backwardCompatibility);
         markSummariesAsVulnerable(backwardCompatibility);
