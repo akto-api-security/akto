@@ -19,6 +19,7 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -45,6 +46,9 @@ public class LLMObservabilityAction extends UserAction {
     private static final String AGG_TOP_TRACES          = "topTraces";
     private static final String AGG_TRACE_SPARK          = "traceSpark";
     private static final String AGG_SESSION_SPARK        = "sessionSpark";
+    // Nested agg: terms on topic.keyword → sub-agg terms on subTopic.keyword.
+    // Preserves domain→subDomain link so the frontend can show the hierarchy correctly.
+    private static final String AGG_TOPIC_HIERARCHY      = "topicHierarchyAgg";
 
     // ── Synthetic result-row keys (computed, not native ES doc fields) ─────────
     private static final String KEY_TOTAL_TOKENS  = "totalTokens";
@@ -74,9 +78,11 @@ public class LLMObservabilityAction extends UserAction {
     @Setter private String       serviceId;
 
     // Multi-value filter lists (used by MessagesView / PromptsView ag-grid set filters)
-    @Setter private List<String> userNames   = new ArrayList<>();
-    @Setter private List<String> serviceIds  = new ArrayList<>();
-    @Setter private List<String> sessionIds  = new ArrayList<>();
+    @Setter private List<String> userNames      = new ArrayList<>();
+    @Setter private List<String> serviceIds     = new ArrayList<>();
+    @Setter private List<String> sessionIds     = new ArrayList<>();
+    @Setter private List<String> topicFilters    = new ArrayList<>();
+    @Setter private List<String> subTopicFilters = new ArrayList<>();
 
     @Getter private List<Map<String, Object>>  sessions      = new ArrayList<>();
     @Getter private List<Map<String, Object>>  messages      = new ArrayList<>();
@@ -128,11 +134,16 @@ public class LLMObservabilityAction extends UserAction {
             JSONObject filteredQuery = new JSONObject().put("bool", new JSONObject().put("must", mustArr));
 
             JSONObject subAggs = new JSONObject()
-                .put(AGG_LATEST_TS,  new JSONObject().put("max", new JSONObject().put("field", AgentQueryRecord.F_TIMESTAMP)))
-                .put(AGG_FIRST_TS,   new JSONObject().put("min", new JSONObject().put("field", AgentQueryRecord.F_TIMESTAMP)))
-                .put(AGG_IN_TOKENS,  new JSONObject().put("sum", new JSONObject().put("field", AgentQueryRecord.F_INPUT_TOKENS)))
-                .put(AGG_OUT_TOKENS, new JSONObject().put("sum", new JSONObject().put("field", AgentQueryRecord.F_OUTPUT_TOKENS)))
-                .put(AGG_MSG_COUNT,  new JSONObject().put("cardinality", new JSONObject().put("field", AgentQueryRecord.F_TRACE_ID_KW)))
+                .put(AGG_LATEST_TS,   new JSONObject().put("max", new JSONObject().put("field", AgentQueryRecord.F_TIMESTAMP)))
+                .put(AGG_FIRST_TS,    new JSONObject().put("min", new JSONObject().put("field", AgentQueryRecord.F_TIMESTAMP)))
+                .put(AGG_IN_TOKENS,   new JSONObject().put("sum", new JSONObject().put("field", AgentQueryRecord.F_INPUT_TOKENS)))
+                .put(AGG_OUT_TOKENS,  new JSONObject().put("sum", new JSONObject().put("field", AgentQueryRecord.F_OUTPUT_TOKENS)))
+                .put(AGG_MSG_COUNT,   new JSONObject().put("cardinality", new JSONObject().put("field", AgentQueryRecord.F_TRACE_ID_KW)))
+                .put(AGG_TOPIC_HIERARCHY, new JSONObject()
+                    .put("terms", new JSONObject().put("field", AgentQueryRecord.F_TOPIC_KW).put("size", 5))
+                    .put("aggs", new JSONObject()
+                        .put("subTopics", new JSONObject()
+                            .put("terms", new JSONObject().put("field", AgentQueryRecord.F_SUB_TOPIC_KW).put("size", 5)))))
                 .put(AGG_FIRST_HIT, new JSONObject().put("top_hits", new JSONObject()
                     .put("size", 1)
                     .put("sort", new JSONArray().put(new JSONObject().put(AgentQueryRecord.F_TIMESTAMP, new JSONObject().put("order", "asc"))))
@@ -211,11 +222,16 @@ public class LLMObservabilityAction extends UserAction {
             JSONObject filteredQuery = new JSONObject().put("bool", new JSONObject().put("must", mustArr));
 
             JSONObject subAggs = new JSONObject()
-                .put(AGG_LATEST_TS,  new JSONObject().put("max",        new JSONObject().put("field", AgentQueryRecord.F_TIMESTAMP)))
-                .put(AGG_FIRST_TS,   new JSONObject().put("min",        new JSONObject().put("field", AgentQueryRecord.F_TIMESTAMP)))
-                .put(AGG_IN_TOKENS,  new JSONObject().put("sum",        new JSONObject().put("field", AgentQueryRecord.F_INPUT_TOKENS)))
-                .put(AGG_OUT_TOKENS, new JSONObject().put("sum",        new JSONObject().put("field", AgentQueryRecord.F_OUTPUT_TOKENS)))
-                .put(AGG_SPAN_COUNT, new JSONObject().put("value_count", new JSONObject().put("field", AgentQueryRecord.F_SPAN_ID_KW)))
+                .put(AGG_LATEST_TS,   new JSONObject().put("max",        new JSONObject().put("field", AgentQueryRecord.F_TIMESTAMP)))
+                .put(AGG_FIRST_TS,    new JSONObject().put("min",        new JSONObject().put("field", AgentQueryRecord.F_TIMESTAMP)))
+                .put(AGG_IN_TOKENS,   new JSONObject().put("sum",        new JSONObject().put("field", AgentQueryRecord.F_INPUT_TOKENS)))
+                .put(AGG_OUT_TOKENS,  new JSONObject().put("sum",        new JSONObject().put("field", AgentQueryRecord.F_OUTPUT_TOKENS)))
+                .put(AGG_SPAN_COUNT,  new JSONObject().put("value_count", new JSONObject().put("field", AgentQueryRecord.F_SPAN_ID_KW)))
+                .put(AGG_TOPIC_HIERARCHY, new JSONObject()
+                    .put("terms", new JSONObject().put("field", AgentQueryRecord.F_TOPIC_KW).put("size", 5))
+                    .put("aggs", new JSONObject()
+                        .put("subTopics", new JSONObject()
+                            .put("terms", new JSONObject().put("field", AgentQueryRecord.F_SUB_TOPIC_KW).put("size", 5)))))
                 .put(AGG_FIRST_HIT, new JSONObject().put("top_hits", new JSONObject()
                     .put("size", 1)
                     .put("sort", new JSONArray().put(new JSONObject().put(AgentQueryRecord.F_TIMESTAMP, new JSONObject().put("order", "asc"))))
@@ -547,13 +563,17 @@ public class LLMObservabilityAction extends UserAction {
             JSONObject aggs = new JSONObject()
                 .put(AgentQueryRecord.F_USER_NAME,  new JSONObject().put("terms", new JSONObject().put("field", AgentQueryRecord.F_USER_NAME_KW).put("size", 500)))
                 .put(AgentQueryRecord.F_DEVICE_ID,  new JSONObject().put("terms", new JSONObject().put("field", AgentQueryRecord.F_DEVICE_ID_KW).put("size", 500)))
-                .put(AgentQueryRecord.F_SERVICE_ID, new JSONObject().put("terms", new JSONObject().put("field", AgentQueryRecord.F_SERVICE_ID_KW).put("size", 500)));
+                .put(AgentQueryRecord.F_SERVICE_ID, new JSONObject().put("terms", new JSONObject().put("field", AgentQueryRecord.F_SERVICE_ID_KW).put("size", 500)))
+                .put(AgentQueryRecord.F_TOPIC,    new JSONObject().put("terms", new JSONObject().put("field", AgentQueryRecord.F_TOPIC_KW).put("size", 100)))
+                .put(AgentQueryRecord.F_SUB_TOPIC, new JSONObject().put("terms", new JSONObject().put("field", AgentQueryRecord.F_SUB_TOPIC_KW).put("size", 200)));
 
             JSONObject aggsResult = es.aggregate(query, aggs);
             filterChoices = new HashMap<>();
             filterChoices.put(AgentQueryRecord.F_USER_NAME,  extractBucketKeys(aggsResult, AgentQueryRecord.F_USER_NAME));
             filterChoices.put(AgentQueryRecord.F_DEVICE_ID,  extractBucketKeys(aggsResult, AgentQueryRecord.F_DEVICE_ID));
             filterChoices.put(AgentQueryRecord.F_SERVICE_ID, extractBucketKeys(aggsResult, AgentQueryRecord.F_SERVICE_ID));
+            filterChoices.put("topic",    extractBucketKeys(aggsResult, "topic"));
+            filterChoices.put("subTopic", extractBucketKeys(aggsResult, "subTopic"));
         } catch (Exception e) {
             filterChoices = new HashMap<>();
         }
@@ -725,6 +745,26 @@ public class LLMObservabilityAction extends UserAction {
                     }
                 }
             }
+
+            // Extract topic hierarchy: domain → [subDomain1, subDomain2, ...].
+            // Preserves the domain→subDomain link; frontend reads row.topicHierarchy.
+            JSONObject topicHierarchyAgg = bucket.optJSONObject(AGG_TOPIC_HIERARCHY);
+            if (topicHierarchyAgg != null) {
+                JSONArray topicBuckets = topicHierarchyAgg.optJSONArray("buckets");
+                Map<String, Object> hierarchy = new LinkedHashMap<>();
+                if (topicBuckets != null) {
+                    for (int j = 0; j < topicBuckets.length(); j++) {
+                        JSONObject tb = topicBuckets.optJSONObject(j);
+                        if (tb == null) continue;
+                        String domainKey = tb.optString("key", "");
+                        if (domainKey.isEmpty()) continue;
+                        List<String> subTopics = extractBucketKeyList(tb.optJSONObject("subTopics"));
+                        hierarchy.put(domainKey, subTopics);
+                    }
+                }
+                if (!hierarchy.isEmpty()) row.put("topicHierarchy", hierarchy);
+            }
+
             result.add(row);
         }
         return result;
@@ -736,9 +776,13 @@ public class LLMObservabilityAction extends UserAction {
     }
 
     private static List<String> extractBucketKeys(JSONObject aggsResult, String field) {
+        if (aggsResult == null) return new ArrayList<>();
+        return extractBucketKeyList(aggsResult.optJSONObject(field));
+    }
+
+    /** Extracts ordered bucket key strings from an already-resolved terms-agg object. */
+    private static List<String> extractBucketKeyList(JSONObject agg) {
         List<String> out = new ArrayList<>();
-        if (aggsResult == null) return out;
-        JSONObject agg = aggsResult.optJSONObject(field);
         if (agg == null) return out;
         JSONArray buckets = agg.optJSONArray("buckets");
         if (buckets == null) return out;
@@ -788,6 +832,11 @@ public class LLMObservabilityAction extends UserAction {
         // traceId — used when scoping Messages tab to a specific trace
         if (traceId != null && !traceId.trim().isEmpty())
             f.put(AgentQueryRecord.F_TRACE_ID_KW, java.util.Collections.singletonList(traceId.trim()));
+        // topic / subTopic filters
+        List<String> topics = nonEmpty(topicFilters);
+        if (!topics.isEmpty()) f.put(AgentQueryRecord.F_TOPIC_KW, topics);
+        List<String> subTopics = nonEmpty(subTopicFilters);
+        if (!subTopics.isEmpty()) f.put(AgentQueryRecord.F_SUB_TOPIC_KW, subTopics);
         // Atlas traffic filter: ENDPOINT context only shows Atlas-sourced records
         if (CONTEXT_SOURCE.ENDPOINT.equals(Context.contextSource.get()))
             f.put(AgentQueryRecord.F_IS_ATLAS_TRAFFIC, java.util.Collections.singletonList("true"));

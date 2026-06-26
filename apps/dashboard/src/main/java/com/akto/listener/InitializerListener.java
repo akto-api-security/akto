@@ -2563,6 +2563,7 @@ public class InitializerListener implements ServletContextListener {
                 int now = Context.now();
 
                 endpointStatViewCron.setUpEndpointInfoViewCronScheduler();
+                userAnalysisCron.setUpUserAnalysisCronScheduler();
 
                 if (runJobFunctions > 0 || runJobFunctionsAnyway) {
 

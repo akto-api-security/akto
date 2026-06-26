@@ -149,7 +149,8 @@ public class UserAnalysisCron {
 
                 newCacheEntries.add(new QueryTopicCache(
                     hash,
-                    getTopicsList(result),
+                    getDomain(result),
+                    getSubDomain(result),
                     result.getBoolean("harmful", false),
                     result.getString("harmfulCategory", ""),
                     result.getString("harmfulReason", ""),
@@ -167,8 +168,9 @@ public class UserAnalysisCron {
 
         // Step 4: Accumulate per-record results into per-AggregateKey structures
         List<ElasticSearchClient.TopicUpdate> topicUpdates = new ArrayList<>();
-        Map<AggregateKey, Map<String, Integer>> aggTopicDeltas  = new HashMap<>();
-        Map<AggregateKey, Map<String, Object>> aggHarmfulMerge  = new HashMap<>();
+        // domain → (subDomain → count) per aggregate key — mirrors topicHierarchy in MongoDB
+        Map<AggregateKey, Map<String, Map<String, Integer>>> aggTopicHierarchy = new HashMap<>();
+        Map<AggregateKey, Map<String, Object>> aggHarmfulMerge = new HashMap<>();
         Map<AggregateKey, long[]>              aggTokens        = new HashMap<>();
         Map<AggregateKey, String>              aggUserNames     = new HashMap<>();
         Map<AggregateKey, String>              aggSummaries     = new HashMap<>();
@@ -179,10 +181,11 @@ public class UserAnalysisCron {
             QueryTopicCache hit = cacheHits.get(hash);
             if (hit != null) {
                 result = new BasicDBObject()
-                    .append("topics", hit.getTopics())
-                    .append("harmful", hit.isHarmful())
-                    .append("harmfulCategory", hit.getHarmfulCategory())
-                    .append("harmfulReason", hit.getHarmfulReason());
+                    .append("domain",          hit.getDomain())
+                    .append("subDomain",        hit.getSubDomain())
+                    .append("harmful",          hit.isHarmful())
+                    .append("harmfulCategory",  hit.getHarmfulCategory())
+                    .append("harmfulReason",    hit.getHarmfulReason());
             } else {
                 result = newClassifications.get(hash);
             }
@@ -190,16 +193,17 @@ public class UserAnalysisCron {
 
             AggregateKey key = new AggregateKey(rec.getServiceId(), rec.getDeviceId());
 
-            // ES write-back: primary topic for this record
-            List<String> topics = getTopicsList(result);
-            if (!topics.isEmpty() && rec.getDocId() != null && !rec.getDocId().isEmpty()) {
-                topicUpdates.add(new ElasticSearchClient.TopicUpdate(rec.getDocId(), topics.get(0)));
+            // ES write-back: domain + subDomain for this record
+            String domain    = getDomain(result);
+            String subDomain = getSubDomain(result);
+            if (!domain.isEmpty() && rec.getDocId() != null && !rec.getDocId().isEmpty()) {
+                topicUpdates.add(new ElasticSearchClient.TopicUpdate(rec.getDocId(), domain, subDomain));
             }
 
-            // Topic deltas
-            Map<String, Integer> topicDeltas = aggTopicDeltas.computeIfAbsent(key, k -> new HashMap<>());
-            for (String t : topics) {
-                if (!t.isEmpty()) topicDeltas.merge(t, 1, Integer::sum);
+            // Build topic hierarchy: domain → subDomain → count
+            if (!domain.isEmpty() && !subDomain.isEmpty()) {
+                Map<String, Map<String, Integer>> hierarchy = aggTopicHierarchy.computeIfAbsent(key, k -> new HashMap<>());
+                hierarchy.computeIfAbsent(domain, d -> new HashMap<>()).merge(subDomain, 1, Integer::sum);
             }
 
             // Harmful merge
@@ -249,7 +253,7 @@ public class UserAnalysisCron {
                 UserAnalysisDataDao.instance.upsertAggregates(
                     key.serviceId, key.deviceId,
                     aggUserNames.getOrDefault(key, ""),
-                    aggTopicDeltas.getOrDefault(key, new HashMap<>()),
+                    aggTopicHierarchy.getOrDefault(key, new HashMap<>()),
                     tokens[0], tokens[1],
                     aggHarmfulMerge.getOrDefault(key, new HashMap<>()),
                     summaryToWrite,
@@ -299,15 +303,14 @@ public class UserAnalysisCron {
         return false;
     }
 
-    private List<String> getTopicsList(BasicDBObject result) {
-        Object topicsObj = result.get("topics");
-        if (!(topicsObj instanceof List)) return Collections.emptyList();
-        List<String> out = new ArrayList<>();
-        for (Object t : (List<?>) topicsObj) {
-            String topic = String.valueOf(t).trim();
-            if (!topic.isEmpty()) out.add(topic);
-        }
-        return out;
+    private static String getDomain(BasicDBObject result) {
+        String d = result.getString("domain", "");
+        return d != null ? d.trim() : "";
+    }
+
+    private static String getSubDomain(BasicDBObject result) {
+        String s = result.getString("subDomain", "");
+        return s != null ? s.trim() : "";
     }
 
     private void applyHarmful(BasicDBObject result, long timestampMs, Map<String, Object> harmfulMerge) {

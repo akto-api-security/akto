@@ -56,6 +56,8 @@ function OverviewContent({ session, traceCount }) {
         { label: "Session ID",  value: truncate(session.sessionIdentifier, 36) },
         { label: "Models",      value: session._models?.length ? session._models.join(", ") : undefined },
         { label: "Endpoint ID", value: session.deviceId, href: session.deviceId ? `/dashboard/observe/inventory/${session.deviceId}` : undefined },
+        { label: "Domain",      value: session.topicHierarchy ? Object.keys(session.topicHierarchy)[0] : undefined },
+        { label: "Sub-domain",  value: session.topicHierarchy ? (Object.values(session.topicHierarchy)[0]?.[0]) : undefined },
     ];
 
     return (

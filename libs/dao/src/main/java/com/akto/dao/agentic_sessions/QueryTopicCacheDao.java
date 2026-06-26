@@ -50,7 +50,8 @@ public class QueryTopicCacheDao extends AccountsContextDao<QueryTopicCache> {
                 Filters.eq("_id", entry.getId()),
                 Updates.combine(
                     Updates.setOnInsert("_id", entry.getId()),
-                    Updates.set(QueryTopicCache.TOPICS, entry.getTopics()),
+                    Updates.set(QueryTopicCache.DOMAIN, entry.getDomain()),
+                    Updates.set(QueryTopicCache.SUB_DOMAIN, entry.getSubDomain()),
                     Updates.set(QueryTopicCache.HARMFUL, entry.isHarmful()),
                     Updates.set(QueryTopicCache.HARMFUL_CATEGORY, entry.getHarmfulCategory()),
                     Updates.set(QueryTopicCache.HARMFUL_REASON, entry.getHarmfulReason()),

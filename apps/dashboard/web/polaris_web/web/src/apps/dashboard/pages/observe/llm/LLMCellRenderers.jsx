@@ -1,5 +1,5 @@
 import React from "react";
-import { HorizontalStack, Link, Text } from "@shopify/polaris";
+import { Badge, HorizontalStack, Text, VerticalStack, Link } from "@shopify/polaris";
 import func from "@/util/func";
 import { formatDurationMs, latencyColor, truncate } from "./constants";
 import { OsIcon } from "../agentic/DeviceEndpoints";
@@ -126,6 +126,35 @@ export function CountCell({ value }) {
 // Relative time from an epoch-ms value.
 export function TimeCell({ value }) {
     return <Text variant="bodySm">{func.prettifyEpoch(Math.floor((value || 0) / 1000))}</Text>;
+}
+
+
+export function TopicCell({ data }) {
+    // Aggregated path: topicHierarchy = { domain: [subDomain, ...], ... }
+    // Flat path (searchPrompts): topic + subTopic as plain strings
+    let entries;
+    if (data?.topicHierarchy && Object.keys(data.topicHierarchy).length > 0) {
+        entries = Object.entries(data.topicHierarchy).slice(0, 3);
+    } else if (data?.topic) {
+        entries = [[data.topic, data.subTopic ? [data.subTopic] : []]];
+    } else {
+        return <Text variant="bodySm" color="subdued">{DASH}</Text>;
+    }
+    return (
+        <VerticalStack gap="1">
+            {entries.map(([domain, subTopics]) => {
+                const subDomain = Array.isArray(subTopics) ? subTopics[0] : (subTopics || "");
+                return (
+                    <HorizontalStack key={domain} gap="1" blockAlign="center" wrap={false}>
+                        <Badge status="info">{domain}</Badge>
+                        {subDomain && (
+                            <Text variant="bodySm" color="subdued" truncate>{subDomain}</Text>
+                        )}
+                    </HorizontalStack>
+                );
+            })}
+        </VerticalStack>
+    );
 }
 
 // Clickable session id (used in unscoped Traces table).

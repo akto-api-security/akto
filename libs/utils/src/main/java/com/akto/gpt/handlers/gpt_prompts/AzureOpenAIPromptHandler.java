@@ -116,6 +116,11 @@ public abstract class AzureOpenAIPromptHandler {
         return PromptHandler.temperature;
     }
 
+    /** Override to request a specific response_format (e.g. json_object). Null = default (unset). */
+    protected JSONObject getResponseFormat() {
+        return null;
+    }
+
     private String extractRawContent(String prompt) throws Exception {
         MediaType mediaType = MediaType.parse("application/json");
         JSONObject payload = new JSONObject();
@@ -125,6 +130,10 @@ public abstract class AzureOpenAIPromptHandler {
         payload.put("max_tokens", getMaxTokens());
         payload.put("frequency_penalty", 0);
         payload.put("presence_penalty", 0.6);
+        JSONObject responseFormat = getResponseFormat();
+        if (responseFormat != null) {
+            payload.put("response_format", responseFormat);
+        }
 
         JSONArray messages = new JSONArray();
         JSONObject systemMessage = new JSONObject();

@@ -39,7 +39,7 @@ public class EndpointShieldAgentAction extends UserAction {
     public String fetchUserAnalysisList() {
         userAnalysisList = UserAnalysisDataDao.instance.findAll(Filters.empty(),
                 Projections.include(UserAnalysisData.USER_NAME, UserAnalysisData.LAST_UPDATED_AT,
-                        UserAnalysisData.TOPIC_COUNTS, UserAnalysisData.TOTAL_INPUT_TOKENS,
+                        UserAnalysisData.TOTAL_INPUT_TOKENS,
                         UserAnalysisData.TOTAL_OUTPUT_TOKENS, UserAnalysisData.AI_SUMMARY,
                         UserAnalysisData.HARMFUL_TOPICS));
         return SUCCESS.toUpperCase();
