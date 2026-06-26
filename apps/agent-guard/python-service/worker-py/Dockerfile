@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY pyproject.toml .
 RUN pip install --no-cache-dir \
-    rsa pyasn1 httpx detect-secrets tiktoken fastapi 'uvicorn[standard]' pydantic
+    rsa pyasn1 httpx redis detect-secrets tiktoken fastapi 'uvicorn[standard]' pydantic
 
 COPY src/ ./src/
 

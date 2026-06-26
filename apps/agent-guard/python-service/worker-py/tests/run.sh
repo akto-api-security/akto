@@ -7,5 +7,5 @@ cd "$(dirname "$0")/.."
 exec uv run --python 3.12 \
   --with pytest --with pytest-asyncio \
   --with detect-secrets --with tiktoken \
-  --with rsa --with pyasn1 --with httpx --with cryptography \
+  --with rsa --with pyasn1 --with httpx --with cryptography --with redis \
   pytest "$@"

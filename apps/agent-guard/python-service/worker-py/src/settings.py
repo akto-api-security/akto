@@ -26,6 +26,17 @@ _FIELDS = (
     "DEFAULT_MODEL_CONFIG_JSON",
     # Portable anonymizer service URL (e.g. http://anonymizer:8093).
     "ANONYMIZER_URL",
+    # --- Per-scanner semantic cache (Redis vector store + embedder service) ---
+    # CACHE_MODE: off | observe | decide (default observe; see cache.py).
+    # CACHE_SHADOW_ENABLED is a back-compat alias: true/1 → observe.
+    "CACHE_MODE", "CACHE_SHADOW_ENABLED",
+    "CACHE_DISTANCE_THRESHOLD", "CACHE_TTL_SECONDS",
+    # Portable embedder service URL (e.g. http://embedder:8094).
+    "EMBEDDER_URL",
+    # Redis with the RediSearch module (e.g. redis://redis:6379, rediss://... on Azure).
+    "REDIS_URL", "CACHE_REDIS_INDEX",
+    # Separate webhook for cache shadow/served alerts (keeps SLACK_WEBHOOK_URL clean).
+    "CACHE_SHADOW_SLACK_WEBHOOK_URL",
 )
 
 
