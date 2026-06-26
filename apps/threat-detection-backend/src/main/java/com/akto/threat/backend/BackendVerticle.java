@@ -7,8 +7,10 @@ import com.akto.threat.backend.service.ApiDistributionDataService;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
+import com.akto.threat.backend.tasks.FlushMessagesToDB;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Vertx;
+import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
 
@@ -55,6 +57,46 @@ public class BackendVerticle extends AbstractVerticle {
     // Start the HTTP server
 
     router.route("/health").handler(ctx -> ctx.response().setStatusCode(200).end("OK"));
+
+    long thresholdMs = Long.parseLong(
+        System.getenv().getOrDefault("HEALTH_DEEP_THRESHOLD_MS", "300000"));
+    long thresholdSec = thresholdMs / 1000;
+
+    router.route("/health/deep").handler(ctx -> {
+      long now = System.currentTimeMillis();
+      long lastPoll = FlushMessagesToDB.getLastSuccessfulPollEpochMs();
+      long lastWrite = FlushMessagesToDB.getLastSuccessfulMongoWriteEpochMs();
+
+      long pollAgoSec = lastPoll == 0 ? -1 : (now - lastPoll) / 1000;
+      long writeAgoSec = lastWrite == 0 ? -1 : (now - lastWrite) / 1000;
+
+      java.util.List<String> reasons = new java.util.ArrayList<>();
+      if (lastPoll == 0 && lastWrite == 0) {
+        reasons.add("not_initialized");
+      } else {
+        if (lastPoll == 0 || (now - lastPoll) > thresholdMs) {
+          reasons.add("kafka_poll_stale");
+        }
+        if (lastWrite == 0 || (now - lastWrite) > thresholdMs) {
+          reasons.add("mongo_write_stale");
+        }
+      }
+
+      boolean healthy = reasons.isEmpty();
+      JsonObject body = new JsonObject()
+          .put("status", healthy ? "ok" : "unhealthy")
+          .put("lastPollAgoSec", pollAgoSec)
+          .put("lastWriteAgoSec", writeAgoSec)
+          .put("thresholdSec", thresholdSec);
+      if (!healthy) {
+        body.put("reason", String.join(",", reasons));
+      }
+
+      ctx.response()
+          .putHeader("Content-Type", "application/json")
+          .setStatusCode(healthy ? 200 : 503)
+          .end(body.encode());
+    });
 
     // 404 handler
     router

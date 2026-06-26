@@ -26,6 +26,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -49,6 +50,17 @@ public class FlushMessagesToDB {
   private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
       System.getenv().getOrDefault("USE_ACTOR_INFO_TABLE", "false")
   );
+
+  private static final AtomicLong lastSuccessfulPollEpochMs = new AtomicLong(0);
+  private static final AtomicLong lastSuccessfulMongoWriteEpochMs = new AtomicLong(0);
+
+  public static long getLastSuccessfulPollEpochMs() {
+    return lastSuccessfulPollEpochMs.get();
+  }
+
+  public static long getLastSuccessfulMongoWriteEpochMs() {
+    return lastSuccessfulMongoWriteEpochMs.get();
+  }
 
   public FlushMessagesToDB(KafkaConfig kafkaConfig, MongoClient mongoClient) {
     String kafkaBrokerUrl = kafkaConfig.getBootstrapServers();
@@ -97,6 +109,7 @@ public class FlushMessagesToDB {
 
             if (!records.isEmpty()) {
               kafkaConsumer.commitSync();
+              lastSuccessfulPollEpochMs.set(System.currentTimeMillis());
             }
           }
         });
@@ -141,6 +154,7 @@ public class FlushMessagesToDB {
         } else {
             // No ignored event exists, safe to insert
             MaliciousEventDao.instance.insertOne(accountId, event);
+            lastSuccessfulMongoWriteEpochMs.set(System.currentTimeMillis());
 
             // Upsert actor_info table for optimized listThreatActors queries
             upsertActorInfo(accountId, event);
