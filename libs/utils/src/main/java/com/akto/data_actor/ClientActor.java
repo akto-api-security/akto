@@ -1428,11 +1428,12 @@ public class ClientActor extends DataActor {
         return apiCollections;
     }
 
-    public void createCollectionForHost(String host, int colId) {
+    public void createCollectionForHost(String host, int colId, boolean hasLatestRagDetection) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("colId", colId);
         obj.put("host", host);
+        obj.put("hasLatestRagDetection", hasLatestRagDetection);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForHost", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -1446,10 +1447,11 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void createCollectionSimple(int vxlanId) {
+    public void createCollectionSimple(int vxlanId, boolean hasLatestRagDetection) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("vxlanId", vxlanId);
+        obj.put("hasLatestRagDetection", hasLatestRagDetection);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionSimple", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);

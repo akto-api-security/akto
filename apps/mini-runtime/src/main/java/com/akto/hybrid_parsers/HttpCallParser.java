@@ -180,8 +180,8 @@ public class HttpCallParser {
         return computeAccessType(direction, existingAccessType);
     }
 
-    public int createCollectionSimple(int vxlanId) {
-        dataActor.createCollectionSimple(vxlanId);
+    public int createCollectionSimple(int vxlanId, boolean hasLatestRagDetection) {
+        dataActor.createCollectionSimple(vxlanId, hasLatestRagDetection);
         return vxlanId;
     }
 
