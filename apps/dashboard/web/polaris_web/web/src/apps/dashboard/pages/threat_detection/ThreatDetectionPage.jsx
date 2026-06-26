@@ -237,7 +237,6 @@ function ThreatDetectionPage() {
             hasQueryEvent: Boolean(
                 searchParams.get("refId") &&
                 searchParams.get("eventType") &&
-                searchParams.get("actor") &&
                 searchParams.get("filterId")
             )
         };
