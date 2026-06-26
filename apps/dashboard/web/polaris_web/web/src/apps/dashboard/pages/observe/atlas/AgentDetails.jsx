@@ -2,7 +2,7 @@ import { Text, HorizontalStack, VerticalStack, Box, Badge, Button, Icon, Tooltip
 import { useRef, useMemo, useCallback, useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from 'framer-motion'
-import { CaretDownMinor, CodeMinor, DynamicSourceMinor, ClockMinor, CalendarMinor, ExportMinor } from '@shopify/polaris-icons'
+import { CaretDownMinor, CodeMinor, DynamicSourceMinor, ClockMinor, CalendarMinor, ExportMinor, RefreshMinor, ChevronLeftMinor, ChevronRightMinor } from '@shopify/polaris-icons'
 import InlineEditableText from "../../../components/shared/InlineEditableText"
 import func from "@/util/func"
 import FlyLayout from "../../../components/layouts/FlyLayout";
@@ -21,18 +21,12 @@ const LOG_LEVEL_TONES = {
     ERROR: 'critical'
 };
 const ICON_SIZE = { maxWidth: "1rem", maxHeight: "1rem" };
-const LOG_TIMESTAMP_WIDTH = "180px";
-const LOG_LEVEL_WIDTH = "60px";
-// const MAX_LOGS_DISPLAYED = 1000;
-const MAX_LOGS_FETCHED = 5000;
-// const LIVE_LOG_LIMIT = 500; // Live mode disabled
+const LOG_TIMESTAMP_WIDTH = "140px";
+const LOG_LEVEL_WIDTH = "50px";
 
-// const INITIAL_WINDOW_HOURS = 6; // time-window approach replaced by count-based pagination
-// const WINDOW_STEP_HOURS = 6;
 const PAGE_SIZE = 500; // logs displayed per page
 
 export const LOG_MODES = {
-    // CURRENT: 'CURRENT', // Live mode disabled
     HISTORICAL: 'HISTORICAL'
 };
 
@@ -130,175 +124,111 @@ function AgentDetails({
 }) {
     const navigate = useNavigate();
     const copyRef = useRef(null);
-    // const liveIntervalRef = useRef(null); // Live mode disabled
 
     const [loading, setLoading] = useState(false);
     const [tabLoading, setTabLoading] = useState(false);
     const [mcpServers, setMcpServers] = useState([]);
     const [userAnalysis, setUserAnalysis] = useState(null);
-    const [agentLogs, setAgentLogs] = useState([]);
-    // const [displayedLogs, setDisplayedLogs] = useState([]); // replaced by agentLogs directly
-    // const [isLogsExpanded, setIsLogsExpanded] = useState(true); // collapse removed
+    const [currentPageLogs, setCurrentPageLogs] = useState([]);
     const [logsLoading, setLogsLoading] = useState(false);
-    const [displayedCount, setDisplayedCount] = useState(PAGE_SIZE);
-    const [lastFetchEndTime, setLastFetchEndTime] = useState(null);
-    const [noNewLogsFound, setNoNewLogsFound] = useState(false);
+    const [exportLoading, setExportLoading] = useState(false);
+    const [pageStack, setPageStack] = useState([null]); // [null, afterId_p0, afterId_p1, ...]
+    const [pageIndex, setPageIndex] = useState(0);
+    const [hasMore, setHasMore] = useState(false);
+    const [totalCount, setTotalCount] = useState(0);
     const [logMode, setLogMode] = useState(LOG_MODES.HISTORICAL);
-    const [selectedLogSource, setSelectedLogSource] = useState('all');
-    const logSourceRef = useRef('all');
-    // const [windowStartTime, setWindowStartTime] = useState(null); // time-window replaced by count-based
-    // const [windowEndTime, setWindowEndTime] = useState(null);
+    const [selectedLogSource, setSelectedLogSource] = useState('installation-logs');
+    const logSourceRef = useRef('installation-logs');
     const [description, setDescription] = useState("");
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState("");
 
-    // Live mode disabled — stopLiveFetching kept for reference
-    // const stopLiveFetching = useCallback(() => {
-    //     if (liveIntervalRef.current) {
-    //         clearInterval(liveIntervalRef.current);
-    //         liveIntervalRef.current = null;
-    //     }
-    // }, []);
-
-    const fetchAgentLogs = useCallback(async (agentId, startTime, endTime) => {
+    const fetchPage = useCallback(async (afterId, updateTotal = false) => {
+        if (!selectedAgent) return;
+        setLogsLoading(true);
         try {
-            const logKey = logSourceRef.current !== 'all' ? logSourceRef.current : null;
-            const logsResponse = await settingRequests.getAgentLogs(agentId, startTime, endTime, logKey);
-            const transformedLogs = (logsResponse.agentLogs || []).map(log => ({
+            const res = await settingRequests.getAgentLogs(
+                selectedAgent.agentId, startTimestamp, endTimestamp,
+                logSourceRef.current,
+                afterId,
+                PAGE_SIZE
+            );
+            const transformed = (res.agentLogs || []).map(log => ({
+                hexId: log.hexId,
                 timestamp: log.timestamp,
                 level: log.level || 'INFO',
                 message: log.log || log.message
             }));
-            let sortedLogs = transformedLogs.sort((a, b) => b.timestamp - a.timestamp);
-            if (sortedLogs.length > MAX_LOGS_FETCHED) {
-                sortedLogs = sortedLogs.slice(0, MAX_LOGS_FETCHED);
-            }
-            return sortedLogs;
+            setCurrentPageLogs(transformed);
+            setHasMore(res.hasMore || false);
+            if (updateTotal) setTotalCount(res.totalCount || 0);
         } catch (error) {
             console.error("Error fetching agent logs:", error);
-            return [];
+            setCurrentPageLogs([]);
+        } finally {
+            setLogsLoading(false);
         }
-    }, []);
-
-    // Live mode disabled
-    // const startLiveFetching = useCallback(async (agentId) => {
-    //     stopLiveFetching();
-    //     let lastFetchTimestamp = Math.floor(Date.now() / 1000);
-    //     liveIntervalRef.current = setInterval(async () => {
-    //         try {
-    //             const now = Math.floor(Date.now() / 1000);
-    //             const newLogs = await fetchAgentLogs(agentId, lastFetchTimestamp, now);
-    //             if (newLogs.length > 0) {
-    //                 setAgentLogs(prevLogs => {
-    //                     const updatedLogs = [...newLogs, ...prevLogs];
-    //                     const uniqueLogs = updatedLogs.filter((log, index, arr) =>
-    //                         arr.findIndex(l => l.timestamp === log.timestamp && l.message === log.message) === index
-    //                     );
-    //                     return uniqueLogs.slice(0, LIVE_LOG_LIMIT);
-    //                 });
-    //                 lastFetchTimestamp = newLogs[0].timestamp;
-    //             }
-    //         } catch (error) {
-    //             console.error("Error in live log fetching:", error);
-    //         }
-    //     }, 10000);
-    //     const now = Math.floor(Date.now() / 1000);
-    //     const oneHourAgo = now - 3600;
-    //     const initialLogs = await fetchAgentLogs(agentId, oneHourAgo, now);
-    //     setAgentLogs(initialLogs.slice(0, LIVE_LOG_LIMIT));
-    //     if (initialLogs.length > 0) {
-    //         lastFetchTimestamp = initialLogs[0].timestamp;
-    //     }
-    // }, [stopLiveFetching, fetchAgentLogs]);
-
-    // Live mode disabled — handleLogModeChange kept for reference
-    // const handleLogModeChange = useCallback(async (newMode) => {
-    //     if (logMode === newMode) return;
-    //     setLogMode(newMode);
-    //     if (!selectedAgent) return;
-    //     const wasExpanded = isLogsExpanded;
-    //     setAgentLogs([]);
-    //     setDisplayedLogs([]);
-    //     if (newMode === LOG_MODES.CURRENT) {
-    //         await startLiveFetching(selectedAgent.agentId);
-    //     } else {
-    //         stopLiveFetching();
-    //         const historicalLogs = await fetchAgentLogs(selectedAgent.agentId, startTimestamp, endTimestamp);
-    //         setAgentLogs(historicalLogs);
-    //     }
-    //     setIsLogsExpanded(wasExpanded);
-    // }, [logMode, selectedAgent, isLogsExpanded, startLiveFetching, stopLiveFetching, fetchAgentLogs, startTimestamp, endTimestamp]);
+    }, [selectedAgent, startTimestamp, endTimestamp]);
 
     const handleSourceChange = useCallback(async (source) => {
         if (logSourceRef.current === source) return;
-        setSelectedLogSource(source);
         logSourceRef.current = source;
+        setSelectedLogSource(source);
         if (!selectedAgent) return;
-        setAgentLogs([]);
-        setDisplayedCount(PAGE_SIZE);
-        setNoNewLogsFound(false);
-        // Live mode disabled — always historical
-        // if (logMode === LOG_MODES.CURRENT) {
-        //     await startLiveFetching(selectedAgent.agentId);
-        // } else {
-        setLogsLoading(true);
-        try {
-            const logs = await fetchAgentLogs(selectedAgent.agentId, startTimestamp, endTimestamp);
-            setAgentLogs(logs);
-            setNoNewLogsFound(true); // just loaded everything — nothing newer right now
-        } finally {
-            setLogsLoading(false);
+        setPageStack([null]);
+        setPageIndex(0);
+        setCurrentPageLogs([]);
+        await fetchPage(null, true);
+    }, [selectedAgent, fetchPage]);
+
+    const handleRefresh = useCallback(async () => {
+        setPageStack([null]);
+        setPageIndex(0);
+        await fetchPage(null, true);
+    }, [fetchPage]);
+
+    const handlePrevPage = useCallback(async () => {
+        const newIndex = pageIndex - 1;
+        setPageIndex(newIndex);
+        await fetchPage(pageStack[newIndex]);
+    }, [pageIndex, pageStack, fetchPage]);
+
+    const handleNextPage = useCallback(async () => {
+        const lastId = currentPageLogs[currentPageLogs.length - 1]?.hexId;
+        const newIndex = pageIndex + 1;
+        if (newIndex >= pageStack.length) {
+            setPageStack(prev => [...prev, lastId]);
         }
-        // }
-    }, [selectedAgent, startTimestamp, endTimestamp, fetchAgentLogs]);
+        setPageIndex(newIndex);
+        await fetchPage(lastId);
+    }, [currentPageLogs, pageIndex, pageStack, fetchPage]);
 
-    // handleLoadOlder: purely frontend — shows the next page from already-fetched agentLogs
-    const handleLoadOlder = useCallback(() => {
-        setDisplayedCount(prev => Math.min(prev + PAGE_SIZE, agentLogs.length));
-    }, [agentLogs.length]);
-
-    // handleLoadNewer: API call to fetch logs newer than the most recent one we have
-    const handleLoadNewer = useCallback(async () => {
+    const handleExportLogs = useCallback(async () => {
         if (!selectedAgent) return;
-        const nowEpoch = Math.floor(Date.now() / 1000);
-        // +1 to exclude the boundary log we already have, so we only get genuinely newer entries
-        const newerStart = agentLogs.length > 0 ? agentLogs[0].timestamp + 1 : lastFetchEndTime;
-        if (!newerStart) return;
-        setLogsLoading(true);
+        setExportLoading(true);
         try {
-            const newerLogs = await fetchAgentLogs(selectedAgent.agentId, newerStart, nowEpoch);
-            if (newerLogs.length > 0) {
-                setAgentLogs(prev => {
-                    const combined = [...newerLogs, ...prev];
-                    const unique = combined.filter((log, idx, arr) =>
-                        arr.findIndex(l => l.timestamp === log.timestamp && l.message === log.message) === idx
-                    );
-                    return unique.sort((a, b) => b.timestamp - a.timestamp);
-                });
-                setNoNewLogsFound(false); // new logs found — keep button enabled
-            } else {
-                setNoNewLogsFound(true); // nothing newer right now — disable button
-            }
-            setLastFetchEndTime(nowEpoch);
+            const res = await settingRequests.exportAgentLogs(
+                selectedAgent.agentId, startTimestamp, endTimestamp,
+                logSourceRef.current
+            );
+            const logs = res.agentLogs || [];
+            if (logs.length === 0) return;
+            const txt = logs
+                .map(l => `[${func.epochToDateTime(l.timestamp)}] [${(l.level || 'INFO').padEnd(7)}] ${l.log || l.message || ''}`)
+                .join('\n');
+            const blob = new Blob([txt], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${logSourceRef.current}-${selectedAgent.agentId}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Error exporting logs:", error);
         } finally {
-            setLogsLoading(false);
+            setExportLoading(false);
         }
-    }, [selectedAgent, agentLogs, lastFetchEndTime, fetchAgentLogs]);
-
-    const handleExportLogs = useCallback(() => {
-        if (!agentLogs || agentLogs.length === 0) return;
-        const logsToExport = agentLogs; // export all fetched logs, not just the currently displayed page
-        const txt = logsToExport
-            .map(l => `[${func.epochToDateTime(l.timestamp)}] [${(l.level || 'INFO').padEnd(7)}] ${l.message || ''}`)
-            .join('\n');
-        const blob = new Blob([txt], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `agent-logs-${selectedAgent?.agentId || 'export'}.txt`;
-        a.click();
-        URL.revokeObjectURL(url);
-    }, [agentLogs, displayedCount, selectedAgent]);
+    }, [selectedAgent, startTimestamp, endTimestamp]);
 
     const handleSaveDescription = useCallback(() => {
         setDescription(editableDescription);
@@ -312,21 +242,18 @@ function AgentDetails({
 
         setMcpServers([]);
         setUserAnalysis(null);
-        setAgentLogs([]);
-        // setDisplayedLogs([]); // replaced
+        setCurrentPageLogs([]);
         setLogsLoading(false);
-        setDisplayedCount(PAGE_SIZE);
-        setLastFetchEndTime(null);
-        setNoNewLogsFound(false);
+        setPageStack([null]);
+        setPageIndex(0);
+        setHasMore(false);
+        setTotalCount(0);
         setLogMode(LOG_MODES.HISTORICAL);
-        setSelectedLogSource('all');
-        logSourceRef.current = 'all';
-        // setWindowStartTime(null); // time-window replaced by count-based
-        // setWindowEndTime(null);
+        setSelectedLogSource('installation-logs');
+        logSourceRef.current = 'installation-logs';
         setDescription("");
         setEditableDescription("");
         setIsEditingDescription(false);
-        // stopLiveFetching(); // Live mode disabled
 
         setLoading(true);
         settingRequests.getMcpServersByAgent(selectedAgent.agentId, selectedAgent.hostname)
@@ -334,30 +261,6 @@ function AgentDetails({
             .catch(() => setMcpServers([]))
             .finally(() => setLoading(false));
     }, [selectedAgent, show]);
-
-    // Live mode disabled — stop-on-close and unmount cleanup no longer needed
-    // useEffect(() => {
-    //     if (!show) stopLiveFetching();
-    // }, [show, stopLiveFetching]);
-    // useEffect(() => {
-    //     return () => stopLiveFetching();
-    // }, [stopLiveFetching]);
-
-    // displayedLogs sync removed — renderLogs() now reads agentLogs directly
-    // useEffect(() => {
-    //     if (agentLogs.length === 0 || !show) {
-    //         setDisplayedLogs([]);
-    //         return;
-    //     }
-    //     setDisplayedLogs(agentLogs.slice(0, MAX_LOGS_DISPLAYED));
-    // }, [agentLogs, show]);
-
-    // Re-enable "Load Newer" 30 seconds after it was disabled (so user can check again without switching filters)
-    useEffect(() => {
-        if (!noNewLogsFound) return;
-        const timer = setTimeout(() => setNoNewLogsFound(false), 30000);
-        return () => clearTimeout(timer);
-    }, [noNewLogsFound]);
 
     const handleTabChange = useCallback(async (tab) => {
         if (!selectedAgent) return;
@@ -385,31 +288,18 @@ function AgentDetails({
                 }
                 break;
             case 'agent-logs': {
-                // Live mode disabled
-                // stopLiveFetching();
-                setAgentLogs([]);
-                setDisplayedCount(PAGE_SIZE);
-                setLastFetchEndTime(endTimestamp);
-                setNoNewLogsFound(false);
-                // setDisplayedLogs([]); // replaced
-                // if (logMode === LOG_MODES.CURRENT) {
-                //     await startLiveFetching(selectedAgent.agentId);
-                // } else {
-                setLogsLoading(true);
-                try {
-                    const logs = await fetchAgentLogs(selectedAgent.agentId, startTimestamp, endTimestamp);
-                    setAgentLogs(logs);
-                    setNoNewLogsFound(true); // just loaded everything — nothing newer right now
-                } finally {
-                    setLogsLoading(false);
-                }
-                // }
+                setCurrentPageLogs([]);
+                setPageStack([null]);
+                setPageIndex(0);
+                setHasMore(false);
+                setTotalCount(0);
+                await fetchPage(null, true);
                 break;
             }
             default:
                 break;
         }
-    }, [selectedAgent, fetchAgentLogs, startTimestamp, endTimestamp]);
+    }, [selectedAgent, fetchPage]);
 
     const mcpServersTableData = useMemo(() =>
         mcpServers.map(server => ({
@@ -431,87 +321,13 @@ function AgentDetails({
         }
     }, [allCollections, navigate]);
 
-    // Old renderLogs — replaced by new version below
-    // const renderLogs_OLD = () => {
-    //     if (!agentLogs || agentLogs.length === 0) {
-    //         return (
-    //             <Box padding="4" background="bg-surface">
-    //                 <Text variant="bodyMd" color="subdued" alignment="center">No logs found</Text>
-    //             </Box>
-    //         );
-    //     }
-    //     if (!displayedLogs || displayedLogs.length === 0) {
-    //         return (
-    //             <Box padding="4" background="bg-surface">
-    //                 <Text variant="bodyMd" color="subdued">Loading logs...</Text>
-    //             </Box>
-    //         );
-    //     }
-    //     return (
-    //         <div className={`rounded-lg overflow-hidden border border-[#C9CCCF] bg-[#F6F6F7] p-2 flex flex-col ${isLogsExpanded ? "gap-1" : "gap-0"}`}>
-    //             <HorizontalStack gap="2" align="space-between" wrap={false}>
-    //                 <Button variant="plain" onClick={() => setIsLogsExpanded(!isLogsExpanded)} textAlign="left" style={{ backgroundColor: '#F6F6F7' }}>
-    //                     <HorizontalStack gap="2" align="start">
-    //                         <motion.div animate={{ rotate: isLogsExpanded ? 0 : 270 }} transition={{ duration: ANIMATION_DURATION }}>
-    //                             <CaretDownMinor height={20} width={20} />
-    //                         </motion.div>
-    //                         <Text as="dd">Agent</Text>
-    //                     </HorizontalStack>
-    //                 </Button>
-    //                 <HorizontalStack gap="3" wrap={false}>
-    //                     <HorizontalStack gap="1">
-    //                         <Button size="micro" pressed={logMode === LOG_MODES.CURRENT} onClick={(e) => { e.stopPropagation(); handleLogModeChange(LOG_MODES.CURRENT); }}>Live</Button>
-    //                         <Button size="micro" pressed={logMode === LOG_MODES.HISTORICAL} onClick={(e) => { e.stopPropagation(); handleLogModeChange(LOG_MODES.HISTORICAL); }}>All Time</Button>
-    //                     </HorizontalStack>
-    //                     <HorizontalStack gap="1">
-    //                         {[{ label: 'All', value: 'all' }, { label: 'Agent', value: 'agent-logs' }, { label: 'Proxy', value: 'proxy-logs' }, { label: 'Install', value: 'installation-logs' }].map(({ label, value }) => (
-    //                             <Button key={value} size="micro" pressed={selectedLogSource === value} onClick={(e) => { e.stopPropagation(); handleSourceChange(value); }}>{label}</Button>
-    //                         ))}
-    //                     </HorizontalStack>
-    //                 </HorizontalStack>
-    //             </HorizontalStack>
-    //             <AnimatePresence>
-    //                 <motion.div animate={isLogsExpanded ? "open" : "closed"} variants={{ open: { height: "auto", opacity: 1 }, closed: { height: 0, opacity: 0 } }} transition={{ duration: ANIMATION_DURATION }} className="overflow-hidden">
-    //                     <div className="bg-[#F6F6F7] max-h-[45vh] overflow-auto ml-2.5 pt-0 space-y-1 border-l border-[#D2D5D8]">
-    //                         <AnimatePresence initial={false}>
-    //                             {displayedLogs.map((log, index) => (
-    //                                 <motion.div key={`${log.timestamp}-${log.message}-${index}`} initial={logMode === LOG_MODES.CURRENT ? { opacity: 0, y: -5 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: "easeOut" }} className="ml-3 p-0.5 hover:bg-[var(--background-selected)]">
-    //                                     <HorizontalStack gap="3" align="start">
-    //                                         <Box minWidth={LOG_TIMESTAMP_WIDTH}><Text variant="bodySm" fontWeight="medium" tone="subdued">{func.epochToDateTime(log.timestamp)}</Text></Box>
-    //                                         <Box minWidth={LOG_LEVEL_WIDTH}><Badge size="small" tone={LOG_LEVEL_TONES[log.level] || 'info'}>{log.level}</Badge></Box>
-    //                                         <Box><Text variant="bodySm" as="p">{log.message}</Text></Box>
-    //                                     </HorizontalStack>
-    //                                 </motion.div>
-    //                             ))}
-    //                         </AnimatePresence>
-    //                     </div>
-    //                 </motion.div>
-    //             </AnimatePresence>
-    //         </div>
-    //     );
-    // };
-
-    // count-based pagination — no time-window tracking needed
-    const canLoadOlder = displayedCount < agentLogs.length;
-    const canLoadNewer = agentLogs.length > 0 && !logsLoading && !noNewLogsFound;
-
     const renderLogs = () => {
         const logSources = [
-            { label: 'All', value: 'all' },
+            // { label: 'All', value: 'all' }, // removed — use specific sources
+            { label: 'Install', value: 'installation-logs' },
             { label: 'Agent', value: 'agent-logs' },
             { label: 'Proxy', value: 'proxy-logs' },
-            { label: 'Install', value: 'installation-logs' },
         ];
-
-        // Live mode toggle — commented out, ready to re-enable
-        // const liveModeToggle = (
-        //     <HorizontalStack gap="1">
-        //         <Button size="micro" pressed={logMode === LOG_MODES.CURRENT}
-        //             onClick={(e) => { e.stopPropagation(); handleLogModeChange(LOG_MODES.CURRENT); }}>Live</Button>
-        //         <Button size="micro" pressed={logMode === LOG_MODES.HISTORICAL}
-        //             onClick={(e) => { e.stopPropagation(); handleLogModeChange(LOG_MODES.HISTORICAL); }}>All Time</Button>
-        //     </HorizontalStack>
-        // );
 
         const controls = (
             <HorizontalStack gap="2" align="space-between" wrap={false}>
@@ -527,16 +343,31 @@ function AgentDetails({
                         </Button>
                     ))}
                 </HorizontalStack>
-                <Button
-                    size="micro"
-                    icon={ExportMinor}
-                    disabled={agentLogs.length === 0 || logsLoading}
-                    onClick={handleExportLogs}
-                >
-                    Export
-                </Button>
+                <HorizontalStack gap="1">
+                    <Button
+                        size="micro"
+                        icon={RefreshMinor}
+                        disabled={logsLoading}
+                        onClick={handleRefresh}
+                        accessibilityLabel="Refresh logs"
+                    />
+                    <Button
+                        size="micro"
+                        icon={ExportMinor}
+                        disabled={totalCount === 0 || logsLoading || exportLoading}
+                        loading={exportLoading}
+                        onClick={handleExportLogs}
+                    >
+                        Export
+                    </Button>
+                </HorizontalStack>
             </HorizontalStack>
         );
+
+        const pageStart = pageIndex * PAGE_SIZE + 1;
+        const pageEnd = !hasMore ? totalCount : pageIndex * PAGE_SIZE + currentPageLogs.length;
+        const canGoPrev = pageIndex > 0;
+        const canGoNext = hasMore;
 
         let logBody;
         if (logsLoading) {
@@ -548,7 +379,7 @@ function AgentDetails({
                     </VerticalStack>
                 </Box>
             );
-        } else if (agentLogs.length === 0) {
+        } else if (currentPageLogs.length === 0) {
             logBody = (
                 <Box padding="8">
                     <Text variant="bodyMd" color="subdued" alignment="center">No logs found for this time window.</Text>
@@ -558,9 +389,9 @@ function AgentDetails({
             logBody = (
                 <div className="max-h-[55vh] overflow-auto">
                     <AnimatePresence initial={false}>
-                        {agentLogs.slice(0, displayedCount).map((log, index) => (
+                        {currentPageLogs.map((log, index) => (
                             <motion.div
-                                key={`${log.timestamp}-${log.message}-${index}`}
+                                key={log.hexId || `${log.timestamp}-${index}`}
                                 initial={false}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: ANIMATION_DURATION, ease: "easeOut" }}
@@ -577,8 +408,8 @@ function AgentDetails({
                                             {log.level}
                                         </Badge>
                                     </Box>
-                                    <Box>
-                                        <Text variant="bodySm" as="p">{log.message}</Text>
+                                    <Box overflow="hidden">
+                                        <Text variant="bodySm" as="p" breakWord>{log.message}</Text>
                                     </Box>
                                 </HorizontalStack>
                             </motion.div>
@@ -589,30 +420,26 @@ function AgentDetails({
         }
 
         const footer = (
-            <HorizontalStack align="space-between" wrap={false} gap="2">
+            <HorizontalStack align="center" wrap={false} gap="2">
                 <Button
                     plain
-                    disabled={!canLoadOlder || logsLoading}
-                    onClick={handleLoadOlder}
-                >
-                    ← Load Older
-                </Button>
-                <VerticalStack gap="0" align="center">
-                    {agentLogs.length > 0 && (
-                        <Text variant="bodySm" color="subdued" alignment="center">
-                            {canLoadOlder
-                                ? `Showing ${displayedCount} of ${agentLogs.length} logs`
-                                : `${agentLogs.length} log${agentLogs.length !== 1 ? 's' : ''}`}
-                        </Text>
-                    )}
-                </VerticalStack>
+                    icon={ChevronLeftMinor}
+                    disabled={!canGoPrev || logsLoading}
+                    onClick={handlePrevPage}
+                    accessibilityLabel="Previous page"
+                />
+                {totalCount > 0 && (
+                    <Text variant="bodySm" color="subdued" alignment="center">
+                        {`${pageStart}-${pageEnd} of ${totalCount}`}
+                    </Text>
+                )}
                 <Button
                     plain
-                    disabled={!canLoadNewer || logsLoading}
-                    onClick={handleLoadNewer}
-                >
-                    Load Newer →
-                </Button>
+                    icon={ChevronRightMinor}
+                    disabled={!canGoNext || logsLoading}
+                    onClick={handleNextPage}
+                    accessibilityLabel="Next page"
+                />
             </HorizontalStack>
         );
 
