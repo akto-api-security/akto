@@ -21,17 +21,28 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
     const handleMarkAsFixed = async () => {
         try {
             setMarking(true);
-
             await observeRequests.markViolationAsFixed(row.id);
-
             setMarking(false);
             setActionActive(false);
             setShow(false);
-
-            // Refresh the violations list
             window.location.reload();
         } catch (err) {
             console.error("Error marking violation as fixed:", err);
+            setMarking(false);
+            setActionActive(false);
+        }
+    };
+
+    const handleReopen = async () => {
+        try {
+            setMarking(true);
+            await observeRequests.reopenViolation(row.id);
+            setMarking(false);
+            setActionActive(false);
+            setShow(false);
+            window.location.reload();
+        } catch (err) {
+            console.error("Error reopening violation:", err);
             setMarking(false);
             setActionActive(false);
         }
@@ -122,7 +133,9 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                 >
                     <ActionList items={[
                         { content: "Open Jira Ticket",  onAction: handleOpenJiraModal },
-                        { content: "Mark as Fixed",     onAction: handleMarkAsFixed },
+                        row.status === "Fixed"
+                            ? { content: "Reopen Violation", onAction: handleReopen }
+                            : { content: "Mark as Fixed",    onAction: handleMarkAsFixed },
                         {
                             content: "Update Policy",
                             onAction: () => {

@@ -10,12 +10,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Collections;
 import java.util.concurrent.*;
 
 public class RedisBackedCounterCache implements CounterCache {
   private final StatefulRedisConnection<String, Long> redis;
+  private final StatefulRedisConnection<String, String> stringRedis;
 
   private final Cache<String, Long> localCache;
+  private final Cache<String, Set<String>> localSetCache;
 
   private final String prefix;
   private final ConcurrentLinkedQueue<Object> pendingOps;
@@ -42,10 +45,13 @@ public class RedisBackedCounterCache implements CounterCache {
     this.prefix = prefix;
     if (redisClient != null) {
       this.redis = redisClient.connect(new LongValueCodec());
+      this.stringRedis = redisClient.connect();
     } else {
       this.redis = null;
+      this.stringRedis = null;
     }
     this.localCache = Caffeine.newBuilder().maximumSize(10000).expireAfterWrite(3, TimeUnit.HOURS).build();
+    this.localSetCache = Caffeine.newBuilder().maximumSize(10000).expireAfterWrite(3, TimeUnit.HOURS).build();
     this.pendingOps = new ConcurrentLinkedQueue<>();
   }
 
@@ -86,6 +92,39 @@ public class RedisBackedCounterCache implements CounterCache {
   public void reset(String key) {
     this.localCache.put(key, 0L);
     this.redis.async().hset(prefix, key, 0L);
+  }
+
+  @Override
+  public void addToSet(String key, String member) {
+    if (this.stringRedis == null) return;
+    Set<String> localSet = this.localSetCache.get(key, k -> ConcurrentHashMap.newKeySet());
+    localSet.add(member);
+    this.stringRedis.async().sadd(key, member);
+    this.stringRedis.async().expire(key, 3 * 60 * 60);
+  }
+
+  @Override
+  public Set<String> getSetMembers(String key) {
+    Set<String> localSet = this.localSetCache.getIfPresent(key);
+    if (localSet != null) {
+      return localSet;
+    }
+    if (this.stringRedis == null) return Collections.emptySet();
+    Set<String> members = this.stringRedis.sync().smembers(key);
+    if (members != null && !members.isEmpty()) {
+      Set<String> concurrentSet = ConcurrentHashMap.newKeySet();
+      concurrentSet.addAll(members);
+      this.localSetCache.put(key, concurrentSet);
+      return concurrentSet;
+    }
+    return Collections.emptySet();
+  }
+
+  public void resetSet(String key) {
+    this.localSetCache.invalidate(key);
+    if (this.stringRedis != null) {
+      this.stringRedis.async().del(key);
+    }
   }
 
   private void flush() {

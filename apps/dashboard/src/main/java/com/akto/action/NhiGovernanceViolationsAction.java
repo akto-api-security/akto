@@ -56,6 +56,12 @@ public class NhiGovernanceViolationsAction extends UserAction {
     private String violationId;
 
     @Setter
+    private int startTimestamp;
+
+    @Setter
+    private int endTimestamp;
+
+    @Setter
     private String projId;
 
     @Setter
@@ -78,10 +84,18 @@ public class NhiGovernanceViolationsAction extends UserAction {
             List<Bson> pipeline = new ArrayList<>();
 
             // Aggregation bypasses AccountsContextDaoWithContextSource — apply contextSource filter explicitly.
+            List<Bson> matchConditions = new ArrayList<>();
             if (Context.contextSource.get() != null) {
-                pipeline.add(Aggregates.match(
-                        Filters.eq(NhiViolation.CONTEXT_SOURCE, Context.contextSource.get().name())
-                ));
+                matchConditions.add(Filters.eq(NhiViolation.CONTEXT_SOURCE, Context.contextSource.get().name()));
+            }
+            if (startTimestamp > 0 && endTimestamp > 0) {
+                matchConditions.add(Filters.gte(NhiViolation.DISCOVERED_AT, startTimestamp));
+                matchConditions.add(Filters.lte(NhiViolation.DISCOVERED_AT, endTimestamp));
+            }
+            if (!matchConditions.isEmpty()) {
+                pipeline.add(Aggregates.match(matchConditions.size() == 1
+                        ? matchConditions.get(0)
+                        : Filters.and(matchConditions)));
             }
 
             // Join nhi_policies. policyIds is List<String>, _id is ObjectId — match via $toString.
@@ -143,7 +157,7 @@ public class NhiGovernanceViolationsAction extends UserAction {
     public String fetchViolationCountsByIdentity() {
         try {
             violations = NhiViolationDao.instance.findAll(
-                    Filters.empty(),
+                    Filters.ne(NhiViolation.STATUS, "Fixed"),
                     Projections.fields(
                             Projections.excludeId(),
                             Projections.include(NhiViolation.SEVERITY, NhiViolation.IDENTITIES + ".identityName")
@@ -194,6 +208,36 @@ public class NhiGovernanceViolationsAction extends UserAction {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching violations: " + e.getMessage());
             addActionError(e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public String reopenViolation() {
+        try {
+            long currentTime = Context.now();
+
+            if (violationId == null || violationId.isEmpty()) {
+                addActionError("Violation ID is required");
+                success = false;
+                return Action.ERROR.toUpperCase();
+            }
+
+            Bson filter = Filters.eq(NhiViolation.ID, new ObjectId(violationId));
+            Bson update = Updates.combine(
+                Updates.set(NhiViolation.STATUS, "Open"),
+                Updates.set(NhiViolation.UPDATED_AT, currentTime),
+                Updates.set(NhiViolation.UPDATED_BY, getSUser().getLogin())
+            );
+
+            NhiViolationDao.instance.updateOne(filter, update);
+
+            success = true;
+            return Action.SUCCESS.toUpperCase();
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error reopening violation: " + e.getMessage());
+            addActionError(e.getMessage());
+            success = false;
             return Action.ERROR.toUpperCase();
         }
     }

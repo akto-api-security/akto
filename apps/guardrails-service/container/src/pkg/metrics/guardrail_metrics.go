@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"math"
-	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -25,28 +24,33 @@ type accountAccumulator struct {
 	responseSamples []int64
 }
 
-func (a *accountAccumulator) recordRequest(ms int64) {
+func (a *accountAccumulator) recordRequest(ns int64) {
 	a.mu.Lock()
-	a.requestSamples = append(a.requestSamples, ms)
+	a.requestSamples = append(a.requestSamples, ns)
 	a.mu.Unlock()
 }
 
-func (a *accountAccumulator) recordResponse(ms int64) {
+func (a *accountAccumulator) recordResponse(ns int64) {
 	a.mu.Lock()
-	a.responseSamples = append(a.responseSamples, ms)
+	a.responseSamples = append(a.responseSamples, ns)
 	a.mu.Unlock()
 }
 
-// p95 returns the 95th-percentile of nanosecond samples converted to milliseconds.
-func p95(samples []int64) float64 {
-	sort.Slice(samples, func(i, j int) bool { return samples[i] < samples[j] })
-	idx := int(math.Ceil(0.95*float64(len(samples)))) - 1
-	if idx < 0 {
-		idx = 0
+// avg returns the mean of nanosecond samples converted to milliseconds (2 dp).
+func avg(samples []int64) float64 {
+	if len(samples) == 0 {
+		return 0
 	}
-	return math.Round(float64(samples[idx])/1e4) / 100 // ns → ms, 2 decimal places
+	var sum int64
+	for _, s := range samples {
+		sum += s
+	}
+	meanNs := float64(sum) / float64(len(samples))
+	return math.Round(meanNs/1e4) / 100 // ns → ms, 2 decimal places
 }
 
+// drain computes the average latency over the samples collected since the last
+// flush (a ~1-minute window, driven by the flush ticker) and resets the buffers.
 func (a *accountAccumulator) drain(accountId string) []MetricData {
 	a.mu.Lock()
 	reqSamples := a.requestSamples
@@ -59,10 +63,10 @@ func (a *accountAccumulator) drain(accountId string) []MetricData {
 	now := time.Now().Unix()
 	var out []MetricData
 	if len(reqSamples) > 0 {
-		out = append(out, MetricData{MetricId: "GUARDRAIL_REQUEST_LATENCY", Value: p95(reqSamples), Timestamp: now, MetricType: "LATENCY", ModuleType: "AKTO_AGENT_GATEWAY", AccountId: accIdInt})
+		out = append(out, MetricData{MetricId: "GUARDRAIL_REQUEST_LATENCY", Value: avg(reqSamples), Timestamp: now, MetricType: "LATENCY", ModuleType: "AKTO_AGENT_GATEWAY", AccountId: accIdInt})
 	}
 	if len(resSamples) > 0 {
-		out = append(out, MetricData{MetricId: "GUARDRAIL_RESPONSE_LATENCY", Value: p95(resSamples), Timestamp: now, MetricType: "LATENCY", ModuleType: "AKTO_AGENT_GATEWAY", AccountId: accIdInt})
+		out = append(out, MetricData{MetricId: "GUARDRAIL_RESPONSE_LATENCY", Value: avg(resSamples), Timestamp: now, MetricType: "LATENCY", ModuleType: "AKTO_AGENT_GATEWAY", AccountId: accIdInt})
 	}
 	return out
 }
@@ -94,10 +98,10 @@ func (a *Accumulator) get(accountId string) *accountAccumulator {
 	return acc
 }
 
-func (a *Accumulator) RecordRequest(accountId string, ms int64)  { a.get(accountId).recordRequest(ms) }
-func (a *Accumulator) RecordResponse(accountId string, ms int64) { a.get(accountId).recordResponse(ms) }
+func (a *Accumulator) RecordRequest(accountId string, ns int64)  { a.get(accountId).recordRequest(ns) }
+func (a *Accumulator) RecordResponse(accountId string, ns int64) { a.get(accountId).recordResponse(ns) }
 
-// DrainAll returns P95 latency metrics grouped by account and resets sample buffers.
+// DrainAll returns average latency metrics grouped by account and resets sample buffers.
 func (a *Accumulator) DrainAll() map[string][]MetricData {
 	a.mu.RLock()
 	ids := make([]string, 0, len(a.accounts))

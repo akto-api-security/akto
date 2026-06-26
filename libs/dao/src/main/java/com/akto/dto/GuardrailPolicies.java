@@ -109,6 +109,8 @@ public class GuardrailPolicies {
     // Modal config
     private ArrayList<ModelConfig> modelConfigs;
 
+    private List<String> enterpriseLicenseComplianceCategories;
+
     public String getHexId() {
         if (this.id != null) {
             return this.id.toHexString();
@@ -203,10 +205,13 @@ public class GuardrailPolicies {
         private String description;
         private List<String> samplePhrases;
 
-        public DeniedTopic(String topic, String description, List<String> samplePhrases) {
+        private String origin;
+
+        public DeniedTopic(String topic, String description, List<String> samplePhrases, String origin) {
             this.topic = topic;
             this.description = description;
             this.samplePhrases = samplePhrases;
+            this.origin = origin;
         }
     }
 
@@ -373,11 +378,11 @@ public class GuardrailPolicies {
     @NoArgsConstructor
     public static class TokenLimitDetection {
         private boolean enabled;
-        private double confidenceScore;
+        private int threshold; // max allowed tokens per prompt
 
-        public TokenLimitDetection(boolean enabled, double confidenceScore) {
+        public TokenLimitDetection(boolean enabled, int threshold) {
             this.enabled = enabled;
-            this.confidenceScore = confidenceScore;
+            this.threshold = threshold;
         }
     }
 

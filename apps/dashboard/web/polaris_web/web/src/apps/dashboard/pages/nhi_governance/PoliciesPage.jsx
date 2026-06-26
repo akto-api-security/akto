@@ -99,11 +99,14 @@ const sortOptions = [
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 const policiesPageTitle = (
-    <TitleWithInfo
-        titleText="Policies"
-        tooltipContent="Governance policies that define rules and constraints for non-human identity usage."
-        docsUrl="https://ai-security-docs.akto.io/nhi-governance/policies"
-    />
+    <HorizontalStack gap="2" blockAlign="center">
+        <TitleWithInfo
+            titleText="Policies"
+            tooltipContent="Governance policies that define rules and constraints for non-human identity usage."
+            docsUrl="https://ai-security-docs.akto.io/nhi-governance/policies"
+        />
+        <Badge status="info">Beta</Badge>
+    </HorizontalStack>
 );
 
 export default function PoliciesPage() {
