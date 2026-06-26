@@ -1619,6 +1619,63 @@ public class InitializerListener implements ServletContextListener {
         }, jitterSeconds, 2 * 60 * 60, TimeUnit.SECONDS);
     }
 
+    // Returns true if version string (e.g. "1.62.18-abc123") is >= the given major.minor.patch
+    private static boolean isVersionAtLeast(String version, int major, int minor, int patch) {
+        if (version == null) return false;
+        try {
+            String numeric = version.split("-")[0];
+            String[] parts = numeric.split("\\.");
+            int vMajor = Integer.parseInt(parts[0]);
+            int vMinor = Integer.parseInt(parts[1]);
+            int vPatch = Integer.parseInt(parts[2]);
+            if (vMajor != major) return vMajor > major;
+            if (vMinor != minor) return vMinor > minor;
+            return vPatch >= patch;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public void setUpRemoveRagDatabaseTagCron() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account account) {
+                        try {
+                            int accountId = Context.accountId.get();
+                            List<ModuleInfo> liveModules = ModuleInfoDao.instance.fetchLiveModulesByType(ModuleInfo.ModuleType.MINI_RUNTIME);
+                            if (liveModules == null || liveModules.isEmpty()) {
+                                logger.infoAndAddToDb("removeRagDatabaseTagCron: no live MINI_RUNTIME modules found for accountId=" + accountId + ", skipping", LogDb.DASHBOARD);
+                                return;
+                            }
+                            boolean hasFixedVersion = liveModules.stream()
+                                .anyMatch(m -> isVersionAtLeast(m.getCurrentVersion(), 1, 70, 8));
+                            if (hasFixedVersion) {
+                                logger.infoAndAddToDb("removeRagDatabaseTagCron: version >=1.70.8 for accountId=" + accountId + ", skipping tag removal", LogDb.DASHBOARD);
+                                return;
+                            }
+                            logger.infoAndAddToDb("removeRagDatabaseTagCron: version <1.70.8 for accountId=" + accountId + ", removing RAG database tag", LogDb.DASHBOARD);
+                            Bson ragTagFilter = Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_RAG_DATABASE_TAG));
+                            long count = ApiCollectionsDao.instance.getMCollection().countDocuments(ragTagFilter);
+                            if (count > 0) {
+                                ApiCollectionsDao.instance.updateMany(
+                                    ragTagFilter,
+                                    Updates.pull(ApiCollection.TAGS_STRING, new BasicDBObject(CollectionTags.KEY_NAME, Constants.AKTO_RAG_DATABASE_TAG))
+                                );
+                                logger.infoAndAddToDb("removeRagDatabaseTagCron: removed RAG database tag from " + count + " collections for accountId=" + accountId, LogDb.DASHBOARD);
+                            } else {
+                                logger.infoAndAddToDb("removeRagDatabaseTagCron: no collections with RAG database tag found for accountId=" + accountId, LogDb.DASHBOARD);
+                            }
+                        } catch (Exception e) {
+                            logger.errorAndAddToDb(e, "removeRagDatabaseTagCron: error - " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+                    }
+                }, "remove-rag-database-tag");
+            }
+        }, 0, 30, TimeUnit.MINUTES);
+    }
+
     static class ChangesInfo {
         public Map<String, String> newSensitiveParams = new HashMap<>();
         public List<BasicDBObject> newSensitiveParamsObject = new ArrayList<>();
@@ -2682,6 +2739,8 @@ public class InitializerListener implements ServletContextListener {
                     setUpWebhookScheduler();
                     logger.warn("Started threat detection rolling reboot scheduler", LogDb.DASHBOARD);
                     setUpThreatDetectionRollingRebootScheduler();
+                    logger.warn("Started remove RAG database tag scheduler", LogDb.DASHBOARD);
+                    setUpRemoveRagDatabaseTagCron();
                     logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
                     setUpTrafficAlertScheduler();
                     logger.warn("Started daily schedulers", LogDb.DASHBOARD);
