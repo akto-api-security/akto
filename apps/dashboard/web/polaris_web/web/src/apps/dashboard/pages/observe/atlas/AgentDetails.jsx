@@ -51,52 +51,153 @@ const getMetadataFields = (agent) => [
     { icon: CalendarMinor, tooltip: "Last Deployed", value: func.prettifyEpoch(agent.lastDeployed) },
 ];
 
-const DEVICE_INFO_FIELDS = [
-    { label: "OS", key: "os", format: (v) => (v && v !== DEFAULT_VALUE) ? v : null },
-    { label: "Architecture", key: "arch" },
-    { label: "Kernel", key: "kernelVersion" },
-    { label: "RAM", key: "totalRamGB", format: (v) => (v != null && v !== DEFAULT_VALUE) ? `${v} GB` : null },
-    { label: "CPU Cores", key: "cpuCount", format: (v) => (v != null && v !== DEFAULT_VALUE) ? String(v) : null },
-    { label: "Virtual Machine", key: "isVM", isVM: true },
-    { label: "Locale", key: "locale" },
-    { label: "Public IP", key: "publicIP" },
-    { label: "Shield Version", key: "agentVersion" },
+const DEVICE_INFO_SECTIONS = [
+    {
+        title: "Hardware",
+        fields: [
+            { label: "CPU Model",      key: "cpuModel" },
+            { label: "Mac Model",      key: "macModel" },
+            { label: "Architecture",   key: "arch" },
+            { label: "RAM",            key: "totalRamGB",    format: (v) => (v != null && v !== DEFAULT_VALUE) ? `${v} GB` : null },
+            { label: "Total Disk",     key: "totalDiskGB",   format: (v) => (v != null && v !== DEFAULT_VALUE) ? `${v} GB` : null },
+            { label: "Free Disk",      key: "availableDiskGB", format: (v) => (v != null && v !== DEFAULT_VALUE) ? `${v} GB` : null },
+            { label: "CPU Cores",      key: "cpuCount",      format: (v) => (v != null && v !== DEFAULT_VALUE) ? String(v) : null },
+            { label: "Virtual Machine",key: "isVM",          isVM: true },
+        ],
+    },
+    {
+        title: "Operating System",
+        fields: [
+            { label: "OS",             key: "osDisplayName", format: (v, agent) => v || agent?.os || null },
+            { label: "OS Version",     key: "osVersion" },
+            { label: "Kernel",         key: "kernelVersion" },
+            { label: "Last Boot",      key: "bootTime",      format: (v) => (v && v !== DEFAULT_VALUE) ? func.prettifyEpoch(v) : null },
+            { label: "Locale",         key: "locale" },
+        ],
+    },
+    {
+        title: "Network",
+        fields: [
+            { label: "Public IP",      key: "publicIP" },
+            { label: "Local IP",       key: "localIP" },
+            { label: "Hostname",       key: "localHostname" },
+        ],
+    },
+    {
+        title: "User",
+        fields: [
+            { label: "Full Name",      key: "userFullName" },
+            { label: "Username",       key: "username" },
+            { label: "Shell",          key: "userShell" },
+        ],
+    },
+    {
+        title: "Agent",
+        fields: [
+            { label: "Shield Version", key: "agentVersion" },
+        ],
+    },
 ];
 
-const DeviceInfoGrid = ({ agent }) => {
-    if (!agent) return null;
-    const rows = DEVICE_INFO_FIELDS.map(field => {
+const DeviceSectionGrid = ({ fields, agent }) => {
+    const rows = fields.map(field => {
         if (field.isVM) {
             const val = agent.isVM;
             if (val == null) return null;
-            return { label: field.label, vmVal: val };
+            return { label: field.label, value: val ? 'Yes' : 'No' };
         }
         const raw = field.format ? field.format(agent[field.key], agent) : agent[field.key];
         if (!raw || raw === DEFAULT_VALUE) return null;
         return { label: field.label, value: raw };
     }).filter(Boolean);
 
-    if (rows.length === 0) return (
+    if (rows.length === 0) return null;
+
+    return (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 24px' }}>
+            {rows.map(row => (
+                <VerticalStack gap="1" key={row.label}>
+                    <Text variant="bodySm" color="subdued">{row.label}</Text>
+                    <Text variant="bodyMd">{'vmVal' in row ? (row.vmVal ? 'Yes' : 'No') : row.value}</Text>
+                </VerticalStack>
+            ))}
+        </div>
+    );
+};
+
+const DeviceInfoGrid = ({ agent }) => {
+    if (!agent) return null;
+
+    const hasAnyField = DEVICE_INFO_SECTIONS.some(section =>
+        section.fields.some(field => {
+            if (field.isVM) return agent.isVM != null && agent.isVM !== DEFAULT_VALUE;
+            const raw = field.format ? field.format(agent[field.key], agent) : agent[field.key];
+            return raw && raw !== DEFAULT_VALUE;
+        })
+    );
+
+    if (!hasAnyField) return (
         <Box padding="4">
             <Text variant="bodyMd" color="subdued" alignment="center">No device info available yet</Text>
         </Box>
     );
 
+    const visibleSections = DEVICE_INFO_SECTIONS.filter(section =>
+        section.fields.some(field => {
+            if (field.isVM) return agent.isVM != null && agent.isVM !== DEFAULT_VALUE;
+            const raw = field.format ? field.format(agent[field.key], agent) : agent[field.key];
+            return raw && raw !== DEFAULT_VALUE;
+        })
+    );
+
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px' }}>
-            {rows.map(row => (
-                <VerticalStack gap="1" key={row.label}>
-                    <Text variant="bodySm" color="subdued">{row.label}</Text>
-                    {'vmVal' in row ? (
-                        <Badge tone={row.vmVal ? 'attention' : 'success'}>
-                            {row.vmVal ? 'Yes' : 'No'}
-                        </Badge>
-                    ) : (
-                        <Text variant="bodyMd" fontWeight="medium">{row.value}</Text>
+        <VerticalStack gap="0">
+            {visibleSections.map((section, idx) => (
+                <div key={section.title}>
+                    {idx > 0 && (
+                        <div style={{ borderTop: '2px solid #C9CCCF', margin: '16px 0' }} />
                     )}
-                </VerticalStack>
+                    <VerticalStack gap="3">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ width: '3px', height: '14px', background: '#8C9196', borderRadius: '2px', flexShrink: 0 }} />
+                            <Text variant="headingSm">{section.title}</Text>
+                        </div>
+                        <DeviceSectionGrid fields={section.fields} agent={agent} />
+                    </VerticalStack>
+                </div>
             ))}
-        </div>
+        </VerticalStack>
+    );
+};
+
+const InstalledAppsSection = ({ apps }) => {
+    const [expanded, setExpanded] = useState(false);
+    if (!apps || apps.length === 0) return null;
+    const sorted = [...apps].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const shown = expanded ? sorted : sorted.slice(0, 8);
+    return (
+        <VerticalStack gap="3">
+            <HorizontalStack align="space-between" blockAlign="center">
+                <Text variant="headingSm">Installed Applications</Text>
+                <Badge>{String(apps.length)}</Badge>
+            </HorizontalStack>
+                <div>
+                    {shown.map((app, idx) => (
+                        <div
+                            key={app.bundleId || app.name || idx}
+                            style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid #F6F6F7' }}
+                        >
+                            <Text variant="bodySm">{app.name}</Text>
+                            <Text variant="bodySm" color="subdued">{app.version || '—'}</Text>
+                        </div>
+                    ))}
+                </div>
+                {apps.length > 8 && (
+                    <Button plain onClick={() => setExpanded(e => !e)}>
+                        {expanded ? 'Show less' : `Show all ${apps.length} apps`}
+                    </Button>
+                )}
+        </VerticalStack>
     );
 };
 
@@ -520,6 +621,17 @@ function AgentDetails({
         panelID: 'device-info-panel',
     };
 
+    const AppsTab = {
+        id: 'installed-apps',
+        content: 'Apps',
+        component: (
+            <Box paddingBlockStart="4">
+                <InstalledAppsSection apps={selectedAgent?.installedApps} />
+            </Box>
+        ),
+        panelID: 'installed-apps-panel',
+    };
+
     const getInputTokenLabel = (tokens) => {
         if (tokens < 10000) return { label: "Light user", tone: "success" };
         if (tokens < 100000) return { label: "Moderate user", tone: "attention" };
@@ -723,7 +835,7 @@ function AgentDetails({
                 </HorizontalStack>,
                 <LayoutWithTabs
                     key="tabs"
-                    tabs={[McpServersTab, DeviceTab, UserAnalysisTab, AgentLogsTab, ConfigureTab]}
+                    tabs={[McpServersTab, DeviceTab, AppsTab, UserAnalysisTab, AgentLogsTab, ConfigureTab]}
                     currTab={handleTabChange}
                 />
             ]}
