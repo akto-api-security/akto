@@ -642,7 +642,6 @@ function ThreatDetectionPage() {
         const hasParams = Boolean(
           urlParams.get("refId") && 
           urlParams.get("eventType") && 
-          urlParams.get("actor") && 
           urlParams.get("filterId")
         );
         
