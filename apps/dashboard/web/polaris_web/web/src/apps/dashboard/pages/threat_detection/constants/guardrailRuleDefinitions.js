@@ -23,7 +23,7 @@ function extractSkillName(ruleViolated) {
     const v = ruleViolated.trim();
     const marker = 'skill:';
     const idx = v.toLowerCase().lastIndexOf(marker);
-    if (idx === -1) return null; // no "skill:<name>" — e.g. the bare "malicious_skill_detected" form
+    if (idx === -1) return null; // no "skill:<name>" - e.g. the bare "malicious_skill_detected" form
     const name = v.slice(idx + marker.length).trim();
     return name.length > 0 ? name : null;
 }
@@ -138,6 +138,36 @@ const GUARDRAIL_RULE_DEFINITIONS = [
 2. **Apply on both request and response** - ensure the policy is configured to scan both directions. Harmful inputs should not reach the model; harmful model outputs should not reach users.
 3. **Add a content moderation layer upstream** - for user-generated content platforms, run a lightweight moderation check before the guardrail to catch obvious abuse early.
 4. **Log and escalate repeat offenders** - track user IDs or session IDs that repeatedly trigger harmful content blocks and apply progressive restrictions.
+`
+    },
+
+    // ─── Enterprise License Compliance ─────────────────────────────────────────
+    {
+        prefixes: ["EnterpriseLicenseCompliance", "enterprise_license_compliance"],
+        heading: "Enterprise License Compliance Violation",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "This request matched a category that is restricted under enterprise AI service agreements and acceptable use policies. Examples include CSAM, malicious code generation, assistance related to weapons of mass destruction, violent extremism, hate speech, human trafficking, and non-consensual surveillance. These restrictions are defined by the AI provider and are not configurable organisation-level filters."
+            },
+            {
+                heading: "Why does it matter?",
+                body: "Enterprise AI providers require these categories to be blocked as part of their service terms. Requests in these areas may lead to provider enforcement actions, create legal or regulatory obligations, and increase organisational risk. Unlike custom policies, these safeguards cannot be overridden."
+            }
+        ],
+        remediation: `## What to do
+
+### Immediate steps
+- Review the blocked request and understand the context in which it occurred.
+- Identify the user or workflow involved and determine whether the request was intentional or accidental.
+- If the activity appears suspicious or inappropriate, involve the relevant security, compliance, or legal teams based on your internal processes.
+- If the request was made without awareness of the restriction, explain the limitation to the user and guide them toward approved alternatives where appropriate.
+
+### Longer-term actions
+1. **Educate users** - help users understand which categories are restricted under the enterprise license and why these safeguards exist.
+2. **Review access controls** - consider whether additional permissions or role-based restrictions are appropriate for higher-risk use cases.
+3. **Keep these protections enabled** - these checks reflect enterprise license requirements from the AI provider and are not intended to be disabled or customised.
+4. **Maintain audit records** - retain relevant event details to support internal reviews, investigations, and compliance processes where required.
 `
     },
 

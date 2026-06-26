@@ -19,7 +19,7 @@ import InfoCard from "../dashboard/new_components/InfoCard";
 import BarGraph from "../../components/charts/BarGraph";
 import SessionStore from "../../../main/SessionStore";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
-import { getDashboardCategory, isApiSecurityCategory, isDastCategory, mapLabel } from "../../../main/labelHelper";
+import { getDashboardCategory, isApiSecurityCategory, isDastCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel } from "../../../main/labelHelper";
 import LineChart from "../../components/charts/LineChart";
 import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
 import { LABELS } from "./constants";
@@ -27,6 +27,7 @@ import useThreatReportDownload from "../../hooks/useThreatReportDownload";
 import WebhookIntegrationModal from "./components/WebhookIntegrationModal";
 import { updateThreatFiltersStore } from "./utils/threatFilters";
 import { redactSampleDataByKeywords } from "./utils/redactSampleData";
+import { resolveComplianceClauseMap } from "./utils/formatUtils";
 const convertToGraphData = (severityMap) => {
     let dataArr = []
     Object.keys(severityMap).forEach((x) => {
@@ -230,10 +231,12 @@ function ThreatDetectionPage() {
             filterId: searchParams.get("filterId"),
             status: statusValue,
             severity: searchParams.get("severity") || '',
+            url: searchParams.get("url") || '',
+            method: searchParams.get("method") || '',
+            ruleViolated: searchParams.get("ruleViolated") || '-',
             hasQueryEvent: Boolean(
                 searchParams.get("refId") &&
                 searchParams.get("eventType") &&
-                searchParams.get("actor") &&
                 searchParams.get("filterId")
             )
         };
@@ -338,69 +341,6 @@ function ThreatDetectionPage() {
         endTimestamp,
         onComplete: () => setMoreActions(false)
     })
-
-    const isDemoMode = func.isDemoAccount();
-
-    /**
-     * Generate deterministic latency data for demo mode
-     * Creates 2 months of data with 3-day intervals for consistent demo experience
-     * @returns {Array} Array of latency data points
-     */
-    const generateLatencyData = useCallback(() => {
-        try {
-            const now = Date.now();
-            const data = [];
-            const totalDays = 60; // 2 months
-            const intervalDays = 3; // Every 3 days
-            const dataPoints = Math.floor(totalDays / intervalDays) + 1; // +1 to include today
-            
-            // Predefined latency values for consistent demo data (total 20-30ms)
-            const latencyValues = [
-                { incoming: 12.5, output: 8.2, total: 21.4 },
-                { incoming: 15.3, output: 9.8, total: 25.7 },
-                { incoming: 11.7, output: 7.4, total: 20.3 },
-                { incoming: 10.3, output: 16.1, total: 27.9 },
-                { incoming: 13.8, output: 8.6, total: 23.1 },
-                { incoming: 14.6, output: 9.9, total: 25.5 },
-                { incoming: 12.2, output: 7.5, total: 20.8 },
-                { incoming: 10.6, output: 15.6, total: 26.2 },
-                { incoming: 16.4, output: 11.8, total: 29.2 },
-                { incoming: 13.1, output: 9.3, total: 23.7 },
-                { incoming: 11.9, output: 14.2, total: 27.1 },
-                { incoming: 15.7, output: 8.9, total: 25.8 },
-                { incoming: 12.8, output: 10.4, total: 24.3 },
-                { incoming: 14.2, output: 12.1, total: 27.6 },
-                { incoming: 11.4, output: 13.7, total: 26.4 },
-                { incoming: 16.1, output: 9.5, total: 27.2 },
-                { incoming: 13.5, output: 11.2, total: 25.8 },
-                { incoming: 15.8, output: 9.6, total: 26.7 },
-                { incoming: 12.1, output: 14.8, total: 28.1 },
-                { incoming: 14.9, output: 8.7, total: 24.9 }
-            ];
-            
-            for (let i = 0; i < dataPoints; i++) {
-                const daysAgo = i * intervalDays;
-                const timestamp = now - (daysAgo * 24 * 60 * 60 * 1000);
-                
-                // Use deterministic values based on data point index
-                const latencyIndex = i % latencyValues.length;
-                const latency = latencyValues[latencyIndex];
-                
-                data.push({
-                    timestamp: Math.floor(timestamp / 1000), // Convert to seconds
-                    incomingRequestP95: latency.incoming,
-                    outputResultP95: latency.output,
-                    totalP95: latency.total
-                });
-            }
-            
-            return data.sort((a, b) => a.timestamp - b.timestamp);
-        } catch (error) {
-            console.error('Error generating latency data:', error);
-            return [];
-        }
-    }, []);
-
     const clearEventState = useCallback(() => {
         setShowNewTab(false);
         setEventState(initialEventState);
@@ -598,12 +538,13 @@ function ThreatDetectionPage() {
                     latency = [];
                     for (let i = 0; i < raw.length; i += bucketSize) {
                         const bucket = raw.slice(i, i + bucketSize);
-                        const avg = field => bucket.reduce((sum, m) => sum + m[field], 0) / bucket.length;
+                        // Downsample long ranges by averaging the per-minute averages in each bucket.
+                        const avgOf = field => bucket.reduce((sum, x) => sum + x[field], 0) / bucket.length;
                         latency.push({
                             timestamp: bucket[Math.floor(bucket.length / 2)].timestamp,
-                            incomingRequestP95: avg('incomingRequestP95'),
-                            outputResultP95:    avg('outputResultP95'),
-                            totalP95:           avg('totalP95'),
+                            incomingRequestP95: avgOf('incomingRequestP95'),
+                            outputResultP95:    avgOf('outputResultP95'),
+                            totalP95:           avgOf('totalP95'),
                         });
                     }
                 }
@@ -637,7 +578,7 @@ function ThreatDetectionPage() {
           const payloadResponse = await threatDetectionRequests.fetchMaliciousRequest(
             queryParams.refId,
             queryParams.eventType,
-            queryParams.actor,
+            queryParams?.actor || "",
             queryParams.filterId
           );
 
@@ -654,16 +595,25 @@ function ThreatDetectionPage() {
             currentRefId: queryParams.refId,
             rowDataList: maliciousPayloads,
             moreInfoData: {
-              url: rowContext?.url || '',
-              method: rowContext?.method || '',
+              url: rowContext?.url || queryParams.url || '',
+              method: rowContext?.method || queryParams.method || '',
               apiCollectionId: rowContext?.apiCollectionId,
               templateId: queryParams.filterId,
               // Prefer the row's severity (set by rowClicked or passed via ?severity= URL param),
               // so deep-linked opens show the actual event severity, not the template default.
               severity: rowContext?.severity || queryParams.severity || '',
               sessionId: rowContext?.sessionId || '',
-              ruleViolated: rowContext?.ruleViolated || '-',
-              complianceMap: rowContext?.complianceMapData || {}
+              ruleViolated: rowContext?.ruleViolated || queryParams.ruleViolated || '-',
+              complianceMap: rowContext?.complianceMapData || (() => {
+                if (!queryParams.filterId) return {};
+                const { threatFiltersMap, guardrailComplianceMap } = SessionStore.getState();
+                const isGuardrail = isAgenticSecurityCategory() || isEndpointSecurityCategory();
+                const event = { filterId: queryParams.filterId };
+                if (queryParams.ruleViolated && queryParams.ruleViolated !== '-') {
+                  event.metadata = JSON.stringify({ rule_violated: queryParams.ruleViolated });
+                }
+                return resolveComplianceClauseMap(event, isGuardrail, threatFiltersMap, guardrailComplianceMap);
+              })()
             },
             currentEventId: rowContext?.eventId || '',
             currentEventStatus: queryParams.status || rowContext?.status || '',
@@ -692,7 +642,6 @@ function ThreatDetectionPage() {
         const hasParams = Boolean(
           urlParams.get("refId") && 
           urlParams.get("eventType") && 
-          urlParams.get("actor") && 
           urlParams.get("filterId")
         );
         
@@ -710,7 +659,7 @@ function ThreatDetectionPage() {
     // Normal mode - show table, charts, and sidebar
     const components = [
         <ChartComponent subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
-        ...(window.USER_NAME?.includes('@akto.io') ? [
+        ...((isEndpointSecurityCategory() || isAgenticSecurityCategory()) && window.USER_NAME?.includes('@akto.io') ? [
             <P95LatencyGraph
                 key="threat-detection-latency"
                 title={`${mapLabel("Threat", getDashboardCategory())} Detection Latency`}

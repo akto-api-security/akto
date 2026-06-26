@@ -18,6 +18,12 @@ const (
 	defaultInterval  = 30 * time.Minute
 	minInterval      = 1 * time.Minute
 	ruleAuthor       = "guardrails-service-nhi"
+
+	// staggerBatch rules are registered per burst; staggerSleep separates bursts.
+	// At 85 targets this spreads bumps over ~8 minutes, reducing peak upload
+	// rate from O(devices×85) simultaneous to O(devices×staggerBatch) per window.
+	staggerBatch = 10
+	staggerSleep = 1 * time.Minute
 )
 
 // Source implements nhi.Source. It owns the cyborg-side rule registration
@@ -79,7 +85,7 @@ func (s *Source) Run(ctx context.Context) {
 }
 
 func (s *Source) tick(ctx context.Context) {
-	if err := s.refreshRules(); err != nil {
+	if err := s.refreshRules(ctx); err != nil {
 		s.logger.Warn("NHI: rule registration failed, will retry next tick",
 			zap.String("source", sourceName), zap.Error(err))
 		return
@@ -95,9 +101,12 @@ func (s *Source) tick(ctx context.Context) {
 // the installer's InspectionPoller to re-scan that file. This is how new
 // credentials added to an existing config (e.g. a new MCP server in
 // ~/.cursor/mcp.json) get picked up without restarting anything.
-func (s *Source) refreshRules() error {
+func (s *Source) refreshRules(ctx context.Context) error {
 	tmpMap := make(map[string]Target, len(s.targets))
-	for _, t := range s.targets {
+	for i, t := range s.targets {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		rule, err := s.client.AddFileInspectionRule(t.Path, false, t.MaxDepth, ruleAuthor)
 		if err != nil {
 			return err
@@ -111,6 +120,17 @@ func (s *Source) refreshRules() error {
 			continue
 		}
 		tmpMap[id] = t
+
+		// After each batch (except the last), sleep to stagger installer upload bursts.
+		if (i+1)%staggerBatch == 0 && i+1 < len(s.targets) {
+			s.logger.Debug("NHI: rule registration batch done, staggering",
+				zap.Int("registered", i+1), zap.Duration("sleep", staggerSleep))
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(staggerSleep):
+			}
+		}
 	}
 
 	s.mu.Lock()

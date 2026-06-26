@@ -8,6 +8,7 @@ import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
+import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from "./components/enterpriseLicenseComplianceCatalog"
 import api from "./api";
 import { transformPolicyForBackend, SEVERITY, normalizeBehaviourValue } from "./utils";
 import GUARDRAIL_PRESETS from "./guardrailPresets";
@@ -289,14 +290,20 @@ function GuardrailPolicies() {
             details.push({ label: "Content Filters", value: filters.join(", ") });
         }
 
-        // Denied topics details
-        if (policy.deniedTopics?.length > 0) {
-            const topicNames = policy.deniedTopics.map(topic => topic.topic || topic.name).slice(0, 2);
-            const moreCount = policy.deniedTopics.length > 2 ? ` +${policy.deniedTopics.length - 2} more` : '';
-            details.push({ 
-                label: "Denied Topics", 
-                value: `${topicNames.join(", ")}${moreCount}` 
-            });
+        // User-defined denied topics (excluding enterprise derived ones)
+        const userDeniedTopics = (policy.deniedTopics || []).filter(t => t?.origin !== ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN);
+        if (userDeniedTopics.length > 0) {
+            const names = userDeniedTopics.map(t => t.topic || t.name).slice(0, 2);
+            const more = userDeniedTopics.length > 2 ? ` +${userDeniedTopics.length - 2} more` : '';
+            details.push({ label: "Denied Topics", value: `${names.join(", ")}${more}` });
+        }
+
+        // Enterprise license compliance topics
+        const enterpriseTopics = (policy.deniedTopics || []).filter(t => t?.origin === ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN);
+        if (enterpriseTopics.length > 0) {
+            const names = enterpriseTopics.map(t => t.topic || t.name).slice(0, 1);
+            const more = enterpriseTopics.length > 1 ? ` +${enterpriseTopics.length - 1} more` : '';
+            details.push({ label: "Enterprise License Compliance Filters", value: `${names.join(", ")}${more}` });
         }
 
         // Word filters
@@ -508,6 +515,7 @@ function GuardrailPolicies() {
                 blockedHosts: guardrailData.blockedHosts || [],
                 blockPersonalAccounts: guardrailData.blockPersonalAccounts || false,
                 deniedTopics: guardrailData.deniedTopics || [],
+                enterpriseLicenseComplianceCategories: guardrailData.enterpriseLicenseComplianceCategories || [],
                 regexPatterns: guardrailData.regexPatterns || [],
                 // Add V2 field for enhanced regex data
                 regexPatternsV2: guardrailData.regexPatternsV2 || [],
@@ -598,6 +606,7 @@ function GuardrailPolicies() {
             rowClickable={true}
             getActions={getActionsList}
             hasRowActions={true}
+            preventRowClickOnActions={true}
             hardCodedKey={true}
             loading={loading || Boolean(pendingPolicyName)}
             loadingText={"Loading guardrail policies..."}

@@ -60,6 +60,21 @@ const resourceName = {
     plural: 'URLs',
 }
 
+const STATUS_BADGE = {
+    PENDING: { status: "new", label: "Pending", progress: "incomplete" },
+    RUNNING: { status: "attention", label: "Running", progress: "partiallyComplete" },
+    COMPLETED: { status: "success", label: "Completed", progress: "complete" },
+    STOP_REQUESTED: { status: "warning", label: "Stop requested", progress: "partiallyComplete" },
+    STOPPED: { status: "warning", label: "Stopped", progress: "complete" },
+    FAILED: { status: "critical", label: "Failed", progress: "complete" },
+}
+
+function StatusBadge({ status }) {
+    if (!status) return null
+    const badge = STATUS_BADGE[status] || { status: "new", label: status }
+    return <Badge status={badge.status} progress={badge.progress}>{badge.label}</Badge>
+}
+
 function DastProgressSingle() {
     const { "crawlId": crawlId } = useParams()
     const navigate = useNavigate()
@@ -180,7 +195,10 @@ function DastProgressSingle() {
     return (
         <PageWithMultipleCards
             title={
-                <Text variant="headingLg" as="h1">DAST Scan Details</Text>
+                <HorizontalStack gap="3" blockAlign="center">
+                    <Text variant="headingLg" as="h1">DAST Scan Details</Text>
+                    <StatusBadge status={crawlerStatus} />
+                </HorizontalStack>
             }
             primaryAction={crawlerStatus === 'RUNNING' && (
                 <Button onClick={() => setShowLiveBrowser(!showLiveBrowser)}>

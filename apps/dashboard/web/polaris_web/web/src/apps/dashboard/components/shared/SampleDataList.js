@@ -83,6 +83,7 @@ function VulnerabilityEvidence({ segments }) {
                     const reason = typeof seg?.reason === 'string' ? seg.reason : '';
                     const phrase = typeof seg?.phrase === 'string' ? seg.phrase : '';
                     const field = typeof seg?.field === 'string' ? seg.field : '';
+                    const isInformational = seg?.informational === true;
                     // Prefer showing the concrete value; if it is masked/absent, show the field so the row is never blank.
                     const evidenceText = phrase || field;
                     return (
@@ -95,7 +96,15 @@ function VulnerabilityEvidence({ segments }) {
                                 </Box>
                                 <VerticalStack gap="0">
                                     {reason ? <Text variant="bodyMd">{reason}</Text> : null}
-                                    {evidenceText ? (
+                                    {/* Informational evidence (e.g. missing headers) describes something absent,
+                                        so render the header list verbatim without the locatable "field: phrase" form. */}
+                                    {isInformational ? (
+                                        phrase ? (
+                                            <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#6B46C1', wordBreak: 'break-all' }}>
+                                                {phrase}
+                                            </span>
+                                        ) : null
+                                    ) : evidenceText ? (
                                         <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#6B46C1', wordBreak: 'break-all' }}>
                                             {field && phrase ? `${field}: ${phrase}` : evidenceText}
                                         </span>
@@ -147,9 +156,15 @@ function SampleDataList(props) {
             return currentSample;
         }
         const { requestText, responseText } = transform.buildRenderedText(currentSample, { isNewDiff, redactHeaders, metadata });
-        const requestSegments = segments.filter(s => String(s?.location || '').toUpperCase() === 'REQUEST');
-        const responseSegments = segments.filter(s => String(s?.location || '').toUpperCase() !== 'REQUEST');
+        // Informational segments (e.g. missing-header evidence) describe something
+        // ABSENT, so there is nothing to locate/highlight - they bypass the
+        // locatability filter and are panel-only. Everything else must be locatable.
+        const informationalSegments = segments.filter(s => s?.informational === true);
+        const locatableInput = segments.filter(s => s?.informational !== true);
+        const requestSegments = locatableInput.filter(s => String(s?.location || '').toUpperCase() === 'REQUEST');
+        const responseSegments = locatableInput.filter(s => String(s?.location || '').toUpperCase() !== 'REQUEST');
         const validated = [
+            ...informationalSegments,
             ...filterLocatableSegments(requestSegments, requestText),
             ...filterLocatableSegments(responseSegments, responseText),
         ];
