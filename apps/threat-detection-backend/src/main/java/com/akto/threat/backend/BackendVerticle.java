@@ -63,10 +63,12 @@ public class BackendVerticle extends AbstractVerticle {
     router.route("/health").handler(ctx -> {
       long now = System.currentTimeMillis();
       long lastPoll = FlushMessagesToDB.getLastSuccessfulPollEpochMs();
+      long lastPollWithRecords = FlushMessagesToDB.getLastPollWithRecordsEpochMs();
       long lastWrite = FlushMessagesToDB.getLastSuccessfulMongoWriteEpochMs();
 
       long pollAgoSec = lastPoll == 0 ? -1 : (now - lastPoll) / 1000;
       long writeAgoSec = lastWrite == 0 ? -1 : (now - lastWrite) / 1000;
+      boolean receivingRecords = lastPollWithRecords > 0 && (now - lastPollWithRecords) <= thresholdMs;
 
       java.util.List<String> reasons = new java.util.ArrayList<>();
       if (lastPoll == 0) {
@@ -75,9 +77,10 @@ public class BackendVerticle extends AbstractVerticle {
         if ((now - lastPoll) > thresholdMs) {
           reasons.add("kafka_poll_stale");
         }
-        // Only flag mongo_write_stale if there have been writes before and they stopped.
-        // lastWrite==0 means no events received yet (idle) which is fine.
-        if (lastWrite > 0 && (now - lastWrite) > thresholdMs) {
+        // Only flag mongo_write_stale if Kafka is actively delivering records
+        // but Mongo writes have stopped. If no records are flowing, Mongo having
+        // nothing to write is expected.
+        if (receivingRecords && (lastWrite == 0 || (now - lastWrite) > thresholdMs)) {
           reasons.add("mongo_write_stale");
         }
       }

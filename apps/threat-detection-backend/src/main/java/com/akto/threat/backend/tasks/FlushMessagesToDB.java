@@ -52,10 +52,15 @@ public class FlushMessagesToDB {
   );
 
   private static final AtomicLong lastSuccessfulPollEpochMs = new AtomicLong(0);
+  private static final AtomicLong lastPollWithRecordsEpochMs = new AtomicLong(0);
   private static final AtomicLong lastSuccessfulMongoWriteEpochMs = new AtomicLong(0);
 
   public static long getLastSuccessfulPollEpochMs() {
     return lastSuccessfulPollEpochMs.get();
+  }
+
+  public static long getLastPollWithRecordsEpochMs() {
+    return lastPollWithRecordsEpochMs.get();
   }
 
   public static long getLastSuccessfulMongoWriteEpochMs() {
@@ -106,6 +111,8 @@ public class FlushMessagesToDB {
             if (records.isEmpty()) {
               continue;
             }
+
+            lastPollWithRecordsEpochMs.set(System.currentTimeMillis());
 
             processRecords(records);
 
