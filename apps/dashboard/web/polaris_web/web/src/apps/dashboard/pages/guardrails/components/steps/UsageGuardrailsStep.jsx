@@ -39,7 +39,7 @@ const UsageGuardrailsStep = ({
                         label={<RuleLabelWithTag name="Enable token limit detection" threats={RULE_OWASP_THREATS.tokenLimit} />}
                         checked={enableTokenLimit}
                         onChange={setEnableTokenLimit}
-                        helpText="Block or alert when a prompt exceeds the specified token count."
+                        helpText="Block or alert when a prompt exceeds the specified token count per message."
                     />
                     {enableTokenLimit && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
