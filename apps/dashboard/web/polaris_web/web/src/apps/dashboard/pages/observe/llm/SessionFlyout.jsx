@@ -14,6 +14,7 @@ import api from "./api";
 import { enrichRow } from "./utils";
 import { getTraceColumnDefs } from "./columns";
 import { formatCompact, formatDurationMs, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
+import func from "@/util/func";
 
 const TAB_OVERVIEW = 0;
 const TAB_TRACES   = 1;
@@ -56,8 +57,7 @@ function OverviewContent({ session, traceCount }) {
         { label: "Session ID",  value: truncate(session.sessionIdentifier, 36) },
         { label: "Models",      value: session._models?.length ? session._models.join(", ") : undefined },
         { label: "Endpoint ID", value: session.deviceId, href: session.deviceId ? `/dashboard/observe/inventory/${session.deviceId}` : undefined },
-        { label: "Domain",      value: session.topicHierarchy ? Object.keys(session.topicHierarchy)[0] : undefined },
-        { label: "Sub-domain",  value: session.topicHierarchy ? (Object.values(session.topicHierarchy)[0]?.[0]) : undefined },
+        { label: "Topics queried",value: session.topicHierarchy ? Object.keys(session.topicHierarchy).map((x) => func.toSentenceCase(x)).join(", ") : undefined },
     ];
 
     return (

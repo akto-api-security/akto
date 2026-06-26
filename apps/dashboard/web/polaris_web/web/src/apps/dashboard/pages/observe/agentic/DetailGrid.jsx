@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, HorizontalGrid, HorizontalStack, Link, VerticalStack, Text } from "@shopify/polaris";
 import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
+import TooltipText from "../../../components/shared/TooltipText";
 
 export default function DetailGrid({ heading, items = [], columns = 1, labelWidth = "140px" }) {
     const renderLabel = (d) => (
@@ -11,11 +12,14 @@ export default function DetailGrid({ heading, items = [], columns = 1, labelWidt
     );
 
     const cell = (d) => {
-        const display = d.value || "-";
+        const text = d.value || "-"
+        const display = <TooltipText tooltip={text} text={text} />
         const content = (
-            <Text variant="bodySm" fontWeight="semibold" color={d.isWarning ? "warning" : undefined}>
-                {d.href && d.value ? <Link url={d.href} external={d.external !== false}>{display}</Link> : display}
-            </Text>
+            <Box maxWidth="150px">
+                <Text variant="bodySm" fontWeight="semibold" color={d.isWarning ? "warning" : undefined}>
+                    {d.href && d.value ? <Link url={d.href} external={d.external !== false}>{display}</Link> : display}
+                </Text>
+            </Box>
         );
         return content;
     };

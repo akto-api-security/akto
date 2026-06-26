@@ -1,9 +1,10 @@
 import React from "react";
-import { Badge, HorizontalStack, Text, VerticalStack, Link } from "@shopify/polaris";
+import { HorizontalStack, Text, Link } from "@shopify/polaris";
 import func from "@/util/func";
 import { formatDurationMs, latencyColor, truncate } from "./constants";
 import { OsIcon } from "../agentic/DeviceEndpoints";
 import AssetIcon from "../agentic/AssetIcon";
+import ShowListInBadge from "../../../components/shared/ShowListInBadge";
 
 export { OsIcon };
 
@@ -129,31 +130,26 @@ export function TimeCell({ value }) {
 }
 
 
-export function TopicCell({ data }) {
+export function TopicCell({ data, isTopic = true }) {
     // Aggregated path: topicHierarchy = { domain: [subDomain, ...], ... }
     // Flat path (searchPrompts): topic + subTopic as plain strings
     let entries;
     if (data?.topicHierarchy && Object.keys(data.topicHierarchy).length > 0) {
-        entries = Object.entries(data.topicHierarchy).slice(0, 3);
+        entries = Object.entries(data.topicHierarchy)
     } else if (data?.topic) {
         entries = [[data.topic, data.subTopic ? [data.subTopic] : []]];
     } else {
         return <Text variant="bodySm" color="subdued">{DASH}</Text>;
     }
+    const finalTopics = isTopic
+        ? entries.map(([topic]) => func.toSentenceCase(topic))
+        : entries.map(([, subtopic]) => func.toSentenceCase(subtopic));
     return (
-        <VerticalStack gap="1">
-            {entries.map(([domain, subTopics]) => {
-                const subDomain = Array.isArray(subTopics) ? subTopics[0] : (subTopics || "");
-                return (
-                    <HorizontalStack key={domain} gap="1" blockAlign="center" wrap={false}>
-                        <Badge status="info">{domain}</Badge>
-                        {subDomain && (
-                            <Text variant="bodySm" color="subdued" truncate>{subDomain}</Text>
-                        )}
-                    </HorizontalStack>
-                );
-            })}
-        </VerticalStack>
+       <ShowListInBadge
+            itemsArr={finalTopics}
+            maxItems={3}
+            maxWidth={"80px"}
+        />
     );
 }
 
