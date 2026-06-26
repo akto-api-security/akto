@@ -2,20 +2,32 @@ import request from "@/util/request";
 import observeApi from "../api";
 import { buildMcpComponentsFromStis, buildSkillsFlyoutData, normalizeSeverity } from "./agenticPageBuilders";
 
+function extractRuleViolated(metadata) {
+    if (!metadata) return "-";
+    try {
+        const obj = JSON.parse(metadata);
+        return obj.rule_violated || obj.ruleViolated || "-";
+    } catch {
+        return "-";
+    }
+}
+
 function normalizeEvent(e) {
     return {
-        host:      e.host || "",
-        url:       e.url || "",
-        severity:  e.severity?.toLowerCase() || "medium",
-        title:     e.filterId || "Policy violation",
-        timeEpoch: e.timestamp || 0,
-        time:      e.timestamp || 0,
-        refId:     e.refId || "",
-        eventType: e.eventType || "",
-        actor:     e.actor || "",
-        filterId:  e.filterId || "",
-        status:    e.status || "",
-        sessionId: e.sessionId || "",
+        host:         e.host || "",
+        url:          e.url || "",
+        severity:     e.severity?.toLowerCase() || "medium",
+        title:        e.filterId || "Policy violation",
+        timeEpoch:    e.timestamp || 0,
+        time:         e.timestamp || 0,
+        refId:        e.refId || "",
+        eventType:    e.eventType || "",
+        actor:        e.actor || "",
+        filterId:     e.filterId || "",
+        status:       e.status || "",
+        sessionId:    e.sessionId || "",
+        ruleViolated: extractRuleViolated(e.metadata),
+        method:       e.method || "",
     };
 }
 
@@ -113,20 +125,19 @@ export function openViolationInThreatActivity(row = {}) {
     const { refId, eventType, actor, filterId, status } = row;
     if (refId && eventType && actor && filterId) {
         const params = new URLSearchParams();
-        // GithubServerTable reads ?filters=latestAttack__<filterId> on load to pre-apply the
-        // attack-type filter — same shape ActivityLog.jsx and openThreatActivityPage() use.
-        params.set("filters", `latestAttack__${filterId}`);
         params.set("refId", refId);
         params.set("eventType", eventType);
         params.set("actor", actor);
         params.set("filterId", filterId);
         params.set("eventStatus", (status || "ACTIVE").toUpperCase());
-        // Pass severity so the flyout shows the correct badge without needing pendingRowContext
-        const { severity } = row;
+        const { severity, url, method, ruleViolated } = row;
         if (severity) params.set("severity", String(severity).toUpperCase());
+        if (url) params.set("url", url);
+        if (method) params.set("method", method);
+        if (ruleViolated && ruleViolated !== "-") params.set("ruleViolated", ruleViolated);
         window.open(`${base}?${params.toString()}#active`, "_blank");
     } else {
-        window.open(`${base}?filters=#active`, "_blank");
+        window.open(`${base}#active`, "_blank");
     }
 }
 

@@ -47,11 +47,14 @@ import {
     BlockedHostsStep,
     BlockedHostsConfig,
     ServerSettingsStep,
-    ServerSettingsConfig
+    ServerSettingsConfig,
+    EnterpriseLicenseComplianceStep,
+    EnterpriseLicenseComplianceConfig
 } from './steps';
+import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from "./enterpriseLicenseComplianceCatalog";
 import "./createGuardrailPage.css";
 
-const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false }) => {
+const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false }) => {
     // Step management
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
@@ -130,7 +133,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     // Step 7: Usage based Guardrails
     const [enableTokenLimit, setEnableTokenLimit] = useState(false);
-    const [tokenLimitConfidenceScore, setTokenLimitConfidenceScore] = useState(0.7);
+    const [tokenLimitThreshold, setTokenLimitThreshold] = useState(4096);
 
     // Step 9: Tools Guardrails
     const [enableToolMisuse, setEnableToolMisuse] = useState(true);
@@ -157,6 +160,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [agentServers, setAgentServers] = useState([]);
     const [browserLlmServers, setBrowserLlmServers] = useState([]);
     const [collectionsLoading, setCollectionsLoading] = useState(false);
+
+    const [enterpriseLicenseComplianceCategories, setEnterpriseLicenseComplianceCategories] = useState([]);
 
     // Get collections from PersistStore
     const allCollections = PersistStore(state => state.allCollections);
@@ -207,7 +212,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         confidenceScore,
         // Step 7
         enableTokenLimit,
-        tokenLimitConfidenceScore,
+        tokenLimitThreshold,
         // Step 9
         enableToolMisuse,
         enableMaliciousTools,
@@ -224,7 +229,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         browserLlmServers,
         applyOnRequest,
         applyOnResponse,
-        policyBehaviour
+        policyBehaviour,
+        // Enterprise License Guardrails
+        enterpriseLicenseComplianceCategories,
     });
 
     const getStepsWithSummary = () => {
@@ -279,6 +286,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 title: AnomalyDetectionConfig.title,
                 summary: AnomalyDetectionConfig.getSummary(storedStateData),
                 ...AnomalyDetectionConfig.validate(storedStateData)
+            }, 
+            {
+                number: EnterpriseLicenseComplianceConfig.number,
+                title: EnterpriseLicenseComplianceConfig.title,
+                summary: EnterpriseLicenseComplianceConfig.getSummary(storedStateData),
+                ...EnterpriseLicenseComplianceConfig.validate(storedStateData)
             }
         ];
 
@@ -349,14 +362,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
     }, [playgroundMessages]);
 
-    // Populate form when editing
+    // Populate form when editing or loading a preset
     useEffect(() => {
-        if (isEditMode && editingPolicy) {
+        if ((isEditMode || isPreset) && editingPolicy) {
             populateFormForEdit(editingPolicy);
-        } else {
+        } else if (!editingPolicy) {
             resetForm();
         }
-    }, [isEditMode, editingPolicy]);
+    }, [isEditMode, isPreset, editingPolicy]);
 
     const isVisibilityOnly = (collection) =>
         collection.envType && collection.envType.some(tag =>
@@ -470,7 +483,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setUrl("");
         setConfidenceScore(25);
         setEnableTokenLimit(false);
-        setTokenLimitConfidenceScore(0.7);
+        setTokenLimitThreshold(4096);
         setEnableToolMisuse(true);
         setEnableMaliciousTools(true);
         setEnableToolNameDescriptionMismatch(true);
@@ -483,6 +496,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyOnResponse(false);
         setApplyOnRequest(false);
         setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
+        setEnterpriseLicenseComplianceCategories([]);
     };
 
     const populateFormForEdit = (policy) => {
@@ -524,7 +538,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             }
         }
 
-        // Split saved denied topics back into Akto defaults and user-custom.
+        // Denied topics - split into general blocks, enterprise license, and custom
         const loadedTopics = policy.deniedTopics || [];
         const defaultKeys = new Set(
             loadedTopics
@@ -532,10 +546,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 .map(t => GENERAL_BLOCKS.find(b => b.topic === t.topic)?.key)
                 .filter(Boolean)
         );
-        const customTopics = loadedTopics.filter(t => !isGeneralBlockTopic(t.topic));
+        const customTopics = loadedTopics.filter(
+            t => !isGeneralBlockTopic(t.topic) && t?.origin !== ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN
+        );
         setEnableDeniedTopics(loadedTopics.length > 0);
         setSelectedDefaultBlockKeys(defaultKeys);
         setDeniedTopics(customTopics);
+        setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
 
         // Word filters
         setWordFilters({
@@ -587,7 +604,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setScannerState(policy.banCodeDetection, setEnableBanCode, setBanCodeConfidenceScore);
         setScannerState(policy.secretsDetection, setEnableSecrets, setSecretsConfidenceScore);
         setScannerState(policy.sentimentDetection, setEnableSentiment, setSentimentConfidenceScore);
-        setScannerState(policy.tokenLimitDetection, setEnableTokenLimit, setTokenLimitConfidenceScore);
+        setEnableTokenLimit(policy.tokenLimitDetection?.enabled || false);
+        setTokenLimitThreshold(policy.tokenLimitDetection?.threshold || 4096);
 
         // External model based evaluation
         setEnableExternalModel(!!policy.url);
@@ -755,7 +773,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 },
                 tokenLimitDetection: {
                     enabled: enableTokenLimit,
-                    confidenceScore: tokenLimitConfidenceScore
+                    threshold: tokenLimitThreshold
                 },
                 url: enableExternalModel ? (url || null) : null,
                 confidenceScore: enableExternalModel ? confidenceScore : null,
@@ -768,7 +786,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 blockPersonalAccounts,
                 applyOnResponse,
                 applyOnRequest,
-                ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
+                ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {}),
+                enterpriseLicenseComplianceCategories,
             };
 
 
@@ -825,6 +844,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableBasePromptRule={setEnableBasePromptRule}
                         basePromptConfidenceScore={basePromptConfidenceScore}
                         setBasePromptConfidenceScore={setBasePromptConfidenceScore}
+                        enterpriseLicenseComplianceCategories={enterpriseLicenseComplianceCategories}
                     />
                 );
             case 3:
@@ -902,8 +922,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     <UsageGuardrailsStep
                         enableTokenLimit={enableTokenLimit}
                         setEnableTokenLimit={setEnableTokenLimit}
-                        tokenLimitConfidenceScore={tokenLimitConfidenceScore}
-                        setTokenLimitConfidenceScore={setTokenLimitConfidenceScore}
+                        tokenLimitThreshold={tokenLimitThreshold}
+                        setTokenLimitThreshold={setTokenLimitThreshold}
                     />
                 );
             case 8:
@@ -921,22 +941,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableToolNameDescriptionMismatch={setEnableToolNameDescriptionMismatch}
                     />
                 );
-            case 11: {
-                const hostSuggestions = Array.from(new Set([
-                    ...(browserConfigs || []).map(c => (c.host || "").trim()),
-                    ...(mcpServers || []).map(s => (s.label || "").trim()),
-                    ...(agentServers || []).map(s => (s.label || "").trim()),
-                ].filter(Boolean))).sort();
-                return (
-                    <BlockedHostsStep
-                        blockedHosts={blockedHosts}
-                        setBlockedHosts={setBlockedHosts}
-                        blockPersonalAccounts={blockPersonalAccounts}
-                        setBlockPersonalAccounts={setBlockPersonalAccounts}
-                        hostSuggestions={hostSuggestions}
-                    />
-                );
-            }
             case 10:
                 return (
                     <ServerSettingsStep
@@ -958,6 +962,29 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         collectionsLoading={collectionsLoading}
                         policyBehaviour={policyBehaviour}
                         setPolicyBehaviour={setPolicyBehaviour}
+                    />
+                );
+            case 11: {
+                const hostSuggestions = Array.from(new Set([
+                    ...(browserConfigs || []).map(c => (c.host || "").trim()),
+                    ...(mcpServers || []).map(s => (s.label || "").trim()),
+                    ...(agentServers || []).map(s => (s.label || "").trim()),
+                ].filter(Boolean))).sort();
+                return (
+                    <BlockedHostsStep
+                        blockedHosts={blockedHosts}
+                        setBlockedHosts={setBlockedHosts}
+                        blockPersonalAccounts={blockPersonalAccounts}
+                        setBlockPersonalAccounts={setBlockPersonalAccounts}
+                        hostSuggestions={hostSuggestions}
+                    />
+                );
+            }
+            case 12:
+                return (
+                    <EnterpriseLicenseComplianceStep
+                        enterpriseLicenseComplianceCategories={enterpriseLicenseComplianceCategories}
+                        setEnterpriseLicenseComplianceCategories={setEnterpriseLicenseComplianceCategories}
                     />
                 );
             default:
@@ -987,7 +1014,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             blockedMessage: blockedMessage || "",
             applyToResponses: applyToResponses,
             behaviour: b,
-            contentFiltering: {
+            contentFilters: {
                 harmfulCategories: enableHarmfulCategories ? harmfulCategoriesSettings : null,
                 promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
                 code: enableCodeFilter ? { level: codeFilterLevel.toUpperCase() } : null
@@ -1022,7 +1049,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             banCodeDetection: buildDetectionConfig(enableBanCode, banCodeConfidenceScore),
             secretsDetection: buildDetectionConfig(enableSecrets, secretsConfidenceScore),
             sentimentDetection: buildDetectionConfig(enableSentiment, sentimentConfidenceScore),
-            tokenLimitDetection: buildDetectionConfig(enableTokenLimit, tokenLimitConfidenceScore),
+            tokenLimitDetection: { enabled: enableTokenLimit, threshold: tokenLimitThreshold },
             url: enableExternalModel ? (url || null) : null,
             confidenceScore: enableExternalModel ? confidenceScore : null,
             applyToAllServers: applyToAllServers,
@@ -1033,7 +1060,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 .map(entry => ({ pattern: entry.pattern.trim() })),
             blockPersonalAccounts,
             applyOnResponse: applyOnResponse,
-            applyOnRequest: applyOnRequest
+            applyOnRequest: applyOnRequest,
+            enterpriseLicenseComplianceCategories: enterpriseLicenseComplianceCategories,
         };
     };
 

@@ -1,5 +1,8 @@
 package com.akto.action.testing;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 import org.apache.commons.lang3.NotImplementedException;
@@ -25,7 +28,7 @@ public class ScriptAction extends UserAction {
     private TestScript testScript;
     private String scriptType;
 
-    public boolean aktoUser(){
+    boolean aktoUser(){
         User user = getSUser();
 
         if(user==null || user.getLogin()==null || user.getLogin().isEmpty()){
@@ -38,9 +41,18 @@ public class ScriptAction extends UserAction {
         return false;
     }
 
+    private static final Set<Integer> whiteListedAccounts = new HashSet<>(Arrays.asList(
+        1764738582
+    ));
+
+    boolean isWhiteListedAccount(){
+        int accountId = Context.accountId.get();
+        return whiteListedAccounts.contains(accountId);
+    }
+
     public String addScript() {
 
-        if (DashboardMode.isSaasDeployment() && !aktoUser()) {
+        if (DashboardMode.isSaasDeployment() && !(aktoUser() || isWhiteListedAccount()) ) {
             return Action.ERROR.toUpperCase();
         }
 
@@ -84,7 +96,7 @@ public class ScriptAction extends UserAction {
     
     public String updateScript() {
 
-        if (DashboardMode.isSaasDeployment() && !aktoUser()) {
+        if (DashboardMode.isSaasDeployment() && !(aktoUser() || isWhiteListedAccount()) ) {
             return Action.ERROR.toUpperCase();
         }
         

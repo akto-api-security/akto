@@ -103,6 +103,14 @@ export default {
         })
         return resp
     },
+    async fetchSubCategoriesByTestSubTypes(subCategoryNames, fetchOnlyActive, skip = 0, limit = 0) {
+        const resp = await request({
+            url: 'api/fetchSubCategoriesByTestSubTypes',
+            method: 'post',
+            data: { subCategoryNames, fetchOnlyActive, skip, limit }
+        })
+        return resp
+    },
     async stopTest(testingRunHexId) {
         const resp = await request({
             url: '/api/stopTest',

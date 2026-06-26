@@ -13,12 +13,10 @@ import useTable from "../../components/tables/TableContext";
 import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import values from "@/util/values";
-import { violationsHeaders, violationsSortOptions, SEV_ORD, sevBadge, IdentityIcon, AgentIcon, PolicyCell } from "./nhiViolationsData";
+import { violationsHeaders, violationsSortOptions, transformApiViolations } from "./nhiViolationsData";
 import ViolationDetailsPanel from "./ViolationDetailsPanel";
 import observeRequests from "../observe/api";
-import { formatRelativeTime } from "./nhiUtils";
 import SpinnerCentered from "../../components/progress/SpinnerCentered";
-import { extractIdentityName, getFirstIdentityName, getAllIdentityNames } from "./identityHelper";
 
 const definedTableTabs = ["All", "Open", "Fixed"];
 const resourceName = { singular: "violation", plural: "violations" };
@@ -48,60 +46,6 @@ function DonutCard({ title, donutData }) {
         } />
     );
 }
-
-// ── Transform API violations to table format ───────────────────────────────────
-
-const transformApiViolations = (apiViolations) => {
-    return apiViolations
-        .sort((a, b) => SEV_ORD[b.severity] - SEV_ORD[a.severity])
-        .map((v, i) => {
-            // Extract hex ID - use hexId field from API response (like updateAuditData does)
-            const violationHexId = v.hexId || v.id;
-
-            // Transform policy array to object format
-            const policyObj = v.policy && Array.isArray(v.policy)
-                ? {
-                    primary: v.policy[0] || "N/A",
-                    extra: Math.max(0, v.policy.length - 1),
-                    extras: v.policy.slice(1) || [],
-                  }
-                : v.policy;
-
-            // Extract identity name from new format { id: ObjectId, identityName: "name" }
-            const firstIdentityName = getFirstIdentityName(v.identities);
-            const allIdentityNames = getAllIdentityNames(v.identities);
-            const extraCount = allIdentityNames.length - 1;
-
-            return {
-                ...v,
-                id: violationHexId,
-                violation: v.violationType,
-                identity: firstIdentityName,
-                identities: v.identities,
-                discovered: formatRelativeTime(v.discoveredAt, "Unknown"),
-                severityOrder: SEV_ORD[v.severity] || 0,
-                policy: policyObj,
-                violationComp: <Text variant="bodyMd" fontWeight="medium">{v.violationType}</Text>,
-                identityComp: (
-                    <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                        <IdentityIcon name={firstIdentityName} />
-                        <Text variant="bodyMd">{firstIdentityName}</Text>
-                        {extraCount > 0 && (
-                            <Badge>{`+${extraCount}`}</Badge>
-                        )}
-                    </HorizontalStack>
-                ),
-                agentComp: (
-                    <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                        <AgentIcon name={v.agentName} />
-                        <Text variant="bodyMd">{v.agentName}</Text>
-                    </HorizontalStack>
-                ),
-                severityComp: sevBadge(v.severity),
-                policyComp: <PolicyCell policy={policyObj} />,
-            };
-        });
-};
 
 // ── Generate chart data from violations ──────────────────────────────────────────
 const generateViolationsOverTimeData = (violations) => {
@@ -152,11 +96,14 @@ const generateViolationsOverTimeData = (violations) => {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 const violationsPageTitle = (
-    <TitleWithInfo
-        titleText="Violations"
-        tooltipContent="Policy violations detected across all non-human identities used by your AI agents."
-        docsUrl="https://ai-security-docs.akto.io/nhi-governance/violations"
-    />
+    <HorizontalStack gap="2" blockAlign="center">
+        <TitleWithInfo
+            titleText="Violations"
+            tooltipContent="Policy violations detected across all non-human identities used by your AI agents."
+            docsUrl="https://ai-security-docs.akto.io/nhi-governance/violations"
+        />
+        <Badge status="info">Beta</Badge>
+    </HorizontalStack>
 );
 
 export default function ViolationsPage() {
@@ -168,7 +115,6 @@ export default function ViolationsPage() {
     // API fetching state
     const [rawViolations, setRawViolations] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
 
     // UI state
     const [selectedTab, setSelectedTab]             = useState(initialSelectedTab);
@@ -178,27 +124,24 @@ export default function ViolationsPage() {
     const [selectedViolation, setSelectedViolation] = useState(null);
     const [showViolationPanel, setShowViolationPanel] = useState(false);
 
+    const [currDateRange, dispatchCurrDateRange] = useReducer(
+        produce((draft, action) => func.dateRangeReducer(draft, action)),
+        values.ranges[2]
+    );
+
+    const startTimestamp = parseInt(currDateRange.period.since.getTime() / 1000);
+    const endTimestamp = parseInt(currDateRange.period.until.getTime() / 1000);
+
     // Fetch violations from API
     useEffect(() => {
         const fetchViolations = async () => {
             try {
                 setLoading(true);
-                setError(null);
-
-                // Fetch violations from API
-                const response = await observeRequests.fetchAllNhiViolations();
-
-                if (response && Array.isArray(response) && response.length > 0) {
-                    setRawViolations(response);
-                } else if (Array.isArray(response)) {
-                    // Empty array response
-                    setRawViolations([]);
-                } else {
-                    setRawViolations([]);
-                }
+                const response = await observeRequests.fetchAllNhiViolations(startTimestamp, endTimestamp);
+                setRawViolations(Array.isArray(response) ? response : []);
+                setLoading(false);
             } catch (err) {
                 console.error("Error fetching violations:", err);
-                setError(err.message);
                 setRawViolations([]);
             } finally {
                 setLoading(false);
@@ -206,13 +149,24 @@ export default function ViolationsPage() {
         };
 
         fetchViolations();
+    }, [startTimestamp, endTimestamp]);
+
+    useEffect(() => {
+        const pending = sessionStorage.getItem("nhi_pending_violation");
+        if (pending) {
+            sessionStorage.removeItem("nhi_pending_violation");
+            try {
+                setSelectedViolation(JSON.parse(pending));
+                setShowViolationPanel(true);
+            } catch (_) {}
+        }
     }, []);
 
     const violationsTableData = useMemo(() => transformApiViolations(rawViolations), [rawViolations]);
 
     // Compute donut from actual violations data so chart always matches the table
     const severityDonutData = useMemo(() => {
-        const counts = violationsTableData.reduce((acc, v) => {
+        const counts = violationsTableData.filter((v) => v.status !== "Fixed").reduce((acc, v) => {
             acc[v.severity] = (acc[v.severity] || 0) + 1;
             return acc;
         }, {});
@@ -226,7 +180,6 @@ export default function ViolationsPage() {
 
     // Generate line chart data dynamically from violations
     const violationsOverTimeData = useMemo(() => {
-        // If we have API data, generate from it
         if (rawViolations && rawViolations.length > 0) {
             const dynamicData = generateViolationsOverTimeData(rawViolations);
             if (dynamicData) return dynamicData;
@@ -234,25 +187,9 @@ export default function ViolationsPage() {
         return [];
     }, [rawViolations]);
 
-    useEffect(() => {
-        const pending = sessionStorage.getItem("nhi_pending_violation");
-        if (pending) {
-            sessionStorage.removeItem("nhi_pending_violation");
-            try {
-                setSelectedViolation(JSON.parse(pending));
-                setShowViolationPanel(true);
-            } catch (_) {}
-        }
-    }, []);
-
-    const [currDateRange, dispatchCurrDateRange] = useReducer(
-        produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges[2]
-    );
-
     const dataByTab = useMemo(() => ({
         all:   violationsTableData,
-        open:  violationsTableData.filter((r) => r.status === "Open"),
+        open:  violationsTableData.filter((r) => r.status !== "Fixed"),
         fixed: violationsTableData.filter((r) => r.status === "Fixed"),
     }), [violationsTableData]);
 
@@ -281,29 +218,35 @@ export default function ViolationsPage() {
                     <InfoCard
                         title="Violations over time"
                         component={
-                            <LineChart
-                                data={violationsOverTimeData}
-                                type="line"
-                                height={220}
-                                text={true}
-                                showGridLines={true}
-                                exportingDisabled={true}
-                                defaultChartOptions={{
-                                    xAxis: {
-                                        type: "datetime",
-                                        dateTimeLabelFormats: { day: "%a" },
-                                        title: { text: null },
-                                        visible: true,
-                                        gridLineWidth: 0,
-                                    },
-                                    yAxis: {
-                                        title: { text: "Violations" },
-                                        gridLineWidth: 1,
-                                        min: 0,
-                                    },
-                                    legend: { enabled: true },
-                                }}
-                            />
+                            violationsOverTimeData.length > 0 ? (
+                                <LineChart
+                                    data={violationsOverTimeData}
+                                    type="line"
+                                    height={220}
+                                    text={true}
+                                    showGridLines={true}
+                                    exportingDisabled={true}
+                                    defaultChartOptions={{
+                                        xAxis: {
+                                            type: "datetime",
+                                            dateTimeLabelFormats: { day: "%a" },
+                                            title: { text: null },
+                                            visible: true,
+                                            gridLineWidth: 0,
+                                        },
+                                        yAxis: {
+                                            title: { text: "Violations" },
+                                            gridLineWidth: 1,
+                                            min: 0,
+                                        },
+                                        legend: { enabled: true },
+                                    }}
+                                />
+                            ) : (
+                                <Box style={{ height: 220, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    <Text variant="bodyMd" color="subdued">No violations in the selected time range</Text>
+                                </Box>
+                            )
                         }
                     />
                     <DonutCard title="Violations by severity" donutData={severityDonutData} />

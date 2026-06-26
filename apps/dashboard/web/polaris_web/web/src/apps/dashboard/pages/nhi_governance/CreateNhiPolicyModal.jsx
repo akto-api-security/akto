@@ -54,13 +54,14 @@ function PolicyDetailsStep({ name, setName, description, setDescription, selecte
         <VerticalStack gap="5">
             <VerticalStack gap="2">
                 <TextField
-                    label="Policy Name"
+                    label="Policy Name *"
                     value={name}
                     onChange={setName}
                     maxLength={MAX_NAME}
                     showCharacterCount
                     autoComplete="off"
                     placeholder="e.g. No Admin Credentials for Agent Identities"
+                    error={name.trim() === "" ? "Policy name is required" : undefined}
                 />
             </VerticalStack>
             <VerticalStack gap="2">
@@ -220,8 +221,8 @@ function RotationEnforcementStep({ rotationEnabled, setRotationEnabled, maxAgeDa
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editingPolicy = null, isEditMode = false }) {
-    const [currentStep, setCurrentStep]       = useState(1);
-    const [completedSteps, setCompletedSteps] = useState([]);
+    const [currentStep, setCurrentStep] = useState(1);
+    const [loading, setLoading] = useState(false);
 
     // Playground state
     const [playgroundInput, setPlaygroundInput]       = useState("");
@@ -240,47 +241,39 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
     const [selectedNhis, setSelectedNhis]     = useState([]);
 
     // Step 2
-    const [tokenSegEnabled, setTokenSegEnabled] = useState(true);
+    const [tokenSegEnabled, setTokenSegEnabled] = useState(false);
 
     // Step 3
-    const [expiryEnabled, setExpiryEnabled]       = useState(true);
+    const [expiryEnabled, setExpiryEnabled]       = useState(false);
     const [warningThreshold, setWarningThreshold] = useState(3);
-    const [flagExpired, setFlagExpired]           = useState(true);
+    const [flagExpired, setFlagExpired]           = useState(false);
 
     // Step 4
-    const [rotationEnabled, setRotationEnabled] = useState(true);
+    const [rotationEnabled, setRotationEnabled] = useState(false);
     const [maxAgeDays, setMaxAgeDays]           = useState(30);
     const [warningDays, setWarningDays]         = useState(7);
 
     useBodyClass('guardrail-page-open');
 
-    // Auto-scroll playground to bottom on new messages. useLayoutEffect (not useEffect) so the
-    // scroll lands before the browser paints — avoids a one-frame flash of the un-scrolled state.
     useLayoutEffect(() => {
         if (playgroundMessages.length === 0) return;
         bottomRef.current?.scrollIntoView({ block: "end" });
     }, [playgroundMessages]);
 
-    // Fetch unique agent names and identity hexIds from nhi_identities
     useEffect(() => {
         observeRequests.fetchNhiIdentities().then((identities) => {
             if (!Array.isArray(identities)) return;
-
-            const agents = [...new Set(
-                identities.map((i) => i.agentName).filter(Boolean)
-            )].sort().map((n) => ({ label: n, value: n }));
-
+            const agents = [...new Set(identities.map((i) => i.agentName).filter(Boolean))]
+                .sort().map((n) => ({ label: n, value: n }));
             const nhis = identities
                 .filter((i) => i.hexId && i.identityName)
                 .map((i) => ({ label: i.identityName, value: i.hexId }))
                 .sort((a, b) => a.label.localeCompare(b.label));
-
             setAgentOptions(agents);
             setNhiOptions(nhis);
         }).catch(() => {});
     }, []);
 
-    // Pre-fill when editing
     useEffect(() => {
         if (isEditMode && editingPolicy) {
             populateFormForEdit(editingPolicy);
@@ -294,26 +287,61 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
         setDescription(p.description || "");
         setSelectedAgents(p.scope?.agents || p.agents || []);
         setSelectedNhis(p.scope?.nhiIds || p.nhiIds || []);
-        setTokenSegEnabled(p.tokenSegregation?.enabled ?? true);
-        setExpiryEnabled(p.expirationTracking?.enabled ?? true);
+        setTokenSegEnabled(p.tokenSegregation?.enabled ?? false);
+        setExpiryEnabled(p.expirationTracking?.enabled ?? false);
         setWarningThreshold(p.expirationTracking?.warningThresholdMonths || 3);
-        setFlagExpired(p.expirationTracking?.flagExpiredTokens ?? true);
-        setRotationEnabled(p.rotationEnforcement?.enabled ?? true);
+        setFlagExpired(p.expirationTracking?.flagExpiredTokens ?? false);
+        setRotationEnabled(p.rotationEnforcement?.enabled ?? false);
         setMaxAgeDays(p.rotationEnforcement?.maxAgeDays || 30);
         setWarningDays(p.rotationEnforcement?.warningDays || 7);
-        setCompletedSteps([1, 2, 3]);
         setCurrentStep(1);
     };
 
     const resetForm = () => {
         setName(""); setDescription(""); setSelectedAgents([]); setSelectedNhis([]);
-        setTokenSegEnabled(true); setExpiryEnabled(true); setWarningThreshold(3); setFlagExpired(true);
-        setRotationEnabled(true); setMaxAgeDays(30); setWarningDays(7);
-        setCompletedSteps([]); setCurrentStep(1);
+        setTokenSegEnabled(false); setExpiryEnabled(false); setWarningThreshold(3); setFlagExpired(false);
+        setRotationEnabled(false); setMaxAgeDays(30); setWarningDays(7);
+        setCurrentStep(1);
         setPlaygroundMessages([]); setPlaygroundInput("");
     };
 
     const handleClose = () => { resetForm(); onClose(); };
+
+    // ── Per-step validation + summaries ────────────────────────────────────────
+    const getStepsWithMeta = () => [
+        {
+            id: 1,
+            label: "Policy details & Scope",
+            isValid: name.trim() !== "",
+            summary: name.trim() || null,
+        },
+        {
+            id: 2,
+            label: "Token Segregation",
+            isValid: true,
+            summary: tokenSegEnabled ? "Enabled" : null,
+        },
+        {
+            id: 3,
+            label: "Expiration Tracking",
+            isValid: true,
+            summary: (() => {
+                const parts = [];
+                if (expiryEnabled) parts.push(`Lifecycle tracking (${warningThreshold}m warning)`);
+                if (flagExpired) parts.push("Flag expired tokens");
+                return parts.length ? parts.join(", ") : null;
+            })(),
+        },
+        {
+            id: 4,
+            label: "Rotation Enforcement",
+            isValid: true,
+            summary: rotationEnabled ? `Enabled (max ${maxAgeDays}d, warn ${warningDays}d)` : null,
+        },
+    ];
+
+    const stepsWithMeta = getStepsWithMeta();
+    const allStepsValid = stepsWithMeta.every((s) => s.isValid);
 
     const buildPayload = (status) => ({
         policyName: name.trim() || "Untitled Policy",
@@ -326,19 +354,29 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
         rotationEnforcement: { enabled: rotationEnabled, maxAgeDays, warningDays },
     });
 
-    const handleSubmit = (status) => {
-        onSave(buildPayload(status), isEditMode ? editingPolicy?._id?.$oid || editingPolicy?.hexId : null);
-        handleClose();
+    const handleSubmit = async (status) => {
+        if (!allStepsValid) return;
+        setLoading(true);
+        try {
+            await onSave(buildPayload(status), isEditMode ? editingPolicy?._id?.$oid || editingPolicy?.hexId : null);
+            handleClose();
+        } catch (_) {
+        } finally {
+            setLoading(false);
+        }
     };
+
+    const isFirstStep = currentStep === STEPS[0].id;
+    const isLastStep  = currentStep === STEPS[STEPS.length - 1].id;
 
     const goNext = () => {
-        setCompletedSteps((prev) => prev.includes(currentStep) ? prev : [...prev, currentStep]);
-        setCurrentStep((s) => Math.min(s + 1, STEPS.length));
+        const idx = stepsWithMeta.findIndex((s) => s.id === currentStep);
+        if (idx < stepsWithMeta.length - 1) setCurrentStep(stepsWithMeta[idx + 1].id);
     };
-
-    const goPrev = () => setCurrentStep((s) => Math.max(s - 1, 1));
-
-    const isLastStep = currentStep === STEPS.length;
+    const goPrev = () => {
+        const idx = stepsWithMeta.findIndex((s) => s.id === currentStep);
+        if (idx > 0) setCurrentStep(stepsWithMeta[idx - 1].id);
+    };
 
     const handleQuickPromptClick = (prompt) => {
         if (playgroundLoading) return;
@@ -354,7 +392,6 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
         const input = playgroundInput;
         setPlaygroundInput("");
         setPlaygroundLoading(true);
-        // Placeholder: echo back — replace with real API call when backend is ready
         setPlaygroundMessages((prev) => [...prev, { userPrompt: input, action: "Received", message: "Ask Akto feature coming soon." }]);
         setPlaygroundLoading(false);
     };
@@ -425,27 +462,34 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
                     </Box>
                     <Box paddingInline="2">
                         <VerticalStack gap="0">
-                            {STEPS.map((step) => {
-                                const isCompleted = completedSteps.includes(step.id);
-                                const isActive    = currentStep === step.id;
+                            {stepsWithMeta.map((step) => {
+                                const isActive = currentStep === step.id;
                                 return (
-                                    <Box
+                                    <div
                                         key={step.id}
                                         className={`guardrail-nav-item ${isActive ? "active" : ""}`}
-                                        onClick={() => isCompleted && setCurrentStep(step.id)}
-                                        data-completed={isCompleted}
+                                        onClick={() => setCurrentStep(step.id)}
+                                        data-completed={step.summary !== null}
                                     >
-                                        <Box className={`step-indicator ${
-                                            isActive     ? "current"    :
-                                            isCompleted  ? "configured" : "pending"
+                                        <div className={`step-indicator ${
+                                            isActive         ? "current"    :
+                                            !step.isValid    ? "error"      :
+                                            step.summary     ? "configured" : "pending"
                                         }`} />
-                                        <Text
-                                            variant="bodyMd"
-                                            fontWeight={isActive ? "semibold" : "regular"}
-                                        >
-                                            {step.label}
-                                        </Text>
-                                    </Box>
+                                        <div style={{ flex: 1, paddingTop: "4px" }}>
+                                            <Text
+                                                variant="bodyMd"
+                                                fontWeight={isActive ? "semibold" : "regular"}
+                                            >
+                                                {step.label}
+                                            </Text>
+                                            {step.summary && (
+                                                <Text variant="bodySm" color="subdued" truncate>
+                                                    <span className="guardrail-nav-summary" title={step.summary}>{step.summary}</span>
+                                                </Text>
+                                            )}
+                                        </div>
+                                    </div>
                                 );
                             })}
                         </VerticalStack>
@@ -458,7 +502,7 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
                         <Box padding="5">
                             <VerticalStack gap="4">
                                 <Text variant="headingMd" as="h2" fontWeight="semibold">
-                                    {STEPS.find((s) => s.id === currentStep)?.label}
+                                    {stepsWithMeta.find((s) => s.id === currentStep)?.label}
                                 </Text>
                                 <Box>{renderCurrentStep()}</Box>
                             </VerticalStack>
@@ -472,11 +516,16 @@ export default function CreateNhiPolicyModal({ onClose, onSave, onDisable, editi
                                 {isEditMode && onDisable && (
                                     <Button destructive onClick={onDisable}>Disable Policy</Button>
                                 )}
-                                <Button onClick={goPrev} disabled={currentStep === 1}>Previous</Button>
+                                <Button onClick={goPrev} disabled={isFirstStep}>Previous</Button>
                             </HorizontalStack>
                             <HorizontalStack gap="2">
                                 <Button onClick={goNext} disabled={isLastStep}>Next</Button>
-                                <Button primary onClick={() => handleSubmit("ACTIVE")}>
+                                <Button
+                                    primary
+                                    loading={loading}
+                                    disabled={!allStepsValid}
+                                    onClick={() => handleSubmit("ACTIVE")}
+                                >
                                     {isEditMode ? "Update policy" : "Create policy"}
                                 </Button>
                             </HorizontalStack>
