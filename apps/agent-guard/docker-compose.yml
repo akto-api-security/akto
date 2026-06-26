@@ -19,10 +19,13 @@ services:
     depends_on:
       anonymizer:
         condition: service_healthy
+      # Cache sidecars are fail-open — the worker runs fine before they're ready,
+      # so don't block the scan API on them becoming healthy (the embedder loads
+      # torch + a model and can take minutes on first boot).
       embedder:
-        condition: service_healthy
+        condition: service_started
       redis:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
       interval: 15s
