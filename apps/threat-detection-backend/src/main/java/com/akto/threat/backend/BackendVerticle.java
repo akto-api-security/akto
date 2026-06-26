@@ -56,13 +56,11 @@ public class BackendVerticle extends AbstractVerticle {
 
     // Start the HTTP server
 
-    router.route("/health").handler(ctx -> ctx.response().setStatusCode(200).end("OK"));
-
     long thresholdMs = Long.parseLong(
         System.getenv().getOrDefault("HEALTH_DEEP_THRESHOLD_MS", "300000"));
     long thresholdSec = thresholdMs / 1000;
 
-    router.route("/health/deep").handler(ctx -> {
+    router.route("/health").handler(ctx -> {
       long now = System.currentTimeMillis();
       long lastPoll = FlushMessagesToDB.getLastSuccessfulPollEpochMs();
       long lastWrite = FlushMessagesToDB.getLastSuccessfulMongoWriteEpochMs();
@@ -71,13 +69,15 @@ public class BackendVerticle extends AbstractVerticle {
       long writeAgoSec = lastWrite == 0 ? -1 : (now - lastWrite) / 1000;
 
       java.util.List<String> reasons = new java.util.ArrayList<>();
-      if (lastPoll == 0 && lastWrite == 0) {
+      if (lastPoll == 0) {
         reasons.add("not_initialized");
       } else {
-        if (lastPoll == 0 || (now - lastPoll) > thresholdMs) {
+        if ((now - lastPoll) > thresholdMs) {
           reasons.add("kafka_poll_stale");
         }
-        if (lastWrite == 0 || (now - lastWrite) > thresholdMs) {
+        // Only flag mongo_write_stale if there have been writes before and they stopped.
+        // lastWrite==0 means no events received yet (idle) which is fine.
+        if (lastWrite > 0 && (now - lastWrite) > thresholdMs) {
           reasons.add("mongo_write_stale");
         }
       }

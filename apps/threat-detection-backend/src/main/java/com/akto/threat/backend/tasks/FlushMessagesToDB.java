@@ -101,6 +101,8 @@ public class FlushMessagesToDB {
             ConsumerRecords<String, String> records =
                 kafkaConsumer.poll(
                     Duration.ofMillis(this.kafkaConfig.getConsumerConfig().getPollDurationMilli()));
+            lastSuccessfulPollEpochMs.set(System.currentTimeMillis());
+
             if (records.isEmpty()) {
               continue;
             }
@@ -109,7 +111,6 @@ public class FlushMessagesToDB {
 
             if (!records.isEmpty()) {
               kafkaConsumer.commitSync();
-              lastSuccessfulPollEpochMs.set(System.currentTimeMillis());
             }
           }
         });
