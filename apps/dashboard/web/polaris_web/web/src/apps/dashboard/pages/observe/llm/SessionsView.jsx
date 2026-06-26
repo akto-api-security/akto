@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { SESSION_COLUMN_DEFS } from "./columns";
 import api from "./api";
@@ -8,10 +8,6 @@ const DEFAULT_COL_DEF = { sortable: true, resizable: true, filter: false };
 export default function SessionsView({ currDateRange, onOpenSession }) {
     const [rows, setRows] = useState([]);
     const [columnDefs, setColumnDefs] = useState(SESSION_COLUMN_DEFS);
-
-    // Maps { filterKey → { pageNum → afterKey } } so each unique filter combination
-    // has its own cursor chain and stale cursors are never used across filter changes.
-    const cursorRegistry = useRef({});
 
     const getEpochs = useCallback(() => ({
         since: Math.floor(Date.parse(currDateRange.period.since) / 1000),
@@ -28,25 +24,15 @@ export default function SessionsView({ currDateRange, onOpenSession }) {
     }, [getEpochs]);
 
     const onServerFetch = useCallback(({ filters, skip, limit, searchString }) => {
-        const pageSize  = limit || 20;
-        const page      = Math.floor(skip / pageSize);
-        const filterKey = JSON.stringify(filters || {});
-
-        // Reset cursor chain for this filter combo when landing on page 0 (new filter or sort).
-        if (page === 0) cursorRegistry.current[filterKey] = { 0: null };
-        if (!cursorRegistry.current[filterKey]) cursorRegistry.current[filterKey] = { 0: null };
-
-        const afterKey = cursorRegistry.current[filterKey][page] || null;
+        const pageSize = limit || 20;
         const { since, until } = getEpochs();
 
+        // The backend treats sessionsAfterKey as an integer offset — pass skip directly.
         return api.fetchSessionsPaged({
             startTime: since, endTime: until,
-            limit: pageSize, afterKey, filters,
+            limit: pageSize, afterKey: String(skip || 0), filters,
             searchString: searchString
         }).then(result => {
-            if (result.nextAfterKey) {
-                cursorRegistry.current[filterKey][page + 1] = result.nextAfterKey;
-            }
             setRows(result.sessions);
             return { value: result.sessions, total: result.total };
         });
