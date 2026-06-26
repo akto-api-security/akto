@@ -606,6 +606,7 @@ function GuardrailPolicies() {
             rowClickable={true}
             getActions={getActionsList}
             hasRowActions={true}
+            preventRowClickOnActions={true}
             hardCodedKey={true}
             loading={loading || Boolean(pendingPolicyName)}
             loadingText={"Loading guardrail policies..."}
