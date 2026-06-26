@@ -100,23 +100,47 @@ def _decode(v: Any) -> str:
     return v.decode("utf-8") if isinstance(v, (bytes, bytearray)) else str(v)
 
 
-def _parse_search_reply(reply: Any) -> Optional[Dict[str, Any]]:
-    """Parse the top match out of an FT.SEARCH RESP2 reply, or None.
+def _bget(d: Dict[Any, Any], key: str) -> Any:
+    """Fetch from a dict whose keys may be str or bytes (decode_responses=False)."""
+    if key in d:
+        return d[key]
+    return d.get(key.encode("utf-8"))
 
-    Reply shape: [count, key1, [f1, v1, f2, v2, ...], key2, [...], ...].
+
+def _shape_match(flat: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "is_valid": _decode(flat.get("is_valid", "1")) in ("1", "true", "True"),
+        "risk_score": float(_decode(flat.get("risk_score", "0")) or 0.0),
+        "reason": _decode(flat.get("reason", "")),
+        "distance": float(_decode(flat.get("dist", "0")) or 0.0),
+        "inserted_at": float(_decode(flat.get("inserted_at", "0")) or 0.0),
+    }
+
+
+def _parse_search_reply(reply: Any) -> Optional[Dict[str, Any]]:
+    """Parse the top match out of an FT.SEARCH reply, or None.
+
+    redis-py normalises FT.SEARCH differently across versions:
+      - >=5 / RESP3: a dict {results: [{extra_attributes: {field: val}}], ...}
+      - RESP2 raw:   a flat list [count, key1, [f1, v1, ...], key2, [...], ...]
+    Both are handled so the cache works regardless of client/protocol.
     """
     try:
-        if not reply or int(reply[0]) == 0 or len(reply) < 3:
+        if not reply:
+            return None
+        if isinstance(reply, dict):  # redis-py >=5 / RESP3 map form
+            results = _bget(reply, "results") or []
+            if not results:
+                return None
+            attrs = _bget(results[0], "extra_attributes") or {}
+            flat = {_decode(k): v for k, v in attrs.items()}
+            return _shape_match(flat)
+        # RESP2 raw list form
+        if int(reply[0]) == 0 or len(reply) < 3:
             return None
         fields = reply[2]
         flat = {_decode(fields[i]): fields[i + 1] for i in range(0, len(fields) - 1, 2)}
-        return {
-            "is_valid": _decode(flat.get("is_valid", "1")) in ("1", "true", "True"),
-            "risk_score": float(_decode(flat.get("risk_score", "0")) or 0.0),
-            "reason": _decode(flat.get("reason", "")),
-            "distance": float(_decode(flat.get("dist", "0")) or 0.0),
-            "inserted_at": float(_decode(flat.get("inserted_at", "0")) or 0.0),
-        }
+        return _shape_match(flat)
     except Exception as exc:
         logger.warning(f"[cache_store] parse reply failed: {exc}")
         return None
