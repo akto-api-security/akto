@@ -103,9 +103,9 @@ public abstract class DataActor {
 
     public abstract List<ApiCollection> fetchApiCollections();
 
-    public abstract void createCollectionSimple(int vxlanId);
+    public abstract void createCollectionSimple(int vxlanId, List<CollectionTags> tags);
 
-    public abstract void createCollectionForHost(String host, int colId);
+    public abstract void createCollectionForHost(String host, int colId, List<CollectionTags> tags);
 
     public abstract AccountSettings fetchAccountSettingsForAccount(int accountId);
     

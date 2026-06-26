@@ -1030,17 +1030,24 @@ public class DbLayer {
         return endpoints;
     }
 
-    public static void createCollectionSimple(int vxlanId) {
+    public static void createCollectionSimple(int vxlanId, List<CollectionTags> tags) {
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
 
+        Bson updates = Updates.combine(
+                Updates.set(ApiCollection.VXLAN_ID, vxlanId),
+                Updates.setOnInsert("startTs", Context.now()),
+                Updates.setOnInsert("urls", new HashSet<>())
+        );
+
+        if (tags != null && !tags.isEmpty() && Constants.SHOULD_SAVE_TAGS) {
+            ApiCollection existing = ApiCollectionsDao.instance.findOne(Filters.eq("_id", vxlanId));
+            updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, getFilteredTags(existing, tags)));
+        }
+
         ApiCollectionsDao.instance.getMCollection().updateOne(
                 Filters.eq("_id", vxlanId),
-                Updates.combine(
-                        Updates.set(ApiCollection.VXLAN_ID, vxlanId),
-                        Updates.setOnInsert("startTs", Context.now()),
-                        Updates.setOnInsert("urls", new HashSet<>())
-                ),
+                updates,
                 updateOptions
         );
     }
@@ -1125,7 +1132,7 @@ public class DbLayer {
         );
     }
 
-    public static void createCollectionForHost(String host, int id) {
+    public static void createCollectionForHost(String host, int id, List<CollectionTags> tags) {
 
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
@@ -1135,6 +1142,11 @@ public class DbLayer {
             Updates.setOnInsert("startTs", Context.now()),
             Updates.setOnInsert("urls", new HashSet<>())
         );
+
+        if (tags != null && !tags.isEmpty() && Constants.SHOULD_SAVE_TAGS) {
+            ApiCollection existing = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.HOST_NAME, host));
+            updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, getFilteredTags(existing, tags)));
+        }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
     }

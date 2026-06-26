@@ -222,12 +222,12 @@ public class DbActor extends DataActor {
         return DbLayer.fetchAllApiCollections();
     }
 
-    public void createCollectionSimple(int vxlanId) {
-        DbLayer.createCollectionSimple(vxlanId);
+    public void createCollectionSimple(int vxlanId, List<CollectionTags> tags) {
+        DbLayer.createCollectionSimple(vxlanId, tags);
     }
 
-    public void createCollectionForHost(String host, int colId) {
-        DbLayer.createCollectionForHost(host, colId);
+    public void createCollectionForHost(String host, int colId, List<CollectionTags> tags) {
+        DbLayer.createCollectionForHost(host, colId, tags);
     }
 
     public AccountSettings fetchAccountSettingsForAccount(int accountId) {

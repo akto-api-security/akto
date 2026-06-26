@@ -274,6 +274,7 @@ public class DbAction extends ActionSupport {
     List<String> hostNames;
     String hostName;
     BasicDBObject log;
+    boolean hasLatestRagDetection;
     boolean isHybridSaas;
     Setup setup;
     Organization organization;
@@ -1850,7 +1851,13 @@ public class DbAction extends ActionSupport {
 
     public String createCollectionSimple() {
         try {
-            DbLayer.createCollectionSimple(vxlanId);
+            List<CollectionTags> ragTags = null;
+            if (hasLatestRagDetection) {
+                ragTags = new ArrayList<>();
+                ragTags.add(new CollectionTags(Context.now(), Constants.AKTO_RAG_DATABASE_TAG, Constants.AKTO_RAG_DATABASE_TAG, CollectionTags.TagSource.AKTO));
+                ragTags = checkTagsNeedUpdates(ragTags, vxlanId);
+            }
+            DbLayer.createCollectionSimple(vxlanId, ragTags);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionSimple " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -1860,7 +1867,13 @@ public class DbAction extends ActionSupport {
 
     public String createCollectionForHost() {
         try {
-            DbLayer.createCollectionForHost(host, colId);
+            List<CollectionTags> ragTags = null;
+            if (hasLatestRagDetection) {
+                ragTags = new ArrayList<>();
+                ragTags.add(new CollectionTags(Context.now(), Constants.AKTO_RAG_DATABASE_TAG, Constants.AKTO_RAG_DATABASE_TAG, CollectionTags.TagSource.AKTO));
+                ragTags = checkTagsNeedUpdates(ragTags, colId);
+            }
+            DbLayer.createCollectionForHost(host, colId, ragTags);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionForHost " + e.toString());
             return Action.ERROR.toUpperCase();

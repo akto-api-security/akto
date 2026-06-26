@@ -1109,12 +1109,15 @@ public class ClientActor extends DataActor {
         return apiCollections;
     }
 
-    public void createCollectionForHost(String host, int colId) {
+    public void createCollectionForHost(String host, int colId, List<CollectionTags> tags) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("colId", colId);
         obj.put("host", host);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForHost", "", "POST", obj.toString(), headers, "");
+        if (tags != null && !tags.isEmpty()) {
+            obj.put("tagsList", tags);
+        }
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForHost", "", "POST", gson.toJson(obj), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
@@ -1127,11 +1130,14 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void createCollectionSimple(int vxlanId) {
+    public void createCollectionSimple(int vxlanId, List<CollectionTags> tags) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("vxlanId", vxlanId);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionSimple", "", "POST", obj.toString(), headers, "");
+        if (tags != null && !tags.isEmpty()) {
+            obj.put("tagsList", tags);
+        }
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionSimple", "", "POST", gson.toJson(obj), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();

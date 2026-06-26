@@ -118,7 +118,7 @@ public class HttpCallParser {
     }
 
     public int createCollectionSimple(int vxlanId) {
-        dataActor.createCollectionSimple(vxlanId);
+        dataActor.createCollectionSimple(vxlanId, null);
         return vxlanId;
     }
 
