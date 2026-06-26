@@ -72,7 +72,7 @@ public class BackendVerticle extends AbstractVerticle {
 
       java.util.List<String> reasons = new java.util.ArrayList<>();
       if (lastPoll == 0) {
-        reasons.add("not_initialized");
+        //reasons.add("not_initialized");
       } else {
         if ((now - lastPoll) > thresholdMs) {
           reasons.add("kafka_poll_stale");
