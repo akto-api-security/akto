@@ -7,6 +7,7 @@ from typing import Any, List
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
+import cascade_backpressure
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
 
@@ -21,6 +22,7 @@ class ScanRequest(BaseModel):
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     settings.init_from_env()
+    cascade_backpressure.configure_from_env()
     yield
 
 
