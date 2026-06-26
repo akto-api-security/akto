@@ -11,6 +11,7 @@ import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.Log;
+import com.akto.dao.context.Context;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
@@ -211,22 +212,21 @@ public class EndpointShieldAgentAction extends UserAction {
             int effectivePageSize = (pageSize > 0) ? Math.min(pageSize, MAX_LOGS_LIMIT) : DEFAULT_PAGE_SIZE;
 
             // Base filter (no cursor) — used for totalCount
-            List<Bson> baseFilters = new ArrayList<>();
-            baseFilters.add(Filters.eq(EndpointShieldLog.AGENT_ID, agentId));
-            baseFilters.add(Filters.gte(Log.TIMESTAMP, startTime));
-            baseFilters.add(Filters.lte(Log.TIMESTAMP, endTime));
+            Bson baseFilter = Filters.and(
+                Filters.eq(EndpointShieldLog.AGENT_ID, agentId),
+                Filters.gte(Log.TIMESTAMP, startTime),
+                Filters.lte(Log.TIMESTAMP, endTime)
+            );
             if (logKey != null && !logKey.isEmpty()) {
-                baseFilters.add(Filters.eq("key", logKey));
+                baseFilter = Filters.and(baseFilter, Filters.eq("key", logKey));
             }
-            Bson baseFilter = Filters.and(baseFilters.toArray(new Bson[0]));
 
             // Add ObjectId cursor for paged requests — _id < afterId fetches older logs.
             // Using _id instead of timestamp avoids skipping logs that share the same second.
-            List<Bson> pagedFilters = new ArrayList<>(baseFilters);
+            Bson pagedFilter = baseFilter;
             if (afterId != null && !afterId.isEmpty()) {
-                pagedFilters.add(Filters.lt("_id", new ObjectId(afterId)));
+                pagedFilter = Filters.and(baseFilter, Filters.lt("_id", new ObjectId(afterId)));
             }
-            Bson pagedFilter = Filters.and(pagedFilters.toArray(new Bson[0]));
 
             // Sort descending by _id (newest ObjectId = newest log)
             Bson sort = Sorts.descending("_id");
@@ -260,19 +260,18 @@ public class EndpointShieldAgentAction extends UserAction {
             }
 
             if (startTime == 0 && endTime == 0) {
-                int now = (int) (System.currentTimeMillis() / 1000);
-                endTime = now;
-                startTime = now - (24 * 60 * 60);
+                endTime = Context.now();
+                startTime = endTime - (24 * 60 * 60);
             }
 
-            List<Bson> filters = new ArrayList<>();
-            filters.add(Filters.eq(EndpointShieldLog.AGENT_ID, agentId));
-            filters.add(Filters.gte(Log.TIMESTAMP, startTime));
-            filters.add(Filters.lte(Log.TIMESTAMP, endTime));
+            Bson filter = Filters.and(
+                Filters.eq(EndpointShieldLog.AGENT_ID, agentId),
+                Filters.gte(Log.TIMESTAMP, startTime),
+                Filters.lte(Log.TIMESTAMP, endTime)
+            );
             if (logKey != null && !logKey.isEmpty()) {
-                filters.add(Filters.eq("key", logKey));
+                filter = Filters.and(filter, Filters.eq("key", logKey));
             }
-            Bson filter = Filters.and(filters.toArray(new Bson[0]));
 
             Bson sort = Sorts.descending("_id");
             Bson projection = Projections.include("log", "timestamp", "key", "agentId", "deviceId", "level");
