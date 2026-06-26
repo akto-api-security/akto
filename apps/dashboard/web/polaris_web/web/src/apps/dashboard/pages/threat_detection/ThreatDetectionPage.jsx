@@ -579,7 +579,7 @@ function ThreatDetectionPage() {
           const payloadResponse = await threatDetectionRequests.fetchMaliciousRequest(
             queryParams.refId,
             queryParams.eventType,
-            queryParams.actor,
+            queryParams?.actor || "",
             queryParams.filterId
           );
 
