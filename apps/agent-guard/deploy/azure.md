@@ -1,303 +1,115 @@
-# Azure deployment plan — Agent Guard
+# Agent Guard on Azure
 
-See also [README.md](../README.md) and [ENV.md](../ENV.md).
+See [README.md](../README.md), [ENV.md](../ENV.md). No Cloudflare DNS cutover — new installs get two Azure worker URLs manually.
 
-Target: match Cloudflare production scale and latency at lower cost (~$400/mo → ~$80–150/mo infra).
+## Architecture
 
-## Current Cloudflare baseline
+| Container App | Image | Ingress | Scale |
+|---------------|-------|---------|-------|
+| `agent-guard-anonymizer` | `akto-agent-guard-anonymizer:<tag>` | Internal `:8093` | min 1, max 5, HTTP ×50 |
+| `agent-guard-executor-v2` | `akto-agent-guard-worker:<tag>` | External `:8090` | min 1, max 20, HTTP ×100 |
+| `agent-guard-executor` | same worker image | External `:8090` | same |
 
-| Component | CF config | Role |
-|-----------|-----------|------|
-| executor / executor-v2 | Python Workers × 2 | LLM cascade + local scanners |
-| anonymizer-worker | Container `standard-4` (4 vCPU, 12 GiB), max 5 | Presidio PII |
-| Traffic pattern | Bursty, scale-to-zero containers | `sleepAfter` 5m (anonymizer), 2h (legacy) |
+- **Environment:** External, **public network access ON** (create with first Container App).
+- **Two workers** = same image, different config (`DEFAULT_MODEL_CONFIG_JSON` on executor only).
+- **Scale:** min replicas = floor always running; max = burst cap; HTTP ×N = concurrent requests per replica before adding another.
 
-**Latency profile:** cascade dominated by GCP Vertex (Qwen + Gemma); local scanners &lt;100ms; anonymizer cold start 2–5s on CF container wake.
+Deploy order: **anonymizer → executor-v2 → executor**.
 
-**Images (CI):**
+## Initial setup (Portal)
 
-- `aktosecurity/akto-agent-guard-executor:<tag>` — legacy ONNX container (existing consumers)
-- `aktosecurity/akto-agent-guard-worker:<tag>` — portable FastAPI executor
-- `aktosecurity/akto-agent-guard-anonymizer:<tag>` — Presidio anonymizer
+1. **Container Apps** → **Create** → new environment, public access **On**, Log Analytics attached.
+2. Create **3 apps** (table above). Anonymizer: ingress **Limited to environment**. Workers: **Accepting traffic from anywhere**.
+3. **Key Vault** → secrets for SA keys; **access policies** for your user (Get, List, Set) + `container-apps-identity` (Get, List).
+4. Per worker: **Identity** → user-assigned `container-apps-identity` → **Application** → **Secrets** (Key Vault ref) → **Containers** → env **Reference a secret**.
+5. Plain env on workers: `ANONYMIZER_URL=https://<anonymizer-internal-fqdn>`, project/endpoint IDs, `DEFAULT_MODEL_CONFIG_JSON` on executor only.
+6. Optional: **Custom domains** on each worker (CNAME → `*.azurecontainerapps.io`, managed cert).
 
----
+### Secrets layout
 
-## Recommended Azure architecture
+| Key Vault → app secret → env ref | Plain env |
+|----------------------------------|-----------|
+| `QWEN3GUARD_SA_KEY_JSON`, `GEMMA_VERTEX_SA_KEY_JSON`, `ANTHROPIC_API_KEY` | `QWEN3GUARD_PROJECT`, `QWEN3GUARD_LOCATION`, `QWEN3GUARD_ENDPOINT_ID`, `GEMMA_VERTEX_*`, `ANTHROPIC_MODEL`, `ANONYMIZER_URL`, `DEFAULT_MODEL_CONFIG_JSON` (executor), `SLACK_WEBHOOK_URL` |
 
-```mermaid
-flowchart TB
-  subgraph edge [Edge]
-    AFD["Azure Front Door\noptional"]
-  end
+Env dropdown empty? Add **Application → Secrets** first, then env **Reference a secret** (not Key Vault directly).
 
-  subgraph cae [Container Apps Environment]
-    ExecV2["executor-v2\n0.5 vCPU / 1 GiB"]
-    Exec["executor\n0.5 vCPU / 1 GiB"]
-    Anon["anonymizer\n1 vCPU / 2 GiB\ninternal ingress"]
-  end
+No `docker-compose.yml` upload in Portal — one Container App per service.
 
-  subgraph secrets [Secrets]
-    KV["Key Vault"]
-  end
+## Updates
 
-  subgraph external [External]
-    Vertex["GCP Vertex AI"]
-    Callers["guardrails-service / clients"]
-  end
+Azure does **not** auto-pull when Docker Hub overwrites `:latest`. Each release needs a **new revision**.
 
-  Callers --> AFD
-  AFD --> ExecV2
-  AFD --> Exec
-  ExecV2 --> Anon
-  Exec --> Anon
-  ExecV2 --> Vertex
-  Exec --> Vertex
-  ExecV2 --> KV
-  Exec --> KV
-```
-
-### Why Container Apps (Consumption)
-
-- Scale-to-zero on executor (matches CF Workers idle cost)
-- HTTP scaling rules (matches request-driven CF model)
-- Internal ingress for anonymizer (replaces CF service binding)
-- No cluster management vs AKS
-- Per-second billing with free grant (180K vCPU-s, 360K GiB-s/mo)
-
-AKS is viable if you already run a cluster; otherwise Container Apps is simpler and cheaper at this scale.
-
----
-
-## Sizing — match Cloudflare capacity
-
-Cloudflare anonymizer: up to 5 × `standard-4` (4 vCPU, 12 GiB). Executor Workers are lightweight; CPU is mostly Vertex I/O wait.
-
-| App | CPU | Memory | minReplicas | maxReplicas | Rationale |
-|-----|-----|--------|-------------|-------------|-----------|
-| executor | 0.5 | 1 GiB | 1 | 20 | Warm instance avoids cold start; burst to 20 matches CF Worker concurrency |
-| executor-v2 | 0.5 | 1 GiB | 1 | 20 | Same image, different `DEFAULT_MODEL_CONFIG_JSON` secret |
-| anonymizer | 1.0 | 2 GiB | 1 | 5 | Matches CF max 5 instances; 2 GiB enough for spaCy (CF over-provisions at 12 GiB) |
-
-**Cost optimization:** start with `minReplicas: 1` on executor (not 0) if p95 latency must match CF Workers (~no cold start). Use `minReplicas: 0` on executor only after measuring acceptable cold-start budget.
-
-**Region:** deploy in the same geography as GCP Vertex endpoints (e.g. `us-central1` Vertex → `centralus` Azure) to preserve cascade latency.
-
----
-
-## Step-by-step deployment
-
-### Phase 0 — Prerequisites (day 1)
-
-1. Azure subscription + resource group (e.g. `rg-agent-guard-prod`)
-2. Log Analytics workspace + Container Apps Environment
-3. Key Vault for Vertex SA keys, Slack, `DEFAULT_MODEL_CONFIG_JSON`
-4. **Container registry** — see [Image registry](#image-registry) below (ACR is optional)
-
-### Image registry
-
-**You do not need ACR** if images already live on Docker Hub or ECR.
-
-| Registry | Works with Container Apps? | Notes |
-|----------|--------------------------|-------|
-| **Docker Hub** (`aktosecurity/...`) | Yes | Configure registry credentials on the Container App Environment |
-| **AWS ECR Public** (`public.ecr.aws/aktosecurity/p7q3h0z2/...`) | Yes | Same — add ECR credentials to the environment |
-| **Azure ACR** | Yes | Only needed if you want all images inside Azure (faster pulls, no cross-cloud auth) |
-
-Point Container Apps directly at CI tags, e.g.:
-
-```text
-docker.io/aktosecurity/akto-agent-guard-worker:a-master
-public.ecr.aws/aktosecurity/p7q3h0z2/akto-agent-guard-worker:1.2.3
-```
-
-`az acr import` is a convenience for mirroring into ACR — not required.
+### Manual / local
 
 ```bash
-# Container Apps Environment — one-time registry setup (Docker Hub example)
-az containerapp env registry set \
-  --name <cae-name> \
-  --resource-group rg-agent-guard-prod \
-  --server docker.io \
-  --username <dockerhub-user> \
-  --password <dockerhub-token>
+cd apps/agent-guard
+RG=rg-agent-guard-prod ./deploy/azure-deploy.sh
 ```
 
-### Phase 1 — Images (day 1)
+Sets `DEPLOYED_AT` so Azure re-pulls `latest`. Override app names: `WORKER_APPS="app1 app2"`.
 
-Images are produced by CI (`staging.yml` / `prod.yml`). Use the tag from the workflow summary (e.g. `a-master` or release version).
+**Portal:** each app → **Edit and deploy** → bump plain env `DEPLOYED_AT` → **Create**. Do not touch secrets.
+
+**Rollback:** **Revision management** → activate previous revision.
+
+### CI (`prod.yml`)
+
+Enable checkbox **Deploy Agent Guard to Azure** when running Production workflow (after **Agent Guard** build). Runs `deploy/azure-deploy.sh` after image push.
+
+| GitHub secret | Required | Purpose |
+|---------------|----------|---------|
+| `AZURE_CREDENTIALS` | Yes | Service principal JSON for `azure/login` |
+| `AGENT_GUARD_AZURE_RESOURCE_GROUP` | No | Defaults to `rg-agent-guard-prod` in script |
+| `AGENT_GUARD_AZURE_WORKER_APPS` | No | Space-separated worker app names |
+| `AGENT_GUARD_AZURE_ANONYMIZER_APP` | No | Defaults to `agent-guard-anonymizer` |
+| `AGENT_GUARD_AZURE_IMAGE_TAG` | No | Defaults to `latest` |
+
+#### One-time: Azure service principal for GitHub
 
 ```bash
-# Verify images exist (no ACR copy needed)
-docker pull aktosecurity/akto-agent-guard-worker:1.2.3
-docker pull aktosecurity/akto-agent-guard-anonymizer:1.2.3
+RG=rg-agent-guard-prod
+SP_NAME=github-agent-guard-deploy
+
+az ad sp create-for-rbac \
+  --name "$SP_NAME" \
+  --role contributor \
+  --scopes /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/$RG \
+  --sdk-auth
 ```
 
-Optional — mirror into ACR only if you prefer Azure-native pulls:
+Copy the **entire JSON output** → GitHub repo **Settings** → **Secrets** → **New repository secret** → name `AZURE_CREDENTIALS`.
+
+Grant only the agent-guard resource group (not whole subscription) unless your policy requires broader scope. Contributor on the RG allows `az containerapp update`.
+
+Optional secrets for non-default app names:
 
 ```bash
-az acr import --name <acr> \
-  --source docker.io/aktosecurity/akto-agent-guard-worker:1.2.3 \
-  --image akto-agent-guard-worker:1.2.3
+# Example if your apps differ
+AGENT_GUARD_AZURE_WORKER_APPS=agent-guard-worker-red agent-guard-executor
+AGENT_GUARD_AZURE_RESOURCE_GROUP=rg-agent-guard-prod
 ```
 
-### Phase 2 — Anonymizer Container App (day 1–2)
+## Monitoring
+
+| Need | Portal |
+|------|--------|
+| Replica count | **Application** → **Revisions and replicas** or **Metrics** → `Replicas` |
+| Live logs | **Monitoring** → **Log stream** |
+| Hits / errors | **Metrics** → `Requests`, `Http5xx`, `RequestDuration` |
+| Query history | Log Analytics → **Logs** → `ContainerAppConsoleLogs_CL` |
 
 ```bash
-az containerapp create \
-  --name agent-guard-anonymizer \
-  --resource-group rg-agent-guard-prod \
-  --environment <cae-name> \
-  --image docker.io/aktosecurity/akto-agent-guard-anonymizer:1.2.3 \
-  --ingress internal \
-  --target-port 8093 \
-  --cpu 1.0 --memory 2Gi \
-  --min-replicas 1 --max-replicas 5 \
-  --scale-rule-name http --scale-rule-type http \
-  --scale-rule-http-concurrency 50
+az containerapp logs show -n <app> -g <rg> --follow
+az containerapp replica list -n <app> -g <rg> -o table
 ```
 
-Note internal FQDN: `agent-guard-anonymizer.internal.<env>.azurecontainerapps.io`
+## Custom DNS
 
-### Phase 3 — Executor Container Apps × 2 (day 2)
+Per worker: **Custom domains** → add hostname → CNAME at DNS provider → managed certificate.
 
-Deploy **same image twice** with different secrets (mirrors CF executor vs executor-v2):
+| DNS | App |
+|-----|-----|
+| DNS #1 (v2) | `agent-guard-executor-v2` |
+| DNS #2 (prod cascade) | `agent-guard-executor` |
 
-| Secret | executor | executor-v2 |
-|--------|----------|-------------|
-| `DEFAULT_MODEL_CONFIG_JSON` | prod modelMap | v2 modelMap |
-| `ANONYMIZER_URL` | `https://agent-guard-anonymizer.internal...` | same |
-
-```bash
-az containerapp create \
-  --name agent-guard-executor \
-  --resource-group rg-agent-guard-prod \
-  --environment <cae-name> \
-  --image docker.io/aktosecurity/akto-agent-guard-worker:1.2.3 \
-  --ingress external \
-  --target-port 8090 \
-  --cpu 0.5 --memory 1Gi \
-  --min-replicas 1 --max-replicas 20 \
-  --env-vars ANONYMIZER_URL=https://agent-guard-anonymizer.internal.<env>.azurecontainerapps.io \
-  --secrets qwen-key=<kv-ref> gemma-key=<kv-ref> ... \
-  --scale-rule-name http --scale-rule-type http \
-  --scale-rule-http-concurrency 100
-```
-
-Repeat for `agent-guard-executor-v2` with v2 secrets.
-
-### Phase 4 — DNS & cutover (day 3–5)
-
-1. **Shadow traffic:** duplicate 10% of scans to Azure URL; compare `is_valid` / `risk_score` / latency
-2. **Front Door (optional):** weighted routing CF 90% / Azure 10% → 0% CF
-3. Update callers:
-   - `guardrails-service` `AGENT_GUARD_ENGINE_URL`
-   - Any hardcoded `*.workers.dev` URLs
-4. Run `smoke.sh` against Azure FQDN
-5. Monitor 1 week; decommission CF workers
-
-### Phase 5 — Observability
-
-- Container Apps → Log Analytics (requests, restarts, scale events)
-- Alerts: 5xx rate, p95 latency, replica count, Vertex error rate in `details.error`
-- Azure Cost Management budget alert at $120/mo
-
----
-
-## Latency parity checklist
-
-| Metric | CF baseline | Azure target | How to measure |
-|--------|-------------|--------------|----------------|
-| Local scanner p95 | capture from CF analytics | ≤ CF + 10ms | k6 on BanSubstrings/Secrets |
-| Cascade p95 | CF + Vertex | ≈ same (region-aligned Vertex) | k6 on PromptInjection |
-| Anonymize p95 | CF container warm | ≤ CF + 20ms | dedicated Anonymize load test |
-| Cold start | Worker ~0ms; container 2–5s | executor minReplicas=1 → ~0ms | burst after 30 min idle |
-| Error rate | CF baseline | ≤ baseline | compare 5xx + fail-open rate |
-
-**k6 smoke script:** reuse `worker-py/scripts/smoke.sh` endpoints in a loop at production RPS.
-
----
-
-## Cost estimate (monthly)
-
-Assumptions: ~500K requests/mo, executor minReplicas=1, anonymizer minReplicas=1, moderate burst.
-
-| Item | Estimate |
-|------|----------|
-| 2× executor (0.5 vCPU, 1 GiB, always warm) | ~$25 |
-| 1× anonymizer (1 vCPU, 2 GiB, always warm) | ~$25 |
-| Burst scale-out overages | ~$15–40 |
-| ACR Basic (optional) | ~$0–5 |
-| Log Analytics | ~$10–25 |
-| Key Vault | ~$1 |
-| Front Door (optional) | ~$35 base |
-| **Total infra** | **~$80–120** (no Front Door) / **~$115–155** (with Front Door) |
-
-Vertex AI inference cost is unchanged (external to Azure).
-
-Compare to ~$400/mo Cloudflare (containers + Workers overages).
-
----
-
-## Auto-updates
-
-Goal: new CI image tag → Container Apps pick it up without manual `az containerapp update` every time.
-
-### Recommended: CI deploy step after image push
-
-Add a job (or workflow) that runs after `staging` / `prod` agent-guard builds succeed:
-
-```bash
-az containerapp update \
-  --name agent-guard-worker \
-  --resource-group rg-agent-guard-prod \
-  --image docker.io/aktosecurity/akto-agent-guard-worker:${IMAGE_TAG}
-
-az containerapp update \
-  --name agent-guard-anonymizer \
-  --resource-group rg-agent-guard-prod \
-  --image docker.io/aktosecurity/akto-agent-guard-anonymizer:${IMAGE_TAG}
-```
-
-Use GitHub Actions with `azure/login` + the same `IMAGE_TAG` from the build job. Container Apps creates a **new revision** and shifts traffic when the update completes (zero-downtime if health probes pass).
-
-**Staging vs prod:** deploy `a-<branch>` tags to a staging Container Apps env; deploy release tags (`1.2.3`) to prod only from `prod.yml` or manual approval.
-
-### Alternative patterns
-
-| Approach | Auto-update? | Trade-off |
-|----------|--------------|-----------|
-| **CI `az containerapp update`** (above) | Yes, on every successful build | Best control; tag is explicit |
-| **`:latest` tag + periodic pull** | Partial | Container Apps does not auto-pull `:latest`; you must still trigger update |
-| **Watchtower / cron on VM** | Yes for VM compose only | Not for Container Apps |
-| **Flux / Argo CD (AKS)** | Yes | Overkill unless you already use GitOps |
-
-### Safe rollout
-
-1. Deploy new revision with **traffic weight 0%** (preview revision)
-2. Run `smoke.sh` against revision FQDN
-3. Shift 100% traffic: `az containerapp ingress traffic set --revision-weight <new>=100`
-
-Or use **single revision mode** (default) — each `update` replaces active revision after health checks pass.
-
----
-
-## Rollback
-
-Keep Cloudflare workers deployable (`pywrangler deploy`). Rollback = flip DNS / env URL to `*.workers.dev` in minutes. No code change required.
-
----
-
-## Alternative: AKS
-
-Use if you already operate AKS. Apply `deploy/kubernetes/` manifests (future), attach ACR, install AGIC/nginx ingress. Higher baseline cost (~$150+/mo for node pool) but more control. Not recommended solely for Agent Guard unless part of existing platform.
-
-## Alternative: VM + docker compose
-
-Lowest ops complexity for a single region:
-
-```bash
-AGENT_GUARD_WORKER_TAG=1.2.3 AGENT_GUARD_ANONYMIZER_TAG=1.2.3 docker compose pull
-docker compose up -d
-```
-
-Suitable for staging; production needs manual HA (2 VMs + load balancer) to match CF scale.
+Set `AGENT_GUARD_ENGINE_URL` on new installs to the matching HTTPS URL.

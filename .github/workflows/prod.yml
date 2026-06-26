@@ -46,6 +46,10 @@ on:
         type: boolean
         default: false
         description: Agent Guard
+      agent_guard_deploy_azure:
+        type: boolean
+        default: false
+        description: Deploy Agent Guard to Azure Container Apps (requires Agent Guard build)
       account_jobs_executor:
         type: boolean
         default: false
@@ -441,6 +445,29 @@ jobs:
             ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-anonymizer:${{ github.event.inputs.release_version_agent_guard }}
           cache-from: type=gha,scope=agent-guard-anonymizer
           cache-to: type=gha,mode=max,scope=agent-guard-anonymizer
+
+      - name: Azure login
+        if: github.event.inputs.agent_guard_deploy_azure == 'true'
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install Azure Container Apps CLI extension
+        if: github.event.inputs.agent_guard_deploy_azure == 'true'
+        run: az extension add --name containerapp --upgrade
+
+      - name: Deploy to Azure Container Apps
+        if: github.event.inputs.agent_guard_deploy_azure == 'true'
+        env:
+          RG: ${{ secrets.AGENT_GUARD_AZURE_RESOURCE_GROUP }}
+          WORKER_APPS: ${{ secrets.AGENT_GUARD_AZURE_WORKER_APPS }}
+          ANONYMIZER_APP: ${{ secrets.AGENT_GUARD_AZURE_ANONYMIZER_APP }}
+          AGENT_GUARD_AZURE_IMAGE_TAG: ${{ secrets.AGENT_GUARD_AZURE_IMAGE_TAG }}
+          RELEASE_VERSION: ${{ github.event.inputs.release_version_agent_guard }}
+        run: |
+          chmod +x apps/agent-guard/deploy/azure-deploy.sh
+          export IMAGE_TAG="${AGENT_GUARD_AZURE_IMAGE_TAG:-${RELEASE_VERSION:-latest}}"
+          apps/agent-guard/deploy/azure-deploy.sh
 
       - name: Push git tag
         id: tag_version

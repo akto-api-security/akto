@@ -6,7 +6,7 @@ LLM guardrail scanning: cascade models (Vertex) + local scanners + Presidio anon
 |-----|----------|
 | [ENV.md](ENV.md) | Environment variables (one `.env` file) |
 | [PRODUCTION.md](PRODUCTION.md) | **Legacy ONNX executor** (`:8092`, existing deployments) |
-| [deploy/azure.md](deploy/azure.md) | Azure Container Apps migration plan |
+| [deploy/azure.md](deploy/azure.md) | Azure Container Apps (Portal + CLI setup) |
 
 ## Quick start (Docker)
 
