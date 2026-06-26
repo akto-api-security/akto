@@ -321,7 +321,6 @@ const router = createBrowserRouter([
                     },
                     {
                         path: "protection",
-                        element: <ThreatProtectedLayout/>,
                         children: [
                             {
                                 path: "threat-dashboard",
@@ -691,6 +690,8 @@ const router = createBrowserRouter([
                 element: <Onboarding/>
             },
             {
+                // Report routes: Dashboard skips fetchAllSubCategories on these paths.
+                // Each report component fetches only the subcategories it needs (targeted fetch).
                 path: "testing/summary/:reportId",
                 element: <VulnerabilityReport/>
             },

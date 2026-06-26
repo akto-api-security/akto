@@ -79,6 +79,15 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 				}
 				if err := dbClient.IngestMetrics(payload); err != nil {
 					logger.Error("Failed to flush guardrail metrics", zap.String("account", accountId), zap.Error(err))
+					continue
+				}
+				// Log the actual average values sent so the computed metric is observable.
+				for _, m := range batch {
+					logger.Info("Flushed guardrail latency metric",
+						zap.String("account", accountId),
+						zap.String("metricId", m.MetricId),
+						zap.Float64("avgMs", m.Value),
+						zap.Int64("timestamp", m.Timestamp))
 				}
 			}
 		}

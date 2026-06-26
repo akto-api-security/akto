@@ -340,10 +340,15 @@ class GuardrailsHandler(CustomLogger):
             or "0.0.0.0"
         )
 
-        request_headers = json.dumps({
+        headers_out = {
             "host": host,
             "content-type": "application/json",
-        })
+        }
+        session_id = request_headers_raw.get("x-session-id", "")
+        if session_id:
+            headers_out["x-session-id"] = session_id
+
+        request_headers = json.dumps(headers_out)
 
         response_headers = json.dumps({
             "content-type": "application/json",

@@ -174,6 +174,11 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
 
   vulnerabilitySegments.forEach((segment) => {
     try {
+      // Informational evidence (e.g. missing headers) describes something ABSENT,
+      // so there is nothing in the editor text to highlight - it is panel-only.
+      if (segment?.informational === true) {
+        return;
+      }
       // Shared locator (see vulnerabilityEvidence.js) - the SAME contract the
       // Evidence panel uses, so we never highlight what the panel can't show.
       const range = locateSegment(segment, text);

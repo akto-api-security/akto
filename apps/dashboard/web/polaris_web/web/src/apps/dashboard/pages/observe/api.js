@@ -1137,20 +1137,20 @@ export default {
         })
     },
 
-    async fetchNhiIdentities() {
+    async fetchNhiIdentities(startTimestamp, endTimestamp) {
         const resp = await request({
             url: '/api/fetchNhiIdentities',
             method: 'post',
-            data: {}
+            data: { startTimestamp, endTimestamp }
         })
         return resp?.identities || []
     },
 
-    async fetchAllNhiViolations() {
+    async fetchAllNhiViolations(startTimestamp, endTimestamp) {
         const resp = await request({
             url: '/api/fetchAllNhiViolations',
             method: 'post',
-            data: {}
+            data: { startTimestamp, endTimestamp }
         })
         return resp?.violations || []
     },
@@ -1176,6 +1176,15 @@ export default {
     async markViolationAsFixed(violationId) {
         const resp = await request({
             url: '/api/markViolationAsFixed',
+            method: 'post',
+            data: { violationId }
+        })
+        return resp?.success || false
+    },
+
+    async reopenViolation(violationId) {
+        const resp = await request({
+            url: '/api/reopenViolation',
             method: 'post',
             data: { violationId }
         })

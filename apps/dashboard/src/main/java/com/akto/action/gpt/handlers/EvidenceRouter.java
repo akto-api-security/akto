@@ -108,6 +108,22 @@ public class EvidenceRouter {
     }
 
     /**
+     * Cheap pre-filter for header-presence (MHH) tests. This ONLY decides whether
+     * it is worth loading + parsing the test template to look for header key
+     * conditions; it does NOT by itself decide to skip the LLM. The authoritative
+     * gate is whether HeaderEvidenceDetector actually extracts header conditions.
+     */
+    public static boolean isHeaderCategory(String category) {
+        if (category == null) {
+            return false;
+        }
+        String c = category.toUpperCase();
+        return c.contains("HEADER") || c.contains("MHH") || c.contains("CORS")
+                || c.contains("HSTS") || c.contains("CSP") || c.contains("X_FRAME")
+                || c.contains("CONTENT_TYPE");
+    }
+
+    /**
      * The sensitive data type a sensitive-data-exposure test targets (e.g.
      * SENSITIVE_DATA_EXPOSURE_EMAIL -> EMAIL), or null if this is not an EDE
      * category. Lets the prompt name the exact data type instead of re-scanning.
