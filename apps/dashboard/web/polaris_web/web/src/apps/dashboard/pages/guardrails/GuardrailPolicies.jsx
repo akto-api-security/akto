@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList, Scrollable, Avatar, Box } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
@@ -134,6 +134,7 @@ function GuardrailPolicies() {
     const [isPreset, setIsPreset] = useState(false);
     const [presetsPopoverActive, setPresetsPopoverActive] = useState(false);
     const [pendingPolicyName, setPendingPolicyName] = useState(null);
+    const skipNextRowClick = useRef(false);
 
     const policyName = new URLSearchParams(window.location.search).get("policy");
 
@@ -446,6 +447,10 @@ function GuardrailPolicies() {
       );
 
     const rowClicked = async(data) => {
+        if (skipNextRowClick.current) {
+            skipNextRowClick.current = false;
+            return;
+        }
         handleEditPolicy(data)
     }
 
@@ -479,7 +484,11 @@ function GuardrailPolicies() {
                         <span style={{ color: '#D72C0D' }}>Disable policy</span> :
                         <span style={{ color: '#008060' }}>Enable policy</span>,
                     icon: isActive ? CancelMinor : ChecklistMajor,
-                    onAction: () => handleToggleStatus(item),
+                    onAction: () => {
+                        skipNextRowClick.current = true;
+                        setTimeout(() => { skipNextRowClick.current = false; }, 100);
+                        handleToggleStatus(item);
+                    },
                     destructive: isActive
                 },
                 {
