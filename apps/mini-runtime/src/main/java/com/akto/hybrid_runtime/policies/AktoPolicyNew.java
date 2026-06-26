@@ -17,12 +17,14 @@ import com.akto.dto.type.URLTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.hybrid_runtime.APICatalogSync;
+import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import java.util.*;
-import java.util.Arrays;
 
 import static com.akto.hybrid_runtime.APICatalogSync.createUrlTemplate;
 
@@ -215,12 +217,19 @@ public class AktoPolicyNew {
 
         apiInfo.setParentMcpToolNames(httpResponseParams.getParentMcpToolNames());
 
-        Map<String, List<String>> reqHeaders = httpResponseParams.getRequestParams().getHeaders();
-        String ua = RuntimeUtil.getHeaderValue(reqHeaders, "user-agent");
-        addClassifiedTag(apiInfo, "user-agent", UserAgentClassifier.classify(ua).name());
+        Map<String, String> tagsMap = HttpCallParser.parseTagsMap(httpResponseParams.getTags());
+        String contextSource = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_SOURCE) : null;
 
-        String referer = RuntimeUtil.getHeaderValue(reqHeaders, "referer");
-        addClassifiedTag(apiInfo, "referer", UserAgentClassifier.extractRefererHost(referer));
+        if (!CONTEXT_SOURCE.ENDPOINT.name().equals(contextSource) && !CONTEXT_SOURCE.AGENTIC.name().equals(contextSource)) {
+            Map<String, List<String>> reqHeaders = httpResponseParams.getRequestParams().getHeaders();
+            String ua = RuntimeUtil.getHeaderValue(reqHeaders, "user-agent");
+            if (ua != null) {
+                addClassifiedTag(apiInfo, "user-agent", UserAgentClassifier.classify(ua).name());
+            }
+
+            String referer = RuntimeUtil.getHeaderValue(reqHeaders, "referer");
+            addClassifiedTag(apiInfo, "referer", UserAgentClassifier.extractRefererHost(referer));
+        }
 
     }
 
