@@ -446,6 +446,20 @@ jobs:
           cache-from: type=gha,scope=agent-guard-anonymizer
           cache-to: type=gha,mode=max,scope=agent-guard-anonymizer
 
+      - name: Build and push embedder image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./apps/agent-guard/python-service/embedder-container
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            aktosecurity/akto-agent-guard-embedder:local
+            aktosecurity/akto-agent-guard-embedder:${{ github.event.inputs.release_version_agent_guard }}
+            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-embedder:local
+            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-embedder:${{ github.event.inputs.release_version_agent_guard }}
+          cache-from: type=gha,scope=agent-guard-embedder
+          cache-to: type=gha,mode=max,scope=agent-guard-embedder
+
       - name: Azure login
         if: github.event.inputs.agent_guard_deploy_azure == 'true'
         uses: azure/login@v2
@@ -489,7 +503,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "🚀 Agent Guard v${{ github.event.inputs.release_version_agent_guard }} released (executor + worker + anonymizer) and pushed to DockerHub & ECR!"
+              "text": "🚀 Agent Guard v${{ github.event.inputs.release_version_agent_guard }} released (executor + worker + anonymizer + embedder) and pushed to DockerHub & ECR!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -11,9 +11,21 @@ services:
       - .env
     environment:
       ANONYMIZER_URL: http://anonymizer:8093
+      # Semantic cache (see python-service/worker-py/src/cache.py). CACHE_MODE,
+      # CACHE_DISTANCE_THRESHOLD, CACHE_TTL_SECONDS, CACHE_SHADOW_SLACK_WEBHOOK_URL
+      # come from .env; these two point at the sidecar services.
+      EMBEDDER_URL: http://embedder:8094
+      REDIS_URL: redis://redis:6379
     depends_on:
       anonymizer:
         condition: service_healthy
+      # Cache sidecars are fail-open — the worker runs fine before they're ready,
+      # so don't block the scan API on them becoming healthy (the embedder loads
+      # torch + a model and can take minutes on first boot).
+      embedder:
+        condition: service_started
+      redis:
+        condition: service_started
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
       interval: 15s
@@ -40,6 +52,42 @@ services:
       timeout: 10s
       retries: 10
       start_period: 60s
+    networks:
+      - agent-guard-network
+
+  embedder:
+    image: aktosecurity/akto-agent-guard-embedder:${AGENT_GUARD_EMBEDDER_TAG:-local}
+    build:
+      context: ./python-service/embedder-container
+      dockerfile: Dockerfile
+    container_name: agent-guard-embedder
+    expose:
+      - "8094"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8094
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8094/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    networks:
+      - agent-guard-network
+
+  redis:
+    # redis-stack-server bundles the RediSearch module the vector cache needs;
+    # plain redis:7 will NOT work (no FT.* commands).
+    image: redis/redis-stack-server:7.4.0-v1
+    container_name: agent-guard-redis
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - agent-guard-network
 
