@@ -478,6 +478,9 @@ const finalizeHostGroupedRow = (g, idSegment) => {
         riskScore: g.maxRiskScore,
         team: g.team || '',
         userRole: g.userRole || '',
+        hasPersonalAccount: g.hasPersonalAccount || false,
+        hasLocalMcpServer: g.hasLocalMcpServer || false,
+        hasMisconfiguredConfig: g.hasMisconfiguredConfig || false,
     };
 };
 
@@ -504,11 +507,17 @@ export const groupCollectionsByDevice = (collections, trafficMap = {}, sensitive
                 sensitiveTypes: new Set(),
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
+                hasPersonalAccount: false,
+                hasLocalMcpServer: false,
+                hasMisconfiguredConfig: false,
             };
         }
         const g = devices[deviceId];
         g.collections.push(c);
         g.clientTypes.add(getTypeFromTags(c.envType));
+        if (hasPersonalAccountTag(c.envType)) g.hasPersonalAccount = true;
+        if (hasLocalMcpServerTag(c.envType)) g.hasLocalMcpServer = true;
+        if (hasMisconfiguredConfigTag(c.envType)) g.hasMisconfiguredConfig = true;
         accumulateHostGroupedCollection(g, c, trafficMap, sensitiveMap, riskScoreMap);
     });
 

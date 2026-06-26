@@ -82,6 +82,15 @@ const parentHeadersBase = [
         isText: CellType.TEXT,
         sortActive: true,
     },
+    {
+        title: 'Endpoint tags',
+        text: 'Endpoint tags',
+        value: 'endpointTagsComp',
+        filterKey: 'endpointTags',
+        textValue: 'endpointTags',
+        showFilter: true,
+        tooltipContent: (<Text variant="bodySm">Risk tags associated with this endpoint (personal account, malicious skills, etc.)</Text>),
+    },
 ];
 
 const parentHeadersScoped = [...parentHeadersBase.slice(0, 2), { title: "Type", text: "Type", value: "parentTypeComp", textValue: "parentTypeComp", isText: CellType.TEXT, boxWidth: "120px" }, ...parentHeadersBase.slice(2)];
@@ -170,8 +179,11 @@ const resourceName = {
  * Groups collections by endpoint ID and merges their data
  */
 const groupByEndpointId = (collections) => {
+    const maliciousSkillsSet = new Set(
+        ((PersistStore.getState().skillRiskScoreCache)?.maliciousSkills || []).map(s => String(s).toLowerCase())
+    );
     const groups = {};
-    
+
     collections.forEach(collection => {
         const endpointId = collection.endpointId || 'unknown';
         if (!groups[endpointId]) {
@@ -188,6 +200,7 @@ const groupByEndpointId = (collections) => {
                 hasPersonalAccount: false,
                 hasLocalMcpServer: false,
                 hasMisconfiguredConfig: false,
+                hasMaliciousSkill: false,
             };
         }
         groups[endpointId].children.push(collection);
@@ -205,7 +218,10 @@ const groupByEndpointId = (collections) => {
         if (hasMisconfiguredConfigTag(collection.envTypeOriginal)) {
             groups[endpointId].hasMisconfiguredConfig = true;
         }
-        
+        if (!groups[endpointId].hasMaliciousSkill && Array.isArray(collection.skills)) {
+            groups[endpointId].hasMaliciousSkill = collection.skills.some(s => maliciousSkillsSet.has(String(s).toLowerCase()));
+        }
+
         // Merge values
         groups[endpointId].riskScore = Math.max(groups[endpointId].riskScore, collection.riskScore || 0);
         groups[endpointId].sensitiveInRespTypes = [...new Set([
@@ -233,7 +249,6 @@ const groupByEndpointId = (collections) => {
  * explode them into separate rows.
  */
 const countAgenticAssets = (children, showCategoryColumn) => {
-    if (!showCategoryColumn) return children.length;
     const skillNames = new Set();
     let nonSkillCount = 0;
     children.forEach(child => {
@@ -243,6 +258,9 @@ const countAgenticAssets = (children, showCategoryColumn) => {
             child.skills.forEach(s => { if (s) skillNames.add(String(s).toLowerCase()); });
         }
     });
+    // When not in the "All" category view, skill collections themselves appear as children.
+    // In that case fall back to children.length so standalone Skill rows count correctly.
+    if (!showCategoryColumn && skillNames.size === 0) return children.length;
     return nonSkillCount + skillNames.size;
 };
 
@@ -254,14 +272,32 @@ const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expand
         const childCount = countAgenticAssets(group.children, showCategoryColumn);
         const riskScore = group.riskScore || 0;
         const hasMisconfiguredConfig = group.hasMisconfiguredConfig || false;
+        const hasMaliciousSkill = group.hasMaliciousSkill || false;
+
+        const endpointTags = [
+            ...(group.hasPersonalAccount ? ['Contains personal account'] : []),
+            ...(group.hasLocalMcpServer ? ['Local MCP Server'] : []),
+            ...(hasMisconfiguredConfig ? ['Misconfigured'] : []),
+            ...(hasMaliciousSkill ? ['Malicious Skills'] : []),
+        ];
 
         return {
-            ...group,
             // Use first collection ID as the row ID (table expects scalar, not array)
             id: group.apiCollectionIds[0] || `endpoint-${group.endpointId}`,
-            allIds: group.apiCollectionIds, // Keep array for bulk actions
+            allIds: group.apiCollectionIds,
             name: `endpoint-${group.endpointId}`,
+            endpointId: group.endpointId,
             displayName: group.endpointId,
+            username: group.username || '-',
+            riskScore: group.riskScore || 0,
+            sensitiveInRespTypes: group.sensitiveInRespTypes || [],
+            detectedTimestamp: group.detectedTimestamp || 0,
+            startTs: group.startTs === Infinity ? 0 : group.startTs,
+            hasPersonalAccount: group.hasPersonalAccount || false,
+            hasLocalMcpServer: group.hasLocalMcpServer || false,
+            hasMisconfiguredConfig,
+            hasMaliciousSkill,
+            endpointTags,
             displayNameComp: (
                 <HorizontalStack gap="1" align="start" wrap={false}>
                     <Box maxWidth="200px">
@@ -271,15 +307,16 @@ const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expand
                     {group.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
                     {group.hasLocalMcpServer && <Badge size="small" status="critical">Local MCP Server</Badge>}
                     {hasMisconfiguredConfig && <Badge size="small" status="attention">Misconfigured</Badge>}
+                    {hasMaliciousSkill && <Badge size="small" status="critical">Malicious Skills</Badge>}
                 </HorizontalStack>
             ),
-            username: group.username || '-',
             ...(showCategoryColumn ? { parentTypeComp: "-" } : {}),
             riskScoreComp: <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
             sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes || []),
             sensitiveSubTypesVal: (group.sensitiveInRespTypes || []).join(' ') || '-',
             lastTraffic: func.prettifyEpoch(group.detectedTimestamp),
             discovered: func.prettifyEpoch(group.startTs === Infinity ? 0 : group.startTs),
+            endpointTagsComp: endpointTags.length > 0 ? endpointTags.join(', ') : '-',
             isTerminal: false,
             // Function to create expandable children row
             collapsibleRow: (
