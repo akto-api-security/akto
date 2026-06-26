@@ -995,12 +995,12 @@ const settingRequests = {
             }
         })
     },
-    getUserAnalysis(deviceId) {
+    getUserAnalysis(username) {
         return request({
             url: '/api/getUserAnalysis',
             method: 'post',
             data: {
-                deviceId
+                username
             }
         })
     },
