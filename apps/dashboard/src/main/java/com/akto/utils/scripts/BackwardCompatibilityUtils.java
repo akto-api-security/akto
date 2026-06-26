@@ -8,13 +8,24 @@ import java.util.Map;
 import java.util.Set;
 
 import com.akto.dao.AgentUsersDao;
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AgenticUsers;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.traffic.CollectionTags;
+import com.akto.util.Constants;
 import com.akto.util.Pair;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Updates;
+import org.bson.conversions.Bson;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class BackwardCompatibilityUtils {
 
@@ -70,6 +81,32 @@ public class BackwardCompatibilityUtils {
         }
         if(agenticUsers.isEmpty()) return;
         AgentUsersDao.instance.insertMany(agenticUsers);
+    }
+
+    public static void cleanupApiInfoTags() {
+        List<Integer> collIds = ApiCollectionsDao.instance.findAll(
+            Filters.elemMatch(ApiCollection.TAGS_STRING,
+                Filters.or(
+                    Filters.and(Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_ENDPOINT_SOURCE_TAG), Filters.eq(CollectionTags.VALUE, Constants.AKTO_ENDPOINT_SOURCE_VALUE)),
+                    Filters.and(Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_ENDPOINT_SOURCE_TAG), Filters.eq(CollectionTags.VALUE, "AGENTIC"))
+                )
+            ),
+            Projections.include(Constants.ID)
+        ).stream().map(ApiCollection::getId).collect(Collectors.toList());
+
+        if (collIds.isEmpty()) return;
+
+        Bson collFilter = Filters.in("_id.apiCollectionId", collIds);
+
+        ApiInfoDao.instance.updateMany(
+            Filters.and(collFilter, Filters.elemMatch(ApiInfo.TAGS_LIST, Filters.eq(CollectionTags.KEY_NAME, "user-agent"))),
+            Updates.pull(ApiInfo.TAGS_LIST, Filters.eq(CollectionTags.KEY_NAME, "user-agent"))
+        );
+
+        ApiInfoDao.instance.updateMany(
+            Filters.and(collFilter, Filters.elemMatch(ApiInfo.TAGS_LIST, Filters.eq(CollectionTags.KEY_NAME, "referer"))),
+            Updates.pull(ApiInfo.TAGS_LIST, Filters.eq(CollectionTags.KEY_NAME, "referer"))
+        );
     }
 
 }

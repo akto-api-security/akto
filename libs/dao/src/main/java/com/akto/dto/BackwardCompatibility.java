@@ -127,6 +127,9 @@ public class BackwardCompatibility {
     public static final String MOVE_USER_DATA_FROM_MODULE_INFO_TO_AGENTIC_USERS = "moveUserDataFromModuleInfoToAgenticUsers";
     private int moveUserDataFromModuleInfoToAgenticUsers;
 
+    public static final String CLEANUP_API_INFO_TAGS = "cleanupApiInfoTags";
+    private int cleanupApiInfoTags;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
