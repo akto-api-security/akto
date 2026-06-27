@@ -18,7 +18,6 @@ on:
           - main
           - guardrails-service
           - agent-guard
-          - agent-guard-executor
           - agent-guard-worker
           - agent-guard-anonymizer
           - agent-guard-embedder
@@ -191,7 +190,7 @@ jobs:
   build-agent-guard:
     if: |
       (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') ||
-      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["all","agent-guard","agent-guard-executor","agent-guard-worker","agent-guard-anonymizer","agent-guard-embedder"]'), github.event.inputs.target))
+      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["all","agent-guard","agent-guard-worker","agent-guard-anonymizer","agent-guard-embedder"]'), github.event.inputs.target))
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2

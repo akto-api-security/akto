@@ -37,20 +37,6 @@ jobs:
           mask-password: "true"
           registry-type: public
 
-      - name: Build and push legacy executor image (ONNX container)
-        uses: docker/build-push-action@v4
-        with:
-          context: ./apps/agent-guard/python-service/container
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            aktosecurity/akto-agent-guard-executor:local
-            aktosecurity/akto-agent-guard-executor:${{ github.event.inputs.release_version }}
-            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-executor:local
-            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-executor:${{ github.event.inputs.release_version }}
-          cache-from: type=gha,scope=agent-guard-executor
-          cache-to: type=gha,mode=max,scope=agent-guard-executor
-
       - name: Build and push worker image (portable FastAPI)
         uses: docker/build-push-action@v4
         with:
@@ -113,7 +99,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "🚀 Agent Guard v${{ github.event.inputs.release_version }} released (executor + worker + anonymizer + embedder) and pushed to DockerHub & ECR!"
+              "text": "🚀 Agent Guard v${{ github.event.inputs.release_version }} released (worker + anonymizer + embedder) and pushed to DockerHub & ECR!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
