@@ -237,13 +237,3 @@ jobs:
           docker buildx build --platform linux/arm64/v8,linux/amd64 \
             -t $ECR_REGISTRY/akto-agent-guard-embedder:$IMAGE_TAG \
             apps/agent-guard/python-service/embedder-container --push
-
-      - name: Build and push agent-guard legacy executor (ONNX container)
-        if: github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-executor"]'), github.event.inputs.target)
-        env:
-          ECR_REGISTRY: aktosecurity
-          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
-        run: |
-          docker buildx build --platform linux/arm64/v8,linux/amd64 \
-            -t $ECR_REGISTRY/akto-agent-guard-executor:$IMAGE_TAG \
-            apps/agent-guard/python-service/container --push
