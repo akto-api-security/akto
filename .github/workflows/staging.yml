@@ -204,46 +204,42 @@ jobs:
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-      - name: Prepare buildx
+      - name: Build and push agent-guard images
+        env:
+          ECR_REGISTRY: aktosecurity
+          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
+          BUILD_WORKER: ${{ github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-worker"]'), github.event.inputs.target) }}
+          BUILD_ANONYMIZER: ${{ github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-anonymizer"]'), github.event.inputs.target) }}
+          BUILD_EMBEDDER: ${{ github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-embedder"]'), github.event.inputs.target) }}
         run: |
-          echo "${{ steps.docker_tag.outputs.IMAGE_TAG }}" >> $GITHUB_STEP_SUMMARY
+          set -euo pipefail
+          echo "$IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
-      - name: Build and push agent-guard legacy executor (ONNX container)
-        if: github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-executor"]'), github.event.inputs.target)
-        env:
-          ECR_REGISTRY: aktosecurity
-          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
-        run: |
-          docker buildx build --platform linux/arm64/v8,linux/amd64 \
-            -t $ECR_REGISTRY/akto-agent-guard-executor:$IMAGE_TAG \
-            apps/agent-guard/python-service/container --push
-
-      - name: Build and push agent-guard worker (portable FastAPI)
-        if: github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-worker"]'), github.event.inputs.target)
-        env:
-          ECR_REGISTRY: aktosecurity
-          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
-        run: |
-          docker buildx build --platform linux/arm64/v8,linux/amd64 \
-            -t $ECR_REGISTRY/akto-agent-guard-worker:$IMAGE_TAG \
-            apps/agent-guard/python-service/worker-py --push
-
-      - name: Build and push agent-guard anonymizer
-        if: github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-anonymizer"]'), github.event.inputs.target)
-        env:
-          ECR_REGISTRY: aktosecurity
-          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
-        run: |
-          docker buildx build --platform linux/arm64/v8,linux/amd64 \
-            -t $ECR_REGISTRY/akto-agent-guard-anonymizer:$IMAGE_TAG \
-            apps/agent-guard/python-service/anonymizer-container --push
-
-      - name: Build and push agent-guard embedder
-        if: github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-embedder"]'), github.event.inputs.target)
-        env:
-          ECR_REGISTRY: aktosecurity
-          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
-        run: |
-          docker buildx build --platform linux/arm64/v8,linux/amd64 \
-            -t $ECR_REGISTRY/akto-agent-guard-embedder:$IMAGE_TAG \
-            apps/agent-guard/python-service/embedder-container --push
+          PIDS=()
+          if [ "$BUILD_WORKER" = "true" ]; then
+            (
+              docker buildx build --platform linux/arm64/v8,linux/amd64 \
+                -t $ECR_REGISTRY/akto-agent-guard-worker:$IMAGE_TAG \
+                apps/agent-guard/python-service/worker-py --push
+            ) &
+            PIDS+=($!)
+          fi
+          if [ "$BUILD_ANONYMIZER" = "true" ]; then
+            (
+              docker buildx build --platform linux/arm64/v8,linux/amd64 \
+                -t $ECR_REGISTRY/akto-agent-guard-anonymizer:$IMAGE_TAG \
+                apps/agent-guard/python-service/anonymizer-container --push
+            ) &
+            PIDS+=($!)
+          fi
+          if [ "$BUILD_EMBEDDER" = "true" ]; then
+            (
+              docker buildx build --platform linux/arm64/v8,linux/amd64 \
+                -t $ECR_REGISTRY/akto-agent-guard-embedder:$IMAGE_TAG \
+                apps/agent-guard/python-service/embedder-container --push
+            ) &
+            PIDS+=($!)
+          fi
+          if [ ${#PIDS[@]} -gt 0 ]; then
+            wait "${PIDS[@]}"
+          fi

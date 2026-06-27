@@ -782,35 +782,29 @@ func (s *Service) validationContextFromParams(
 	}
 }
 
-// extractPayloadForValidation checks if a GuardrailSchema is configured for the endpoint.
-// If found, extracts only the configured content fields. Falls through to raw payload on any miss.
+// extractPayloadForValidation extracts configured JSON fields for guardrail evaluation.
+// Priority: dashboard guardrailSchema → GUARDRAIL_FIELD_MAPPING env → raw payload.
 func (s *Service) extractPayloadForValidation(payload, method, path string, isRequest bool) string {
 	key := EndpointKey(method, path)
 
-	gs, ok := GlobalGuardrailSchemaRegistry().Get(key)
-	if !ok {
-		s.logger.Debug("[SchemaExtract] no schema found for endpoint, using raw payload",
+	fields := resolveFieldsForEndpoint(method, path, isRequest)
+	if len(fields) == 0 {
+		s.logger.Debug("[SchemaExtract] no field mapping for endpoint, using raw payload",
 			zap.String("endpoint", key),
 			zap.Bool("isRequest", isRequest))
 		return payload
 	}
 
-	schemaJSON, _ := json.Marshal(gs)
-	s.logger.Info("[SchemaExtract] schema found for endpoint",
-		zap.String("endpoint", key),
-		zap.Bool("isRequest", isRequest),
-		zap.String("schema", string(schemaJSON)))
-
-	var fields []MessageFieldEntry
-	if isRequest {
-		fields = gs.RequestMessageFields
-	} else {
-		fields = gs.ResponseMessageFields
+	source := "dashboard"
+	if gs, ok := GlobalGuardrailSchemaRegistry().Get(key); !ok || gs == nil ||
+		(isRequest && !gs.HasRequestFields()) || (!isRequest && !gs.HasResponseFields()) {
+		source = "env"
 	}
 
 	s.logger.Info("[SchemaExtract] attempting field extraction",
 		zap.String("endpoint", key),
 		zap.Bool("isRequest", isRequest),
+		zap.String("source", source),
 		zap.Int("fieldCount", len(fields)))
 
 	extracted := ExtractContent(payload, fields)

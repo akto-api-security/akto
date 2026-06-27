@@ -3,6 +3,7 @@
 from typing import Any, Callable, Coroutine, Dict, Optional
 
 import alerts
+import cascade_backpressure
 import cache
 from constants import (
     CASCADE_SCANNERS,
@@ -80,6 +81,14 @@ async def scan_payload(
             config = {**default_cfg, **config, "modelConfigs": default_cfg["modelConfigs"]}
         if scanner_name in GEMMA_ONLY_SCANNERS:
             config = {**config, "modelConfigs": strip_qwen_tier(config.get("modelConfigs"))}
+        if cascade_backpressure.should_skip_cascade():
+            return shape_response(
+                scanner_name,
+                True,
+                0.0,
+                text,
+                {**cascade_backpressure.cascade_skip_details(), "scanner_type": scanner_type},
+            )
         store_fn = None
         if config.get("storeAllResults"):
             store_fn = lambda completed, name: schedule(alerts.store_results(completed, name))
@@ -101,6 +110,9 @@ async def scan_payload(
             result = await scan_with_model_map(
                 scanner_name, scanner_type, text, config, store_fn=store_fn
             )
+            elapsed = result.get("execution_time_ms")
+            if isinstance(elapsed, (int, float)) and elapsed > 0:
+                cascade_backpressure.record_cascade_latency(float(elapsed))
             schedule(alerts.post_slack(scanner_name, scanner_type, text, result))
             # Per-scanner semantic cache: observe + warm (shadow in observe mode;
             # cache-warm + miss-comparison in decide mode). Fire-and-forget.
