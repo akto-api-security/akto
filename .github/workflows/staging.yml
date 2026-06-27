@@ -21,6 +21,7 @@ on:
           - agent-guard-executor
           - agent-guard-worker
           - agent-guard-anonymizer
+          - agent-guard-embedder
 
 jobs:
   build:
@@ -190,7 +191,7 @@ jobs:
   build-agent-guard:
     if: |
       (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') ||
-      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["all","agent-guard","agent-guard-executor","agent-guard-worker","agent-guard-anonymizer"]'), github.event.inputs.target))
+      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["all","agent-guard","agent-guard-executor","agent-guard-worker","agent-guard-anonymizer","agent-guard-embedder"]'), github.event.inputs.target))
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
@@ -236,3 +237,13 @@ jobs:
           docker buildx build --platform linux/arm64/v8,linux/amd64 \
             -t $ECR_REGISTRY/akto-agent-guard-anonymizer:$IMAGE_TAG \
             apps/agent-guard/python-service/anonymizer-container --push
+
+      - name: Build and push agent-guard embedder
+        if: github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-embedder"]'), github.event.inputs.target)
+        env:
+          ECR_REGISTRY: aktosecurity
+          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
+        run: |
+          docker buildx build --platform linux/arm64/v8,linux/amd64 \
+            -t $ECR_REGISTRY/akto-agent-guard-embedder:$IMAGE_TAG \
+            apps/agent-guard/python-service/embedder-container --push

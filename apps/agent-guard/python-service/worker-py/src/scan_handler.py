@@ -4,6 +4,7 @@ from typing import Any, Callable, Coroutine, Dict, Optional
 
 import alerts
 import cascade_backpressure
+import cache
 from constants import (
     CASCADE_SCANNERS,
     GEMMA_ONLY_SCANNERS,
@@ -91,6 +92,20 @@ async def scan_payload(
         store_fn = None
         if config.get("storeAllResults"):
             store_fn = lambda completed, name: schedule(alerts.store_results(completed, name))
+
+        # Semantic cache, decide mode: embed + lookup once before paying for the
+        # cascade. A fresh, within-threshold, safe (is_valid=True) hit short-
+        # circuits; anything else (block / miss / error) falls through. `prep` is
+        # reused by observe() below so a miss embeds only once.
+        prep = None
+        if cache.serving():
+            prep = await cache.prepare(scanner_name, scanner_type, text, config)
+            served = cache.try_serve(prep, scanner_name, scanner_type, text)
+            if served is not None:
+                schedule(alerts.post_cache_shadow(served["alert"]))
+                return shape_response(
+                    scanner_name, True, served["risk_score"], text, served["details"]
+                )
         try:
             result = await scan_with_model_map(
                 scanner_name, scanner_type, text, config, store_fn=store_fn
@@ -99,6 +114,10 @@ async def scan_payload(
             if isinstance(elapsed, (int, float)) and elapsed > 0:
                 cascade_backpressure.record_cascade_latency(float(elapsed))
             schedule(alerts.post_slack(scanner_name, scanner_type, text, result))
+            # Per-scanner semantic cache: observe + warm (shadow in observe mode;
+            # cache-warm + miss-comparison in decide mode). Fire-and-forget.
+            if cache.enabled():
+                schedule(cache.observe(scanner_name, scanner_type, text, config, result, prep=prep))
             return shape_response(
                 scanner_name,
                 result["is_valid"],
