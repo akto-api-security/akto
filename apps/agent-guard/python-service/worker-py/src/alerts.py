@@ -111,7 +111,9 @@ def _cache_shadow_blocks(info: Dict[str, Any]) -> List[Dict[str, Any]]:
         header = "HIT ⚠️ MISMATCH — guardrails-cache"
 
     if outcome == "served":
-        line = f"*served:* {_verdict(True)}   *scanner_key:* `{key}`"
+        # Show the actual served verdict — blocks can be served now (exact-repeat),
+        # not just safe hits, so this must reflect real_is_valid, never hardcoded.
+        line = f"*served:* {real}   *scanner_key:* `{key}`"
     else:
         line = f"*real:* {real}   *scanner_key:* `{key}`   *latency:* `{latency}ms`"
     extra: List[str] = []
