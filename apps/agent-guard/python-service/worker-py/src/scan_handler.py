@@ -85,9 +85,11 @@ async def scan_payload(
             store_fn = lambda completed, name: schedule(alerts.store_results(completed, name))
 
         # Semantic cache, decide mode: embed + lookup once before paying for the
-        # cascade. A fresh, within-threshold, safe (is_valid=True) hit short-
-        # circuits; anything else (block / miss / error) falls through. `prep` is
-        # reused by observe() below so a miss embeds only once.
+        # cascade. A fresh within-threshold hit short-circuits — safe verdicts on
+        # a fuzzy match, blocks only on a (near-)exact repeat (see cache.try_serve);
+        # a miss/error falls through. The served verdict (is_valid) is honoured so
+        # cached blocks still block. `prep` is reused by observe() so a miss embeds
+        # only once.
         prep = None
         if cache.serving():
             prep = await cache.prepare(scanner_name, scanner_type, text, config)
@@ -95,7 +97,7 @@ async def scan_payload(
             if served is not None:
                 schedule(alerts.post_cache_shadow(served["alert"]))
                 return shape_response(
-                    scanner_name, True, served["risk_score"], text, served["details"]
+                    scanner_name, served["is_valid"], served["risk_score"], text, served["details"]
                 )
         try:
             result = await scan_with_model_map(

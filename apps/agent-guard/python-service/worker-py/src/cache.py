@@ -43,6 +43,12 @@ from settings import settings
 logger = logging.getLogger(__name__)
 
 _DEFAULT_DISTANCE_THRESHOLD = 0.15
+# Blocked verdicts are served only on a (near-)exact repeat. Default 0.0 keeps
+# blocks unserved (COSINE distance of identical text is ~1e-7, never ≤ 0); set
+# CACHE_BLOCK_DISTANCE_THRESHOLD to a small epsilon (e.g. 1e-4) to serve exact
+# repeats. Kept far below the safe threshold so semantically-similar (but not
+# identical) prompts are never blocked from a cached neighbour.
+_DEFAULT_BLOCK_DISTANCE_THRESHOLD = 0.0
 _DEFAULT_TTL_SECONDS = 6 * 3600  # 6h
 _EMBED_TIMEOUT_S = 10.0
 _MODES = ("off", "observe", "decide")
@@ -81,6 +87,20 @@ def _threshold() -> float:
         return float(raw) if raw else _DEFAULT_DISTANCE_THRESHOLD
     except ValueError:
         return _DEFAULT_DISTANCE_THRESHOLD
+
+
+def _block_threshold() -> float:
+    raw = str(getattr(settings, "CACHE_BLOCK_DISTANCE_THRESHOLD", "")).strip()
+    try:
+        return float(raw) if raw else _DEFAULT_BLOCK_DISTANCE_THRESHOLD
+    except ValueError:
+        return _DEFAULT_BLOCK_DISTANCE_THRESHOLD
+
+
+def _threshold_for(is_valid: bool) -> float:
+    """Per-verdict match tolerance: safe uses the fuzzy threshold, blocked uses
+    the strict (exact-repeat) one."""
+    return _threshold() if is_valid else _block_threshold()
 
 
 def _ttl_seconds() -> float:
@@ -171,17 +191,21 @@ def _classify(cached: Optional[Dict[str, Any]], threshold: float, ttl: float,
 # --------------------------------------------------------------------------- #
 def try_serve(prep: Dict[str, Any], scanner_name: str, scanner_type: str,
               text: str) -> Optional[Dict[str, Any]]:
-    """Return a served response (+ alert info) for a fresh safe hit, else None.
+    """Return a served response (+ alert info) for a fresh cache hit, else None.
 
-    Only short-circuits cached is_valid=True verdicts; a cached block, a miss,
-    or anything stale/over-threshold returns None so the caller runs the real
-    cascade.
+    Per-verdict tolerance: a cached safe verdict (is_valid=True) is served on a
+    fuzzy match (CACHE_DISTANCE_THRESHOLD, default 0.15); a cached block
+    (is_valid=False) is served only on a (near-)exact repeat
+    (CACHE_BLOCK_DISTANCE_THRESHOLD, default 0.0 → blocks unserved). A miss or
+    anything stale/over-threshold returns None so the caller runs the real
+    cascade. The served verdict (is_valid) is returned so the caller can block.
     """
     cached = prep.get("cached")
-    threshold, ttl, now = _threshold(), _ttl_seconds(), time.time()
-    if not _fresh_hit(cached, threshold, ttl, now):
+    if cached is None:
         return None
-    if not cached["is_valid"]:  # never short-circuit a block from the cache
+    is_valid = bool(cached["is_valid"])
+    threshold, ttl, now = _threshold_for(is_valid), _ttl_seconds(), time.time()
+    if not _fresh_hit(cached, threshold, ttl, now):
         return None
 
     details = {
@@ -196,15 +220,16 @@ def try_serve(prep: Dict[str, Any], scanner_name: str, scanner_type: str,
         "text": text,
         "outcome": "served",
         "scanner_key": prep.get("scanner_key", "—"),
-        "real_is_valid": True,
-        "cached_is_valid": True,
+        "real_is_valid": is_valid,
+        "cached_is_valid": is_valid,
         "real_reason": cached["reason"],
         "distance": cached["distance"],
         "threshold": threshold,
         "age_s": round(now - cached["inserted_at"], 1),
         "ttl_s": ttl,
     }
-    return {"risk_score": cached["risk_score"], "details": details, "alert": alert_info}
+    return {"is_valid": is_valid, "risk_score": cached["risk_score"],
+            "details": details, "alert": alert_info}
 
 
 # --------------------------------------------------------------------------- #
