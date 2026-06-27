@@ -522,11 +522,6 @@ const transform = {
         const category = getDashboardCategory();
         const isEndpointSecurity = category === CATEGORY_ENDPOINT_SECURITY;
 
-        const cachedSkillData = PersistStore.getState().skillRiskScoreCache;
-        const maliciousSkillsSet = cachedSkillData?.maliciousSkills?.length
-            ? new Set(cachedSkillData.maliciousSkills.map(s => String(s).toLowerCase()))
-            : null;
-
         const prettifyData = newData.map((c)=>{
             // Check if we're in the untracked tab
             const isUntrackedTab = selectedTab === 'untracked';
@@ -600,15 +595,6 @@ const transform = {
             ) : undefined);
 
             const resolvedServiceName = serviceName || c.serviceName || '';
-            const isMalicious = maliciousSkillsSet
-                ? (
-                    (resolvedServiceName && maliciousSkillsSet.has(resolvedServiceName.toLowerCase())) ||
-                    (Array.isArray(c.skills) && c.skills.some(s => maliciousSkillsSet.has(String(s).toLowerCase())))
-                  )
-                : (c.isMalicious || false);
-            const enrichedEnvType = isMalicious && Array.isArray(c.envType) && !c.envType.includes('Malicious Skill')
-                ? [...c.envType, 'Malicious Skill']
-                : c.envType;
 
             return{
                 ...c,
@@ -632,9 +618,7 @@ const transform = {
                 riskScore: c.riskScore,
                 deactivatedRiskScore: c.deactivated ? (c.riskScore - 10 ) : c.riskScore,
                 activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 )),
-                isMalicious,
-                envType: enrichedEnvType,
-                envTypeComp: isLoading ? loadingComp : this.getCollectionTypeList(enrichedEnvType, 1, false),
+                envTypeComp: isLoading ? loadingComp : this.getCollectionTypeList(c.envType, 1, false),
                 sensitiveSubTypesVal: c?.sensitiveInRespTypes.join(" ") ||  "-"
             }
         })

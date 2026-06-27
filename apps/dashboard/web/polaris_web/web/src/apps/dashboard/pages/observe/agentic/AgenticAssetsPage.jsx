@@ -147,6 +147,14 @@ const COL_DEFS = [
       color: "#6D7175",
     },
   },
+  {
+    field: "tags",
+    headerName: "Tags",
+    hide: true,
+    filter: "agSetColumnFilter",
+    sortable: false,
+    // Values are pre-computed string arrays on each row; AG Grid set-filter reads them natively.
+  },
 ];
 
 const DEFAULT_COL_DEF = {
@@ -194,7 +202,17 @@ function TableSection({
         [...violSevFilter].some((sev) => (r.violations?.[sev] || 0) > 0),
       );
     }
-    return filtered;
+    // Compute tags array for the AG Grid set-filter (sidebar "Tags" filter panel).
+    // Mirrors the marker icons shown in AssetNameCellRenderer.
+    return filtered.map((r) => {
+      const isSkill = r.type === "Skill";
+      const tags = [];
+      if (r.hasPersonalAccount && !isSkill) tags.push("Contains personal account");
+      if (r.hasLocalMcpServer && !isSkill)  tags.push("Local MCP Server");
+      if (r.hasMisconfiguredConfig && !isSkill) tags.push("Misconfigured");
+      if (r.isMalicious && isSkill)         tags.push("Malicious Skill");
+      return tags.length ? { ...r, tags } : r;
+    });
   }, [agenticTreeData, typeFilter, violSevFilter]);
 
   useEffect(() => {
