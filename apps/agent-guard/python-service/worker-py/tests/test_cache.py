@@ -123,16 +123,47 @@ def test_try_serve_serves_safe_hit(monkeypatch):
     cached["reason"] = "looks fine"
     served = cache.try_serve(_prep(cached), "Toxicity", "prompt", "hi")
     assert served is not None
+    assert served["is_valid"] is True
     assert served["risk_score"] == 0.12
     assert served["details"]["cache"] == "served"
     assert served["alert"]["outcome"] == "served"
 
 
-def test_try_serve_never_serves_a_block(monkeypatch):
+def test_try_serve_block_default_threshold_not_served(monkeypatch):
+    # Default block threshold (0.0) -> blocks never served, even a close neighbour.
     monkeypatch.setattr(cache.settings, "CACHE_DISTANCE_THRESHOLD", "0.15")
+    monkeypatch.setattr(cache.settings, "CACHE_BLOCK_DISTANCE_THRESHOLD", "")
     monkeypatch.setattr(cache.settings, "CACHE_TTL_SECONDS", "6000")
     assert cache.try_serve(_prep(_cached(is_valid=False, distance=0.01)),
                            "Toxicity", "prompt", "hi") is None
+
+
+def test_try_serve_block_served_on_exact_repeat(monkeypatch):
+    # With a small epsilon block threshold, a (near-)exact repeat block IS served,
+    # carrying is_valid=False so the caller still blocks.
+    monkeypatch.setattr(cache.settings, "CACHE_DISTANCE_THRESHOLD", "0.15")
+    monkeypatch.setattr(cache.settings, "CACHE_BLOCK_DISTANCE_THRESHOLD", "1e-4")
+    monkeypatch.setattr(cache.settings, "CACHE_TTL_SECONDS", "6000")
+    cached = _cached(is_valid=False, distance=1e-7, age=1)
+    cached["reason"] = "prompt injection"
+    served = cache.try_serve(_prep(cached), "Toxicity", "prompt", "hi")
+    assert served is not None
+    assert served["is_valid"] is False
+    assert served["details"]["reason"] == "prompt injection"
+    assert served["alert"]["real_is_valid"] is False
+
+
+def test_try_serve_block_not_served_when_only_similar(monkeypatch):
+    # A merely-similar (not exact) block stays unserved even with epsilon set,
+    # so semantically-near prompts are never blocked from a cached neighbour.
+    monkeypatch.setattr(cache.settings, "CACHE_DISTANCE_THRESHOLD", "0.15")
+    monkeypatch.setattr(cache.settings, "CACHE_BLOCK_DISTANCE_THRESHOLD", "1e-4")
+    monkeypatch.setattr(cache.settings, "CACHE_TTL_SECONDS", "6000")
+    assert cache.try_serve(_prep(_cached(is_valid=False, distance=0.05)),
+                           "Toxicity", "prompt", "hi") is None
+    # ...but a safe neighbour at the same distance is still served (fuzzy threshold)
+    assert cache.try_serve(_prep(_cached(is_valid=True, distance=0.05)),
+                           "Toxicity", "prompt", "hi") is not None
 
 
 def test_try_serve_falls_through_on_near_miss_expired_and_empty(monkeypatch):
