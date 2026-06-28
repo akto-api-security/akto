@@ -183,11 +183,49 @@ async def test_embed_noop_when_url_unset(monkeypatch):
 
 
 async def test_prepare_fail_open_without_embedder(monkeypatch):
+    async def _no_exact(sk, th):
+        return None
+    monkeypatch.setattr(cache.cache_store, "exact_get", _no_exact)
     monkeypatch.setattr(cache.settings, "EMBEDDER_URL", "")
     prep = await cache.prepare("Toxicity", "prompt", "hi", {})
     assert prep["vec"] is None
     assert prep["cached"] is None
     assert prep["scanner_key"]
+
+
+async def test_prepare_exact_hit_skips_embed(monkeypatch):
+    # Exact-repeat fast path: serve from the deterministic key without embedding.
+    async def _exact(sk, th):
+        return {"is_valid": True, "risk_score": 0.1, "reason": "cached",
+                "distance": 0.0, "inserted_at": time.time()}
+    async def _boom_embed(text):
+        raise AssertionError("embed must NOT run on an exact hit")
+    monkeypatch.setattr(cache.cache_store, "exact_get", _exact)
+    monkeypatch.setattr(cache, "_embed", _boom_embed)
+    prep = await cache.prepare("Toxicity", "prompt", "hi", {})
+    assert prep["exact"] is True
+    assert prep["vec"] is None
+    assert prep["cached"]["distance"] == 0.0
+
+
+async def test_prepare_exact_miss_falls_to_fuzzy(monkeypatch):
+    # Exact miss → embed + KNN (semantic) path.
+    calls = {"embed": 0}
+    async def _no_exact(sk, th):
+        return None
+    async def _embed(text):
+        calls["embed"] += 1
+        return [0.1] * 384
+    async def _query(vec, sk):
+        return {"is_valid": True, "risk_score": 0.0, "reason": "",
+                "distance": 0.05, "inserted_at": time.time()}
+    monkeypatch.setattr(cache.cache_store, "exact_get", _no_exact)
+    monkeypatch.setattr(cache, "_embed", _embed)
+    monkeypatch.setattr(cache.cache_store, "query", _query)
+    prep = await cache.prepare("Toxicity", "prompt", "hi", {})
+    assert prep["exact"] is False
+    assert calls["embed"] == 1
+    assert prep["cached"]["distance"] == 0.05
 
 
 async def test_observe_alerts_embed_error_and_skips_store(monkeypatch):
