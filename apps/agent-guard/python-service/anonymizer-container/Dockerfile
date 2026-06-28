@@ -12,4 +12,6 @@ ENV PYTHONUNBUFFERED=1
 ENV PORT=8093
 EXPOSE 8093
 
-CMD ["uvicorn", "anonymizer_service:app", "--host", "0.0.0.0", "--port", "8093"]
+# Multiple workers so anonymization isn't pinned to one core. Each worker loads
+# its own spaCy model (small); default 4, override with ANONYMIZER_WORKERS.
+CMD exec uvicorn anonymizer_service:app --host 0.0.0.0 --port 8093 --workers ${ANONYMIZER_WORKERS:-4}

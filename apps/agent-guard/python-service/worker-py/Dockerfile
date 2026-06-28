@@ -16,4 +16,8 @@ ENV PORT=8090
 
 EXPOSE 8090
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8090"]
+# Run one uvicorn worker per CPU core. A single process pins the cache-serve path
+# to one core (the rest of the box sits idle) — the per-instance throughput
+# ceiling. The worker is stateless (state lives in Redis), so workers parallelize
+# cleanly. Override with UVICORN_WORKERS. `exec` makes uvicorn PID 1 for signals.
+CMD exec uvicorn app:app --host 0.0.0.0 --port 8090 --workers ${UVICORN_WORKERS:-$(nproc)}
