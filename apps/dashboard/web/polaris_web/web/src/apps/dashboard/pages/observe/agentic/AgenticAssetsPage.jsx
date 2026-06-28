@@ -189,13 +189,7 @@ function TableSection({
     const rows = agenticTreeData.filter((r) => r.path?.length === 1);
     let filtered = rows;
     if (typeFilter && typeFilter.size > 0) {
-      const hasMaliciousFilter = typeFilter.has("Malicious");
-      const typeOnlyFilter = new Set([...typeFilter].filter(t => t !== "Malicious"));
-      filtered = rows.filter((r) => {
-        if (typeOnlyFilter.size > 0 && typeOnlyFilter.has(r.type)) return true;
-        if (hasMaliciousFilter && r.isMalicious) return true;
-        return false;
-      });
+      filtered = rows.filter((r) => typeFilter.has(r.type));
     }
     if (violSevFilter && violSevFilter.size > 0) {
       filtered = filtered.filter((r) =>
@@ -606,11 +600,10 @@ export default function AgenticAssetsPage() {
   const totalAssets = agenticFlatData.length;
 
   const assetTypeBreakdown = useMemo(() => [
-    { label: "Agents",          count: agenticFlatData.filter(r => r.type === "AI Agent").length,   color: "#9642FC",  key: "AI Agent" },
-    { label: "MCP Servers",     count: agenticFlatData.filter(r => r.type === "MCP Server").length, color: "#4cbebb",  key: "MCP Server" },
-    { label: "LLMs",            count: agenticFlatData.filter(r => r.type === "LLM").length,        color: "#EAB308",  key: "LLM" },
-    { label: "Skills",          count: agenticFlatData.filter(r => r.type === "Skill").length,      color: "#D1D5DB",  key: "Skill" },
-    { label: "Malicious Skills",count: agenticFlatData.filter(r => r.isMalicious).length,           color: "#DC2626",  key: "Malicious" },
+    { label: "Agents",      count: agenticFlatData.filter(r => r.type === "AI Agent").length,   color: "#9642FC",  key: "AI Agent" },
+    { label: "MCP Servers", count: agenticFlatData.filter(r => r.type === "MCP Server").length, color: "#4cbebb",  key: "MCP Server" },
+    { label: "LLMs",        count: agenticFlatData.filter(r => r.type === "LLM").length,        color: "#EAB308",  key: "LLM" },
+    { label: "Skills",      count: agenticFlatData.filter(r => r.type === "Skill").length,      color: "#D1D5DB",  key: "Skill" },
   ], [agenticFlatData]);
 
   const violationsByCollectionId = useMemo(
