@@ -170,6 +170,30 @@ async def query(vec: List[float], scanner_key: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+async def exact_get(scanner_key: str, text_hash: str) -> Optional[Dict[str, Any]]:
+    """Exact-repeat fast path: a direct HGETALL of the deterministic key — no
+    embedding, no vector FT.SEARCH. Returns the stored verdict with distance 0.0,
+    or None on miss. Native EXPIRE means an expired entry is already gone (a miss),
+    so the caller falls through to the embed + KNN fuzzy path. Cheap enough to run
+    on every request; it offloads both the embedder (CPU) and the search index.
+    """
+    client = _get_client()
+    if client is None:
+        return None
+    try:
+        key = f"{_KEY_PREFIX}{scanner_key}:{text_hash}"
+        raw = await client.hgetall(key)
+        if not raw:
+            return None
+        flat = {_decode(k): v for k, v in raw.items()}
+        match = _shape_match(flat)
+        match["distance"] = 0.0  # exact text match
+        return match
+    except Exception as exc:
+        logger.warning(f"[cache_store] exact_get failed: {exc}")
+        return None
+
+
 async def upsert(vec: List[float], scanner_key: str, entry_id: str,
                  is_valid: bool, risk_score: float, reason: str,
                  inserted_at: int, ttl_seconds: int) -> None:

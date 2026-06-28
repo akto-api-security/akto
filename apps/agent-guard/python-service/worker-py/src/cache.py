@@ -165,9 +165,17 @@ async def prepare(scanner_name: str, scanner_type: str, text: str,
     be None.
     """
     scanner_key = config_hash(scanner_name, scanner_type, config)
+    # Exact-repeat fast path: deterministic-key lookup (HGETALL), no embedding and
+    # no vector search. Real traffic is ~99.7% exact repeats, so this serves the
+    # bulk of requests while skipping the CPU embed + FT.SEARCH entirely — and
+    # still works when the embedder is unavailable.
+    exact = await cache_store.exact_get(scanner_key, _text_hash(text))
+    if exact is not None:
+        return {"scanner_key": scanner_key, "vec": None, "cached": exact, "exact": True}
+    # Exact miss → embed + KNN for a semantic (fuzzy) match.
     vec = await _embed(text)
     cached = await cache_store.query(vec, scanner_key) if vec is not None else None
-    return {"scanner_key": scanner_key, "vec": vec, "cached": cached}
+    return {"scanner_key": scanner_key, "vec": vec, "cached": cached, "exact": False}
 
 
 def _fresh_hit(cached: Optional[Dict[str, Any]], threshold: float, ttl: float,
