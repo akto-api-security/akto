@@ -281,18 +281,10 @@ const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expand
             ...(hasMaliciousSkill ? ['Malicious Skills'] : []),
         ];
 
-        // For Skill filter: build a searchable string of all skill names from children so the
-        // query box can match skill names (e.g. "read_file") against parent rows. Skill names
-        // live on child.skills[] which is intentionally excluded from the row object (excluding
-        // it was the fix that made search performant), so we pre-compute a flat string here.
-        const skillNamesSearch = filterType === FILTER_TYPES.SKILL
-            ? [...new Set(group.children.flatMap(c => Array.isArray(c.skills) ? c.skills.map(String) : []))].join(' ')
-            : undefined;
-
         return {
             // Use first collection ID as the row ID (table expects scalar, not array)
             id: group.apiCollectionIds[0] || `endpoint-${group.endpointId}`,
-            allIds: group.apiCollectionIds,
+            allIds: group.apiCollectionIds, // Keep array for bulk actions
             name: `endpoint-${group.endpointId}`,
             endpointId: group.endpointId,
             displayName: group.endpointId,
@@ -301,12 +293,7 @@ const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expand
             sensitiveInRespTypes: group.sensitiveInRespTypes || [],
             detectedTimestamp: group.detectedTimestamp || 0,
             startTs: group.startTs === Infinity ? 0 : group.startTs,
-            hasPersonalAccount: group.hasPersonalAccount || false,
-            hasLocalMcpServer: group.hasLocalMcpServer || false,
-            hasMisconfiguredConfig,
-            hasMaliciousSkill,
             endpointTags,
-            ...(skillNamesSearch !== undefined ? { skillNamesSearch } : {}),
             displayNameComp: (
                 <HorizontalStack gap="1" align="start" wrap={false}>
                     <Box maxWidth="200px">
