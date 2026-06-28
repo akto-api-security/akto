@@ -81,24 +81,18 @@ async def scan_payload(
             config = {**default_cfg, **config, "modelConfigs": default_cfg["modelConfigs"]}
         if scanner_name in GEMMA_ONLY_SCANNERS:
             config = {**config, "modelConfigs": strip_qwen_tier(config.get("modelConfigs"))}
-        if cascade_backpressure.should_skip_cascade():
-            return shape_response(
-                scanner_name,
-                True,
-                0.0,
-                text,
-                {**cascade_backpressure.cascade_skip_details(), "scanner_type": scanner_type},
-            )
         store_fn = None
         if config.get("storeAllResults"):
             store_fn = lambda completed, name: schedule(alerts.store_results(completed, name))
 
-        # Semantic cache, decide mode: embed + lookup once before paying for the
-        # cascade. A fresh within-threshold hit short-circuits — safe verdicts on
-        # a fuzzy match, blocks only on a (near-)exact repeat (see cache.try_serve);
-        # a miss/error falls through. The served verdict (is_valid) is honoured so
-        # cached blocks still block. `prep` is reused by observe() so a miss embeds
-        # only once.
+        # Semantic cache, decide mode: consult the cache BEFORE applying
+        # backpressure, so a cached verdict (including a cached block) is still
+        # served correctly while Vertex is slow — backpressure must only short-
+        # circuit a genuine miss, never a known answer. A fresh within-threshold
+        # hit short-circuits — safe verdicts on a fuzzy match, blocks only on a
+        # (near-)exact repeat (see cache.try_serve); a miss/error falls through.
+        # The served verdict (is_valid) is honoured so cached blocks still block.
+        # `prep` is reused by observe() so a miss embeds only once.
         prep = None
         if cache.serving():
             prep = await cache.prepare(scanner_name, scanner_type, text, config)
@@ -108,6 +102,17 @@ async def scan_payload(
                 return shape_response(
                     scanner_name, served["is_valid"], served["risk_score"], text, served["details"]
                 )
+
+        # Cache miss (or cache not serving): only now does backpressure fail-open
+        # to avoid paying for the slow cascade while Vertex latency is elevated.
+        if cascade_backpressure.should_skip_cascade():
+            return shape_response(
+                scanner_name,
+                True,
+                0.0,
+                text,
+                {**cascade_backpressure.cascade_skip_details(), "scanner_type": scanner_type},
+            )
         try:
             result = await scan_with_model_map(
                 scanner_name, scanner_type, text, config, store_fn=store_fn
