@@ -873,6 +873,16 @@ const transform = {
     })
     return summaries;
   },
+  prepareSummaryTableRows: (summaries, statusSummaries = {}) => {
+    const rows = transform.prettifySummaryTable(summaries).map((row) => ({
+      ...row,
+      testRunState: row.state,
+      testingRunResultSummaryHexId: row.hexId,
+      authError: row.metadata?.error,
+      tokenRateLimited: row.metadata?.tokenRateLimited,
+    }));
+    return transform.enrichWithRunStatus(rows, statusSummaries);
+  },
 
   getInfoSectionsHeaders() {
     let moreInfoSections = [

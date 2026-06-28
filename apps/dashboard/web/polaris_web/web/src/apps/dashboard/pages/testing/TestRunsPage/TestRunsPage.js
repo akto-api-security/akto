@@ -5,7 +5,7 @@ import api from "../api";
 import testingApi from "../../testing/api";
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { useCollectionPageScope } from '../../../hooks/useCollectionPageScope';
-import transform, { getStatus } from "../transform";
+import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func"
 import { CellType } from "../../../components/tables/rows/GithubRow";
@@ -18,41 +18,13 @@ import PersistStore from "../../../../main/PersistStore";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 import SummaryCardComponent from "./SummaryCardComponent";
+import {
+  getCachedRunStatusCounts,
+  getValidRunStatusMap,
+  setCachedRunStatusCounts,
+} from "./runStatusCache";
+import { shouldFetchRunStatusSummary } from "./runStatusUtils";
 
-// Module-level cache for test run execution status counts. Counts for COMPLETED runs are
-// stable, so caching them here (instead of a component ref) keeps them across remounts and
-// avoids re-hitting the heavy backend status API when revisiting the page within the TTL.
-const RUN_STATUS_CACHE_TTL_MS = 5 * 60 * 1000;
-const runStatusCache = new Map(); // testingRunResultSummaryHexId -> { counts, ts }
-
-function getCachedRunStatusCounts(hexId) {
-  const entry = runStatusCache.get(hexId);
-  if (!entry) return undefined;
-  if (Date.now() - entry.ts > RUN_STATUS_CACHE_TTL_MS) {
-    runStatusCache.delete(hexId);
-    return undefined;
-  }
-  return entry.counts;
-}
-
-function getValidRunStatusMap() {
-  const result = {};
-  const now = Date.now();
-  runStatusCache.forEach((entry, hexId) => {
-    if (now - entry.ts > RUN_STATUS_CACHE_TTL_MS) {
-      runStatusCache.delete(hexId);
-    } else {
-      result[hexId] = entry.counts;
-    }
-  });
-  return result;
-}
-
-function setCachedRunStatusCounts(statusSummaries) {
-  Object.entries(statusSummaries || {}).forEach(([hexId, counts]) => {
-    runStatusCache.set(hexId, { counts, ts: Date.now() });
-  });
-}
 /*
   {
     text:"", // req. -> The text to be shown wherever the header is being shown
@@ -215,12 +187,6 @@ const [selected, setSelected] = useState(initialTabIdx)
 
 const tableCountObj = func.getTabsCount(definedTableTabs, {}, initialCount)
 const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setCurrentTab, currentTab, tabsInfo)
-
-function shouldFetchRunStatusSummary(item) {
-  return getStatus(item?.testRunState) === "COMPLETED"
-    && !item?.authError
-    && !item?.tokenRateLimited;
-}
 
 const [severityMap, setSeverityMap] = useState({})
 const [subCategoryInfo, setSubCategoryInfo] = useState({})

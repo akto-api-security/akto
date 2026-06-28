@@ -3669,6 +3669,16 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void cleanupApiInfoTags(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getCleanupApiInfoTags() == 0 && Context.accountId.get() == 1726615470){
+            BackwardCompatibilityUtils.cleanupApiInfoTags();
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.CLEANUP_API_INFO_TAGS, Context.now())
+            );
+        }
+    }
+
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
@@ -3679,6 +3689,7 @@ public class InitializerListener implements ServletContextListener {
         updateCustomDataTypeOperator(backwardCompatibility);
         markSummariesAsVulnerable(backwardCompatibility);
         moveUserDataFromModuleInfoToAgenticUsers(backwardCompatibility);
+        cleanupApiInfoTags(backwardCompatibility);
         dropLastCronRunInfoField(backwardCompatibility);
         cleanupRbacEntriesForDeveloperRole(backwardCompatibility);
         fetchIntegratedConnections(backwardCompatibility);
