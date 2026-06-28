@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox } from "@shopify/polaris";
+import { VerticalStack, Text, FormLayout, TextField, Box, Checkbox } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
+import ConfidenceSelect, { toOpt, fromOpt, toOpt100, fromOpt100 } from "../ConfidenceSelect";
+
 
 // URL validation function
 const validateUrl = (url) => {
@@ -90,15 +92,10 @@ const CustomGuardrailsStep = ({
                                     helpText="This prompt will be used to evaluate whether content should be blocked. Be specific about what you want to detect."
                                 />
 
-                                <RangeSlider
+                                <ConfidenceSelect
                                     label="Confidence score threshold"
-                                    value={llmConfidenceScore}
-                                    onChange={setLlmConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    helpText="Content will be blocked if the LLM's confidence score exceeds this threshold"
+                                    value={toOpt(llmConfidenceScore)}
+                                    onChange={(v) => setLlmConfidenceScore(fromOpt(v))}
                                 />
                             </FormLayout>
                         </Box>
@@ -125,15 +122,10 @@ const CustomGuardrailsStep = ({
                                     error={urlError}
                                 />
 
-                                <RangeSlider
+                                <ConfidenceSelect
                                     label="Confidence score threshold"
-                                    value={confidenceScore}
-                                    onChange={setConfidenceScore}
-                                    min={0}
-                                    max={100}
-                                    step={25}
-                                    output
-                                    helpText="Content will be blocked if the model's confidence score exceeds this threshold (0-100)"
+                                    value={toOpt100(confidenceScore)}
+                                    onChange={(v) => setConfidenceScore(fromOpt100(v))}
                                 />
                             </FormLayout>
                         </Box>

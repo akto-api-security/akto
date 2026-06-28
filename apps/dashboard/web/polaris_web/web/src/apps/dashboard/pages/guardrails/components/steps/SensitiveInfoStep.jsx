@@ -7,7 +7,6 @@ import {
     TextField,
     HorizontalStack,
     Checkbox,
-    RangeSlider,
     Spinner,
     Tooltip,
     Icon
@@ -20,6 +19,8 @@ import observeApi from "../../../observe/api";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
+import ConfidenceSelect, { toOpt, fromOpt } from "../ConfidenceSelect";
+
 
 const MIN_COUNT_TOOLTIP =
     "The guardrail applies only when the prompt has at least this many matches of this PII type. Example: 20 means 20 or more occurrences of that type.";
@@ -403,19 +404,11 @@ const SensitiveInfoStep = ({
                     />
                     {enableSecrets && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
-                                <RangeSlider
-                                    label=""
-                                    value={secretsConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setSecretsConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting secrets."
-                                />
-                            </VerticalStack>
+                            <ConfidenceSelect
+                                label="Confidence Threshold"
+                                value={toOpt(secretsConfidenceScore)}
+                                onChange={(v) => setSecretsConfidenceScore(fromOpt(v))}
+                            />
                         </Box>
                     )}
                 </Box>
@@ -430,19 +423,11 @@ const SensitiveInfoStep = ({
                     />
                     {enableAnonymize && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
-                                <RangeSlider
-                                    label=""
-                                    value={anonymizeConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setAnonymizeConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting sensitive data that should be anonymized."
-                                />
-                            </VerticalStack>
+                            <ConfidenceSelect
+                                label="Confidence Threshold"
+                                value={toOpt(anonymizeConfidenceScore)}
+                                onChange={(v) => setAnonymizeConfidenceScore(fromOpt(v))}
+                            />
                         </Box>
                     )}
                 </Box>
