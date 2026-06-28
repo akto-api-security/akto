@@ -8,23 +8,55 @@ on:
         required: true
 
 jobs:
-  build-agent-guard:
-    runs-on: ubuntu-22.04
+  # ---------------------------------------------------------------------------
+  # Build each image for each platform on a NATIVE runner (no QEMU emulation),
+  # pushing by digest only (no tags yet). 3 images x 2 platforms = 6 parallel
+  # jobs. Cache is scoped per image+platform so each scope stays well under the
+  # 10GB GHA cache limit instead of evicting one another.
+  # ---------------------------------------------------------------------------
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: worker
+            context: ./apps/agent-guard/python-service/worker-py
+            dockerhub: aktosecurity/akto-agent-guard-worker
+            ecr: p7q3h0z2/akto-agent-guard-worker
+          - name: anonymizer
+            context: ./apps/agent-guard/python-service/anonymizer-container
+            dockerhub: aktosecurity/akto-agent-guard-anonymizer
+            ecr: p7q3h0z2/akto-agent-guard-anonymizer
+          - name: embedder
+            context: ./apps/agent-guard/python-service/embedder-container
+            dockerhub: aktosecurity/akto-agent-guard-embedder
+            ecr: p7q3h0z2/akto-agent-guard-embedder
+        platform:
+          - os: linux/amd64
+            runner: ubuntu-22.04
+          - os: linux/arm64
+            runner: ubuntu-22.04-arm
+    runs-on: ${{ matrix.platform.runner }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+
+      - name: Prepare platform pair
+        run: echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+        env:
+          platform: ${{ matrix.platform.os }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: DockerHub login
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Configure AWS Credentials for ECR
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -32,52 +64,114 @@ jobs:
 
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@v2
         with:
           mask-password: "true"
           registry-type: public
 
-      - name: Build and push worker image (portable FastAPI)
-        uses: docker/build-push-action@v4
+      - name: Build and push by digest (${{ matrix.image.name }} / ${{ matrix.platform.os }})
+        id: build
+        uses: docker/build-push-action@v6
         with:
-          context: ./apps/agent-guard/python-service/worker-py
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            aktosecurity/akto-agent-guard-worker:local
-            aktosecurity/akto-agent-guard-worker:${{ github.event.inputs.release_version }}
-            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-worker:local
-            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-worker:${{ github.event.inputs.release_version }}
-          cache-from: type=gha,scope=agent-guard-worker
-          cache-to: type=gha,mode=max,scope=agent-guard-worker
+          context: ${{ matrix.image.context }}
+          platforms: ${{ matrix.platform.os }}
+          provenance: false
+          cache-from: type=gha,scope=agent-guard-${{ matrix.image.name }}-${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,mode=max,scope=agent-guard-${{ matrix.image.name }}-${{ env.PLATFORM_PAIR }}
+          outputs: |
+            type=image,"name=${{ matrix.image.dockerhub }},${{ steps.login-ecr.outputs.registry }}/${{ matrix.image.ecr }}",push-by-digest=true,name-canonical=true,push=true
 
-      - name: Build and push anonymizer image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./apps/agent-guard/python-service/anonymizer-container
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            aktosecurity/akto-agent-guard-anonymizer:local
-            aktosecurity/akto-agent-guard-anonymizer:${{ github.event.inputs.release_version }}
-            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-anonymizer:local
-            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-anonymizer:${{ github.event.inputs.release_version }}
-          cache-from: type=gha,scope=agent-guard-anonymizer
-          cache-to: type=gha,mode=max,scope=agent-guard-anonymizer
+      - name: Export digest
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
-      - name: Build and push embedder image
-        uses: docker/build-push-action@v4
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
         with:
-          context: ./apps/agent-guard/python-service/embedder-container
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            aktosecurity/akto-agent-guard-embedder:local
-            aktosecurity/akto-agent-guard-embedder:${{ github.event.inputs.release_version }}
-            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-embedder:local
-            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-embedder:${{ github.event.inputs.release_version }}
-          cache-from: type=gha,scope=agent-guard-embedder
-          cache-to: type=gha,mode=max,scope=agent-guard-embedder
+          name: digests-${{ matrix.image.name }}-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # ---------------------------------------------------------------------------
+  # Merge each image's per-platform digests into one multi-arch manifest and
+  # apply the real tags, on both DockerHub and ECR. One job per image.
+  # ---------------------------------------------------------------------------
+  merge:
+    needs: build
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: worker
+            dockerhub: aktosecurity/akto-agent-guard-worker
+            ecr: p7q3h0z2/akto-agent-guard-worker
+          - name: anonymizer
+            dockerhub: aktosecurity/akto-agent-guard-anonymizer
+            ecr: p7q3h0z2/akto-agent-guard-anonymizer
+          - name: embedder
+            dockerhub: aktosecurity/akto-agent-guard-embedder
+            ecr: p7q3h0z2/akto-agent-guard-embedder
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-${{ matrix.image.name }}-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: DockerHub login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Configure AWS Credentials for ECR
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: "true"
+          registry-type: public
+
+      - name: Create multi-arch manifests (DockerHub + ECR)
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          VERSION: ${{ github.event.inputs.release_version }}
+          DH: ${{ matrix.image.dockerhub }}
+          ECR: ${{ steps.login-ecr.outputs.registry }}/${{ matrix.image.ecr }}
+        run: |
+          docker buildx imagetools create \
+            -t "$DH:local" -t "$DH:$VERSION" \
+            $(printf "$DH@sha256:%s " *)
+          docker buildx imagetools create \
+            -t "$ECR:local" -t "$ECR:$VERSION" \
+            $(printf "$ECR@sha256:%s " *)
+
+  # ---------------------------------------------------------------------------
+  # Tag, release, and notify — once, after all images are published.
+  # ---------------------------------------------------------------------------
+  release:
+    needs: merge
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Push git tag
         id: tag_version
@@ -105,8 +199,15 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
+  # ---------------------------------------------------------------------------
+  # Single failure notification covering any failed job above.
+  # ---------------------------------------------------------------------------
+  notify-failure:
+    needs: [build, merge, release]
+    if: failure()
+    runs-on: ubuntu-22.04
+    steps:
       - name: Send failure notification to Slack
-        if: failure()
         uses: slackapi/slack-github-action@v1.23.0
         with:
           payload: |
