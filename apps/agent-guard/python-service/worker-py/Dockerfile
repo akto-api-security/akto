@@ -2,10 +2,12 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY pyproject.toml .
+# Install deps before copying any source so the (slow) pip layer stays cached and
+# only re-runs when the dependency list itself changes — not on every code edit.
 RUN pip install --no-cache-dir \
     rsa pyasn1 httpx redis detect-secrets tiktoken fastapi 'uvicorn[standard]' pydantic
 
+COPY pyproject.toml .
 COPY src/ ./src/
 
 ENV PYTHONUNBUFFERED=1
