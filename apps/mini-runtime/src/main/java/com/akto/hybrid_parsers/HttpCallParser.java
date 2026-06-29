@@ -45,6 +45,9 @@ import com.akto.tracing.TraceParseResult;
 import com.akto.tracing.copilot.CopilotActivityParser;
 import com.akto.tracing.n8n.N8nTraceParser;
 import com.akto.tracing.snowflake.SnowflakeTraceParser;
+import com.akto.tracing.bedrock.BedrockAgentTraceParser;
+import com.akto.dao.tracing.TraceDao;
+import com.akto.dao.tracing.SpanDao;
 import com.akto.usage.OrgUtils;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
@@ -563,6 +566,13 @@ public class HttpCallParser {
         return Constants.AI_AGENT_SOURCE_SNOWFLAKE.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
     }
 
+    private boolean isBedrockAgentTraffic(Map<String, String> tagsMap) {
+        if (tagsMap == null) {
+            return false;
+        }
+        return Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+    }
+
     private boolean isCopilotTraffic(Map<String, String> tagsMap) {
         if (tagsMap == null) return false;
         return Constants.AI_AGENT_SOURCE_COPILOT_STUDIO.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
@@ -737,6 +747,85 @@ public class HttpCallParser {
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error parsing N8N trace: " + e.getMessage());
+        }
+    }
+
+    private void parseBedrockAgentTrace(HttpResponseParams httpResponseParam) {
+        try {
+            String payload = httpResponseParam.getPayload();
+            if (payload == null || payload.isEmpty()) {
+                return;
+            }
+
+            // Parse the responsePayload JSON to extract awsMetadata
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payloadMap = gson.fromJson(payload, Map.class);
+            if (payloadMap == null || !payloadMap.containsKey("awsMetadata")) {
+                // Not a Bedrock Agent trace response, skip
+                return;
+            }
+
+            // Extract the awsMetadata field
+            Object awsMetadata = payloadMap.get("awsMetadata");
+            if (awsMetadata == null) {
+                return;
+            }
+
+            // Convert metadata to JSON string for parser
+            String bedrockTraceJson = gson.toJson(awsMetadata);
+
+            // Validate if this is parseable Bedrock Agent trace data
+            boolean canParse = BedrockAgentTraceParser.getInstance().canParse(bedrockTraceJson);
+            loggerMaker.info("parseBedrockAgentTrace: BedrockAgentTraceParser.canParse() = " + canParse, LogDb.RUNTIME);
+
+            if (!canParse) {
+                loggerMaker.info("awsMetadata found but not valid Bedrock Agent trace format", LogDb.RUNTIME);
+                // Log first 500 chars for debugging
+                String tracePreview = bedrockTraceJson.length() > 500 ? bedrockTraceJson.substring(0, 500) + "..." : bedrockTraceJson;
+                loggerMaker.info("Invalid trace preview: " + tracePreview, LogDb.RUNTIME);
+                return;
+            }
+
+            loggerMaker.info("Found valid Bedrock Agent execution trace", LogDb.RUNTIME);
+
+            // Parse trace using BedrockAgentTraceParser
+            TraceParseResult result = BedrockAgentTraceParser.getInstance().parse(bedrockTraceJson);
+
+            // Store trace and spans using dataActor
+            dataActor.storeTrace(result.getTrace());
+            if (result.getSpans() != null && !result.getSpans().isEmpty()) {
+                dataActor.storeSpans(result.getSpans());
+                loggerMaker.info("Stored Bedrock Agent trace with " + result.getSpans().size() + " spans", LogDb.RUNTIME);
+            }
+
+            // Extract bot name and use as workflowId
+            String botName = (String) result.getMetadata().get("botName");
+            String agentType = (String) result.getMetadata().get("agentType");
+
+            if (botName == null || botName.isEmpty()) {
+                loggerMaker.info("Bedrock Agent trace missing botName, skipping service graph update", LogDb.RUNTIME);
+                return;
+            }
+
+            // Use botName as hostname (from executionFlow[0].name)
+            String hostname = botName;
+            int apiCollectionId = ServiceGraphBuilder.getInstance().getApiCollectionIdFromWorkflowId(botName, hostname);
+
+            if (apiCollectionId != -1) {
+                // Save the service graph edges
+                java.util.Map<String, ServiceGraphEdgeInfo> edges = BedrockAgentTraceParser.getInstance().extractServiceGraph(bedrockTraceJson);
+                if (edges != null && !edges.isEmpty()) {
+                    ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
+                    loggerMaker.info("Updated service graph for Bedrock Agent: " + botName
+                        + " (agentType: " + agentType + ", collection: " + apiCollectionId
+                        + ", hostname: " + hostname + ") with " + edges.size() + " edges", LogDb.RUNTIME);
+                }
+            } else {
+                loggerMaker.info("Invalid API collection ID for Bedrock Agent botName: " + botName, LogDb.RUNTIME);
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing Bedrock Agent trace: " + e.getMessage());
         }
     }
 
@@ -1610,6 +1699,11 @@ public class HttpCallParser {
             // Parse N8N trace metadata if this is N8N traffic
             if (isN8nTraffic(tagsMap)) {
                 parseN8nTrace(httpResponseParam);
+            }
+
+            // Parse Bedrock Agent trace metadata if this is Bedrock Agent traffic
+            if (isBedrockAgentTraffic(tagsMap)) {
+                parseBedrockAgentTrace(httpResponseParam);
             }
 
             // Build service graph edges for Arcade traffic
