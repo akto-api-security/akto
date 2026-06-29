@@ -11,6 +11,7 @@ import CompulsoryDescriptionModal from "../../issues/components/CompulsoryDescri
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import testingApi from "../api"
+import testEditorApi from "../../test_editor/api"
 import GridRows from '../../../components/shared/GridRows'
 import { useNavigate } from 'react-router-dom'
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
@@ -698,24 +699,256 @@ function TestRunResultFlyout(props) {
     const dataStoreTime = 2 * 30 * 24 * 60 * 60;
     const dataExpired = func.timeNow() - (selectedTestRunResult?.endTimestamp || func.timeNow()) > dataStoreTime
 
-    // Move state outside to prevent reset on component recreation
-    const hasAnalyzedRef = useRef(false);
+    // Track which result id we've already analyzed so we analyze exactly once per
+    // result and never re-trigger the LLM call on re-renders / tab remounts.
+    const analyzedIdRef = useRef(null);
     const [vulnerabilityHighlights, setVulnerabilityHighlights] = useState({});
 
-    // Component that handles vulnerability analysis only when mounted
-    const ValuesTabContent = React.memo(({ isAgentic = false, runAutomatedTests = false } = {}) => {
-        useEffect(() => {
+    // Build deterministic evidence anchors when the model returns nothing but the
+    // test is already confirmed vulnerable. This guarantees a highlight + tooltip
+    // without depending on the LLM (common for authorization/access-control issues,
+    // where a single response looks normal in isolation).
+    const parseHeaders = (h) => {
+        if (!h) return {};
+        if (typeof h === 'object') return h;
+        if (typeof h === 'string') {
+            try { return JSON.parse(h); } catch (e) { return {}; }
+        }
+        return {};
+    };
+
+    // Parse a request/response message that may be a JSON string or already an object.
+    const parseMessageObj = (msg) => {
+        if (!msg) return null;
+        if (typeof msg === 'object') return msg;
+        if (typeof msg === 'string') {
+            try { return JSON.parse(msg); } catch (e) { return null; }
+        }
+        return null;
+    };
+
+    // Cap how many changed fields we surface so the prompt/UI stay small.
+    const MAX_DIFF_ENTRIES = 15;
+
+    // A value is "masked" when the UI redacts it (e.g. auth headers shown as ******).
+    // We must not emit such a value as a phrase (it won't exist verbatim in the
+    // rendered editor); the segment is bound by its field key instead.
+    const isMaskedValue = (v) => typeof v === 'string' && /^\*{3,}$/.test(v.trim());
+
+    // Transport / proxy / CDN / infra / credential / probe headers are NEVER
+    // meaningful attack evidence - they ride along on every request. Highlighting
+    // them floods the evidence panel with noise (host, x-forwarded-*, fastly-*,
+    // the auth JWT, the akto "a" probe, etc.), so we never treat them as injected.
+    const NOISE_FIELD_PREFIXES = ['x-forwarded-', 'x-akto-', 'x-sigsci-', 'fastly-', 'sec-fetch-', 'sec-ch-', 'x-amzn-', 'cf-'];
+    const NOISE_FIELD_EXACT = new Set([
+        'host', 'content-length', 'content-type', 'connection', 'accept', 'accept-encoding',
+        'accept-language', 'accept-charset', 'user-agent', 'referer', 'origin', 'cache-control',
+        'pragma', 'te', 'trailer', 'transfer-encoding', 'upgrade', 'keep-alive', 'via', 'forwarded',
+        'x-real-ip', 'x-request-id', 'x-correlation-id', 'cdn-loop', 'x-varnish', 'x-timer',
+        'x-cache', 'x-cache-hits', 'x-served-by', 'dnt',
+        'authorization', 'cookie', 'set-cookie', 'proxy-authorization', 'x-api-key', 'api-key', 'apikey', 'a'
+    ]);
+    const isNoiseField = (key) => {
+        const k = String(key || '').trim().toLowerCase();
+        if (!k) return true;
+        if (NOISE_FIELD_EXACT.has(k)) return true;
+        return NOISE_FIELD_PREFIXES.some((p) => k.startsWith(p));
+    };
+
+    // Compute what the test changed between the baseline (original) request and the
+    // attack request. These changed/added values are the concrete evidence of the
+    // injected attack (e.g. invalid header values, swapped auth token, payload).
+    //
+    // IMPORTANT: a header/body field is only "injected" if there is a real baseline
+    // to compare against. When the baseline has no headers (the diff is degenerate),
+    // we must NOT mark the entire request as injected - otherwise every transport
+    // header shows up as fake evidence.
+    const computeRequestDiff = (originalMessage, attackMessage) => {
+        const orig = parseMessageObj(originalMessage);
+        const atk = parseMessageObj(attackMessage);
+        if (!atk || !atk.request) return [];
+
+        const entries = [];
+        const origHeaders = parseHeaders(orig?.request?.headers);
+        const atkHeaders = parseHeaders(atk?.request?.headers);
+        const hasBaselineHeaders = Object.keys(origHeaders).length > 0;
+
+        Object.keys(atkHeaders).forEach((key) => {
+            if (entries.length >= MAX_DIFF_ENTRIES) return;
+            if (isNoiseField(key)) return;
+            const modified = atkHeaders[key];
+            const original = origHeaders[key];
+            const modStr = modified === undefined || modified === null ? '' : String(modified);
+            const hasOriginal = original !== undefined;
+            if (hasOriginal) {
+                const origStr = String(original);
+                if (origStr !== modStr) {
+                    entries.push({ field: key, original: origStr, modified: modStr, location: 'REQUEST' });
+                }
+            } else if (hasBaselineHeaders) {
+                // Genuinely added vs a real baseline.
+                entries.push({ field: key, original: null, modified: modStr, location: 'REQUEST' });
+            }
+        });
+
+        const origBodyObj = parseMessageObj(orig?.request?.body);
+        const atkBodyObj = parseMessageObj(atk?.request?.body);
+        const hasBaselineBody = origBodyObj && typeof origBodyObj === 'object';
+        if (atkBodyObj && typeof atkBodyObj === 'object' && !Array.isArray(atkBodyObj)) {
+            Object.keys(atkBodyObj).forEach((key) => {
+                if (entries.length >= MAX_DIFF_ENTRIES) return;
+                const modified = atkBodyObj[key];
+                const original = origBodyObj ? origBodyObj[key] : undefined;
+                const modStr = typeof modified === 'object' ? JSON.stringify(modified) : String(modified);
+                const hasOriginal = original !== undefined;
+                if (hasOriginal) {
+                    const origStr = typeof original === 'object' ? JSON.stringify(original) : String(original);
+                    if (origStr !== modStr) {
+                        entries.push({ field: key, original: origStr, modified: modStr, location: 'REQUEST' });
+                    }
+                } else if (hasBaselineBody) {
+                    entries.push({ field: key, original: null, modified: modStr, location: 'REQUEST' });
+                }
+            });
+        } else {
+            const origBody = orig?.request?.body;
+            const atkBody = atk?.request?.body;
+            if (typeof atkBody === 'string' && atkBody.length > 0 && typeof origBody === 'string' && origBody.length > 0 && String(origBody) !== atkBody && entries.length < MAX_DIFF_ENTRIES) {
+                entries.push({
+                    field: 'body',
+                    original: String(origBody).slice(0, 120),
+                    modified: atkBody.slice(0, 120),
+                    location: 'REQUEST'
+                });
+            }
+        }
+
+        return entries.slice(0, MAX_DIFF_ENTRIES);
+    };
+
+    // For multi-exec tests, summarise the sibling attempts (everything except the
+    // last/vulnerable one) so the model can explain cross-attempt proof (rate-limit,
+    // 2-account BOLA) without us sending every full request/response.
+    const buildSiblingAttempts = (testResults, lastIdx) => {
+        if (!Array.isArray(testResults) || testResults.length <= 1) return [];
+        const summary = [];
+        testResults.forEach((res, i) => {
+            if (i === lastIdx) return;
+            if (summary.length >= 10) return;
+            const msg = parseMessageObj(res?.message);
+            const statusCode = msg?.response?.statusCode || null;
+            const diff = computeRequestDiff(res?.originalMessage, res?.message);
+            const keyChange = diff.length > 0 ? `${diff[0].field}=${diff[0].modified}` : null;
+            summary.push({ attempt: i + 1, statusCode, keyChange });
+        });
+        return summary;
+    };
+
+    // Trim a test template (YAML) to keep the prompt small. The validate/success
+    // conditions and injected wordlists are what explain WHY the test is vulnerable.
+    const TEMPLATE_MAX_CHARS = 1500;
+    const trimTemplate = (content) => {
+        if (typeof content !== 'string' || content.length === 0) return '';
+        return content.length > TEMPLATE_MAX_CHARS
+            ? content.slice(0, TEMPLATE_MAX_CHARS) + "\n...[truncated]"
+            : content;
+    };
+
+    // Cache trimmed templates per testSubType so we never refetch within a run.
+    // On any failure (e.g. no TEST_EDITOR access) we degrade gracefully to "".
+    const templateCacheRef = useRef({});
+    const getTrimmedTemplate = async (testSubType) => {
+        if (!testSubType) return '';
+        if (templateCacheRef.current[testSubType] !== undefined) {
+            return templateCacheRef.current[testSubType];
+        }
+        let trimmed = '';
+        try {
+            const resp = await testEditorApi.fetchTestContent(testSubType);
+            const content = typeof resp === 'string' ? resp : (resp?.content || '');
+            trimmed = trimTemplate(content);
+        } catch (e) {
+            trimmed = '';
+        }
+        templateCacheRef.current[testSubType] = trimmed;
+        return trimmed;
+    };
+
+    // Deterministic, specific evidence when the model returns nothing. We never
+    // emit a hardcoded generic sentence: we prefer (1) the concrete values the test
+    // changed, then (2) the framework's own validationReason, then (3) the response
+    // proof (a short value or the status code).
+    const buildFallbackSegments = (messageObj, requestDiff, validationReason) => {
+        const segments = [];
+
+        // (1) Request-side: the actual injected/changed values.
+        (requestDiff || []).forEach((d) => {
+            if (segments.length >= MAX_DIFF_ENTRIES) return;
+            const masked = isMaskedValue(d.modified);
+            const seg = {
+                field: d.field,
+                location: 'REQUEST',
+                reason: (d.original !== null && d.original !== undefined)
+                    ? `"${d.field}" was changed from "${d.original}" to "${d.modified}" and the endpoint still accepted it.`
+                    : `"${d.field}" was injected with "${d.modified}" and the endpoint still accepted it.`
+            };
+            // Bind by field when the value is masked/empty; otherwise highlight the value.
+            if (!masked && typeof d.modified === 'string' && d.modified.length > 0) {
+                seg.phrase = d.modified.slice(0, 80);
+            }
+            segments.push(seg);
+        });
+
+        // (2)/(3) Response-side proof, preferring the framework's own reason.
+        const responseReason = (typeof validationReason === 'string' && validationReason.trim().length > 0)
+            ? validationReason.trim()
+            : null;
+        const body = messageObj?.response?.body;
+        const cleaned = typeof body === 'string'
+            ? body.trim().replace(/^[\s"'\[{]+|[\s"'\]},]+$/g, '')
+            : '';
+        if (cleaned.length > 0 && cleaned.length <= 60) {
+            segments.push({
+                location: 'RESPONSE',
+                phrase: cleaned,
+                reason: responseReason || `The response returned this value, satisfying the test's success condition.`
+            });
+        } else if (messageObj?.response?.statusCode) {
+            segments.push({
+                location: 'RESPONSE',
+                field: 'statusCode',
+                phrase: String(messageObj.response.statusCode),
+                reason: responseReason || `The request returned status ${messageObj.response.statusCode}, satisfying the test's success condition.`
+            });
+        }
+
+        return segments;
+    };
+
+    // Run vulnerability analysis at the flyout level so it re-triggers whenever a
+    // different result is selected on the same page. Keeping it here (instead of
+    // inside the memoized ValuesTabContent) avoids relying on the inner component
+    // remounting, which it does not always do when only the selected result changes
+    // while staying on the same tab.
+    useEffect(() => {
             // Check if vulnerability highlighting is enabled (use existing GPT feature flag)
             //const isVulnerabilityHighlightingEnabled = window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && 
             //    window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true;
-            const isVulnerabilityHighlightingEnabled = false;
+            const isVulnerabilityHighlightingEnabled = true;
+            const currentId = selectedTestRunResult?.id;
 
-            if (!hasAnalyzedRef.current && selectedTestRunResult?.vulnerable && selectedTestRunResult?.testResults && isVulnerabilityHighlightingEnabled) {
-                hasAnalyzedRef.current = true;
+            if (currentId && analyzedIdRef.current !== currentId && selectedTestRunResult?.vulnerable && selectedTestRunResult?.testResults && isVulnerabilityHighlightingEnabled) {
+                analyzedIdRef.current = currentId;
+                // Drop the previously viewed result's highlights so we never show
+                // stale/mismatched evidence while the new analysis runs.
+                setVulnerabilityHighlights({});
                 setVulnerabilityAnalysisError(null);
 
                 const timeoutId = setTimeout(() => {
-                    const analysisPromises = selectedTestRunResult.testResults.map(async (result, idx) => {
+                    // Multi-exec tests only mark the last attempt as vulnerable; analyze that one only.
+                    const lastIdx = selectedTestRunResult.testResults.length - 1;
+                    const analysisPromises = [lastIdx].map(async (idx) => {
+                        const result = selectedTestRunResult.testResults[idx];
                         // Parse the message if it's a string
                         let messageObj = result.message;
                         if (typeof messageObj === 'string') {
@@ -728,6 +961,17 @@ function TestRunResultFlyout(props) {
 
                         if (messageObj && messageObj.response && messageObj.response.body) {
                             try {
+                                // What the test actually changed vs the baseline request - the
+                                // concrete injected evidence (invalid headers, swapped token, payload).
+                                const requestDiff = computeRequestDiff(result.originalMessage, result.message);
+                                // The test's own validate outcome (why it was flagged vulnerable).
+                                const resultValidationReason = result.validationReason || '';
+                                // The test template (validate conditions + wordlists) explains the "why".
+                                const testSubType = selectedTestRunResult?.testCategoryId;
+                                const testTemplate = await getTrimmedTemplate(testSubType);
+                                // Cross-attempt context for multi-exec tests.
+                                const siblingAttempts = buildSiblingAttempts(selectedTestRunResult.testResults, idx);
+
                                 // Minimal payload structure for optimal LLM analysis
                                 const testResultData = {
                                     resultId: selectedTestRunResult?.id ? `${selectedTestRunResult.id}_${idx}` : null,
@@ -735,12 +979,21 @@ function TestRunResultFlyout(props) {
                                         category: selectedTestRunResult?.testCategoryId || selectedTestRunResult?.testCategory || 'UNKNOWN',
                                         description: issueDetails?.description || selectedTestRunResult?.name || '',
                                         severity: issueDetails?.severity || 'HIGH',
-                                        cwe: issueDetails?.cwe || []
+                                        cwe: issueDetails?.cwe || [],
+                                        // Why the framework considered this vulnerable, and the test
+                                        // definition (validate conditions + injected wordlists).
+                                        validationReason: resultValidationReason,
+                                        testTemplate: testTemplate
                                     },
                                     request: {
                                         method: messageObj.request?.method || 'GET',
                                         url: messageObj.request?.url || '',
                                         contentType: messageObj.request?.headers?.['content-type'] || 'application/json',
+                                        // Send the FULL request headers + body so evidence that lives
+                                        // in the request (e.g. a swapped auth token / cookie for broken
+                                        // authorization) is available to the model, not just response.
+                                        headers: messageObj.request?.headers || {},
+                                        body: messageObj.request?.body || '',
                                         authorization: messageObj.request?.headers?.['authorization'] || null,
                                         userAgent: messageObj.request?.headers?.['user-agent'] || null,
                                         xForwardedFor: messageObj.request?.headers?.['x-forwarded-for'] || null,
@@ -751,7 +1004,10 @@ function TestRunResultFlyout(props) {
                                         statusCode: messageObj.response?.statusCode || 200,
                                         headers: messageObj.response?.headers || {},
                                         body: messageObj.response?.body || ''
-                                    }
+                                    },
+                                    // Explicit hints: exactly what the test changed, and the other attempts.
+                                    modifiedRequestValues: requestDiff,
+                                    siblingAttempts: siblingAttempts
                                 };
 
                                 const response = await testingApi.analyzeVulnerability(
@@ -761,16 +1017,29 @@ function TestRunResultFlyout(props) {
 
                                 const analysisData = response.analysisResult || response;
 
-                                if (analysisData?.vulnerableSegments?.length > 0) {
-                                    const enhancedSegments = analysisData.vulnerableSegments.map(segment => ({
-                                        ...segment,
-                                        vulnerabilityType: selectedTestRunResult?.testCategoryId || selectedTestRunResult?.testCategory || 'UNKNOWN',
-                                        severity: issueDetails?.severity || 'HIGH'
-                                    }));
+                                const baseMeta = {
+                                    vulnerabilityType: selectedTestRunResult?.testCategoryId || selectedTestRunResult?.testCategory || 'UNKNOWN',
+                                    severity: issueDetails?.severity || 'HIGH'
+                                };
 
+                                let segmentsToUse = [];
+                                if (analysisData?.vulnerableSegments?.length > 0) {
+                                    segmentsToUse = analysisData.vulnerableSegments.map(segment => ({
+                                        ...segment,
+                                        ...baseMeta
+                                    }));
+                                } else {
+                                    // Safety net: the test engine already flagged this result as
+                                    // vulnerable, but the model returned no segment. Build specific
+                                    // evidence deterministically from the diff + validationReason +
+                                    // response proof (never a hardcoded generic sentence).
+                                    segmentsToUse = buildFallbackSegments(messageObj, requestDiff, resultValidationReason).map(seg => ({ ...seg, ...baseMeta }));
+                                }
+
+                                if (segmentsToUse.length > 0) {
                                     setVulnerabilityHighlights(prev => ({
                                         ...prev,
-                                        [idx]: enhancedSegments
+                                        [idx]: segmentsToUse
                                     }));
                                     setTimeout(() => {
                                         setRefreshFlag(Date.now().toString());
@@ -796,8 +1065,10 @@ function TestRunResultFlyout(props) {
 
                 return () => clearTimeout(timeoutId);
             }
-        }, [selectedTestRunResult?.id,]);
+        }, [selectedTestRunResult?.id]);
 
+    // Component that renders the request/response editors for the selected result.
+    const ValuesTabContent = React.memo(({ isAgentic = false, runAutomatedTests = false } = {}) => {
         if (dataExpired && !selectedTestRunResult?.vulnerable) {
             return dataExpiredComponent;
         }

@@ -24,14 +24,11 @@ public class WizApiEndpointsImportJobUtil {
 
     public static void setupBeforeImport(int accountId) {
         SingleTypeInfo.fetchCustomDataTypes(accountId);
-        AccountHTTPCallParserAktoPolicyInfo aktoPolicyInfo = RuntimeListener.accountHTTPParserMap.get(accountId);
-        if (aktoPolicyInfo == null) {
-            aktoPolicyInfo = new AccountHTTPCallParserAktoPolicyInfo();
-            HttpCallParser httpCallParser = new HttpCallParser("userIdentifier", 10, 5, 30, false, true);
-            httpCallParser.setSkipDependencyAnalysis(true);
-            aktoPolicyInfo.setHttpCallParser(httpCallParser);
-            RuntimeListener.accountHTTPParserMap.put(accountId, aktoPolicyInfo);
-        }
+        AccountHTTPCallParserAktoPolicyInfo aktoPolicyInfo = new AccountHTTPCallParserAktoPolicyInfo();
+        HttpCallParser httpCallParser = new HttpCallParser("userIdentifier", 10, 5, 30, false, true);
+        httpCallParser.setSkipDependencyAnalysis(true);
+        aktoPolicyInfo.setHttpCallParser(httpCallParser);
+        RuntimeListener.accountHTTPParserMap.put(accountId, aktoPolicyInfo);
     }
     
     public static void wizApiEndpointsProcessor(ParserResult parsedSwagger, WizImportJobPageContext pageContext) {

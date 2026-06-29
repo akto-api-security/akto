@@ -10,9 +10,7 @@ import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
 import ModuleEnvConfigComponent from "../../settings/health_logs/ModuleEnvConfig";
-import TitleWithInfo from "../../../components/shared/TitleWithInfo";
 import settingRequests from "../../settings/api";
-import transform from "../transform"
 
 const ANIMATION_DURATION = 0.2;
 const LOG_LEVEL_TONES = {

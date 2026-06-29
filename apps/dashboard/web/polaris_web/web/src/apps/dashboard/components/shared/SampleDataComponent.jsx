@@ -123,28 +123,27 @@ function SampleDataComponent(props) {
         const responseVulnerabilitySegments = metadataSegments.filter(s => s.location === 'LOCATION_RESPONSE_BODY');
         const segmentsFromMetadata = fromMetadata;
 
-        if(isNewDiff){
-            let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine)
-            let lineResObj = transform.getFirstLine(originalResponseJson?.firstLine,responseJson?.firstLine)
+        // LLM analysis segments carry a location of REQUEST/RESPONSE so we can
+        // highlight the evidence in the correct editor (default to RESPONSE).
+        // Informational segments (e.g. missing headers) are panel-only - they
+        // describe something absent, so they never go to the editors.
+        const highlightableSegments = baseSegments.filter(s => s?.informational !== true);
+        const llmRequestSegments = highlightableSegments.filter(s => s?.location === 'REQUEST');
+        const llmResponseSegments = highlightableSegments.filter(s => s?.location !== 'REQUEST');
 
-            let requestHeaderObj = transform.compareJsonKeys(originalRequestJson?.json?.requestHeaders,requestJson?.json?.requestHeaders)
-            let responseHeaderObj = transform.compareJsonKeys(originalResponseJson?.json?.responseHeaders,responseJson?.json?.responseHeaders)
-            
-            let requestPayloadObj = transform.getPayloadData(originalRequestJson?.json?.requestPayload,requestJson?.json?.requestPayload)
-            let responsePayloadObj = transform.getPayloadData(originalResponseJson?.json?.responsePayload,responseJson?.json?.responsePayload)
-            
-            const requestData = transform.mergeDataObjs(lineReqObj, requestHeaderObj, requestPayloadObj)
-            const responseData = transform.mergeDataObjs(lineResObj, responseHeaderObj, responsePayloadObj)
+        if(isNewDiff){
+            // Shared builder so the rendered text matches the verification contract.
+            const { requestData, responseData } = transform.buildDiffData(requestJson, responseJson, originalRequestJson, originalResponseJson)
 
             setSampleJsonData({
-                request: requestData,
-                response: { ...responseData, vulnerabilitySegments: segmentsFromMetadata ? responseVulnerabilitySegments : vulnerabilitySegments }
+                request: { ...requestData, vulnerabilitySegments: segmentsFromMetadata ? [] : llmRequestSegments },
+                response: { ...responseData, vulnerabilitySegments: segmentsFromMetadata ? responseVulnerabilitySegments : llmResponseSegments }
             })
         }else{
             setSampleJsonData({ 
-                // If segments came from threat metadata, highlight in request; if they were provided by caller (e.g., LLM analysis), pass to both panes
-                request: { message: transform.formatData(requestJson,"http", redactHeaders), original: transform.formatData(originalRequestJson,"http", redactHeaders), highlightPaths:requestJson?.highlightPaths, vulnerabilitySegments },
-                response: showResponse ? { message: transform.formatData(responseJson,"http", redactHeaders), original: transform.formatData(originalResponseJson,"http", redactHeaders), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments: segmentsFromMetadata ? responseVulnerabilitySegments : vulnerabilitySegments } : {},
+                // Threat metadata segments highlight in request; LLM analysis segments are routed by their location field (REQUEST vs RESPONSE)
+                request: { message: transform.formatData(requestJson,"http", redactHeaders), original: transform.formatData(originalRequestJson,"http", redactHeaders), highlightPaths:requestJson?.highlightPaths, vulnerabilitySegments: segmentsFromMetadata ? vulnerabilitySegments : llmRequestSegments },
+                response: showResponse ? { message: transform.formatData(responseJson,"http", redactHeaders), original: transform.formatData(originalResponseJson,"http", redactHeaders), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments: segmentsFromMetadata ? responseVulnerabilitySegments : llmResponseSegments } : {},
             })
         }
     }, [sampleData, metadata, isNewDiff, showResponse, simpleJson, type, redactHeaders, isWebSocket])

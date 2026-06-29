@@ -6,6 +6,31 @@ package com.akto.utils.elasticsearch;
  */
 public class AgentQueryRecord {
 
+    // Elasticsearch document field names. Use these instead of inline string literals
+    // when building queries or parsing results in action / service classes.
+    public static final String F_ACCOUNT_ID            = "accountId";
+    public static final String F_SERVICE_ID            = "serviceId";
+    public static final String F_SERVICE_ID_KW         = "serviceId.keyword";
+    public static final String F_DEVICE_ID             = "deviceId";
+    public static final String F_DEVICE_ID_KW          = "deviceId.keyword";
+    public static final String F_USER_NAME             = "userName";
+    public static final String F_USER_NAME_KW          = "userName.keyword";
+    public static final String F_SESSION_IDENTIFIER    = "sessionIdentifier";
+    public static final String F_SESSION_IDENTIFIER_KW = "sessionIdentifier.keyword";
+    public static final String F_QUERY_PAYLOAD         = "queryPayload";
+    public static final String F_RESPONSE_PAYLOAD      = "responsePayload";
+    public static final String F_TIMESTAMP             = "timestamp";
+    public static final String F_INPUT_TOKENS          = "inputTokens";
+    public static final String F_OUTPUT_TOKENS         = "outputTokens";
+    public static final String F_TRACE_ID              = "traceId";
+    public static final String F_TRACE_ID_KW           = "traceId.keyword";
+    public static final String F_SPAN_ID_KW            = "spanId.keyword";
+    public static final String F_IS_ATLAS_TRAFFIC      = "isAtlasTraffic";
+    public static final String F_TOPIC                 = "topic";
+    public static final String F_TOPIC_KW              = "topic.keyword";
+    public static final String F_SUB_TOPIC             = "subTopic";
+    public static final String F_SUB_TOPIC_KW          = "subTopic.keyword";
+
     private final String docId;
     private final int accountId;
     private final String serviceId;
@@ -20,12 +45,15 @@ public class AgentQueryRecord {
     private final String traceId;
     private final String spanId;
     private final boolean isAtlasTraffic;
+    private final String topic;
+    private final String subTopic;
 
     public AgentQueryRecord(String docId, int accountId, String serviceId, String deviceId,
                             String userName, String sessionIdentifier,
                             String queryPayload, String responsePayload,
                             long timeStampMs, int inputTokens, int outputTokens,
-                            String traceId, String spanId, boolean isAtlasTraffic) {
+                            String traceId, String spanId, boolean isAtlasTraffic,
+                            String topic, String subTopic) {
         this.docId = docId;
         this.accountId = accountId;
         this.serviceId = serviceId;
@@ -40,6 +68,8 @@ public class AgentQueryRecord {
         this.traceId = traceId;
         this.spanId = spanId;
         this.isAtlasTraffic = isAtlasTraffic;
+        this.topic = topic != null ? topic : "";
+        this.subTopic = subTopic != null ? subTopic : "";
     }
 
     public String getDocId() { return docId; }
@@ -56,4 +86,6 @@ public class AgentQueryRecord {
     public String getTraceId() { return traceId; }
     public String getSpanId() { return spanId; }
     public boolean getIsAtlasTraffic() { return isAtlasTraffic; }
+    public String getTopic() { return topic; }
+    public String getSubTopic() { return subTopic; }
 }

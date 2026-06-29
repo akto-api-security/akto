@@ -122,6 +122,7 @@ import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetect
 import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetectionDemo";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
 import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashboardPage";
+import ThreatProtectedLayout from "../dashboard/pages/threat_detection/ThreatProtectedLayout";
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
 import DastProgress from "../dashboard/pages/observe/api_collections/DastProgress.jsx";
 import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
@@ -216,7 +217,8 @@ const router = createBrowserRouter([
                         children: [
                             {
                                 path: "sensitive",
-                                element: <AllSensitiveData/>
+                                element: <ThreatProtectedLayout probeUrl="/api/fetchDataTypes" featureName="Sensitive Data"/>,
+                                children: [{ index: true, element: <AllSensitiveData/> }]
                             },
                             {
                                 path: "inventory",
@@ -688,6 +690,8 @@ const router = createBrowserRouter([
                 element: <Onboarding/>
             },
             {
+                // Report routes: Dashboard skips fetchAllSubCategories on these paths.
+                // Each report component fetches only the subcategories it needs (targeted fetch).
                 path: "testing/summary/:reportId",
                 element: <VulnerabilityReport/>
             },

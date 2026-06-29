@@ -3,6 +3,7 @@ import {  CancelMajor } from "@shopify/polaris-icons";
 import { useEffect, useState } from "react";
 import "./run_test_suites.css"
 import RunTestSuiteRow from "./RunTestSuiteRow";
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import testingApi from "../../testing/api";
 import func from "@/util/func";
 import { getDashboardCategory, mapLabel, isAgenticSecurityCategory } from "../../../../main/labelHelper";
@@ -11,6 +12,7 @@ function RunTestSuites({ apiCollectionName, activeFromTesting, setTestSuiteIds, 
 
     const [data, setData] = useState({ agenticSecurity: {}, attackBaseTechnique: {}, attackStrategy: {}, owaspTop10List: {}, testingMethods:{}, custom : {}, severity: {}, duration: {} });
     const [testSuiteIdsNameMap, setTestSuiteIdsNameMap] = useState({});
+    const [loading, setLoading] = useState(true);
 
 
     async function fetchData() {
@@ -95,7 +97,15 @@ function RunTestSuites({ apiCollectionName, activeFromTesting, setTestSuiteIds, 
     }
     
     useEffect(() => {
-        fetchData();
+        const loadData = async () => {
+            setLoading(true)
+            try {
+                await fetchData()
+            } finally {
+                setLoading(false)
+            }
+        }
+        loadData()
     }, []);
 
     function createTestName(testSuiteIds) {
@@ -152,6 +162,7 @@ function RunTestSuites({ apiCollectionName, activeFromTesting, setTestSuiteIds, 
     return (
         <Scrollable vertical={true} horizontal={false} shadow={false}>
             <div className="runTestSuitesModal" style={{ minHeight: "72vh",paddingBlockEnd:"1rem" }}>
+                {loading ? <SpinnerCentered /> :
                 <VerticalStack gap={5}>
                     <div style={{ display: "grid", gridTemplateColumns: "max-content auto max-content", alignItems: "center", gap: "10px" }}>
                         <Text variant="headingMd">Name:</Text>
@@ -195,6 +206,7 @@ function RunTestSuites({ apiCollectionName, activeFromTesting, setTestSuiteIds, 
                     }
 
                 </VerticalStack>
+                }
             </div>
         </Scrollable>
     )

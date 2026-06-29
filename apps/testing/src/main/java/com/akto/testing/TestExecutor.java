@@ -318,7 +318,8 @@ public class TestExecutor {
                     testSuiteObjectIds.add(testSuiteObjectId);
                 }
 
-                testingRunSubCategories = TestSuiteDao.getAllTestSuitesSubCategories(testSuiteObjectIds);
+                testingRunSubCategories = TestSuiteDao.getAllTestSuitesSubCategories(
+                        testSuiteObjectIds, testingRun.getDashboardContext());
             }
         }
 

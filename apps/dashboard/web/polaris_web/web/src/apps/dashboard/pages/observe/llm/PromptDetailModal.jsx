@@ -1,7 +1,7 @@
 import { Badge, Box, HorizontalStack, Modal, Text, VerticalStack } from "@shopify/polaris";
 import { ClockMinor, HashtagMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
-import { formatCost, truncate } from "./constants";
+import { truncate } from "./constants";
 import ChatMessage from "../../testing/TestRunResultPage/components/ChatMessage";
 
 export default function PromptDetailModal({ prompt, onClose }) {
@@ -39,7 +39,6 @@ export default function PromptDetailModal({ prompt, onClose }) {
                         <Badge tone="info">
                             {(prompt._inputTokens || 0) + " in / " + (prompt._outputTokens || 0) + " out"}
                         </Badge>
-                        <Badge>{formatCost(prompt._inputTokens || 0, prompt._outputTokens || 0)}</Badge>
                     </HorizontalStack>
 
                     {/* Prompt */}

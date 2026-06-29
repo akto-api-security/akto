@@ -7,6 +7,19 @@ import editorSetup from './customEditor';
 import yamlEditorSetup from "../../pages/test_editor/components/editor_config/editorSetup"
 import keywords from "../../pages/test_editor/components/editor_config/keywords"
 import authTypesApi from "@/apps/dashboard/pages/settings/auth_types/api";
+import { locateSegment } from "./vulnerabilityEvidence";
+import { COOKIE_REDACT_PLACEHOLDER } from './customDiffEditor';
+
+function highlightRedactedCookies(ref) {
+  if (!func.isCookieRedactAccount()) return
+  const matches = ref.getModel().findMatches(COOKIE_REDACT_PLACEHOLDER, false, false, true, null, true)
+  matches.forEach((match) => {
+    ref.createDecorationsCollection([{
+      range: match.range,
+      options: { inlineClassName: "highlightOther" }
+    }])
+  })
+}
 
 function highlightPaths(highlightPathMap, ref){
   highlightPathMap && Object.keys(highlightPathMap).forEach((key) => {
@@ -156,53 +169,53 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
     return;
   }
 
-  const textLength = text.length;
-  const isValidRange = (start, end) => Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end <= textLength && start < end;
-  const resolvePhrase = (segment) => {
-    if (typeof segment?.phrase === 'string' && segment.phrase.length > 0) {
-      return segment.phrase;
-    }
-    if (typeof segment?.message === 'string' && segment.message.length > 0) {
-      return segment.message.replace(/\s*\[chars\s+\d+-\d+\]\s*$/, '');
-    }
-    return undefined;
-  };
-
   const decorations = [];
+  let firstStart = Infinity;
 
   vulnerabilitySegments.forEach((segment) => {
     try {
-      let start = Number(segment?.start);
-      let end = Number(segment?.end);
-      const phrase = resolvePhrase(segment);
-
-      if (phrase) {
-        const phraseMatchesProvidedRange = isValidRange(start, end) && text.slice(start, end) === phrase;
-        if (!phraseMatchesProvidedRange) {
-          const idx = text.indexOf(phrase);
-          if (idx >= 0) {
-            start = idx;
-            end = idx + phrase.length;
-          }
-        }
+      // Informational evidence (e.g. missing headers) describes something ABSENT,
+      // so there is nothing in the editor text to highlight - it is panel-only.
+      if (segment?.informational === true) {
+        return;
       }
-
-      if (!isValidRange(start, end)) {
+      // Shared locator (see vulnerabilityEvidence.js) - the SAME contract the
+      // Evidence panel uses, so we never highlight what the panel can't show.
+      const range = locateSegment(segment, text);
+      // If we cannot locate the exact phrase, skip rather than highlight the
+      // wrong span using unreliable offsets.
+      if (!range) {
         return;
       }
 
-      const startPos = model.getPositionAt(start);
-      const endPos = model.getPositionAt(end);
+      const startPos = model.getPositionAt(range.start);
+      const endPos = model.getPositionAt(range.end);
 
       if (!startPos || !endPos) {
         return;
       }
 
+      firstStart = Math.min(firstStart, range.start);
+
+      const reason = typeof segment?.reason === 'string' ? segment.reason.trim() : '';
+      const options = {
+        inlineClassName: "vulnerability-highlight",
+        // Marker in the scrollbar so evidence is easy to find/jump to in large responses.
+        overviewRuler: {
+          color: "rgba(139, 69, 255, 0.8)",
+          position: monaco.editor.OverviewRulerLane.Right
+        }
+      };
+      if (reason) {
+        options.hoverMessage = [
+          { value: "**Evidence**" },
+          { value: reason }
+        ];
+      }
+
       decorations.push({
         range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
-        options: {
-          inlineClassName: "vulnerability-highlight"
-        }
+        options
       });
     } catch (error) {
       console.error('Error creating vulnerability highlight:', error, segment);
@@ -210,7 +223,19 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
   });
 
   if (decorations.length > 0) {
+    if (ref._vulnDecorations) {
+      ref._vulnDecorations.clear();
+    }
     ref._vulnDecorations = ref.createDecorationsCollection(decorations);
+
+    // Scroll the first piece of evidence into view so users don't have to hunt
+    // through a large response.
+    if (Number.isFinite(firstStart)) {
+      const pos = model.getPositionAt(firstStart);
+      if (pos) {
+        ref.revealLineInCenter(pos.lineNumber);
+      }
+    }
   }
 }
 
@@ -387,6 +412,7 @@ function SampleData(props) {
         let message = data.original ? data.original : data?.message 
         instance.setValue(message)
         highlightPaths(data?.highlightPaths, instance);
+        highlightRedactedCookies(instance);
         if(data.headersMap){
           highlightHeaders(data, instance,getLineNumbers)
         }

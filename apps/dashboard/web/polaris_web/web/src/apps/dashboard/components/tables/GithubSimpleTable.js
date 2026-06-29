@@ -60,6 +60,7 @@ function GithubSimpleTable(props) {
         calendarFilterKeys={props?.calendarFilterKeys}
         supportsNegationFilter={true}
         onExportCsv={props?.onExportCsv}
+        skipUrlFilters={props?.skipUrlFilters}
     />
 
 }

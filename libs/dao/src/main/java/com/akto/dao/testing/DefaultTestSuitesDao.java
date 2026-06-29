@@ -13,7 +13,6 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import org.apache.commons.lang3.StringUtils;
-import org.bson.conversions.Bson;
 
 import java.util.*;
 
@@ -219,37 +218,42 @@ public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> 
     }
 
     public void saveYamlTestTemplateInDefaultSuite(Info info, String author) {
-        for(Map.Entry<String, List<String>> entry : owaspTop10List.entrySet()) {
+        for (Map.Entry<String, List<String>> entry : owaspTop10List.entrySet()) {
             String key = entry.getKey();
             List<String> categories = entry.getValue();
 
-            if(!categories.contains(info.getCategory().getName())) {
+            if (!categories.contains(info.getCategory().getName())) {
                 continue;
             }
 
-            for(DefaultTestSuites.DefaultSuitesType defaultSuitesType : DefaultTestSuites.DefaultSuitesType.values()) {
-                if(defaultSuitesType.name().equals(DefaultTestSuites.DefaultSuitesType.TESTING_METHODS.name())) {
-                    continue;
-                }
+            DefaultTestSuitesDao.instance.updateOne(
+                    Filters.and(
+                            Filters.eq(DefaultTestSuites.NAME, key),
+                            Filters.eq(DefaultTestSuites.SUITE_TYPE, DefaultTestSuites.DefaultSuitesType.OWASP.name())
+                    ),
+                    Updates.combine(
+                            Updates.setOnInsert(DefaultTestSuites.CREATED_AT, Context.now()),
+                            Updates.set(DefaultTestSuites.LAST_UPDATED, Context.now()),
+                            Updates.setOnInsert(DefaultTestSuites.CREATED_BY, author),
+                            Updates.setOnInsert(DefaultTestSuites.SUITE_TYPE, DefaultTestSuites.DefaultSuitesType.OWASP.name()),
+                            Updates.addEachToSet(DefaultTestSuites.SUB_CATEGORY_LIST, Arrays.asList(info.getSubCategory()))
+                    )
+            );
 
-                Bson keyFilter = Filters.eq(DefaultTestSuites.NAME, key);
-                if(defaultSuitesType.name().equals(DefaultTestSuites.DefaultSuitesType.SEVERITY.name())) {
-                    keyFilter = Filters.eq(DefaultTestSuites.NAME, StringUtils.capitalize(info.getSeverity().toLowerCase()));
-                }
-
-                DefaultTestSuitesDao.instance.updateOne(Filters.and(
-                                keyFilter,
-                                Filters.eq(DefaultTestSuites.SUITE_TYPE, defaultSuitesType.name())
-                        ),
-                        Updates.combine(
-                                Updates.setOnInsert(DefaultTestSuites.CREATED_AT, Context.now()),
-                                Updates.set(DefaultTestSuites.LAST_UPDATED, Context.now()),
-                                Updates.setOnInsert(DefaultTestSuites.CREATED_BY, author),
-                                Updates.setOnInsert(DefaultTestSuites.SUITE_TYPE, defaultSuitesType.name()),
-                                Updates.addEachToSet(DefaultTestSuites.SUB_CATEGORY_LIST, Arrays.asList(info.getSubCategory()))
-                        )
-                );
-            }
+            String severityName = StringUtils.capitalize(info.getSeverity().toLowerCase());
+            DefaultTestSuitesDao.instance.updateOne(
+                    Filters.and(
+                            Filters.eq(DefaultTestSuites.NAME, severityName),
+                            Filters.eq(DefaultTestSuites.SUITE_TYPE, DefaultTestSuites.DefaultSuitesType.SEVERITY.name())
+                    ),
+                    Updates.combine(
+                            Updates.setOnInsert(DefaultTestSuites.CREATED_AT, Context.now()),
+                            Updates.set(DefaultTestSuites.LAST_UPDATED, Context.now()),
+                            Updates.setOnInsert(DefaultTestSuites.CREATED_BY, author),
+                            Updates.setOnInsert(DefaultTestSuites.SUITE_TYPE, DefaultTestSuites.DefaultSuitesType.SEVERITY.name()),
+                            Updates.addEachToSet(DefaultTestSuites.SUB_CATEGORY_LIST, Arrays.asList(info.getSubCategory()))
+                    )
+            );
         }
     }
 

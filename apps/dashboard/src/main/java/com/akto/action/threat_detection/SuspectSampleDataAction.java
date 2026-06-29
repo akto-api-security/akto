@@ -200,31 +200,40 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
               m -> {
                 this.maliciousEvents = m.getMaliciousEventsList().stream()
                     .map(
-                        smr -> new DashboardMaliciousEvent(
-                            smr.getId(),
-                            smr.getActor(),
-                            smr.getFilterId(),
-                            smr.getEndpoint(),
-                            URLMethods.Method.fromString(smr.getMethod()),
-                            smr.getApiCollectionId(),
-                            smr.getIp(),
-                            smr.getCountry(),
-                            smr.getDestCountry(),
-                            smr.getDetectedAt(),
-                            smr.getType(),
-                            smr.getRefId(),
-                            smr.getCategory(),
-                            smr.getSubCategory(),
-                            smr.getEventTypeVal(),
-                            smr.getPayload(),
-                            smr.getMetadata(),
-                            smr.getSuccessfulExploit(),
-                            smr.getStatus(),
-                            smr.getLabel(),
-                            smr.getHost(),
-                            smr.getJiraTicketUrl(),
-                            smr.getSeverity(),
-                            smr.getSessionId() != null && !smr.getSessionId().isEmpty() ? smr.getSessionId() : ""))
+                        smr -> {
+                            DashboardMaliciousEvent event = new DashboardMaliciousEvent(
+                                smr.getId(),
+                                smr.getActor(),
+                                smr.getFilterId(),
+                                smr.getEndpoint(),
+                                URLMethods.Method.fromString(smr.getMethod()),
+                                smr.getApiCollectionId(),
+                                smr.getIp(),
+                                smr.getCountry(),
+                                smr.getDestCountry(),
+                                smr.getDetectedAt(),
+                                smr.getType(),
+                                smr.getRefId(),
+                                smr.getCategory(),
+                                smr.getSubCategory(),
+                                smr.getEventTypeVal(),
+                                smr.getPayload(),
+                                smr.getMetadata(),
+                                smr.getSuccessfulExploit(),
+                                smr.getStatus(),
+                                smr.getLabel(),
+                                smr.getHost(),
+                                smr.getJiraTicketUrl(),
+                                smr.getSeverity(),
+                                smr.getSessionId() != null && !smr.getSessionId().isEmpty() ? smr.getSessionId() : "");
+                            if (!smr.getOwaspCategoriesList().isEmpty()) {
+                                event.setOwaspCategories(smr.getOwaspCategoriesList().stream()
+                                    .map(o -> new DashboardMaliciousEvent.OwaspCategory(
+                                        o.getId(), o.getName(), o.getSeverity(), o.getConfidence()))
+                                    .collect(Collectors.toList()));
+                            }
+                            return event;
+                        })
                     .collect(Collectors.toList());
                 this.total = m.getTotal();
               });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { Box, IndexFiltersMode, Text, HorizontalStack, Badge, Card, VerticalStack, Divider, Button } from "@shopify/polaris"
+import { Box, IndexFiltersMode, Text, HorizontalStack, Badge, Card, VerticalStack, Divider, Button, Banner } from "@shopify/polaris"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable"
 import func from "@/util/func"
 import api from "./api"
@@ -60,6 +60,21 @@ const resourceName = {
     plural: 'URLs',
 }
 
+const STATUS_BADGE = {
+    PENDING: { status: "new", label: "Pending", progress: "incomplete" },
+    RUNNING: { status: "attention", label: "Running", progress: "partiallyComplete" },
+    COMPLETED: { status: "success", label: "Completed", progress: "complete" },
+    STOP_REQUESTED: { status: "warning", label: "Stop requested", progress: "partiallyComplete" },
+    STOPPED: { status: "warning", label: "Stopped", progress: "complete" },
+    FAILED: { status: "critical", label: "Failed", progress: "complete" },
+}
+
+function StatusBadge({ status }) {
+    if (!status) return null
+    const badge = STATUS_BADGE[status] || { status: "new", label: status }
+    return <Badge status={badge.status} progress={badge.progress}>{badge.label}</Badge>
+}
+
 function DastProgressSingle() {
     const { "crawlId": crawlId } = useParams()
     const navigate = useNavigate()
@@ -83,7 +98,9 @@ function DastProgressSingle() {
                 setScanMetadata({
                     moduleName: currentScan.moduleName || "Internal DAST (Akto)",
                     applicationPages: currentScan.applicationPages || "-",
-                    urlTemplatePatterns: currentScan.urlTemplatePatterns || "-"
+                    urlTemplatePatterns: currentScan.urlTemplatePatterns || "-",
+                    testRoleFailed: currentScan.testRoleFailed || false,
+                    testRoleError: currentScan.testRoleError || ""
                 })
                 setCrawlerStatus(currentScan.status)
             }
@@ -178,7 +195,10 @@ function DastProgressSingle() {
     return (
         <PageWithMultipleCards
             title={
-                <Text variant="headingLg" as="h1">DAST Scan Details</Text>
+                <HorizontalStack gap="3" blockAlign="center">
+                    <Text variant="headingLg" as="h1">DAST Scan Details</Text>
+                    <StatusBadge status={crawlerStatus} />
+                </HorizontalStack>
             }
             primaryAction={crawlerStatus === 'RUNNING' && (
                 <Button onClick={() => setShowLiveBrowser(!showLiveBrowser)}>
@@ -186,6 +206,16 @@ function DastProgressSingle() {
                 </Button>
             )}
             components={[
+                scanMetadata?.testRoleFailed && (
+                    <Box paddingBlockEnd="4" key="test-role-warning">
+                        <Banner status="warning" title="Test role authentication failed">
+                            <Text>
+                                This scan ran without authentication because the configured test role could not authenticate
+                                {scanMetadata.testRoleError ? `: ${scanMetadata.testRoleError}` : "."} Results may be incomplete.
+                            </Text>
+                        </Banner>
+                    </Box>
+                ),
                 crawlDetails && (
                     <Box paddingBlockEnd="4">
                         <Card>

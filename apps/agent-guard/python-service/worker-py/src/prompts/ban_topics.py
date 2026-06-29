@@ -69,15 +69,35 @@ Text to analyze:
 %s"""
 
 
-def _format_topics(topics: Any) -> str:
+def _format_topic_entry(topic: str, descriptions: Dict[str, str], sample_phrases: Dict[str, list]) -> str:
+    lines = [f"- {topic}"]
+    desc = descriptions.get(topic, "")
+    if desc:
+        lines.append(f"  Flag when: {desc}")
+    phrases = sample_phrases.get(topic, [])
+    if phrases:
+        lines.append(f"  Examples that MUST be flagged: {', '.join(f'\"{p}\"' for p in phrases)}")
+    return "\n".join(lines)
+
+
+def _format_topics(topics: Any, descriptions: Dict[str, str] = None, sample_phrases: Dict[str, list] = None) -> str:
     if isinstance(topics, str):
         return topics
-    if isinstance(topics, list):
-        return ", ".join(str(t) for t in topics if t)
-    return ""
+    if not isinstance(topics, list):
+        return ""
+    descs = descriptions or {}
+    phrases = sample_phrases or {}
+    if descs or phrases:
+        entries = [_format_topic_entry(t, descs, phrases) for t in topics if t]
+        return "(flag messages matching each topic's criteria below)\n" + "\n".join(entries)
+    return ", ".join(str(t) for t in topics if t)
 
 
 def build(config: Dict[str, Any], provider_name: str, text: str) -> str:
-    topics_str = _format_topics(config.get("topics", []))
+    topics_str = _format_topics(
+        config.get("topics", []),
+        config.get("topicDescriptions", {}),
+        config.get("topicSamplePhrases", {}),
+    )
     template = GEMMA if provider_name == "gemma_vertexai" else DEFAULT
     return template % (topics_str, text)

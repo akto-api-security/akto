@@ -5,7 +5,8 @@ const threatDetectionRequests = {
         return request({
             url: '/api/fetchFilterYamlTemplate',
             method: 'post',
-            data: {}
+            data: {},
+            suppress403Toast: true
         })
     },
     saveFilterYamlTemplate(content) {
@@ -46,7 +47,8 @@ const threatDetectionRequests = {
                 ...(latestApiOrigRegex ? { latestApiOrigRegex } : {}),
                 method: method,
                 ...(typeof sortBySeverity === 'boolean' ? { sortBySeverity } : {})
-            }
+            },
+            suppress403Toast: true
         })
     },
     fetchFiltersThreatTable(startTimestamp, endTimestamp) {
@@ -60,7 +62,8 @@ const threatDetectionRequests = {
         return request({
             url: '/api/fetchFiltersThreatTable',
             method: 'post',
-            data: data
+            data: data,
+            suppress403Toast: true
         })
     },
     fetchThreatActors(skip, sort, latestAttack, country, startTs, endTs, actorId, host, cursor) {
@@ -304,7 +307,8 @@ const threatDetectionRequests = {
         return request({
             url: '/api/fetchThreatComplianceInfos',
             method: 'post',
-            data: {}
+            data: {},
+            suppress403Toast: true
         })
     },
     fetchGuardrailComplianceInfos() {

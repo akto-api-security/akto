@@ -181,3 +181,7 @@
     flex-direction: column;
     min-height: 0;
 }
+
+.ag-row-group-leaf-indent{
+    margin-left: 0px !important;
+}

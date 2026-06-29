@@ -86,6 +86,21 @@ public class ApiCountCacheLayer implements CounterCache {
         throw new UnsupportedOperationException("Unimplemented method 'reset'");
     }
 
+    @Override
+    public void addToSet(String key, String member) {
+        throw new UnsupportedOperationException("Unimplemented method 'addToSet'");
+    }
+
+    @Override
+    public java.util.Set<String> getSetMembers(String key) {
+        throw new UnsupportedOperationException("Unimplemented method 'getSetMembers'");
+    }
+
+    @Override
+    public void resetSet(String key) {
+        throw new UnsupportedOperationException("Unimplemented method 'resetSet'");
+    }
+
     private void flush() {
         Set<String> keys = new HashSet<>();
         while (!this.pendingOps.isEmpty()) {

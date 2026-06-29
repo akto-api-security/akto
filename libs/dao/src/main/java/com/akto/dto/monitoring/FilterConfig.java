@@ -165,4 +165,5 @@ public class FilterConfig {
     public void setFailureFilter(ConfigParserResult failureFilter) {
         this.failureFilter = failureFilter;
     }
+
 }

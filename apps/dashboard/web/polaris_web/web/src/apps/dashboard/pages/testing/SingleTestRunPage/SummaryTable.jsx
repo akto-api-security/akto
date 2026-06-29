@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useRef, useState, useMemo } from 'react'
 import transform from '../transform'
 import func from '@/util/func'
 import api from '../api'
@@ -6,10 +6,18 @@ import { IndexTable, useIndexResourceState, LegacyCard, HorizontalStack, Paginat
 import { GithubRow } from '../../../components/tables/rows/GithubRow'
 import observeFunc from "../../observe/transform"
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper'
+import {
+    getCachedRunStatusCounts,
+    getValidRunStatusMap,
+    setCachedRunStatusCounts,
+} from '../TestRunsPage/runStatusCache'
+import { shouldFetchRunStatusSummary } from '../TestRunsPage/runStatusUtils'
 
 function SummaryTable({testingRunResultSummaries, setSummary}) {
 
     const [data, setData] = useState([])
+    const [runStatusUpdateKey, setRunStatusUpdateKey] = useState("")
+    const pendingRunStatusRequestRef = useRef(null)
 
     // Memoize headers to prevent recreation on every render
     const headers = useMemo(() => [
@@ -25,6 +33,11 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
             title: 'Vulnerabilities',
             value: 'prettifiedSeverities',
             isCustom: true
+        },
+        {
+            title: mapLabel("Test", getDashboardCategory()) + " run status",
+            value: 'run_message',
+            maxWidth: '220px',
         },
         {
             title: `Total ${mapLabel('APIs Tested', getDashboardCategory())}`,
@@ -59,8 +72,49 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
       ]};
 
     useEffect(() => {
-        setData(transform.prettifySummaryTable(testingRunResultSummaries))
-    },[testingRunResultSummaries])
+        setData(transform.prepareSummaryTableRows(testingRunResultSummaries, getValidRunStatusMap()))
+    }, [testingRunResultSummaries, runStatusUpdateKey])
+
+    useEffect(() => {
+        const summaryHexIds = [...new Set(
+            (testingRunResultSummaries || [])
+                .filter(shouldFetchRunStatusSummary)
+                .map((summary) => summary.hexId)
+                .filter((hexId) => hexId && getCachedRunStatusCounts(hexId) === undefined)
+        )];
+
+        if (summaryHexIds.length === 0) {
+            return;
+        }
+
+        const requestKey = summaryHexIds.slice().sort().join(',');
+        if (pendingRunStatusRequestRef.current === requestKey) {
+            return;
+        }
+
+        pendingRunStatusRequestRef.current = requestKey;
+        const chunkSize = 10;
+        const chunks = [];
+        for (let i = 0; i < summaryHexIds.length; i += chunkSize) {
+            chunks.push(summaryHexIds.slice(i, i + chunkSize));
+        }
+
+        Promise.all(chunks.map((chunk) =>
+            api.fetchTestRunStatusSummaries(chunk)
+                .then((statusSummaries) => {
+                    if (pendingRunStatusRequestRef.current !== requestKey) {
+                        return;
+                    }
+                    setCachedRunStatusCounts(statusSummaries);
+                    setRunStatusUpdateKey(Date.now().toString());
+                })
+                .catch(() => {})
+        )).finally(() => {
+            if (pendingRunStatusRequestRef.current === requestKey) {
+                pendingRunStatusRequestRef.current = null;
+            }
+        });
+    }, [testingRunResultSummaries])
 
     const resourceIDResolver = (data) => {
         return data.id;

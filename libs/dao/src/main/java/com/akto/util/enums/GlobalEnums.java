@@ -22,7 +22,7 @@ public class GlobalEnums {
     /* Category of tests perfomred */
     public enum TestCategory {
 
-        // whenever adding a new test category, please ensure that if mcp or LLM is used, update the list of categories in TestTemplateUtils.java which will be used to fetch templates in fetchAllSubCategories
+        // whenever adding a new test category, please ensure that if mcp or LLM is used, update the list of categories in TestCategoryContextUtils.java which will be used to fetch templates in fetchAllSubCategories
 
         BOLA("BOLA", Severity.HIGH, "Broken Object Level Authorization (BOLA)", "BOLA"),
         NO_AUTH("NO_AUTH", Severity.HIGH, "Broken User Authentication (BUA)", "Broken Authentication"),

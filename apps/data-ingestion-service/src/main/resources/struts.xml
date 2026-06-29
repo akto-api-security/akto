@@ -85,6 +85,17 @@
             </result>
         </action>
 
+        <action name="api/http-proxy/dify" class="com.akto.action.DifyModerationAction" method="moderation">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">difyResponse</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="root">difyResponse</param>
+            </result>
+        </action>
+
         <action name="api/http-proxy/truefoundry" class="com.akto.action.TrueFoundryProxyAction" method="truefoundry">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

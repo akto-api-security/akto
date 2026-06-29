@@ -56,10 +56,53 @@ def get_default_config(raw_json: str = "") -> Dict[str, Any]:
 
 
 # Routing tables — the single source of truth for which backend handles a scan.
-CASCADE_SCANNERS = {"PromptInjection", "BanTopics", "Toxicity", "Gibberish"}
+# BanCode is LLM-judged (code detection via the Gemma arbiter), not the old
+# heuristic — see GEMMA_ONLY_SCANNERS for why it skips the Qwen tier.
+CASCADE_SCANNERS = {"PromptInjection", "BanTopics", "Toxicity", "Gibberish", "BanCode"}
 LOCAL_SCANNERS = {"BanSubstrings", "TokenLimit", "Secrets"}
+# Scanners the Qwen3Guard tier cannot judge (it emits a safety verdict, not a
+# code/quality verdict). For these, the Qwen FAST_THREAT_FILTER tier is stripped
+# from modelConfigs so only the arbiter LLM (Gemma) decides — otherwise Qwen
+# would fast-pass benign-but-flaggable input as "safe".
+GEMMA_ONLY_SCANNERS = {"BanCode"}
+
+
+def strip_qwen_tier(model_configs):
+    """Drop Qwen (FAST_THREAT_FILTER) providers so only the arbiter judges.
+
+    Returns the original list if filtering would leave nothing usable.
+    """
+    filtered = [
+        m for m in (model_configs or [])
+        if not str(m.get("provider", "")).lower().startswith("qwen")
+    ]
+    return filtered or list(model_configs or [])
 # Scanners that proxy to a sibling Worker which in turn owns a Cloudflare
 # Container. Used for any scanner that needs a real Python runtime (spaCy,
 # torch, etc.) which Pyodide can't host.
 REMOTE_SCANNERS = {"Anonymize"}
 SUPPORTED_SCANNERS = CASCADE_SCANNERS | LOCAL_SCANNERS | REMOTE_SCANNERS
+
+# Caller-supplied scanner_name aliases → canonical name. The container exposes a
+# separate ML-based `Code` scanner (language classification); Pyodide can't host
+# that model, so here `Code` is served by the `BanCode` heuristic (code-presence
+# detection). Keys are lower-cased; matching is case-insensitive (see
+# canonical_scanner). All code-detection spellings therefore behave identically.
+SCANNER_ALIASES = {"code": "BanCode"}
+
+
+def canonical_scanner(name: str) -> str:
+    """Resolve a caller-supplied scanner_name to its canonical form.
+
+    Case-insensitive, so "bancode" / "BANCODE" match "BanCode". Applies
+    SCANNER_ALIASES (e.g. Code/code → BanCode) so equivalent names route to the
+    same scanner. Unknown names are returned unchanged for the caller's
+    unsupported-scanner handling.
+    """
+    if not name:
+        return name
+    lowered = name.lower()
+    for canonical in SUPPORTED_SCANNERS:
+        if canonical.lower() == lowered:
+            return canonical
+    return SCANNER_ALIASES.get(lowered, name)
