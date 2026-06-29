@@ -1,15 +1,23 @@
 """Standalone FastAPI entrypoint for Docker, Kubernetes, and VM deployments."""
 
 import asyncio
+import logging
+import os
+import time
 from contextlib import asynccontextmanager
 from typing import Any, List
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel, Field
 
 import cascade_backpressure
+import scan_diag
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
+
+logger = logging.getLogger(__name__)
+
+_scan_inflight = 0
 
 
 class ScanRequest(BaseModel):
@@ -29,8 +37,36 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Akto Agent Guard Executor", version="1.0.0", lifespan=lifespan)
 
 
+@app.middleware("http")
+async def scan_inflight_middleware(request: Request, call_next):
+    """Track concurrent /scan handlers per uvicorn worker (queue saturation signal)."""
+    global _scan_inflight
+    if request.url.path not in ("/scan", "/scan/batch"):
+        return await call_next(request)
+
+    _scan_inflight += 1
+    scan_diag.log_inflight(_scan_inflight, entering=True)
+    try:
+        return await call_next(request)
+    finally:
+        _scan_inflight -= 1
+        scan_diag.log_inflight(_scan_inflight, entering=False)
+
+
 def _schedule_background(coro) -> None:
     asyncio.create_task(coro)
+
+
+def _response_path(details: dict[str, Any]) -> str:
+    if details.get("cascade_skipped"):
+        return "cascade_backpressure_skip"
+    if details.get("cache_hit") or details.get("cache_served"):
+        return "cache_hit"
+    if details.get("error"):
+        return "error"
+    if "scan_time_ms" in details or "execution_time_ms" in details:
+        return "cascade_run"
+    return "other"
 
 
 @app.get("/health")
@@ -45,7 +81,20 @@ def scanners():
 
 @app.post("/scan")
 async def scan(body: ScanRequest):
-    return await scan_payload(body.model_dump(), schedule_fn=_schedule_background)
+    started = time.perf_counter()
+    result = await scan_payload(body.model_dump(), schedule_fn=_schedule_background)
+    total_ms = (time.perf_counter() - started) * 1000.0
+    details = result.get("details") or {}
+    path = _response_path(details)
+    if path == "cascade_backpressure_skip" or scan_diag.enabled() or total_ms >= 3000:
+        logger.info(
+            "[scan-diag] http_complete scanner=%s path=%s total_ms=%.2f pid=%s",
+            body.scanner_name,
+            path,
+            total_ms,
+            os.getpid(),
+        )
+    return result
 
 
 @app.post("/scan/batch")

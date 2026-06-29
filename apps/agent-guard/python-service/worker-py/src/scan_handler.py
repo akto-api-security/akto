@@ -1,10 +1,12 @@
 """Cloud-agnostic scan routing shared by the Cloudflare Worker and FastAPI app."""
 
+import time
 from typing import Any, Callable, Coroutine, Dict, Optional
 
 import alerts
 import cascade_backpressure
 import cache
+import scan_diag
 from constants import (
     CASCADE_SCANNERS,
     GEMMA_ONLY_SCANNERS,
@@ -57,13 +59,23 @@ async def scan_payload(
     schedule_fn: Optional[ScheduleFn] = None,
 ) -> dict:
     """Run one scan and return the ScanResponse-shaped dict."""
+    started = time.perf_counter()
     schedule = schedule_fn or _noop_schedule
     scanner_name = canonical_scanner(payload.get("scanner_name", ""))
     scanner_type = payload.get("scanner_type", "prompt")
     text = payload.get("text", "")
     config = payload.get("config") or {}
 
+    def _elapsed_ms() -> float:
+        return (time.perf_counter() - started) * 1000.0
+
     if scanner_name not in SUPPORTED_SCANNERS:
+        scan_diag.log_scan_outcome(
+            "unsupported_scanner",
+            scanner_name,
+            _elapsed_ms(),
+            always=True,
+        )
         return shape_response(
             scanner_name, True, 0.0, text, {"error": f"unsupported scanner: {scanner_name}"}
         )
@@ -99,6 +111,13 @@ async def scan_payload(
             served = cache.try_serve(prep, scanner_name, scanner_type, text)
             if served is not None:
                 schedule(alerts.post_cache_shadow(served["alert"]))
+                scan_diag.log_scan_outcome(
+                    "cache_hit",
+                    scanner_name,
+                    _elapsed_ms(),
+                    extra={"is_valid": served["is_valid"]},
+                    always=True,
+                )
                 return shape_response(
                     scanner_name, served["is_valid"], served["risk_score"], text, served["details"]
                 )
@@ -106,6 +125,7 @@ async def scan_payload(
         # Cache miss (or cache not serving): only now does backpressure fail-open
         # to avoid paying for the slow cascade while Vertex latency is elevated.
         if cascade_backpressure.should_skip_cascade():
+            scan_diag.log_backpressure_skip(scanner_name)
             return shape_response(
                 scanner_name,
                 True,
@@ -113,6 +133,7 @@ async def scan_payload(
                 text,
                 {**cascade_backpressure.cascade_skip_details(), "scanner_type": scanner_type},
             )
+        scan_diag.log_backpressure_proceeding(scanner_name)
         try:
             result = await scan_with_model_map(
                 scanner_name, scanner_type, text, config, store_fn=store_fn
@@ -125,6 +146,15 @@ async def scan_payload(
             # cache-warm + miss-comparison in decide mode). Fire-and-forget.
             if cache.enabled():
                 schedule(cache.observe(scanner_name, scanner_type, text, config, result, prep=prep))
+            scan_diag.log_scan_outcome(
+                "cascade_run",
+                scanner_name,
+                _elapsed_ms(),
+                extra={
+                    "is_valid": result.get("is_valid"),
+                    "cascade_ms": elapsed,
+                },
+            )
             return shape_response(
                 scanner_name,
                 result["is_valid"],
@@ -133,6 +163,13 @@ async def scan_payload(
                 result.get("details", {}),
             )
         except Exception as exc:
+            scan_diag.log_scan_outcome(
+                "cascade_error",
+                scanner_name,
+                _elapsed_ms(),
+                extra={"error": str(exc)},
+                always=True,
+            )
             return shape_response(
                 scanner_name,
                 True,
@@ -144,6 +181,12 @@ async def scan_payload(
     if scanner_name in LOCAL_SCANNERS:
         try:
             r = scan_local(scanner_name, scanner_type, text, config)
+            scan_diag.log_scan_outcome(
+                "local_scan",
+                scanner_name,
+                _elapsed_ms(),
+                extra={"is_valid": r["is_valid"]},
+            )
             return shape_response(
                 scanner_name, r["is_valid"], r["risk_score"], r["sanitized_text"], r["details"]
             )

@@ -134,6 +134,27 @@ def recent_sample_count() -> int:
         return len(_samples)
 
 
+def status_snapshot() -> Dict[str, object]:
+    """Current backpressure window for diagnostics (per uvicorn worker process)."""
+    cfg = _config
+    with _lock:
+        _prune_locked(_now())
+        count = len(_samples)
+        if count == 0:
+            avg: Optional[float] = None
+        else:
+            avg = sum(lat for _, lat in _samples) / count
+    return {
+        "enabled": cfg.enabled,
+        "recent_sample_count": count,
+        "recent_avg_latency_ms": round(avg, 2) if avg is not None else None,
+        "threshold_ms": cfg.threshold_ms,
+        "min_samples": cfg.min_samples,
+        "ttl_seconds": cfg.ttl_seconds,
+        "pid": os.getpid(),
+    }
+
+
 def should_skip_cascade() -> bool:
     """Return True when the average of non-expired cascade latencies meets the env
     threshold. Stale samples are evicted first so this recovers on its own."""
