@@ -800,9 +800,7 @@ export function buildAgenticAssetsPageData(
         const collectionIds = (group.collections || []).map((c) => c.id);
         // Skills are capability manifest entries — violations belong to the agent/service collection
         // that declares them, not to the skill itself. Suppress to avoid double-counting.
-        const violations = group.rowType === ROW_TYPES.SKILL
-            ? null
-            : violationsForCollections(collectionIds, violationsByCollectionId);
+        const violations = violationsForCollections(collectionIds, violationsByCollectionId);
         const groups = buildTeamGroupsForAsset(group, usernameMap, userMetadataMap);
         const devices = buildDevicesForGroup(group, usernameMap, riskScoreMap);
         const skillNames = uniqueSkillNamesForGroup(group);
