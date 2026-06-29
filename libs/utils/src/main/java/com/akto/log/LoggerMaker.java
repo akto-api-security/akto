@@ -161,7 +161,7 @@ public class LoggerMaker {
     }
 
     protected String basicError(String err, LogDb db) {
-        err = String.format("%s\nAccount id: %d", err, Context.getActualAccountId());
+        err = formatMessageWithAccountId(err);
         logger.error(err);
         try{
             insert(err, "error", db);
@@ -215,7 +215,13 @@ public class LoggerMaker {
     }
 
     private String formatMessageWithAccountId(String info) {
-        return "acc: " + Context.getActualAccountId() + ", " + info;
+        StringBuilder sb = new StringBuilder();
+        String summaryId = Context.testRunResultSummaryId.get();
+        if (summaryId != null && !summaryId.isEmpty()) {
+            sb.append("trrs: ").append(summaryId).append(", ");
+        }
+        sb.append("acc: ").append(Context.getActualAccountId()).append(", ").append(info);
+        return sb.toString();
     }
 
     @Deprecated
@@ -244,7 +250,7 @@ public class LoggerMaker {
         String infoMessage = formatMessageWithAccountId(info);
         logger.info(infoMessage);
         if(checkUpdate()){
-            String text = aClass + " : " + " [" + moduleId + " ] " + info;
+            String text = aClass + " : " + " [" + moduleId + " ] " + infoMessage;
             Log log = new Log(text, "info", Context.now());
             dataActor.insertTestingLog(log);
             logCount++;
