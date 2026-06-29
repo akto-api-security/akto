@@ -530,24 +530,20 @@ const ContentPolicyStep = ({
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px', overflowAnchor: 'none' }}>
                             <VerticalStack gap="3">
                                 {editingIndex === null && (
-                                    <Button icon={PlusMinor} onClick={startAdding} fullWidth textAlign="left">Add denied topic</Button>
-                                )}
-                                {editingIndex === deniedTopics.length && renderEditRow(true)}
-                                {/* Custom topics */}
-                                {deniedTopics.map((topic, customIdx) => {
-                                    if (editingIndex === customIdx) return renderEditRow(false);
-                                    return renderViewRow(topic, customIdx);
-                                })}
-                                {/* Akto default topics toggle */}
-                                {editingIndex === null && (
-                                    <Button
-                                        icon={defaultPickerOpen ? ChevronUpMinor : ChevronDownMinor}
-                                        onClick={() => setDefaultPickerOpen(o => !o)}
-                                        fullWidth
-                                        textAlign="left"
-                                    >
-                                        {`Add Akto default topics${selectedDefaultBlockKeys.size > 0 ? ` (${selectedDefaultBlockKeys.size} selected)` : ''}`}
-                                    </Button>
+                                    <VerticalStack gap="2">
+                                        <Button icon={PlusMinor} onClick={startAdding} fullWidth textAlign="left">Add denied topic</Button>
+                                        <Button
+                                            icon={defaultPickerOpen ? ChevronUpMinor : ChevronDownMinor}
+                                            onClick={() => setDefaultPickerOpen(o => !o)}
+                                            fullWidth
+                                            textAlign="left"
+                                        >
+                                            <HorizontalStack gap="2" blockAlign="center">
+                                                <span>{`Add Akto default topics${selectedDefaultBlockKeys.size > 0 ? ` (${selectedDefaultBlockKeys.size} selected)` : ''}`}</span>
+                                                <Badge status="info">Beta</Badge>
+                                            </HorizontalStack>
+                                        </Button>
+                                    </VerticalStack>
                                 )}
                                 {defaultPickerOpen && (
                                     <Box background="bg-surface-secondary" padding="3" borderRadius="2" borderWidth="1" borderColor="border">
