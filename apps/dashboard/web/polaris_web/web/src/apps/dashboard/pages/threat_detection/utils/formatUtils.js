@@ -37,6 +37,12 @@ export const extractRuleViolated = (metadata) => {
   }
 };
 
+/**
+ * Resolves the compliance-clause map for a single threat/malicious event.
+ * Guardrail (Agentic/Endpoint): keyed by capability derived from metadata.rule_violated.
+ * API Security: lives on the threat filter template, keyed by filterId.
+ * Returns {} when nothing matches (callers do Object.keys() on it).
+ */
 const DB_COMPLIANCE_CAPABILITIES = [
   { capability: "deniedTopics", prefixes: ["BanTopics", "BanSubstrings", "deniedTopics", "denied_topic"] },
   { capability: "llmRule", prefixes: ["UserDefinedLLMRule", "LLMRule"] },
