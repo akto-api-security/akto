@@ -3329,7 +3329,7 @@ public class DbAction extends ActionSupport {
     public String createCollectionSimpleForVpc() {
         try {
             if (!isLatestRagDetection && tagsList != null) {
-                tagsList.removeIf(t -> t.getKeyName() != null && Constants.AKTO_RAG_DATABASE_TAG.equals(t.getKeyName()));
+                tagsList.removeIf(t -> t != null && Constants.AKTO_RAG_DATABASE_TAG.equals(t.getKeyName()));
             }
             DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, checkTagsNeedUpdates(tagsList, vxlanId), accessType);
         } catch (Exception e) {
@@ -3342,7 +3342,7 @@ public class DbAction extends ActionSupport {
     public String createCollectionForHostAndVpc() {
         try {
             if (!isLatestRagDetection && tagsList != null) {
-                tagsList.removeIf(t -> t.getKeyName() != null && Constants.AKTO_RAG_DATABASE_TAG.equals(t.getKeyName()));
+                tagsList.removeIf(t -> t != null && Constants.AKTO_RAG_DATABASE_TAG.equals(t.getKeyName()));
             }
             DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, checkTagsNeedUpdates(tagsList, colId), accessType, skills);
             boolean isMcpServer = tagsList != null
@@ -3383,7 +3383,7 @@ public class DbAction extends ActionSupport {
     public String createCollectionForServiceTag() {
         try {
             if (!isLatestRagDetection && tagsList != null) {
-                tagsList.removeIf(t -> t.getKeyName() != null && Constants.AKTO_RAG_DATABASE_TAG.equals(t.getKeyName()));
+                tagsList.removeIf(t -> t != null && Constants.AKTO_RAG_DATABASE_TAG.equals(t.getKeyName()));
             }
             DbLayer.createCollectionForServiceTag(colId, serviceTagValue, hostNames, tagsList, hostName, accessType);
         } catch (Exception e) {
