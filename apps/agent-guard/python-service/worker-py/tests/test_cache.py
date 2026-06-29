@@ -228,6 +228,36 @@ async def test_prepare_exact_miss_falls_to_fuzzy(monkeypatch):
     assert prep["cached"]["distance"] == 0.05
 
 
+async def test_prepare_skips_embed_when_cache_backpressure_tripped(monkeypatch):
+    # When the embedder is saturated (CACHE breaker tripped), an exact miss must
+    # NOT pay the embed cost — exact_get still runs, embed/KNN are skipped.
+    calls = {"exact": 0, "embed": 0, "query": 0}
+
+    async def _no_exact(sk, th):
+        calls["exact"] += 1
+        return None
+
+    async def _boom_embed(text):
+        calls["embed"] += 1
+        raise AssertionError("embed must NOT run when CACHE backpressure is tripped")
+
+    async def _boom_query(vec, sk):
+        calls["query"] += 1
+        raise AssertionError("KNN query must NOT run when CACHE backpressure is tripped")
+
+    monkeypatch.setattr(cache.cache_store, "exact_get", _no_exact)
+    monkeypatch.setattr(cache, "_embed", _boom_embed)
+    monkeypatch.setattr(cache.cache_store, "query", _boom_query)
+    monkeypatch.setattr(cache.cascade_backpressure.CACHE, "should_skip", lambda: True)
+
+    prep = await cache.prepare("Toxicity", "prompt", "hi", {})
+    assert prep["exact"] is False
+    assert prep.get("embed_skipped") is True
+    assert prep["vec"] is None
+    assert prep["cached"] is None
+    assert calls == {"exact": 1, "embed": 0, "query": 0}  # exact ran, fuzzy didn't
+
+
 async def test_observe_alerts_embed_error_and_skips_store(monkeypatch):
     monkeypatch.setattr(cache.settings, "CACHE_MODE", "observe")
     posted = {}
@@ -245,6 +275,30 @@ async def test_observe_alerts_embed_error_and_skips_store(monkeypatch):
     await cache.observe("Toxicity", "prompt", "hi", {}, {"is_valid": True, "details": {}})
     assert posted.get("outcome") == "error"
     assert posted.get("error") == "embed_unavailable"
+
+
+async def test_observe_returns_quietly_when_embed_was_skipped(monkeypatch):
+    # If the request path skipped the embed (CACHE backpressure), observe has
+    # nothing to compare or warm — it must NOT re-embed or fire a shadow alert.
+    monkeypatch.setattr(cache.settings, "CACHE_MODE", "decide")
+
+    async def _boom_post(info):
+        raise AssertionError("no shadow alert when embed was skipped")
+
+    async def _boom_upsert(*a, **k):
+        raise AssertionError("no warm when embed was skipped")
+
+    async def _boom_embed(text):
+        raise AssertionError("must not re-embed when embed was skipped")
+
+    monkeypatch.setattr(cache.alerts, "post_cache_shadow", _boom_post)
+    monkeypatch.setattr(cache.cache_store, "upsert", _boom_upsert)
+    monkeypatch.setattr(cache, "_embed", _boom_embed)
+
+    prep = {"scanner_key": "k", "vec": None, "cached": None, "embed_skipped": True}
+    await cache.observe("Toxicity", "prompt", "hi", {},
+                        {"is_valid": True, "details": {}}, prep=prep)
+    # reaching here without an AssertionError is the pass condition
 
 
 async def _async_none():
