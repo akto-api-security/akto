@@ -1098,8 +1098,24 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Bool("modified", result.Modified),
 		zap.String("behaviour", result.Behaviour),
 		zap.String("reason", result.Reason),
-		zap.String("sessionID", sessionID),
+		zap.Int("policyCount", len(policies)),
+		zap.Int64("policiesMs", time.Since(policiesStart).Milliseconds()),
+		zap.Int64("processMs", time.Since(processStart).Milliseconds()),
 		zap.Int64("totalLatencyMs", time.Since(start).Milliseconds()))
+
+	totalMs := time.Since(start).Milliseconds()
+	if totalMs >= 1500 {
+		s.logger.Warn("ValidateRequest - slow",
+			zap.String("path", params.Path),
+			zap.String("method", params.Method),
+			zap.String("account", params.AktoAccountID),
+			zap.String("sessionID", sessionID),
+			zap.Int("policyCount", len(policies)),
+			zap.Int64("policiesMs", time.Since(policiesStart).Milliseconds()),
+			zap.Int64("processMs", time.Since(processStart).Milliseconds()),
+			zap.Int64("totalLatencyMs", totalMs),
+			zap.Bool("allowed", result.Allowed))
+	}
 
 	return result, nil
 }
