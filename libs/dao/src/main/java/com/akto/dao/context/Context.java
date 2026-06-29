@@ -10,11 +10,13 @@ import java.time.format.DateTimeFormatter;
 public class Context {
     public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
     public static ThreadLocal<Boolean> tokenExpired = new ThreadLocal<Boolean>();
+    public static ThreadLocal<String> testRunResultSummaryId = new ThreadLocal<String>();
 
 
     public static void resetContextThreadLocals() {
         accountId.remove();
         tokenExpired.remove();
+        testRunResultSummaryId.remove();
     }
 
     public static int getId() {

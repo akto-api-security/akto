@@ -1,6 +1,8 @@
 package com.akto.dto;
 
 import com.mongodb.BasicDBObject;
+import lombok.Getter;
+import lombok.Setter;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
@@ -28,6 +30,11 @@ public class Log {
 
     public static final String TIMESTAMP = "timestamp";
     private int timestamp;
+
+    public static final String TEST_RUN_RESULT_SUMMARY_ID = "testRunResultSummaryId";
+    @Getter
+    @Setter
+    private String testRunResultSummaryId;
 
     public Log() {
     }
@@ -68,6 +75,7 @@ public class Log {
             " log='" + getLog() + "'" +
             ", key='" + getKey() + "'" +
             ", timestamp='" + getTimestamp() + "'" +
+            ", testRunResultSummaryId='" + getTestRunResultSummaryId() + "'" +
             "}";
     }
 
@@ -75,7 +83,8 @@ public class Log {
         return new BasicDBObject("_id", getId())
                 .append("log", getLog())
                 .append("key", getKey())
-                .append("timestamp", getTimestamp());
+                .append("timestamp", getTimestamp())
+                .append(TEST_RUN_RESULT_SUMMARY_ID, getTestRunResultSummaryId());
     }
 
 }

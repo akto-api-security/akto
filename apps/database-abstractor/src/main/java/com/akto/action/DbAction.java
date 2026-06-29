@@ -2964,6 +2964,7 @@ public class DbAction extends ActionSupport {
                 return Action.SUCCESS.toUpperCase();
             }
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            dbLog.setTestRunResultSummaryId(log.getString("testRunResultSummaryId"));
 
             // Skip writing cyborg call logs.
             if (dbLog.getLog().contains("ApiExecutor") &&
