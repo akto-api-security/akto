@@ -95,11 +95,24 @@ function UsersAndDevices() {
         return "success";
     }, []);
 
+    const buildGroupNameDisplay = useCallback((group, extraBadges = []) => {
+        const badges = [...extraBadges];
+        if (group.hasPersonalAccount) badges.push(<Badge key="personal" size="small" status="warning">Contains personal account</Badge>);
+        if (group.hasLocalMcpServer) badges.push(<Badge key="local-mcp" size="small" status="critical">Local MCP Server</Badge>);
+        if (badges.length === 0) return group.groupName;
+        return (
+            <HorizontalStack gap="2" align="start" wrap={false}>
+                <Text>{group.groupName}</Text>
+                {badges}
+            </HorizontalStack>
+        );
+    }, []);
+
     const prettifyGroupData = useCallback(
         (groups) => {
             return groups.map((group) => ({
                 ...group,
-                groupNameDisplay: group.groupName,
+                groupNameDisplay: buildGroupNameDisplay(group),
                 sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes || [], false),
                 riskScoreComp:
                     group.riskScore !== null ? (
@@ -111,31 +124,28 @@ function UsersAndDevices() {
                     ),
             }));
         },
-        [getRiskScoreStatus],
+        [getRiskScoreStatus, buildGroupNameDisplay],
     );
 
     const applyMaliciousBadgeToUsers = useCallback((maliciousSkillsSet, misconfiguredCollectionIdsSet, isMountedRef) => {
         if (!isMountedRef.current) return;
+        const enrichRow = (row) => {
+            const skillNames = row.uniqueSkillNames || new Set(
+                (row.collections || []).flatMap(c => Array.isArray(c.skills) ? c.skills.map(s => String(s).toLowerCase()) : [])
+            );
+            const hasMalicious = [...skillNames].some((s) => maliciousSkillsSet.has(s));
+            const collectionIds = (row.collections || []).map((c) => c.id);
+            const hasMisconfigured = collectionIds.some((id) => misconfiguredCollectionIdsSet.has(id));
+            const extraBadges = [];
+            if (hasMalicious) extraBadges.push(<Badge key="malicious" size="small" status="critical">Malicious Skills</Badge>);
+            return { ...row, hasMaliciousSkill: hasMalicious, hasMisconfiguredConfig: hasMisconfigured, groupNameDisplay: buildGroupNameDisplay(row, extraBadges) };
+        };
         setData((prev) => ({
-            ...prev,
-            users: prev.users.map((row) => {
-                const skillNames = row.uniqueSkillNames || new Set();
-                const hasMalicious = [...skillNames].some((s) => maliciousSkillsSet.has(s));
-                const collectionIds = (row.collections || []).map((c) => c.id);
-                const hasMisconfigured = collectionIds.some((id) => misconfiguredCollectionIdsSet.has(id));
-                const badges = [];
-                if (hasMalicious) badges.push(<Badge key="malicious" size="small" status="critical">Malicious Skills</Badge>);
-                const groupNameDisplay = badges.length > 0 ? (
-                    <HorizontalStack gap="2" align="start" wrap={false}>
-                        <Text>{row.groupName}</Text>
-                        {badges}
-                    </HorizontalStack>
-                ) : row.groupName;
-                return { ...row, hasMaliciousSkill: hasMalicious, hasMisconfiguredConfig: hasMisconfigured, groupNameDisplay };
-            }),
+            users: prev.users.map(enrichRow),
+            devices: prev.devices.map(enrichRow),
         }));
         setUserEnrichVersion((v) => v + 1);
-    }, []);
+    }, [buildGroupNameDisplay]);
 
     const enrichUsersWithMaliciousSkills = useCallback(async (userRows, isMountedRef = { current: true }) => {
         const allCollectionIds = [];
@@ -186,7 +196,7 @@ function UsersAndDevices() {
             });
             setLoading(false);
 
-            enrichUsersWithMaliciousSkills(userGroups, isMountedRef);
+            enrichUsersWithMaliciousSkills([...userGroups, ...deviceGroups], isMountedRef);
         } catch {
             setLoading(false);
         }
