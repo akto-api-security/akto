@@ -3604,7 +3604,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static void cleanupApiInfoTags(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getCleanupApiInfoTags() == 0 && Context.accountId.get() == 1726615470){
+        if(backwardCompatibility.getCleanupApiInfoTags() == 0){
             BackwardCompatibilityUtils.cleanupApiInfoTags();
             BackwardCompatibilityDao.instance.updateOne(
                 Filters.eq("_id", backwardCompatibility.getId()),
