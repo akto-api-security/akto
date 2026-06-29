@@ -400,3 +400,9 @@ func (h *ValidationHandler) HealthCheck(c *gin.Context) {
 		"status":  "healthy",
 	})
 }
+
+// BackpressureStatus returns the scan breaker's current window state, for
+// diagnostics and load-test observability (mirrors agent-guard's status snapshot).
+func (h *ValidationHandler) BackpressureStatus(c *gin.Context) {
+	c.JSON(http.StatusOK, h.validatorService.BackpressureSnapshot())
+}

@@ -138,6 +138,12 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		sessionMgr:          sessionManager,
 		schemaFetcher:       schemaFetcher,
 	}
+	bp := mcp.GetScanBackpressureSnapshot()
+	logger.Info("Scan backpressure breaker active (mcp processor, remote-scanner boundary)",
+		zap.Bool("enabled", bp.Enabled),
+		zap.Float64("thresholdMs", bp.ThresholdMs),
+		zap.Int("minSamples", bp.MinSamples),
+		zap.Float64("ttlSeconds", bp.TTLSeconds))
 	go func() {
 		if _, err := svc.getMcpAllowedHostList(); err != nil {
 			logger.Warn("Warm MCP allowlist cache failed", zap.Error(err))
@@ -910,6 +916,13 @@ func (s *Service) extractPayloadForValidation(payload, method, path string, isRe
 	return finalPayload
 }
 
+// BackpressureSnapshot exposes the scan breaker's current state for diagnostics.
+// The breaker lives in the mcp processor (remote-scanner boundary); guardrails-
+// service just surfaces its snapshot on GET /backpressure.
+func (s *Service) BackpressureSnapshot() mcp.ScanBackpressureSnapshot {
+	return mcp.GetScanBackpressureSnapshot()
+}
+
 // ValidateRequest validates a request payload against guardrail policies with session tracking
 func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRequestParams, sessionID string, requestID string) (*mcp.ValidationResult, error) {
 	start := time.Now()
@@ -1042,7 +1055,10 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
 		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
 
-	// Use the default processor - skipThreat is passed via ValidationContext
+	// Use the default processor - skipThreat is passed via ValidationContext.
+	// Scan backpressure lives inside the mcp processor at the remote-scanner
+	// boundary (executeSingleScannerTask), so only the agent-guard /scan fan-out
+	// is shed when degraded — local PII/regex/token-limit filters always run.
 	processStart := time.Now()
 	processResult, err := s.processor.ProcessRequestParallel(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
 	if err != nil {
@@ -1199,7 +1215,9 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("method", params.Method),
 		zap.String("payloadToValidate", responseBodyForValidation))
 
-	// Use processor's ProcessResponse method with external policies
+	// Use processor's ProcessResponse method with external policies. Scan
+	// backpressure is applied inside the mcp processor at the remote-scanner
+	// boundary, so only the agent-guard /scan call is shed when degraded.
 	processStart := time.Now()
 	processResult, err := s.processor.ProcessResponseParallel(ctx, responseBodyForValidation, valCtx, policies)
 	if err != nil {

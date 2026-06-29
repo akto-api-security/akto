@@ -130,6 +130,6 @@ require (
 )
 
 replace (
-	github.com/akto-api-security/akto-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260629141439-07a1d4d0aa6d
+	github.com/akto-api-security/akto-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260629143124-ddc23499ab59
 	github.com/shoenig/go-m1cpu => ./internal/stub/go-m1cpu
 )
