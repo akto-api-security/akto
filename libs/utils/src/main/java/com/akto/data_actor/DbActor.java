@@ -474,8 +474,8 @@ public class DbActor extends DataActor {
         DbLayer.insertApiCollection(apiCollectionId, apiCollectionName);
     }
 
-    public void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType) {
-        DbLayer.createCollectionForServiceTag(id, serviceTagValue, hostNames, tags, hostName, accessType);
+    public void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType, boolean isLatestRagDetection) {
+        DbLayer.createCollectionForServiceTag(id, serviceTagValue, hostNames, tags, hostName, accessType, isLatestRagDetection);
     }
 
     public void addHostNameToServiceTagCollection(int collectionId, String hostName) {
@@ -622,12 +622,12 @@ public class DbActor extends DataActor {
         return DbLayer.fetchMergedUrls();
     }
 
-    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType) {
-        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tags, accessType);
+    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType, boolean isLatestRagDetection) {
+        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tags, accessType, isLatestRagDetection);
     }
 
-    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType) {
-        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags, accessType);
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType, boolean isLatestRagDetection) {
+        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags, accessType, isLatestRagDetection);
     }
 
     public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue) {
