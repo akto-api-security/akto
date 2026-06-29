@@ -545,7 +545,8 @@ const ContentPolicyStep = ({
                                         </Button>
                                     </VerticalStack>
                                 )}
-                                {defaultPickerOpen && (
+                                {editingIndex !== null && renderEditRow(editingIndex === deniedTopics.length)}
+                                {defaultPickerOpen && editingIndex === null && (
                                     <Box background="bg-surface-secondary" padding="3" borderRadius="2" borderWidth="1" borderColor="border">
                                         <VerticalStack gap="4">
                                             {Object.values(GENERAL_BLOCK_GROUPS).map(group => (
@@ -565,11 +566,16 @@ const ContentPolicyStep = ({
                                         </VerticalStack>
                                     </Box>
                                 )}
-                                {/* Akto default topics */}
-                                {activeDefaultTopics.map((topic) => renderViewRow(topic, -1))}
+
+                                {/* Unified list: Akto defaults first, then custom topics */}
                                 {allActiveTopics.length > 0 && (
                                     <Text variant="bodySm" tone="subdued">{allActiveTopics.length} denied topic{allActiveTopics.length !== 1 ? 's' : ''} active</Text>
                                 )}
+                                {allActiveTopics.map((topic) => {
+                                    const customIdx = topic._isDefault ? -1 : deniedTopics.indexOf(topic);
+                                    if (!topic._isDefault && editingIndex === customIdx) return null;
+                                    return renderViewRow(topic, customIdx);
+                                })}
                             </VerticalStack>
                         </Box>
                     )}
