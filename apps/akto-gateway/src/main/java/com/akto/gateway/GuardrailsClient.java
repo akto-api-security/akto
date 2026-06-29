@@ -2,8 +2,15 @@ package com.akto.gateway;
 
 import com.akto.log.LoggerMaker;
 import com.akto.utils.SlackUtils;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import okhttp3.*;
+import okhttp3.ConnectionPool;
+import okhttp3.Dispatcher;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -14,29 +21,35 @@ public class GuardrailsClient {
     private static final LoggerMaker loggerMaker = new LoggerMaker(GuardrailsClient.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
-    private static final int DEFAULT_MAX_IDLE_CONNECTIONS = 200;
 
-    private String guardrailsServiceUrl;
-    private OkHttpClient httpClient;
+    // Align with guardrails-service scan timeout (60s); sized for ~100k RPM ingress.
+    private static final int TIMEOUT_MS = 30_000;
+
+    private static final OkHttpClient HTTP_CLIENT = CoreHTTPClient.client.newBuilder()
+            .dispatcher(buildDispatcher())
+            .connectionPool(new ConnectionPool(512, 5L, TimeUnit.MINUTES))
+            .connectTimeout(TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            .readTimeout(TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            .writeTimeout(TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            .callTimeout(TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            .build();
+
+    private final String guardrailsServiceUrl;
 
     public GuardrailsClient() {
         this.guardrailsServiceUrl = loadServiceUrlFromEnv();
-        this.httpClient = createHttpClient(10000);
         loggerMaker.infoAndAddToDb("GuardrailsClient initialized - URL: {}", guardrailsServiceUrl);
     }
 
     public GuardrailsClient(String serviceUrl, int timeout) {
         this.guardrailsServiceUrl = serviceUrl;
-        this.httpClient = createHttpClient(timeout);
     }
 
-    private OkHttpClient createHttpClient(int timeoutMs) {
-        return new OkHttpClient.Builder()
-                .connectTimeout(timeoutMs, TimeUnit.MILLISECONDS)
-                .readTimeout(timeoutMs, TimeUnit.MILLISECONDS)
-                .writeTimeout(timeoutMs, TimeUnit.MILLISECONDS)
-                .connectionPool(new ConnectionPool(DEFAULT_MAX_IDLE_CONNECTIONS, 5, TimeUnit.MINUTES))
-                .build();
+    private static Dispatcher buildDispatcher() {
+        Dispatcher dispatcher = new Dispatcher();
+        dispatcher.setMaxRequests(2048);
+        dispatcher.setMaxRequestsPerHost(2048);
+        return dispatcher;
     }
 
     @SuppressWarnings("unchecked")
@@ -64,7 +77,7 @@ public class GuardrailsClient {
 
             Request httpRequest = requestBuilder.build();
 
-            try (Response response = httpClient.newCall(httpRequest).execute()) {
+            try (Response response = HTTP_CLIENT.newCall(httpRequest).execute()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
 
                 loggerMaker.infoAndAddToDb("Guardrails response (status {}): {}", response.code(), responseBody);
