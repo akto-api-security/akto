@@ -507,6 +507,8 @@ const finalizeHostGroupedRow = (g, idSegment) => {
         hasPersonalAccount: g.hasPersonalAccount || false,
         hasLocalMcpServer: g.hasLocalMcpServer || false,
         hasMisconfiguredConfig: g.hasMisconfiguredConfig || false,
+        teamSource: g.teamSource || 'sso',
+        roleSource: g.roleSource || 'sso',
     };
 };
 
@@ -576,6 +578,8 @@ export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMa
                 nonSkillCollectionsCount: 0,
                 team: meta.team || '',
                 userRole: meta.userRole || '',
+                teamSource: meta.teamSource || 'sso',
+                roleSource: meta.roleSource || 'sso',
             };
         }
         const g = users[username];
