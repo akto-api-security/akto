@@ -58,13 +58,6 @@
             <version>2.5.33</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-servlets</artifactId>
-            <version>9.4.58.v20250814</version>
-        </dependency>
-        
-       
     </dependencies>
     <build>
         <sourceDirectory>src/main/java</sourceDirectory>

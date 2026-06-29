@@ -1,6 +1,5 @@
 #!/bin/bash
-# Auto-size JVM heap from cgroup/container memory for data-ingestion Jetty.
-# Mirrors apps/dashboard/set_xmx.sh with G1 + smaller stacks for large thread pools.
+# Auto-size JVM heap from cgroup/container memory for data-ingestion Jetty 12 + virtual threads.
 
 set -e
 
@@ -26,10 +25,15 @@ PARALLEL_GC_THREADS=$((NUM_CPUS * 3 / 4))
 CONC_GC_THREADS=$((PARALLEL_GC_THREADS / 2))
 [ "$CONC_GC_THREADS" -lt 1 ] && CONC_GC_THREADS=1
 
-export JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError \
--Xms${XMS_MEM}m -Xmx${XMX_MEM}m -Xss512k \
--XX:+UseG1GC -XX:MaxGCPauseMillis=200 \
--XX:ParallelGCThreads=${PARALLEL_GC_THREADS} -XX:ConcGCThreads=${CONC_GC_THREADS}"
+# Carrier threads for virtual threads; must exceed jetty.http.selectors (see tuning ini).
+VT_PARALLELISM=$((NUM_CPUS * 2))
+[ "$VT_PARALLELISM" -lt 8 ] && VT_PARALLELISM=8
 
-echo "data-ingestion JVM: ${MEM_LIMIT_MB}MB limit → -Xms${XMS_MEM}m -Xmx${XMX_MEM}m (${NUM_CPUS} CPUs, ParallelGCThreads=${PARALLEL_GC_THREADS})"
+export JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError \
+-Xms${XMS_MEM}m -Xmx${XMX_MEM}m \
+-XX:+UseG1GC -XX:MaxGCPauseMillis=200 \
+-XX:ParallelGCThreads=${PARALLEL_GC_THREADS} -XX:ConcGCThreads=${CONC_GC_THREADS} \
+-Djdk.virtualThreadScheduler.parallelism=${VT_PARALLELISM}"
+
+echo "data-ingestion JVM (Jetty 12 VT): ${MEM_LIMIT_MB}MB limit → -Xms${XMS_MEM}m -Xmx${XMX_MEM}m (${NUM_CPUS} CPUs, VT parallelism=${VT_PARALLELISM})"
 echo "JAVA_OPTIONS=${JAVA_OPTIONS}"
