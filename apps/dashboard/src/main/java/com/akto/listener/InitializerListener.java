@@ -3603,6 +3603,16 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void cleanupApiInfoTags(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getCleanupApiInfoTags() == 0){
+            BackwardCompatibilityUtils.cleanupApiInfoTags();
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.CLEANUP_API_INFO_TAGS, Context.now())
+            );
+        }
+    }
+
 
     private static void removeRagDatabaseTag(BackwardCompatibility backwardCompatibility) {
         int accountId = Context.accountId.get();
@@ -3642,6 +3652,7 @@ public class InitializerListener implements ServletContextListener {
         updateCustomDataTypeOperator(backwardCompatibility);
         markSummariesAsVulnerable(backwardCompatibility);
         moveUserDataFromModuleInfoToAgenticUsers(backwardCompatibility);
+        cleanupApiInfoTags(backwardCompatibility);
         dropLastCronRunInfoField(backwardCompatibility);
         cleanupRbacEntriesForDeveloperRole(backwardCompatibility);
         fetchIntegratedConnections(backwardCompatibility);
