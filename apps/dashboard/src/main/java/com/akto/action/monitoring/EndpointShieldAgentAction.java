@@ -14,6 +14,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -245,15 +246,18 @@ public class EndpointShieldAgentAction extends UserAction {
         this.endTime = endTime;
     }
 
+    @Setter
+    String username;
+
     public String fetchUserAnalysis() {
-        if (deviceId == null || deviceId.trim().isEmpty()) {
-            addActionError("Device ID is required");
+        if (this.username == null || this.username.isEmpty()) {
+            addActionError("Username is required");
             return ERROR.toUpperCase();
         }
 
         userAnalysis = UserAnalysisDataDao.instance.findOne(
             Filters.and(
-                Filters.eq(UserAnalysisData.ID_DEVICE_ID, deviceId)
+                Filters.eq(UserAnalysisData.USER_NAME, this.username)
             )
         );
 
