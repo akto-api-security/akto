@@ -29,8 +29,10 @@ class ScanRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    scan_diag.configure_process_logging()
     settings.init_from_env()
     cascade_backpressure.configure_from_env()
+    scan_diag.log_startup_banner()
     yield
 
 
@@ -44,10 +46,22 @@ async def scan_inflight_middleware(request: Request, call_next):
     if request.url.path not in ("/scan", "/scan/batch"):
         return await call_next(request)
 
+    wall_start = time.perf_counter()
     _scan_inflight += 1
-    scan_diag.log_inflight(_scan_inflight, entering=True)
+    inflight = _scan_inflight
+    scan_diag.log_inflight(inflight, entering=True)
     try:
-        return await call_next(request)
+        response = await call_next(request)
+        wall_ms = (time.perf_counter() - wall_start) * 1000.0
+        if scan_diag.enabled() or inflight >= 6 or wall_ms >= 500:
+            logger.info(
+                "[scan-diag] wall_complete path=%s inflight_at_enter=%s wall_ms=%.2f pid=%s",
+                request.url.path,
+                inflight,
+                wall_ms,
+                os.getpid(),
+            )
+        return response
     finally:
         _scan_inflight -= 1
         scan_diag.log_inflight(_scan_inflight, entering=False)
@@ -71,7 +85,16 @@ def _response_path(details: dict[str, Any]) -> str:
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "service": "agent-guard-executor"}
+    body: dict[str, Any] = {
+        "status": "healthy",
+        "service": "agent-guard-executor",
+        "pid": os.getpid(),
+        "scan_diagnostics": scan_diag.enabled(),
+        "log_level": logging.getLevelName(scan_diag.resolve_log_level()),
+    }
+    if scan_diag.enabled():
+        body["backpressure"] = cascade_backpressure.status_snapshot()
+    return body
 
 
 @app.get("/scanners")

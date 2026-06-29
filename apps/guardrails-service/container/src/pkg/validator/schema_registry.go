@@ -10,6 +10,7 @@ import (
 
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 	"go.uber.org/zap"
+	"golang.org/x/sync/singleflight"
 )
 
 // aktoParamPattern matches Akto-style path parameters: INTEGER, STRING, FLOAT, BOOLEAN
@@ -183,6 +184,7 @@ type SchemaFetcher struct {
 	mu              sync.RWMutex
 	logger          *zap.Logger
 	endpoints       map[string]map[string]bool // method -> path -> true
+	refreshGroup    singleflight.Group
 }
 
 // NewSchemaFetcher creates a new SchemaFetcher and performs an initial fetch.
@@ -206,10 +208,21 @@ func (sf *SchemaFetcher) RefreshIfNeeded() {
 	elapsed := time.Since(sf.lastFetchTime)
 	sf.mu.RUnlock()
 
-	if elapsed >= sf.refreshInterval {
-		if err := sf.FetchAndUpdate(); err != nil {
-			sf.logger.Warn("SchemaFetcher: refresh failed, using stale state", zap.Error(err))
+	if elapsed < sf.refreshInterval {
+		return
+	}
+
+	_, err, _ := sf.refreshGroup.Do("guardrail-schema", func() (interface{}, error) {
+		sf.mu.RLock()
+		if time.Since(sf.lastFetchTime) < sf.refreshInterval {
+			sf.mu.RUnlock()
+			return nil, nil
 		}
+		sf.mu.RUnlock()
+		return nil, sf.FetchAndUpdate()
+	})
+	if err != nil {
+		sf.logger.Warn("SchemaFetcher: refresh failed, using stale state", zap.Error(err))
 	}
 }
 

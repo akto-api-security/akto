@@ -1,9 +1,10 @@
 import React from "react";
-import { HorizontalStack, Link, Text } from "@shopify/polaris";
+import { HorizontalStack, Text, Link } from "@shopify/polaris";
 import func from "@/util/func";
 import { formatDurationMs, latencyColor, truncate } from "./constants";
 import { OsIcon } from "../agentic/DeviceEndpoints";
 import AssetIcon from "../agentic/AssetIcon";
+import ShowListInBadge from "../../../components/shared/ShowListInBadge";
 
 export { OsIcon };
 
@@ -126,6 +127,30 @@ export function CountCell({ value }) {
 // Relative time from an epoch-ms value.
 export function TimeCell({ value }) {
     return <Text variant="bodySm">{func.prettifyEpoch(Math.floor((value || 0) / 1000))}</Text>;
+}
+
+
+export function TopicCell({ data, isTopic = true }) {
+    // Aggregated path: topicHierarchy = { domain: [subDomain, ...], ... }
+    // Flat path (searchPrompts): topic + subTopic as plain strings
+    let entries;
+    if (data?.topicHierarchy && Object.keys(data.topicHierarchy).length > 0) {
+        entries = Object.entries(data.topicHierarchy)
+    } else if (data?.topic) {
+        entries = [[data.topic, data.subTopic ? [data.subTopic] : []]];
+    } else {
+        return <Text variant="bodySm" color="subdued">{DASH}</Text>;
+    }
+    const finalTopics = isTopic
+        ? entries.map(([topic]) => func.toSentenceCase(topic))
+        : entries.map(([, subtopic]) => subtopic);
+    return (
+       <ShowListInBadge
+            itemsArr={finalTopics}
+            maxItems={3}
+            maxWidth={"80px"}
+        />
+    );
 }
 
 // Clickable session id (used in unscoped Traces table).
