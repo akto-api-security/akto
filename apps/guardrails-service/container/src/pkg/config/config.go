@@ -45,6 +45,13 @@ type Config struct {
 	NhiEnabled         bool
 	NhiScanIntervalMin int
 
+	// ValidationTimeoutMs bounds the whole synchronous validate path (all parallel
+	// policy goroutines, their async scanner waits, and each /scan call) with one
+	// deadline. Keep it below the caller's client timeout (data-ingestion's
+	// GUARDRAILS_CLIENT_TIMEOUT_MS, default 3000) so a slow/saturated scanner
+	// fails open here *before* the caller gives up. <=0 disables the bound.
+	ValidationTimeoutMs int
+
 	File FileConfig
 }
 
@@ -105,6 +112,7 @@ func LoadConfig() *Config {
 		CollectionRefreshIntervalMin:  		getEnvAsInt("COLLECTION_REFRESH_INTERVAL_MIN", 5),
 		NhiEnabled:                       	getEnvAsBool("NHI_ENABLED", true),
 		NhiScanIntervalMin:               	getEnvAsInt("NHI_SCAN_INTERVAL_MIN", 30),
+		ValidationTimeoutMs:              	getEnvAsInt("GUARDRAILS_VALIDATION_TIMEOUT_MS", 2500),
 		File: FileConfig{
 			Enabled:          getEnvAsBool("FILE_VALIDATION_ENABLED", false),
 			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
