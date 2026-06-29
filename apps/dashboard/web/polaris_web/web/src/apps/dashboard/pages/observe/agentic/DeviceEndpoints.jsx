@@ -8,7 +8,7 @@ import MisconfiguredConfigIcon from "@/assets/MisconfiguredConfigIcon.svg";
 import PersonLockIcon from "@/assets/PersonLockIcon.svg";
 import LaptopIcon from "@/assets/Laptop.svg";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
-import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
+import { AllEnterpriseModule } from "ag-grid-enterprise";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import AgGridRow from "@/apps/dashboard/components/tables/rows/AgGridRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
@@ -18,7 +18,7 @@ import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentere
 import { SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import DonutChart from "../../../components/shared/DonutChart";
 import AgenticStatsCard from "./AgenticStatsCard";
-import agenticObserveApi, { aggregateViolationsByCollectionId, fetchAgenticViolations } from "./agenticObserveApi";
+import { aggregateViolationsByCollectionId, fetchAgenticViolations } from "./agenticObserveApi";
 import { buildDeviceEndpointsPageData } from "./agenticPageBuilders";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 import { groupCollectionsByUser } from "./constants";
@@ -388,11 +388,6 @@ function TableSection({ deviceFlatData, agentRiskData, collections, startTimesta
         setDeviceFlyout({ device, agents: findAgentsForDevice(deviceId), hostNames: getHostNamesForDevice(deviceId, collections) });
     }, [deviceFlatData, findDeviceRow, findAgentsForDevice, collections]);
 
-    const handleDeviceClickFromFlyout = useCallback((device) => {
-        const deviceId = device?.path?.[0];
-        if (!deviceId) return;
-        setDeviceFlyout({ device, agents: findAgentsForDevice(deviceId), hostNames: getHostNamesForDevice(deviceId, collections) });
-    }, [findAgentsForDevice, collections]);
 
     const handleRowClick = useCallback((e) => {
         const { data, node } = e;

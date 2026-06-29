@@ -291,6 +291,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 number: EnterpriseLicenseComplianceConfig.number,
                 title: EnterpriseLicenseComplianceConfig.title,
                 summary: EnterpriseLicenseComplianceConfig.getSummary(storedStateData),
+                beta: true,
                 ...EnterpriseLicenseComplianceConfig.validate(storedStateData)
             }
         ];
@@ -1224,12 +1225,15 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                         (step.summary && step.summary !== 'Coming soon') ? 'configured' : 'pending'
                                     }`} />
                                     <div style={{ flex: 1, paddingTop: '4px' }}>
-                                        <Text
-                                            variant="bodyMd"
-                                            fontWeight={step.number === currentStep ? "semibold" : "regular"}
-                                        >
-                                            {step.title}
-                                        </Text>
+                                        <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                                            <Text
+                                                variant="bodyMd"
+                                                fontWeight={step.number === currentStep ? "semibold" : "regular"}
+                                            >
+                                                {step.title}
+                                            </Text>
+                                            {step.beta && <Badge status="info">Beta</Badge>}
+                                        </HorizontalStack>
                                         {step.summary && (
                                             <Text variant="bodySm" color="subdued" truncate>
                                                 <span className="guardrail-nav-summary" title={step.summary}>{step.summary}</span>
@@ -1246,9 +1250,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     <div className="guardrail-content-inner">
                         <Box padding="5">
                             <VerticalStack gap="4">
-                                <Text variant="headingMd" as="h2" fontWeight="semibold">
-                                    {steps.find(s => s.number === currentStep)?.title}
-                                </Text>
+                                <HorizontalStack gap="2" blockAlign="center">
+                                    <Text variant="headingMd" as="h2" fontWeight="semibold">
+                                        {steps.find(s => s.number === currentStep)?.title}
+                                    </Text>
+                                    {steps.find(s => s.number === currentStep)?.beta && <Badge status="info">Beta</Badge>}
+                                </HorizontalStack>
                                 <Box>
                                     {renderStepContent(currentStep)}
                                 </Box>

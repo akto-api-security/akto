@@ -9,6 +9,7 @@ import {
     TimeCell,
     TitleCell,
     TokensCell,
+    TopicCell,
     UserCell,
 } from "./LLMCellRenderers";
 import { formatDurationMs } from "./constants";
@@ -42,6 +43,16 @@ const userServiceCols = [
 ];
 
 const NO_FILTER = { filterAllowed: false, filter: false, sortable: false };
+
+const topicCol = (headerName, isTopic = true) => ({
+    headerName,
+    field: "topicHierarchy",
+    width: 240,
+    cellRenderer: TopicCell,
+    cellRendererParams: { isTopic },
+    cellStyle: FLEX_CELL,
+    ...NO_FILTER,
+});
 
 const titleCol = (headerName) => ({
     headerName,
@@ -132,6 +143,7 @@ export const SESSION_COLUMN_DEFS = [
         sortable: true,
     },
     countCol("Traces", "messageCount", 85),
+    topicCol("Topics Queried"),
     tokensCol,
     {
         // Session total duration can be hours — no alarming colour, plain text only.
@@ -176,6 +188,8 @@ export function getTraceColumnDefs({ showSession, onSessionClick } = {}) {
             ...NO_FILTER,
         },
         countCol("Spans", "spanCount", 80),
+        topicCol("Topics Queried"),
+        topicCol("SubTopic queried", false),
         tokensCol,
         durationCol,
         ...(showSession ? [{
@@ -219,6 +233,8 @@ export const ARGUS_TRACE_COL_DEFS = [
         cellStyle: FLEX_CELL,
         ...NO_FILTER,
     },
+    topicCol("Topics Queried"),
+    topicCol("SubTopic queried", false),
     // {
     //     headerName: "Model",
     //     field: "_model",
@@ -243,6 +259,8 @@ export const MESSAGE_FLAT_COLUMN_DEFS = [
         cellStyle: FLEX_CELL,
         ...NO_FILTER,
     },
+    topicCol("Topics Queried"),
+    topicCol("SubTopic queried", false),
     tokensCol,
     timeCol("timestamp"),
     idCol("Trace ID", "traceId"),

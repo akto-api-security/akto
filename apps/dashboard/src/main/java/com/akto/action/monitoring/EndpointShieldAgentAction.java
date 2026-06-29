@@ -14,6 +14,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,7 +40,7 @@ public class EndpointShieldAgentAction extends UserAction {
     public String fetchUserAnalysisList() {
         userAnalysisList = UserAnalysisDataDao.instance.findAll(Filters.empty(),
                 Projections.include(UserAnalysisData.USER_NAME, UserAnalysisData.LAST_UPDATED_AT,
-                        UserAnalysisData.TOPIC_COUNTS, UserAnalysisData.TOTAL_INPUT_TOKENS,
+                        UserAnalysisData.TOTAL_INPUT_TOKENS,
                         UserAnalysisData.TOTAL_OUTPUT_TOKENS, UserAnalysisData.AI_SUMMARY,
                         UserAnalysisData.HARMFUL_TOPICS));
         return SUCCESS.toUpperCase();
@@ -245,15 +246,18 @@ public class EndpointShieldAgentAction extends UserAction {
         this.endTime = endTime;
     }
 
+    @Setter
+    String username;
+
     public String fetchUserAnalysis() {
-        if (deviceId == null || deviceId.trim().isEmpty()) {
-            addActionError("Device ID is required");
+        if (this.username == null || this.username.isEmpty()) {
+            addActionError("Username is required");
             return ERROR.toUpperCase();
         }
 
         userAnalysis = UserAnalysisDataDao.instance.findOne(
             Filters.and(
-                Filters.eq(UserAnalysisData.ID_DEVICE_ID, deviceId)
+                Filters.eq(UserAnalysisData.USER_NAME, this.username)
             )
         );
 
