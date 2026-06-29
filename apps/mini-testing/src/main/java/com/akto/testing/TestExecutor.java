@@ -905,6 +905,10 @@ public class TestExecutor {
         List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, CountDownLatch latch, Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap) {
 
         Context.accountId.set(accountId);
+        String previousSummaryIdContext = Context.testRunResultSummaryId.get();
+        if (summaryId != null) {
+            Context.testRunResultSummaryId.set(summaryId.toHexString());
+        }
         loggerMaker.warnAndAddToDb("Starting test for " + apiInfoKey);
         AtomicBoolean isApiInfoTested = new AtomicBoolean(false);
         try {
@@ -920,6 +924,8 @@ public class TestExecutor {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
+        } finally {
+            Context.testRunResultSummaryId.set(previousSummaryIdContext);
         }
         if(isApiInfoTested.get()){
             loggerMaker.warnAndAddToDb("API: " + apiInfoKey.toString() + " has been successfully tested");
@@ -1110,8 +1116,17 @@ public class TestExecutor {
             TestingRunResult testingRunResult = null;
             Future<TestingRunResult> future = legacyTestTimeoutExecutor.submit(() -> {
                 Context.accountId.set(currentAccountId);
-                return runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig,
-                    instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
+                if (summaryId != null) {
+                    Context.testRunResultSummaryId.set(summaryId.toHexString());
+                }
+                try {
+                    TestingRunResult legacyResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig,
+                        instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
+                    persistTestLogsToDb(legacyResult != null ? legacyResult.getTestLogs() : null);
+                    return legacyResult;
+                } finally {
+                    Context.testRunResultSummaryId.remove();
+                }
             });
             try {
                 testingRunResult = future.get(MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
@@ -1131,6 +1146,27 @@ public class TestExecutor {
             return testingRunResult;
         }
         return null;
+    }
+
+    /**
+     * Persists the per-test transient testLogs (which are @BsonIgnore on TestingRunResult and would
+     * otherwise be dropped) into the TESTING logs collection. The current thread's
+     * Context.testRunResultSummaryId is expected to be set so each line is scoped to the run summary.
+     */
+    public void persistTestLogsToDb(List<TestingRunResult.TestLog> testLogs) {
+        if (testLogs == null || testLogs.isEmpty()) {
+            return;
+        }
+        for (TestingRunResult.TestLog testLog : testLogs) {
+            if (testLog == null || testLog.getMessage() == null) {
+                continue;
+            }
+            if (testLog.getTestLogType() == TestingRunResult.TestLogType.ERROR) {
+                loggerMaker.errorAndAddToDb(testLog.getMessage(), LogDb.TESTING);
+            } else {
+                loggerMaker.infoAndAddToDb(testLog.getMessage(), LogDb.TESTING);
+            }
+        }
     }
 
     // Track auth status per test run: if auth fails, kill all remaining tests

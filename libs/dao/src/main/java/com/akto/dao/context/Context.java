@@ -11,11 +11,13 @@ import org.slf4j.LoggerFactory;
 
 public class Context {
     public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
+    public static ThreadLocal<String> testRunResultSummaryId = new ThreadLocal<String>();
 
     private static final Logger logger = LoggerFactory.getLogger(Context.class);
 
     public static void resetContextThreadLocals() {
         accountId.remove();
+        testRunResultSummaryId.remove();
     }
 
     public static int getId() {
