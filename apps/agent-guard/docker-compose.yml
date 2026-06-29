@@ -44,8 +44,10 @@ services:
     expose:
       - "8093"
     environment:
-      - PYTHONUNBUFFERED=1
-      - PORT=8093
+      ANONYMIZER_DIAGNOSTICS: ${ANONYMIZER_DIAGNOSTICS:-true}
+      ANONYMIZER_LOG_LEVEL: ${ANONYMIZER_LOG_LEVEL:-info}
+      ANONYMIZER_SLOW_MS: ${ANONYMIZER_SLOW_MS:-200}
+      ANONYMIZER_WORKERS: ${ANONYMIZER_WORKERS:-4}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8093/health')"]
       interval: 15s
