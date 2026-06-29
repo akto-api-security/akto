@@ -388,7 +388,10 @@ const ContentPolicyStep = ({
                                             fullWidth
                                             textAlign="left"
                                         >
-                                            {`Add Akto default topics${selectedDefaultBlockKeys.size > 0 ? ` (${selectedDefaultBlockKeys.size} selected)` : ''}`}
+                                            <HorizontalStack gap="2" blockAlign="center">
+                                                <span>{`Add Akto default topics${selectedDefaultBlockKeys.size > 0 ? ` (${selectedDefaultBlockKeys.size} selected)` : ''}`}</span>
+                                                <Badge status="info">Beta</Badge>
+                                            </HorizontalStack>
                                         </Button>
                                     </VerticalStack>
                                 )}
