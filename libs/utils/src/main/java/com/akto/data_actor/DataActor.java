@@ -234,7 +234,7 @@ public abstract class DataActor {
 
     public abstract void insertApiCollection(int apiCollectionId, String apiCollectionName);
 
-    public abstract void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType);
+    public abstract void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType, boolean isLatestRagDetection);
 
     public abstract void addHostNameToServiceTagCollection(int collectionId, String hostName);
 
@@ -289,9 +289,9 @@ public abstract class DataActor {
 
     public abstract Set<MergedUrls> fetchMergedUrls();
 
-    public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType);
+    public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType, boolean isLatestRagDetection);
 
-    public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType);
+    public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType, boolean isLatestRagDetection);
 
     public abstract List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue);
 
