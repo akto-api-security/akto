@@ -12,6 +12,9 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.net.SocketTimeoutException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -22,20 +25,12 @@ public class GuardrailsClient {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
-    // Inline LLM-proxy path: a slow guardrails call must not hold the request long.
-    // 3s bounds tail latency and thread/connection pileup; on timeout the call
-    // fails open (see buildErrorResponse) so traffic keeps flowing. Sized for
-    // ~100k RPM ingress.
-    private static final int TIMEOUT_MS = 3_000;
+    // Inline LLM-proxy path: bound guardrails wait so servlet threads release quickly.
+    // On timeout/transport failure we fail-open (see buildFailOpenResponse) — same HTTP
+    // 200 + Allowed=true shape as a healthy validation, so LiteLLM/k6 keep flowing.
+    private static final int TIMEOUT_MS = resolveTimeoutMs();
 
-    private static final OkHttpClient HTTP_CLIENT = CoreHTTPClient.client.newBuilder()
-            .dispatcher(buildDispatcher())
-            .connectionPool(new ConnectionPool(512, 5L, TimeUnit.MINUTES))
-            .connectTimeout(TIMEOUT_MS, TimeUnit.MILLISECONDS)
-            .readTimeout(TIMEOUT_MS, TimeUnit.MILLISECONDS)
-            .writeTimeout(TIMEOUT_MS, TimeUnit.MILLISECONDS)
-            .callTimeout(TIMEOUT_MS, TimeUnit.MILLISECONDS)
-            .build();
+    private static final OkHttpClient HTTP_CLIENT = buildHttpClient(TIMEOUT_MS);
 
     private final String guardrailsServiceUrl;
 
@@ -48,11 +43,53 @@ public class GuardrailsClient {
         this.guardrailsServiceUrl = serviceUrl;
     }
 
+    private static int resolveTimeoutMs() {
+        String raw = System.getenv("GUARDRAILS_CLIENT_TIMEOUT_MS");
+        if (raw == null || raw.trim().isEmpty()) {
+            return 3_000;
+        }
+        try {
+            return Math.max(500, Integer.parseInt(raw.trim()));
+        } catch (NumberFormatException e) {
+            return 3_000;
+        }
+    }
+
+    private static OkHttpClient buildHttpClient(int timeoutMs) {
+        return CoreHTTPClient.client.newBuilder()
+                .dispatcher(buildDispatcher())
+                .connectionPool(new ConnectionPool(1024, 5L, TimeUnit.MINUTES))
+                .connectTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                .readTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                .writeTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                .build();
+    }
+
     private static Dispatcher buildDispatcher() {
         Dispatcher dispatcher = new Dispatcher();
         dispatcher.setMaxRequests(2048);
         dispatcher.setMaxRequestsPerHost(2048);
         return dispatcher;
+    }
+
+    /** Transport/degradation failures where we intentionally fail-open like a normal allow. */
+    private static boolean isFailOpenTransportError(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof SocketTimeoutException || t instanceof InterruptedIOException) {
+                return true;
+            }
+            if (t instanceof IOException) {
+                String msg = t.getMessage();
+                if (msg != null) {
+                    String lower = msg.toLowerCase();
+                    if (lower.contains("timeout") || lower.contains("canceled") || lower.contains("cancelled")) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     @SuppressWarnings("unchecked")
@@ -86,21 +123,37 @@ public class GuardrailsClient {
                 loggerMaker.infoAndAddToDb("Guardrails response (status {}): {}", response.code(), responseBody);
 
                 if (response.isSuccessful()) {
-                    return objectMapper.readValue(responseBody, Map.class);
-                } else {
-                    loggerMaker.warnAndAddToDb("Guardrails service returned error status: {}", response.code());
-                    return buildErrorResponse("Guardrails service error: HTTP " + response.code());
+                    try {
+                        return objectMapper.readValue(responseBody, Map.class);
+                    } catch (Exception parseEx) {
+                        loggerMaker.warnAndAddToDb(
+                            "Guardrails response not parseable, failing open - path: {}, error: {}",
+                            request.get("path"), parseEx.getMessage());
+                        return buildFailOpenResponse("invalid guardrails response: " + parseEx.getMessage());
+                    }
                 }
+                loggerMaker.warnAndAddToDb(
+                    "Guardrails service returned error status {}, failing open - path: {}",
+                    response.code(), request.get("path"));
+                return buildFailOpenResponse("Guardrails service error: HTTP " + response.code());
             }
 
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error calling guardrails service: {}", e.getMessage());
+            if (isFailOpenTransportError(e)) {
+                // Expected under load: return the same allow verdict shape as success; do not
+                // treat as a client-facing failure or spam Slack on every timeout.
+                loggerMaker.warnAndAddToDb(
+                    "Guardrails unavailable ({}), failing open - path: {}, method: {}, account: {}",
+                    e.getMessage(), request.get("path"), request.get("method"), request.get("akto_account_id"));
+                return buildFailOpenResponse(e.getMessage());
+            }
+            loggerMaker.errorAndAddToDb(e, "Unexpected error calling guardrails service: {}", e.getMessage());
             String alertMsg = "[guardrails] Service call failed - path: " + request.get("path")
                 + ", method: " + request.get("method")
                 + ", account: " + request.get("akto_account_id")
                 + ", error: " + e.getMessage();
             SlackUtils.sendAlert(alertMsg);
-            return buildErrorResponse(e.getMessage());
+            return buildFailOpenResponse(e.getMessage());
         }
     }
 
@@ -112,28 +165,24 @@ public class GuardrailsClient {
         return callValidate(request, "/api/validate/response");
     }
 
-    // Fail-OPEN on guardrails-service infrastructure failures (timeout, connection
-    // refused, 5xx, unparseable body). This path is reached ONLY on transport/error
-    // conditions — a genuine block is an HTTP 200 with allowed=false, handled at the
-    // isSuccessful() branch above and never routed here. Failing open keeps LLM
-    // traffic flowing when guardrails is degraded, consistent with the fail-open
-    // backpressure design in agent-guard and guardrails-service: availability over
-    // enforcement under degradation. The error is still surfaced in `reason`/`error`
-    // for observability.
-    private Map<String, Object> buildErrorResponse(String errorMessage) {
-        Map<String, Object> error = new HashMap<>();
-        // Mirror a normal guardrails-service allow verdict shape so every consumer
-        // reads the fail-open decision the same way. guardrails-service emits the
-        // capital-cased "Allowed"/"Modified"; the lowercase keys are kept for
-        // back-compat with internal isAllowed() (which checks both).
-        error.put("Allowed", true);
-        error.put("allowed", true);
-        error.put("Modified", false);
-        error.put("modified", false);
-        error.put("reason", "Guardrails unavailable, failing open: " + errorMessage);
-        error.put("error", errorMessage);
-        error.put("failOpen", true);
-        return error;
+    /**
+     * Same JSON shape as guardrails-service {@code ValidationResult} on allow, plus
+     * {@code failOpen} for observability. LiteLLM hook and k6 only require Allowed.
+     */
+    private Map<String, Object> buildFailOpenResponse(String errorMessage) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("Allowed", true);
+        result.put("allowed", true);
+        result.put("Modified", false);
+        result.put("modified", false);
+        result.put("ModifiedPayload", "");
+        result.put("Reason", "");
+        result.put("reason", "");
+        result.put("Behaviour", "");
+        result.put("behaviour", "");
+        result.put("failOpen", true);
+        result.put("error", errorMessage);
+        return result;
     }
 
     private static boolean isGuardrailsAuthEnabled() {

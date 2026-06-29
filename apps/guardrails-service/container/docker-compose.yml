@@ -74,6 +74,11 @@ services:
       context: ../../data-ingestion-service
       dockerfile: Dockerfile
     env_file: ./.env/data-ingestion-docker.env
+    # n2d-highcpu-16: give DI ~15 GB + all CPUs; heap auto-sized via docker/set-jvm-opts.sh
+    mem_limit: 15g
+    cpus: 16
+    environment:
+      GUARDRAILS_CLIENT_TIMEOUT_MS: "2000"
     restart: always
     ports:
       - "80:8080"
