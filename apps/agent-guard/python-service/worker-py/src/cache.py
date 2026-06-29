@@ -36,6 +36,7 @@ from typing import Any, Dict, List, Optional
 
 import alerts
 import cache_store
+import cascade_backpressure
 import http_client
 from settings import settings
 
@@ -135,10 +136,16 @@ def _text_hash(text: str) -> str:
 # Embedding (embedder container over HTTP)
 # --------------------------------------------------------------------------- #
 async def _embed(text: str) -> Optional[List[float]]:
-    """Embed text → 384-dim vector via EMBEDDER_URL /embed, or None (fail-open)."""
+    """Embed text → 384-dim vector via EMBEDDER_URL /embed, or None (fail-open).
+
+    Every call's latency is recorded to the CACHE backpressure breaker — including
+    HTTP errors and timeouts, which are strong embedder-saturation signals — so the
+    breaker can trip and stop the fuzzy lookup from hammering a choked embedder.
+    """
     base = (settings.EMBEDDER_URL or "").strip().rstrip("/")
     if not base:
         return None
+    t0 = time.monotonic()
     try:
         client = http_client.get_client()
         resp = await client.post(f"{base}/embed", json={"text": text},
@@ -151,6 +158,8 @@ async def _embed(text: str) -> Optional[List[float]]:
     except Exception as exc:
         logger.warning(f"[cache] embed failed: {exc}")
         return None
+    finally:
+        cascade_backpressure.CACHE.record((time.monotonic() - t0) * 1000.0)
 
 
 # --------------------------------------------------------------------------- #
@@ -172,7 +181,14 @@ async def prepare(scanner_name: str, scanner_type: str, text: str,
     exact = await cache_store.exact_get(scanner_key, _text_hash(text))
     if exact is not None:
         return {"scanner_key": scanner_key, "vec": None, "cached": exact, "exact": True}
-    # Exact miss → embed + KNN for a semantic (fuzzy) match.
+    # Exact miss → embed + KNN for a semantic (fuzzy) match. But the embed is the
+    # expensive step, and when the embedder is saturated it dominates miss latency
+    # (~2s) — so gate it behind the CACHE breaker. When tripped, skip the fuzzy
+    # lookup entirely and treat this as a miss; the cheap exact-hash check above
+    # already ran. This is independent of cascade (Vertex) backpressure.
+    if cascade_backpressure.CACHE.should_skip():
+        return {"scanner_key": scanner_key, "vec": None, "cached": None,
+                "exact": False, "embed_skipped": True}
     vec = await _embed(text)
     cached = await cache_store.query(vec, scanner_key) if vec is not None else None
     return {"scanner_key": scanner_key, "vec": vec, "cached": cached, "exact": False}
@@ -267,6 +283,16 @@ async def observe(scanner_name: str, scanner_type: str, text: str,
         "threshold": _threshold(),
         "ttl_s": _ttl_seconds(),
     }
+
+    # CACHE backpressure: when the embedder is saturated, the request path already
+    # skipped the embed (prep.embed_skipped) — there is nothing to compare or warm,
+    # so return quietly rather than spamming an embed-error shadow alert. In
+    # observe-only mode (no prep) skip the shadow embed too, so the fire-and-forget
+    # shadow work doesn't pile onto an already-choked embedder.
+    if prep is not None and prep.get("embed_skipped"):
+        return
+    if prep is None and cascade_backpressure.CACHE.should_skip():
+        return
 
     t0 = time.time()
     try:
