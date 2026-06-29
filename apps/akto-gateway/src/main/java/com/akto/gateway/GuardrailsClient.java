@@ -22,15 +22,16 @@ public class GuardrailsClient {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
-    private static final int DEFAULT_TIMEOUT_MS = 30_000;
+    // Align with guardrails-service scan timeout (60s); sized for ~100k RPM ingress.
+    private static final int TIMEOUT_MS = 30_000;
 
     private static final OkHttpClient HTTP_CLIENT = CoreHTTPClient.client.newBuilder()
             .dispatcher(buildDispatcher())
-            .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
-            .connectTimeout(resolveTimeoutMs(), TimeUnit.MILLISECONDS)
-            .readTimeout(resolveTimeoutMs(), TimeUnit.MILLISECONDS)
-            .writeTimeout(resolveTimeoutMs(), TimeUnit.MILLISECONDS)
-            .callTimeout(resolveTimeoutMs(), TimeUnit.MILLISECONDS)
+            .connectionPool(new ConnectionPool(512, 5L, TimeUnit.MINUTES))
+            .connectTimeout(TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            .readTimeout(TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            .writeTimeout(TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            .callTimeout(TIMEOUT_MS, TimeUnit.MILLISECONDS)
             .build();
 
     private final String guardrailsServiceUrl;
@@ -46,22 +47,9 @@ public class GuardrailsClient {
 
     private static Dispatcher buildDispatcher() {
         Dispatcher dispatcher = new Dispatcher();
-        dispatcher.setMaxRequests(256);
-        dispatcher.setMaxRequestsPerHost(128);
+        dispatcher.setMaxRequests(2048);
+        dispatcher.setMaxRequestsPerHost(2048);
         return dispatcher;
-    }
-
-    private static int resolveTimeoutMs() {
-        String raw = System.getenv("GUARDRAILS_HTTP_TIMEOUT_MS");
-        if (raw == null || raw.trim().isEmpty()) {
-            return DEFAULT_TIMEOUT_MS;
-        }
-        try {
-            int timeoutMs = Integer.parseInt(raw.trim());
-            return timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS;
-        } catch (NumberFormatException e) {
-            return DEFAULT_TIMEOUT_MS;
-        }
     }
 
     @SuppressWarnings("unchecked")
