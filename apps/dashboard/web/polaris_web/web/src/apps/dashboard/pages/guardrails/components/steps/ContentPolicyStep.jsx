@@ -4,7 +4,6 @@ import {
     Text,
     Checkbox,
     Box,
-    RangeSlider,
     HorizontalStack,
     Button,
     TextField,
@@ -18,6 +17,7 @@ import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
 import { GENERAL_BLOCKS, GENERAL_BLOCK_GROUPS, toDeniedTopic } from "../../generalBlocks";
 import func from "@/util/func";
+import ConfidenceSelect, { toOpt, fromOpt, toLevelOpt, fromLevelOpt } from "../ConfidenceSelect";
 
 export const ContentPolicyConfig = {
     number: 2,
@@ -40,6 +40,7 @@ export const ContentPolicyConfig = {
         return filters.length > 0 ? filters.join(', ') : null;
     }
 };
+
 
 const ContentPolicyStep = ({
     // Prompt attacks
@@ -330,21 +331,11 @@ const ContentPolicyStep = ({
                     />
                     {enablePromptAttacks && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Prompt Attack Level</Text>
-                                <RangeSlider
-                                    label=""
-                                    value={promptAttackLevel === 'none' ? 0 : promptAttackLevel === 'low' ? 1 : promptAttackLevel === 'medium' ? 2 : 3}
-                                    min={0}
-                                    max={3}
-                                    step={1}
-                                    output
-                                    onChange={(value) => {
-                                        const levels = ['none', 'low', 'medium', 'high'];
-                                        setPromptAttackLevel(levels[value]);
-                                    }}
-                                />
-                            </VerticalStack>
+                            <ConfidenceSelect
+                                label="Prompt Attack Level"
+                                value={toLevelOpt(promptAttackLevel)}
+                                onChange={(v) => setPromptAttackLevel(fromLevelOpt(v))}
+                            />
                         </Box>
                     )}
                 </Box>
@@ -451,30 +442,29 @@ const ContentPolicyStep = ({
                                 </HorizontalStack>
                                 {Object.entries(harmfulCategoriesSettings).map(([category, level]) => {
                                     if (category === 'useForResponses') return null;
+                                    const enabled = level !== 'none';
                                     return (
                                         <Box key={category}>
-                                            <Text variant="bodyMd" fontWeight="medium" textTransform="capitalize">{category}</Text>
-                                            <Box paddingBlockStart="2">
-                                                <RangeSlider
-                                                    label=""
-                                                    value={level === 'none' ? 0 : level === 'low' ? 1 : level === 'medium' ? 2 : 3}
-                                                    min={0}
-                                                    max={3}
-                                                    step={1}
-                                                    output
-                                                    onChange={(value) => {
-                                                        const levels = ['none', 'low', 'medium', 'high'];
-                                                        setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, [category]: levels[value] });
-                                                    }}
-                                                />
-                                            </Box>
+                                            <Checkbox
+                                                label={category.charAt(0).toUpperCase() + category.slice(1)}
+                                                checked={enabled}
+                                                onChange={(checked) => setHarmfulCategoriesSettings(prev => ({ ...prev, [category]: checked ? 'high' : 'none' }))}
+                                            />
+                                            {enabled && (
+                                                <Box paddingBlockStart="2" paddingInlineStart="6">
+                                                    <ConfidenceSelect
+                                                        value={toLevelOpt(level)}
+                                                        onChange={(v) => setHarmfulCategoriesSettings(prev => ({ ...prev, [category]: fromLevelOpt(v) }))}
+                                                    />
+                                                </Box>
+                                            )}
                                         </Box>
                                     );
                                 })}
                                 <Checkbox
                                     label="Use the same harmful categories filters for responses"
                                     checked={harmfulCategoriesSettings.useForResponses}
-                                    onChange={(checked) => setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, useForResponses: checked })}
+                                    onChange={(checked) => setHarmfulCategoriesSettings(prev => ({ ...prev, useForResponses: checked }))}
                                 />
                             </VerticalStack>
                         </Box>
@@ -491,18 +481,11 @@ const ContentPolicyStep = ({
                     />
                     {enableBasePromptRule && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <FormLayout>
-                                <RangeSlider
-                                    label="Confidence Threshold"
-                                    value={basePromptConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setBasePromptConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values require more confidence to block content."
-                                />
-                            </FormLayout>
+                            <ConfidenceSelect
+                                label="Confidence Threshold"
+                                value={toOpt(basePromptConfidenceScore)}
+                                onChange={(v) => setBasePromptConfidenceScore(fromOpt(v))}
+                            />
                         </Box>
                     )}
                 </Box>

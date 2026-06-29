@@ -52,6 +52,7 @@ import {
     EnterpriseLicenseComplianceConfig
 } from './steps';
 import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from "./enterpriseLicenseComplianceCatalog";
+import { fromOpt, toOpt, fromOpt100, toOpt100 } from "./ConfidenceSelect";
 import "./createGuardrailPage.css";
 
 const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false }) => {
@@ -93,13 +94,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         useForResponses: false
     });
     const [enableBasePromptRule, setEnableBasePromptRule] = useState(false);
-    const [basePromptConfidenceScore, setBasePromptConfidenceScore] = useState(0.5);
+    const [basePromptConfidenceScore, setBasePromptConfidenceScore] = useState(0.9);
 
     // Step 3: Language Safety & Abuse Guardrails
     const [enableGibberishDetection, setEnableGibberishDetection] = useState(false);
-    const [gibberishConfidenceScore, setGibberishConfidenceScore] = useState(0.7);
+    const [gibberishConfidenceScore, setGibberishConfidenceScore] = useState(0.9);
     const [enableSentiment, setEnableSentiment] = useState(false);
-    const [sentimentConfidenceScore, setSentimentConfidenceScore] = useState(0.7);
+    const [sentimentConfidenceScore, setSentimentConfidenceScore] = useState(0.9);
     const [wordFilters, setWordFilters] = useState({
         profanity: false,
         custom: []
@@ -113,23 +114,23 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [regexPatterns, setRegexPatterns] = useState([]);
     const [newRegexPattern, setNewRegexPattern] = useState("");
     const [enableSecrets, setEnableSecrets] = useState(false);
-    const [secretsConfidenceScore, setSecretsConfidenceScore] = useState(0.7);
+    const [secretsConfidenceScore, setSecretsConfidenceScore] = useState(0.9);
     const [enableAnonymize, setEnableAnonymize] = useState(false);
-    const [anonymizeConfidenceScore, setAnonymizeConfidenceScore] = useState(0.7);
+    const [anonymizeConfidenceScore, setAnonymizeConfidenceScore] = useState(0.9);
 
     // Step 5: Advanced Code Detection Filters
     const [enableCodeFilter, setEnableCodeFilter] = useState(false);
     const [codeFilterLevel, setCodeFilterLevel] = useState("high");
     const [enableBanCode, setEnableBanCode] = useState(false);
-    const [banCodeConfidenceScore, setBanCodeConfidenceScore] = useState(0.7);
+    const [banCodeConfidenceScore, setBanCodeConfidenceScore] = useState(0.9);
 
     // Step 6: Custom Guardrails
     const [enableLlmPrompt, setEnableLlmPrompt] = useState(false);
     const [llmPrompt, setLlmPrompt] = useState("");
-    const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
+    const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.9);
     const [enableExternalModel, setEnableExternalModel] = useState(false);
     const [url, setUrl] = useState("");
-    const [confidenceScore, setConfidenceScore] = useState(25);
+    const [confidenceScore, setConfidenceScore] = useState(75);
 
     // Step 7: Usage based Guardrails
     const [enableTokenLimit, setEnableTokenLimit] = useState(false);
@@ -453,11 +454,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             useForResponses: false
         });
         setEnableBasePromptRule(false);
-        setBasePromptConfidenceScore(0.5);
+        setBasePromptConfidenceScore(0.9);
         setEnableGibberishDetection(false);
-        setGibberishConfidenceScore(0.7);
+        setGibberishConfidenceScore(0.9);
         setEnableSentiment(false);
-        setSentimentConfidenceScore(0.7);
+        setSentimentConfidenceScore(0.9);
         setWordFilters({
             profanity: false,
             custom: []
@@ -469,19 +470,19 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setRegexPatterns([]);
         setNewRegexPattern("");
         setEnableSecrets(false);
-        setSecretsConfidenceScore(0.7);
+        setSecretsConfidenceScore(0.9);
         setEnableAnonymize(false);
-        setAnonymizeConfidenceScore(0.7);
+        setAnonymizeConfidenceScore(0.9);
         setEnableCodeFilter(false);
         setCodeFilterLevel("high");
         setEnableBanCode(false);
-        setBanCodeConfidenceScore(0.7);
+        setBanCodeConfidenceScore(0.9);
         setEnableLlmPrompt(false);
         setLlmPrompt("");
-        setLlmConfidenceScore(0.5);
+        setLlmConfidenceScore(0.9);
         setEnableExternalModel(false);
         setUrl("");
-        setConfidenceScore(25);
+        setConfidenceScore(75);
         setEnableTokenLimit(false);
         setTokenLimitThreshold(4096);
         setEnableToolMisuse(true);
@@ -585,19 +586,19 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         // LLM prompt
         setEnableLlmPrompt(policy.llmRule?.enabled && !!policy.llmRule?.userPrompt);
         setLlmPrompt(policy.llmRule?.userPrompt || "");
-        setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
+        setLlmConfidenceScore(fromOpt(toOpt(policy.llmRule?.confidenceScore ?? 0.9)));
 
         // Base Prompt Based Validation (AI Agents)
         setEnableBasePromptRule(policy.basePromptRule?.enabled || false);
-        setBasePromptConfidenceScore(policy.basePromptRule?.confidenceScore ?? 0.5);
+        setBasePromptConfidenceScore(fromOpt(toOpt(policy.basePromptRule?.confidenceScore ?? 0.9)));
 
         // Gibberish Detection
         setEnableGibberishDetection(policy.gibberishDetection?.enabled || false);
-        setGibberishConfidenceScore(policy.gibberishDetection?.confidenceScore ?? 0.7);
+        setGibberishConfidenceScore(fromOpt(toOpt(policy.gibberishDetection?.confidenceScore ?? 0.9)));
 
         const setScannerState = (detection, setEnabled, setConfidence) => {
             setEnabled(detection?.enabled || false);
-            setConfidence(detection?.confidenceScore ?? 0.7);
+            setConfidence(fromOpt(toOpt(detection?.confidenceScore ?? 0.9)));
         };
 
         setScannerState(policy.anonymizeDetection, setEnableAnonymize, setAnonymizeConfidenceScore);
@@ -610,11 +611,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         // External model based evaluation
         setEnableExternalModel(!!policy.url);
         setUrl(policy.url || "");
-        const existingScore = policy.confidenceScore || policy.riskScore || 25;
-        const nearestCheckpoint = [25, 50, 75, 100].reduce((prev, curr) =>
-            Math.abs(curr - existingScore) < Math.abs(prev - existingScore) ? curr : prev
-        );
-        setConfidenceScore(nearestCheckpoint);
+        setConfidenceScore(fromOpt100(toOpt100(policy.confidenceScore ?? policy.riskScore ?? 75)));
 
         // Server settings
         setSelectedMcpServers(

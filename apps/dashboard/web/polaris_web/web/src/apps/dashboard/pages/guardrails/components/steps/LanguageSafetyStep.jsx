@@ -1,4 +1,5 @@
-import { VerticalStack, Text, Checkbox, HorizontalStack, Button, TextField, Box, DataTable, RangeSlider } from "@shopify/polaris";
+import { VerticalStack, Text, Checkbox, HorizontalStack, Button, TextField, Box, DataTable } from "@shopify/polaris";
+import ConfidenceSelect, { toOpt, fromOpt } from "../ConfidenceSelect";
 import { DeleteMajor } from '@shopify/polaris-icons';
 import OwaspTag from "../OwaspTag";
 
@@ -19,6 +20,7 @@ export const LanguageSafetyConfig = {
         return filters.length > 0 ? filters.join(", ") : null;
     }
 };
+
 
 const LanguageSafetyStep = ({
     // Gibberish detection
@@ -55,19 +57,11 @@ const LanguageSafetyStep = ({
                     />
                     {enableGibberishDetection && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
-                                <RangeSlider
-                                    label=""
-                                    value={gibberishConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setGibberishConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting gibberish."
-                                />
-                            </VerticalStack>
+                            <ConfidenceSelect
+                                label="Confidence Threshold"
+                                value={toOpt(gibberishConfidenceScore)}
+                                onChange={(v) => setGibberishConfidenceScore(fromOpt(v))}
+                            />
                         </Box>
                     )}
                 </Box>
@@ -82,19 +76,11 @@ const LanguageSafetyStep = ({
                     />
                     {enableSentiment && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
-                                <RangeSlider
-                                    label=""
-                                    value={sentimentConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setSentimentConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting negative sentiment."
-                                />
-                            </VerticalStack>
+                            <ConfidenceSelect
+                                label="Confidence Threshold"
+                                value={toOpt(sentimentConfidenceScore)}
+                                onChange={(v) => setSentimentConfidenceScore(fromOpt(v))}
+                            />
                         </Box>
                     )}
                 </Box>

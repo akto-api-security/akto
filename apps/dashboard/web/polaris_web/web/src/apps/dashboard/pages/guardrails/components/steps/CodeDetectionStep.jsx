@@ -1,7 +1,9 @@
-import { VerticalStack, Text, Checkbox, Box, RangeSlider } from "@shopify/polaris";
+import { VerticalStack, Text, Checkbox, Box } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
+import ConfidenceSelect, { toOpt, fromOpt, toLevelOpt, fromLevelOpt } from "../ConfidenceSelect";
+
 
 export const CodeDetectionConfig = {
     number: 5,
@@ -46,21 +48,11 @@ const CodeDetectionStep = ({
                     />
                     {enableCodeFilter && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Code Detection Level</Text>
-                                <RangeSlider
-                                    label=""
-                                    value={codeFilterLevel === 'none' ? 0 : codeFilterLevel === 'low' ? 1 : codeFilterLevel === 'medium' ? 2 : 3}
-                                    min={0}
-                                    max={3}
-                                    step={1}
-                                    output
-                                    onChange={(value) => {
-                                        const levels = ['none', 'low', 'medium', 'high'];
-                                        setCodeFilterLevel(levels[value]);
-                                    }}
-                                />
-                            </VerticalStack>
+                            <ConfidenceSelect
+                                label="Code Detection Level"
+                                value={toLevelOpt(codeFilterLevel)}
+                                onChange={(v) => setCodeFilterLevel(fromLevelOpt(v))}
+                            />
                         </Box>
                     )}
                 </Box>
@@ -74,19 +66,11 @@ const CodeDetectionStep = ({
                     />
                     {enableBanCode && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
-                                <RangeSlider
-                                    label=""
-                                    value={banCodeConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setBanCodeConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting code."
-                                />
-                            </VerticalStack>
+                            <ConfidenceSelect
+                                label="Confidence Threshold"
+                                value={toOpt(banCodeConfidenceScore)}
+                                onChange={(v) => setBanCodeConfidenceScore(fromOpt(v))}
+                            />
                         </Box>
                     )}
                 </Box>
