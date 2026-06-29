@@ -181,6 +181,8 @@ func setupRouter(validationHandler *handlers.ValidationHandler, authMiddleware g
 
 	// Root health check stays unauthenticated for liveness probes (worker/orchestrator).
 	router.GET("/health", validationHandler.HealthCheck)
+	// Backpressure breaker snapshot — unauthenticated, for diagnostics/load tests.
+	router.GET("/backpressure", validationHandler.BackpressureStatus)
 
 	api := router.Group("/api")
 	if authMiddleware != nil {

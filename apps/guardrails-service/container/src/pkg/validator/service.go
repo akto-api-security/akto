@@ -12,6 +12,7 @@ import (
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/models"
+	"github.com/akto-api-security/guardrails-service/pkg/backpressure"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
@@ -71,6 +72,12 @@ type Service struct {
 	schemaFetcher         *SchemaFetcher
 	policyRefreshGroup    singleflight.Group
 	allowlistRefreshGroup singleflight.Group
+	// scanBreaker sheds load when the downstream scan path (agent-guard /scan,
+	// reached via the mcp processor) degrades: it watches ProcessRequestParallel /
+	// ProcessResponseParallel latency and fail-opens new requests while the recent
+	// average is over threshold, so throughput is preserved instead of every
+	// request blocking up to the HTTP timeout. Mirrors agent-guard's LatencyBreaker.
+	scanBreaker *backpressure.Breaker
 }
 
 // NewService creates a new validator service
@@ -137,7 +144,15 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		collectionTagsCache: &collectionTagsCache{byHostName: make(map[string]map[string]string)},
 		sessionMgr:          sessionManager,
 		schemaFetcher:       schemaFetcher,
+		scanBreaker:         backpressure.NewFromEnv("GUARDRAILS_BACKPRESSURE", "guardrails_scan_backpressure"),
 	}
+	bpCfg := svc.scanBreaker.Config()
+	logger.Info("Guardrails scan backpressure breaker initialized",
+		zap.Bool("enabled", bpCfg.Enabled),
+		zap.Float64("thresholdMs", bpCfg.ThresholdMs),
+		zap.Int("minSamples", bpCfg.MinSamples),
+		zap.Int("window", bpCfg.Window),
+		zap.Float64("ttlSeconds", bpCfg.TTLSeconds))
 	go func() {
 		if _, err := svc.getMcpAllowedHostList(); err != nil {
 			logger.Warn("Warm MCP allowlist cache failed", zap.Error(err))
@@ -910,6 +925,25 @@ func (s *Service) extractPayloadForValidation(payload, method, path string, isRe
 	return finalPayload
 }
 
+// BackpressureSnapshot exposes the scan breaker's current state for diagnostics.
+func (s *Service) BackpressureSnapshot() backpressure.Snapshot {
+	return s.scanBreaker.Snapshot()
+}
+
+// backpressureFailOpen builds the fail-open ValidationResult returned while the
+// scan breaker is tripped. Mirrors agent-guard's fail-open (is_valid=true): the
+// request is allowed (never blocked) and the reason carries the breaker label so
+// the skip is observable downstream.
+func backpressureFailOpen(reason string) *mcp.ValidationResult {
+	return &mcp.ValidationResult{
+		Allowed:   true,
+		Modified:  false,
+		Reason:    "guardrail scan skipped (backpressure): " + reason,
+		Metadata:  types.ThreatMetadata{},
+		Behaviour: "",
+	}
+}
+
 // ValidateRequest validates a request payload against guardrail policies with session tracking
 func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRequestParams, sessionID string, requestID string) (*mcp.ValidationResult, error) {
 	start := time.Now()
@@ -1042,9 +1076,29 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
 		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
 
+	// Backpressure: if the scan path is degraded (recent ProcessRequestParallel
+	// latency over threshold), fail-open immediately instead of blocking on the
+	// slow downstream. Cheap local checks above (blocked host, personal account)
+	// have already run; only the LLM-scanner fan-out is shed.
+	if s.scanBreaker.ShouldSkip() {
+		avg, _ := s.scanBreaker.RecentAvgLatencyMs()
+		s.logger.Warn("ValidateRequest - scan backpressure tripped, failing open",
+			zap.String("path", params.Path),
+			zap.String("method", params.Method),
+			zap.String("account", params.AktoAccountID),
+			zap.String("sessionID", sessionID),
+			zap.Float64("recentAvgLatencyMs", avg),
+			zap.Int("recentSampleCount", s.scanBreaker.RecentSampleCount()))
+		return backpressureFailOpen(s.scanBreaker.Reason()), nil
+	}
+
 	// Use the default processor - skipThreat is passed via ValidationContext
 	processStart := time.Now()
 	processResult, err := s.processor.ProcessRequestParallel(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
+	// Record scan latency for both success and failure: a string of slow/erroring
+	// calls (e.g. agent-guard timing out) must trip the breaker so the next
+	// requests fail-open fast rather than each waiting out the HTTP timeout.
+	s.scanBreaker.Record(float64(time.Since(processStart).Milliseconds()))
 	if err != nil {
 		s.logger.Error("ValidateRequest - ProcessRequestParallel failed",
 			zap.String("path", params.Path),
@@ -1199,9 +1253,23 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("method", params.Method),
 		zap.String("payloadToValidate", responseBodyForValidation))
 
+	// Backpressure: shed the scan fan-out while the downstream is degraded.
+	if s.scanBreaker.ShouldSkip() {
+		avg, _ := s.scanBreaker.RecentAvgLatencyMs()
+		s.logger.Warn("ValidateResponse - scan backpressure tripped, failing open",
+			zap.String("path", params.Path),
+			zap.String("method", params.Method),
+			zap.String("account", params.AktoAccountID),
+			zap.String("sessionID", sessionID),
+			zap.Float64("recentAvgLatencyMs", avg),
+			zap.Int("recentSampleCount", s.scanBreaker.RecentSampleCount()))
+		return backpressureFailOpen(s.scanBreaker.Reason()), nil
+	}
+
 	// Use processor's ProcessResponse method with external policies
 	processStart := time.Now()
 	processResult, err := s.processor.ProcessResponseParallel(ctx, responseBodyForValidation, valCtx, policies)
+	s.scanBreaker.Record(float64(time.Since(processStart).Milliseconds()))
 	if err != nil {
 		s.logger.Error("ValidateResponse - ProcessResponseParallel failed",
 			zap.String("path", params.Path),
