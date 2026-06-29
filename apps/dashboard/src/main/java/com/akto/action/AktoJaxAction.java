@@ -1,6 +1,8 @@
 package com.akto.action;
 
 import com.akto.ApiRequest;
+import com.akto.billing.UsageMetricUtils;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.CrawlerRunDao;
@@ -130,6 +132,19 @@ public class AktoJaxAction extends UserAction {
             if(crawlingTime < 600 || crawlingTime > 345600) { // crawlerTime cannot be < 10 minutes OR crawlerTime cannot be greater than 4 days
                 addActionError("Invalid crawling time");
                 return ERROR.toUpperCase();
+            }
+
+            // AI based crawling (AI JS discovery + AGENTIC/HYBRID crawl modes) is a gated feature.
+            // The frontend hides it behind STIGG AI_DAST, but enforce it here too so a crafted request can't bypass it.
+            boolean wantsAiCrawling = enableAiJsDiscovery
+                || (crawlMode != null && (crawlMode.equalsIgnoreCase("AGENTIC") || crawlMode.equalsIgnoreCase("HYBRID")));
+            if (wantsAiCrawling) {
+                FeatureAccess aiDastAccess = UsageMetricUtils.getFeatureAccessSaas(Context.accountId.get(), "AI_DAST");
+                if (aiDastAccess == null || !aiDastAccess.getIsGranted()) {
+                    loggerMaker.errorAndAddToDb("Blocked AI based crawling: AI_DAST not granted for accountId=" + Context.accountId.get());
+                    addActionError("AI based crawling is not available in your current plan.");
+                    return ERROR.toUpperCase();
+                }
             }
 
             loggerMaker.infoAndAddToDb("Initializing Crawler");
