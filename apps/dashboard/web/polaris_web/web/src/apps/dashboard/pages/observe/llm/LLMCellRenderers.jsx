@@ -141,14 +141,16 @@ export function TopicCell({ data, isTopic = true }) {
     } else {
         return <Text variant="bodySm" color="subdued">{DASH}</Text>;
     }
+    let subTopics = new Set();
     const finalTopics = isTopic
         ? entries.map(([topic]) => func.toSentenceCase(topic))
-        : entries.map(([, subtopic]) => subtopic);
+        : entries.map(([, subtopic]) =>  (Array.isArray(subtopic) ? subtopic : [subtopic]).forEach(item => subTopics.add(item)));
     return (
        <ShowListInBadge
-            itemsArr={finalTopics}
-            maxItems={3}
+            itemsArr={isTopic ? finalTopics : [...subTopics]}
+            maxItems={isTopic ? 3 : 4}
             maxWidth={"80px"}
+            useTooltip={true}
         />
     );
 }
