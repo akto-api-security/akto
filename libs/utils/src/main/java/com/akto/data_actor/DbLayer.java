@@ -422,9 +422,10 @@ public class DbLayer {
         );
     }
 
-    public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType) {
+public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType, boolean isLatestRagDetection) {
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
+
 
         Bson updates = Updates.combine(
             Updates.set(ApiCollection.VXLAN_ID, vxlanId),
@@ -460,10 +461,11 @@ public class DbLayer {
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
     }
 
-    public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags, String accessType) {
+    public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags, String accessType, boolean isLatestRagDetection) {
 
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
+
 
         Bson updates = Updates.combine(
             Updates.setOnInsert("_id", id),
@@ -484,9 +486,10 @@ public class DbLayer {
     }
 
     // Similar to createCollectionForHostAndVpc but for service-tag based collections
-    public static void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType) {
+    public static void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType, boolean isLatestRagDetection) {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
+
 
         Bson updates = Updates.combine(
             Updates.setOnInsert(Constants.ID, id),
