@@ -32,7 +32,7 @@ public class UserAnalysisCron {
     private static final int CRON_INTERVAL_MINUTES       = 10;
     private static final int SLACK_SECONDS               = 60;
     private static final int PAGE_SIZE                   = 10;
-    private static final int MAX_DOCS_PER_ACCOUNT_PER_TICK = 100;
+    private static final int MAX_DOCS_PER_ACCOUNT_PER_TICK = 5500;
     private static final int MIN_QUERY_LENGTH            = 20;
     private static final int BATCH_SIZE                  = 10;
 
@@ -75,6 +75,8 @@ public class UserAnalysisCron {
         ElasticSearchClient.instance().scrollQueryData(accountId, startTs, endTs, PAGE_SIZE,
             MAX_DOCS_PER_ACCOUNT_PER_TICK, records::add);
 
+        loggerMaker.info("Fetch query records from ES with count: " + records.size());
+
         // Filter: drop tool-use spans and short/empty records
         List<AgentQueryRecord> llmRecords = new ArrayList<>();
         for (AgentQueryRecord rec : records) {
@@ -83,14 +85,22 @@ public class UserAnalysisCron {
             if (rec.getQueryPayload() == null || rec.getQueryPayload().length() < MIN_QUERY_LENGTH) continue;
             if (!isToolUseRecord(rec)) llmRecords.add(rec);
         }
+        loggerMaker.info("Filtered query records from ES, count left: " + llmRecords.size());
 
         if (!llmRecords.isEmpty()) {
             classifyAndPersist(llmRecords, accountId, classifier);
         }
 
+        // If the fetch was capped, advance the cursor only to the last fetched record's
+        // timestamp so the next tick resumes mid-window rather than skipping unprocessed records.
+        long cursorTs = endTs;
+        if (records.size() >= MAX_DOCS_PER_ACCOUNT_PER_TICK) {
+            cursorTs = records.get(records.size() - 1).getTimeStampMs();
+        }
+
         AccountSettingsDao.instance.updateOne(
             Filters.eq(Constants.ID, accountId),
-            Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_USER_ANALYSIS_CRON, (endTs / 1000))
+            Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_USER_ANALYSIS_CRON, (cursorTs / 1000))
         );
     }
 
@@ -237,6 +247,7 @@ public class UserAnalysisCron {
 
         // Step 5: Bulk write topics back to ES
         if (!topicUpdates.isEmpty()) {
+            loggerMaker.infoAndAddToDb("Bulk updates for topics: " + topicUpdates.size());
             try {
                 ElasticSearchClient.instance().bulkUpdateTopics(topicUpdates);
             } catch (Exception e) {
