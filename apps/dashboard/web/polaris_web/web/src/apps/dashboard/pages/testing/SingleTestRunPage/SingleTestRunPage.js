@@ -28,7 +28,8 @@ import {
   PlusMinor,
   SettingsMinor,
   ViewMajor,
-  CircleAlertMajor
+  CircleAlertMajor,
+  FileMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import observeApi from "../../observe/api";
@@ -142,6 +143,7 @@ function SingleTestRunPage() {
   const [selected, setSelected] = useState(0)
   const [workflowTest, setWorkflowTest] = useState(false);
   const [secondaryPopover, setSecondaryPopover] = useState(false)
+  const [logsModalActive, setLogsModalActive] = useState(false)
   const setErrorsObject = TestingStore((state) => state.setErrorsObject)
   const setTestingEndpointsApisList = TestingStore((state) => state.setTestingEndpointsApisList)
   const currentTestingRuns = []
@@ -950,8 +952,7 @@ function SingleTestRunPage() {
 
   const components = [
     runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={true} totalVulnerabilities={tableCountObj.vulnerable} refreshTrigger={chartRefreshCounter} />,
-    tokenRateLimitBannerComp, metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder),
-    currentSummary?.hexId ? <TestRunLogs key="test-run-logs" summaryHexId={currentSummary.hexId} startTimestamp={currentSummary.startTimestamp} endTimestamp={currentSummary.endTimestamp} /> : null];
+    tokenRateLimitBannerComp, metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
   const openVulnerabilityReport = async (summaryMode = false) => {
     const currentPageKey = "/dashboard/testing/" + selectedTestRun?.id + "/#" + selectedTab
@@ -1284,7 +1285,12 @@ function SingleTestRunPage() {
         content: 'Re-Calculate Issues Count',
         icon: RefreshMajor,
         onAction: () => { setConfirmationModal(true) }
-      }
+      },
+      ...(currentSummary?.hexId ? [{
+        content: 'View logs',
+        icon: FileMinor,
+        onAction: () => { setSecondaryPopover(false); setLogsModalActive(true) }
+      }] : [])
     ]
   })
   const moreActionsComp = (
@@ -1313,6 +1319,15 @@ function SingleTestRunPage() {
         components={useComponents}
       />
       <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false} />
+      {currentSummary?.hexId ? (
+        <TestRunLogs
+          open={logsModalActive}
+          onClose={() => setLogsModalActive(false)}
+          summaryHexId={currentSummary.hexId}
+          startTimestamp={currentSummary.startTimestamp}
+          endTimestamp={currentSummary.endTimestamp}
+        />
+      ) : null}
       <SeveritySelector
         open={severityModalActive}
         onClose={() => setSeverityModalActive(false)}

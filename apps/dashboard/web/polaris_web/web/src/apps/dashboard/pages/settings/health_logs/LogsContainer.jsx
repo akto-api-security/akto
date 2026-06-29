@@ -15,7 +15,16 @@ const logLineStyle = {
     maxWidth: "100%",
 }
 
-const LogsContainer = ({ logs, displayedLogData }) => {
+const formatLogLine = (entry) => {
+    const message = entry.log ?? ""
+    const summaryId = entry.testRunResultSummaryId
+    if (summaryId && !message.includes("trrs:")) {
+        return `trrs: ${summaryId}, ${message}`
+    }
+    return message
+}
+
+const LogsContainer = ({ logs, displayedLogData, runSummaryHexId }) => {
     const d1 = func.epochToDateTime(Math.floor(logs.startTime / 1000))
     const d2 = func.epochToDateTime(Math.floor(logs.endTime / 1000))
     const totalLoaded = logs.logData.length
@@ -24,6 +33,11 @@ const LogsContainer = ({ logs, displayedLogData }) => {
 
     return (
         <Box width="100%" minWidth="0">
+            {runSummaryHexId ? (
+                <Box paddingBlockEnd="2">
+                    <Text as="p" variant="bodySm" color="subdued">Run summary id: {runSummaryHexId}</Text>
+                </Box>
+            ) : null}
             <Text as="p" variant="bodyMd">
                 <span>Fetched logs from </span>
                 <span style={{ color: tokens.color["color-bg-success-strong"] }}>{d1}</span>
@@ -43,7 +57,7 @@ const LogsContainer = ({ logs, displayedLogData }) => {
                         <VerticalStack gap="1">
                             {displayedLogData.map((entry, idx) => (
                                 <Box key={idx} width="100%" minWidth="0" style={logLineStyle}>
-                                    [{func.epochToDateTime(entry.timestamp)}] {entry.log}
+                                    [{func.epochToDateTime(entry.timestamp)}] {formatLogLine(entry)}
                                 </Box>
                             ))}
                         </VerticalStack>

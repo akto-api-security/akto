@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { Card, HorizontalStack, VerticalStack, Text, Button, TextField } from "@shopify/polaris";
+import { Modal, HorizontalStack, VerticalStack, Text, Button, TextField } from "@shopify/polaris";
 import { RefreshMajor } from "@shopify/polaris-icons";
 import api from "../api";
 import LogsContainer from "../../settings/health_logs/LogsContainer";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 
-const TestRunLogs = ({ summaryHexId, startTimestamp, endTimestamp }) => {
+const TestRunLogs = ({ open, onClose, summaryHexId, startTimestamp, endTimestamp }) => {
     const [logData, setLogData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchValue, setSearchValue] = useState("");
@@ -24,12 +24,18 @@ const TestRunLogs = ({ summaryHexId, startTimestamp, endTimestamp }) => {
     }, [summaryHexId]);
 
     useEffect(() => {
-        fetchLogs();
-    }, [fetchLogs]);
+        if (open) {
+            fetchLogs();
+        }
+    }, [open, fetchLogs]);
 
-    const displayedLogData = searchValue
-        ? logData.filter((entry) => `${entry.log ?? ""}`.toLowerCase().includes(searchValue.toLowerCase()))
-        : logData;
+    const matchesSearch = (entry) => {
+        const term = searchValue.toLowerCase();
+        return `${entry.log ?? ""}`.toLowerCase().includes(term)
+            || `${entry.testRunResultSummaryId ?? ""}`.toLowerCase().includes(term);
+    };
+
+    const displayedLogData = searchValue ? logData.filter(matchesSearch) : logData;
 
     const logs = {
         startTime: (startTimestamp || 0) * 1000,
@@ -38,27 +44,34 @@ const TestRunLogs = ({ summaryHexId, startTimestamp, endTimestamp }) => {
     };
 
     return (
-        <Card key="test-run-logs">
-            <VerticalStack gap="3">
-                <HorizontalStack align="space-between" blockAlign="center">
-                    <Text variant="headingMd" as="h2">Logs</Text>
-                    <Button icon={RefreshMajor} onClick={fetchLogs} loading={loading}>Refresh</Button>
-                </HorizontalStack>
-                <TextField
-                    value={searchValue}
-                    onChange={setSearchValue}
-                    placeholder="Filter by text in timestamp or message"
-                    autoComplete="off"
-                    clearButton
-                    onClearButtonClick={() => setSearchValue("")}
-                />
-                {loading
-                    ? <SpinnerCentered />
-                    : (logData.length === 0
-                        ? <Text color="subdued">No logs found for this test run.</Text>
-                        : <LogsContainer logs={logs} displayedLogData={displayedLogData} />)}
-            </VerticalStack>
-        </Card>
+        <Modal
+            large
+            open={open}
+            onClose={onClose}
+            title="Test run logs"
+        >
+            <Modal.Section>
+                <VerticalStack gap="3">
+                    <HorizontalStack align="space-between" blockAlign="center">
+                        <Text variant="bodySm" color="subdued" as="span">Run summary id: {summaryHexId}</Text>
+                        <Button icon={RefreshMajor} onClick={fetchLogs} loading={loading}>Refresh</Button>
+                    </HorizontalStack>
+                    <TextField
+                        value={searchValue}
+                        onChange={setSearchValue}
+                        placeholder="Filter by text in timestamp, message or summary id"
+                        autoComplete="off"
+                        clearButton
+                        onClearButtonClick={() => setSearchValue("")}
+                    />
+                    {loading
+                        ? <SpinnerCentered />
+                        : (logData.length === 0
+                            ? <Text color="subdued">No logs found for this test run.</Text>
+                            : <LogsContainer logs={logs} displayedLogData={displayedLogData} runSummaryHexId={summaryHexId} />)}
+                </VerticalStack>
+            </Modal.Section>
+        </Modal>
     );
 };
 

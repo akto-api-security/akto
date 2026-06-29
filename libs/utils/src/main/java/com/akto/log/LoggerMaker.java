@@ -175,9 +175,14 @@ public class LoggerMaker  {
         sendToSlack(slackWebhookUrl, err);
     }
 
+    private String trrsPrefix() {
+        String summaryId = Context.testRunResultSummaryId.get();
+        return (summaryId != null && !summaryId.isEmpty()) ? "trrs: " + summaryId + ", " : "";
+    }
+
     protected String basicError(String err, LogDb db) {
         if(Context.accountId.get() != null){
-            err = String.format("%s\nAccount id: %d", err, Context.accountId.get());
+            err = String.format("%s%s\nAccount id: %d", trrsPrefix(), err, Context.accountId.get());
         }
         if (!isSendToInfraOnly()) {
             logger.error(err);
@@ -237,7 +242,7 @@ public class LoggerMaker  {
     @Deprecated
     public void infoAndAddToDb(String info, LogDb db) {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String infoMessage = "acc: " + accountId + ", " + info;
+        String infoMessage = trrsPrefix() + "acc: " + accountId + ", " + info;
         if (!isSendToInfraOnly()) {
             logger.info(infoMessage);
         }
@@ -250,7 +255,7 @@ public class LoggerMaker  {
 
     public void warnAndAddToDb(String info, LogDb db) {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String infoMessage = "acc: " + accountId + ", " + info;
+        String infoMessage = trrsPrefix() + "acc: " + accountId + ", " + info;
         if (!isSendToInfraOnly()) {
             logger.warn(infoMessage);
         }
@@ -465,7 +470,7 @@ public class LoggerMaker  {
         }
 
         Bson sortAscending = Sorts.ascending(Log.TIMESTAMP);
-        Bson standardProjection = Projections.include("log", Log.TIMESTAMP, Log.KEY);
+        Bson standardProjection = Projections.include("log", Log.TIMESTAMP, Log.KEY, Log.TEST_RUN_RESULT_SUMMARY_ID);
         logs = LogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
         return logs;
     }
