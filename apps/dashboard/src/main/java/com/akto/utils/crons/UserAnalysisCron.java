@@ -1,10 +1,12 @@
 package com.akto.utils.crons;
 
 import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.agentic_sessions.QueryTopicCacheDao;
 import com.akto.dao.agentic_sessions.UserAnalysisDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.agentic_sessions.QueryTopicCache;
 import com.akto.gpt.handlers.gpt_prompts.UserQueryTopicClassifier;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -17,6 +19,8 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
@@ -25,11 +29,12 @@ public class UserAnalysisCron {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(UserAnalysisCron.class, LogDb.DASHBOARD);
 
-    private static final int CRON_INTERVAL_MINUTES = 10;
-    private static final int SLACK_SECONDS = 60;
-    private static final int PAGE_SIZE = 10;
+    private static final int CRON_INTERVAL_MINUTES       = 10;
+    private static final int SLACK_SECONDS               = 60;
+    private static final int PAGE_SIZE                   = 10;
     private static final int MAX_DOCS_PER_ACCOUNT_PER_TICK = 100;
-    private static final int MIN_QUERY_LENGTH = 20;
+    private static final int MIN_QUERY_LENGTH            = 20;
+    private static final int BATCH_SIZE                  = 10;
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
@@ -63,19 +68,201 @@ public class UserAnalysisCron {
         long endTs = nowMs - SLACK_SECONDS * 1000L;
         long startTs = resolveStartTs(settings);
 
-        // Rolling summaries accumulated in memory across the tick; individual record
-        // data (tokens, topics, harmful) is flushed to DB immediately per record.
-        Map<AggregateKey, String> rollingSummaries = new HashMap<>();
         UserQueryTopicClassifier classifier = new UserQueryTopicClassifier();
 
+        // Collect unprocessed records (scrollQueryData already filters topicProcessed=true)
+        List<AgentQueryRecord> records = new ArrayList<>();
         ElasticSearchClient.instance().scrollQueryData(accountId, startTs, endTs, PAGE_SIZE,
-            MAX_DOCS_PER_ACCOUNT_PER_TICK,
-            rec -> processRecord(rec, accountId, rollingSummaries, classifier));
+            MAX_DOCS_PER_ACCOUNT_PER_TICK, records::add);
+
+        // Filter: drop tool-use spans and short/empty records
+        List<AgentQueryRecord> llmRecords = new ArrayList<>();
+        for (AgentQueryRecord rec : records) {
+            if (rec.getServiceId() == null || rec.getServiceId().isEmpty()) continue;
+            if (rec.getDeviceId() == null || rec.getDeviceId().isEmpty()) continue;
+            if (rec.getQueryPayload() == null || rec.getQueryPayload().length() < MIN_QUERY_LENGTH) continue;
+            if (!isToolUseRecord(rec)) llmRecords.add(rec);
+        }
+
+        if (!llmRecords.isEmpty()) {
+            classifyAndPersist(llmRecords, accountId, classifier);
+        }
 
         AccountSettingsDao.instance.updateOne(
             Filters.eq(Constants.ID, accountId),
             Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_USER_ANALYSIS_CRON, (endTs / 1000))
         );
+    }
+
+    private void classifyAndPersist(List<AgentQueryRecord> llmRecords, int accountId,
+                                    UserQueryTopicClassifier classifier) {
+        // Step 1: Compute hash per record and bulk-check the topic cache
+        Map<AgentQueryRecord, String> recToHash = new LinkedHashMap<>();
+        Set<String> allHashes = new LinkedHashSet<>();
+        for (AgentQueryRecord rec : llmRecords) {
+            String hash = md5Hash(rec.getQueryPayload());
+            recToHash.put(rec, hash);
+            allHashes.add(hash);
+        }
+
+        Map<String, QueryTopicCache> cacheHits;
+        try {
+            cacheHits = QueryTopicCacheDao.instance.bulkGet(allHashes);
+        } catch (Exception e) {
+            loggerMaker.error("UserAnalysisCron: cache lookup failed, treating all as misses: " + e.getMessage());
+            cacheHits = new HashMap<>();
+        }
+
+        // Step 2: Batch-classify cache misses
+        List<AgentQueryRecord> cacheMisses = new ArrayList<>();
+        for (AgentQueryRecord rec : llmRecords) {
+            if (!cacheHits.containsKey(recToHash.get(rec))) cacheMisses.add(rec);
+        }
+
+        Map<String, BasicDBObject> newClassifications = new HashMap<>();
+        List<QueryTopicCache> newCacheEntries = new ArrayList<>();
+        long now = System.currentTimeMillis();
+
+        for (int i = 0; i < cacheMisses.size(); i += BATCH_SIZE) {
+            List<AgentQueryRecord> batch = cacheMisses.subList(i, Math.min(i + BATCH_SIZE, cacheMisses.size()));
+            List<BasicDBObject> inputs = new ArrayList<>();
+            for (AgentQueryRecord rec : batch) {
+                inputs.add(new BasicDBObject()
+                    .append(UserQueryTopicClassifier.QUERY_PAYLOAD, rec.getQueryPayload())
+                    .append(UserQueryTopicClassifier.RESPONSE_PAYLOAD,
+                        rec.getResponsePayload() != null ? rec.getResponsePayload() : ""));
+            }
+            List<BasicDBObject> results;
+            try {
+                results = classifier.handleBatch(inputs);
+            } catch (Exception e) {
+                loggerMaker.error("UserAnalysisCron: handleBatch error for accountId " + accountId + ": " + e.getMessage());
+                continue;
+            }
+            if (results == null) continue;
+
+            for (int j = 0; j < batch.size() && j < results.size(); j++) {
+                BasicDBObject result = results.get(j);
+                if (result == null || result.containsKey("error")) continue;
+                String hash = recToHash.get(batch.get(j));
+                newClassifications.put(hash, result);
+
+                newCacheEntries.add(new QueryTopicCache(
+                    hash,
+                    getDomain(result),
+                    getSubDomain(result),
+                    result.getBoolean("harmful", false),
+                    result.getString("harmfulCategory", ""),
+                    result.getString("harmfulReason", ""),
+                    now
+                ));
+            }
+        }
+
+        // Step 3: Persist new cache entries
+        try {
+            QueryTopicCacheDao.instance.bulkPut(newCacheEntries);
+        } catch (Exception e) {
+            loggerMaker.error("UserAnalysisCron: cache store failed: " + e.getMessage());
+        }
+
+        // Step 4: Accumulate per-record results into per-AggregateKey structures
+        List<ElasticSearchClient.TopicUpdate> topicUpdates = new ArrayList<>();
+        // domain → (subDomain → count) per aggregate key — mirrors topicHierarchy in MongoDB
+        Map<AggregateKey, Map<String, Map<String, Integer>>> aggTopicHierarchy = new HashMap<>();
+        Map<AggregateKey, Map<String, Object>> aggHarmfulMerge = new HashMap<>();
+        Map<AggregateKey, long[]>              aggTokens        = new HashMap<>();
+        Map<AggregateKey, String>              aggUserNames     = new HashMap<>();
+        Map<AggregateKey, String>              aggSummaries     = new HashMap<>();
+
+        for (AgentQueryRecord rec : llmRecords) {
+            String hash = recToHash.get(rec);
+            BasicDBObject result;
+            QueryTopicCache hit = cacheHits.get(hash);
+            if (hit != null) {
+                result = new BasicDBObject()
+                    .append("domain",          hit.getDomain())
+                    .append("subDomain",        hit.getSubDomain())
+                    .append("harmful",          hit.isHarmful())
+                    .append("harmfulCategory",  hit.getHarmfulCategory())
+                    .append("harmfulReason",    hit.getHarmfulReason());
+            } else {
+                result = newClassifications.get(hash);
+            }
+            if (result == null) continue;
+
+            AggregateKey key = new AggregateKey(rec.getServiceId(), rec.getDeviceId());
+
+            // ES write-back: domain + subDomain for this record
+            String domain    = getDomain(result);
+            String subDomain = getSubDomain(result);
+            if (!domain.isEmpty() && rec.getDocId() != null && !rec.getDocId().isEmpty()) {
+                topicUpdates.add(new ElasticSearchClient.TopicUpdate(rec.getDocId(), domain, subDomain));
+            }
+
+            // Build topic hierarchy: domain → subDomain → count
+            if (!domain.isEmpty() && !subDomain.isEmpty()) {
+                Map<String, Map<String, Integer>> hierarchy = aggTopicHierarchy.computeIfAbsent(key, k -> new HashMap<>());
+                hierarchy.computeIfAbsent(domain, d -> new HashMap<>()).merge(subDomain, 1, Integer::sum);
+            }
+
+            // Harmful merge
+            if (result.getBoolean("harmful", false)) {
+                Map<String, Object> harmfulMerge = aggHarmfulMerge.computeIfAbsent(key, k -> new HashMap<>());
+                applyHarmful(result, rec.getTimeStampMs(), harmfulMerge);
+            }
+
+            // Token accumulation
+            long inTok = rec.getInputTokens() > 0 ? rec.getInputTokens() : rec.getQueryPayload().length() / 4;
+            long outTok = rec.getOutputTokens() > 0 ? rec.getOutputTokens()
+                : (rec.getResponsePayload() != null ? rec.getResponsePayload().length() / 4 : 0);
+            long[] tokens = aggTokens.computeIfAbsent(key, k -> new long[]{0, 0});
+            tokens[0] += inTok;
+            tokens[1] += outTok;
+
+            // Track last userName and summary per key (cache hits have no summary)
+            if (rec.getUserName() != null && !rec.getUserName().isEmpty()) {
+                aggUserNames.put(key, rec.getUserName());
+            } else {
+                aggUserNames.putIfAbsent(key, "");
+            }
+            if (hit == null) {
+                // Summary only comes from fresh AI classifications, not cache hits
+                String summary = result.getString("summary", "");
+                if (summary != null && !summary.isEmpty()) {
+                    aggSummaries.put(key, summary);
+                }
+            }
+        }
+
+        // Step 5: Bulk write topics back to ES
+        if (!topicUpdates.isEmpty()) {
+            try {
+                ElasticSearchClient.instance().bulkUpdateTopics(topicUpdates);
+            } catch (Exception e) {
+                loggerMaker.error("UserAnalysisCron: bulkUpdateTopics failed for accountId " + accountId + ": " + e.getMessage());
+            }
+        }
+
+        // Step 6: One upsertAggregates per unique AggregateKey
+        for (AggregateKey key : aggTokens.keySet()) {
+            long[] tokens = aggTokens.get(key);
+            // null summary means all-cache-hit; upsertAggregates will skip overwriting existing summary
+            String summaryToWrite = aggSummaries.get(key);
+            try {
+                UserAnalysisDataDao.instance.upsertAggregates(
+                    key.serviceId, key.deviceId,
+                    aggUserNames.getOrDefault(key, ""),
+                    aggTopicHierarchy.getOrDefault(key, new HashMap<>()),
+                    tokens[0], tokens[1],
+                    aggHarmfulMerge.getOrDefault(key, new HashMap<>()),
+                    summaryToWrite,
+                    System.currentTimeMillis()
+                );
+            } catch (Exception e) {
+                loggerMaker.error("UserAnalysisCron: upsert failed for (" + key.serviceId + ", " + key.deviceId + "): " + e.getMessage());
+            }
+        }
     }
 
     private long resolveStartTs(AccountSettings settings) {
@@ -85,78 +272,48 @@ public class UserAnalysisCron {
         return info.getLastUserAnalysisCron() * 1000L;
     }
 
-    private void processRecord(AgentQueryRecord rec, int accountId,
-                               Map<AggregateKey, String> rollingSummaries,
-                               UserQueryTopicClassifier classifier) {
-        if (rec.getServiceId() == null || rec.getServiceId().isEmpty()) return;
-        if (rec.getDeviceId() == null || rec.getDeviceId().isEmpty()) return;
-        if (rec.getQueryPayload() == null || rec.getQueryPayload().length() < MIN_QUERY_LENGTH) return;
+    /**
+     * Returns true for tool-execution spans (Bash, Read, Edit, MCP, etc.) that carry
+     * no classifiable topic. Mirrors the classifySpan() logic in constants.js on the frontend.
+     */
+    private boolean isToolUseRecord(AgentQueryRecord rec) {
+        // LLM records always have token counts — fast exit
+        if (rec.getInputTokens() > 0 || rec.getOutputTokens() > 0) return false;
 
-        AggregateKey key = new AggregateKey(rec.getServiceId(), rec.getDeviceId());
-        String existingSummary = rollingSummaries.getOrDefault(key, "");
-
-        BasicDBObject classifierInput = new BasicDBObject()
-            .append(UserQueryTopicClassifier.QUERY_PAYLOAD, rec.getQueryPayload())
-            .append(UserQueryTopicClassifier.RESPONSE_PAYLOAD, rec.getResponsePayload() != null ? rec.getResponsePayload() : "")
-            .append(UserQueryTopicClassifier.EXISTING_SUMMARY, existingSummary);
-
-        BasicDBObject result;
+        // Zero tokens: likely a tool span. Confirm via payload structure.
         try {
-            result = classifier.handle(classifierInput);
-        } catch (Exception e) {
-            loggerMaker.error("UserAnalysisCron: classifier error for accountId " + accountId + ": " + e.getMessage());
-            return;
-        }
-        if (result == null) return;
-
-        Map<String, Integer> topicDeltas = new HashMap<>();
-        applyTopics(result, topicDeltas);
-
-        Map<String, Object> harmfulMerge = new HashMap<>();
-        applyHarmful(result, rec.getTimeStampMs(), harmfulMerge);
-
-        String newSummary = result.getString("summary", "");
-        if (newSummary != null && !newSummary.isEmpty()) {
-            rollingSummaries.put(key, newSummary);
-        }
-
-        // Use token counts from the ES record; fall back to payload-length heuristic (~4 chars/token).
-        long inputTokens = rec.getInputTokens();
-        long outputTokens = rec.getOutputTokens();
-        if (inputTokens == 0 && rec.getQueryPayload() != null) {
-            inputTokens = rec.getQueryPayload().length() / 4;
-        }
-        if (outputTokens == 0 && rec.getResponsePayload() != null) {
-            outputTokens = rec.getResponsePayload().length() / 4;
-        }
-
-        String userName = rec.getUserName() != null ? rec.getUserName() : "";
-        String summaryToWrite = rollingSummaries.get(key);
-
-        try {
-            UserAnalysisDataDao.instance.upsertAggregates(
-                key.serviceId, key.deviceId, userName,
-                topicDeltas, inputTokens, outputTokens,
-                harmfulMerge, summaryToWrite, System.currentTimeMillis()
-            );
-        } catch (Exception ex) {
-            loggerMaker.error("UserAnalysisCron: upsert failed for (" + key.serviceId + ", " + key.deviceId + "): " + ex.getMessage());
-        }
+            BasicDBObject obj = BasicDBObject.parse(rec.getQueryPayload());
+            if (obj.containsKey("toolName")) return true;
+            Object bodyObj = obj.get("body");
+            if (bodyObj instanceof BasicDBObject) {
+                BasicDBObject body = (BasicDBObject) bodyObj;
+                if (body.containsKey("toolName")) return true;
+                if (body.containsKey("result")) return true;
+            }
+            Object content = obj.get("content");
+            if (content instanceof List) {
+                for (Object c : (List<?>) content) {
+                    if (c instanceof BasicDBObject
+                        && "tool_use".equals(((BasicDBObject) c).getString("type"))) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return false;
     }
 
-    private void applyTopics(BasicDBObject result, Map<String, Integer> topicDeltas) {
-        Object topicsObj = result.get("topics");
-        if (!(topicsObj instanceof List)) return;
-        for (Object t : (List<?>) topicsObj) {
-            String topic = String.valueOf(t).trim();
-            if (!topic.isEmpty()) {
-                topicDeltas.merge(topic, 1, Integer::sum);
-            }
-        }
+    private static String getDomain(BasicDBObject result) {
+        String d = result.getString("domain", "");
+        return d != null ? d.trim() : "";
+    }
+
+    private static String getSubDomain(BasicDBObject result) {
+        String s = result.getString("subDomain", "");
+        return s != null ? s.trim() : "";
     }
 
     private void applyHarmful(BasicDBObject result, long timestampMs, Map<String, Object> harmfulMerge) {
-        if (!result.getBoolean("harmful", false)) return;
         String category = result.getString("harmfulCategory", "general");
         if (category == null || category.isEmpty()) category = "general";
         String reason = result.getString("harmfulReason", "");
@@ -172,6 +329,21 @@ public class UserAnalysisCron {
         entry.put("count", entry.getInt("count", 0) + 1);
         entry.put("lastSeenAt", timestampMs);
         if (reason != null && !reason.isEmpty()) entry.put("lastReason", reason);
+    }
+
+    private static String md5Hash(String input) {
+        if (input == null) return "";
+        try {
+            String normalized = input.trim().toLowerCase();
+            String prefix = normalized.length() > 300 ? normalized.substring(0, 300) : normalized;
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] digest = md.digest(prefix.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(32);
+            for (byte b : digest) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception e) {
+            return String.valueOf(input.hashCode());
+        }
     }
 
     private static final class AggregateKey {

@@ -23,8 +23,8 @@ public class UserAnalysisData {
     public static final String DEVICE_ID = "deviceId";
     public static final String USER_NAME = "userName";
     public static final String LAST_UPDATED_AT = "lastUpdatedAt";
-    public static final String TOPIC_COUNTS = "topicCounts";
-    public static final String HARMFUL_TOPICS = "harmfulTopics";
+    public static final String TOPIC_HIERARCHY  = "topicHierarchy";
+    public static final String HARMFUL_TOPICS   = "harmfulTopics";
     public static final String TOTAL_INPUT_TOKENS = "totalInputTokens";
     public static final String TOTAL_OUTPUT_TOKENS = "totalOutputTokens";
     public static final String AI_SUMMARY = "aiSummary";
@@ -59,7 +59,8 @@ public class UserAnalysisData {
 
     private UserAnalysisDataKey id;
     private String userName;
-    private Map<String, Integer> topicCounts = new HashMap<>();
+    // domain → (subDomain → count). Outer key is the topic; no separate flat topicCounts needed.
+    private Map<String, Map<String, Integer>> topicHierarchy = new HashMap<>();
     private long totalInputTokens;
     private long totalOutputTokens;
     private String aiSummary;
@@ -67,10 +68,15 @@ public class UserAnalysisData {
     private Map<String, Object> harmfulTopics = new HashMap<>();
 
     public List<String> getDominantTopics(int topN) {
-        if (topicCounts == null || topicCounts.isEmpty()) {
-            return new ArrayList<>();
+        if (topicHierarchy == null || topicHierarchy.isEmpty()) return new ArrayList<>();
+        List<Map.Entry<String, Integer>> entries = new ArrayList<>();
+        for (Map.Entry<String, Map<String, Integer>> e : topicHierarchy.entrySet()) {
+            int total = 0;
+            if (e.getValue() != null) {
+                for (int v : e.getValue().values()) total += v;
+            }
+            entries.add(new java.util.AbstractMap.SimpleEntry<>(e.getKey(), total));
         }
-        List<Map.Entry<String, Integer>> entries = new ArrayList<>(topicCounts.entrySet());
         entries.sort(Comparator.comparingInt(Map.Entry<String, Integer>::getValue).reversed());
         List<String> result = new ArrayList<>();
         for (int i = 0; i < Math.min(topN, entries.size()); i++) {
