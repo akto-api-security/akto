@@ -22,8 +22,11 @@ public class GuardrailsClient {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
-    // Align with guardrails-service scan timeout (60s); sized for ~100k RPM ingress.
-    private static final int TIMEOUT_MS = 30_000;
+    // Inline LLM-proxy path: a slow guardrails call must not hold the request long.
+    // 3s bounds tail latency and thread/connection pileup; on timeout the call
+    // fails open (see buildErrorResponse) so traffic keeps flowing. Sized for
+    // ~100k RPM ingress.
+    private static final int TIMEOUT_MS = 3_000;
 
     private static final OkHttpClient HTTP_CLIENT = CoreHTTPClient.client.newBuilder()
             .dispatcher(buildDispatcher())
@@ -109,12 +112,27 @@ public class GuardrailsClient {
         return callValidate(request, "/api/validate/response");
     }
 
+    // Fail-OPEN on guardrails-service infrastructure failures (timeout, connection
+    // refused, 5xx, unparseable body). This path is reached ONLY on transport/error
+    // conditions — a genuine block is an HTTP 200 with allowed=false, handled at the
+    // isSuccessful() branch above and never routed here. Failing open keeps LLM
+    // traffic flowing when guardrails is degraded, consistent with the fail-open
+    // backpressure design in agent-guard and guardrails-service: availability over
+    // enforcement under degradation. The error is still surfaced in `reason`/`error`
+    // for observability.
     private Map<String, Object> buildErrorResponse(String errorMessage) {
         Map<String, Object> error = new HashMap<>();
-        error.put("allowed", false);
+        // Mirror a normal guardrails-service allow verdict shape so every consumer
+        // reads the fail-open decision the same way. guardrails-service emits the
+        // capital-cased "Allowed"/"Modified"; the lowercase keys are kept for
+        // back-compat with internal isAllowed() (which checks both).
+        error.put("Allowed", true);
+        error.put("allowed", true);
+        error.put("Modified", false);
         error.put("modified", false);
-        error.put("reason", "Guardrails validation failed: " + errorMessage);
+        error.put("reason", "Guardrails unavailable, failing open: " + errorMessage);
         error.put("error", errorMessage);
+        error.put("failOpen", true);
         return error;
     }
 
