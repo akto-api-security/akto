@@ -373,6 +373,32 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
     }));
 };
 
+// Groups Argus gen-ai collections (no asset owner tag) by source-id (hostname parts[1]).
+// Option values match what Argus policies store in selectedAgentServers (e.g. "cursor", "claude1").
+export const groupArgusAgentsBySourceId = (collections) => {
+    const agents = {};
+    collections.forEach((c) => {
+        if (c.deactivated) return;
+        const typeTag = findTypeTag(c.envType);
+        if (!typeTag || typeTag.keyName !== TYPE_TAG_KEYS.GEN_AI) return;
+        const hasAssetOwner = (c.envType || []).some(t =>
+            ASSET_TAG_KEYS_SET.has(t.keyName) || t.keyName === "agent-name"
+        );
+        if (hasAssetOwner) return;
+        const hostName = c.hostName || c.displayName || c.name;
+        if (!hostName) return;
+        const parts = hostName.split('.');
+        if (parts.length < 3) return;
+        const sourceId = parts[1];
+        if (!sourceId) return;
+        if (!agents[sourceId]) {
+            agents[sourceId] = { groupKey: sourceId, collections: [] };
+        }
+        agents[sourceId].collections.push(c);
+    });
+    return Object.values(agents);
+};
+
 // Group collections by skill tag value — one row per unique skill name
 export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}) => {
     const skills = {};

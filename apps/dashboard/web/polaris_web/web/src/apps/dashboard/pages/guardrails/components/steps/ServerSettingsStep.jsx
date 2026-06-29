@@ -1,6 +1,6 @@
 import { VerticalStack, HorizontalStack, Text, FormLayout, Box, Checkbox, RadioButton, Popover, TextField, Link, Tag, Banner, Badge, Button, InlineError } from "@shopify/polaris";
 import { DeleteMinor } from "@shopify/polaris-icons";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import DropdownSearch from "../../../../components/shared/DropdownSearch";
 import Dropdown from "../../../../components/layouts/Dropdown";
 import AssetIcon from "../../../observe/agentic/AssetIcon";
@@ -8,23 +8,7 @@ import { formatDisplayName } from "../../../observe/agentic/mcpClientHelper";
 import OwaspTag from "../OwaspTag";
 import RuleEnforcementDropdown from "../RuleEnforcementDropdown";
 import { isEndpointSecurityCategory } from "../../../../../main/labelHelper";
-import { extractEndpointId } from "../../../observe/agentic/constants";
 
-// Strip deviceId prefix using the same extractEndpointId as the Agentic Assets screen
-// 'macbook.cursor.time' → 'cursor.time', merging duplicates across devices
-const stripDeviceId = (label) => {
-    const deviceId = extractEndpointId(label);
-    return deviceId ? label.slice(deviceId.length + 1) : label;
-};
-
-const groupByService = (servers) => {
-    const seen = {};
-    (servers || []).forEach(s => {
-        const key = stripDeviceId(s.label) || s.label;
-        if (!seen[key]) seen[key] = { label: key, value: key };
-    });
-    return Object.values(seen);
-};
 
 export const ServerSettingsConfig = {
     number: 10,
@@ -65,6 +49,11 @@ export const ServerSettingsConfig = {
 const CountPopover = ({ count, label, items }) => {
     const [active, setActive] = useState(false);
     const [search, setSearch] = useState('');
+    const closeTimer = useRef(null);
+
+    const open = () => { if (closeTimer.current) clearTimeout(closeTimer.current); setActive(true); };
+    const scheduleClose = () => { closeTimer.current = setTimeout(() => { setActive(false); setSearch(''); }, 150); };
+
     const filtered = (items || []).filter(item =>
         (item.label || '').toLowerCase().includes(search.toLowerCase())
     );
@@ -72,34 +61,36 @@ const CountPopover = ({ count, label, items }) => {
         <Popover
             active={active}
             activator={
-                <Link onClick={() => setActive(v => !v)}>
-                    {count} {label}
-                </Link>
+                <span onMouseEnter={open} onMouseLeave={scheduleClose} style={{ cursor: 'pointer' }}>
+                    <Link>{count} {label}</Link>
+                </span>
             }
             onClose={() => { setActive(false); setSearch(''); }}
         >
-            <Popover.Pane fixed>
-                <Box padding="2" minWidth="240px" maxWidth="320px">
-                    <TextField
-                        placeholder={`Search ${label}...`}
-                        value={search}
-                        onChange={setSearch}
-                        autoComplete="off"
-                    />
-                </Box>
-            </Popover.Pane>
-            <Popover.Pane>
-                <Box padding="3" maxWidth="320px">
-                    {filtered.length === 0
-                        ? <Text tone="subdued" variant="bodySm">No {label} found</Text>
-                        : <HorizontalStack gap="2" wrap>
-                            {filtered.map(item => (
-                                <Tag key={item.value}>{item.label}</Tag>
-                            ))}
-                          </HorizontalStack>
-                    }
-                </Box>
-            </Popover.Pane>
+            <div onMouseEnter={open} onMouseLeave={scheduleClose}>
+                <Popover.Pane fixed>
+                    <Box padding="2" minWidth="240px" maxWidth="320px">
+                        <TextField
+                            placeholder={`Search ${label}...`}
+                            value={search}
+                            onChange={setSearch}
+                            autoComplete="off"
+                        />
+                    </Box>
+                </Popover.Pane>
+                <Popover.Pane>
+                    <Box padding="3" maxWidth="320px">
+                        {filtered.length === 0
+                            ? <Text tone="subdued" variant="bodySm">No {label} found</Text>
+                            : <HorizontalStack gap="2" wrap>
+                                {filtered.map(item => (
+                                    <Tag key={item.value}>{item.label}</Tag>
+                                ))}
+                              </HorizontalStack>
+                        }
+                    </Box>
+                </Popover.Pane>
+            </div>
         </Popover>
     );
 };
@@ -217,26 +208,52 @@ const ServerSettingsStep = ({
         ];
     };
 
-    // Atlas: group by service suffix (strips deviceId, merges duplicates)
-    // Argus: raw per-device list with disabled state for block mode
+    // Atlas: filterCollections() already groups by service/platform key — use directly.
+    // Argus: raw per-device list with disabled state for block mode.
     const mcpOptions = isAtlas
-        ? sortSelectedFirst(groupByService(mcpServers), selectedMcpServers)
+        ? sortSelectedFirst(mcpServers || [], selectedMcpServers)
         : sortSelectedFirst(
             isBlockMode ? (mcpServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (mcpServers || []),
             selectedMcpServers
           );
     const agentOptions = isAtlas
-        ? sortSelectedFirst(groupByService(agentServers), selectedAgentServers)
+        ? sortSelectedFirst(agentServers || [], selectedAgentServers)
         : sortSelectedFirst(
             isBlockMode ? (agentServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (agentServers || []),
             selectedAgentServers
           );
     const llmOptions = isAtlas
-        ? sortSelectedFirst(groupByService(browserLlmServers), selectedBrowserLlms)
+        ? sortSelectedFirst(browserLlmServers || [], selectedBrowserLlms)
         : sortSelectedFirst(
             isBlockMode ? (browserLlmServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (browserLlmServers || []),
             selectedBrowserLlms
           );
+
+    // One-time Atlas cleanup: strips stale condition values that don't match a current option.
+    // Skipped for Argus — backward-compat values may not yet have a matching option.
+    const normalizedRef = useRef(false);
+    useEffect(() => {
+        if (!isAtlas) return;
+        if (normalizedRef.current) return;
+        const total = agentOptions.length + mcpOptions.length + llmOptions.length;
+        if (total === 0) return;
+        normalizedRef.current = true;
+        const agentVals = new Set(agentOptions.map(o => o.value));
+        const mcpVals = new Set(mcpOptions.map(o => o.value));
+        const llmVals = new Set(llmOptions.map(o => o.value));
+        setAgenticConditions(prev => {
+            let changed = false;
+            const next = prev.map(c => {
+                const valSet = c.type === 'AGENT' ? agentVals : c.type === 'MCP_SERVER' ? mcpVals : c.type === 'LLM' ? llmVals : null;
+                if (!valSet || valSet.size === 0) return c;
+                const valid = (c.values || []).filter(v => valSet.has(v));
+                if (valid.length === (c.values || []).length) return c;
+                changed = true;
+                return { ...c, values: valid };
+            });
+            return changed ? next : prev;
+        });
+    }, [agentOptions.length, mcpOptions.length, llmOptions.length]);
 
     const agenticTypeOptions = [
         { label: `${agentOptions.length > 1 ? 'AI Agents' : 'AI Agent'} [${agentOptions.length}]`, value: 'AGENT', disabled: agentOptions.length === 0 },
@@ -313,10 +330,12 @@ const ServerSettingsStep = ({
         );
     };
 
-    // Count items for "Apply to all" helpText
-    const mcpCountItems = isAtlas ? groupByService(compatibleMcpServers) : compatibleMcpServers;
-    const agentCountItems = isAtlas ? groupByService(compatibleAgentServers) : compatibleAgentServers;
-    const llmCountItems = isAtlas ? groupByService(compatibleBrowserLlmServers) : compatibleBrowserLlmServers;
+    // Count items for "Apply to all" helpText — use same grouping as the dropdowns, with enriched display names.
+    // Atlas: filterCollections() already produces one entry per service/platform key.
+    // Argus: use compatible servers (filtered by inline for block mode).
+    const mcpCountItems = enrichOptions(isAtlas ? (mcpServers || []) : compatibleMcpServers, 'MCP Server');
+    const agentCountItems = enrichOptions(isAtlas ? (agentServers || []) : compatibleAgentServers, 'AI Agent');
+    const llmCountItems = enrichOptions(isAtlas ? (browserLlmServers || []) : compatibleBrowserLlmServers, 'LLM');
 
     useEffect(() => {
         // Atlas uses app-level groups — per-device inline filtering doesn't apply

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { isEndpointSecurityCategory } from "../../../../main/labelHelper";
+
 import {
     Text,
     HorizontalStack,
@@ -26,7 +26,7 @@ import {
     resolveStoredPolicyBehaviour
 } from '../utils';
 import { getDefaultGeneralBlockTopics, GENERAL_BLOCKS, isGeneralBlockTopic, toDeniedTopic } from '../generalBlocks';
-import { groupCollectionsByAgent, groupCollectionsByService } from '../../observe/agentic/constants';
+import { groupCollectionsByAgent, groupCollectionsByService, groupArgusAgentsBySourceId, extractServiceName } from '../../observe/agentic/constants';
 import func from "@/util/func";
 import {
     PolicyDetailsStep,
@@ -54,30 +54,35 @@ import {
 } from './steps';
 import "./createGuardrailPage.css";
 
-// Atlas: store service keys so new devices are covered automatically via service-key matching in enforcement.
+// Store service keys so new devices are covered automatically via service-key matching in enforcement.
 const expandGroupsToV2 = (selectedKeys) =>
-    (selectedKeys || []).map(key => ({ id: key, name: key }));
+    (selectedKeys || []).filter(key => key).map(key => ({ id: key, name: key }));
 
-// Reverse stored V2 entries back to service keys; handles old-format (numeric id) and new-format (service key as id).
+const groupToOption = (g) => ({
+    label: g.groupKey,
+    value: g.groupKey,
+    isInline: g.collections.some(c => !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe'))
+});
+
+// Converts stored V2 server entries back to the option-value keys used by the dropdowns.
+// Works for all stored formats: numeric collection ID, full hostname, or short service key.
 const reverseToServiceKeys = (v2Servers, allCollections) => {
-    const stripFirst = (s) => { const i = (s || '').indexOf('.'); return i > 0 ? s.slice(i + 1) : (s || ''); };
     const keys = (v2Servers || []).map(s => {
         const col = (allCollections || []).find(c => c.id?.toString() === s.id?.toString());
-        if (col) return stripFirst(col.displayName);
-        const sName = s.name || String(s.id || '');
-        return /^\d+$/.test(String(s.id || '')) ? stripFirst(sName) : sName;
+        // Use same source priority as groupCollectionsByService so the derived key matches the option value.
+        const rawName = col ? (col.hostName || col.displayName || '') : (s.name || String(s.id || ''));
+        return extractServiceName(rawName) || rawName;
     });
     return [...new Set(keys)];
 };
 
-// Returns service keys for all browser-llm collections, used to classify new-format V2 entries on load.
 const getLlmServiceKeySet = (allCollections) => {
     const keys = new Set();
     (allCollections || []).forEach(c => {
         if (c.envType?.some(e => e.keyName === 'browser-llm')) {
-            const name = c.displayName || '';
-            const dotIdx = name.indexOf('.');
-            keys.add(dotIdx > 0 ? name.slice(dotIdx + 1) : name);
+            const rawName = c.hostName || c.displayName || '';
+            const svcKey = extractServiceName(rawName) || rawName;
+            if (svcKey) keys.add(svcKey);
         }
     });
     return keys;
@@ -455,34 +460,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const filterCollections = () => {
         setCollectionsLoading(true);
         try {
-            const serviceGroups = groupCollectionsByService(allCollections.filter(c => !isVisibilityOnly(c)));
-            const mcpServerCollections = serviceGroups
-                .filter(g => g.clientType === 'MCP Server')
-                .map(g => ({
-                    label: g.groupKey,
-                    value: g.groupKey,
-                    isInline: g.collections.some(c => !c.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe'))
-                }));
+            const nonVisibility = allCollections.filter(c => !isVisibilityOnly(c));
+            const serviceGroups = groupCollectionsByService(nonVisibility);
+            const agentGroups = groupCollectionsByAgent(nonVisibility);
+            const agentGroupKeys = new Set(agentGroups.map(g => g.groupKey));
+            const argusAgentGroups = groupArgusAgentsBySourceId(nonVisibility)
+                .filter(g => !agentGroupKeys.has(g.groupKey));
 
-
-            const agentGroups = groupCollectionsByAgent(allCollections.filter(c => !isVisibilityOnly(c)));
-            const agentServerCollections = agentGroups.map(g => ({
-                label: g.groupKey,
-                value: g.groupKey,
-                isInline: g.collections.some(c => !c.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe'))
-            }));
-
-            const browserLlmCollections = serviceGroups
-                .filter(g => g.clientType === 'LLM')
-                .map(g => ({
-                    label: g.groupKey,
-                    value: g.groupKey,
-                    isInline: g.collections.some(c => !c.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe'))
-                }));
-
-            setMcpServers(mcpServerCollections);
-            setAgentServers(agentServerCollections);
-            setBrowserLlmServers(browserLlmCollections);
+            setMcpServers(serviceGroups.filter(g => g.clientType === 'MCP Server').map(groupToOption));
+            setAgentServers([...agentGroups, ...argusAgentGroups].map(groupToOption));
+            setBrowserLlmServers(serviceGroups.filter(g => g.clientType === 'LLM').map(groupToOption));
         } catch (error) {
             console.error("Error filtering collections:", error);
         } finally {
@@ -676,11 +663,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setConfidenceScore(nearestCheckpoint);
 
         // Server settings
-        const isAtlas = isEndpointSecurityCategory();
         const storedMcpV2 = policy.selectedMcpServersV2 || [];
         setSelectedMcpServers(
             storedMcpV2.length > 0
-                ? (isAtlas ? reverseToServiceKeys(storedMcpV2, allCollections) : storedMcpV2.map(s => s.id))
+                ? reverseToServiceKeys(storedMcpV2, allCollections)
                 : policy.selectedMcpServers || []
         );
 
@@ -690,24 +676,22 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             ? policy.selectedAgentServersV2
             : (policy.selectedAgentServers || []).map(id => ({ id, name: id }));
 
-        const llmServiceKeySet = isAtlas ? getLlmServiceKeySet(allCollections) : null;
+        // Compute llmServiceKeySet for both Atlas and Argus — needed to classify new-format
+        // V2 entries where the id is a service key (not a numeric collection id).
+        const llmServiceKeySet = getLlmServiceKeySet(allCollections);
         const rawAgentEntries = [];
         const rawLlmEntries = [];
         rawAgentServersV2.forEach(s => {
             const col = allCollections?.find(c => c.id?.toString() === s.id?.toString());
             const isBrowserLlm = col
                 ? col.envType?.some(e => e.keyName === 'browser-llm')
-                : isAtlas && llmServiceKeySet.has(s.name || '');
+                : llmServiceKeySet.has(s.name || '');
             if (isBrowserLlm) rawLlmEntries.push(s);
             else rawAgentEntries.push(s);
         });
 
-        setSelectedAgentServers(isAtlas
-            ? reverseToServiceKeys(rawAgentEntries, allCollections)
-            : rawAgentEntries.map(s => s.id));
-        setSelectedBrowserLlms(isAtlas
-            ? reverseToServiceKeys(rawLlmEntries, allCollections)
-            : rawLlmEntries.map(s => s.id));
+        setSelectedAgentServers(reverseToServiceKeys(rawAgentEntries, allCollections));
+        setSelectedBrowserLlms(reverseToServiceKeys(rawLlmEntries, allCollections));
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
         setApplyToAllServers(policy.applyToAllServers ?? true);
@@ -745,36 +729,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const handleSave = async () => {
         setLoading(true);
         try {
-            const isAtlas = isEndpointSecurityCategory();
-
-            const transformedMcpServers = isAtlas
-                ? expandGroupsToV2(selectedMcpServers)
-                : selectedMcpServers
-                    .filter(serverId => serverId)
-                    .map(serverId => {
-                        const server = mcpServers.find(s => s.value === serverId || s.value === serverId.toString());
-                        return { id: serverId.toString(), name: server ? server.label : serverId.toString() };
-                    });
-
-            const transformedAgentServers = isAtlas
-                ? [
-                    ...expandGroupsToV2(selectedAgentServers),
-                    ...expandGroupsToV2(selectedBrowserLlms)
-                ]
-                : [
-                    ...selectedAgentServers
-                        .filter(serverId => serverId)
-                        .map(serverId => {
-                            const server = agentServers.find(s => s.value === serverId || s.value === serverId.toString());
-                            return { id: serverId.toString(), name: server ? server.label : serverId.toString() };
-                        }),
-                    ...selectedBrowserLlms
-                        .filter(serverId => serverId)
-                        .map(serverId => {
-                            const server = browserLlmServers.find(s => s.value === serverId || s.value === serverId.toString());
-                            return { id: serverId.toString(), name: server ? server.label : serverId.toString() };
-                        })
-                ];
+            const transformedMcpServers = expandGroupsToV2(selectedMcpServers);
+            const transformedAgentServers = [
+                ...expandGroupsToV2(selectedAgentServers),
+                ...expandGroupsToV2(selectedBrowserLlms)
+            ];
 
             // Drop empty rows and normalize the glob patterns before persisting.
             const cleanedBlockedHosts = (blockedHosts || [])

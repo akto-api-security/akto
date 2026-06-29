@@ -180,10 +180,8 @@ func (s *Service) filterPoliciesByContextSource(policies []types.Policy, context
 // filterPoliciesByMcpServer filters policies by MCP server name.
 // Mirrors the logic in PolicyManager.GetPoliciesForMcpServer from the mcp-endpoint-shield library:
 // policies with an empty server map are skipped (not configured for any server).
+// filterPoliciesByMcpServer filters policies to those applicable to the given MCP server name.
 // YAML policies always pass through. If mcpServerName is empty, all policies are returned unchanged.
-// For block-mode policies with applyToAllServers=true, the policy only applies if the server's
-// collection has the mode=inline tag (i.e. the connector is in the synchronous request path
-// and can actually block requests).
 func (s *Service) filterPoliciesByMcpServer(policies []types.Policy, mcpServerName string) []types.Policy {
 	if mcpServerName == "" {
 		return policies
@@ -213,11 +211,57 @@ func (s *Service) filterPoliciesByMcpServer(policies []types.Policy, mcpServerNa
 			combinedServers[k] = v
 		}
 		if len(combinedServers) == 0 {
-			continue // Not configured for any server — skip
+			continue // not configured for any server
 		}
 		for serverName := range combinedServers {
-			if strings.ToLower(serverName) == mcpServerNameLower {
+			storedLower := strings.ToLower(serverName)
+			// Exact match: full hostname stored (old Argus) or short key equals incoming.
+			if storedLower == mcpServerNameLower {
 				filtered = append(filtered, policy)
+				break
+			}
+			// Suffix match: stored value is a trailing dot-segment — covers service names
+			// ('filesystem'), multi-segment LLM domains ('chatgpt.com'), and old device-stripped
+			// Atlas keys ('cursor.filesystem') since ".cursor.filesystem" is a valid suffix.
+			if strings.HasSuffix(mcpServerNameLower, "."+storedLower) {
+				filtered = append(filtered, policy)
+				break
+			}
+			// Middle-segment match: stored agent platform key sits between device-id and service name.
+			// e.g. stored='cursor' matches 'device.cursor.filesystem'.
+			if strings.Contains(mcpServerNameLower, "."+storedLower+".") {
+				filtered = append(filtered, policy)
+				break
+			}
+		}
+	}
+	return filtered
+}
+
+// filterPoliciesByDeviceId filters policies by the device label embedded in the MCP server name.
+// The device label is the first dot-delimited segment of "{deviceLabel}.{clientType}.{host}".
+// Policies with an empty ApplyToDeviceIds list apply to all devices and always pass through.
+// If mcpServerName is empty or has no device prefix, all policies are returned unchanged.
+func (s *Service) filterPoliciesByDeviceId(policies []types.Policy, mcpServerName string) []types.Policy {
+	if mcpServerName == "" {
+		return policies
+	}
+	deviceLabel := ""
+	if i := strings.IndexByte(mcpServerName, '.'); i > 0 {
+		deviceLabel = mcpServerName[:i]
+	}
+	if deviceLabel == "" {
+		return policies
+	}
+	filtered := make([]types.Policy, 0, len(policies))
+	for _, p := range policies {
+		if len(p.ApplyToDeviceIds) == 0 {
+			filtered = append(filtered, p)
+			continue
+		}
+		for _, id := range p.ApplyToDeviceIds {
+			if id == deviceLabel {
+				filtered = append(filtered, p)
 				break
 			}
 		}
@@ -928,6 +972,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Filter policies by MCP server name so all subsequent checks only fire for
 	// rules that belong to policies applicable to this server.
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
+	policies = s.filterPoliciesByDeviceId(policies, valCtx.McpServerName)
 
 	// Check account-type guardrail after server filtering so the policy's server
 	// selection is respected (a personal-account policy scoped to server A should
@@ -1095,6 +1140,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 
 	// Filter policies by MCP server name — policies with no server configured are skipped
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
+	policies = s.filterPoliciesByDeviceId(policies, valCtx.McpServerName)
 
 	s.logger.Info("ValidateResponse - calling ProcessResponse",
 		zap.String("path", params.Path),
@@ -1388,6 +1434,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 		// Filter policies by MCP server name for this specific batch item
 		itemPolicies := s.filterPoliciesByMcpServer(policies, mcpServerName)
+		itemPolicies = s.filterPoliciesByDeviceId(itemPolicies, mcpServerName)
 		s.logger.Debug("ValidateBatch - applicable policies for server",
 			zap.Int("index", i),
 			zap.String("mcpServerName", mcpServerName),
