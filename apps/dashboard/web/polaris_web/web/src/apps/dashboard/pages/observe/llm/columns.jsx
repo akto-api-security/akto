@@ -233,6 +233,8 @@ export const ARGUS_TRACE_COL_DEFS = [
         cellStyle: FLEX_CELL,
         ...NO_FILTER,
     },
+    topicCol("Topics Queried"),
+    topicCol("SubTopic queried", false),
     // {
     //     headerName: "Model",
     //     field: "_model",
@@ -257,7 +259,8 @@ export const MESSAGE_FLAT_COLUMN_DEFS = [
         cellStyle: FLEX_CELL,
         ...NO_FILTER,
     },
-    topicCol,
+    topicCol("Topics Queried"),
+    topicCol("SubTopic queried", false),
     tokensCol,
     timeCol("timestamp"),
     idCol("Trace ID", "traceId"),

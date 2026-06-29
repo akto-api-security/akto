@@ -143,7 +143,7 @@ export function TopicCell({ data, isTopic = true }) {
     }
     const finalTopics = isTopic
         ? entries.map(([topic]) => func.toSentenceCase(topic))
-        : entries.map(([, subtopic]) => func.toSentenceCase(subtopic));
+        : entries.map(([, subtopic]) => subtopic);
     return (
        <ShowListInBadge
             itemsArr={finalTopics}
