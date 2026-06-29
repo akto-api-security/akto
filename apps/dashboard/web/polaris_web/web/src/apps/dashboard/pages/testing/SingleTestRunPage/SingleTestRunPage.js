@@ -42,6 +42,7 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import TooltipText from "../../../components/shared/TooltipText";
 import PersistStore from "../../../../main/PersistStore";
 import TrendChart from "./TrendChart";
+import TestRunLogs from "./TestRunLogs";
 import useTable from "../../../components/tables/TableContext";
 import ReRunModal from "./ReRunModal";
 import TestingStore from "../testingStore";
@@ -949,7 +950,8 @@ function SingleTestRunPage() {
 
   const components = [
     runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={true} totalVulnerabilities={tableCountObj.vulnerable} refreshTrigger={chartRefreshCounter} />,
-    tokenRateLimitBannerComp, metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder)];
+    tokenRateLimitBannerComp, metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder),
+    currentSummary?.hexId ? <TestRunLogs key="test-run-logs" summaryHexId={currentSummary.hexId} startTimestamp={currentSummary.startTimestamp} endTimestamp={currentSummary.endTimestamp} /> : null];
 
   const openVulnerabilityReport = async (summaryMode = false) => {
     const currentPageKey = "/dashboard/testing/" + selectedTestRun?.id + "/#" + selectedTab

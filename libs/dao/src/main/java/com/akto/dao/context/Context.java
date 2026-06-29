@@ -13,12 +13,14 @@ public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
 public static ThreadLocal<Integer> userId = new ThreadLocal<Integer>();
 public static ThreadLocal<CONTEXT_SOURCE> contextSource = new ThreadLocal<CONTEXT_SOURCE>();
 public static ThreadLocal<Boolean> isRedactPayload = new ThreadLocal<>();
+public static ThreadLocal<String> testRunResultSummaryId = new ThreadLocal<String>();
 
     public static void resetContextThreadLocals() {
         accountId.remove();
         userId.remove();
         contextSource.remove();
         isRedactPayload.remove();
+        testRunResultSummaryId.remove();
     }
 
     public static int getId() {

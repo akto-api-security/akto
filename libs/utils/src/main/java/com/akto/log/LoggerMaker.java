@@ -331,6 +331,7 @@ public class LoggerMaker  {
 
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
+        log.setTestRunResultSummaryId(Context.testRunResultSummaryId.get());
         if(checkUpdate() && db!=null){
             switch(db){
                 case TESTING: 
@@ -442,6 +443,31 @@ public class LoggerMaker  {
             return timeRange;
         }
         return Filters.and(timeRange, Filters.in(Log.KEY, normalized));
+    }
+
+    /**
+     * Fetches TESTING logs scoped to a specific testing run result summary id (instead of a time range).
+     * These are the logs stamped with the summary id at insert time, used by the per-run Logs tab.
+     */
+    public List<Log> fetchTestingLogRecordsBySummaryId(String testRunResultSummaryId, List<String> logKeysFilter) {
+        List<Log> logs = new ArrayList<>();
+        if (testRunResultSummaryId == null || testRunResultSummaryId.isEmpty()) {
+            return logs;
+        }
+
+        Bson summaryFilter = Filters.eq(Log.TEST_RUN_RESULT_SUMMARY_ID, testRunResultSummaryId);
+        Bson filters;
+        List<String> normalized = normalizeLogKeysFilter(logKeysFilter);
+        if (normalized == null || normalized.size() >= STORED_LOG_KEYS.size()) {
+            filters = summaryFilter;
+        } else {
+            filters = Filters.and(summaryFilter, Filters.in(Log.KEY, normalized));
+        }
+
+        Bson sortAscending = Sorts.ascending(Log.TIMESTAMP);
+        Bson standardProjection = Projections.include("log", Log.TIMESTAMP, Log.KEY);
+        logs = LogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
+        return logs;
     }
 
     /**

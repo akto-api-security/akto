@@ -45,12 +45,27 @@ public class DbLogsAction extends UserAction {
     @Setter
     private List<String> logKeys;
 
+    /** Testing run result summary id whose scoped TESTING logs should be fetched. */
+    @Getter
+    @Setter
+    private String testingRunResultSummaryId;
+
     public String fetchLogsFromDb() {
         if(logDb==null){
             addActionError("Invalid log collection");
             return ERROR.toUpperCase();
         }
         logs = loggerMaker.fetchLogRecords(startTime, endTime, logDb, logKeys);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchTestRunLogs() {
+        if (testingRunResultSummaryId == null || testingRunResultSummaryId.isEmpty()) {
+            addActionError("Invalid testing run result summary id");
+            return ERROR.toUpperCase();
+        }
+        logs = loggerMaker.fetchTestingLogRecordsBySummaryId(testingRunResultSummaryId, logKeys);
 
         return SUCCESS.toUpperCase();
     }
