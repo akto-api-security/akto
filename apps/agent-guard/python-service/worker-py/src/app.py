@@ -29,8 +29,10 @@ class ScanRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    scan_diag.configure_process_logging()
     settings.init_from_env()
     cascade_backpressure.configure_from_env()
+    scan_diag.log_startup_banner()
     yield
 
 
@@ -71,7 +73,16 @@ def _response_path(details: dict[str, Any]) -> str:
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "service": "agent-guard-executor"}
+    body: dict[str, Any] = {
+        "status": "healthy",
+        "service": "agent-guard-executor",
+        "pid": os.getpid(),
+        "scan_diagnostics": scan_diag.enabled(),
+        "log_level": logging.getLevelName(scan_diag.resolve_log_level()),
+    }
+    if scan_diag.enabled():
+        body["backpressure"] = cascade_backpressure.status_snapshot()
+    return body
 
 
 @app.get("/scanners")

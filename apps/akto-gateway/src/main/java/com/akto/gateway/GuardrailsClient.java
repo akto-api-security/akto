@@ -14,6 +14,7 @@ public class GuardrailsClient {
     private static final LoggerMaker loggerMaker = new LoggerMaker(GuardrailsClient.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    private static final int DEFAULT_MAX_IDLE_CONNECTIONS = 200;
 
     private String guardrailsServiceUrl;
     private OkHttpClient httpClient;
@@ -34,6 +35,7 @@ public class GuardrailsClient {
                 .connectTimeout(timeoutMs, TimeUnit.MILLISECONDS)
                 .readTimeout(timeoutMs, TimeUnit.MILLISECONDS)
                 .writeTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                .connectionPool(new ConnectionPool(DEFAULT_MAX_IDLE_CONNECTIONS, 5, TimeUnit.MINUTES))
                 .build();
     }
 

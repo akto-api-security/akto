@@ -16,7 +16,17 @@ import (
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/singleflight"
 )
+
+// policyRefreshResult bundles refreshed policy cache fields for singleflight callers.
+type policyRefreshResult struct {
+	policies      []types.Policy
+	auditPolicies map[string]*types.AuditPolicy
+	compiledRules map[string]*regexp.Regexp
+	hasAuditRules bool
+}
 
 // policyCache holds cached policies and their metadata
 type policyCache struct {
@@ -50,15 +60,17 @@ type mcpListCache struct {
 
 // Service handles payload validation using akto-gateway library
 type Service struct {
-	config              *config.Config
-	dbClient            *dbabstractor.Client
-	processor           mcp.RequestProcessor // Default processor (skipThreat=false)
-	logger              *zap.Logger
-	cache               *policyCache
-	mcpListCache        *mcpListCache
-	collectionTagsCache *collectionTagsCache
-	sessionMgr          *session.SessionManager // Our session manager implementation for session tracking
-	schemaFetcher       *SchemaFetcher
+	config                *config.Config
+	dbClient              *dbabstractor.Client
+	processor             mcp.RequestProcessor // Default processor (skipThreat=false)
+	logger                *zap.Logger
+	cache                 *policyCache
+	mcpListCache          *mcpListCache
+	collectionTagsCache   *collectionTagsCache
+	sessionMgr            *session.SessionManager // Our session manager implementation for session tracking
+	schemaFetcher         *SchemaFetcher
+	policyRefreshGroup    singleflight.Group
+	allowlistRefreshGroup singleflight.Group
 }
 
 // NewService creates a new validator service
@@ -115,7 +127,7 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 
 	schemaFetcher := NewSchemaFetcher(dbClient, time.Duration(cfg.PolicyRefreshIntervalMin)*time.Minute, logger)
 
-	return &Service{
+	svc := &Service{
 		config:              cfg,
 		dbClient:            dbClient,
 		processor:           defaultProcessor,
@@ -125,7 +137,16 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		collectionTagsCache: &collectionTagsCache{byHostName: make(map[string]map[string]string)},
 		sessionMgr:          sessionManager,
 		schemaFetcher:       schemaFetcher,
-	}, nil
+	}
+	go func() {
+		if _, err := svc.getMcpAllowedHostList(); err != nil {
+			logger.Warn("Warm MCP allowlist cache failed", zap.Error(err))
+		}
+		if _, _, _, _, err := svc.getCachedPolicies(""); err != nil {
+			logger.Warn("Warm policy cache failed", zap.Error(err))
+		}
+	}()
+	return svc, nil
 }
 
 // policyNames extracts policy names for debug logging
@@ -237,27 +258,44 @@ func (s *Service) getMcpAllowedHostList() ([]types.McpAllowedList, error) {
 	}
 	s.mcpListCache.mu.RUnlock()
 
-	s.mcpListCache.mu.Lock()
-	defer s.mcpListCache.mu.Unlock()
+	v, err, _ := s.allowlistRefreshGroup.Do("mcp-allowlist", func() (interface{}, error) {
+		s.mcpListCache.mu.Lock()
+		defer s.mcpListCache.mu.Unlock()
 
-	rawResp, err := s.dbClient.FetchMcpAllowedHostList()
+		if !s.mcpListCache.lastFetched.IsZero() && time.Since(s.mcpListCache.lastFetched) < refreshInterval {
+			return s.mcpListCache.mcpAllowedList, nil
+		}
+
+		rawResp, fetchErr := s.dbClient.FetchMcpAllowedHostList()
+		if fetchErr != nil {
+			return nil, fetchErr
+		}
+
+		var mcpHostAllowedList struct {
+			McpAllowlist []types.McpAllowedList `json:"mcpAllowlist"`
+		}
+		if unmarshalErr := json.Unmarshal(rawResp, &mcpHostAllowedList); unmarshalErr != nil {
+			return nil, fmt.Errorf("failed to unmarshal outer response: %w", unmarshalErr)
+		}
+
+		s.mcpListCache.mcpAllowedList = mcpHostAllowedList.McpAllowlist
+		s.mcpListCache.lastFetched = time.Now()
+		s.logger.Info("MCP allowlist cache refreshed", zap.Int("count", len(mcpHostAllowedList.McpAllowlist)))
+		return mcpHostAllowedList.McpAllowlist, nil
+	})
 	if err != nil {
+		s.mcpListCache.mu.RLock()
+		if len(s.mcpListCache.mcpAllowedList) > 0 {
+			stale := s.mcpListCache.mcpAllowedList
+			s.mcpListCache.mu.RUnlock()
+			s.logger.Warn("MCP allowlist refresh failed, using stale cache", zap.Error(err))
+			return stale, nil
+		}
+		s.mcpListCache.mu.RUnlock()
 		s.logger.Error("Failed to fetch MCP allowlist from database-abstractor", zap.Error(err))
 		return nil, err
 	}
-
-	var mcpHostAllowedList struct {
-		McpAllowlist []types.McpAllowedList `json:"mcpAllowlist"`
-	}
-
-	if err := json.Unmarshal(rawResp, &mcpHostAllowedList); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal outer response: %w", err)
-	}
-
-	s.mcpListCache.mcpAllowedList = mcpHostAllowedList.McpAllowlist
-	s.mcpListCache.lastFetched = time.Now()
-	s.logger.Info("MCP allowlist cache refreshed", zap.Int("count", len(mcpHostAllowedList.McpAllowlist)))
-	return mcpHostAllowedList.McpAllowlist, nil
+	return v.([]types.McpAllowedList), nil
 }
 
 func (s *Service) getCachedPolicies(contextSource string) ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
@@ -282,15 +320,42 @@ func (s *Service) getCachedPolicies(contextSource string) ([]types.Policy, map[s
 	}
 	s.cache.mu.RUnlock()
 
-	// Cache is stale or empty, fetch fresh policies
-	allPolicies, auditPolicies, compiledRules, hasAuditRules, err := s.refreshPolicies()
-	if err != nil {
-		return nil, nil, nil, false, err
+	// Cache is stale or empty, coalesce refresh across concurrent requests.
+	v, refreshErr, _ := s.policyRefreshGroup.Do("guardrail-policies", func() (interface{}, error) {
+		policies, auditPolicies, compiledRules, hasAuditRules, err := s.refreshPolicies()
+		if err != nil {
+			return nil, err
+		}
+		return &policyRefreshResult{
+			policies:      policies,
+			auditPolicies: auditPolicies,
+			compiledRules: compiledRules,
+			hasAuditRules: hasAuditRules,
+		}, nil
+	})
+	if refreshErr != nil {
+		s.cache.mu.RLock()
+		hasStale := !s.cache.lastFetched.IsZero() && len(s.cache.policies) > 0
+		if hasStale {
+			filteredPolicies := s.filterPoliciesByContextSource(s.cache.policies, contextSource)
+			staleAudit := s.cache.auditPolicies
+			staleRules := s.cache.compiledRules
+			staleHasAudit := s.cache.hasAuditRules
+			lastFetched := s.cache.lastFetched
+			s.cache.mu.RUnlock()
+			s.logger.Warn("Policy refresh failed, using stale cache",
+				zap.String("contextSource", contextSource),
+				zap.Time("lastFetched", lastFetched),
+				zap.Error(refreshErr))
+			return filteredPolicies, staleAudit, staleRules, staleHasAudit, nil
+		}
+		s.cache.mu.RUnlock()
+		return nil, nil, nil, false, refreshErr
 	}
 
-	// Filter by contextSource before returning
-	filteredPolicies := s.filterPoliciesByContextSource(allPolicies, contextSource)
-	return filteredPolicies, auditPolicies, compiledRules, hasAuditRules, nil
+	bundle := v.(*policyRefreshResult)
+	filteredPolicies := s.filterPoliciesByContextSource(bundle.policies, contextSource)
+	return filteredPolicies, bundle.auditPolicies, bundle.compiledRules, bundle.hasAuditRules, nil
 }
 
 // refreshPolicies fetches fresh policies from database and updates the cache
@@ -612,9 +677,28 @@ func extractHostHeader(headers map[string]string) string {
 
 // fetchAndParsePolicies fetches policies from database abstractor and parses them
 func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, []mcp.BlockedHostRule, error) {
-	rawGuardrailPolicies, err := s.dbClient.FetchGuardrailPolicies()
-	if err != nil {
-		return nil, nil, nil, false, nil, fmt.Errorf("failed to fetch guardrail policies: %w", err)
+	var rawGuardrailPolicies, rawAuditPolicies []byte
+
+	g := new(errgroup.Group)
+	g.Go(func() error {
+		var err error
+		rawGuardrailPolicies, err = s.dbClient.FetchGuardrailPolicies()
+		if err != nil {
+			return fmt.Errorf("failed to fetch guardrail policies: %w", err)
+		}
+		return nil
+	})
+	g.Go(func() error {
+		var err error
+		rawAuditPolicies, err = s.dbClient.FetchMcpAuditInfo()
+		if err != nil {
+			s.logger.Warn("Failed to fetch MCP audit info", zap.Error(err))
+			rawAuditPolicies = []byte("{}")
+		}
+		return nil
+	})
+	if err := g.Wait(); err != nil {
+		return nil, nil, nil, false, nil, err
 	}
 
 	s.logger.Debug("Raw guardrail policies response",
@@ -650,14 +734,6 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		zap.String("feature", "blocked-host-v1"),
 		zap.Int("ruleCount", len(blockedHostRules)),
 		zap.Strings("patterns", mcp.BlockedHostPatterns(blockedHostRules)))
-
-	// Fetch MCP audit info from database abstractor
-	rawAuditPolicies, err := s.dbClient.FetchMcpAuditInfo()
-	if err != nil {
-		s.logger.Warn("Failed to fetch MCP audit info", zap.Error(err))
-		// Continue without audit policies rather than failing completely
-		rawAuditPolicies = []byte("{}")
-	}
 
 	s.logger.Debug("Raw audit policies response",
 		zap.Int("size", len(rawAuditPolicies)),

@@ -34,10 +34,9 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
-import httpx
-
 import alerts
 import cache_store
+import http_client
 from settings import settings
 
 logger = logging.getLogger(__name__)
@@ -141,9 +140,10 @@ async def _embed(text: str) -> Optional[List[float]]:
     if not base:
         return None
     try:
-        async with httpx.AsyncClient(timeout=_EMBED_TIMEOUT_S) as client:
-            resp = await client.post(f"{base}/embed", json={"text": text},
-                                     headers={"Accept-Encoding": "identity"})
+        client = http_client.get_client()
+        resp = await client.post(f"{base}/embed", json={"text": text},
+                                 headers={"Accept-Encoding": "identity"},
+                                 timeout=_EMBED_TIMEOUT_S)
         if resp.status_code >= 400:
             logger.warning(f"[cache] embedder returned {resp.status_code}")
             return None
