@@ -122,6 +122,7 @@ public class ThreatUtils {
         requiredIndexes.put("idx_detectedAt_host", Indexes.compoundIndex(Indexes.descending("detectedAt"), Indexes.ascending("host")));
         requiredIndexes.put("idx_detectedAt_latestApiEndpoint", Indexes.compoundIndex(Indexes.descending("detectedAt"), Indexes.ascending("latestApiEndpoint")));
         requiredIndexes.put("idx_context_detectedAt_severity", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("severity")));
+        requiredIndexes.put("idx_context_detectedAt_status", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("status")));
         requiredIndexes.put("idx_detected_context_actor_country", Indexes.compoundIndex(Indexes.descending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("filterId"), Indexes.ascending("actor"), Indexes.ascending("country")));
 
         for (Map.Entry<String, Bson> entry : requiredIndexes.entrySet()) {

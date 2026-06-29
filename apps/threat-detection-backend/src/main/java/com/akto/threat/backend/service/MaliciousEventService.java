@@ -11,7 +11,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.OwaspCategory;
-import java.util.Collections;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
@@ -478,9 +477,9 @@ public class MaliciousEventService {
     }
 
     // Handle status filter
-    // if (filter.hasStatusFilter()) {
-    //   applyStatusFilter(query, filter.getStatusFilter());
-    // }
+    if (filter.hasStatusFilter()) {
+      applyStatusFilter(query, filter.getStatusFilter());
+    }
 
     if (filter.hasDetectedAtTimeRange()) {
       TimeRangeFilter timeRange = filter.getDetectedAtTimeRange();
@@ -689,7 +688,19 @@ public class MaliciousEventService {
 
 
   private void applyStatusFilter(Document query, String statusFilter) {
-    // Skip filter - all docs have status set, null/exists checks cause full doc scans
+    if (statusFilter == null) {
+      return;
+    }
+
+    if (ThreatDetectionConstants.UNDER_REVIEW.equals(statusFilter)) {
+      query.append("status", ThreatDetectionConstants.UNDER_REVIEW);
+    } else if (ThreatDetectionConstants.IGNORED.equals(statusFilter)) {
+      query.append("status", ThreatDetectionConstants.IGNORED);
+    } else if (ThreatDetectionConstants.TRAINING.equals(statusFilter)) {
+      query.append("status", ThreatDetectionConstants.TRAINING);
+    } else if (ThreatDetectionConstants.ACTIVE.equals(statusFilter) || ThreatDetectionConstants.EVENTS_FILTER.equals(statusFilter)) {
+      query.append("status", ThreatDetectionConstants.ACTIVE);
+    }
   }
 
   private Document buildQueryFromFilter(Map<String, Object> filter, String contextSource) {
@@ -755,9 +766,8 @@ public class MaliciousEventService {
       }
     }
 
-    // Handle status filter
     String statusFilter = (String) filter.get("statusFilter");
-    //applyStatusFilter(query, statusFilter);
+    applyStatusFilter(query, statusFilter);
 
     // // Handle label filter with backward compatibility
     // String label = (String) filter.get("label");
