@@ -126,6 +126,9 @@ public class BackwardCompatibility {
     public static final String REMOVE_RAG_DATABASE_TAG = "removeRagDatabaseTag";
     private int removeRagDatabaseTag;
 
+    public static final String CLEANUP_API_INFO_TAGS = "cleanupApiInfoTags";
+    private int cleanupApiInfoTags;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -136,7 +139,7 @@ public class BackwardCompatibility {
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
                                  int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType,
                                  int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs, int moveOktaOidcSSO, int markSummariesVulnerable,
-                                 int changeOperatorConditionInCDT, int cleanupRbacEntries, int fillLastTestedField, int fillQueryParams, int createVinSupportDataType, int moveUserDataFromModuleInfoToAgenticUsers) {
+                                 int changeOperatorConditionInCDT, int cleanupRbacEntries, int fillLastTestedField, int fillQueryParams, int createVinSupportDataType, int moveUserDataFromModuleInfoToAgenticUsers, int cleanupApiInfoTags) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -176,6 +179,7 @@ public class BackwardCompatibility {
         this.fillQueryParams = fillQueryParams;
         this.createVinSupportDataType = createVinSupportDataType;
         this.moveUserDataFromModuleInfoToAgenticUsers = moveUserDataFromModuleInfoToAgenticUsers;
+        this.cleanupApiInfoTags = cleanupApiInfoTags;
     }
 
     public BackwardCompatibility() {
@@ -531,5 +535,13 @@ public class BackwardCompatibility {
 
     public void setRemoveRagDatabaseTag(int removeRagDatabaseTag) {
         this.removeRagDatabaseTag = removeRagDatabaseTag;
+    }
+
+    public int getCleanupApiInfoTags() {
+        return cleanupApiInfoTags;
+    }
+
+    public void setCleanupApiInfoTags(int cleanupApiInfoTags) {
+        this.cleanupApiInfoTags = cleanupApiInfoTags;
     }
 }
