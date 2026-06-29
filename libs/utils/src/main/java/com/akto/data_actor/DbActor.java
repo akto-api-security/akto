@@ -835,4 +835,53 @@ public class DbActor extends DataActor {
     public Map<String, String> fetchDeviceUserMap() {
         return new HashMap<>();
     }
+
+    @Override
+    public String fetchWebSocketConnectionUrl(int collectionId) throws Exception {
+        try {
+            // Fetch all APIs 
+            List<ApiInfo> allApiInfos = fetchApiInfos();
+            
+            // Filter for connection string APIs (WebSocket URLs)
+            // For now, we'll use the first API from the collection that could be a WebSocket
+            ApiInfo wsInfo = allApiInfos.stream()
+                .filter(api -> api.getId().getApiCollectionId() == collectionId)
+                .findFirst()
+                .orElse(null);
+            
+            if (wsInfo == null) {
+                return null;
+            }
+            
+            // Get API collection metadata for hostname
+            ApiCollection apiCollection = DbLayer.fetchApiCollectionMeta(collectionId);
+            String hostName = apiCollection != null ? apiCollection.getHostName() : "";
+            
+            String path = wsInfo.getId().getUrl();
+            
+            // Build full WebSocket URL with protocol and hostname
+            return buildWebSocketUrl(hostName, path);
+        } catch (Exception e) {
+            throw e;
+        }
+    }
+
+    private String buildWebSocketUrl(String hostName, String path) {
+        if (hostName == null || hostName.isEmpty()) {
+            return path;
+        }
+        
+        String protocol = "ws://";
+        String cleanHostName = hostName;
+        
+        if (hostName.contains("https") || hostName.contains("wss")) {
+            protocol = "wss://";
+            cleanHostName = hostName.replace("https://", "").replace("wss://", "");
+        } else if (hostName.contains("http")) {
+            protocol = "ws://";
+            cleanHostName = hostName.replace("http://", "").replace("ws://", "");
+        }
+        
+        return protocol + cleanHostName + path;
+    }
 }

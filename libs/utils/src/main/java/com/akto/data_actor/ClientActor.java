@@ -4799,4 +4799,36 @@ public class ClientActor extends DataActor {
         }
     }
 
+    @Override
+    public String fetchWebSocketConnectionUrl(int collectionId) throws Exception {
+        try {
+            Map<String, List<String>> headers = buildHeaders();
+            BasicDBObject obj = new BasicDBObject();
+            obj.put("apiCollectionId", collectionId);
+            OriginalHttpRequest request = new OriginalHttpRequest(
+                    url + "/fetchWebSocketApiInfosWithUrls", "", "POST", obj.toString(), headers, "");
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responseBody = response.getBody();
+            if (response.getStatusCode() != 200 || responseBody == null) {
+                loggerMaker.errorAndAddToDb("fetchWebSocketConnectionUrl: non 2xx response, status: " + response.getStatusCode() + ", body: " + responseBody, LoggerMaker.LogDb.TESTING);
+                return null;
+            }
+            responseBody = responseBody.trim();
+            if (responseBody.isEmpty() || "null".equals(responseBody)) {
+                loggerMaker.infoAndAddToDb("fetchWebSocketConnectionUrl: empty or null body, no WS connection URL found for collectionId: " + collectionId, LoggerMaker.LogDb.TESTING);
+                return null;
+            }
+            BasicDBObject responseObj = BasicDBObject.parse(responseBody);
+            Object urlObj = responseObj.get("connectionUrl");
+            if (urlObj != null) {
+                return urlObj.toString();
+            }
+            loggerMaker.errorAndAddToDb("fetchWebSocketConnectionUrl: connectionUrl not found in response body: " + responseBody, LoggerMaker.LogDb.TESTING);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("fetchWebSocketConnectionUrl: error - " + e.getMessage(), LoggerMaker.LogDb.TESTING);
+            throw e;
+        }
+        return null;
+    }
+
 }

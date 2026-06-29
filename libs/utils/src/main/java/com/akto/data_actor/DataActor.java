@@ -361,4 +361,6 @@ public abstract class DataActor {
     public abstract void writeApiSequences(List<ApiSequences> sequences);
     public abstract void storeAgentQueryData(AgentQueryRecord agentQueryRecord);
     public abstract Map<String, String> fetchDeviceUserMap();
+
+    public abstract String fetchWebSocketConnectionUrl(int collectionId) throws Exception;
 }

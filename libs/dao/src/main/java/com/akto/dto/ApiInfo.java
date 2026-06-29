@@ -55,6 +55,9 @@ public class ApiInfo {
     public static final String PARENT_MCP_TOOL_NAMES = "parentMcpToolNames";
     private List<String> parentMcpToolNames;
 
+    public static final String IS_CONNECTION_STRING = "isConnectionString";
+    private boolean isConnectionString;
+
     public static class AuthType {
         public static final String UNAUTHENTICATED = "UNAUTHENTICATED";
         public static final String BASIC = "BASIC";
@@ -424,4 +427,8 @@ public class ApiInfo {
     public void setTagsList(List<CollectionTags> tagsList) {
         this.tagsList = tagsList;
     }
+
+    public boolean getIsConnectionString() { return isConnectionString; }
+    public void setIsConnectionString(boolean isConnectionString) { this.isConnectionString = isConnectionString; }
+    
 }
