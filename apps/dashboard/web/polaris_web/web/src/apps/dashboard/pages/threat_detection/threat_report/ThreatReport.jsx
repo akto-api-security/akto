@@ -244,14 +244,17 @@ const ThreatReport = () => {
             }
 
             setLoading(false)
+            window.__AKTO_REPORT_READY = true
         } catch (error) {
             console.error('Error fetching threat data:', error)
             func.setToast(true, true, 'Error loading threat report')
             setLoading(false)
+            window.__AKTO_REPORT_READY = true
         }
     }
 
     useEffect(() => {
+        window.__AKTO_REPORT_READY = false
         fetchThreatData()
     }, [reportId])
 

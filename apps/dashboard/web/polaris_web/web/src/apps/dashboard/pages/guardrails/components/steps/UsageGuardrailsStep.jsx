@@ -1,4 +1,4 @@
-import { VerticalStack, Text, Checkbox, Box, RangeSlider } from "@shopify/polaris";
+import { VerticalStack, Text, Checkbox, Box, TextField } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
@@ -23,8 +23,8 @@ export const UsageGuardrailsConfig = {
 const UsageGuardrailsStep = ({
     enableTokenLimit,
     setEnableTokenLimit,
-    tokenLimitConfidenceScore,
-    setTokenLimitConfidenceScore
+    tokenLimitThreshold,
+    setTokenLimitThreshold
 }) => {
     return (
         <VerticalStack gap="4">
@@ -39,21 +39,19 @@ const UsageGuardrailsStep = ({
                         label={<RuleLabelWithTag name="Enable token limit detection" threats={RULE_OWASP_THREATS.tokenLimit} />}
                         checked={enableTokenLimit}
                         onChange={setEnableTokenLimit}
-                        helpText="Detect when user inputs exceed token limits and block overly long inputs."
+                        helpText="Block or alert when a prompt exceeds the specified token count per message."
                     />
                     {enableTokenLimit && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
-                                <RangeSlider
-                                    label=""
-                                    value={tokenLimitConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setTokenLimitConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in enforcing token limits."
+                                <TextField
+                                    label="Max tokens per prompt"
+                                    type="number"
+                                    value={String(tokenLimitThreshold)}
+                                    onChange={(val) => setTokenLimitThreshold(Math.max(1, parseInt(val, 10) || 1))}
+                                    min={1}
+                                    helpText="Prompts exceeding this token count will be blocked (or alerted, depending on policy behaviour). Tokens are estimated as characters ÷ 4."
+                                    autoComplete="off"
                                 />
                             </VerticalStack>
                         </Box>

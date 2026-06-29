@@ -10,3 +10,4 @@ export { default as AnomalyDetectionStep, AnomalyDetectionConfig } from './Anoma
 export { default as ToolsGuardrailsStep, ToolsGuardrailsConfig } from './ToolsGuardrailsStep';
 export { default as BlockedHostsStep, BlockedHostsConfig } from './BlockedHostsStep';
 export { default as ServerSettingsStep, ServerSettingsConfig } from './ServerSettingsStep';
+export { default as EnterpriseLicenseComplianceStep, EnterpriseLicenseComplianceConfig } from './EnterpriseLicenseComplianceStep';

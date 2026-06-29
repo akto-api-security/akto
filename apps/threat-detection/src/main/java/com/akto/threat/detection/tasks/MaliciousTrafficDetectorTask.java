@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import com.akto.dto.*;
+import com.akto.dto.api_protection_parse_layer.Condition.DistinctIdentifier;
 import com.akto.enums.RedactionType;
 import com.akto.threat.detection.cache.AccountConfig;
 import com.akto.threat.detection.cache.AccountConfigurationCache;
@@ -480,7 +481,13 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
             continue;
           }
 
-          shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule, shouldIncrement, breachFilterPassed);
+          // Extract identity for distinct count rules
+          String identity = null;
+          if (rule.getCondition().getDistinctIdentifier() != null) {
+            identity = extractIdentity(responseParam, rule.getCondition().getDistinctIdentifier());
+          }
+
+          shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule, shouldIncrement, breachFilterPassed, identity);
 
           if (shouldNotify) {
             logger.debugAndAddToDb("aggregate condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
@@ -496,6 +503,29 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
     }
     }
     }
+
+  private String extractIdentity(HttpResponseParams responseParam, DistinctIdentifier identifier) {
+    if (identifier == null || identifier.getKey() == null) return null;
+    try {
+      String payload;
+      switch (identifier.getSource()) {
+        case "request_payload":
+          payload = responseParam.getRequestParams().getPayload();
+          break;
+        case "response_payload":
+          payload = responseParam.getPayload();
+          break;
+        case "request_headers":
+          List<String> headerVals = responseParam.getRequestParams().getHeaders().get(identifier.getKey());
+          return (headerVals != null && !headerVals.isEmpty()) ? headerVals.get(0) : null;
+        default:
+          return null;
+      }
+      return com.akto.util.JSONUtils.extractValueForKey(payload, identifier.getKey());
+    } catch (Exception e) {
+      return null;
+    }
+  }
 
   private void checkSequenceAnomaly(String actor, int apiCollectionId, String urlForAggregation,
       URLMethods.Method method, HttpResponseParams responseParam) {

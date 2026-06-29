@@ -145,6 +145,13 @@ export function getHttpStatusIssueList(statusCounts) {
   return getExecutionIssueList(statusCounts).filter((item) => statusCodeFromKey(item.key) != null);
 }
 
+export function shouldFetchRunStatusSummary(item) {
+  const state = item?.testRunState ?? item?.state;
+  const authError = item?.authError ?? item?.metadata?.error;
+  const tokenRateLimited = item?.tokenRateLimited ?? item?.metadata?.tokenRateLimited;
+  return getStatus(state) === "COMPLETED" && !authError && !tokenRateLimited;
+}
+
 function buildSummaryNodes(issues) {
   const topIssues = issues.slice(0, 2);
   const remaining = issues.length - topIssues.length;

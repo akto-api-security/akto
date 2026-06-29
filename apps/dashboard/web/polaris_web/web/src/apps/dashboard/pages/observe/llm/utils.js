@@ -1,36 +1,45 @@
 import { parsePromptText, parseResponseText, parseTokens, parseModel } from "./constants";
 
-// Bucket items into numBuckets time slots and return a count array suitable for sparklines.
+// Bucket items into numBuckets time slots.
+// Returns { counts, timestamps } where timestamps are the bucket midpoints in epoch seconds.
 // getTime(item) → epoch seconds (0 is ignored).
 export function buildSparkline(items, getTime, numBuckets = 12) {
-    if (!items.length) return [0];
+    if (!items.length) return { counts: [0], timestamps: [0] };
     const times = items.map(getTime).filter(t => t > 0);
-    if (!times.length) return [0];
+    if (!times.length) return { counts: [0], timestamps: [0] };
     const minT = Math.min(...times);
     const maxT = Math.max(...times);
     const range = maxT - minT || 1;
-    const buckets = Array(numBuckets).fill(0);
+    const bucketSize = range / numBuckets;
+    const counts = Array(numBuckets).fill(0);
     times.forEach(t => {
         const idx = Math.min(numBuckets - 1, Math.floor(((t - minT) / range) * numBuckets));
-        buckets[idx]++;
+        counts[idx]++;
     });
-    return buckets;
+    const timestamps = Array.from({ length: numBuckets }, (_, i) =>
+        Math.round(minT + (i + 0.5) * bucketSize)
+    );
+    return { counts, timestamps };
 }
 
 // Same as buildSparkline but sums getValue(item) per bucket instead of counting.
 export function buildWeightedSparkline(items, getTime, getValue, numBuckets = 12) {
-    if (!items.length) return [0];
+    if (!items.length) return { counts: [0], timestamps: [0] };
     const pairs = items.map(item => ({ t: getTime(item), v: getValue(item) })).filter(p => p.t > 0);
-    if (!pairs.length) return [0];
+    if (!pairs.length) return { counts: [0], timestamps: [0] };
     const minT = Math.min(...pairs.map(p => p.t));
     const maxT = Math.max(...pairs.map(p => p.t));
     const range = maxT - minT || 1;
-    const buckets = Array(numBuckets).fill(0);
+    const bucketSize = range / numBuckets;
+    const counts = Array(numBuckets).fill(0);
     pairs.forEach(({ t, v }) => {
         const idx = Math.min(numBuckets - 1, Math.floor(((t - minT) / range) * numBuckets));
-        buckets[idx] += v;
+        counts[idx] += v;
     });
-    return buckets;
+    const timestamps = Array.from({ length: numBuckets }, (_, i) =>
+        Math.round(minT + (i + 0.5) * bucketSize)
+    );
+    return { counts, timestamps };
 }
 
 // Enriches a raw ES doc (prompt / span / message / session summary) with parsed
@@ -80,20 +89,21 @@ export function enrichRow(row) {
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-// Build human-readable date labels for the 12-bucket sparkline, one per bucket.
-// Short range (≤ 30 days) → "Jun 17"; longer → "Jun '25".
-export function buildSparklineLabels(since, until, numBuckets = 12) {
-    if (!since || !until || until <= since) return [];
-    const rangeMs  = (until - since) * 1000;
-    const bucketMs = rangeMs / numBuckets;
+// Format actual epoch-second bucket timestamps as sparkline tooltip labels.
+// Detects the right granularity from the span of the timestamps themselves.
+// > 2 years → "2024"; > 30 days → "Jun '25"; ≤ 30 days → "Jun 17".
+export function formatSparklineLabels(timestamps) {
+    if (!timestamps?.length) return [];
+    const validTs = timestamps.filter(t => t > 0);
+    if (!validTs.length) return timestamps.map(() => "");
+    const rangeMs   = (Math.max(...validTs) - Math.min(...validTs)) * 1000;
+    const multiYear = rangeMs > 2 * 365 * 86400 * 1000;
     const longRange = rangeMs > 30 * 86400 * 1000;
-    const labels = [];
-    for (let i = 0; i < numBuckets; i++) {
-        const d = new Date(since * 1000 + (i + 0.5) * bucketMs);
-        labels.push(longRange
-            ? `${MONTHS[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`
-            : `${MONTHS[d.getMonth()]} ${d.getDate()}`
-        );
-    }
-    return labels;
+    return timestamps.map(t => {
+        if (!t) return "";
+        const d = new Date(t * 1000);
+        if (multiYear) return String(d.getFullYear());
+        if (longRange) return `${MONTHS[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`;
+        return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+    });
 }

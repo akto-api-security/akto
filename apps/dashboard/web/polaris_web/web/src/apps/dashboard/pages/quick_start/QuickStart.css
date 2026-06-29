@@ -68,6 +68,11 @@
     white-space: nowrap;
 }
 
+.connector-code-token .view-line span {
+    color: #D72B0C !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
 .right-card .Polaris-Scrollable{
     overflow-x: hidden;
 }

@@ -4,6 +4,7 @@ import com.akto.dao.GuardrailPoliciesDao;
 import com.akto.dao.context.Context;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.GuardrailPolicies;
+import com.akto.dto.EnterpriseLicenseComplianceCatalog;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -75,7 +76,10 @@ public class GuardrailPoliciesAction extends UserAction {
         try {
             this.guardrailPolicies  = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(0, 20);
             this.total = GuardrailPoliciesDao.instance.getTotalCount();
-            
+            for (GuardrailPolicies policy : this.guardrailPolicies) {
+                EnterpriseLicenseComplianceCatalog.applyToPolicy(policy);
+            }
+
             loggerMaker.info("Fetched " + guardrailPolicies.size() + " guardrail policies out of " + total + " total");
 
             return SUCCESS.toUpperCase();
@@ -148,6 +152,8 @@ public class GuardrailPoliciesAction extends UserAction {
                 ? Filters.eq(Constants.ID, new ObjectId(hexId))
                 : Filters.eq("name", policy.getName()); // or use another unique identifier
             
+            EnterpriseLicenseComplianceCatalog.applyToPolicy(policy);
+
             List<Bson> updates = buildPolicyUpdates(policy, contextSource);
 
             // Only set createdBy and createdTimestamp on insert
@@ -276,6 +282,9 @@ public class GuardrailPoliciesAction extends UserAction {
         if (StringUtils.isNotBlank(p.getSourceHash())) {
             updates.add(Updates.set("sourceHash", p.getSourceHash()));
         }
+        if (p.getEnterpriseLicenseComplianceCategories() != null) {
+            updates.add(Updates.set("enterpriseLicenseComplianceCategories", p.getEnterpriseLicenseComplianceCategories()));
+        }
 
         return updates;
     }
@@ -359,6 +368,8 @@ public class GuardrailPoliciesAction extends UserAction {
             if (!policyToSend.isApplyOnRequest() && !policyToSend.isApplyOnResponse()) {
                 policyToSend.setApplyOnRequest(true);
             }
+
+            EnterpriseLicenseComplianceCatalog.applyToPolicy(policyToSend);
 
             // Serialize policy to JSON and add to request
             try {
