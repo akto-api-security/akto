@@ -3598,6 +3598,9 @@ public class ClientActor extends DataActor {
         logObj.put("key", log.getKey());
         logObj.put("log", log.getLog());
         logObj.put("timestamp", log.getTimestamp());
+        if (log.getTestRunResultSummaryId() != null) {
+            logObj.put("testRunResultSummaryId", log.getTestRunResultSummaryId());
+        }
         obj.put("log", logObj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingLog", "", "POST", obj.toString(), headers, "");
         try {
