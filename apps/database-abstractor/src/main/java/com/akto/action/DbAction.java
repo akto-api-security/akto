@@ -716,6 +716,69 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchWebSocketApiInfos() {
+        try {
+            List<ApiInfo> allApiInfos = DbLayer.fetchApiInfosByCollection(apiCollectionId);
+            apiInfos = allApiInfos.stream()
+                .filter(ApiInfo::getIsConnectionString)
+                .collect(Collectors.toList());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchWebSocketApiInfos " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    @Getter @Setter
+    private Map<String, Object> webSocketInfoWithUrl;
+
+    public String fetchWebSocketApiInfosWithUrls() {
+        try {
+            List<ApiInfo> allApiInfos = DbLayer.fetchApiInfosByCollection(apiCollectionId);
+            List<ApiInfo> wsApiInfos = allApiInfos.stream()
+                .filter(ApiInfo::getIsConnectionString)
+                .collect(Collectors.toList());
+            
+            if (wsApiInfos.isEmpty()) {
+                return Action.SUCCESS.toUpperCase();
+            }
+            
+            ApiCollection apiCollection = DbLayer.fetchApiCollectionMeta(apiCollectionId);
+            String hostName = apiCollection != null ? apiCollection.getHostName() : "";
+            
+            ApiInfo wsInfo = wsApiInfos.get(0);
+            webSocketInfoWithUrl = new HashMap<>();
+            webSocketInfoWithUrl.put("apiInfo", wsInfo);
+            webSocketInfoWithUrl.put("url", wsInfo.getId().getUrl());
+            webSocketInfoWithUrl.put("method", wsInfo.getId().getMethod());
+            webSocketInfoWithUrl.put("apiCollectionId", wsInfo.getId().getApiCollectionId());
+            
+            String fullUrl = buildFullUrl(hostName, wsInfo.getId().getUrl());
+            webSocketInfoWithUrl.put("connectionUrl", fullUrl);
+            webSocketInfoWithUrl.put("hostName", hostName);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchWebSocketApiInfosWithUrls " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    private String buildFullUrl(String hostName, String path) {
+        if (hostName == null || hostName.isEmpty()) {
+            return path;
+        }
+        
+        String protocol = "ws://";
+        if (hostName.contains("https") || hostName.contains("wss")) {
+            protocol = "wss://";
+            hostName = hostName.replace("https://", "").replace("wss://", "");
+        } else if (hostName.contains("http")) {
+            protocol = "ws://";
+            hostName = hostName.replace("http://", "").replace("ws://", "");
+        }
+        
+        return protocol + hostName + path;
+    }
 
     TrafficCollectorMetrics trafficCollectorMetrics = null;
     public String updateTrafficCollectorMetrics() {

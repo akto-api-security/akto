@@ -309,6 +309,32 @@
             </result>
         </action>
 
+        <action name="api/fetchWebSocketApiInfos" class="com.akto.action.DbAction" method="fetchWebSocketApiInfos">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">apiInfos</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchWebSocketApiInfosWithUrls" class="com.akto.action.DbAction" method="fetchWebSocketApiInfosWithUrls">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">webSocketInfoWithUrl</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/bulkWriteTestingRunIssues" class="com.akto.action.DbAction" method="bulkWriteTestingRunIssues">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2698,6 +2724,20 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
+
+        <action name="api/fetchWsConnectionApiInfos" class="com.akto.action.DbAction" method="fetchWsConnectionApiInfos">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">apiInfos</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
 
     </package>
 
