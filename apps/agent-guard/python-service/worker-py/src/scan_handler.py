@@ -162,20 +162,26 @@ async def scan_payload(
                     "chunks": chunk_count,
                 }
                 if decided in (intent_decision.ALLOW, intent_decision.BLOCK):
-                    is_valid = decided == intent_decision.ALLOW
+                    if prefilter.act():
+                        is_valid = decided == intent_decision.ALLOW
+                        scan_diag.log_intent_decision(
+                            decided.lower(), agent_host, scanner_name, decided,
+                            timer, extra=log_extra, always=True,
+                        )
+                        return shape_response(scanner_name, is_valid, 0.0 if is_valid else 1.0, text, {
+                            "scanner_type": scanner_type,
+                            "prefilter": decided.lower(),
+                            "reason": fast["reason"],
+                            "task_intent": fast["intent"]["task"],
+                            "risk_intent": fast["intent"]["risk"],
+                            "scope_distance": fast["intent"].get("scope_distance"),
+                        })
+                    # Shadow mode: log what would have been decided, then fall through.
                     scan_diag.log_intent_decision(
-                        decided.lower(), agent_host, scanner_name, decided,
+                        f"{decided.lower()}_shadow", agent_host, scanner_name, decided,
                         timer, extra=log_extra, always=True,
                     )
-                    return shape_response(scanner_name, is_valid, 0.0 if is_valid else 1.0, text, {
-                        "scanner_type": scanner_type,
-                        "prefilter": decided.lower(),
-                        "reason": fast["reason"],
-                        "task_intent": fast["intent"]["task"],
-                        "risk_intent": fast["intent"]["risk"],
-                        "scope_distance": fast["intent"].get("scope_distance"),
-                    })
-                # ESCALATE: log the intent timings/result, then fall through to the cascade.
+                # ESCALATE (or shadow): log the intent timings/result, then fall through to the cascade.
                 scan_diag.log_intent_decision(
                     "escalate", agent_host, scanner_name, decided, timer, extra=log_extra,
                 )

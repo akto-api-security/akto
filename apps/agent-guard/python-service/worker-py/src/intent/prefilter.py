@@ -31,6 +31,11 @@ def enabled() -> bool:
     return str(getattr(settings, "INTENT_ENABLED", "")).strip().lower() in ("1", "true", "yes", "on")
 
 
+def act() -> bool:
+    """When False (default), ALLOW/BLOCK are shadow-logged only; request still ESCALATEs."""
+    return str(getattr(settings, "INTENT_ACT", "")).strip().lower() in ("1", "true", "yes", "on")
+
+
 def _float(name: str, default: float) -> float:
     raw = str(getattr(settings, name, "")).strip()
     try:

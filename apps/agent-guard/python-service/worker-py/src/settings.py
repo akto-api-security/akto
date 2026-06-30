@@ -51,6 +51,10 @@ _FIELDS = (
     "INTENT_ALLOW_THRESHOLD", "INTENT_BLOCK_THRESHOLD", "INTENT_SCOPE_DISTANCE",
     # Max chunks embedded/classified per request (caps miss-path cost).
     "INTENT_MAX_CHUNKS",
+    # INTENT_ACT: when falsy (default), ALLOW/BLOCK decisions are only logged
+    # (shadow mode) and the request still ESCALATEs to the LLM cascade. Set to
+    # "true" to enforce intent decisions and skip the cascade.
+    "INTENT_ACT",
 )
 
 
