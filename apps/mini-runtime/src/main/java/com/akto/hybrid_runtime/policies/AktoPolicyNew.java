@@ -9,6 +9,7 @@ import com.akto.dto.traffic.CollectionTags;
 import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.policies.*;
 import com.akto.runtime.utils.Utils;
+import com.akto.util.Constants;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -19,8 +20,11 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.util.Constants;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
+import org.yaml.snakeyaml.scanner.Constant;
+
 import java.util.*;
 import java.util.Arrays;
 
@@ -107,6 +111,22 @@ public class AktoPolicyNew {
         loggerMaker.infoAndAddToDb("Syncing with db");
         List<ApiInfo> apiInfoList = getUpdates(apiInfoCatalogMap);
         loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+ apiInfoList.size());
+        
+        // Log detailed information about each ApiInfo being synced
+        for (ApiInfo apiInfo : apiInfoList) {
+            if (apiInfo != null) {
+                ApiInfo.ApiInfoKey key = apiInfo.getId();
+                String logMsg = String.format(
+                    "ApiInfo sync: collection=%d, url=%s, method=%s, isConnectionString=%s",
+                    key.getApiCollectionId(),
+                    key.getUrl(),
+                    key.getMethod(),
+                    apiInfo.getIsConnectionString()
+                );
+                loggerMaker.infoAndAddToDb(logMsg);
+            }
+        }
+        
         try {
             if (apiInfoList.size() > 0) {
                 loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+apiInfoList.size());
@@ -160,6 +180,15 @@ public class AktoPolicyNew {
         PolicyCatalog policyCatalog = getApiInfoFromMap(apiInfoKey);
         policyCatalog.setSeenEarlier(true);
         ApiInfo apiInfo = policyCatalog.getApiInfo();
+
+        // Detect and set WebSocket connection string endpoints
+        boolean isWebSocketConnectionString = Constants.WEBSOCKET_PROTOCOL.equals(httpResponseParams.getType()) 
+            && httpResponseParams.getStatusCode() == 101 
+            && (httpResponseParams.getPayload() == null || httpResponseParams.getPayload().isEmpty());
+        if (isWebSocketConnectionString) {
+            apiInfo.setIsConnectionString(true);
+            loggerMaker.infoAndAddToDb("Detected WebSocket connection string for: " + apiInfo.getId().toString());
+        }
 
         if (Utils.printDebugUrlLog(httpResponseParams.getRequestParams().getURL())) {
             loggerMaker.infoAndAddToDb("Found debug url in process " + httpResponseParams.getRequestParams().getURL()
