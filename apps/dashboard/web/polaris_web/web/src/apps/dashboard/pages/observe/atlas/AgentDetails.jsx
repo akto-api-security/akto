@@ -11,6 +11,8 @@ import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
 import ModuleEnvConfigComponent from "../../settings/health_logs/ModuleEnvConfig";
 import settingRequests from "../../settings/api";
+import TitleWithInfo from "../../../components/shared/TitleWithInfo";
+import transform from "../transform";
 
 const ANIMATION_DURATION = 0.2;
 const LOG_LEVEL_TONES = {
@@ -168,35 +170,12 @@ const DeviceInfoGrid = ({ agent }) => {
     );
 };
 
-const InstalledAppsSection = ({ apps }) => {
-    const [expanded, setExpanded] = useState(false);
-    if (!apps || apps.length === 0) return null;
-    const sorted = [...apps].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    const shown = expanded ? sorted : sorted.slice(0, 8);
-    return (
-        <VerticalStack gap="3">
-            <HorizontalStack align="space-between" blockAlign="center">
-                <Text variant="headingSm">Installed Applications</Text>
-                <Badge>{String(apps.length)}</Badge>
-            </HorizontalStack>
-                <div>
-                    {shown.map((app, idx) => (
-                        <div
-                            key={app.bundleId || app.name || idx}
-                            style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid #F6F6F7' }}
-                        >
-                            <Text variant="bodySm">{app.name}</Text>
-                            <Text variant="bodySm" color="subdued">{app.version || '—'}</Text>
-                        </div>
-                    ))}
-                </div>
-                {apps.length > 8 && (
-                    <Button plain onClick={() => setExpanded(e => !e)}>
-                        {expanded ? 'Show less' : `Show all ${apps.length} apps`}
-                    </Button>
-                )}
-        </VerticalStack>
-    );
+// Decodes literal \uXXXX sequences (double-escaped by some agents) then strips
+// invisible Unicode formatting chars (LTR/RTL marks, zero-width spaces, etc.)
+const sanitizeAppText = (str) => {
+    if (!str) return str;
+    const decoded = str.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+    return decoded.replace(/[\u200b-\u200f\u202a-\u202e\u2060\ufeff]/g, '').trim();
 };
 
 const createSimpleHeader = (text, value = null) => ({
@@ -209,6 +188,11 @@ const mcpServersHeaders = [
     createSimpleHeader("Server Name", "serverName"),
     createSimpleHeader("Endpoint / Command", "serverUrl"),
     createSimpleHeader("Last Updated", "lastSeenFormatted")
+];
+
+const installedAppsHeaders = [
+    createSimpleHeader("App Name", "name"),
+    createSimpleHeader("Version", "version"),
 ];
 
 function AgentDetails({
@@ -312,14 +296,14 @@ function AgentDetails({
             );
             const logs = res.agentLogs || [];
             if (logs.length === 0) return;
-            const txt = logs
-                .map(l => `[${func.epochToDateTime(l.timestamp)}] [${(l.level || 'INFO').padEnd(7)}] ${l.log || l.message || ''}`)
+            const txt = [...logs].reverse()
+                .map(l => `[${func.epochToDateTime(l.timestamp)}] [${(l.level || 'INFO').toUpperCase()}] ${l.log || l.message || ''}`)
                 .join('\n');
             const blob = new Blob([txt], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${logSourceRef.current}-${selectedAgent.agentId}.txt`;
+            a.download = `${logSourceRef.current}-${selectedAgent.agentId}.log`;
             a.click();
             URL.revokeObjectURL(url);
         } catch (error) {
@@ -408,6 +392,15 @@ function AgentDetails({
             lastSeen: server.lastSeen,
             collectionName: server.collectionName
         })), [mcpServers]);
+
+    const installedAppsTableData = useMemo(() =>
+        [...(selectedAgent?.installedApps || [])]
+            .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+            .map(app => ({
+                name: sanitizeAppText(app.name) || '\u2014',
+                version: app.version ? sanitizeAppText(app.version) : '\u2014',
+            })),
+    [selectedAgent]);
 
     const handleServerClick = useCallback((server) => {
         const collection = allCollections.find(col =>
@@ -623,8 +616,19 @@ function AgentDetails({
         id: 'installed-apps',
         content: 'Apps',
         component: (
-            <Box paddingBlockStart="4">
-                <InstalledAppsSection apps={selectedAgent?.installedApps} />
+            <Box paddingBlockStart={"4"}>
+                <GithubSimpleTable
+                    key="installed-apps-table"
+                    data={installedAppsTableData}
+                    resourceName={{ singular: "app", plural: "apps" }}
+                    headers={installedAppsHeaders}
+                    headings={installedAppsHeaders}
+                    useNewRow={true}
+                    condensedHeight={true}
+                    hideQueryField={true}
+                    loading={false}
+                    pageLimit={20}
+                />
             </Box>
         ),
         panelID: 'installed-apps-panel',

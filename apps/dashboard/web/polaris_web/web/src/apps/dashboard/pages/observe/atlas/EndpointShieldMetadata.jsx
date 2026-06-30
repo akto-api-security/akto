@@ -1,4 +1,5 @@
-import { Text, HorizontalStack } from "@shopify/polaris"
+import { Text, HorizontalStack, Icon, Tooltip } from "@shopify/polaris"
+import { StatusActiveMajor, DiamondAlertMinor, RefreshMinor } from "@shopify/polaris-icons"
 import { useEffect, useReducer, useState, useCallback } from "react"
 import values from "@/util/values";
 import { produce } from "immer"
@@ -23,11 +24,11 @@ const createHeading = (text, value = null, sortKey = null) => ({
 });
 
 const headings = [
-    createHeading("Agent ID", "agentId"),
+    { ...createHeading("Status", "statusComp"), sortActive: false },
     createHeading("Hostname", "hostname"),
     createHeading("Device ID", "deviceId"),
     createHeading("Agent Version", "agentVersion"),
-    createHeading("OS", "osLabel", "os"),
+    createHeading("OS", "osComp", "os"),
     createHeading("Username", "username"),
     createHeading("Last Heartbeat", "lastHeartbeatComp", "lastHeartbeat"),
     createHeading("Last Deployed", "lastDeployedComp", "lastDeployed")
@@ -43,14 +44,13 @@ const createSortOptions = (label, sortKey, columnIndex, isTimeField = false) => 
 };
 
 const sortOptions = [
-    ...createSortOptions('Agent ID', 'agentId', 1),
-    ...createSortOptions('Hostname', 'hostname', 2),
-    ...createSortOptions('Device ID', 'deviceId', 3),
-    ...createSortOptions('Agent Version', 'agentVersion', 4),
-    ...createSortOptions('OS', 'os', 5),
-    ...createSortOptions('Username', 'username', 6),
-    ...createSortOptions('Last Heartbeat', 'lastHeartbeat', 7, true),
-    ...createSortOptions('Last Deployed', 'lastDeployed', 8, true)
+    ...createSortOptions('Hostname', 'hostname', 1),
+    ...createSortOptions('Device ID', 'deviceId', 2),
+    ...createSortOptions('Agent Version', 'agentVersion', 3),
+    ...createSortOptions('OS', 'os', 4),
+    ...createSortOptions('Username', 'username', 5),
+    ...createSortOptions('Last Heartbeat', 'lastHeartbeat', 6, true),
+    ...createSortOptions('Last Deployed', 'lastDeployed', 7, true)
 ];
 
 const createFilter = (key, label) => ({
@@ -65,15 +65,61 @@ const resourceName = {
     plural: 'agents',
 };
 
+const OS_ICON_MAP = { darwin: '/public/os-mac.svg', mac: '/public/os-mac.svg', windows: '/public/os-windows.svg', linux: '/public/os-linux.svg' };
+
+const getOsIcon = (os) => {
+    if (!os || os === DEFAULT_VALUE) return null;
+    const key = os.toLowerCase();
+    for (const [prefix, icon] of Object.entries(OS_ICON_MAP)) {
+        if (key.includes(prefix)) return icon;
+    }
+    return null;
+};
+
+const getStatusComp = (installStatus, lastHeartbeat) => {
+    if (installStatus === 'installing') {
+        return (
+            <Tooltip content="Installation in progress" dismissOnMouseOut>
+                <Icon source={RefreshMinor} color="warning" />
+            </Tooltip>
+        );
+    }
+    if (installStatus === 'failed') {
+        return (
+            <Tooltip content="Installation failed" dismissOnMouseOut>
+                <Icon source={DiamondAlertMinor} color="critical" />
+            </Tooltip>
+        );
+    }
+    if (lastHeartbeat > 0) {
+        return (
+            <Tooltip content="Running" dismissOnMouseOut>
+                <Icon source={StatusActiveMajor} color="success" />
+            </Tooltip>
+        );
+    }
+    return null;
+};
+
 const convertDataIntoTableFormat = (agentData) => {
     const os = agentData?.os;
-    const osLabel = os && os !== DEFAULT_VALUE ? os : DEFAULT_VALUE;
+    const osDisplayName = agentData?.osDisplayName;
+    const displayOs = (osDisplayName && osDisplayName !== DEFAULT_VALUE) ? osDisplayName : (os && os !== DEFAULT_VALUE ? os : null);
+    const osIcon = getOsIcon(os);
+    const osComp = displayOs ? (
+        <HorizontalStack gap="1" wrap={false} blockAlign="center">
+            {osIcon && <img src={osIcon} alt={os} style={{ width: '16px', height: '16px', flexShrink: 0 }} />}
+            <Text variant="bodySm">{displayOs}</Text>
+        </HorizontalStack>
+    ) : DEFAULT_VALUE;
+
     return {
         ...agentData,
         id: agentData?.agentId,
         lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
         lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed),
-        osLabel,
+        osComp,
+        statusComp: getStatusComp(agentData?.installStatus, agentData?.lastHeartbeat),
     };
 };
 
@@ -151,6 +197,7 @@ function EndpointShieldMetadata() {
                 userShell: module.additionalData?.userShell || DEFAULT_VALUE,
                 bootTime: module.additionalData?.bootTime || null,
                 installedApps: module.additionalData?.installedApps || [],
+                installStatus: module.additionalData?.installStatus || null,
                 _moduleData: module
             }));
             setEndpointShieldData({ agents: deduplicateAgents(agents) });

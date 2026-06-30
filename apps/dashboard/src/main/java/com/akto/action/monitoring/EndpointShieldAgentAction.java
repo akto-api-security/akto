@@ -244,7 +244,12 @@ public class EndpointShieldAgentAction extends UserAction {
             }
 
             agentLogs = new ArrayList<>(fetched);
-            totalCount = EndpointShieldLogsDao.instance.getMCollection().countDocuments(baseFilter);
+            // Only count on the first page — subsequent pages discard the value anyway
+            if (afterId == null || afterId.isEmpty()) {
+                totalCount = EndpointShieldLogsDao.instance.getMCollection()
+                    .countDocuments(baseFilter, new com.mongodb.client.model.CountOptions()
+                        .maxTime(30, java.util.concurrent.TimeUnit.SECONDS));
+            }
 
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
