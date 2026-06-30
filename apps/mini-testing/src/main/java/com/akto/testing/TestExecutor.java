@@ -129,6 +129,9 @@ public class TestExecutor {
         
         loggerMaker.insertImportantTestingLog("FALLBACK METHOD CALLED: executeAllTestsInLegacyMode started with " + apiInfoKeyList.size() + " API endpoints and " + testingRunSubCategories.size() + " subcategories");
         
+        // Pre-fetch isConnectionString for WS endpoints once before the loop to avoid per-iteration DB calls.
+        Map<ApiInfoKey, Boolean> wsConnectionStringMap = buildWsConnectionStringMap(testingUtil.getSampleMessages());
+
         int maxThreads = Math.min(100, Math.max(10, testingRun.getMaxConcurrentRequests()));
         List<Future<Void>> testingRecords = new ArrayList<>();
         ExecutorService threadPool = Executors.newFixedThreadPool(maxThreads);
@@ -157,7 +160,15 @@ public class TestExecutor {
                     OriginalReqResPayloadInformation.getInstance().getOriginalReqPayloadMap().put(key, originalRequestPayload);
                 }
             }
-            RawApi rawApi = RawApi.buildFromMessage(sample, true);
+            RawApi rawApi = RawApi.buildFromMessages(messages, true);
+            if (rawApi != null
+                    && rawApi.getRequest().getProtocolType() == OriginalHttpRequest.ProtocolType.WEBSOCKET
+                    && Boolean.TRUE.equals(wsConnectionStringMap.get(apiInfoKey))) {
+                rawApi.getRequest().setIsConnectionString(true);
+                if (rawApi.getResponse() != null) {
+                    rawApi.getResponse().setStatusCode(200);
+                }
+            }
             if(rawApi != null){
                 TestingConfigurations.getInstance().getRawApiMap().put(apiInfoKey, rawApi);
             }
@@ -414,7 +425,7 @@ public class TestExecutor {
                         List<String> messages = testingUtil.getSampleMessages().get(firstApiKey);
                         if (messages != null && !messages.isEmpty()) {
                             try {
-                                rawApiForAuth = RawApi.buildFromMessage(messages.get(messages.size() - 1), true);
+                                rawApiForAuth = RawApi.buildFromMessages(messages, true);
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb("Error building RawApi for auth prefetch: " + e.getMessage(), LogDb.TESTING);
                             }
@@ -465,6 +476,9 @@ public class TestExecutor {
                 }
             }
 
+            // Pre-fetch isConnectionString for WS endpoints once before the loop to avoid per-iteration DB calls.
+            Map<ApiInfoKey, Boolean> wsConnectionStringMap = buildWsConnectionStringMap(testingUtil.getSampleMessages());
+
             AtomicInteger totalRecords = new AtomicInteger(0);
             AtomicInteger throttleNumber = new AtomicInteger(0);
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
@@ -492,7 +506,15 @@ public class TestExecutor {
                         OriginalReqResPayloadInformation.getInstance().getOriginalReqPayloadMap().put(key, originalRequestPayload);
                     }
                 }
-                RawApi rawApi = RawApi.buildFromMessage(sample, true);
+                RawApi rawApi = RawApi.buildFromMessages(messages, true);
+                if (rawApi != null
+                        && rawApi.getRequest().getProtocolType() == OriginalHttpRequest.ProtocolType.WEBSOCKET
+                        && Boolean.TRUE.equals(wsConnectionStringMap.get(apiInfoKey))) {
+                    rawApi.getRequest().setIsConnectionString(true);
+                    if (rawApi.getResponse() != null) {
+                        rawApi.getResponse().setStatusCode(200);
+                    }
+                }
                 if(rawApi != null){
                     TestingConfigurations.getInstance().getRawApiMap().put(apiInfoKey, rawApi);
                 }
@@ -697,6 +719,27 @@ public class TestExecutor {
         } catch (Exception e){
         }
         return severity;
+    }
+
+
+    private Map<ApiInfoKey, Boolean> buildWsConnectionStringMap(Map<ApiInfoKey, List<String>> sampleDataMap) {
+        Map<ApiInfoKey, Boolean> result = new HashMap<>();
+        if (sampleDataMap == null) return result;
+        for (Map.Entry<ApiInfoKey, List<String>> entry : sampleDataMap.entrySet()) {
+            List<String> msgs = entry.getValue();
+            if (msgs == null || msgs.isEmpty()) continue;
+            String first = msgs.get(0);
+            if (first != null && first.contains("\"WEBSOCKET\"")) {
+                try {
+                    ApiInfo apiInfo = dataActor.fetchApiInfo(entry.getKey());
+                    result.put(entry.getKey(), apiInfo != null && apiInfo.getIsConnectionString());
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error fetching ApiInfo for WS endpoint " + entry.getKey());
+                    result.put(entry.getKey(), false);
+                }
+            }
+        }
+        return result;
     }
 
     public static OriginalHttpRequest findOriginalHttpRequest(ApiInfo.ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap, SampleMessageStore sampleMessageStore){

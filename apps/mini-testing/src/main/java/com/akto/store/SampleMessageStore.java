@@ -61,13 +61,23 @@ public class SampleMessageStore {
     private void fillSampleDataMap(List<SampleData> sampleDataList){
         Map<ApiInfo.ApiInfoKey, List<String>> tempSampleDataMap = new HashMap<>();
         for (SampleData sampleData: sampleDataList) {
-            if (sampleData.getSamples() == null) continue;
             Key key = sampleData.getId();
             ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(key.getApiCollectionId(), key.getUrl(), key.getMethod());
-            if (tempSampleDataMap.containsKey(apiInfoKey)) {
-                tempSampleDataMap.get(apiInfoKey).addAll(sampleData.getSamples());
+            
+            List<String> dataToAdd = new ArrayList<>();
+            
+            // For samples, use as-is (handles both HTTP and WebSocket connection samples)
+            if (sampleData.getSamples() != null) {
+                dataToAdd.addAll(sampleData.getSamples());
             } else {
-                tempSampleDataMap.put(apiInfoKey, sampleData.getSamples());
+                // Skip if no samples (don't use events - they require special handling)
+                continue;
+            }
+            
+            if (tempSampleDataMap.containsKey(apiInfoKey)) {
+                tempSampleDataMap.get(apiInfoKey).addAll(dataToAdd);
+            } else {
+                tempSampleDataMap.put(apiInfoKey, dataToAdd);
             }
         }
 
@@ -121,28 +131,52 @@ public class SampleMessageStore {
                 samples = new ArrayList<>();
             }
             AllMetrics.instance.setMultipleSampleDataFetchLatency(System.currentTimeMillis() - start);
-            for(String message: samples){
-                messages.add(RawApi.buildFromMessage(message, true));
-            }
+            messages.addAll(buildRawApisFromSampleList(samples, apiInfoKey.toString()));
 
             if (messages.isEmpty()) {
                 List<String> dbSamples = sampleDataMap.get(apiInfoKey);
                 if (dbSamples == null || dbSamples.isEmpty())
                     return messages;
 
-                for (String message : dbSamples) {
-                    try {
-                        messages.add(RawApi.buildFromMessage(message, true));
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Error while building RawAPI for " + apiInfoKey.toString() + " : " + e.getMessage());
-                    }
-                }
+                messages.addAll(buildRawApisFromSampleList(dbSamples, apiInfoKey.toString()));
             }
             return messages;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error while fetching all original messages for "+ apiInfoKey +" : " + e, LogDb.TESTING);
         }
         return messages;
+    }
+
+    /**
+     * Builds RawApi instances from a list of raw sample strings.
+     * For WebSocket endpoints all samples are merged into one representative RawApi
+     * (incoming frame → request body, outgoing frame → response body).
+     * For HTTP endpoints one RawApi is produced per sample.
+     */
+    private static List<RawApi> buildRawApisFromSampleList(List<String> rawMessages, String apiInfoKeyStr) {
+        if (rawMessages == null || rawMessages.isEmpty()) return Collections.emptyList();
+
+        // Detect WebSocket by peeking at the first non-null message.
+        for (String msg : rawMessages) {
+            if (msg != null && !msg.isEmpty()) {
+                if (msg.contains("\"WEBSOCKET\"")) {
+                    RawApi merged = RawApi.buildFromWebSocketSamples(rawMessages);
+                    return merged != null ? Collections.singletonList(merged) : Collections.emptyList();
+                }
+                break;
+            }
+        }
+
+        // HTTP path — build one RawApi per sample.
+        List<RawApi> result = new ArrayList<>();
+        for (String message : rawMessages) {
+            try {
+                result.add(RawApi.buildFromMessage(message, true));
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error while building RawAPI for " + apiInfoKeyStr + " : " + e.getMessage());
+            }
+        }
+        return result;
     }
 
     public static List<RawApi> filterMessagesWithAuthToken(List<RawApi> messages, AuthMechanism authMechanism) {

@@ -73,6 +73,12 @@ public class OriginalHttpResponse {
             obj = ((Double) obj).intValue();
         }
         this.statusCode = Integer.parseInt(obj.toString());
+
+        // Override 101 Switching Protocols → 200 for WebSocket so response_code filters work.
+        String type = (String) json.get("type");
+        if (OriginalHttpRequest.WEBSOCKET_TYPE.equalsIgnoreCase(type)) {
+            this.statusCode = 200;
+        }
     }
 
     public void addHeaderFromLine(String line) {

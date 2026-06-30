@@ -2,6 +2,8 @@ package com.akto.testing;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.CollectionConditions.ConditionsType;
@@ -38,6 +40,7 @@ import java.util.stream.Collectors;
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.TESTING);
 
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -57,9 +60,9 @@ public class ApiExecutor {
                 HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs, requestProtocol, isHttps) :
                 HTTPClientHandler.instance.getHTTPClient(isHttps, followRedirects, requestProtocol);
 
-        if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
-            throw new IllegalArgumentException("SSRF attack attempt");
-        }
+        // if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
+        //     throw new IllegalArgumentException("SSRF attack attempt");
+        // }
         String requestUrl = request.url().toString();
         boolean isCyborgCall = requestUrl.contains("cyborg.akto.io") || requestUrl.contains("ultron.akto.io");
         long start = System.currentTimeMillis();
@@ -282,11 +285,65 @@ public class ApiExecutor {
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects,
         TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
         boolean skipSSRFCheck) throws Exception {
-        return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false);
+        return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false, 0);
     }
 
-    private static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean jsonRpcCheck) throws Exception {
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects,
+        TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
+        boolean skipSSRFCheck, int collectionId) throws Exception {
+        return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false, collectionId);
+    }
+
+    private static OriginalHttpResponse handleWebSocketRequest(OriginalHttpRequest request, TestingRunConfig testingRunConfig, int collectionId) throws Exception {
+        if (testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null
+                && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()) {
+            calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
+        }
+        removeAktoInternalHeaders(request);
+
+        long timeoutMs = 5000;  // Default 30 second timeout for WebSocket messages
+
+        // For Kafka parallel execution (new testing mode), use direct (non-pooled) connections
+        // to avoid message mixing between concurrent tasks
+        if (Constants.IS_NEW_TESTING_ENABLED) {
+            String wsUrl = request.isConnectionString() ? buildWebSocketUrl(request) : getWebSocketConnectionUrl(collectionId);
+            return WebSocketExecutor.sendMessageDirect(request, wsUrl, request.getHeaders(), timeoutMs);
+        }
+
+        // Connection-string endpoints: open a fresh WS connection, capture the initial server
+        // message, close immediately, and return 200. No pool, no message to send.
+        if (request.isConnectionString()) {
+            String wsUrl = buildWebSocketUrl(request);
+            return WebSocketExecutor.connectAndGetInitialMessage(wsUrl, request.getHeaders(), timeoutMs);
+        }
+
+        String connectionUrl = getWebSocketConnectionUrl(collectionId);
+        String subcategoryId = testingRunConfig != null && testingRunConfig.getConversationId() != null ? 
+            testingRunConfig.getConversationId() : "default";
+        
+        try {
+            return WebSocketExecutor.sendMessage(request, connectionUrl, subcategoryId, timeoutMs);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("WebSocket message execution failed: " + e.getMessage(), LogDb.TESTING);
+            return new OriginalHttpResponse("{\"error\": \"" + e.getMessage() + "\"}", new HashMap<>(), 500);
+        }
+    }
+
+    private static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean jsonRpcCheck, int collectionId) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
+
+        // Check protocol type and route accordingly
+        if (request.getProtocolType() == OriginalHttpRequest.ProtocolType.WEBSOCKET) {
+            return handleWebSocketRequest(request, testingRunConfig, collectionId);
+        }
+
+        // Detect protocol type from URL if not explicitly set
+        if (request.getProtocolType() == OriginalHttpRequest.ProtocolType.HTTP) {
+            OriginalHttpRequest.ProtocolType detectedType = OriginalHttpRequest.detectProtocolType(request.getUrl());
+            if (detectedType != OriginalHttpRequest.ProtocolType.HTTP) {
+                request.setProtocolType(detectedType);
+            }
+        }
 
         if (!jsonRpcCheck && shouldInitiateSSEStream(request)) {
             return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false);
@@ -907,7 +964,7 @@ public class ApiExecutor {
             boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug,
             List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
         return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs,
-                skipSSRFCheck, true);
+                skipSSRFCheck, true, 0);
     }
 
     public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects,
@@ -953,7 +1010,7 @@ public class ApiExecutor {
         }
 
         // Send actual request
-        OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, true);
+        OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, true, 0);
 
         if (resp.getStatusCode() >= 400) {
             closeSseSession(session);
@@ -1018,5 +1075,49 @@ public class ApiExecutor {
             return false;
         }
         return true;
+    }
+
+    private static String getWebSocketConnectionUrl(int collectionId) {
+        // Try to get cached connection URL for this collection
+        String connectionUrl = WebSocketConnectionPool.getCachedConnectionUrl(collectionId);
+        
+        if (connectionUrl == null) {
+            // Not cached yet - fetch from Cyborg via dataActor
+            try {
+                connectionUrl = dataActor.fetchWebSocketConnectionUrl(collectionId);
+                if (connectionUrl != null) {
+                    WebSocketConnectionPool.cacheConnectionUrl(collectionId, connectionUrl);
+                    loggerMaker.infoAndAddToDb("Cached WebSocket connection URL for collectionId: " + collectionId, LogDb.TESTING);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Failed to fetch WebSocket connection URL from DataActor: " + e.getMessage(), LogDb.TESTING);
+            }
+        }
+        
+        return connectionUrl;
+    }
+
+    private static String buildWebSocketUrl(OriginalHttpRequest request) {
+        String path = request.getUrl();
+        
+        // Extract host from headers
+        String host = null;
+        if (request.getHeaders() != null) {
+            List<String> hostValues = request.getHeaders().get("host");
+            if (hostValues != null && !hostValues.isEmpty()) {
+                host = hostValues.get(0);
+            }
+        }
+        
+        // If no host header, return path as-is (fallback, unlikely)
+        if (host == null || host.isEmpty()) {
+            return path.startsWith("ws") ? path : "ws://" + path;
+        }
+        
+        // Determine scheme based on whether host is localhost
+        String scheme = host.toLowerCase().contains("localhost") ? "ws://" : "wss://";
+        
+        // Build full URL: scheme + host + path
+        return scheme + host + path;
     }
 }

@@ -81,6 +81,26 @@ public class ConsumerUtil {
         int timeNow = Context.now();
         if(messagesList == null || messagesList.isEmpty()){}
         else{
+            if (instance.getRawApiMap().get(apiInfoKey) == null) {
+                com.akto.dto.RawApi rawApi = com.akto.dto.RawApi.buildFromMessages(messagesList, true);
+                if (rawApi != null
+                        && rawApi.getRequest().getProtocolType() == com.akto.dto.OriginalHttpRequest.ProtocolType.WEBSOCKET) {
+                    try {
+                        ApiInfo apiInfo = dataActor.fetchApiInfo(apiInfoKey);
+                        if (apiInfo != null && apiInfo.getIsConnectionString()) {
+                            rawApi.getRequest().setIsConnectionString(true);
+                            if (rawApi.getResponse() != null) {
+                                rawApi.getResponse().setStatusCode(200);
+                            }
+                        }
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error fetching ApiInfo for WS connection string check: " + apiInfoKey);
+                    }
+                }
+                if (rawApi != null) {
+                    instance.getRawApiMap().put(apiInfoKey, rawApi);
+                }
+            }
             String sample = messagesList.get(messagesList.size() - 1);
             loggerMaker.infoAndAddToDb("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
             TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
