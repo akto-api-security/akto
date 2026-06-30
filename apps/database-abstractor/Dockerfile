@@ -1,7 +1,7 @@
-FROM jetty:9.4-jre8
+FROM jetty:9.4-jre8-alpine
 USER root
-RUN apt-get update -y
-RUN apt-get install -y --no-install-recommends libpcap-dev procps
+RUN apk update
+RUN apk add --no-cache libpcap-dev procps
 ADD ./target/database-abstractor.war /var/lib/jetty/webapps/root.war
 RUN echo "--module=http-forwarded" > /var/lib/jetty/start.d/http-forwarded.ini
 RUN echo "jetty.httpConfig.sendServerVersion=false" > /var/lib/jetty/start.d/server.ini
