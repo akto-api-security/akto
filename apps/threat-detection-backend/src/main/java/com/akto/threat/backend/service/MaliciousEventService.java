@@ -378,7 +378,7 @@ public class MaliciousEventService {
     Bson timeRangeFilter = buildTimeRangeFilter(
         request.getDetectedAtTimeRange(), "detectedAt");
 
-    Set<String> actors = fetchActorsForFilters(accountId, request);
+    Set<String> actors = fetchActorsForFilters(accountId, request, contextSource);
 
     // Fetch remaining filters from malicious_events scoped to the current context source
     fetchAlertFilterData(accountId, subCategories, urls, hosts, timeRangeFilter, contextSource);
@@ -391,16 +391,18 @@ public class MaliciousEventService {
         .build();
   }
 
-  private Set<String> fetchActorsForFilters(String accountId, FetchAlertFiltersRequest request) {
+  private Set<String> fetchActorsForFilters(String accountId, FetchAlertFiltersRequest request, String contextSource) {
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
     if (USE_ACTOR_INFO_TABLE) {
       ActorInfoDao actorInfoDao = ActorInfoDao.instance;
       Bson actorTimeRangeFilter = buildTimeRangeFilter(
           request.getDetectedAtTimeRange(), "discoveredAt");
+      Bson combinedFilter = Filters.and(actorTimeRangeFilter, contextFilter);
 
       try {
         Set<String> actors = new HashSet<>();
         actorInfoDao.getCollection(accountId)
-            .distinct("actorId", actorTimeRangeFilter, String.class)
+            .distinct("actorId", combinedFilter, String.class)
             .forEach(value -> {
               if (value != null && !value.isEmpty()) {
                 actors.add(value);
@@ -414,7 +416,8 @@ public class MaliciousEventService {
     } else {
       Bson timeRangeFilter = buildTimeRangeFilter(
           request.getDetectedAtTimeRange(), "detectedAt");
-      return fetchDistinctFieldValues(accountId, "actor", timeRangeFilter, String.class);
+      Bson combinedFilter = Filters.and(timeRangeFilter, contextFilter);
+      return fetchDistinctFieldValues(accountId, "actor", combinedFilter, String.class);
     }
   }
 
