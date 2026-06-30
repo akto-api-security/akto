@@ -13,7 +13,7 @@ import ModuleEnvConfigComponent from "../../settings/health_logs/ModuleEnvConfig
 import settingRequests from "../../settings/api";
 import TitleWithInfo from "../../../components/shared/TitleWithInfo";
 import transform from "../transform";
-import DetailGrid from "../../agentic/DetailGrid";
+import DetailGrid from "../agentic/DetailGrid";
 
 const ANIMATION_DURATION = 0.2;
 const LOG_LEVEL_TONES = {
