@@ -244,6 +244,7 @@ function EndpointShieldMetadata() {
             userShell: module.additionalData?.userShell || DEFAULT_VALUE,
             bootTime: module.additionalData?.bootTime || null,
             installedApps: module.additionalData?.installedApps || [],
+            installStatus: module.additionalData?.installStatus || null,
             _moduleData: module
         }));
         setEndpointShieldData({ agents: deduplicateAgents(agents) });

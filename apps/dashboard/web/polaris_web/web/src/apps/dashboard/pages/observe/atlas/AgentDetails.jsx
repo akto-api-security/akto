@@ -13,6 +13,7 @@ import ModuleEnvConfigComponent from "../../settings/health_logs/ModuleEnvConfig
 import settingRequests from "../../settings/api";
 import TitleWithInfo from "../../../components/shared/TitleWithInfo";
 import transform from "../transform";
+import DetailGrid from "../../agentic/DetailGrid";
 
 const ANIMATION_DURATION = 0.2;
 const LOG_LEVEL_TONES = {
@@ -26,9 +27,6 @@ const LOG_LEVEL_WIDTH = "50px";
 
 const PAGE_SIZE = 500; // logs displayed per page
 
-export const LOG_MODES = {
-    HISTORICAL: 'HISTORICAL'
-};
 
 const MetadataField = ({ icon, tooltip, value }) => {
     if (!value || value === DEFAULT_VALUE) return null;
@@ -99,72 +97,33 @@ const DEVICE_INFO_SECTIONS = [
     },
 ];
 
-const DeviceSectionGrid = ({ fields, agent }) => {
-    const rows = fields.map(field => {
-        if (field.isVM) {
-            const val = agent.isVM;
-            if (val == null) return null;
-            return { label: field.label, value: val ? 'Yes' : 'No' };
-        }
-        const raw = field.format ? field.format(agent[field.key], agent) : agent[field.key];
-        if (!raw || raw === DEFAULT_VALUE) return null;
-        return { label: field.label, value: raw };
-    }).filter(Boolean);
-
-    if (rows.length === 0) return null;
-
-    return (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 24px' }}>
-            {rows.map(row => (
-                <VerticalStack gap="1" key={row.label}>
-                    <Text variant="bodySm" color="subdued">{row.label}</Text>
-                    <Text variant="bodyMd">{'vmVal' in row ? (row.vmVal ? 'Yes' : 'No') : row.value}</Text>
-                </VerticalStack>
-            ))}
-        </div>
-    );
-};
-
 const DeviceInfoGrid = ({ agent }) => {
     if (!agent) return null;
 
-    const hasAnyField = DEVICE_INFO_SECTIONS.some(section =>
-        section.fields.some(field => {
-            if (field.isVM) return agent.isVM != null && agent.isVM !== DEFAULT_VALUE;
+    const visibleSections = DEVICE_INFO_SECTIONS.map(section => {
+        const items = section.fields.map(field => {
+            if (field.isVM) {
+                const val = agent.isVM;
+                if (val == null) return null;
+                return { label: field.label, value: val ? 'Yes' : 'No' };
+            }
             const raw = field.format ? field.format(agent[field.key], agent) : agent[field.key];
-            return raw && raw !== DEFAULT_VALUE;
-        })
-    );
+            if (!raw || raw === DEFAULT_VALUE) return null;
+            return { label: field.label, value: String(raw) };
+        }).filter(Boolean);
+        return { title: section.title, items };
+    }).filter(s => s.items.length > 0);
 
-    if (!hasAnyField) return (
+    if (visibleSections.length === 0) return (
         <Box padding="4">
             <Text variant="bodyMd" color="subdued" alignment="center">No device info available yet</Text>
         </Box>
     );
 
-    const visibleSections = DEVICE_INFO_SECTIONS.filter(section =>
-        section.fields.some(field => {
-            if (field.isVM) return agent.isVM != null && agent.isVM !== DEFAULT_VALUE;
-            const raw = field.format ? field.format(agent[field.key], agent) : agent[field.key];
-            return raw && raw !== DEFAULT_VALUE;
-        })
-    );
-
     return (
-        <VerticalStack gap="0">
-            {visibleSections.map((section, idx) => (
-                <div key={section.title}>
-                    {idx > 0 && (
-                        <div style={{ borderTop: '2px solid #C9CCCF', margin: '16px 0' }} />
-                    )}
-                    <VerticalStack gap="3">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ width: '3px', height: '14px', background: '#8C9196', borderRadius: '2px', flexShrink: 0 }} />
-                            <Text variant="headingSm">{section.title}</Text>
-                        </div>
-                        <DeviceSectionGrid fields={section.fields} agent={agent} />
-                    </VerticalStack>
-                </div>
+        <VerticalStack gap="5">
+            {visibleSections.map(section => (
+                <DetailGrid key={section.title} heading={section.title} items={section.items} columns={2} />
             ))}
         </VerticalStack>
     );
@@ -219,7 +178,6 @@ function AgentDetails({
     const [pageIndex, setPageIndex] = useState(0);
     const [hasMore, setHasMore] = useState(false);
     const [totalCount, setTotalCount] = useState(0);
-    const [logMode, setLogMode] = useState(LOG_MODES.HISTORICAL);
     const [selectedLogSource, setSelectedLogSource] = useState('installation-logs');
     const logSourceRef = useRef('installation-logs');
     const [description, setDescription] = useState("");
@@ -278,6 +236,7 @@ function AgentDetails({
 
     const handleNextPage = useCallback(async () => {
         const lastId = currentPageLogs[currentPageLogs.length - 1]?.hexId;
+        if (!lastId) return; // no cursor — can't advance safely
         const newIndex = pageIndex + 1;
         if (newIndex >= pageStack.length) {
             setPageStack(prev => [...prev, lastId]);
@@ -331,7 +290,6 @@ function AgentDetails({
         setPageIndex(0);
         setHasMore(false);
         setTotalCount(0);
-        setLogMode(LOG_MODES.HISTORICAL);
         setSelectedLogSource('installation-logs');
         logSourceRef.current = 'installation-logs';
         setDescription("");
@@ -446,7 +404,7 @@ function AgentDetails({
                     <Button
                         size="micro"
                         icon={ExportMinor}
-                        disabled={totalCount === 0 || logsLoading || exportLoading}
+                        disabled={logsLoading || exportLoading}
                         loading={exportLoading}
                         onClick={handleExportLogs}
                     >

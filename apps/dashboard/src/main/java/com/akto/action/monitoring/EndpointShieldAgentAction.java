@@ -27,8 +27,7 @@ import java.util.Map;
 import java.util.Comparator;
 
 public class EndpointShieldAgentAction extends UserAction {
-    private static final int MAX_LOGS_LIMIT = 10000; // Maximum logs to fetch from database
-    private static final int DEFAULT_PAGE_SIZE = 500;
+    private static final int MAX_LOGS_LIMIT = 10000;
     private static final int MAX_EXPORT_LIMIT = 100_000;
 
     private String agentId;
@@ -210,7 +209,9 @@ public class EndpointShieldAgentAction extends UserAction {
                 startTime = now - (24 * 60 * 60); // 24 hours ago
             }
 
-            int effectivePageSize = (pageSize > 0) ? Math.min(pageSize, MAX_LOGS_LIMIT) : DEFAULT_PAGE_SIZE;
+            // pageSize==0 means caller didn't send the field (Java int default); fall back to MAX_LOGS_LIMIT
+            // to preserve the pre-pagination behaviour for callers that don't paginate.
+            int effectivePageSize = (pageSize > 0) ? Math.min(pageSize, MAX_LOGS_LIMIT) : MAX_LOGS_LIMIT;
 
             // Base filter (no cursor) — used for totalCount
             Bson baseFilter = Filters.and(

@@ -55,7 +55,8 @@ services:
       com.centurylinklabs.watchtower.enable: "false"
 
   akto-api-security-runtime:
-    image: akto-mini-runtime:local
+    image: public.ecr.aws/aktosecurity/akto-api-security-mini-runtime:testruntime
+    # image: akto-mini-runtime:local  # local dev only — do not merge
     env_file: ./.env/docker-mini-runtime.env
     mem_limit: 8g
     restart: always
