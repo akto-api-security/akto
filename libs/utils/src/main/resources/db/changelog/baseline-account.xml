@@ -1,0 +1,1896 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!-- Baseline schema for account DB collections (per-account data) -->
+
+    <changeSet id="baseline-access_control_task_info-collection" author="akto">
+        <mongodb:createCollection collectionName="access_control_task_info"/>
+    </changeSet>
+
+    <changeSet id="baseline-access_matrix_url_to_roles-collection" author="akto">
+        <mongodb:createCollection collectionName="access_matrix_url_to_roles"/>
+    </changeSet>
+
+    <changeSet id="baseline-account_jobs-collection" author="akto">
+        <mongodb:createCollection collectionName="account_jobs"/>
+    </changeSet>
+
+    <changeSet id="baseline-account_jobs-index-0" author="akto">
+        <mongodb:createIndex collectionName="account_jobs">
+            <mongodb:keys>{ &quot;jobStatus&quot;: -1, &quot;scheduledAt&quot;: -1, &quot;heartbeatAt&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;jobStatus-scheduled-heartbeat_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-account_jobs-index-1" author="akto">
+        <mongodb:createIndex collectionName="account_jobs">
+            <mongodb:keys>{ &quot;jobType&quot;: -1, &quot;subType&quot;: -1, &quot;jobStatus&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;jobType-subType-jobStatus_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-accounts_settings-collection" author="akto">
+        <mongodb:createCollection collectionName="accounts_settings"/>
+    </changeSet>
+
+    <changeSet id="baseline-activities-collection" author="akto">
+        <mongodb:createCollection collectionName="activities"/>
+    </changeSet>
+
+    <changeSet id="baseline-activities-index-0" author="akto">
+        <mongodb:createIndex collectionName="activities">
+            <mongodb:keys>{ &quot;timestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-advanced_traffic_filters-collection" author="akto">
+        <mongodb:createCollection collectionName="advanced_traffic_filters"/>
+    </changeSet>
+
+    <changeSet id="baseline-adx_integration-collection" author="akto">
+        <mongodb:createCollection collectionName="adx_integration"/>
+    </changeSet>
+
+    <changeSet id="baseline-agent_conversation_results-collection" author="akto">
+        <mongodb:createCollection collectionName="agent_conversation_results"/>
+    </changeSet>
+
+    <changeSet id="baseline-agent_models-collection" author="akto">
+        <mongodb:createCollection collectionName="agent_models"/>
+    </changeSet>
+
+    <changeSet id="baseline-agent_runs-collection" author="akto">
+        <mongodb:createCollection collectionName="agent_runs"/>
+    </changeSet>
+
+    <changeSet id="baseline-agent_sub_process_attempts-collection" author="akto">
+        <mongodb:createCollection collectionName="agent_sub_process_attempts"/>
+    </changeSet>
+
+    <changeSet id="baseline-agent_traffic_logs-collection" author="akto">
+        <mongodb:createCollection collectionName="agent_traffic_logs"/>
+    </changeSet>
+
+    <changeSet id="baseline-agent_traffic_logs-index-0" author="akto">
+        <mongodb:createIndex collectionName="agent_traffic_logs">
+            <mongodb:keys>{ &quot;expiresAt&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;expiresAt_1&quot;, &quot;expireAfterSeconds&quot;: 0 }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-agent_traffic_logs-index-1" author="akto">
+        <mongodb:createIndex collectionName="agent_traffic_logs">
+            <mongodb:keys>{ &quot;apiCollectionId&quot;: -1, &quot;timestamp&quot;: -1, &quot;isBlocked&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollec-timestamp-isBlocked_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-agent_users-collection" author="akto">
+        <mongodb:createCollection collectionName="agent_users"/>
+    </changeSet>
+
+    <changeSet id="baseline-agent_users-index-0" author="akto">
+        <mongodb:createIndex collectionName="agent_users">
+            <mongodb:keys>{ &quot;teamName&quot;: -1, &quot;userRole&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;teamName-userRole_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-agent_users-index-1" author="akto">
+        <mongodb:createIndex collectionName="agent_users">
+            <mongodb:keys>{ &quot;userName&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;userName_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-agentic_session_context-collection" author="akto">
+        <mongodb:createCollection collectionName="agentic_session_context"/>
+    </changeSet>
+
+    <changeSet id="baseline-akto_data_type-collection" author="akto">
+        <mongodb:createCollection collectionName="akto_data_type"/>
+    </changeSet>
+
+    <changeSet id="baseline-akto_gpt_config-collection" author="akto">
+        <mongodb:createCollection collectionName="akto_gpt_config"/>
+    </changeSet>
+
+    <changeSet id="baseline-api_audit_logs-collection" author="akto">
+        <mongodb:createCollection collectionName="api_audit_logs"/>
+    </changeSet>
+
+    <changeSet id="baseline-api_audit_logs-index-0" author="akto">
+        <mongodb:createIndex collectionName="api_audit_logs">
+            <mongodb:keys>{ &quot;timestamp&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_audit_logs-index-1" author="akto">
+        <mongodb:createIndex collectionName="api_audit_logs">
+            <mongodb:keys>{ &quot;userEmail&quot;: 1, &quot;userIpAddress&quot;: 1, &quot;timestamp&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;userEmail-userIpAdd-timestamp_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_auth-collection" author="akto">
+        <mongodb:createCollection collectionName="api_auth"/>
+    </changeSet>
+
+    <changeSet id="baseline-api_collections-collection" author="akto">
+        <mongodb:createCollection collectionName="api_collections"/>
+    </changeSet>
+
+    <changeSet id="baseline-api_collections-index-0" author="akto">
+        <mongodb:createIndex collectionName="api_collections">
+            <mongodb:keys>{ &quot;startTs&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;startTs_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_collections-index-1" author="akto">
+        <mongodb:createIndex collectionName="api_collections">
+            <mongodb:keys>{ &quot;name&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;name_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_dependencies_from_discovery-collection" author="akto">
+        <mongodb:createCollection collectionName="api_dependencies_from_discovery"/>
+    </changeSet>
+
+    <changeSet id="baseline-api_hit_count_info-collection" author="akto">
+        <mongodb:createCollection collectionName="api_hit_count_info"/>
+    </changeSet>
+
+    <changeSet id="baseline-api_hit_count_info-index-0" author="akto">
+        <mongodb:createIndex collectionName="api_hit_count_info">
+            <mongodb:keys>{ &quot;ts&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;ts_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_hit_count_info-index-1" author="akto">
+        <mongodb:createIndex collectionName="api_hit_count_info">
+            <mongodb:keys>{ &quot;apiCollectionId&quot;: 1, &quot;url&quot;: 1, &quot;method&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollec-url-method_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_hit_count_info-index-2" author="akto">
+        <mongodb:createIndex collectionName="api_hit_count_info">
+            <mongodb:keys>{ &quot;apiCollectionId&quot;: -1, &quot;url&quot;: -1, &quot;method&quot;: -1, &quot;ts&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCol-url-method-ts_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_info-collection" author="akto">
+        <mongodb:createCollection collectionName="api_info"/>
+    </changeSet>
+
+    <changeSet id="baseline-api_info-index-0" author="akto">
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ &quot;_id.apiCollectionId&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollectionId_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_info-index-1" author="akto">
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ &quot;_id.url&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;url_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_info-index-2" author="akto">
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ &quot;_id.apiCollectionId&quot;: 1, &quot;_id.url&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollectionI-url_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_info-index-3" author="akto">
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ &quot;_id.apiCollectionId&quot;: -1, &quot;lastSeen&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollectionI-lastSeen_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_info-index-4" author="akto">
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ &quot;lastTested&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;lastTested_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_info-index-5" author="akto">
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ &quot;lastCalculatedTime&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;lastCalculatedTime_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_info-index-6" author="akto">
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ &quot;collectionIds&quot;: 1, &quot;_id.url&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;collectionIds-url_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_info-index-7" author="akto">
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ &quot;severityScore&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;severityScore_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_info-index-8" author="akto">
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ &quot;_id.apiCollectionId&quot;: -1, &quot;agentProxyGuardrailEnabled&quot;: -1, &quot;lastSeen&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollec-agentProx-lastSeen_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_info-index-9" author="akto">
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ &quot;agentProxyGuardrailEnabled&quot;: -1, &quot;lastSeen&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;agentProxyGuar-lastSeen_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_info-index-10" author="akto">
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ &quot;riskScore&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;riskScore_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_info-index-11" author="akto">
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ &quot;riskScore&quot;: -1, &quot;_id.apiCollectionId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;riskScore-apiCollectionI_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_info-index-12" author="akto">
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ &quot;discoveredTimestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;discoveredTimestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_info-index-13" author="akto">
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ &quot;parentMcpToolNames&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;parentMcpToolNames_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_sequences-collection" author="akto">
+        <mongodb:createCollection collectionName="api_sequences"/>
+    </changeSet>
+
+    <changeSet id="baseline-api_sequences-index-0" author="akto">
+        <mongodb:createIndex collectionName="api_sequences">
+            <mongodb:keys>{ &quot;apiCollectionId&quot;: -1, &quot;paths&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollectionI-paths_-1&quot;, &quot;unique&quot;: true }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_sequences-index-1" author="akto">
+        <mongodb:createIndex collectionName="api_sequences">
+            <mongodb:keys>{ &quot;createdAt&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;createdAt_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api_sequences-index-2" author="akto">
+        <mongodb:createIndex collectionName="api_sequences">
+            <mongodb:keys>{ &quot;lastUpdatedAt&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;lastUpdatedAt_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-apispec-collection" author="akto">
+        <mongodb:createCollection collectionName="apispec"/>
+    </changeSet>
+
+    <changeSet id="baseline-attempts-collection" author="akto">
+        <mongodb:createCollection collectionName="attempts"/>
+    </changeSet>
+
+    <changeSet id="baseline-auth_mechanisms-collection" author="akto">
+        <mongodb:createCollection collectionName="auth_mechanisms"/>
+    </changeSet>
+
+    <changeSet id="baseline-aws_resources-collection" author="akto">
+        <mongodb:createCollection collectionName="aws_resources"/>
+    </changeSet>
+
+    <changeSet id="baseline-azure_boards_integration-collection" author="akto">
+        <mongodb:createCollection collectionName="azure_boards_integration"/>
+    </changeSet>
+
+    <changeSet id="baseline-backward_compatibility-collection" author="akto">
+        <mongodb:createCollection collectionName="backward_compatibility"/>
+    </changeSet>
+
+    <changeSet id="baseline-bidirectional_sync_settings-collection" author="akto">
+        <mongodb:createCollection collectionName="bidirectional_sync_settings"/>
+    </changeSet>
+
+    <changeSet id="baseline-browser_extension_configs-collection" author="akto">
+        <mongodb:createCollection collectionName="browser_extension_configs"/>
+    </changeSet>
+
+    <changeSet id="baseline-burp_plugin_info-collection" author="akto">
+        <mongodb:createCollection collectionName="burp_plugin_info"/>
+    </changeSet>
+
+    <changeSet id="baseline-code_analysis_api_infos-collection" author="akto">
+        <mongodb:createCollection collectionName="code_analysis_api_infos"/>
+    </changeSet>
+
+    <changeSet id="baseline-code_analysis_api_infos-index-0" author="akto">
+        <mongodb:createIndex collectionName="code_analysis_api_infos">
+            <mongodb:keys>{ &quot;_id.codeAnalysisCollectionId&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;codeAnalysisCollectionId_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-code_analysis_collections-collection" author="akto">
+        <mongodb:createCollection collectionName="code_analysis_collections"/>
+    </changeSet>
+
+    <changeSet id="baseline-code_analysis_collections-index-0" author="akto">
+        <mongodb:createIndex collectionName="code_analysis_collections">
+            <mongodb:keys>{ &quot;name&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;name_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-code_analysis_repos-collection" author="akto">
+        <mongodb:createCollection collectionName="code_analysis_repos"/>
+    </changeSet>
+
+    <changeSet id="baseline-code_analysis_single_type_infos-collection" author="akto">
+        <mongodb:createCollection collectionName="code_analysis_single_type_infos"/>
+    </changeSet>
+
+    <changeSet id="baseline-common_templates-collection" author="akto">
+        <mongodb:createCollection collectionName="common_templates"/>
+    </changeSet>
+
+    <changeSet id="baseline-crawler_runs-collection" author="akto">
+        <mongodb:createCollection collectionName="crawler_runs"/>
+    </changeSet>
+
+    <changeSet id="baseline-crawler_urls-collection" author="akto">
+        <mongodb:createCollection collectionName="crawler_urls"/>
+    </changeSet>
+
+    <changeSet id="baseline-crawler_urls-index-0" author="akto">
+        <mongodb:createIndex collectionName="crawler_urls">
+            <mongodb:keys>{ &quot;crawlId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;crawlId_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-custom_auth_type-collection" author="akto">
+        <mongodb:createCollection collectionName="custom_auth_type"/>
+    </changeSet>
+
+    <changeSet id="baseline-custom_data_type-collection" author="akto">
+        <mongodb:createCollection collectionName="custom_data_type"/>
+    </changeSet>
+
+    <changeSet id="baseline-custom_roles-collection" author="akto">
+        <mongodb:createCollection collectionName="custom_roles"/>
+    </changeSet>
+
+    <changeSet id="baseline-custom_roles-index-0" author="akto">
+        <mongodb:createIndex collectionName="custom_roles">
+            <mongodb:keys>{ &quot;name&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;name_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-custom_webhooks-collection" author="akto">
+        <mongodb:createCollection collectionName="custom_webhooks"/>
+    </changeSet>
+
+    <changeSet id="baseline-custom_webhooks_result-collection" author="akto">
+        <mongodb:createCollection collectionName="custom_webhooks_result"/>
+    </changeSet>
+
+    <changeSet id="baseline-default_test_suites-collection" author="akto">
+        <mongodb:createCollection collectionName="default_test_suites"/>
+    </changeSet>
+
+    <changeSet id="baseline-delete_test_runs_info-collection" author="akto">
+        <mongodb:createCollection collectionName="delete_test_runs_info"/>
+    </changeSet>
+
+    <changeSet id="baseline-demo_request_for_template-collection" author="akto">
+        <mongodb:createCollection collectionName="demo_request_for_template"/>
+    </changeSet>
+
+    <changeSet id="baseline-dependency_flow_nodes-collection" author="akto">
+        <mongodb:createCollection collectionName="dependency_flow_nodes"/>
+    </changeSet>
+
+    <changeSet id="baseline-dependency_flow_nodes-index-0" author="akto">
+        <mongodb:createIndex collectionName="dependency_flow_nodes">
+            <mongodb:keys>{ &quot;apiCollectionId&quot;: 1, &quot;url&quot;: 1, &quot;method&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollec-url-method_1&quot;, &quot;unique&quot;: true }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-dependency_flow_nodes-index-1" author="akto">
+        <mongodb:createIndex collectionName="dependency_flow_nodes">
+            <mongodb:keys>{ &quot;apiCollectionId&quot;: 1, &quot;maxDepth&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollectionI-maxDepth_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-dependency_nodes-collection" author="akto">
+        <mongodb:createCollection collectionName="dependency_nodes"/>
+    </changeSet>
+
+    <changeSet id="baseline-dependency_nodes-index-0" author="akto">
+        <mongodb:createIndex collectionName="dependency_nodes">
+            <mongodb:keys>{ &quot;apiCollectionIdResp&quot;: 1, &quot;urlResp&quot;: 1, &quot;methodResp&quot;: 1, &quot;apiCollectionIdReq&quot;: 1, &quot;urlReq&quot;: 1, &quot;methodReq&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiC-urlR-meth-apiC-urlR-meth_1&quot;, &quot;unique&quot;: true }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-dependency_nodes-index-1" author="akto">
+        <mongodb:createIndex collectionName="dependency_nodes">
+            <mongodb:keys>{ &quot;apiCollectionIdResp&quot;: 1, &quot;urlResp&quot;: 1, &quot;methodResp&quot;: 1, &quot;apiCollectionIdReq&quot;: 1, &quot;urlReq&quot;: 1, &quot;methodReq&quot;: 1, &quot;paramInfos.requestParam&quot;: 1, &quot;paramInfos.responseParam&quot;: 1, &quot;paramInfos.isUrlParam&quot;: 1, &quot;paramInfos.isHeader&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;ap-ur-me-ap-ur-me-re-re-is-is_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-dependency_nodes-index-2" author="akto">
+        <mongodb:createIndex collectionName="dependency_nodes">
+            <mongodb:keys>{ &quot;lastUpdated&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;lastUpdated_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-devrev_integration-collection" author="akto">
+        <mongodb:createCollection collectionName="devrev_integration"/>
+    </changeSet>
+
+    <changeSet id="baseline-dibs-collection" author="akto">
+        <mongodb:createCollection collectionName="dibs"/>
+    </changeSet>
+
+    <changeSet id="baseline-discovery_agent_runs-collection" author="akto">
+        <mongodb:createCollection collectionName="discovery_agent_runs"/>
+    </changeSet>
+
+    <changeSet id="baseline-discovery_sub_processes-collection" author="akto">
+        <mongodb:createCollection collectionName="discovery_sub_processes"/>
+    </changeSet>
+
+    <changeSet id="baseline-endpoint_info_views-collection" author="akto">
+        <mongodb:createCollection collectionName="endpoint_info_views"/>
+    </changeSet>
+
+    <changeSet id="baseline-endpoint_info_views-index-0" author="akto">
+        <mongodb:createIndex collectionName="endpoint_info_views">
+            <mongodb:keys>{ &quot;apiCollectionId&quot;: -1, &quot;discoveredTimestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollectionI-discoveredTime_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-endpoint_info_views-index-1" author="akto">
+        <mongodb:createIndex collectionName="endpoint_info_views">
+            <mongodb:keys>{ &quot;apiCollectionId&quot;: 1, &quot;url&quot;: 1, &quot;method&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollec-url-method_1&quot;, &quot;unique&quot;: true }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-endpoint_info_views_temp-collection" author="akto">
+        <mongodb:createCollection collectionName="endpoint_info_views_temp"/>
+    </changeSet>
+
+    <changeSet id="baseline-endpoint_info_views_temp-index-0" author="akto">
+        <mongodb:createIndex collectionName="endpoint_info_views_temp">
+            <mongodb:keys>{ &quot;apiCollectionId&quot;: -1, &quot;discoveredTimestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollectionI-discoveredTime_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-endpoint_info_views_temp-index-1" author="akto">
+        <mongodb:createIndex collectionName="endpoint_info_views_temp">
+            <mongodb:keys>{ &quot;apiCollectionId&quot;: 1, &quot;url&quot;: 1, &quot;method&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollec-url-method_1&quot;, &quot;unique&quot;: true }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-endpoint_logical_group-collection" author="akto">
+        <mongodb:createCollection collectionName="endpoint_logical_group"/>
+    </changeSet>
+
+    <changeSet id="baseline-endpoint_remote_command_executions-collection" author="akto">
+        <mongodb:createCollection collectionName="endpoint_remote_command_executions"/>
+    </changeSet>
+
+    <changeSet id="baseline-endpoint_remote_command_executions-index-0" author="akto">
+        <mongodb:createIndex collectionName="endpoint_remote_command_executions">
+            <mongodb:keys>{ &quot;commandId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;commandId_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-endpoint_remote_command_executions-index-1" author="akto">
+        <mongodb:createIndex collectionName="endpoint_remote_command_executions">
+            <mongodb:keys>{ &quot;deviceId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;deviceId_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-endpoint_remote_command_executions-index-2" author="akto">
+        <mongodb:createIndex collectionName="endpoint_remote_command_executions">
+            <mongodb:keys>{ &quot;commandId&quot;: -1, &quot;deviceId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;commandId-deviceId_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-endpoint_remote_commands-collection" author="akto">
+        <mongodb:createCollection collectionName="endpoint_remote_commands"/>
+    </changeSet>
+
+    <changeSet id="baseline-endpoint_remote_commands-index-0" author="akto">
+        <mongodb:createIndex collectionName="endpoint_remote_commands">
+            <mongodb:keys>{ &quot;createdAt&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;createdAt_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-endpoint_remote_commands-index-1" author="akto">
+        <mongodb:createIndex collectionName="endpoint_remote_commands">
+            <mongodb:keys>{ &quot;status&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;status_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-endpoints_info-collection" author="akto">
+        <mongodb:createCollection collectionName="endpoints_info"/>
+    </changeSet>
+
+    <changeSet id="baseline-event_metrics-collection" author="akto">
+        <mongodb:createCollection collectionName="event_metrics"/>
+    </changeSet>
+
+    <changeSet id="baseline-file_inspection_results-collection" author="akto">
+        <mongodb:createCollection collectionName="file_inspection_results"/>
+    </changeSet>
+
+    <changeSet id="baseline-file_inspection_results-index-0" author="akto">
+        <mongodb:createIndex collectionName="file_inspection_results">
+            <mongodb:keys>{ &quot;ruleId&quot;: -1, &quot;executedAt&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;ruleId-executedAt_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-file_inspection_results-index-1" author="akto">
+        <mongodb:createIndex collectionName="file_inspection_results">
+            <mongodb:keys>{ &quot;deviceId&quot;: -1, &quot;executedAt&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;deviceId-executedAt_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-file_inspection_results-index-2" author="akto">
+        <mongodb:createIndex collectionName="file_inspection_results">
+            <mongodb:keys>{ &quot;deviceId&quot;: -1, &quot;ruleId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;deviceId-ruleId_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-file_inspection_rules-collection" author="akto">
+        <mongodb:createCollection collectionName="file_inspection_rules"/>
+    </changeSet>
+
+    <changeSet id="baseline-file_inspection_rules-index-0" author="akto">
+        <mongodb:createIndex collectionName="file_inspection_rules">
+            <mongodb:keys>{ &quot;updatedTs&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;updatedTs_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-file_inspection_rules-index-1" author="akto">
+        <mongodb:createIndex collectionName="file_inspection_rules">
+            <mongodb:keys>{ &quot;path&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;path_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-file_upload_logs-collection" author="akto">
+        <mongodb:createCollection collectionName="file_upload_logs"/>
+    </changeSet>
+
+    <changeSet id="baseline-file_uploads-collection" author="akto">
+        <mongodb:createCollection collectionName="file_uploads"/>
+    </changeSet>
+
+    <changeSet id="baseline-files-collection" author="akto">
+        <mongodb:createCollection collectionName="files"/>
+    </changeSet>
+
+    <changeSet id="baseline-filter_sample_data-collection" author="akto">
+        <mongodb:createCollection collectionName="filter_sample_data"/>
+    </changeSet>
+
+    <changeSet id="baseline-filter_yaml_templates-collection" author="akto">
+        <mongodb:createCollection collectionName="filter_yaml_templates"/>
+    </changeSet>
+
+    <changeSet id="baseline-generic_agent_conversations-collection" author="akto">
+        <mongodb:createCollection collectionName="generic_agent_conversations"/>
+    </changeSet>
+
+    <changeSet id="baseline-guardrail_policies-collection" author="akto">
+        <mongodb:createCollection collectionName="guardrail_policies"/>
+    </changeSet>
+
+    <changeSet id="baseline-guardrail_policies-index-0" author="akto">
+        <mongodb:createIndex collectionName="guardrail_policies">
+            <mongodb:keys>{ &quot;createdTimestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;createdTimestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-guardrail_policies-index-1" author="akto">
+        <mongodb:createIndex collectionName="guardrail_policies">
+            <mongodb:keys>{ &quot;updatedTimestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;updatedTimestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-guardrail_policies-index-2" author="akto">
+        <mongodb:createIndex collectionName="guardrail_policies">
+            <mongodb:keys>{ &quot;severity&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;severity_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-guardrail_policies-index-3" author="akto">
+        <mongodb:createIndex collectionName="guardrail_policies">
+            <mongodb:keys>{ &quot;isActive&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;isActive_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-guardrail_policies-index-4" author="akto">
+        <mongodb:createIndex collectionName="guardrail_policies">
+            <mongodb:keys>{ &quot;contextSource&quot;: -1, &quot;updatedTimestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;contextSource-updatedTimesta_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-guardrail_policies-index-5" author="akto">
+        <mongodb:createIndex collectionName="guardrail_policies">
+            <mongodb:keys>{ &quot;name&quot;: -1, &quot;contextSource&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;name-contextSource_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-historical_data-collection" author="akto">
+        <mongodb:createCollection collectionName="historical_data"/>
+    </changeSet>
+
+    <changeSet id="baseline-historical_data-index-0" author="akto">
+        <mongodb:createIndex collectionName="historical_data">
+            <mongodb:keys>{ &quot;time&quot;: 1, &quot;apiCollectionId&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;time-apiCollectionI_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-ip_level_api_hit_count-collection" author="akto">
+        <mongodb:createCollection collectionName="ip_level_api_hit_count"/>
+    </changeSet>
+
+    <changeSet id="baseline-jira_integration-collection" author="akto">
+        <mongodb:createCollection collectionName="jira_integration"/>
+    </changeSet>
+
+    <changeSet id="baseline-loaders-collection" author="akto">
+        <mongodb:createCollection collectionName="loaders"/>
+    </changeSet>
+
+    <changeSet id="baseline-login_flow_steps-collection" author="akto">
+        <mongodb:createCollection collectionName="login_flow_steps"/>
+    </changeSet>
+
+    <changeSet id="baseline-logs-collection" author="akto">
+        <mongodb:createCollection collectionName="logs"/>
+    </changeSet>
+
+    <changeSet id="baseline-logs-index-0" author="akto">
+        <mongodb:createIndex collectionName="logs">
+            <mongodb:keys>{ &quot;timestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-logs_agentic_testing-collection" author="akto">
+        <mongodb:createCollection collectionName="logs_agentic_testing"/>
+    </changeSet>
+
+    <changeSet id="baseline-logs_agentic_testing-index-0" author="akto">
+        <mongodb:createIndex collectionName="logs_agentic_testing">
+            <mongodb:keys>{ &quot;timestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-logs_analyser-collection" author="akto">
+        <mongodb:createCollection collectionName="logs_analyser"/>
+    </changeSet>
+
+    <changeSet id="baseline-logs_analyser-index-0" author="akto">
+        <mongodb:createIndex collectionName="logs_analyser">
+            <mongodb:keys>{ &quot;timestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-logs_aws_api_gateway-collection" author="akto">
+        <mongodb:createCollection collectionName="logs_aws_api_gateway"/>
+    </changeSet>
+
+    <changeSet id="baseline-logs_aws_api_gateway-index-0" author="akto">
+        <mongodb:createIndex collectionName="logs_aws_api_gateway">
+            <mongodb:keys>{ &quot;timestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-logs_billing-collection" author="akto">
+        <mongodb:createCollection collectionName="logs_billing"/>
+    </changeSet>
+
+    <changeSet id="baseline-logs_billing-index-0" author="akto">
+        <mongodb:createIndex collectionName="logs_billing">
+            <mongodb:keys>{ &quot;timestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-logs_dashboard-collection" author="akto">
+        <mongodb:createCollection collectionName="logs_dashboard"/>
+    </changeSet>
+
+    <changeSet id="baseline-logs_dashboard-index-0" author="akto">
+        <mongodb:createIndex collectionName="logs_dashboard">
+            <mongodb:keys>{ &quot;timestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-logs_data_ingestion-collection" author="akto">
+        <mongodb:createCollection collectionName="logs_data_ingestion"/>
+    </changeSet>
+
+    <changeSet id="baseline-logs_data_ingestion-index-0" author="akto">
+        <mongodb:createIndex collectionName="logs_data_ingestion">
+            <mongodb:keys>{ &quot;timestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-logs_endpoint_shield-collection" author="akto">
+        <mongodb:createCollection collectionName="logs_endpoint_shield"/>
+    </changeSet>
+
+    <changeSet id="baseline-logs_endpoint_shield-index-0" author="akto">
+        <mongodb:createIndex collectionName="logs_endpoint_shield">
+            <mongodb:keys>{ &quot;timestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-logs_endpoint_shield-index-1" author="akto">
+        <mongodb:createIndex collectionName="logs_endpoint_shield">
+            <mongodb:keys>{ &quot;agentId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;agentId_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-logs_endpoint_shield-index-2" author="akto">
+        <mongodb:createIndex collectionName="logs_endpoint_shield">
+            <mongodb:keys>{ &quot;deviceId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;deviceId_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-logs_guardrails_service-collection" author="akto">
+        <mongodb:createCollection collectionName="logs_guardrails_service"/>
+    </changeSet>
+
+    <changeSet id="baseline-logs_guardrails_service-index-0" author="akto">
+        <mongodb:createIndex collectionName="logs_guardrails_service">
+            <mongodb:keys>{ &quot;timestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-logs_puppeteer-collection" author="akto">
+        <mongodb:createCollection collectionName="logs_puppeteer"/>
+    </changeSet>
+
+    <changeSet id="baseline-logs_runtime-collection" author="akto">
+        <mongodb:createCollection collectionName="logs_runtime"/>
+    </changeSet>
+
+    <changeSet id="baseline-logs_runtime-index-0" author="akto">
+        <mongodb:createIndex collectionName="logs_runtime">
+            <mongodb:keys>{ &quot;timestamp&quot;: -1, &quot;key&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp-key_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-malicious_events-collection" author="akto">
+        <mongodb:createCollection collectionName="malicious_events"/>
+    </changeSet>
+
+    <changeSet id="baseline-markov-collection" author="akto">
+        <mongodb:createCollection collectionName="markov"/>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_allowlist-collection" author="akto">
+        <mongodb:createCollection collectionName="mcp_allowlist"/>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_allowlist-index-0" author="akto">
+        <mongodb:createIndex collectionName="mcp_allowlist">
+            <mongodb:keys>{ &quot;registryId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;registryId_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_allowlist-index-1" author="akto">
+        <mongodb:createIndex collectionName="mcp_allowlist">
+            <mongodb:keys>{ &quot;createdAt&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;createdAt_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_allowlist-index-2" author="akto">
+        <mongodb:createIndex collectionName="mcp_allowlist">
+            <mongodb:keys>{ &quot;name&quot;: -1, &quot;registryId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;name-registryId_-1&quot;, &quot;unique&quot;: true }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_audit_info-collection" author="akto">
+        <mongodb:createCollection collectionName="mcp_audit_info"/>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_audit_info-index-0" author="akto">
+        <mongodb:createIndex collectionName="mcp_audit_info">
+            <mongodb:keys>{ &quot;lastDetected&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;lastDetected_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_audit_info-index-1" author="akto">
+        <mongodb:createIndex collectionName="mcp_audit_info">
+            <mongodb:keys>{ &quot;markedBy&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;markedBy_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_audit_info-index-2" author="akto">
+        <mongodb:createIndex collectionName="mcp_audit_info">
+            <mongodb:keys>{ &quot;type&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;type_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_audit_info-index-3" author="akto">
+        <mongodb:createIndex collectionName="mcp_audit_info">
+            <mongodb:keys>{ &quot;resourceName&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;resourceName_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_audit_info-index-4" author="akto">
+        <mongodb:createIndex collectionName="mcp_audit_info">
+            <mongodb:keys>{ &quot;updatedTimestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;updatedTimestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_audit_info-index-5" author="akto">
+        <mongodb:createIndex collectionName="mcp_audit_info">
+            <mongodb:keys>{ &quot;mcpHost&quot;: -1, &quot;type&quot;: -1, &quot;resourceName&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;mcpHost-type-resourceN_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_audit_info-index-6" author="akto">
+        <mongodb:createIndex collectionName="mcp_audit_info">
+            <mongodb:keys>{ &quot;contextSource&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;contextSource_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_recon_requests-collection" author="akto">
+        <mongodb:createCollection collectionName="mcp_recon_requests"/>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_recon_requests-index-0" author="akto">
+        <mongodb:createIndex collectionName="mcp_recon_requests">
+            <mongodb:keys>{ &quot;status&quot;: -1, &quot;accountId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;status-accountId_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_recon_requests-index-1" author="akto">
+        <mongodb:createIndex collectionName="mcp_recon_requests">
+            <mongodb:keys>{ &quot;accountId&quot;: -1, &quot;status&quot;: -1, &quot;createdAt&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;accountId-status-createdAt_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_registry_config-collection" author="akto">
+        <mongodb:createCollection collectionName="mcp_registry_config"/>
+    </changeSet>
+
+    <changeSet id="baseline-mcp_registry_config-index-0" author="akto">
+        <mongodb:createIndex collectionName="mcp_registry_config">
+            <mongodb:keys>{ &quot;registryType&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;registryType_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-merged_urls-collection" author="akto">
+        <mongodb:createCollection collectionName="merged_urls"/>
+    </changeSet>
+
+    <changeSet id="baseline-metrics_data-collection" author="akto">
+        <mongodb:createCollection collectionName="metrics_data"/>
+    </changeSet>
+
+    <changeSet id="baseline-metrics_data-index-0" author="akto">
+        <mongodb:createIndex collectionName="metrics_data">
+            <mongodb:keys>{ &quot;timestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-microsoft_defender_integration-collection" author="akto">
+        <mongodb:createCollection collectionName="microsoft_defender_integration"/>
+    </changeSet>
+
+    <changeSet id="baseline-modify_host_details-collection" author="akto">
+        <mongodb:createCollection collectionName="modify_host_details"/>
+    </changeSet>
+
+    <changeSet id="baseline-module_info-collection" author="akto">
+        <mongodb:createCollection collectionName="module_info"/>
+    </changeSet>
+
+    <changeSet id="baseline-module_info-index-0" author="akto">
+        <mongodb:createIndex collectionName="module_info">
+            <mongodb:keys>{ &quot;moduleType&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;moduleType_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-module_info-index-1" author="akto">
+        <mongodb:createIndex collectionName="module_info">
+            <mongodb:keys>{ &quot;moduleType&quot;: -1, &quot;lastHeartbeatReceived&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;moduleType-lastHeartbeatR_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-new_relic_integration-collection" author="akto">
+        <mongodb:createCollection collectionName="new_relic_integration"/>
+    </changeSet>
+
+    <changeSet id="baseline-nhi_identities-collection" author="akto">
+        <mongodb:createCollection collectionName="nhi_identities"/>
+    </changeSet>
+
+    <changeSet id="baseline-nhi_identities-index-0" author="akto">
+        <mongodb:createIndex collectionName="nhi_identities">
+            <mongodb:keys>{ &quot;contextSource&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;contextSource_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-nhi_identities-index-1" author="akto">
+        <mongodb:createIndex collectionName="nhi_identities">
+            <mongodb:keys>{ &quot;status&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;status_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-nhi_identities-index-2" author="akto">
+        <mongodb:createIndex collectionName="nhi_identities">
+            <mongodb:keys>{ &quot;identityName&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;identityName_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-nhi_identities-index-3" author="akto">
+        <mongodb:createIndex collectionName="nhi_identities">
+            <mongodb:keys>{ &quot;riskLevel&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;riskLevel_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-nhi_identities-index-4" author="akto">
+        <mongodb:createIndex collectionName="nhi_identities">
+            <mongodb:keys>{ &quot;contextSource&quot;: -1, &quot;status&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;contextSource-status_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-nhi_policies-collection" author="akto">
+        <mongodb:createCollection collectionName="nhi_policies"/>
+    </changeSet>
+
+    <changeSet id="baseline-nhi_policies-index-0" author="akto">
+        <mongodb:createIndex collectionName="nhi_policies">
+            <mongodb:keys>{ &quot;status&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;status_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-nhi_policies-index-1" author="akto">
+        <mongodb:createIndex collectionName="nhi_policies">
+            <mongodb:keys>{ &quot;policyName&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;policyName_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-nhi_violations-collection" author="akto">
+        <mongodb:createCollection collectionName="nhi_violations"/>
+    </changeSet>
+
+    <changeSet id="baseline-nhi_violations-index-0" author="akto">
+        <mongodb:createIndex collectionName="nhi_violations">
+            <mongodb:keys>{ &quot;contextSource&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;contextSource_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-nhi_violations-index-1" author="akto">
+        <mongodb:createIndex collectionName="nhi_violations">
+            <mongodb:keys>{ &quot;status&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;status_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-nhi_violations-index-2" author="akto">
+        <mongodb:createIndex collectionName="nhi_violations">
+            <mongodb:keys>{ &quot;policyIds&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;policyIds_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-nhi_violations-index-3" author="akto">
+        <mongodb:createIndex collectionName="nhi_violations">
+            <mongodb:keys>{ &quot;contextSource&quot;: -1, &quot;status&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;contextSource-status_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-open_telemetry_integration-collection" author="akto">
+        <mongodb:createCollection collectionName="open_telemetry_integration"/>
+    </changeSet>
+
+    <changeSet id="baseline-otp_messages-collection" author="akto">
+        <mongodb:createCollection collectionName="otp_messages"/>
+    </changeSet>
+
+    <changeSet id="baseline-pii_sources-collection" author="akto">
+        <mongodb:createCollection collectionName="pii_sources"/>
+    </changeSet>
+
+    <changeSet id="baseline-prompt_hardening_yaml_templates-collection" author="akto">
+        <mongodb:createCollection collectionName="prompt_hardening_yaml_templates"/>
+    </changeSet>
+
+    <changeSet id="baseline-protection_logs-collection" author="akto">
+        <mongodb:createCollection collectionName="protection_logs"/>
+    </changeSet>
+
+    <changeSet id="baseline-protection_logs-index-0" author="akto">
+        <mongodb:createIndex collectionName="protection_logs">
+            <mongodb:keys>{ &quot;timestamp&quot;: -1, &quot;key&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp-key_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-query_topic_cache-collection" author="akto">
+        <mongodb:createCollection collectionName="query_topic_cache"/>
+    </changeSet>
+
+    <changeSet id="baseline-query_topic_cache-index-0" author="akto">
+        <mongodb:createIndex collectionName="query_topic_cache">
+            <mongodb:keys>{ &quot;createdAt&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;createdAt_1&quot;, &quot;expireAfterSeconds&quot;: 604800 }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-recorded_login_flow_input-collection" author="akto">
+        <mongodb:createCollection collectionName="recorded_login_flow_input"/>
+    </changeSet>
+
+    <changeSet id="baseline-recorded_login_flow_screenshots-collection" author="akto">
+        <mongodb:createCollection collectionName="recorded_login_flow_screenshots"/>
+    </changeSet>
+
+    <changeSet id="baseline-relationship-collection" author="akto">
+        <mongodb:createCollection collectionName="relationship"/>
+    </changeSet>
+
+    <changeSet id="baseline-replace_details-collection" author="akto">
+        <mongodb:createCollection collectionName="replace_details"/>
+    </changeSet>
+
+    <changeSet id="baseline-request_templates-collection" author="akto">
+        <mongodb:createCollection collectionName="request_templates"/>
+    </changeSet>
+
+    <changeSet id="baseline-runtime_filters-collection" author="akto">
+        <mongodb:createCollection collectionName="runtime_filters"/>
+    </changeSet>
+
+    <changeSet id="baseline-runtime_metrics-collection" author="akto">
+        <mongodb:createCollection collectionName="runtime_metrics"/>
+    </changeSet>
+
+    <changeSet id="baseline-runtime_metrics-index-0" author="akto">
+        <mongodb:createIndex collectionName="runtime_metrics">
+            <mongodb:keys>{ &quot;timestamp&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-runtime_metrics-index-1" author="akto">
+        <mongodb:createIndex collectionName="runtime_metrics">
+            <mongodb:keys>{ &quot;timestamp&quot;: 1, &quot;instanceId&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp-instanceId_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-sample_data-collection" author="akto">
+        <mongodb:createCollection collectionName="sample_data"/>
+    </changeSet>
+
+    <changeSet id="baseline-sample_data-index-0" author="akto">
+        <mongodb:createIndex collectionName="sample_data">
+            <mongodb:keys>{ &quot;_id.apiCollectionId&quot;: 1, &quot;_id.url&quot;: 1, &quot;_id.method&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollec-url-method_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-sample_data-index-1" author="akto">
+        <mongodb:createIndex collectionName="sample_data">
+            <mongodb:keys>{ &quot;_id.apiCollectionId&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollectionId_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-sample_data-index-2" author="akto">
+        <mongodb:createIndex collectionName="sample_data">
+            <mongodb:keys>{ &quot;collectionIds&quot;: 1, &quot;_id.url&quot;: 1, &quot;_id.method&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;collectio-url-method_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-scans-collection" author="akto">
+        <mongodb:createCollection collectionName="scans"/>
+    </changeSet>
+
+    <changeSet id="baseline-sensitive_param_info-collection" author="akto">
+        <mongodb:createCollection collectionName="sensitive_param_info"/>
+    </changeSet>
+
+    <changeSet id="baseline-sensitive_sample_data-collection" author="akto">
+        <mongodb:createCollection collectionName="sensitive_sample_data"/>
+    </changeSet>
+
+    <changeSet id="baseline-sensitive_sample_data-index-0" author="akto">
+        <mongodb:createIndex collectionName="sensitive_sample_data">
+            <mongodb:keys>{ &quot;_id.url&quot;: 1, &quot;_id.apiCollectionId&quot;: 1, &quot;_id.method&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;url-apiCollec-method_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-sensitive_sample_data-index-1" author="akto">
+        <mongodb:createIndex collectionName="sensitive_sample_data">
+            <mongodb:keys>{ &quot;_id.url&quot;: 1, &quot;collectionIds&quot;: 1, &quot;_id.method&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;url-collectio-method_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-sensitive_sample_data-index-2" author="akto">
+        <mongodb:createIndex collectionName="sensitive_sample_data">
+            <mongodb:keys>{ &quot;collectionIds&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;collectionIds_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-sentinelone_integration-collection" author="akto">
+        <mongodb:createCollection collectionName="sentinelone_integration"/>
+    </changeSet>
+
+    <changeSet id="baseline-servicenow_integration-collection" author="akto">
+        <mongodb:createCollection collectionName="servicenow_integration"/>
+    </changeSet>
+
+    <changeSet id="baseline-single_type_info-collection" author="akto">
+        <mongodb:createCollection collectionName="single_type_info"/>
+    </changeSet>
+
+    <changeSet id="baseline-single_type_info-index-0" author="akto">
+        <mongodb:createIndex collectionName="single_type_info">
+            <mongodb:keys>{ &quot;url&quot;: 1, &quot;method&quot;: 1, &quot;responseCode&quot;: 1, &quot;isHeader&quot;: 1, &quot;param&quot;: 1, &quot;subType&quot;: 1, &quot;apiCollectionId&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;url-met-res-isH-par-sub-api_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-single_type_info-index-1" author="akto">
+        <mongodb:createIndex collectionName="single_type_info">
+            <mongodb:keys>{ &quot;apiCollectionId&quot;: -1, &quot;timestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollectionI-timestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-single_type_info-index-2" author="akto">
+        <mongodb:createIndex collectionName="single_type_info">
+            <mongodb:keys>{ &quot;param&quot;: 1, &quot;apiCollectionId&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;param-apiCollectionI_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-single_type_info-index-3" author="akto">
+        <mongodb:createIndex collectionName="single_type_info">
+            <mongodb:keys>{ &quot;responseCode&quot;: 1, &quot;isHeader&quot;: 1, &quot;param&quot;: 1, &quot;subType&quot;: 1, &quot;apiCollectionId&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;respo-isHea-param-subTy-apiCo_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-single_type_info-index-4" author="akto">
+        <mongodb:createIndex collectionName="single_type_info">
+            <mongodb:keys>{ &quot;responseCode&quot;: 1, &quot;isHeader&quot;: 1, &quot;param&quot;: 1, &quot;subType&quot;: 1, &quot;apiCollectionId&quot;: 1, &quot;_id&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;resp-isHe-para-subT-apiC-_id_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-single_type_info-index-5" author="akto">
+        <mongodb:createIndex collectionName="single_type_info">
+            <mongodb:keys>{ &quot;subType&quot;: 1, &quot;responseCode&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;subType-responseCode_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-single_type_info-index-6" author="akto">
+        <mongodb:createIndex collectionName="single_type_info">
+            <mongodb:keys>{ &quot;lastSeen&quot;: -1, &quot;apiCollectionId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;lastSeen-apiCollectionI_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-single_type_info-index-7" author="akto">
+        <mongodb:createIndex collectionName="single_type_info">
+            <mongodb:keys>{ &quot;collectionIds&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;collectionIds_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-single_type_info-index-8" author="akto">
+        <mongodb:createIndex collectionName="single_type_info">
+            <mongodb:keys>{ &quot;responseCode&quot;: 1, &quot;subType&quot;: 1, &quot;timestamp&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;responseC-subType-timestamp_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-single_type_info-index-9" author="akto">
+        <mongodb:createIndex collectionName="single_type_info">
+            <mongodb:keys>{ &quot;lastSeen&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;lastSeen_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-single_type_info-index-10" author="akto">
+        <mongodb:createIndex collectionName="single_type_info">
+            <mongodb:keys>{ &quot;timestamp&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;timestamp_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-slack_webhooks-collection" author="akto">
+        <mongodb:createCollection collectionName="slack_webhooks"/>
+    </changeSet>
+
+    <changeSet id="baseline-source_code_vulnerabilities-collection" author="akto">
+        <mongodb:createCollection collectionName="source_code_vulnerabilities"/>
+    </changeSet>
+
+    <changeSet id="baseline-source_code_vulnerabilities-index-0" author="akto">
+        <mongodb:createIndex collectionName="source_code_vulnerabilities">
+            <mongodb:keys>{ &quot;agentProcessId&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;agentProcessId_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-spans-collection" author="akto">
+        <mongodb:createCollection collectionName="spans"/>
+    </changeSet>
+
+    <changeSet id="baseline-spans-index-0" author="akto">
+        <mongodb:createIndex collectionName="spans">
+            <mongodb:keys>{ &quot;traceId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;traceId_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-spans-index-1" author="akto">
+        <mongodb:createIndex collectionName="spans">
+            <mongodb:keys>{ &quot;parentSpanId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;parentSpanId_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-spans-index-2" author="akto">
+        <mongodb:createIndex collectionName="spans">
+            <mongodb:keys>{ &quot;spanKind&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;spanKind_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-suspect_sample_data-collection" author="akto">
+        <mongodb:createCollection collectionName="suspect_sample_data"/>
+    </changeSet>
+
+    <changeSet id="baseline-suspect_sample_data-index-0" author="akto">
+        <mongodb:createIndex collectionName="suspect_sample_data">
+            <mongodb:keys>{ &quot;discovered&quot;: -1, &quot;sourceIPs&quot;: -1, &quot;matchingUrl&quot;: -1, &quot;apiCollectionId&quot;: -1, &quot;_id&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;disco-sourc-match-apiCo-_id_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-svc_to_svc_graph_edges-collection" author="akto">
+        <mongodb:createCollection collectionName="svc_to_svc_graph_edges"/>
+    </changeSet>
+
+    <changeSet id="baseline-svc_to_svc_graph_nodes-collection" author="akto">
+        <mongodb:createCollection collectionName="svc_to_svc_graph_nodes"/>
+    </changeSet>
+
+    <changeSet id="baseline-tag_config-collection" author="akto">
+        <mongodb:createCollection collectionName="tag_config"/>
+    </changeSet>
+
+    <changeSet id="baseline-teams-collection" author="akto">
+        <mongodb:createCollection collectionName="teams"/>
+    </changeSet>
+
+    <changeSet id="baseline-test_collection_properties-collection" author="akto">
+        <mongodb:createCollection collectionName="test_collection_properties"/>
+    </changeSet>
+
+    <changeSet id="baseline-test_collection_properties-index-0" author="akto">
+        <mongodb:createIndex collectionName="test_collection_properties">
+            <mongodb:keys>{ &quot;apiCollectionId&quot;: -1, &quot;name&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollectionI-name_-1&quot;, &quot;unique&quot;: true }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-test_env_settings-collection" author="akto">
+        <mongodb:createCollection collectionName="test_env_settings"/>
+    </changeSet>
+
+    <changeSet id="baseline-test_reports-collection" author="akto">
+        <mongodb:createCollection collectionName="test_reports"/>
+    </changeSet>
+
+    <changeSet id="baseline-test_roles-collection" author="akto">
+        <mongodb:createCollection collectionName="test_roles"/>
+    </changeSet>
+
+    <changeSet id="baseline-test_roles-index-0" author="akto">
+        <mongodb:createIndex collectionName="test_roles">
+            <mongodb:keys>{ &quot;name&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;name_1&quot;, &quot;unique&quot;: true }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-test_run-collection" author="akto">
+        <mongodb:createCollection collectionName="test_run"/>
+    </changeSet>
+
+    <changeSet id="baseline-test_source_configs-collection" author="akto">
+        <mongodb:createCollection collectionName="test_source_configs"/>
+    </changeSet>
+
+    <changeSet id="baseline-test_suite-collection" author="akto">
+        <mongodb:createCollection collectionName="test_suite"/>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run-collection" author="akto">
+        <mongodb:createCollection collectionName="testing_run"/>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run-index-0" author="akto">
+        <mongodb:createIndex collectionName="testing_run">
+            <mongodb:keys>{ &quot;scheduleTimestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;scheduleTimestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run-index-1" author="akto">
+        <mongodb:createIndex collectionName="testing_run">
+            <mongodb:keys>{ &quot;endTimestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;endTimestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run-index-2" author="akto">
+        <mongodb:createIndex collectionName="testing_run">
+            <mongodb:keys>{ &quot;testingEndpoints.apiCollectionId&quot;: -1, &quot;endTimestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollectionI-endTimestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run-index-3" author="akto">
+        <mongodb:createIndex collectionName="testing_run">
+            <mongodb:keys>{ &quot;name&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;name_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run-index-4" author="akto">
+        <mongodb:createIndex collectionName="testing_run">
+            <mongodb:keys>{ &quot;dashboardContext&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;dashboardContext_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_config-collection" author="akto">
+        <mongodb:createCollection collectionName="testing_run_config"/>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_issues-collection" author="akto">
+        <mongodb:createCollection collectionName="testing_run_issues"/>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_issues-index-0" author="akto">
+        <mongodb:createIndex collectionName="testing_run_issues">
+            <mongodb:keys>{ &quot;testRunIssueStatus&quot;: 1, &quot;creationTime&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunIssueSt-creationTime_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_issues-index-1" author="akto">
+        <mongodb:createIndex collectionName="testing_run_issues">
+            <mongodb:keys>{ &quot;testRunIssueStatus&quot;: 1, &quot;_id.apiInfoKey.apiCollectionId&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunIssueSt-apiCollectionI_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_issues-index-2" author="akto">
+        <mongodb:createIndex collectionName="testing_run_issues">
+            <mongodb:keys>{ &quot;testRunIssueStatus&quot;: -1, &quot;lastSeen&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunIssueSt-lastSeen_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_issues-index-3" author="akto">
+        <mongodb:createIndex collectionName="testing_run_issues">
+            <mongodb:keys>{ &quot;testRunIssueStatus&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunIssueStatus_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_issues-index-4" author="akto">
+        <mongodb:createIndex collectionName="testing_run_issues">
+            <mongodb:keys>{ &quot;latestTestingRunSummaryId&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;latestTestingRunSummaryId_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_issues-index-5" author="akto">
+        <mongodb:createIndex collectionName="testing_run_issues">
+            <mongodb:keys>{ &quot;_id&quot;: 1, &quot;testRunIssueStatus&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;_id-testRunIssueSt_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_issues-index-6" author="akto">
+        <mongodb:createIndex collectionName="testing_run_issues">
+            <mongodb:keys>{ &quot;ticketProjectKey&quot;: 1, &quot;ticketSource&quot;: 1, &quot;lastUpdated&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;ticketPro-ticketSou-lastUpdat_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_issues-index-7" author="akto">
+        <mongodb:createIndex collectionName="testing_run_issues">
+            <mongodb:keys>{ &quot;ticketProjectKey&quot;: 1, &quot;ticketSource&quot;: 1, &quot;ticketId&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;ticketPro-ticketSou-ticketId_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_issues-index-8" author="akto">
+        <mongodb:createIndex collectionName="testing_run_issues">
+            <mongodb:keys>{ &quot;testRunIssueStatus&quot;: 1, &quot;_id.testSubCategory&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunIssueSt-testSubCategor_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_playground-collection" author="akto">
+        <mongodb:createCollection collectionName="testing_run_playground"/>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_playground-index-0" author="akto">
+        <mongodb:createIndex collectionName="testing_run_playground">
+            <mongodb:keys>{ &quot;createdAt&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;createdAt_1&quot;, &quot;expireAfterSeconds&quot;: 300 }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result-collection" author="akto">
+        <mongodb:createCollection collectionName="testing_run_result"/>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result-index-0" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result">
+            <mongodb:keys>{ &quot;testRunResultSummaryId&quot;: -1, &quot;_id&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunResultSummaryId_-1__id_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result-index-1" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result">
+            <mongodb:keys>{ &quot;testRunResultSummaryId&quot;: -1, &quot;vulnerable&quot;: -1, &quot;_id&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunRe-vulnerabl-_id_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result-index-2" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result">
+            <mongodb:keys>{ &quot;testRunResultSummaryId&quot;: 1, &quot;vulnerable&quot;: 1, &quot;endTimestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunResultSummaryId_1_vulnerable_1_endTimestamp_-1_partial_message_exists&quot;, &quot;partialFilterExpression&quot;: { &quot;testResults.message&quot;: { &quot;$exists&quot;: true } } }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result-index-3" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result">
+            <mongodb:keys>{ &quot;testRunResultSummaryId&quot;: -1, &quot;vulnerable&quot;: -1, &quot;testResults.0.errors.0&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunRe-vulnerabl-0_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result-index-4" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result">
+            <mongodb:keys>{ &quot;endTimestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;endTimestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result-index-5" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result">
+            <mongodb:keys>{ &quot;endTimestamp&quot;: -1, &quot;testResults.errors&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;endTimestamp-errors_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result-index-6" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result">
+            <mongodb:keys>{ &quot;testResults.0.requiresConfig&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;requiresConfig_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result-index-7" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result">
+            <mongodb:keys>{ &quot;apiInfoKey.apiCollectionId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollectionId_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result-index-8" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result">
+            <mongodb:keys>{ &quot;testRunResultSummaryId&quot;: -1, &quot;apiInfoKey.apiCollectionId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunResultS-apiCollectionI_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result-index-9" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result">
+            <mongodb:keys>{ &quot;testRunResultSummaryId&quot;: -1, &quot;testResults.confidence&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunResultS-confidence_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result-index-10" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result">
+            <mongodb:keys>{ &quot;testRunResultSummaryId&quot;: -1, &quot;apiInfoKey.method&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunResultS-method_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result-index-11" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result">
+            <mongodb:keys>{ &quot;testRunResultSummaryId&quot;: -1, &quot;testSuperType&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunResultS-testSuperType_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result-index-12" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result">
+            <mongodb:keys>{ &quot;testRunResultSummaryId&quot;: -1, &quot;vulnerable&quot;: -1, &quot;apiInfoKey&quot;: -1, &quot;testSubType&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRu-vulner-apiInf-testSu_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result-index-13" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result">
+            <mongodb:keys>{ &quot;apiInfoKey&quot;: -1, &quot;testSubType&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiInfoKey-testSubType_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result-capped" author="akto" failOnError="false">
+        <mongodb:runCommand>
+            <mongodb:command>{ "convertToCapped": "testing_run_result", "size": 50000000000, "max": 5000000 }</mongodb:command>
+        </mongodb:runCommand>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result_summaries-collection" author="akto">
+        <mongodb:createCollection collectionName="testing_run_result_summaries"/>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result_summaries-index-0" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result_summaries">
+            <mongodb:keys>{ &quot;testingRunId&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testingRunId_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result_summaries-index-1" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result_summaries">
+            <mongodb:keys>{ &quot;startTimestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;startTimestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result_summaries-index-2" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result_summaries">
+            <mongodb:keys>{ &quot;endTimestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;endTimestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result_summaries-index-3" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result_summaries">
+            <mongodb:keys>{ &quot;testingRunId&quot;: 1, &quot;startTimestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testingRunId_1_startTimestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result_summaries-index-4" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result_summaries">
+            <mongodb:keys>{ &quot;metadata.branch&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;metadata.branch_1&quot;, &quot;sparse&quot;: true }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_run_result_summaries-index-5" author="akto">
+        <mongodb:createIndex collectionName="testing_run_result_summaries">
+            <mongodb:keys>{ &quot;metadata.repository&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;metadata.repository_1&quot;, &quot;sparse&quot;: true }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing_schedules-collection" author="akto">
+        <mongodb:createCollection collectionName="testing_schedules"/>
+    </changeSet>
+
+    <changeSet id="baseline-third_party-collection" author="akto">
+        <mongodb:createCollection collectionName="third_party"/>
+    </changeSet>
+
+    <changeSet id="baseline-threat_activity_webhook_integration-collection" author="akto">
+        <mongodb:createCollection collectionName="threat_activity_webhook_integration"/>
+    </changeSet>
+
+    <changeSet id="baseline-traces-collection" author="akto">
+        <mongodb:createCollection collectionName="traces"/>
+    </changeSet>
+
+    <changeSet id="baseline-traces-index-0" author="akto">
+        <mongodb:createIndex collectionName="traces">
+            <mongodb:keys>{ &quot;rootSpanId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;rootSpanId_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-traces-index-1" author="akto">
+        <mongodb:createIndex collectionName="traces">
+            <mongodb:keys>{ &quot;aiAgentName&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;aiAgentName_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-traces-index-2" author="akto">
+        <mongodb:createIndex collectionName="traces">
+            <mongodb:keys>{ &quot;startTimeMillis&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;startTimeMillis_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-traffic_alerts-collection" author="akto">
+        <mongodb:createCollection collectionName="traffic_alerts"/>
+    </changeSet>
+
+    <changeSet id="baseline-traffic_alerts-index-0" author="akto">
+        <mongodb:createIndex collectionName="traffic_alerts">
+            <mongodb:keys>{ &quot;lastDismissed&quot;: 1, &quot;lastDetected&quot;: 1, &quot;severity&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;lastDismi-lastDetec-severity_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-traffic_alerts-index-1" author="akto">
+        <mongodb:createIndex collectionName="traffic_alerts">
+            <mongodb:keys>{ &quot;alertType&quot;: 1, &quot;lastDetected&quot;: 1, &quot;severity&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;alertType-lastDetec-severity_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-traffic_info-collection" author="akto">
+        <mongodb:createCollection collectionName="traffic_info"/>
+    </changeSet>
+
+    <changeSet id="baseline-traffic_metrics-collection" author="akto">
+        <mongodb:createCollection collectionName="traffic_metrics"/>
+    </changeSet>
+
+    <changeSet id="baseline-traffic_metrics-index-0" author="akto">
+        <mongodb:createIndex collectionName="traffic_metrics">
+            <mongodb:keys>{ &quot;_id.name&quot;: 1, &quot;_id.bucketStartEpoch&quot;: 1, &quot;_id.bucketEndEpoch&quot;: 1, &quot;_id.ip&quot;: 1, &quot;_id.host&quot;: 1, &quot;_id.vxlanID&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;name-buck-buck-ip-host-vxla_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-traffic_metrics_alerts-collection" author="akto">
+        <mongodb:createCollection collectionName="traffic_metrics_alerts"/>
+    </changeSet>
+
+    <changeSet id="baseline-uningested_api_info-collection" author="akto">
+        <mongodb:createCollection collectionName="uningested_api_info"/>
+    </changeSet>
+
+    <changeSet id="baseline-uningested_api_info-index-0" author="akto">
+        <mongodb:createIndex collectionName="uningested_api_info">
+            <mongodb:keys>{ &quot;apiCollectionId&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCollectionId_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-uningested_api_info-index-1" author="akto">
+        <mongodb:createIndex collectionName="uningested_api_info">
+            <mongodb:keys>{ &quot;apiCollectionId&quot;: 1, &quot;urlType&quot;: 1, &quot;method&quot;: 1, &quot;url&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiCol-urlTyp-method-url_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-url_templates-collection" author="akto">
+        <mongodb:createCollection collectionName="url_templates"/>
+    </changeSet>
+
+    <changeSet id="baseline-user_analysis_data-collection" author="akto">
+        <mongodb:createCollection collectionName="user_analysis_data"/>
+    </changeSet>
+
+    <changeSet id="baseline-user_analysis_data-index-0" author="akto">
+        <mongodb:createIndex collectionName="user_analysis_data">
+            <mongodb:keys>{ &quot;lastUpdatedAt&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;lastUpdatedAt_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-user_analysis_data-index-1" author="akto">
+        <mongodb:createIndex collectionName="user_analysis_data">
+            <mongodb:keys>{ &quot;userName&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;userName_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-user_dashboards-collection" author="akto">
+        <mongodb:createCollection collectionName="user_dashboards"/>
+    </changeSet>
+
+    <changeSet id="baseline-vulnerable_testing_run_results-collection" author="akto">
+        <mongodb:createCollection collectionName="vulnerable_testing_run_results"/>
+    </changeSet>
+
+    <changeSet id="baseline-vulnerable_testing_run_results-index-0" author="akto">
+        <mongodb:createIndex collectionName="vulnerable_testing_run_results">
+            <mongodb:keys>{ &quot;testRunResultSummaryId&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunResultSummaryId_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-vulnerable_testing_run_results-index-1" author="akto">
+        <mongodb:createIndex collectionName="vulnerable_testing_run_results">
+            <mongodb:keys>{ &quot;testRunResultSummaryId&quot;: -1, &quot;testResults.confidence&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunResultS-confidence_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-vulnerable_testing_run_results-index-2" author="akto">
+        <mongodb:createIndex collectionName="vulnerable_testing_run_results">
+            <mongodb:keys>{ &quot;testRunResultSummaryId&quot;: -1, &quot;testSuperType&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunResultS-testSuperType_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-vulnerable_testing_run_results-index-3" author="akto">
+        <mongodb:createIndex collectionName="vulnerable_testing_run_results">
+            <mongodb:keys>{ &quot;testRunResultSummaryId&quot;: -1, &quot;apiInfoKey&quot;: -1, &quot;testSubType&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;testRunRe-apiInfoKe-testSubTy_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-vulnerable_testing_run_results-index-4" author="akto">
+        <mongodb:createIndex collectionName="vulnerable_testing_run_results">
+            <mongodb:keys>{ &quot;apiInfoKey&quot;: -1, &quot;testSubType&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;apiInfoKey-testSubType_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-wiz_integration-collection" author="akto">
+        <mongodb:createCollection collectionName="wiz_integration"/>
+    </changeSet>
+
+    <changeSet id="baseline-workflow_test_results-collection" author="akto">
+        <mongodb:createCollection collectionName="workflow_test_results"/>
+    </changeSet>
+
+    <changeSet id="baseline-workflow_tests-collection" author="akto">
+        <mongodb:createCollection collectionName="workflow_tests"/>
+    </changeSet>
+
+    <changeSet id="baseline-yaml_templates-collection" author="akto">
+        <mongodb:createCollection collectionName="yaml_templates"/>
+    </changeSet>
+</databaseChangeLog>

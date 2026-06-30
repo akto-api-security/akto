@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Baseline schema: all collections and indexes for a fresh billing DB -->
+    <include file="db/changelog/baseline-billing.xml"/>
+
+    <!-- Billing-scope migrations. Add .xml files to billing/ -->
+    <includeAll path="db/changelog/billing" errorIfMissingOrEmpty="false" endsWithFilter=".xml"/>
+
+</databaseChangeLog>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!-- Baseline schema for billing DB collections (organizations, usage, tokens) -->
+
+    <changeSet id="baseline-organization_flags-collection" author="akto">
+        <mongodb:createCollection collectionName="organization_flags"/>
+    </changeSet>
+
+    <changeSet id="baseline-organization_usage-collection" author="akto">
+        <mongodb:createCollection collectionName="organization_usage"/>
+    </changeSet>
+
+    <changeSet id="baseline-organizations-collection" author="akto">
+        <mongodb:createCollection collectionName="organizations"/>
+    </changeSet>
+
+    <changeSet id="baseline-tokens-collection" author="akto">
+        <mongodb:createCollection collectionName="tokens"/>
+    </changeSet>
+
+    <changeSet id="baseline-usage_metric_info-collection" author="akto">
+        <mongodb:createCollection collectionName="usage_metric_info"/>
+    </changeSet>
+
+    <changeSet id="baseline-usage_metrics-collection" author="akto">
+        <mongodb:createCollection collectionName="usage_metrics"/>
+    </changeSet>
+
+    <changeSet id="baseline-usage_sync-collection" author="akto">
+        <mongodb:createCollection collectionName="usage_sync"/>
+    </changeSet>
+</databaseChangeLog>
