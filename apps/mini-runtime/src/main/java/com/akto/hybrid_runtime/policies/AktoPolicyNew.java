@@ -112,20 +112,6 @@ public class AktoPolicyNew {
         List<ApiInfo> apiInfoList = getUpdates(apiInfoCatalogMap);
         loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+ apiInfoList.size());
         
-        // Log detailed information about each ApiInfo being synced
-        for (ApiInfo apiInfo : apiInfoList) {
-            if (apiInfo != null) {
-                ApiInfo.ApiInfoKey key = apiInfo.getId();
-                String logMsg = String.format(
-                    "ApiInfo sync: collection=%d, url=%s, method=%s, isConnectionString=%s",
-                    key.getApiCollectionId(),
-                    key.getUrl(),
-                    key.getMethod(),
-                    apiInfo.getIsConnectionString()
-                );
-                loggerMaker.infoAndAddToDb(logMsg);
-            }
-        }
         
         try {
             if (apiInfoList.size() > 0) {
