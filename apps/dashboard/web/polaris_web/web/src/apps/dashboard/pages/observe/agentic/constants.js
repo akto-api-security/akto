@@ -281,6 +281,12 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
 // Service name can contain dots (e.g., "mcp.razorpay.com" from "123.456.mcp.razorpay.com")
 const ASSET_TAG_KEYS_SET = new Set(Object.values(ASSET_TAG_KEYS));
 
+// Returns true if the collection has an asset-owner tag (Atlas ai-agent/mcp-client)
+// or the older connector agent-name tag. Used to exclude agent-owned gen-ai collections
+// from service groups and from Argus source-id groups.
+const hasAgentOwnerTag = (envType) =>
+    (envType || []).some(t => ASSET_TAG_KEYS_SET.has(t.keyName) || t.keyName === "agent-name");
+
 export const groupCollectionsByService = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}) => {
     const services = {};
     
@@ -294,11 +300,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
         // gen-ai collections WITHOUT any such tag are standalone assets that predate the
         // tagging scheme and must still appear.
         if (typeTag.keyName === TYPE_TAG_KEYS.GEN_AI) {
-            const tags = c.envType || [];
-            const hasAgentOwner = tags.some(t =>
-                ASSET_TAG_KEYS_SET.has(t.keyName) || t.keyName === "agent-name"
-            );
-            if (hasAgentOwner) return;
+            if (hasAgentOwnerTag(c.envType)) return;
         }
 
         const hostName = c.hostName || c.displayName || c.name;
@@ -381,10 +383,7 @@ export const groupArgusAgentsBySourceId = (collections) => {
         if (c.deactivated) return;
         const typeTag = findTypeTag(c.envType);
         if (!typeTag || typeTag.keyName !== TYPE_TAG_KEYS.GEN_AI) return;
-        const hasAssetOwner = (c.envType || []).some(t =>
-            ASSET_TAG_KEYS_SET.has(t.keyName) || t.keyName === "agent-name"
-        );
-        if (hasAssetOwner) return;
+        if (hasAgentOwnerTag(c.envType)) return;
         const hostName = c.hostName || c.displayName || c.name;
         if (!hostName) return;
         const parts = hostName.split('.');

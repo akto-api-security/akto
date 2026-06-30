@@ -1,6 +1,6 @@
 import { VerticalStack, HorizontalStack, Text, FormLayout, Box, Checkbox, RadioButton, Popover, TextField, Link, Tag, Banner, Badge, Button, InlineError } from "@shopify/polaris";
 import { DeleteMinor } from "@shopify/polaris-icons";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useReducer } from "react";
 import DropdownSearch from "../../../../components/shared/DropdownSearch";
 import Dropdown from "../../../../components/layouts/Dropdown";
 import AssetIcon from "../../../observe/agentic/AssetIcon";
@@ -43,6 +43,28 @@ export const ServerSettingsConfig = {
         }
         summary += `${appSettings} ${behaviourSuffix}`;
         return summary;
+    }
+};
+
+const conditionsReducer = (state, action) => {
+    switch (action.type) {
+        case 'add':    return [...state, { type: action.condType, values: [] }];
+        case 'delete': return state.filter((_, i) => i !== action.index);
+        case 'update': return state.map((c, i) => i === action.index ? { ...c, ...action.updates } : c);
+        case 'clear':  return [];
+        case 'normalize': {
+            let changed = false;
+            const next = state.map(c => {
+                const valSet = action.valSets[c.type];
+                if (!valSet || valSet.size === 0) return c;
+                const valid = (c.values || []).filter(v => valSet.has(v));
+                if (valid.length === (c.values || []).length) return c;
+                changed = true;
+                return { ...c, values: valid };
+            });
+            return changed ? next : state;
+        }
+        default: return state;
     }
 };
 
@@ -129,7 +151,7 @@ const ServerSettingsStep = ({
     const isBlockMode = policyBehaviour === 'block';
     const isAtlas = isEndpointSecurityCategory();
 
-    const [agenticConditions, setAgenticConditions] = useState(() => {
+    const [agenticConditions, agenticDispatch] = useReducer(conditionsReducer, null, () => {
         const conds = [];
         if ((selectedAgentServers || []).length > 0) conds.push({ type: 'AGENT', values: selectedAgentServers });
         if ((selectedMcpServers || []).length > 0) conds.push({ type: 'MCP_SERVER', values: selectedMcpServers });
@@ -137,7 +159,7 @@ const ServerSettingsStep = ({
         return conds;
     });
 
-    const [userConditions, setUserConditions] = useState(() => {
+    const [userConditions, userDispatch] = useReducer(conditionsReducer, null, () => {
         const conds = [];
         if ((targetRoles || []).length > 0) conds.push({ type: 'ROLE', values: targetRoles });
         if ((targetTeams || []).length > 0) conds.push({ type: 'TEAM', values: targetTeams });
@@ -157,15 +179,6 @@ const ServerSettingsStep = ({
         }
     }, [userConditions]);
 
-    const addAgenticCondition = (type) => setAgenticConditions(prev => [...prev, { type: type || 'AGENT', values: [] }]);
-    const deleteAgenticCondition = (index) => setAgenticConditions(prev => prev.filter((_, i) => i !== index));
-    const clearAgenticConditions = () => setAgenticConditions([]);
-    const updateAgenticCondition = (index, updates) => setAgenticConditions(prev => prev.map((c, i) => i === index ? { ...c, ...updates } : c));
-
-    const addUserCondition = (type) => setUserConditions(prev => [...prev, { type: type || 'TEAM', values: [] }]);
-    const deleteUserCondition = (index) => setUserConditions(prev => prev.filter((_, i) => i !== index));
-    const clearUserConditions = () => setUserConditions([]);
-    const updateUserCondition = (index, updates) => setUserConditions(prev => prev.map((c, i) => i === index ? { ...c, ...updates } : c));
 
     const TYPE_PREFIXES = ['ai-agent.', 'mcp-server.', 'browser-llm.', 'skill.'];
     const stripTypePrefix = (label) => {
@@ -238,20 +251,13 @@ const ServerSettingsStep = ({
         const total = agentOptions.length + mcpOptions.length + llmOptions.length;
         if (total === 0) return;
         normalizedRef.current = true;
-        const agentVals = new Set(agentOptions.map(o => o.value));
-        const mcpVals = new Set(mcpOptions.map(o => o.value));
-        const llmVals = new Set(llmOptions.map(o => o.value));
-        setAgenticConditions(prev => {
-            let changed = false;
-            const next = prev.map(c => {
-                const valSet = c.type === 'AGENT' ? agentVals : c.type === 'MCP_SERVER' ? mcpVals : c.type === 'LLM' ? llmVals : null;
-                if (!valSet || valSet.size === 0) return c;
-                const valid = (c.values || []).filter(v => valSet.has(v));
-                if (valid.length === (c.values || []).length) return c;
-                changed = true;
-                return { ...c, values: valid };
-            });
-            return changed ? next : prev;
+        agenticDispatch({
+            type: 'normalize',
+            valSets: {
+                AGENT: new Set(agentOptions.map(o => o.value)),
+                MCP_SERVER: new Set(mcpOptions.map(o => o.value)),
+                LLM: new Set(llmOptions.map(o => o.value)),
+            },
         });
     }, [agentOptions.length, mcpOptions.length, llmOptions.length]);
 
@@ -268,7 +274,7 @@ const ServerSettingsStep = ({
         { label: `${roleCount > 1 ? 'Roles' : 'Role'} [${roleCount}]`, value: 'ROLE', disabled: roleCount === 0 },
     ];
 
-    const renderConditionRows = (conditions, typeOptions, onUpdate, onDelete, onAdd, onClear, operator = 'OR', showError = false) => {
+    const renderConditionRows = (conditions, typeOptions, dispatch, operator = 'OR', showError = false) => {
         const usedTypes = new Set(conditions.map(c => c.type));
         const availableTypeOptions = typeOptions.filter(o => !o.disabled);
         const allTypesFilled = availableTypeOptions.length === 0 || availableTypeOptions.every(o => usedTypes.has(o.value));
@@ -296,7 +302,7 @@ const ServerSettingsStep = ({
                                     menuItems={rowTypeOptions}
                                     disabledOptions={rowTypeOptions.filter(o => o.disabled).map(o => o.value)}
                                     initial={rowTypeOptions.find(o => o.value === condition.type)?.label || rowTypeOptions[0]?.label}
-                                    selected={(val) => onUpdate(index, { type: val, values: [] })}
+                                    selected={(val) => dispatch({ type: 'update', index, updates: { type: val, values: [] } })}
                                 />
                             </div>
                             <Text variant="bodyMd" tone="subdued" fontWeight="medium">{getOptionsForType(condition.type).length > 1 ? 'are' : 'is'}</Text>
@@ -305,7 +311,7 @@ const ServerSettingsStep = ({
                                     id={`cond-val-${condition.type}-${index}`}
                                     placeholder="Select value"
                                     optionsList={sortSelectedFirst(getOptionsForType(condition.type), condition.values || [])}
-                                    setSelected={(vals) => onUpdate(index, { values: vals })}
+                                    setSelected={(vals) => dispatch({ type: 'update', index, updates: { values: vals } })}
                                     preSelected={condition.values || []}
                                     allowMultiple={true}
                                     disabled={getOptionsForType(condition.type).length === 0}
@@ -313,14 +319,14 @@ const ServerSettingsStep = ({
                                     sliceMaxVal={getOptionsForType(condition.type).length || 20}
                                 />
                             </div>
-                            <Button icon={DeleteMinor} onClick={() => onDelete(index)} />
+                            <Button icon={DeleteMinor} onClick={() => dispatch({ type: 'delete', index })} />
                         </HorizontalStack>
                     );
                 })}
                 <HorizontalStack gap="4" blockAlign="center">
-                    {!allTypesFilled && <Button onClick={() => onAdd(nextUnusedType)}>Add condition</Button>}
+                    {!allTypesFilled && <Button onClick={() => dispatch({ type: 'add', condType: nextUnusedType })}>Add condition</Button>}
                     {conditions.length > 0 && (
-                        <Button plain destructive onClick={onClear}>Clear all</Button>
+                        <Button plain destructive onClick={() => dispatch({ type: 'clear' })}>Clear all</Button>
                     )}
                 </HorizontalStack>
                 {showError && conditions.length === 0 && (
@@ -411,7 +417,7 @@ const ServerSettingsStep = ({
                                     />
                                     {!applyToAllServers && (
                                         <Box paddingInlineStart="6">
-                                            {renderConditionRows(agenticConditions, agenticTypeOptions, updateAgenticCondition, deleteAgenticCondition, addAgenticCondition, clearAgenticConditions, 'OR', showConditionError)}
+                                            {renderConditionRows(agenticConditions, agenticTypeOptions, agenticDispatch, 'OR', showConditionError)}
                                         </Box>
                                     )}
                                 </VerticalStack>
@@ -468,7 +474,7 @@ const ServerSettingsStep = ({
                                     />
                                     {!applyToAllUsers && (
                                         <Box paddingInlineStart="6">
-                                            {renderConditionRows(userConditions, userTypeOptions, updateUserCondition, deleteUserCondition, addUserCondition, clearUserConditions, 'AND', showUserConditionError)}
+                                            {renderConditionRows(userConditions, userTypeOptions, userDispatch, 'AND', showUserConditionError)}
                                         </Box>
                                     )}
                                 </VerticalStack>
@@ -525,7 +531,7 @@ const ServerSettingsStep = ({
                                     />
                                     {!applyToAllServers && (
                                         <Box paddingInlineStart="6">
-                                            {renderConditionRows(agenticConditions, agenticTypeOptions, updateAgenticCondition, deleteAgenticCondition, addAgenticCondition, clearAgenticConditions, 'OR', showConditionError)}
+                                            {renderConditionRows(agenticConditions, agenticTypeOptions, agenticDispatch, 'OR', showConditionError)}
                                             {hasIncompatibleServers && (
                                                 <Banner tone="info">
                                                     Some agentic assets are disabled. Block mode requires servers running in inline (sync) mode.
