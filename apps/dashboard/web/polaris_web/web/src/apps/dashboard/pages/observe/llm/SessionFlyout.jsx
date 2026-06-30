@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Box, Divider, HorizontalGrid, HorizontalStack, Scrollable, Tabs, Text, VerticalStack } from "@shopify/polaris";
+import { Box, Button, Divider, HorizontalGrid, HorizontalStack, Scrollable, Tabs, Text, VerticalStack } from "@shopify/polaris";
+import CreateTopicGuardrailModal from "../../guardrails/components/CreateTopicGuardrailModal";
 import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
 import AgenticFlyoutShell from "../agentic/AgenticFlyoutShell";
 import FlyoutBreadcrumb from "../agentic/FlyoutBreadcrumb";
@@ -42,8 +43,18 @@ function SessionFlowGraph({ session }) {
 
 // ─── Overview ─────────────────────────────────────────────────────────────────
 
-function OverviewContent({ session, traceCount }) {
+function OverviewContent({ session, traceCount, currDateRange }) {
+    const [guardrailModalOpen, setGuardrailModalOpen] = useState(false);
     const totalTokens = (Number(session._inputTokens) || 0) + (Number(session._outputTokens) || 0);
+
+    const topics = useMemo(() => Object.keys(session.topicHierarchy || {}), [session.topicHierarchy]);
+    const guardrailDateRange = useMemo(() => {
+        if (!currDateRange?.period) return { startTime: undefined, endTime: undefined };
+        return {
+            startTime: Math.floor(Date.parse(currDateRange.period.since) / 1000),
+            endTime: Math.floor(Date.parse(currDateRange.period.until) / 1000),
+        };
+    }, [currDateRange]);
 
     const stats = [
         { label: "Traces",       value: traceCount },
@@ -63,6 +74,11 @@ function OverviewContent({ session, traceCount }) {
     return (
         <Box padding="4">
             <VerticalStack gap="5">
+                {topics.length > 0 && (
+                    <HorizontalStack align="end">
+                        <Button onClick={() => setGuardrailModalOpen(true)}>Create guardrail</Button>
+                    </HorizontalStack>
+                )}
                 <HorizontalGrid columns={4} gap="3">
                     {stats.map(s => (
                         <VerticalStack gap="1" key={s.label}>
@@ -90,6 +106,13 @@ function OverviewContent({ session, traceCount }) {
                     columns={3}
                 />
             </VerticalStack>
+            <CreateTopicGuardrailModal
+                open={guardrailModalOpen}
+                onClose={() => setGuardrailModalOpen(false)}
+                topics={topics}
+                scope={{ sessionId: session.sessionIdentifier }}
+                dateRange={guardrailDateRange}
+            />
         </Box>
     );
 }
@@ -206,7 +229,7 @@ export default function SessionFlyout({ session, currDateRange, onClose }) {
         switch (activeTab) {
             case TAB_OVERVIEW: return (
                 <Scrollable style={{ flex: 1 }}>
-                    <OverviewContent session={session} traceCount={traceCount} />
+                    <OverviewContent session={session} traceCount={traceCount} currDateRange={currDateRange} />
                 </Scrollable>
             );
             case TAB_TRACES: return (

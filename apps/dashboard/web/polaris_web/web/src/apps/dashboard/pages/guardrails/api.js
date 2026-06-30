@@ -9,6 +9,15 @@ export default {
         return resp
     },
 
+    async fetchGuardrailPolicyByName(name) {
+        const resp = await request({
+            url: '/api/fetchGuardrailPolicyByName',
+            method: 'post',
+            data: { name }
+        })
+        return resp
+    },
+
     async createGuardrailPolicy(policyData) {
         const resp = await request({
             url: '/api/createGuardrailPolicy',

@@ -32,7 +32,8 @@ const PolicyDetailsStep = ({
     applyToResponses,
     setApplyToResponses,
     severity,
-    setSeverity
+    setSeverity,
+    nameReadOnly = false
 }) => {
     return (
         <VerticalStack gap="4">
@@ -44,6 +45,7 @@ const PolicyDetailsStep = ({
                     placeholder="chatbot-guardrail"
                     helpText="Valid characters are a-z, A-Z, 0-9, _ (underscore) and - (hyphen). The name can have up to 50 characters."
                     requiredIndicator
+                    disabled={nameReadOnly}
                 />
                 <TextField
                     label="Description"

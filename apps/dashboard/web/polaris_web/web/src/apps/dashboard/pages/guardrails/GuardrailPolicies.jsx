@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList, Scrollable, Avatar, Box } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
@@ -132,10 +133,27 @@ function GuardrailPolicies() {
     const [editingPolicy, setEditingPolicy] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
     const [isPreset, setIsPreset] = useState(false);
+    const [isTopicGuardrailPrefill, setIsTopicGuardrailPrefill] = useState(false);
     const [presetsPopoverActive, setPresetsPopoverActive] = useState(false);
     const [pendingPolicyName, setPendingPolicyName] = useState(null);
 
+    const location = useLocation();
+    const navigate = useNavigate();
     const policyName = new URLSearchParams(window.location.search).get("policy");
+
+    // Prefill carried from the LLM Traces / Endpoints pages: open the Create
+    // Guardrail page prefilled as a NEW canonical topic-guardrail policy.
+    useEffect(() => {
+        const prefill = location.state?.topicGuardrailPrefill;
+        if (!prefill) return;
+        setEditingPolicy({ ...prefill, deniedTopics: prefill.deniedTopics || [] });
+        setIsEditMode(false);
+        setIsPreset(true);
+        setIsTopicGuardrailPrefill(true);
+        setShowCreateModal(true);
+        // Clear router state so this doesn't re-trigger on re-render / back-nav.
+        navigate(location.pathname, { replace: true, state: {} });
+    }, [location.state, location.pathname, navigate]);
 
     // Load guardrail policies on component mount
     useEffect(() => {
@@ -562,6 +580,7 @@ function GuardrailPolicies() {
             setEditingPolicy(null);
             setIsEditMode(false);
             setIsPreset(false);
+            setIsTopicGuardrailPrefill(false);
             await fetchGuardrailPolicies();
         } catch (error) {
             func.setToast(true, true, isEditMode ? "Failed to update guardrail" : "Failed to create guardrail");
@@ -580,11 +599,13 @@ function GuardrailPolicies() {
                     setEditingPolicy(null);
                     setIsEditMode(false);
                     setIsPreset(false);
+                    setIsTopicGuardrailPrefill(false);
                 }}
                 onSave={handleCreateGuardrail}
                 editingPolicy={editingPolicy}
                 isEditMode={isEditMode}
                 isPreset={isPreset}
+                nameReadOnly={isTopicGuardrailPrefill}
             />
         );
     }

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider, Link, Badge, List } from "@shopify/polaris";
+import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider, Link, Badge, List, Button } from "@shopify/polaris";
+import CreateTopicGuardrailModal from "../../guardrails/components/CreateTopicGuardrailModal";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AgenticFlyoutShell from "./AgenticFlyoutShell";
@@ -260,9 +261,10 @@ function makeTopicUrl(username, topic, subTopic) {
     return `${LLM_OBS_PATH}?${p.toString()}`;
 }
 
-function UserAnalysisSection({ username }) {
+function UserAnalysisSection({ username, deviceId, startTimestamp, endTimestamp }) {
     const [analysis, setAnalysis] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [guardrailModalOpen, setGuardrailModalOpen] = useState(false);
 
     useEffect(() => {
         if (!username) { setLoading(false); return; }
@@ -298,6 +300,7 @@ function UserAnalysisSection({ username }) {
 
     const inputTokens = analysis.totalInputTokens || 0;
     const outputTokens = analysis.totalOutputTokens || 0;
+    const topics = Object.keys(analysis.topicHierarchy || {});
 
     return (
         <VerticalStack gap="3">
@@ -320,7 +323,10 @@ function UserAnalysisSection({ username }) {
 
             {topicEntries.length > 0 && (
                 <VerticalStack gap="2">
-                    <Text variant="headingXs" color="subdued">Topics Queried</Text>
+                    <HorizontalStack align="space-between" blockAlign="center">
+                        <Text variant="headingXs" color="subdued">Topics Queried</Text>
+                        <Button size="slim" onClick={() => setGuardrailModalOpen(true)}>Create guardrail</Button>
+                    </HorizontalStack>
                     <VerticalStack gap="3">
                         {topicEntries.map(([topic, subMap]) => {
                             const subEntries = Object.entries(subMap || {}).sort((a, b) => b[1] - a[1]);
@@ -351,6 +357,13 @@ function UserAnalysisSection({ username }) {
                     </VerticalStack>
                 </VerticalStack>
             )}
+            <CreateTopicGuardrailModal
+                open={guardrailModalOpen}
+                onClose={() => setGuardrailModalOpen(false)}
+                topics={topics}
+                scope={{ userName: username, deviceId }}
+                dateRange={{ startTime: startTimestamp, endTime: endTimestamp }}
+            />
         </VerticalStack>
     );
 }
@@ -359,7 +372,7 @@ function UserAnalysisSection({ username }) {
 
 const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 
-function OverviewTab({ device, agents, collections, onTabChange }) {
+function OverviewTab({ device, agents, collections, onTabChange, startTimestamp, endTimestamp }) {
     const { aiCount, mcpCount, llmCount, totalV } = useMemo(() => ({
         aiCount:  agents.filter(a => a.type === "AI Agent").length,
         mcpCount: agents.filter(a => a.type === "MCP Server").length,
@@ -444,7 +457,12 @@ function OverviewTab({ device, agents, collections, onTabChange }) {
 
                 <DetailGrid heading="Device Details" items={deviceDetails} columns={3} />
 
-                <UserAnalysisSection username={safeVal(device.username)} />
+                <UserAnalysisSection
+                    username={safeVal(device.username)}
+                    deviceId={device.path?.[0] || device.deviceId}
+                    startTimestamp={startTimestamp}
+                    endTimestamp={endTimestamp}
+                />
             </VerticalStack>
         </Box>
     );
@@ -610,7 +628,7 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
             }
         >
             <Box padding="2" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-                {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} collections={collections} onTabChange={setSelectedTab} />}
+                {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} collections={collections} onTabChange={setSelectedTab} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
                 {selectedTab === 1 && <AgenticsTab agents={agents || []} onAgentClick={onAgentClick} agentRiskData={agentRiskData} />}
                 {selectedTab === 2 && <ViolationsTab hostNames={deviceHostNames} deviceId={device?.path?.[0] || device?.deviceId} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
             </Box>

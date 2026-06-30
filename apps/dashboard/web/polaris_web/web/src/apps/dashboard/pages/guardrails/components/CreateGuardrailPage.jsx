@@ -54,7 +54,7 @@ import {
 import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from "./enterpriseLicenseComplianceCatalog";
 import "./createGuardrailPage.css";
 
-const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false }) => {
+const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false, nameReadOnly = false }) => {
     // Step management
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
@@ -820,6 +820,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setSeverity={setSeverity}
                         applyToResponses={applyToResponses}
                         setApplyToResponses={setApplyToResponses}
+                        nameReadOnly={nameReadOnly}
                     />
                 );
             case 2:
