@@ -26,7 +26,8 @@ import {
     resolveStoredPolicyBehaviour
 } from '../utils';
 import { getDefaultGeneralBlockTopics, GENERAL_BLOCKS, isGeneralBlockTopic, toDeniedTopic } from '../generalBlocks';
-import { groupCollectionsByAgent, groupCollectionsByService, groupArgusAgentsBySourceId, extractServiceName } from '../../observe/agentic/constants';
+import { groupCollectionsByAgent, groupCollectionsByService, extractServiceName } from '../../observe/agentic/constants';
+import { isEndpointSecurityCategory } from '../../../../main/labelHelper';
 import func from "@/util/func";
 import {
     PolicyDetailsStep,
@@ -67,10 +68,12 @@ const groupToOption = (g) => ({
 // Converts stored V2 server entries back to the option-value keys used by the dropdowns.
 // Works for all stored formats: numeric collection ID, full hostname, or short service key.
 const reverseToServiceKeys = (v2Servers, allCollections) => {
+    const isArgus = !isEndpointSecurityCategory();
     const keys = (v2Servers || []).map(s => {
         const col = (allCollections || []).find(c => c.id?.toString() === s.id?.toString());
-        // Use same source priority as groupCollectionsByService so the derived key matches the option value.
         const rawName = col ? (col.hostName || col.displayName || '') : (s.name || String(s.id || ''));
+        // Argus stores full hostnames as option keys — don't extract service name
+        if (isArgus) return rawName;
         return extractServiceName(rawName) || rawName;
     });
     return [...new Set(keys)];
@@ -461,15 +464,28 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setCollectionsLoading(true);
         try {
             const nonVisibility = allCollections.filter(c => !isVisibilityOnly(c));
-            const serviceGroups = groupCollectionsByService(nonVisibility);
-            const agentGroups = groupCollectionsByAgent(nonVisibility);
-            const agentGroupKeys = new Set(agentGroups.map(g => g.groupKey));
-            const argusAgentGroups = groupArgusAgentsBySourceId(nonVisibility)
-                .filter(g => !agentGroupKeys.has(g.groupKey));
-
-            setMcpServers(serviceGroups.filter(g => g.clientType === 'MCP Server').map(groupToOption));
-            setAgentServers([...agentGroups, ...argusAgentGroups].map(groupToOption));
-            setBrowserLlmServers(serviceGroups.filter(g => g.clientType === 'LLM').map(groupToOption));
+            if (isEndpointSecurityCategory()) {
+                // Atlas: group by service/platform key — one entry covers all devices running that service
+                const serviceGroups = groupCollectionsByService(nonVisibility);
+                const agentGroups = groupCollectionsByAgent(nonVisibility);
+                setMcpServers(serviceGroups.filter(g => g.clientType === 'MCP Server').map(groupToOption));
+                setAgentServers(agentGroups.map(groupToOption));
+                setBrowserLlmServers(serviceGroups.filter(g => g.clientType === 'LLM').map(groupToOption));
+            } else {
+                // Argus: each device+service is a distinct target — use full hostname as the option value
+                const toOption = (c) => {
+                    const name = c.hostName || c.displayName || c.name || '';
+                    return {
+                        label: name,
+                        value: name,
+                        isInline: !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe')
+                    };
+                };
+                const dedup = (opts) => [...new Map(opts.map(o => [o.value, o])).values()].filter(o => o.value);
+                setMcpServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'mcp-server')).map(toOption)));
+                setAgentServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'gen-ai')).map(toOption)));
+                setBrowserLlmServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'browser-llm')).map(toOption)));
+            }
         } catch (error) {
             console.error("Error filtering collections:", error);
         } finally {
