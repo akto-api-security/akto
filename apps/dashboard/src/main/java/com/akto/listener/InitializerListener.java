@@ -3638,6 +3638,16 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void migrateOrphanSkillCollections(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getMigrateOrphanSkillCollections() == 0){
+            BackwardCompatibilityUtils.migrateOrphanSkillCollections();
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.MIGRATE_ORPHAN_SKILL_COLLECTIONS, Context.now())
+            );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             try {
@@ -3653,6 +3663,7 @@ public class InitializerListener implements ServletContextListener {
         markSummariesAsVulnerable(backwardCompatibility);
         moveUserDataFromModuleInfoToAgenticUsers(backwardCompatibility);
         cleanupApiInfoTags(backwardCompatibility);
+        migrateOrphanSkillCollections(backwardCompatibility);
         dropLastCronRunInfoField(backwardCompatibility);
         cleanupRbacEntriesForDeveloperRole(backwardCompatibility);
         fetchIntegratedConnections(backwardCompatibility);

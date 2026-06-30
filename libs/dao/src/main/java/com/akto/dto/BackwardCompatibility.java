@@ -129,6 +129,9 @@ public class BackwardCompatibility {
     public static final String CLEANUP_API_INFO_TAGS = "cleanupApiInfoTags";
     private int cleanupApiInfoTags;
 
+    public static final String MIGRATE_ORPHAN_SKILL_COLLECTIONS = "migrateOrphanSkillCollections";
+    private int migrateOrphanSkillCollections;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -136,10 +139,10 @@ public class BackwardCompatibility {
                                  int aktoDefaultNewUI, int initializeOrganizationAccountBelongsTo, int orgsInBilling,
                                  int computeIntegratedConnections, int deleteLastCronRunInfo, int moveAuthMechanismToRole,
                                  int loginSignupGroups, int vulnerableApiUpdationVersionV1, int riskScoreGroups,
-                                 int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
+                                 int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField,
                                  int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType,
                                  int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs, int moveOktaOidcSSO, int markSummariesVulnerable,
-                                 int changeOperatorConditionInCDT, int cleanupRbacEntries, int fillLastTestedField, int fillQueryParams, int createVinSupportDataType, int moveUserDataFromModuleInfoToAgenticUsers, int cleanupApiInfoTags) {
+                                 int changeOperatorConditionInCDT, int cleanupRbacEntries, int fillLastTestedField, int fillQueryParams, int createVinSupportDataType, int moveUserDataFromModuleInfoToAgenticUsers, int cleanupApiInfoTags, int migrateOrphanSkillCollections) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -175,11 +178,12 @@ public class BackwardCompatibility {
         this.markSummariesVulnerable = markSummariesVulnerable;
         this.changeOperatorConditionInCDT = changeOperatorConditionInCDT;
         this.cleanupRbacEntries = cleanupRbacEntries;
-        this.fillLastTestedField = fillLastTestedField; 
+        this.fillLastTestedField = fillLastTestedField;
         this.fillQueryParams = fillQueryParams;
         this.createVinSupportDataType = createVinSupportDataType;
         this.moveUserDataFromModuleInfoToAgenticUsers = moveUserDataFromModuleInfoToAgenticUsers;
         this.cleanupApiInfoTags = cleanupApiInfoTags;
+        this.migrateOrphanSkillCollections = migrateOrphanSkillCollections;
     }
 
     public BackwardCompatibility() {
@@ -232,7 +236,7 @@ public class BackwardCompatibility {
     public void setAddAktoDataTypes(int addAktoDataTypes) {
         this.addAktoDataTypes = addAktoDataTypes;
     }
-    
+
     public int getMergeOnHostInit() {
         return this.mergeOnHostInit;
     }
@@ -360,7 +364,7 @@ public class BackwardCompatibility {
     public void setLoginSignupGroups(int loginSignupGroups) {
         this.loginSignupGroups = loginSignupGroups;
     }
-    
+
     public int getVulnerableApiUpdationVersionV1() {
         return vulnerableApiUpdationVersionV1;
     }
@@ -376,7 +380,7 @@ public class BackwardCompatibility {
     public void setRiskScoreGroups(int riskScoreGroups) {
         this.riskScoreGroups = riskScoreGroups;
     }
-    
+
     public int getDeactivateCollections() {
         return deactivateCollections;
     }
@@ -543,5 +547,13 @@ public class BackwardCompatibility {
 
     public void setCleanupApiInfoTags(int cleanupApiInfoTags) {
         this.cleanupApiInfoTags = cleanupApiInfoTags;
+    }
+
+    public int getMigrateOrphanSkillCollections() {
+        return migrateOrphanSkillCollections;
+    }
+
+    public void setMigrateOrphanSkillCollections(int migrateOrphanSkillCollections) {
+        this.migrateOrphanSkillCollections = migrateOrphanSkillCollections;
     }
 }
