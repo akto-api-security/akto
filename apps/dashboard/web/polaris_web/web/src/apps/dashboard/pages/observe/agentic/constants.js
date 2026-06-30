@@ -205,6 +205,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
 
     collections.forEach((c) => {
         if (c.deactivated) return;
+        if ((c.hostName || c.displayName || c.name || '').endsWith('.not-attached')) return;
         const assetTag = findAssetTag(c.envType);
         if (!assetTag?.value) return; // Skip collections without agent tag
         if (assetTag.keyName === ASSET_TAG_KEYS.BROWSER_LLM_AGENT) return; // Skip browser-llm-agent rows
