@@ -2,6 +2,7 @@ package com.akto.dao.context;
 
 import com.akto.dao.AccountsDao;
 import com.akto.dto.Account;
+import com.akto.dto.Log;
 
 import java.math.BigDecimal;
 import java.time.*;
@@ -10,13 +11,15 @@ import java.time.format.DateTimeFormatter;
 public class Context {
     public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
     public static ThreadLocal<Boolean> tokenExpired = new ThreadLocal<Boolean>();
-    public static ThreadLocal<String> testRunResultSummaryId = new ThreadLocal<String>();
+    public static ThreadLocal<String> activityId = new ThreadLocal<String>();
+    public static ThreadLocal<Log.ActivityType> activityType = new ThreadLocal<Log.ActivityType>();
 
 
     public static void resetContextThreadLocals() {
         accountId.remove();
         tokenExpired.remove();
-        testRunResultSummaryId.remove();
+        activityId.remove();
+        activityType.remove();
     }
 
     public static int getId() {

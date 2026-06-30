@@ -299,7 +299,8 @@ public class LoggerMaker  {
     private void insert(String info, String key, LogDb db) {
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
-        log.setTestRunResultSummaryId(Context.testRunResultSummaryId.get());
+        log.setActivityId(Context.activityId.get());
+        log.setActivityType(Context.activityType.get());
 
         if(checkUpdate() && db!=null){
             switch(db){
