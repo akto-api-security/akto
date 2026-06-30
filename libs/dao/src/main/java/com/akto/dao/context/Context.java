@@ -2,6 +2,7 @@ package com.akto.dao.context;
 
 import com.akto.dao.AccountsDao;
 import com.akto.dto.Account;
+import com.akto.dto.Log;
 import java.math.BigDecimal;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -11,13 +12,15 @@ import org.slf4j.LoggerFactory;
 
 public class Context {
     public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
-    public static ThreadLocal<String> testRunResultSummaryId = new ThreadLocal<String>();
+    public static ThreadLocal<String> activityId = new ThreadLocal<String>();
+    public static ThreadLocal<Log.ActivityType> activityType = new ThreadLocal<Log.ActivityType>();
 
     private static final Logger logger = LoggerFactory.getLogger(Context.class);
 
     public static void resetContextThreadLocals() {
         accountId.remove();
-        testRunResultSummaryId.remove();
+        activityId.remove();
+        activityType.remove();
     }
 
     public static int getId() {

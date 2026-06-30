@@ -8,6 +8,10 @@ import org.bson.types.ObjectId;
 
 public class Log {
 
+    public enum ActivityType {
+        TESTING_RUN_RESULT_SUMMARY_ACTIVITY
+    }
+
     private ObjectId id;
     public ObjectId getId() {
         return id;
@@ -31,10 +35,16 @@ public class Log {
     public static final String TIMESTAMP = "timestamp";
     private int timestamp;
 
-    public static final String TEST_RUN_RESULT_SUMMARY_ID = "testRunResultSummaryId";
+    public static final String ACTIVITY_ID = "activityId";
+    public static final String ACTIVITY_TYPE = "activityType";
+
     @Getter
     @Setter
-    private String testRunResultSummaryId;
+    private String activityId; // activity id for the log eg test run result summary id
+
+    @Getter
+    @Setter
+    private ActivityType activityType; // activity type for the log eg TESTING_RUN_RESULT_SUMMARY_ACTIVITY
 
     public Log() {
     }
@@ -75,7 +85,8 @@ public class Log {
             " log='" + getLog() + "'" +
             ", key='" + getKey() + "'" +
             ", timestamp='" + getTimestamp() + "'" +
-            ", testRunResultSummaryId='" + getTestRunResultSummaryId() + "'" +
+            ", activityId='" + getActivityId() + "'" +
+            ", activityType='" + getActivityType() + "'" +
             "}";
     }
 
@@ -84,7 +95,8 @@ public class Log {
                 .append("log", getLog())
                 .append("key", getKey())
                 .append("timestamp", getTimestamp())
-                .append(TEST_RUN_RESULT_SUMMARY_ID, getTestRunResultSummaryId());
+                .append(ACTIVITY_ID, getActivityId())
+                .append(ACTIVITY_TYPE, getActivityType());
     }
 
 }

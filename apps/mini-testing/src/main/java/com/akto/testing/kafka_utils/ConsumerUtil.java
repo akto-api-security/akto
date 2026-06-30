@@ -25,6 +25,7 @@ import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.Log;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResult;
@@ -72,7 +73,8 @@ public class ConsumerUtil {
         Context.accountId.set(singleTestPayload.getAccountId());
         ObjectId summaryId = singleTestPayload.getTestingRunResultSummaryId();
         if (summaryId != null) {
-            Context.testRunResultSummaryId.set(summaryId.toHexString());
+            Context.activityId.set(summaryId.toHexString());
+            Context.activityType.set(Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY);
         }
         try {
             TestExecutor executor = new TestExecutor();
@@ -97,7 +99,8 @@ public class ConsumerUtil {
                 loggerMaker.insertImportantTestingLog("Test completed for: " + apiInfoKey + " with subcategory: " + subCategory + " in " + (Context.now() - timeNow) + " seconds");
             }
         } finally {
-            Context.testRunResultSummaryId.remove();
+            Context.activityId.remove();
+            Context.activityType.remove();
         }
     }
 
