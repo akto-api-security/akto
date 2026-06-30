@@ -147,6 +147,14 @@ const COL_DEFS = [
       color: "#6D7175",
     },
   },
+  {
+    field: "tags",
+    headerName: "Tags",
+    hide: true,
+    filter: "agSetColumnFilter",
+    sortable: false,
+    // Values are pre-computed string arrays on each row; AG Grid set-filter reads them natively.
+  },
 ];
 
 const DEFAULT_COL_DEF = {
@@ -179,16 +187,26 @@ function TableSection({
 
   const flatRowData = useMemo(() => {
     const rows = agenticTreeData.filter((r) => r.path?.length === 1);
-    let filtered =
-      typeFilter && typeFilter.size > 0
-        ? rows.filter((r) => typeFilter.has(r.type))
-        : rows;
+    let filtered = rows;
+    if (typeFilter && typeFilter.size > 0) {
+      filtered = rows.filter((r) => typeFilter.has(r.type));
+    }
     if (violSevFilter && violSevFilter.size > 0) {
       filtered = filtered.filter((r) =>
         [...violSevFilter].some((sev) => (r.violations?.[sev] || 0) > 0),
       );
     }
-    return filtered;
+    // Compute tags array for the AG Grid set-filter (sidebar "Tags" filter panel).
+    // Mirrors the marker icons shown in AssetNameCellRenderer.
+    return filtered.map((r) => {
+      const isSkill = r.type === "Skill";
+      const tags = [];
+      if (r.hasPersonalAccount && !isSkill) tags.push("Contains personal account");
+      if (r.hasLocalMcpServer && !isSkill)  tags.push("Local MCP Server");
+      if (r.hasMisconfiguredConfig && !isSkill) tags.push("Misconfigured");
+      if (r.isMalicious && isSkill)         tags.push("Malicious Skill");
+      return tags.length ? { ...r, tags } : r;
+    });
   }, [agenticTreeData, typeFilter, violSevFilter]);
 
   useEffect(() => {
@@ -582,10 +600,10 @@ export default function AgenticAssetsPage() {
   const totalAssets = agenticFlatData.length;
 
   const assetTypeBreakdown = useMemo(() => [
-    { label: "Agents",     count: agenticFlatData.filter(r => r.type === "AI Agent").length,   color: "#9642FC",  key: "AI Agent" },
-    { label: "MCP Servers",count: agenticFlatData.filter(r => r.type === "MCP Server").length,color: "#4cbebb",  key: "MCP Server" },
-    { label: "LLMs",       count: agenticFlatData.filter(r => r.type === "LLM").length,        color: "#EAB308",  key: "LLM" },
-    { label: "Skills",     count: agenticFlatData.filter(r => r.type === "Skill").length,      color: "#D1D5DB",  key: "Skill" },
+    { label: "Agents",      count: agenticFlatData.filter(r => r.type === "AI Agent").length,   color: "#9642FC",  key: "AI Agent" },
+    { label: "MCP Servers", count: agenticFlatData.filter(r => r.type === "MCP Server").length, color: "#4cbebb",  key: "MCP Server" },
+    { label: "LLMs",        count: agenticFlatData.filter(r => r.type === "LLM").length,        color: "#EAB308",  key: "LLM" },
+    { label: "Skills",      count: agenticFlatData.filter(r => r.type === "Skill").length,      color: "#D1D5DB",  key: "Skill" },
   ], [agenticFlatData]);
 
   const violationsByCollectionId = useMemo(
