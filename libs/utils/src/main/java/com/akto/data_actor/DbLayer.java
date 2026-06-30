@@ -310,19 +310,25 @@ public class DbLayer {
                 Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
                 Filters.eq(ModuleInfo._REBOOT, false)
             );
-            Bson updates = Updates.combine(
-                    //putting class name because findOneAndUpdate doesn't put class name by default
-                    Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
-                    Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType().name()),
-                    Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
-                    Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
-                    Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
-                    Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS)),
-                    Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
-                    Updates.set(ModuleInfo.MINI_RUNTIME_NAME, moduleInfo.getMiniRuntimeName()),
-                    Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
-                    Updates.set(ModuleInfo.DELETE_TOPIC_AND_REBOOT, moduleInfo.isDeleteTopicAndReboot())
-            );
+            
+            List<Bson> updatesList = new ArrayList<>();
+            updatesList.add(Updates.setOnInsert("_t", moduleInfo.getClass().getName()));
+            updatesList.add(Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType().name()));
+            updatesList.add(Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()));
+            updatesList.add(Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()));
+            updatesList.add(Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()));
+            
+            // TTL: Set expiresAt only for TRAFFIC_COLLECTOR modules
+            if (moduleInfo.getModuleType() == ModuleInfo.ModuleType.TRAFFIC_COLLECTOR) {
+                updatesList.add(Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS)));
+            }
+            
+            updatesList.add(Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()));
+            updatesList.add(Updates.set(ModuleInfo.MINI_RUNTIME_NAME, moduleInfo.getMiniRuntimeName()));
+            updatesList.add(Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()));
+            updatesList.add(Updates.set(ModuleInfo.DELETE_TOPIC_AND_REBOOT, moduleInfo.isDeleteTopicAndReboot()));
+            
+            Bson updates = Updates.combine(updatesList);
             bulkUpdates.add(new UpdateOneModel<>(filter, updates, updateOptions));
         }
 
