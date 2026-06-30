@@ -119,6 +119,8 @@ const fetchEndpointShieldUserMetadata = async () => {
                 team: u.teamName || '',
                 userRole: u.userRole || '',
                 userEmail: u.userEmail || '',
+                teamSource: u.teamSource || 'sso',
+                roleSource: u.roleSource || 'sso',
             };
         });
 
