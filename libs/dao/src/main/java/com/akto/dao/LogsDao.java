@@ -35,7 +35,7 @@ public class LogsDao extends AccountsContextDao<Log> {
         String[] fieldNames = {Log.TIMESTAMP};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
 
-        String[] activityFields = {Log.ACTIVITY_TYPE, Log.ACTIVITY_ID};
+        String[] activityFields = {Log.ACTIVITY_TYPE, Log.ACTIVITY_ID, Log.TIMESTAMP};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), activityFields,false);
     }
 
