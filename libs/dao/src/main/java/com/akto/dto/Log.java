@@ -81,13 +81,18 @@ public class Log {
 
     @Override
     public String toString() {
-        return "{" +
-            " log='" + getLog() + "'" +
-            ", key='" + getKey() + "'" +
-            ", timestamp='" + getTimestamp() + "'" +
-            ", activityId='" + getActivityId() + "'" +
-            ", activityType='" + getActivityType() + "'" +
-            "}";
+        StringBuilder sb = new StringBuilder("{");
+        sb.append(" log='").append(getLog()).append("'");
+        sb.append(", key='").append(getKey()).append("'");
+        sb.append(", timestamp='").append(getTimestamp()).append("'");
+        if (getActivityId() != null) {
+            sb.append(", activityId='").append(getActivityId()).append("'");
+        }
+        if (getActivityType() != null) {
+            sb.append(", activityType='").append(getActivityType()).append("'");
+        }
+        sb.append("}");
+        return sb.toString();
     }
 
     public BasicDBObject toBasicDBObject(){
