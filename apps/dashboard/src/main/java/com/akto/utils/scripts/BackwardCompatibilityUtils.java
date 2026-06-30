@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.akto.dao.AgentUsersDao;
 import com.akto.dao.ApiCollectionsDao;
@@ -16,13 +17,14 @@ import com.akto.dto.AgenticUsers;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.util.Constants;
 import com.akto.util.Pair;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 
-import java.util.stream.Collectors;
+import static com.akto.util.Constants.AKTO_GEN_AI_TAG;
 
 public class BackwardCompatibilityUtils {
 
@@ -44,7 +46,7 @@ public class BackwardCompatibilityUtils {
             if(moduleInfo.getAdditionalData().containsKey("username")) {
                 userName = (String) moduleInfo.getAdditionalData().get("username");
             }
-            
+
             if(!userNameToDevicesMap.containsKey(userName)) {
                 userNameToDevicesMap.put(userName, new HashSet<>());
             }
@@ -57,7 +59,7 @@ public class BackwardCompatibilityUtils {
                 String userRole = (String) moduleInfo.getAdditionalData().get("userRole");
                 String team = (String) moduleInfo.getAdditionalData().get("team");
                 userNameToRoleAndTeamMap.put(userName, new Pair<>(userRole, team));
-            }   
+            }
         }
 
         List<AgenticUsers> agenticUsers = new ArrayList<>();
@@ -104,6 +106,62 @@ public class BackwardCompatibilityUtils {
             Filters.and(collFilter, Filters.elemMatch("tagsList", Filters.eq(CollectionTags.KEY_NAME, "referer"))),
             Updates.pull("tagsList", Filters.eq(CollectionTags.KEY_NAME, "referer"))
         );
+    }
+
+    private static final String OLD_ORPHAN_SUFFIX = ".skill.not-attached";
+    private static final String NEW_ORPHAN_SUFFIX = ".ai-agent.not-attached";
+
+    public static void migrateOrphanSkillCollections() {
+        List<ApiCollection> oldOrphans = ApiCollectionsDao.instance.findAll(
+            Filters.regex(ApiCollection.HOST_NAME, java.util.regex.Pattern.quote(OLD_ORPHAN_SUFFIX) + "$"),
+            Projections.include(Constants.ID, ApiCollection.HOST_NAME, ApiCollection.SKILLS)
+        );
+
+        if (oldOrphans == null || oldOrphans.isEmpty()) return;
+
+        List<Integer> oldIdsToDelete = new ArrayList<>();
+
+        for (ApiCollection oldColl : oldOrphans) {
+            String oldHost = oldColl.getHostName();
+            if (oldHost == null) continue;
+
+            String device = oldHost.substring(0, oldHost.length() - OLD_ORPHAN_SUFFIX.length());
+            String newHost = device + NEW_ORPHAN_SUFFIX;
+
+            ApiCollection newColl = ApiCollectionsDao.instance.findOne(
+                Filters.eq(ApiCollection.HOST_NAME, newHost)
+            );
+            if (newColl == null) continue;
+
+            List<String> skills = oldColl.getSkills();
+            if (skills != null && !skills.isEmpty()) {
+                ApiCollectionsDao.instance.updateOne(
+                    Filters.eq(Constants.ID, newColl.getId()),
+                    Updates.addEachToSet(ApiCollection.SKILLS, skills)
+                );
+            }
+
+            boolean hasGenAiTag = newColl.getTagsList() != null && newColl.getTagsList().stream()
+                .anyMatch(t -> AKTO_GEN_AI_TAG.equals(t.getKeyName()));
+
+            if (!hasGenAiTag) {
+                CollectionTags genAiTag = new CollectionTags(
+                    Context.now(), AKTO_GEN_AI_TAG, "Gen AI", CollectionTags.TagSource.KUBERNETES
+                );
+                ApiCollectionsDao.instance.updateOne(
+                    Filters.eq(Constants.ID, newColl.getId()),
+                    Updates.addToSet(ApiCollection.TAGS_STRING, genAiTag)
+                );
+            }
+
+            oldIdsToDelete.add(oldColl.getId());
+        }
+
+        if (!oldIdsToDelete.isEmpty()) {
+            ApiCollectionsDao.instance.getMCollection().deleteMany(
+                Filters.in(Constants.ID, oldIdsToDelete)
+            );
+        }
     }
 
 }
