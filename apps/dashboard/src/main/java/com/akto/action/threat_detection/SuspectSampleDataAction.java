@@ -252,7 +252,6 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
     int accountId = Context.accountId.get();
     CONTEXT_SOURCE source = Context.contextSource.get();
-    post.addHeader("x-context-source", source != null ? source.toString() : "");
 
     try {
       // Build request with time range if provided
