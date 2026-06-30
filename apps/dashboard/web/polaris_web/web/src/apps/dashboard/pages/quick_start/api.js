@@ -414,6 +414,30 @@ const api = {
         })
     },
 
+    fetchWizIntegration() {
+        return request({
+            url: '/api/fetchWizIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addWizTrafficSource() {
+        return request({
+            url: '/api/addWizTrafficSource',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    removeWizTrafficSource() {
+        return request({
+            url: '/api/removeWizTrafficSource',
+            method: 'post',
+            data: {}
+        })
+    },
+
 }
 
 export default api
