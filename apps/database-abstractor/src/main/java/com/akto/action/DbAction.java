@@ -722,6 +722,69 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchWebSocketApiInfos() {
+        try {
+            List<ApiInfo> allApiInfos = DbLayer.fetchApiInfosByCollection(apiCollectionId);
+            apiInfos = allApiInfos.stream()
+                .filter(ApiInfo::getIsConnectionString)
+                .collect(Collectors.toList());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchWebSocketApiInfos " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    @Getter @Setter
+    private Map<String, Object> webSocketInfoWithUrl;
+
+    public String fetchWebSocketApiInfosWithUrls() {
+        try {
+            List<ApiInfo> allApiInfos = DbLayer.fetchApiInfosByCollection(apiCollectionId);
+            List<ApiInfo> wsApiInfos = allApiInfos.stream()
+                .filter(ApiInfo::getIsConnectionString)
+                .collect(Collectors.toList());
+            
+            if (wsApiInfos.isEmpty()) {
+                return Action.SUCCESS.toUpperCase();
+            }
+            
+            ApiCollection apiCollection = DbLayer.fetchApiCollectionMeta(apiCollectionId);
+            String hostName = apiCollection != null ? apiCollection.getHostName() : "";
+            
+            ApiInfo wsInfo = wsApiInfos.get(0);
+            webSocketInfoWithUrl = new HashMap<>();
+            webSocketInfoWithUrl.put("apiInfo", wsInfo);
+            webSocketInfoWithUrl.put("url", wsInfo.getId().getUrl());
+            webSocketInfoWithUrl.put("method", wsInfo.getId().getMethod());
+            webSocketInfoWithUrl.put("apiCollectionId", wsInfo.getId().getApiCollectionId());
+            
+            String fullUrl = buildFullUrl(hostName, wsInfo.getId().getUrl());
+            webSocketInfoWithUrl.put("connectionUrl", fullUrl);
+            webSocketInfoWithUrl.put("hostName", hostName);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchWebSocketApiInfosWithUrls " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    private String buildFullUrl(String hostName, String path) {
+        if (hostName == null || hostName.isEmpty()) {
+            return path;
+        }
+        
+        String protocol = "ws://";
+        if (hostName.contains("https") || hostName.contains("wss")) {
+            protocol = "wss://";
+            hostName = hostName.replace("https://", "").replace("wss://", "");
+        } else if (hostName.contains("http")) {
+            protocol = "ws://";
+            hostName = hostName.replace("http://", "").replace("ws://", "");
+        }
+        
+        return protocol + hostName + path;
+    }
 
     TrafficCollectorMetrics trafficCollectorMetrics = null;
     public String updateTrafficCollectorMetrics() {
@@ -755,6 +818,7 @@ public class DbAction extends ActionSupport {
                 String json = obj.toJson();
                 //loggerMaker.infoAndAddToDb("Fast-discovery: Converting JSON to ApiInfo: " + json);
                 ApiInfo apiInfo = objectMapper.readValue(json, ApiInfo.class);
+                applyConnectionStringFlag(apiInfo, obj);
                 //loggerMaker.infoAndAddToDb("Fast-discovery: ApiInfo after conversion - id=" + apiInfo.getId());
                 ApiInfoKey id = apiInfo.getId();
                 
@@ -796,6 +860,30 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private void applyConnectionStringFlag(ApiInfo apiInfo, BasicDBObject obj) {
+        if (apiInfo.getIsConnectionString()) {
+            return;
+        }
+
+        String type = obj.getString("type");
+        if (type == null || type.isEmpty()) {
+            type = apiInfo.getApiType();
+        }
+
+        int statusCode = 0;
+        Object statusCodeObj = obj.get("statusCode");
+        if (statusCodeObj instanceof Number) {
+            statusCode = ((Number) statusCodeObj).intValue();
+        } else if (apiInfo.getResponseCodes() != null && apiInfo.getResponseCodes().contains(101)) {
+            statusCode = 101;
+        }
+
+        String payload = obj.getString("payload");
+        if (HttpResponseParams.isWebSocketHandshake(type, statusCode, payload)) {
+            apiInfo.setIsConnectionString(true);
+        }
     }
 
     public String writeApiSequences() {
@@ -6294,6 +6382,14 @@ public class DbAction extends ActionSupport {
                 update.put("field", "collectionIds");
                 update.put("val", apiInfo.get("collectionIds"));  // Send as array
                 update.put("op", "setOnInsert");
+                updates.add(new Gson().toJson(update));
+            }
+
+            if (apiInfo.containsKey("isConnectionString") && Boolean.TRUE.equals(apiInfo.get("isConnectionString"))) {
+                Map<String, Object> update = new HashMap<>();
+                update.put("field", "isConnectionString");
+                update.put("val", true);
+                update.put("op", "set");
                 updates.add(new Gson().toJson(update));
             }
 
