@@ -923,6 +923,20 @@ func (s *Service) BackpressureSnapshot() mcp.ScanBackpressureSnapshot {
 	return mcp.GetScanBackpressureSnapshot()
 }
 
+// withValidationDeadline caps the synchronous validate path with a single
+// absolute deadline (config.ValidationTimeoutMs). It cascades to every parallel
+// policy goroutine, async scanner wait, and /scan call at once — because
+// executeAsyncTasks honors a parent deadline and context.WithTimeout takes the
+// earlier of parent/child — so the whole request fails open before the caller's
+// client timeout fires. The returned cancel must always be called. Returns the
+// ctx unchanged (with a no-op cancel) when disabled (<=0).
+func (s *Service) withValidationDeadline(ctx context.Context) (context.Context, context.CancelFunc) {
+	if s.config == nil || s.config.ValidationTimeoutMs <= 0 {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, time.Duration(s.config.ValidationTimeoutMs)*time.Millisecond)
+}
+
 // ValidateRequest validates a request payload against guardrail policies with session tracking
 func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRequestParams, sessionID string, requestID string) (*mcp.ValidationResult, error) {
 	start := time.Now()
@@ -1060,7 +1074,9 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// boundary (executeSingleScannerTask), so only the agent-guard /scan fan-out
 	// is shed when degraded — local PII/regex/token-limit filters always run.
 	processStart := time.Now()
-	processResult, err := s.processor.ProcessRequestParallel(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
+	procCtx, cancelProc := s.withValidationDeadline(ctx)
+	defer cancelProc()
+	processResult, err := s.processor.ProcessRequestParallel(procCtx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
 	if err != nil {
 		s.logger.Error("ValidateRequest - ProcessRequestParallel failed",
 			zap.String("path", params.Path),
@@ -1219,7 +1235,9 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	// backpressure is applied inside the mcp processor at the remote-scanner
 	// boundary, so only the agent-guard /scan call is shed when degraded.
 	processStart := time.Now()
-	processResult, err := s.processor.ProcessResponseParallel(ctx, responseBodyForValidation, valCtx, policies)
+	procCtx, cancelProc := s.withValidationDeadline(ctx)
+	defer cancelProc()
+	processResult, err := s.processor.ProcessResponseParallel(procCtx, responseBodyForValidation, valCtx, policies)
 	if err != nil {
 		s.logger.Error("ValidateResponse - ProcessResponseParallel failed",
 			zap.String("path", params.Path),
