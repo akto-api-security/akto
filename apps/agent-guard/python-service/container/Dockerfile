@@ -22,6 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/scanner_service.py .
 COPY src/intent_analyzer.py .
 COPY src/llm_scanner.py .
+COPY src/heuristic_code_scanner.py .
 COPY src/model_map.py .
 COPY src/providers.py .
 COPY src/constants.py .
