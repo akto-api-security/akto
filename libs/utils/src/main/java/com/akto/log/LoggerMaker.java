@@ -214,12 +214,18 @@ public class LoggerMaker {
         }
     }
 
+    private String activityPrefix() {
+        Log.ActivityType type = Context.activityType.get();
+        String id = Context.activityId.get();
+        if (type == Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY && id != null && !id.isEmpty()) {
+            return "trrs: " + id + ", ";
+        }
+        return "";
+    }
+
     private String formatMessageWithAccountId(String info) {
         StringBuilder sb = new StringBuilder();
-        String summaryId = Context.testRunResultSummaryId.get();
-        if (summaryId != null && !summaryId.isEmpty()) {
-            sb.append("trrs: ").append(summaryId).append(", ");
-        }
+        sb.append(activityPrefix());
         sb.append("acc: ").append(Context.getActualAccountId()).append(", ").append(info);
         return sb.toString();
     }
@@ -252,6 +258,8 @@ public class LoggerMaker {
         if(checkUpdate()){
             String text = aClass + " : " + " [" + moduleId + " ] " + infoMessage;
             Log log = new Log(text, "info", Context.now());
+            log.setActivityId(Context.activityId.get());
+            log.setActivityType(Context.activityType.get());
             dataActor.insertTestingLog(log);
             logCount++;
         }
@@ -306,7 +314,8 @@ public class LoggerMaker {
         }
 
         Log log = new Log(text, key, Context.now());
-        log.setTestRunResultSummaryId(Context.testRunResultSummaryId.get());
+        log.setActivityId(Context.activityId.get());
+        log.setActivityType(Context.activityType.get());
 
         if(checkUpdate() && db!=null){
             switch(db){

@@ -10,6 +10,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
+import com.akto.dto.Log;
 import com.akto.dto.DependencyNode;
 import com.akto.dto.DependencyNode.ParamInfo;
 import com.akto.dto.OriginalHttpRequest;
@@ -905,9 +906,11 @@ public class TestExecutor {
         List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, CountDownLatch latch, Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap) {
 
         Context.accountId.set(accountId);
-        String previousSummaryIdContext = Context.testRunResultSummaryId.get();
+        String previousActivityId = Context.activityId.get();
+        Log.ActivityType previousActivityType = Context.activityType.get();
         if (summaryId != null) {
-            Context.testRunResultSummaryId.set(summaryId.toHexString());
+            Context.activityId.set(summaryId.toHexString());
+            Context.activityType.set(Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY);
         }
         loggerMaker.warnAndAddToDb("Starting test for " + apiInfoKey);
         AtomicBoolean isApiInfoTested = new AtomicBoolean(false);
@@ -925,7 +928,8 @@ public class TestExecutor {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
         } finally {
-            Context.testRunResultSummaryId.set(previousSummaryIdContext);
+            Context.activityId.set(previousActivityId);
+            Context.activityType.set(previousActivityType);
         }
         if(isApiInfoTested.get()){
             loggerMaker.warnAndAddToDb("API: " + apiInfoKey.toString() + " has been successfully tested");
@@ -1117,7 +1121,8 @@ public class TestExecutor {
             Future<TestingRunResult> future = legacyTestTimeoutExecutor.submit(() -> {
                 Context.accountId.set(currentAccountId);
                 if (summaryId != null) {
-                    Context.testRunResultSummaryId.set(summaryId.toHexString());
+                    Context.activityId.set(summaryId.toHexString());
+                    Context.activityType.set(Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY);
                 }
                 try {
                     TestingRunResult legacyResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig,
@@ -1125,7 +1130,8 @@ public class TestExecutor {
                     persistTestLogsToDb(legacyResult != null ? legacyResult.getTestLogs() : null);
                     return legacyResult;
                 } finally {
-                    Context.testRunResultSummaryId.remove();
+                    Context.activityId.remove();
+                    Context.activityType.remove();
                 }
             });
             try {
@@ -1151,7 +1157,7 @@ public class TestExecutor {
     /**
      * Persists the per-test transient testLogs (which are @BsonIgnore on TestingRunResult and would
      * otherwise be dropped) into the TESTING logs collection. The current thread's
-     * Context.testRunResultSummaryId is expected to be set so each line is scoped to the run summary.
+     * Context.activityId/activityType (TESTING_RUN_RESULT_SUMMARY_ACTIVITY) is expected to be set so each line is scoped to the run summary.
      */
     public void persistTestLogsToDb(List<TestingRunResult.TestLog> testLogs) {
         if (testLogs == null || testLogs.isEmpty()) {
