@@ -179,6 +179,12 @@ async def scan_payload(
                 scan_diag.log_intent_decision(
                     "escalate", agent_host, scanner_name, decided, timer, extra=log_extra,
                 )
+                # Lazy corpus warm: on the first cold-start ESCALATE for this agent,
+                # load its prior training examples from db-abstractor and re-fit the
+                # per-agent LogReg. Fire-and-forget — current request already ESCALATEs;
+                # subsequent requests on this pod benefit from the warmed classifier.
+                if fast.get("p_malicious_clf") is None:
+                    schedule(intent_corpus.warmup(agent_host))
 
         # Cache miss (or cache not serving): only now does backpressure fail-open
         # to avoid paying for the slow cascade while Vertex latency is elevated.

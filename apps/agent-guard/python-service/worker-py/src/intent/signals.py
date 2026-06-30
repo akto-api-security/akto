@@ -48,9 +48,18 @@ _ATTACK_PATTERNS: Dict[str, List[re.Pattern]] = {
         re.compile(r"(?i)\bdisable\b.*\b(2fa|mfa|two.?factor|multi.?factor|authenticator)\b"),
     ],
     "system_override": [
+        # Classic prompt injection: "ignore/forget/override all previous instructions"
         re.compile(r"(?i)(ignore|disregard|forget|override)\b.*\b(previous|prior|above|all)?\b.*\b(instruction|rule|policy|guideline|system prompt)s?\b"),
-        re.compile(r"(?i)you are now\b.*\b(admin|root|superuser|unrestricted|dan)\b"),
+        # Identity hijack: "you are now DAN / an unrestricted AI / a root user"
+        re.compile(r"(?i)you are now\b.*\b(admin|root|superuser|unrestricted|dan|jailbreak)\b"),
+        re.compile(r"(?i)\b(pretend|act|behave)\b.*\b(you are|you're|as if)\b.*\b(unrestricted|no (limit|filter|restriction)|without (rule|guideline|restriction))\b"),
+        re.compile(r"(?i)\byour (new |true )?(identity|persona|role|name)\b.*\b(is|are)\b"),
+        # System prompt extraction
         re.compile(r"(?i)reveal\b.*\b(system prompt|initial instructions)\b"),
+        re.compile(r"(?i)(print|output|show|repeat|tell me)\b.*\b(system prompt|initial instruction|your instructions)\b"),
+        # DAN / jailbreak mode triggers
+        re.compile(r"(?i)\b(DAN|jailbreak|dev mode|developer mode|god mode|unrestricted mode)\b.*\b(mode|enabled?|on|activated?)\b"),
+        re.compile(r"(?i)\benable\b.*\b(DAN|developer mode|jailbreak|unrestricted)\b"),
     ],
 }
 

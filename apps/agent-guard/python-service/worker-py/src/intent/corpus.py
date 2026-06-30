@@ -23,20 +23,21 @@ Design:
 import asyncio
 import logging
 from collections import deque
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from settings import settings
 
 logger = logging.getLogger(__name__)
 
-_BATCH_SIZE = 50      # flush when buffer reaches this many examples
+_BATCH_SIZE = 20      # flush when buffer reaches this many examples
 _MAX_BUFFER  = 2000   # hard cap: deque drops oldest when full
-_ENDPOINT    = "/api/intent-corpus/bulk"
+_ENDPOINT      = "/api/bulkInsertCorpusExamples"
+_LOAD_ENDPOINT = "/api/loadCorpusForAgent"
 
 # In-process buffer shared across all async tasks on this pod.
 _buffer: "deque[Dict[str, Any]]" = deque(maxlen=_MAX_BUFFER)
-# Prevent concurrent flushes from sending the same examples twice.
 _flush_lock: Optional[asyncio.Lock] = None
+_warmed: set = set()
 
 
 def _get_lock() -> asyncio.Lock:
@@ -77,6 +78,77 @@ def queue(
         "confidence":   round(float(confidence), 4),
     })
     return len(_buffer) >= _BATCH_SIZE
+
+
+async def load(agent_host: str) -> List[Tuple[List[float], bool]]:
+    """Fetch stored training examples for agent_host from the database-abstractor.
+
+    Returns a list of (vector, is_valid) pairs ready to feed into trainer.record().
+    Returns [] on any error or when the URL is not configured — fail-open.
+    """
+    base = (getattr(settings, "DATABASE_ABSTRACTOR_SERVICE_URL", "") or "").rstrip("/")
+    if not base:
+        return []
+    url = f"{base}{_LOAD_ENDPOINT}"
+    try:
+        import http_client
+        client = http_client.get_client()
+        resp = await client.post(
+            url,
+            json={"agent_host": agent_host},
+            headers={"Accept-Encoding": "identity"},
+            timeout=10.0,
+        )
+        if resp.status_code >= 400:
+            logger.warning(f"[corpus] load returned {resp.status_code} for agent={agent_host!r}")
+            return []
+        data = resp.json()
+        examples = data.get("examples") or []
+        # Each item is a bucket: {vectors: [[384 floats], ...], is_valid: bool}.
+        # Flatten all vectors across all buckets into (vector, is_valid) pairs.
+        return [
+            (vec, bool(ex["is_valid"]))
+            for ex in examples
+            if "vectors" in ex and "is_valid" in ex
+            for vec in ex["vectors"]
+            if vec
+        ]
+    except Exception as exc:
+        logger.warning(f"[corpus] load failed for agent={agent_host!r}: {exc}")
+        return []
+
+
+async def warmup(agent_host: str) -> None:
+    """Lazy-load prior corpus for agent_host and warm the per-agent LogReg classifier.
+
+    Called fire-and-forget on the first cold-start ESCALATE for an agent.
+    Runs once per agent per pod lifetime — the _warmed guard prevents duplicate
+    loads even when multiple requests race to the same cold agent simultaneously
+    (asyncio is single-threaded so the add happens before the first await).
+    """
+    if not agent_host or agent_host in _warmed:
+        return
+    _warmed.add(agent_host)
+
+    examples = await load(agent_host)
+    if not examples:
+        logger.debug(f"[corpus] no prior examples for agent={agent_host!r} — staying cold")
+        return
+
+    from intent import trainer as _trainer  # local import avoids circular dependency
+    crossed = False
+    for vec, is_valid in examples:
+        if _trainer.record(agent_host, vec, is_valid):
+            crossed = True
+
+    if crossed:
+        await _trainer.train_now(agent_host)
+        logger.info(f"[corpus] warmed agent={agent_host!r} classifier with {len(examples)} examples")
+    else:
+        logger.debug(
+            f"[corpus] loaded {len(examples)} examples for agent={agent_host!r}"
+            f" — below train threshold, classifier still cold"
+        )
 
 
 async def flush() -> None:
