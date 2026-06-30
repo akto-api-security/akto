@@ -92,8 +92,8 @@ public class WebSocketEventProcessor {
                     time,
                     accountId,
                     false,
-                    HttpResponseParams.Source.MIRRORING,  
-                    buildOriginalMessage(jsonMap, wsEndpointPath, event),
+                    HttpResponseParams.Source.MIRRORING,
+                    buildOriginalMessage(jsonMap, wsEndpointPath, event, "WS"),
                     ""
                 );
                 
@@ -237,7 +237,7 @@ public class WebSocketEventProcessor {
                 WEBSOCKET_TYPE, 101, "Switching Protocols", responseHeaders, "",
                 requestParams, time, accountId, false,
                 HttpResponseParams.Source.MIRRORING,
-                buildOriginalMessage(jsonMap, wsEndpointPath, null), ""
+                buildOriginalMessage(jsonMap, wsEndpointPath, null, "GET"), ""
             );
         } catch (Exception e) {
             loggerMaker.error("Error building WebSocket handshake response param: " + e.getMessage());
@@ -246,7 +246,7 @@ public class WebSocketEventProcessor {
     }
 
     private static String buildOriginalMessage(Map<String, Object> jsonMap, String wsEndpointPath,
-            WebSocketMessageParser.WebSocketEvent event) {
+            WebSocketMessageParser.WebSocketEvent event, String method) {
         Map<String, Object> messageMap = new java.util.HashMap<>(jsonMap);
 
         String path = wsEndpointPath != null ? wsEndpointPath : "/ws";
@@ -270,7 +270,7 @@ public class WebSocketEventProcessor {
             messageMap.put("type", "WEBSOCKET");
         }
         if (!messageMap.containsKey("method")) {
-            messageMap.put("method", "GET");
+            messageMap.put("method", method);
         }
         if (!messageMap.containsKey("statusCode")) {
             messageMap.put("statusCode", 101);
