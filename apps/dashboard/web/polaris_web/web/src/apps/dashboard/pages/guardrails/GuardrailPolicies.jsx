@@ -557,6 +557,8 @@ function GuardrailPolicies() {
                 ...(guardrailData.sentimentDetection ? { sentimentDetection: guardrailData.sentimentDetection } : {}),
                 ...(guardrailData.tokenLimitDetection ? { tokenLimitDetection: guardrailData.tokenLimitDetection } : {}),
                 applyToAllServers: guardrailData.applyToAllServers ?? true,
+                targetTeams: guardrailData.targetTeams || [],
+                targetRoles: guardrailData.targetRoles || [],
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
                 behaviour: guardrailData.behaviour != null
