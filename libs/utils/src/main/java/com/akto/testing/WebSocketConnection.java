@@ -69,17 +69,32 @@ public class WebSocketConnection {
 
     public String getNextResponse(long timeoutMs) throws TimeoutException, InterruptedException {
         long deadline = System.currentTimeMillis() + timeoutMs;
+        TimestampedMessage resultMsg = null;
+        
         while (System.currentTimeMillis() < deadline) {
-            TimestampedMessage msg = receivedMessages.poll();
-            if (msg != null) {
-                if (msg.receivedAt < lastSentAt || isPingPong(msg.content)) {
-                    // Pre-send frame or ping/pong — discard and keep polling.
-                    continue;
+            // Find the most recent valid message (since queue was drained before send)
+            TimestampedMessage msg = null;
+            Iterator<TimestampedMessage> iter = receivedMessages.iterator();
+            while (iter.hasNext()) {
+                TimestampedMessage candidate = iter.next();
+                if (candidate.receivedAt >= lastSentAt && !isPingPong(candidate.content)) {
+                    msg = candidate;  // Keep updating to get the most recent
                 }
-                loggerMaker.infoAndAddToDb("WebSocket response received: " + msg.content.substring(0, Math.min(100, msg.content.length())), LogDb.TESTING);
-                return msg.content;
+            }
+            
+            if (msg != null) {
+                resultMsg = msg;
+                break;  // Found it, exit the timeout loop
             }
             Thread.sleep(10);
+        }
+        
+        // Clear all messages (whether we found one or timed out)
+        receivedMessages.clear();
+        
+        if (resultMsg != null) {
+            loggerMaker.infoAndAddToDb("WebSocket response received: " + resultMsg.content.substring(0, Math.min(100, resultMsg.content.length())), LogDb.TESTING);
+            return resultMsg.content;
         }
         throw new TimeoutException("No response received within " + timeoutMs + "ms");
     }

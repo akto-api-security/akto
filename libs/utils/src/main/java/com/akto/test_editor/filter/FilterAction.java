@@ -316,6 +316,18 @@ public final class FilterAction {
         if (rawApi == null) {
             return new DataOperandsFilterResponse(false, null, null, null);
         }
+
+        // For WS connection string endpoints, only bypass request validation.
+        // Still check if response exists and is not null.
+        if (rawApi != null && rawApi.getRequest() != null
+                && rawApi.getRequest().isConnectionString()) {
+            OriginalHttpResponse response = rawApi.getResponse();
+            if (response == null || response.getBody() == null) {
+                return new DataOperandsFilterResponse(true, null, null, null);
+            }
+            // Response exists, allow normal validation to proceed
+        }
+
         OriginalHttpResponse response = rawApi.getResponse();
         if (response == null) {
             return new DataOperandsFilterResponse(false, null, null, null);

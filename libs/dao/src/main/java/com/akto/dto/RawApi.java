@@ -51,6 +51,81 @@ public class RawApi {
 
         return new RawApi(request, response, message);
     }
+    public static RawApi buildFromMessages(List<String> messages, boolean checkResponsePayloadParsing) {
+        if (messages == null || messages.isEmpty()) return null;
+        if (isWebSocketSampleList(messages)) {
+            return buildFromWebSocketSamples(messages);
+        }
+        return buildFromMessage(messages.get(messages.size() - 1), checkResponsePayloadParsing);
+    }
+
+    private static boolean isWebSocketSampleList(List<String> messages) {
+        for (String msg : messages) {
+            if (msg != null && !msg.isEmpty()) {
+                return msg.contains("\"WEBSOCKET\"");
+            }
+        }
+        return false;
+    }
+
+
+    public static RawApi buildFromWebSocketSamples(List<String> messages) {
+        if (messages == null || messages.isEmpty()) return null;
+
+        String incomingSampleMsg = null;
+        String incomingPayload  = null;
+        String outgoingPayload  = null;
+
+        for (String message : messages) {
+            if (message == null || message.isEmpty()) continue;
+            try {
+                BasicDBObject json = BasicDBObject.parse(message);
+                if (!OriginalHttpRequest.WEBSOCKET_TYPE.equalsIgnoreCase(json.getString("type"))) continue;
+
+                String responsePayload = json.getString("responsePayload");
+                if (responsePayload == null || responsePayload.isEmpty()) continue;
+
+                BasicDBObject eventObj = BasicDBObject.parse(responsePayload);
+                String direction = eventObj.getString("direction");
+                String payload   = eventObj.getString("payload");
+                if (payload == null || payload.isEmpty()) continue;
+
+                if (OriginalHttpRequest.WS_DIRECTION_INCOMING.equalsIgnoreCase(direction) && incomingPayload == null) {
+                    incomingPayload  = payload;
+                    incomingSampleMsg = message;
+                } else if (OriginalHttpRequest.WS_DIRECTION_OUTGOING.equalsIgnoreCase(direction) && outgoingPayload == null) {
+                    outgoingPayload = payload;
+                }
+            } catch (Exception ignored) {}
+
+            if (incomingPayload != null && outgoingPayload != null) break;
+        }
+
+        // Use the incoming sample as the base (carries the correct headers/URL/auth).
+        // Fall back to the last sample if no incoming frame was found.
+        String baseMsg = incomingSampleMsg != null ? incomingSampleMsg : messages.get(messages.size() - 1);
+        RawApi base = buildFromMessage(baseMsg, true);
+        if (base == null) return null;
+
+        if (incomingPayload != null) {
+            base.getRequest().setBody(incomingPayload);
+        }
+        if (outgoingPayload != null && base.getResponse() != null) {
+            base.getResponse().setBody(outgoingPayload);
+            base.getResponse().setStatusCode(200);
+        }
+
+        // Patch originalMessage so stored test results reflect the merged bodies
+        // rather than the raw sample's requestPayload:{} / responsePayload:<event-object>.
+        try {
+            BasicDBObject msgJson = BasicDBObject.parse(baseMsg);
+            msgJson.put("requestPayload", incomingPayload != null ? incomingPayload : "{}");
+            msgJson.put("responsePayload", outgoingPayload != null ? outgoingPayload : "{}");
+            base.setOriginalMessage(msgJson.toJson());
+        } catch (Exception ignored) {}
+
+        return base;
+    }
 
     public BasicDBObject fetchReqPayload() {
         OriginalHttpRequest req = this.getRequest();

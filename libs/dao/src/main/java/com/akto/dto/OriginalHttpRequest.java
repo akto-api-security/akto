@@ -17,6 +17,15 @@ import java.util.*;
 
 public class OriginalHttpRequest {
 
+    public enum ProtocolType {
+        HTTP,
+        WEBSOCKET
+    }
+
+    public static final String WEBSOCKET_TYPE = "WEBSOCKET";
+    public static final String WS_DIRECTION_INCOMING = "incoming";
+    public static final String WS_DIRECTION_OUTGOING = "outgoing";
+
     private static final Gson gson = new Gson();
     private String url;
     private String type;
@@ -24,6 +33,8 @@ public class OriginalHttpRequest {
     private String method;
     private String body;
     private Map<String, List<String>> headers;
+    private ProtocolType protocolType = ProtocolType.HTTP;
+    private boolean isConnectionString;
 
     @Getter
     @Setter
@@ -70,6 +81,8 @@ public class OriginalHttpRequest {
         );
         copy.digestAuthUsername = this.digestAuthUsername;
         copy.digestAuthPassword = this.digestAuthPassword;
+        copy.protocolType = this.protocolType;
+        copy.isConnectionString = this.isConnectionString;
         return copy;
     }
 
@@ -85,10 +98,15 @@ public class OriginalHttpRequest {
 
         this.type = (String) json.get("type");
 
+        // Detect WebSocket from the sample's "type" field and set protocolType accordingly
+        if (WEBSOCKET_TYPE.equalsIgnoreCase(this.type)) {
+            this.protocolType = ProtocolType.WEBSOCKET;
+        }
+
         this.method = (String) json.get("method");
 
         String requestPayload = (String) json.get("requestPayload");
-        this.body = requestPayload.trim();
+        this.body = requestPayload != null ? requestPayload.trim() : "";
 
         this.headers = buildHeadersMap(json, "requestHeaders");
     }
@@ -450,6 +468,26 @@ public class OriginalHttpRequest {
             }
         }
         return gson.toJson(filteredHeaders);
+    }
+
+    public ProtocolType getProtocolType() {
+        return this.protocolType;
+    }
+
+    public void setProtocolType(ProtocolType protocolType) {
+        this.protocolType = protocolType;
+    }
+
+    public boolean isConnectionString() {
+        return isConnectionString;
+    }
+
+    public void setIsConnectionString(boolean isConnectionString) {
+        this.isConnectionString = isConnectionString;
+    }
+
+    public static ProtocolType detectProtocolType(String url) {
+        return ProtocolType.HTTP;
     }
 
     @Override
