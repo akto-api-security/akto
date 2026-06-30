@@ -2536,7 +2536,12 @@ public class InitializerListener implements ServletContextListener {
                     }
                 } while (!connectedToMongo);
 
-                LiquibaseStartupMigrator.runIfEnabled(mongoURI);
+                try {
+                    LiquibaseStartupMigrator.runIfEnabled(mongoURI);
+                } catch (Exception e) {
+                    logger.errorAndAddToDb(e, "Liquibase startup migrations failed — aborting initialization");
+                    throw new RuntimeException("Liquibase startup migrations failed", e);
+                }
 
                 if (DashboardMode.isOnPremDeployment()) {
                     Context.accountId.set(1_000_000);
@@ -3739,7 +3744,9 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void runInitializerFunctions() {
-        DaoInit.createIndices();
+        if (!LiquibaseStartupMigrator.isMigrationEnabled()) {
+            DaoInit.createIndices();
+        }
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
