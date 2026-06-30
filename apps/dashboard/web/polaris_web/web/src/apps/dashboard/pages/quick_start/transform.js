@@ -463,11 +463,11 @@ const awsAgentCoreObj = {
 const amazonQuickObj = {
     icon: '/public/aws.svg',
     label: "Amazon Quick",
-    text: "Import your Amazon Quick chat conversations, seamlessly into AKTO.",
+    text: "Import your Amazon Quick AI agents and conversations, seamlessly into AKTO.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-amazon-quick',
     key: "AMAZON_QUICK",
     component: <BannerComponent
-        content="Import your Amazon Quick chat conversations, seamlessly in AKTO."
+        content="Import your Amazon Quick AI agents and conversations, seamlessly in AKTO."
         docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-amazon-quick'
     />
 }
