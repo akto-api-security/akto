@@ -1340,7 +1340,7 @@ const claudeCoworkObj = {
     icon: '/public/claude.svg',
     label: "Claude Cowork",
     text: "Secure your Claude Cowork interactions with Akto guardrails.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-cowork-connector',
     key: "CLAUDE_COWORK",
     component: <AddOnComponenet/>
 }
