@@ -184,6 +184,19 @@ public class LoggerMaker  {
         return "";
     }
 
+    /**
+     * Stamps the current thread's activity context onto the log only when both the type and a
+     * non-empty id are present. Leaves the fields unset otherwise so null is never persisted/printed.
+     */
+    private static void applyActivityContext(Log log) {
+        Log.ActivityType type = Context.activityType.get();
+        String id = Context.activityId.get();
+        if (type != null && id != null && !id.isEmpty()) {
+            log.setActivityId(id);
+            log.setActivityType(type);
+        }
+    }
+
     protected String basicError(String err, LogDb db) {
         if(Context.accountId.get() != null){
             err = String.format("%s%s\nAccount id: %d", activityPrefix(), err, Context.accountId.get());
@@ -340,8 +353,7 @@ public class LoggerMaker  {
 
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
-        log.setActivityId(Context.activityId.get());
-        log.setActivityType(Context.activityType.get());
+        applyActivityContext(log);
         if(checkUpdate() && db!=null){
             switch(db){
                 case TESTING: 
