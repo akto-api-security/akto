@@ -55,6 +55,10 @@ _FIELDS = (
     # (shadow mode) and the request still ESCALATEs to the LLM cascade. Set to
     # "true" to enforce intent decisions and skip the cascade.
     "INTENT_ACT",
+    # INTENT_LOG_FILE: path to an append-only JSONL audit log. Each line records
+    # the prompt, nearest-neighbour match, p_clf, and decision path so you can
+    # monitor classifier accuracy without tailing terminal logs. Unset = disabled.
+    "INTENT_LOG_FILE",
 )
 
 

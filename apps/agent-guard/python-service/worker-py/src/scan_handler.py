@@ -17,6 +17,7 @@ from constants import (
     get_default_config,
     strip_qwen_tier,
 )
+from intent import audit_log as intent_audit
 from intent import corpus as intent_corpus
 from intent import decision as intent_decision
 from intent import prefilter, trainer
@@ -161,6 +162,19 @@ async def scan_payload(
                     "p_clf": fast.get("p_malicious_clf"),
                     "chunks": chunk_count,
                 }
+                _neighbor = (prep or {}).get("cached")
+                _audit_kwargs = dict(
+                    agent=agent_host,
+                    scanner=scanner_name,
+                    prompt=text,
+                    norm_text=norm_text,
+                    p_clf=fast.get("p_malicious_clf"),
+                    reason=fast["reason"],
+                    task=fast["intent"]["task"],
+                    risk=fast["intent"]["risk"],
+                    scope_distance=fast["intent"].get("scope_distance"),
+                    neighbor=_neighbor,
+                )
                 if decided in (intent_decision.ALLOW, intent_decision.BLOCK):
                     if prefilter.act():
                         is_valid = decided == intent_decision.ALLOW
@@ -168,6 +182,7 @@ async def scan_payload(
                             decided.lower(), agent_host, scanner_name, decided,
                             timer, extra=log_extra, always=True,
                         )
+                        intent_audit.append(f"intent_{decided.lower()}", **_audit_kwargs)
                         return shape_response(scanner_name, is_valid, 0.0 if is_valid else 1.0, text, {
                             "scanner_type": scanner_type,
                             "prefilter": decided.lower(),
@@ -181,10 +196,13 @@ async def scan_payload(
                         f"{decided.lower()}_shadow", agent_host, scanner_name, decided,
                         timer, extra=log_extra, always=True,
                     )
+                    intent_audit.append(f"intent_{decided.lower()}_shadow", **_audit_kwargs)
                 # ESCALATE (or shadow): log the intent timings/result, then fall through to the cascade.
                 scan_diag.log_intent_decision(
                     "escalate", agent_host, scanner_name, decided, timer, extra=log_extra,
                 )
+                if decided == intent_decision.ESCALATE:
+                    intent_audit.append("intent_escalate", **_audit_kwargs)
                 # Lazy corpus warm: on the first cold-start ESCALATE for this agent,
                 # load its prior training examples from db-abstractor and re-fit the
                 # per-agent LogReg. Fire-and-forget — current request already ESCALATEs;
