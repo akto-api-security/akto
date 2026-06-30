@@ -25,6 +25,14 @@ on:
           - agent-guard-worker
           - agent-guard-anonymizer
           - agent-guard-embedder
+      skipTests:
+        description: 'Skip unit tests'
+        type: boolean
+        default: false
+      skipFrontendBuild:
+        description: 'Skip dashboard frontend build and S3 sync'
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -87,12 +95,18 @@ jobs:
         run: bash apps/dashboard/scripts/download-dashboard-vendor-assets.sh
 
       - name: Build Dashboard polaris UI
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.skipFrontendBuild != 'true'
         working-directory: ./apps/dashboard/web/polaris_web
         run: |
           npm install
           RELEASE_VERSION=${{ steps.docker_tag.outputs.IMAGE_TAG }} npm run build
 
-      - run: mvn package -Dakto-image-tag=${{ steps.docker_tag.outputs.IMAGE_TAG }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
+      - name: Run mvn package
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.skipTests != 'true'
+        run: mvn package -Dakto-image-tag=${{ steps.docker_tag.outputs.IMAGE_TAG }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
+      - name: Run mvn package (skip tests)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.skipTests == 'true'
+        run: mvn package -Dakto-image-tag=${{ steps.docker_tag.outputs.IMAGE_TAG }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}} -DskipTests
 
       - name: DockerHub login
         env:
@@ -185,7 +199,9 @@ jobs:
           ) &
           PID_DATA_INGESTION=$!
 
-          aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/$IMAGE_TAG/dist --delete
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ "${{ github.event.inputs.skipFrontendBuild }}" != "true" ]; then
+            aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/$IMAGE_TAG/dist --delete
+          fi
           (
             cd apps/dashboard
             docker buildx build --platform linux/arm64/v8,linux/amd64 \
