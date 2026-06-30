@@ -307,6 +307,34 @@ public class FilterValidationTests {
     }
 
     @Test
+    public void testJwtSigningAlgConditions() {
+        Map<String, Object> config = initconfig();
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "https://epsilon.6sense.com:443/v3/company/details", Method.PUT);
+        RawApi rawApi = initRawapi(apiInfoKey);
+
+        com.akto.dao.test_editor.filter.ConfigParser parser = new com.akto.dao.test_editor.filter.ConfigParser();
+        Filter filter = new Filter();
+        Map<String, Object> varMap = new HashMap<>();
+        
+        Object filterObj1 = config.get("jwt_signing_alg_RS256");
+        ConfigParserResult configParserResult1 = parser.parse(filterObj1);
+        DataOperandsFilterResponse dataOperandsFilterResponse1 = filter.isEndpointValid(configParserResult1.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
+        assertEquals(true, dataOperandsFilterResponse1.getResult());
+
+        Object filterObj2 = config.get("jwt_signing_alg_HS256");
+        ConfigParserResult configParserResult2 = parser.parse(filterObj2);
+        DataOperandsFilterResponse dataOperandsFilterResponse2 = filter.isEndpointValid(configParserResult2.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
+        assertEquals(false, dataOperandsFilterResponse2.getResult());
+
+        Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
+        headers.remove("authorization");
+        rawApi.getRequest().setHeaders(headers);
+        DataOperandsFilterResponse dataOperandsFilterResponse3 = filter.isEndpointValid(configParserResult1.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
+        assertEquals(false, dataOperandsFilterResponse3.getResult());
+    }
+
+
+    @Test
     public void testRegexConditions() {
         Map<String, Object> config = initconfig();
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "https://epsilon.6sense.com:443/v3/company/details", Method.PUT);
