@@ -281,6 +281,12 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
 // Service name can contain dots (e.g., "mcp.razorpay.com" from "123.456.mcp.razorpay.com")
 const ASSET_TAG_KEYS_SET = new Set(Object.values(ASSET_TAG_KEYS));
 
+// Returns true if the collection has an asset-owner tag (Atlas ai-agent/mcp-client)
+// or the older connector agent-name tag. Used to exclude agent-owned gen-ai collections
+// from service groups and from Argus source-id groups.
+const hasAgentOwnerTag = (envType) =>
+    (envType || []).some(t => ASSET_TAG_KEYS_SET.has(t.keyName) || t.keyName === "agent-name");
+
 export const groupCollectionsByService = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}) => {
     const services = {};
     
@@ -294,11 +300,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
         // gen-ai collections WITHOUT any such tag are standalone assets that predate the
         // tagging scheme and must still appear.
         if (typeTag.keyName === TYPE_TAG_KEYS.GEN_AI) {
-            const tags = c.envType || [];
-            const hasAgentOwner = tags.some(t =>
-                ASSET_TAG_KEYS_SET.has(t.keyName) || t.keyName === "agent-name"
-            );
-            if (hasAgentOwner) return;
+            if (hasAgentOwnerTag(c.envType)) return;
         }
 
         const hostName = c.hostName || c.displayName || c.name;
@@ -371,6 +373,29 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore,
     }));
+};
+
+// Groups Argus gen-ai collections (no asset owner tag) by source-id (hostname parts[1]).
+// Option values match what Argus policies store in selectedAgentServers (e.g. "cursor", "claude1").
+export const groupArgusAgentsBySourceId = (collections) => {
+    const agents = {};
+    collections.forEach((c) => {
+        if (c.deactivated) return;
+        const typeTag = findTypeTag(c.envType);
+        if (!typeTag || typeTag.keyName !== TYPE_TAG_KEYS.GEN_AI) return;
+        if (hasAgentOwnerTag(c.envType)) return;
+        const hostName = c.hostName || c.displayName || c.name;
+        if (!hostName) return;
+        const parts = hostName.split('.');
+        if (parts.length < 3) return;
+        const sourceId = parts[1];
+        if (!sourceId) return;
+        if (!agents[sourceId]) {
+            agents[sourceId] = { groupKey: sourceId, collections: [] };
+        }
+        agents[sourceId].collections.push(c);
+    });
+    return Object.values(agents);
 };
 
 // Group collections by skill tag value — one row per unique skill name
@@ -481,6 +506,8 @@ const finalizeHostGroupedRow = (g, idSegment) => {
         hasPersonalAccount: g.hasPersonalAccount || false,
         hasLocalMcpServer: g.hasLocalMcpServer || false,
         hasMisconfiguredConfig: g.hasMisconfiguredConfig || false,
+        teamSource: g.teamSource || 'sso',
+        roleSource: g.roleSource || 'sso',
     };
 };
 
@@ -550,6 +577,8 @@ export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMa
                 nonSkillCollectionsCount: 0,
                 team: meta.team || '',
                 userRole: meta.userRole || '',
+                teamSource: meta.teamSource || 'sso',
+                roleSource: meta.roleSource || 'sso',
             };
         }
         const g = users[username];
