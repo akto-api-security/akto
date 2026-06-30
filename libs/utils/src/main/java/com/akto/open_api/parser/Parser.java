@@ -241,8 +241,6 @@ public class Parser {
                     List<Map<String, String>> responseObjectList = new ArrayList<>();
 
                     try {
-                        loggerMaker.infoAndAddToDb("Replaying request for " + path + " " + method + ", replaying request");
-
                         Map<String, List<String>> modifiedHeaders = new HashMap<>();
                         for (String key : requestHeaders.keySet()) {
                             modifiedHeaders.put(key, Collections.singletonList(requestHeaders.get(key)));
@@ -256,6 +254,7 @@ public class Parser {
                             if (skipLiveReplay) {
                                 throw new Exception("Live replay skipped by user, falling back to spec examples");
                             }
+                            loggerMaker.infoAndAddToDb("Replaying request for " + path + " " + method);
                             OriginalHttpResponse res = ApiExecutor.sendRequest(originalHttpRequest, true, null, false, new ArrayList<>());
                             responseHeadersString = convertHeaders(res.getHeaders());
                             responsePayload =  res.getBody();
