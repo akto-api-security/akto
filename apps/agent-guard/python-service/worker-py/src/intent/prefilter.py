@@ -22,9 +22,9 @@ from . import client, decision, payload, signals
 logger = logging.getLogger(__name__)
 
 _DEFAULT_MAX_CHUNKS = 16
-_DEFAULT_ALLOW_THRESHOLD = 0.85
+_DEFAULT_ALLOW_THRESHOLD = 0.80
 _DEFAULT_BLOCK_THRESHOLD = 0.80
-_DEFAULT_SCOPE_DISTANCE = 0.15
+_DEFAULT_SCOPE_DISTANCE = 0.30
 
 
 def enabled() -> bool:

@@ -218,7 +218,7 @@ async def scan_payload(
             #   2. trainer.record()   – buffers (vec, label) in-process; fires
             #                           /train when threshold is crossed so the
             #                           per-agent LogReg improves this pod.
-            #   3. corpus.queue()     – buffers (vec, triple, confidence) for a
+            #   3. corpus.queue()     – buffers (vec, triple) for a
             #                           batch flush to DATABASE_ABSTRACTOR_SERVICE_URL
             #                           so all pods share the training corpus and
             #                           examples survive pod restarts.
@@ -233,7 +233,6 @@ async def scan_payload(
                     "risk_intent":  details.get("risk_intent", ""),
                     "scope_bucket": details.get("scope_bucket", ""),
                 }
-                confidence = float(details.get("example_confidence") or result.get("decision_confidence") or 0.0)
                 if prep is not None:
                     vec = prep.get("vec")
                     is_valid_bool = bool(result.get("is_valid", True))
@@ -241,7 +240,7 @@ async def scan_payload(
                     if trainer.record(agent_host, vec, is_valid_bool):
                         schedule(trainer.train_now(agent_host))
                     # Durable cross-pod corpus (batch → database-abstractor → MongoDB)
-                    if intent_corpus.queue(agent_host, vec, is_valid_bool, triple, confidence):
+                    if intent_corpus.queue(agent_host, vec, is_valid_bool, triple):
                         schedule(intent_corpus.flush())
             # Per-scanner semantic cache: observe + warm (shadow in observe mode;
             # cache-warm + miss-comparison in decide mode). Fire-and-forget.

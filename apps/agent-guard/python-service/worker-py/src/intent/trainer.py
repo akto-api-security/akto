@@ -17,7 +17,7 @@ from settings import settings
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_RETRAIN_EVERY_N = 25
+_DEFAULT_RETRAIN_EVERY_N = 15
 _MAX_BUFFER = 2000  # cap retained examples per agent (most recent win)
 _TRAIN_TIMEOUT_S = 30.0
 

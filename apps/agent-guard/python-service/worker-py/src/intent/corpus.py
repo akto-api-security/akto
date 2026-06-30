@@ -57,7 +57,6 @@ def queue(
     vec: Optional[List[float]],
     is_valid: bool,
     triple: Dict[str, str],
-    confidence: float = 0.0,
 ) -> bool:
     """Append one learned example to the in-process buffer.
 
@@ -69,13 +68,11 @@ def queue(
     if not vec:
         return False
     _buffer.append({
-        "agent_host":   agent_host,
-        "vector":       vec,
-        "is_valid":     is_valid,
-        "task_intent":  triple.get("task_intent", ""),
-        "risk_intent":  triple.get("risk_intent", ""),
-        "scope_bucket": triple.get("scope_bucket", ""),
-        "confidence":   round(float(confidence), 4),
+        "agentHost":   agent_host,
+        "vectors":     [vec],          # Java expects List<List<Double>>
+        "isValid":     is_valid,
+        "taskIntent":  triple.get("task_intent", ""),
+        "scopeBucket": triple.get("scope_bucket", ""),
     })
     return len(_buffer) >= _BATCH_SIZE
 
@@ -95,7 +92,7 @@ async def load(agent_host: str) -> List[Tuple[List[float], bool]]:
         client = http_client.get_client()
         resp = await client.post(
             url,
-            json={"agent_host": agent_host},
+            json={"agentHost": agent_host},
             headers={"Accept-Encoding": "identity"},
             timeout=10.0,
         )
