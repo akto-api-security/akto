@@ -3,17 +3,12 @@ package com.akto.dto;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.bson.codecs.pojo.annotations.BsonId;
 import java.util.List;
 
 @Getter
 @Setter
 @NoArgsConstructor
 public class AgentGuardCorpusEntry {
-
-    @BsonId
-    private String id;
-    public static final String ID = "_id";
 
     public static final String AGENT_HOST = "agentHost";
     private String agentHost;
