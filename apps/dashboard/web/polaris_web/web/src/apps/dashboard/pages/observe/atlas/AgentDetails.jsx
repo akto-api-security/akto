@@ -1,4 +1,4 @@
-import { Text, HorizontalStack, VerticalStack, Box, Badge, Button, Icon, Tooltip, Avatar, List } from "@shopify/polaris"
+import { Text, HorizontalStack, VerticalStack, Box, Badge, Button, Icon, Tooltip, Avatar } from "@shopify/polaris"
 import { useRef, useMemo, useCallback, useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from 'framer-motion'
@@ -10,9 +10,7 @@ import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
 import ModuleEnvConfigComponent from "../../settings/health_logs/ModuleEnvConfig";
-import TitleWithInfo from "../../../components/shared/TitleWithInfo";
 import settingRequests from "../../settings/api";
-import transform from "../transform"
 
 const ANIMATION_DURATION = 0.2;
 const LOG_LEVEL_TONES = {
@@ -82,7 +80,6 @@ function AgentDetails({
     const [loading, setLoading] = useState(false);
     const [tabLoading, setTabLoading] = useState(false);
     const [mcpServers, setMcpServers] = useState([]);
-    const [userAnalysis, setUserAnalysis] = useState(null);
     const [agentLogs, setAgentLogs] = useState([]);
     const [displayedLogs, setDisplayedLogs] = useState([]);
     const [isLogsExpanded, setIsLogsExpanded] = useState(true);
@@ -178,7 +175,6 @@ function AgentDetails({
         if (!selectedAgent || !show) return;
 
         setMcpServers([]);
-        setUserAnalysis(null);
         setAgentLogs([]);
         setDisplayedLogs([]);
         setLogMode(LOG_MODES.HISTORICAL);
@@ -223,17 +219,6 @@ function AgentDetails({
                     setMcpServers(res.mcpServers || []);
                 } catch {
                     setMcpServers([]);
-                } finally {
-                    setTabLoading(false);
-                }
-                break;
-            case 'user-analysis':
-                setTabLoading(true);
-                try {
-                    const res = await settingRequests.getUserAnalysis(selectedAgent.hostname);
-                    setUserAnalysis(res || null);
-                } catch {
-                    setUserAnalysis(null);
                 } finally {
                     setTabLoading(false);
                 }
@@ -424,147 +409,6 @@ function AgentDetails({
         ),
         panelID: 'configure-panel',
     };
-
-    const getInputTokenLabel = (tokens) => {
-        if (tokens < 10000) return { label: "Light user", tone: "success" };
-        if (tokens < 100000) return { label: "Moderate user", tone: "attention" };
-        return { label: "Heavy user", tone: "critical" };
-    };
-
-    const getOutputTokenLabel = (inputTokens, outputTokens) => {
-        if (outputTokens > inputTokens * 3) return { label: "High output amplifier", tone: "critical" };
-        if (outputTokens > inputTokens * 1.5) return { label: "Verbose responder", tone: "attention" };
-        return { label: "Balanced output", tone: "success" };
-    };
-
-    const humanizeTopicKey = (key) =>
-        key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-
-    const titleComp = <TitleWithInfo
-                titleText="Queries Flagged"
-                textProps={{ variant: "headingMd" }}
-                tooltipContent="Queries identified as potentially harmful or policy-violating."
-            />
-
-    const dominantTopics = useMemo(() => {
-        if (!userAnalysis?.topicCounts) return [];
-        return Object.entries(userAnalysis.topicCounts)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 5)
-            .map(([topic]) => topic);
-    }, [userAnalysis]);
-
-    const UserAnalysisTab = {
-        id: 'user-analysis',
-        content: 'User Analysis',
-        component: (
-            <Box paddingBlockStart={"4"}>
-                {tabLoading ? (
-                    <Box padding="4" background="bg-surface">
-                        <Text variant="bodyMd" color="subdued" alignment="center">Loading...</Text>
-                    </Box>
-                ) : !userAnalysis ? (
-                    <Box padding="4" background="bg-surface">
-                        <Text variant="bodyMd" color="subdued" alignment="center">No analysis data found</Text>
-                    </Box>
-                ) : (
-                    <VerticalStack gap="4">
-                        {userAnalysis.aiSummary && (
-                            <VerticalStack gap="1">
-                                <TitleWithInfo
-                                    titleText="User Analysis Summary"
-                                    textProps={{ variant: "headingMd" }}
-                                    tooltipContent="An overview summary of the user using the current agent."
-                                />
-                                <Text variant="bodyMd">{userAnalysis.aiSummary}</Text>
-                            </VerticalStack>
-                        )}
-                        <HorizontalStack gap="6">
-                            <VerticalStack gap="1">
-                                <TitleWithInfo
-                                    titleText="Input Tokens"
-                                    textProps={{ variant: "headingMd" }}
-                                    tooltipContent={`Total input tokens. (${getInputTokenLabel(userAnalysis.totalInputTokens ?? 0).label})`}
-                                />
-                                <Box>
-                                    <Badge status={getInputTokenLabel(userAnalysis.totalInputTokens ?? 0).tone}>
-                                        {transform.formatNumberWithCommas(userAnalysis.totalInputTokens ?? 0)}
-                                    </Badge>
-                                </Box>
-                            </VerticalStack>
-                            <VerticalStack gap="1">
-                                <TitleWithInfo
-                                    titleText="Output Tokens"
-                                    textProps={{ variant: "headingMd" }}
-                                    tooltipContent={`Total output tokens. (${getOutputTokenLabel(userAnalysis.totalInputTokens ?? 0, userAnalysis.totalOutputTokens ?? 0).label})`}
-                                />
-                                <Box>
-                                    <Badge status={getOutputTokenLabel(userAnalysis.totalInputTokens ?? 0, userAnalysis.totalOutputTokens ?? 0).tone}>
-                                        {transform.formatNumberWithCommas(userAnalysis.totalOutputTokens ?? 0)}
-                                    </Badge>
-                                </Box>
-                            </VerticalStack>
-                        </HorizontalStack>
-                        {dominantTopics.length > 0 && (
-                            <VerticalStack gap="2">
-                                <TitleWithInfo
-                                    titleText="Dominant Topics"
-                                    textProps={{ variant: "headingMd" }}
-                                    tooltipContent="The topics that the user mostly queries."
-                                />
-                                <List type="bullet" gap="extraTight">
-                                    {dominantTopics.map((topic) => (
-                                        <List.Item key={topic}>{humanizeTopicKey(topic)}</List.Item>
-                                    ))}
-                                </List>
-                            </VerticalStack>
-                        )}
-                        {userAnalysis.harmfulTopics && Object.keys(userAnalysis.harmfulTopics).length > 0 ? (
-                            <VerticalStack gap="2">
-                                {titleComp}
-                                <List type="bullet" gap="extraTight">
-                                    {Object.entries(userAnalysis.harmfulTopics).map(([topic, data]) => (
-                                        <List.Item key={topic}>
-                                            <VerticalStack gap="1">
-                                                <HorizontalStack gap="2" blockAlign="center">
-                                                    <Text variant="bodyMd" fontWeight="bold" color="critical">
-                                                        {humanizeTopicKey(topic)}
-                                                    </Text>
-                                                    {data.lastSeenAt && (
-                                                        <Text variant="bodySm" color="subdued">
-                                                            {func.prettifyEpoch(
-                                                                typeof data.lastSeenAt === "object" && data.lastSeenAt.$numberLong
-                                                                    ? Math.floor(parseInt(data.lastSeenAt.$numberLong) / 1000)
-                                                                    : Math.floor(data.lastSeenAt / 1000)
-                                                            )}
-                                                        </Text>
-                                                    )}
-                                                    {data.count != null && (
-                                                        <Badge size="small" tone="critical">{`${data.count}x`}</Badge>
-                                                    )}
-                                                </HorizontalStack>
-                                                {data.lastReason && (
-                                                    <Text variant="bodySm" fontWeight="regular" color="subdued" as="p">
-                                                        {data.lastReason}
-                                                    </Text>
-                                                )}
-                                            </VerticalStack>
-                                        </List.Item>
-                                    ))}
-                                </List>
-                            </VerticalStack>
-                        ) : (
-                            <Box padding="4" background="bg-surface">
-                                <Text variant="bodyMd" color="subdued" alignment="center">No harmful topics found</Text>
-                            </Box>
-                        )}
-                    </VerticalStack>
-                )}
-            </Box>
-        ),
-        panelID: 'user-analysis-panel',
-    };
-
     if (!selectedAgent) return null;
 
     return (
@@ -628,7 +472,7 @@ function AgentDetails({
                 </HorizontalStack>,
                 <LayoutWithTabs
                     key="tabs"
-                    tabs={[McpServersTab, UserAnalysisTab, AgentLogsTab, ConfigureTab]}
+                    tabs={[McpServersTab, AgentLogsTab, ConfigureTab]}
                     currTab={handleTabChange}
                 />
             ]}

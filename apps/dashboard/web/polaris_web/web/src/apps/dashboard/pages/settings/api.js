@@ -888,11 +888,11 @@ const settingRequests = {
             data: { username, team, userRole }
         })
     },
-    async fetchAgenticUsers() {
+    async fetchAgenticUsers(params = {}) {
         return await request({
             url: '/api/fetchAgenticUsers',
             method: 'post',
-            data: {}
+            data: params
         })
     },
     async fetchCloudflareWafIntegration() {
@@ -995,12 +995,12 @@ const settingRequests = {
             }
         })
     },
-    getUserAnalysis(deviceId) {
+    getUserAnalysis(username) {
         return request({
             url: '/api/getUserAnalysis',
             method: 'post',
             data: {
-                deviceId
+                username
             }
         })
     },

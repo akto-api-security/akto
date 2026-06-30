@@ -27,9 +27,20 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
     @Setter
     private String identityId;
 
+    @Setter
+    private int startTimestamp;
+
+    @Setter
+    private int endTimestamp;
+
     public String fetchNhiIdentities() {
         try {
-            identities = NhiIdentityDao.instance.findAll(Filters.empty());
+            Bson filter = (startTimestamp > 0 && endTimestamp > 0)
+                    ? Filters.and(
+                            Filters.gte(NhiIdentity.CREATED_AT, startTimestamp),
+                            Filters.lte(NhiIdentity.CREATED_AT, endTimestamp))
+                    : Filters.empty();
+            identities = NhiIdentityDao.instance.findAll(filter);
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching NHI identities: " + e.getMessage());

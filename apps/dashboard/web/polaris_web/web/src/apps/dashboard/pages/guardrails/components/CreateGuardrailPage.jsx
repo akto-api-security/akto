@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+
 import {
     Text,
     HorizontalStack,
@@ -15,6 +16,7 @@ import {
 import PersistStore from '../../../../main/PersistStore';
 import AgenticSearchInput from '../../agentic/components/AgenticSearchInput';
 import guardrailApi from '../api';
+import settingsApi from '../../settings/api';
 import {
     transformPolicyForBackend,
     SEVERITY,
@@ -23,6 +25,9 @@ import {
     normalizePiiTypesFromPolicy,
     resolveStoredPolicyBehaviour
 } from '../utils';
+import { getDefaultGeneralBlockTopics, GENERAL_BLOCKS, isGeneralBlockTopic, toDeniedTopic } from '../generalBlocks';
+import { groupCollectionsByAgent, groupCollectionsByService, extractServiceName } from '../../observe/agentic/constants';
+import { isEndpointSecurityCategory } from '../../../../main/labelHelper';
 import func from "@/util/func";
 import {
     PolicyDetailsStep,
@@ -50,10 +55,48 @@ import {
 } from './steps';
 import "./createGuardrailPage.css";
 
-const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false }) => {
+// Store service keys so new devices are covered automatically via service-key matching in enforcement.
+const expandGroupsToV2 = (selectedKeys) =>
+    (selectedKeys || []).filter(key => key).map(key => ({ id: key, name: key }));
+
+const groupToOption = (g) => ({
+    label: g.groupKey,
+    value: g.groupKey,
+    isInline: g.collections.some(c => !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe'))
+});
+
+// Converts stored V2 server entries back to the option-value keys used by the dropdowns.
+// Works for all stored formats: numeric collection ID, full hostname, or short service key.
+const reverseToServiceKeys = (v2Servers, allCollections) => {
+    const isArgus = !isEndpointSecurityCategory();
+    const keys = (v2Servers || []).map(s => {
+        const col = (allCollections || []).find(c => c.id?.toString() === s.id?.toString());
+        const rawName = col ? (col.hostName || col.displayName || '') : (s.name || String(s.id || ''));
+        // Argus stores full hostnames as option keys — don't extract service name
+        if (isArgus) return rawName;
+        return extractServiceName(rawName) || rawName;
+    });
+    return [...new Set(keys)];
+};
+
+const getLlmServiceKeySet = (allCollections) => {
+    const keys = new Set();
+    (allCollections || []).forEach(c => {
+        if (c.envType?.some(e => e.keyName === 'browser-llm')) {
+            const rawName = c.hostName || c.displayName || '';
+            const svcKey = extractServiceName(rawName) || rawName;
+            if (svcKey) keys.add(svcKey);
+        }
+    });
+    return keys;
+};
+
+const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false }) => {
     // Step management
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
+    const [leftSteps, setLeftSteps] = useState(new Set());
+    const prevStepRef = useRef(currentStep);
 
     // Playground state
     const [playgroundInput, setPlaygroundInput] = useState("");
@@ -73,6 +116,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [promptAttackLevel, setPromptAttackLevel] = useState("high");
     const [enableContextPoisoning, setEnableContextPoisoning] = useState(false);
     const [enableDeniedTopics, setEnableDeniedTopics] = useState(false);
+    // Akto default blocks tracked separately as a Set of keys (not mixed into deniedTopics).
+    // On save these are merged with custom topics; on load they are split back out.
+    const [selectedDefaultBlockKeys, setSelectedDefaultBlockKeys] = useState(
+        () => new Set(getDefaultGeneralBlockTopics().map(t => GENERAL_BLOCKS.find(b => b.topic === t.topic)?.key).filter(Boolean))
+    );
     const [deniedTopics, setDeniedTopics] = useState([]);
     const [enableHarmfulCategories, setEnableHarmfulCategories] = useState(false);
     const [harmfulCategoriesSettings, setHarmfulCategoriesSettings] = useState({
@@ -146,6 +194,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [applyOnRequest, setApplyOnRequest] = useState(false);
     const [policyBehaviour, setPolicyBehaviour] = useState(GUARDRAIL_BEHAVIOUR.BLOCK);
 
+    // Step 12: User targeting
+    const [applyToAllUsers, setApplyToAllUsers] = useState(true);
+    const [targetTeams, setTargetTeams] = useState([]);
+    const [targetRoles, setTargetRoles] = useState([]);
+    const [agenticUsers, setAgenticUsers] = useState([]);
+    const [usersLoading, setUsersLoading] = useState(false);
+
     // Collections data
     const [mcpServers, setMcpServers] = useState([]);
     const [agentServers, setAgentServers] = useState([]);
@@ -154,6 +209,18 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     // Get collections from PersistStore
     const allCollections = PersistStore(state => state.allCollections);
+
+    const availableTeams = useMemo(() => {
+        const teams = new Set();
+        (agenticUsers || []).forEach(u => { if (u.teamName) teams.add(u.teamName); });
+        return Array.from(teams).sort();
+    }, [agenticUsers]);
+
+    const availableRoles = useMemo(() => {
+        const roles = new Set();
+        (agenticUsers || []).forEach(u => { if (u.userRole) roles.add(u.userRole); });
+        return Array.from(roles).sort();
+    }, [agenticUsers]);
 
     // Create validation state object
     const getStoredStateData = () => ({
@@ -166,6 +233,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         promptAttackLevel,
         enableContextPoisoning,
         enableDeniedTopics,
+        selectedDefaultBlockKeys,
         deniedTopics,
         enableHarmfulCategories,
         harmfulCategoriesSettings,
@@ -217,7 +285,17 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         browserLlmServers,
         applyOnRequest,
         applyOnResponse,
-        policyBehaviour
+        policyBehaviour,
+        applyToAllUsers,
+        targetTeams,
+        targetRoles,
+        serverScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllServers &&
+            (selectedMcpServers || []).length === 0 &&
+            (selectedAgentServers || []).length === 0 &&
+            (selectedBrowserLlms || []).length === 0,
+        userScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllUsers &&
+            (targetTeams || []).length === 0 &&
+            (targetRoles || []).length === 0,
     });
 
     const getStepsWithSummary = () => {
@@ -309,6 +387,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     }, []);
 
     useEffect(() => {
+        if (prevStepRef.current !== currentStep) {
+            setLeftSteps(prev => new Set([...prev, prevStepRef.current]));
+            prevStepRef.current = currentStep;
+        }
+    }, [currentStep]);
+
+    useEffect(() => {
         if (allCollections && allCollections.length > 0) {
             filterCollections();
         } else {
@@ -335,6 +420,25 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         return () => { isActive = false; };
     }, []);
 
+    // Fetch agentic users to populate team/role options
+    useEffect(() => {
+        let isActive = true;
+        (async () => {
+            setUsersLoading(true);
+            try {
+                const response = await settingsApi.fetchAgenticUsers();
+                if (isActive && response?.agenticUsers) {
+                    setAgenticUsers(response.agenticUsers);
+                }
+            } catch (error) {
+                console.error("Error fetching agentic users:", error);
+            } finally {
+                if (isActive) setUsersLoading(false);
+            }
+        })();
+        return () => { isActive = false; };
+    }, []);
+
     // Auto-scroll to bottom when new messages are added
     useEffect(() => {
         if (playgroundScrollRef.current && playgroundMessages.length > 0) {
@@ -342,14 +446,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
     }, [playgroundMessages]);
 
-    // Populate form when editing
+    // Populate form when editing or loading a preset
     useEffect(() => {
-        if (isEditMode && editingPolicy) {
+        if ((isEditMode || isPreset) && editingPolicy) {
             populateFormForEdit(editingPolicy);
-        } else {
+        } else if (!editingPolicy) {
             resetForm();
         }
-    }, [isEditMode, editingPolicy]);
+    }, [isEditMode, isPreset, editingPolicy]);
 
     const isVisibilityOnly = (collection) =>
         collection.envType && collection.envType.some(tag =>
@@ -359,49 +463,29 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const filterCollections = () => {
         setCollectionsLoading(true);
         try {
-            const mcpServerCollections = allCollections.filter(collection => {
-                const hasMcpEnvType = collection.envType && collection.envType.some(envType =>
-                    envType.keyName === 'mcp-server'
-                );
-                return hasMcpEnvType && !isVisibilityOnly(collection);
-            })
-            .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
-            .map(collection => ({
-                label: collection.displayName,
-                value: collection.id.toString(),
-                isInline: !collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe')
-            }));
-
-
-            const agentServerCollections = allCollections.filter(collection => {
-                const hasGenAiEnvType = collection.envType && collection.envType.some(envType =>
-                    envType.keyName === 'gen-ai'
-                );
-                return hasGenAiEnvType && !isVisibilityOnly(collection);
-            })
-            .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
-            .map(collection => ({
-                label: collection.displayName,
-                value: collection.id.toString(),
-                isInline: !collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe')
-            }));
-
-            const browserLlmCollections = allCollections.filter(collection => {
-                const hasBrowserLlmEnvType = collection.envType && collection.envType.some(envType =>
-                    envType.keyName === 'browser-llm'
-                );
-                return hasBrowserLlmEnvType && !isVisibilityOnly(collection);
-            })
-            .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
-            .map(collection => ({
-                label: collection.displayName,
-                value: collection.id.toString(),
-                isInline: !collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe')
-            }));
-
-            setMcpServers(mcpServerCollections);
-            setAgentServers(agentServerCollections);
-            setBrowserLlmServers(browserLlmCollections);
+            const nonVisibility = allCollections.filter(c => !isVisibilityOnly(c));
+            if (isEndpointSecurityCategory()) {
+                // Atlas: group by service/platform key — one entry covers all devices running that service
+                const serviceGroups = groupCollectionsByService(nonVisibility);
+                const agentGroups = groupCollectionsByAgent(nonVisibility);
+                setMcpServers(serviceGroups.filter(g => g.clientType === 'MCP Server').map(groupToOption));
+                setAgentServers(agentGroups.map(groupToOption));
+                setBrowserLlmServers(serviceGroups.filter(g => g.clientType === 'LLM').map(groupToOption));
+            } else {
+                // Argus: each device+service is a distinct target — use full hostname as the option value
+                const toOption = (c) => {
+                    const name = c.hostName || c.displayName || c.name || '';
+                    return {
+                        label: name,
+                        value: name,
+                        isInline: !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe')
+                    };
+                };
+                const dedup = (opts) => [...new Map(opts.map(o => [o.value, o])).values()].filter(o => o.value);
+                setMcpServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'mcp-server')).map(toOption)));
+                setAgentServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'gen-ai')).map(toOption)));
+                setBrowserLlmServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'browser-llm')).map(toOption)));
+            }
         } catch (error) {
             console.error("Error filtering collections:", error);
         } finally {
@@ -421,6 +505,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setPromptAttackLevel("high");
         setEnableContextPoisoning(false);
         setEnableDeniedTopics(false);
+        setSelectedDefaultBlockKeys(new Set(getDefaultGeneralBlockTopics().map(t => GENERAL_BLOCKS.find(b => b.topic === t.topic)?.key).filter(Boolean)));
         setDeniedTopics([]);
         setEnableHarmfulCategories(false);
         setHarmfulCategoriesSettings({
@@ -475,6 +560,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyOnResponse(false);
         setApplyOnRequest(false);
         setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
+        setApplyToAllUsers(true);
+        setTargetTeams([]);
+        setTargetRoles([]);
     };
 
     const populateFormForEdit = (policy) => {
@@ -516,10 +604,18 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             }
         }
 
-        // Denied topics
-        const hasDeniedTopics = policy.deniedTopics && policy.deniedTopics.length > 0;
-        setEnableDeniedTopics(hasDeniedTopics);
-        setDeniedTopics(policy.deniedTopics || []);
+        // Split saved denied topics back into Akto defaults and user-custom.
+        const loadedTopics = policy.deniedTopics || [];
+        const defaultKeys = new Set(
+            loadedTopics
+                .filter(t => isGeneralBlockTopic(t.topic))
+                .map(t => GENERAL_BLOCKS.find(b => b.topic === t.topic)?.key)
+                .filter(Boolean)
+        );
+        const customTopics = loadedTopics.filter(t => !isGeneralBlockTopic(t.topic));
+        setEnableDeniedTopics(loadedTopics.length > 0);
+        setSelectedDefaultBlockKeys(defaultKeys);
+        setDeniedTopics(customTopics);
 
         // Word filters
         setWordFilters({
@@ -583,31 +679,35 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setConfidenceScore(nearestCheckpoint);
 
         // Server settings
+        const storedMcpV2 = policy.selectedMcpServersV2 || [];
         setSelectedMcpServers(
-            policy.selectedMcpServersV2?.length > 0
-                ? policy.selectedMcpServersV2.map(server => server.id)
+            storedMcpV2.length > 0
+                ? reverseToServiceKeys(storedMcpV2, allCollections)
                 : policy.selectedMcpServers || []
         );
 
         // selectedAgentServersV2 stores both gen-ai and browser-llm entries.
-        // Split them back into their respective dropdowns using allCollections envType.
-        const rawAgentServers = policy.selectedAgentServersV2?.length > 0
-            ? policy.selectedAgentServersV2.map(server => server.id)
-            : policy.selectedAgentServers || [];
+        // Split them back into their respective dropdowns.
+        const rawAgentServersV2 = policy.selectedAgentServersV2?.length > 0
+            ? policy.selectedAgentServersV2
+            : (policy.selectedAgentServers || []).map(id => ({ id, name: id }));
 
-        const agentIds = [];
-        const browserLlmIds = [];
-        rawAgentServers.forEach(id => {
-            const col = allCollections?.find(c => c.id?.toString() === id?.toString());
-            const isBrowserLlm = col?.envType?.some(e => e.keyName === 'browser-llm');
-            if (isBrowserLlm) {
-                browserLlmIds.push(id);
-            } else {
-                agentIds.push(id);
-            }
+        // Compute llmServiceKeySet for both Atlas and Argus — needed to classify new-format
+        // V2 entries where the id is a service key (not a numeric collection id).
+        const llmServiceKeySet = getLlmServiceKeySet(allCollections);
+        const rawAgentEntries = [];
+        const rawLlmEntries = [];
+        rawAgentServersV2.forEach(s => {
+            const col = allCollections?.find(c => c.id?.toString() === s.id?.toString());
+            const isBrowserLlm = col
+                ? col.envType?.some(e => e.keyName === 'browser-llm')
+                : llmServiceKeySet.has(s.name || '');
+            if (isBrowserLlm) rawLlmEntries.push(s);
+            else rawAgentEntries.push(s);
         });
-        setSelectedAgentServers(agentIds);
-        setSelectedBrowserLlms(browserLlmIds);
+
+        setSelectedAgentServers(reverseToServiceKeys(rawAgentEntries, allCollections));
+        setSelectedBrowserLlms(reverseToServiceKeys(rawLlmEntries, allCollections));
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
         setApplyToAllServers(policy.applyToAllServers ?? true);
@@ -617,6 +717,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             pattern: entry.pattern || ""
         })));
         setBlockPersonalAccounts(policy.blockPersonalAccounts || false);
+
+        setApplyToAllUsers(!policy.targetTeams?.length && !policy.targetRoles?.length);
+        setTargetTeams(policy.targetTeams || []);
+        setTargetRoles(policy.targetRoles || []);
     };
 
     const handleClose = () => {
@@ -641,36 +745,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const handleSave = async () => {
         setLoading(true);
         try {
-            // Transform selectedMcpServers and selectedAgentServers to include both ID and name
-            const transformedMcpServers = selectedMcpServers
-                .filter(serverId => serverId)
-                .map(serverId => {
-                    const server = mcpServers.find(s => s.value === serverId || s.value === serverId.toString());
-                    return {
-                        id: serverId.toString(),
-                        name: server ? server.label : serverId.toString()
-                    };
-                });
-
+            const transformedMcpServers = expandGroupsToV2(selectedMcpServers);
             const transformedAgentServers = [
-                ...selectedAgentServers
-                    .filter(serverId => serverId)
-                    .map(serverId => {
-                        const server = agentServers.find(s => s.value === serverId || s.value === serverId.toString());
-                        return {
-                            id: serverId.toString(),
-                            name: server ? server.label : serverId.toString()
-                        };
-                    }),
-                ...selectedBrowserLlms
-                    .filter(serverId => serverId)
-                    .map(serverId => {
-                        const server = browserLlmServers.find(s => s.value === serverId || s.value === serverId.toString());
-                        return {
-                            id: serverId.toString(),
-                            name: server ? server.label : serverId.toString()
-                        };
-                    })
+                ...expandGroupsToV2(selectedAgentServers),
+                ...expandGroupsToV2(selectedBrowserLlms)
             ];
 
             // Drop empty rows and normalize the glob patterns before persisting.
@@ -691,7 +769,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
                     code: enableCodeFilter ? { level: codeFilterLevel.toUpperCase() } : null
                 },
-                deniedTopics,
+                deniedTopics: enableDeniedTopics
+                    ? [
+                        ...GENERAL_BLOCKS.filter(b => selectedDefaultBlockKeys.has(b.key)).map(toDeniedTopic),
+                        ...deniedTopics
+                      ]
+                    : [],
                 wordFilters,
                 piiFilters: enablePiiTypes ? piiTypes : [],
                 regexPatterns: enableRegexPatterns ? regexPatterns
@@ -747,6 +830,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 blockPersonalAccounts,
                 applyOnResponse,
                 applyOnRequest,
+                targetTeams: applyToAllUsers ? [] : targetTeams,
+                targetRoles: applyToAllUsers ? [] : targetRoles,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
 
@@ -792,6 +877,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableContextPoisoning={setEnableContextPoisoning}
                         enableDeniedTopics={enableDeniedTopics}
                         setEnableDeniedTopics={setEnableDeniedTopics}
+                        selectedDefaultBlockKeys={selectedDefaultBlockKeys}
+                        setSelectedDefaultBlockKeys={setSelectedDefaultBlockKeys}
                         deniedTopics={deniedTopics}
                         setDeniedTopics={setDeniedTopics}
                         enableHarmfulCategories={enableHarmfulCategories}
@@ -935,6 +1022,17 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         collectionsLoading={collectionsLoading}
                         policyBehaviour={policyBehaviour}
                         setPolicyBehaviour={setPolicyBehaviour}
+                        targetTeams={targetTeams}
+                        setTargetTeams={setTargetTeams}
+                        targetRoles={targetRoles}
+                        setTargetRoles={setTargetRoles}
+                        availableTeams={availableTeams}
+                        availableRoles={availableRoles}
+                        usersLoading={usersLoading}
+                        applyToAllUsers={applyToAllUsers}
+                        setApplyToAllUsers={setApplyToAllUsers}
+                        showConditionError={leftSteps.has(ServerSettingsConfig.number)}
+                        showUserConditionError={leftSteps.has(ServerSettingsConfig.number)}
                     />
                 );
             default:
@@ -969,7 +1067,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
                 code: enableCodeFilter ? { level: codeFilterLevel.toUpperCase() } : null
             },
-            deniedTopics: deniedTopics,
+            deniedTopics: enableDeniedTopics
+                ? [
+                    ...GENERAL_BLOCKS.filter(b => selectedDefaultBlockKeys.has(b.key)).map(toDeniedTopic),
+                    ...deniedTopics
+                  ]
+                : [],
             wordFilters: wordFilters,
             piiFilters: piiTypes,
             regexPatterns: regexPatterns

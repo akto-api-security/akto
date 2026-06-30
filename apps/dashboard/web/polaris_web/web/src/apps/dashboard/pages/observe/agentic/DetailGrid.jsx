@@ -1,13 +1,25 @@
 import React from "react";
 import { Box, HorizontalGrid, HorizontalStack, Link, VerticalStack, Text } from "@shopify/polaris";
+import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
+import TooltipText from "../../../components/shared/TooltipText";
 
 export default function DetailGrid({ heading, items = [], columns = 1, labelWidth = "140px" }) {
+    const renderLabel = (d) => (
+        <HorizontalStack gap="1" blockAlign="center">
+            <Text variant="bodySm" color="subdued">{d.label}</Text>
+            <InfoTooltipIcon content={d.tooltip} />
+        </HorizontalStack>
+    );
+
     const cell = (d) => {
-        const display = d.value || "-";
+        const text = d.value || "-"
+        const display = <TooltipText tooltip={text} text={text} />
         const content = (
-            <Text variant="bodySm" fontWeight="semibold" color={d.isWarning ? "warning" : undefined}>
-                {d.href && d.value ? <Link url={d.href} external={d.external !== false}>{display}</Link> : display}
-            </Text>
+            <Box maxWidth="150px">
+                <Text variant="bodySm" fontWeight="semibold" color={d.isWarning ? "warning" : undefined}>
+                    {d.href && d.value ? <Link url={d.href} external={d.external !== false}>{display}</Link> : display}
+                </Text>
+            </Box>
         );
         return content;
     };
@@ -19,7 +31,7 @@ export default function DetailGrid({ heading, items = [], columns = 1, labelWidt
                 <HorizontalGrid columns={columns} gap="3">
                     {items.map((d) => (
                         <VerticalStack gap="1" key={d.label}>
-                            <Text variant="bodySm" color="subdued">{d.label}</Text>
+                            {renderLabel(d)}
                             {cell(d)}
                         </VerticalStack>
                     ))}
@@ -27,7 +39,7 @@ export default function DetailGrid({ heading, items = [], columns = 1, labelWidt
             ) : (
                 items.map((d) => (
                     <HorizontalStack key={d.label} gap="4" blockAlign="center">
-                        <Box minWidth={labelWidth}><Text variant="bodySm" color="subdued">{d.label}</Text></Box>
+                        <Box minWidth={labelWidth}>{renderLabel(d)}</Box>
                         {cell(d)}
                     </HorizontalStack>
                 ))

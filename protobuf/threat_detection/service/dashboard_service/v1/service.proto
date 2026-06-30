@@ -3,6 +3,7 @@ syntax = "proto3";
 package threat_detection.service.dashboard_service.v1;
 
 import "threat_detection/message/malicious_event/event_type/v1/event_type.proto";
+import "threat_detection/message/malicious_event/v1/message.proto";
 
 // Dashboard service which the dashboard actions will call instead of directly calling DB
 option java_outer_classname = "DashboardServiceProto";
@@ -35,6 +36,7 @@ message ListMaliciousRequestsResponse {
       string severity = 23;  // Severity level: "CRITICAL", "HIGH", "MEDIUM", "LOW"
       string dest_country = 24;  // Destination country code (where the request is going to)
       string session_id = 25;  // Session identifier for tracking user sessions
+      repeated threat_detection.message.malicious_event.v1.OwaspCategory owasp_categories = 26;
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;

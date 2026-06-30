@@ -8,6 +8,13 @@ import "threat_detection/message/sample_request/v1/message.proto";
 option java_outer_classname = "MaliciousEventProto";
 option java_package = "threat_detection.message.malicious_event.v1";
 
+message OwaspCategory {
+  string id = 1;
+  string name = 2;
+  string severity = 3;
+  string confidence = 4;
+}
+
 message MaliciousEventMessage {
   string actor = 1;
   string filter_id = 2;
@@ -29,6 +36,7 @@ message MaliciousEventMessage {
   string status = 18;
   string context_source = 19;  // Context source: API, MCP, GEN_AI, AGENTIC, DAST, ENDPOINT
   string session_id = 20;  // Session identifier for tracking user sessions
+  repeated OwaspCategory owasp_categories = 21;
 }
 
 message MaliciousEventKafkaEnvelope {

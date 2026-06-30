@@ -168,8 +168,15 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		zap.Bool("hasResponsePayload", req.ResponsePayload != ""),
 		zap.Bool("hasMetadata", req.Metadata != ""))
 
+	// Measure only the guardrail validation work for the P95 metric, excluding
+	// JSON binding, session extraction and logging overhead captured by `start`.
+	valStart := time.Now()
 	result, err := h.validatorService.ValidateRequest(c.Request.Context(), &req, sessionID, requestID)
+	valLatency := time.Since(valStart)
 	if err != nil {
+		if h.metrics != nil && req.AktoAccountID != "" {
+			h.metrics.RecordRequest(req.AktoAccountID, valLatency.Nanoseconds())
+		}
 		h.logger.Error("ValidateRequest failed",
 			zap.String("path", req.Path),
 			zap.String("method", req.Method),
@@ -187,8 +194,6 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		return
 	}
 
-	elapsed := time.Since(start)
-	latencyMs := elapsed.Milliseconds()
 	h.logger.Info("ValidateRequest - completed",
 		zap.String("path", req.Path),
 		zap.String("method", req.Method),
@@ -197,10 +202,11 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
 		zap.String("behaviour", result.Behaviour),
-		zap.Int64("latencyMs", latencyMs))
+		zap.Int64("latencyMs", time.Since(start).Milliseconds()),
+		zap.Int64("validationMs", valLatency.Milliseconds()))
 
 	if h.metrics != nil && req.AktoAccountID != "" {
-		h.metrics.RecordRequest(req.AktoAccountID, elapsed.Nanoseconds())
+		h.metrics.RecordRequest(req.AktoAccountID, valLatency.Nanoseconds())
 	}
 
 	status := "ALLOWED"
@@ -336,8 +342,15 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		zap.Bool("hasMetadata", req.Metadata != ""),
 		zap.Bool("skipThreat", req.EffectiveSkipThreat()))
 
+	// Measure only the guardrail validation work for the P95 metric, excluding
+	// JSON binding, session extraction and logging overhead captured by `start`.
+	valStart := time.Now()
 	result, err := h.validatorService.ValidateResponse(c.Request.Context(), &req, responseBody, sessionID, requestID)
+	valLatency := time.Since(valStart)
 	if err != nil {
+		if h.metrics != nil && req.AktoAccountID != "" {
+			h.metrics.RecordResponse(req.AktoAccountID, valLatency.Nanoseconds())
+		}
 		h.logger.Error("ValidateResponse failed",
 			zap.String("path", req.Path),
 			zap.String("method", req.Method),
@@ -355,8 +368,6 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		return
 	}
 
-	elapsed := time.Since(start)
-	latencyMs := elapsed.Milliseconds()
 	h.logger.Info("ValidateResponse - completed",
 		zap.String("path", req.Path),
 		zap.String("method", req.Method),
@@ -365,10 +376,11 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
 		zap.String("behaviour", result.Behaviour),
-		zap.Int64("latencyMs", latencyMs))
+		zap.Int64("latencyMs", time.Since(start).Milliseconds()),
+		zap.Int64("validationMs", valLatency.Milliseconds()))
 
 	if h.metrics != nil && req.AktoAccountID != "" {
-		h.metrics.RecordResponse(req.AktoAccountID, elapsed.Nanoseconds())
+		h.metrics.RecordResponse(req.AktoAccountID, valLatency.Nanoseconds())
 	}
 
 	responseStatus := "ALLOWED"

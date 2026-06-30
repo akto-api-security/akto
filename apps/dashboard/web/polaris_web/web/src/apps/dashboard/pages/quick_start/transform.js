@@ -2,6 +2,7 @@ import {Avatar, Badge} from "@shopify/polaris"
 import PostmanSource from "./components/PostmanSource"
 import BurpSource from "./components/BurpSource"
 import HybridSaasSource from "./components/HybridSaasSource"
+import DifyConnector from "./components/DifyConnector"
 import AgenticShield from "./components/AgenticShield"
 import AwsSource from "./components/AwsSource"
 import FargateSource from "./components/FargateSource"
@@ -456,6 +457,18 @@ const awsAgentCoreObj = {
     component: <BannerComponent
         content="Import your AWS Bedrock AgentCore AI agents seamlessly into Akto."
         docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/aws-bedrock-agentcore'
+    />
+}
+
+const amazonQuickObj = {
+    icon: '/public/aws.svg',
+    label: "Amazon Quick",
+    text: "Import your Amazon Quick AI agents and conversations, seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-amazon-quick',
+    key: "AMAZON_QUICK",
+    component: <BannerComponent
+        content="Import your Amazon Quick AI agents and conversations, seamlessly in AKTO."
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-amazon-quick'
     />
 }
 
@@ -1288,6 +1301,15 @@ const litellmImportObj = {
         content="Import your LiteLLM proxy traffic, seamlessly in AKTO."
         docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/litellm'
     />
+}
+
+const difyImportObj = {
+    icon: '/public/dify.svg',
+    label: "Dify",
+    text: "Secure your Dify app inputs and outputs with Akto guardrails.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/dify',
+    key: "DIFY",
+    component: <DifyConnector />
 }
 
 const claudeCodeCliHookObj = {
@@ -2146,14 +2168,14 @@ const quickStartFunc = {
         ]
 
         const aiAgentConnectors = [
-            awsBedrockObj, awsAgentCoreObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
+            awsBedrockObj, awsAgentCoreObj, amazonQuickObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
             n8nImportObj, langchainImportObj, copilotStudioImportObj, snowflakeObj,
             vertexAICustomDeployedModelImportObj, salesforceImportObj,
             anthropicImportObj, openaiImportObj
         ]
 
         const aiMcpGatewayConnectors = [
-            litellmImportObj, trueFoundryImportObj, arcadeImportObj
+            litellmImportObj, difyImportObj, trueFoundryImportObj, arcadeImportObj
         ]
 
         // MCP Scan
@@ -2266,13 +2288,13 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal() || func.isLimitedAccount()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, neovimHookObj, openCodeHookObj, hermesHookObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, neovimHookObj, openCodeHookObj, hermesHookObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, neovimHookObj, openCodeHookObj,hermesHookObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, neovimHookObj, openCodeHookObj,hermesHookObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
@@ -2285,8 +2307,8 @@ const quickStartFunc = {
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj,
-                awsBedrockObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
-                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, anthropicImportObj, openaiImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj, neovimHookObj, openCodeHookObj,hermesHookObj,
+                awsBedrockObj, amazonQuickObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
+                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, anthropicImportObj, openaiImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj, neovimHookObj, openCodeHookObj,hermesHookObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj,
                 intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
                 jamfEndpointObj, kandjiEndpointObj, customEndpointObj,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
   Banner,
   List,
@@ -11,6 +11,15 @@ import SampleData from './SampleData';
 import ValidationReasonBanner from './ValidationReasonBanner';
 import func from '../../../../util/func';
 import { getDashboardCategory, mapLabel, isAgenticSecurityCategory, isEndpointSecurityCategory } from '../../../main/labelHelper';
+import transform from './customDiffEditor';
+import { filterLocatableSegments } from './vulnerabilityEvidence';
+
+// Evidence panel is internal-only until the feature is generally available.
+const SHOW_VULNERABILITY_EVIDENCE = func.isAktoUser();
+// Good-to-have, off by default: when the model reports low confidence in a piece
+// of evidence, show a subtle hint nudging the user toward the existing
+// Triage -> "False positive" action. The framework verdict stays authoritative.
+const SHOW_LOW_CONFIDENCE_HINT = false;
 
 function SchemaValidationError({ sampleData}) {
     const [expanded, setExpanded] = useState(false);
@@ -58,6 +67,65 @@ function SchemaValidationError({ sampleData}) {
     )
 }
 
+function VulnerabilityEvidence({ segments }) {
+    if (!Array.isArray(segments) || segments.length === 0) {
+        return null;
+    }
+
+    const hasLowConfidence = SHOW_LOW_CONFIDENCE_HINT
+        && segments.some((seg) => String(seg?.confidence || '').toLowerCase() === 'low');
+
+    return (
+        <Banner title="Evidence" status="warning">
+            <VerticalStack gap="2">
+                {segments.map((seg, index) => {
+                    const isRequest = String(seg?.location || 'RESPONSE').toUpperCase() === 'REQUEST';
+                    const reason = typeof seg?.reason === 'string' ? seg.reason : '';
+                    const phrase = typeof seg?.phrase === 'string' ? seg.phrase : '';
+                    const field = typeof seg?.field === 'string' ? seg.field : '';
+                    const isInformational = seg?.informational === true;
+                    // Prefer showing the concrete value; if it is masked/absent, show the field so the row is never blank.
+                    const evidenceText = phrase || field;
+                    return (
+                        <Box key={index}>
+                            <HorizontalStack gap="2" align="start" blockAlign="start" wrap={false}>
+                                <Box paddingBlockStart="05">
+                                    <Badge status={isRequest ? 'attention' : 'critical'}>
+                                        {isRequest ? 'Request' : 'Response'}
+                                    </Badge>
+                                </Box>
+                                <VerticalStack gap="0">
+                                    {reason ? <Text variant="bodyMd">{reason}</Text> : null}
+                                    {/* Informational evidence (e.g. missing headers) describes something absent,
+                                        so render the header list verbatim without the locatable "field: phrase" form. */}
+                                    {isInformational ? (
+                                        phrase ? (
+                                            <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#6B46C1', wordBreak: 'break-all' }}>
+                                                {phrase}
+                                            </span>
+                                        ) : null
+                                    ) : evidenceText ? (
+                                        <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#6B46C1', wordBreak: 'break-all' }}>
+                                            {field && phrase ? `${field}: ${phrase}` : evidenceText}
+                                        </span>
+                                    ) : null}
+                                </VerticalStack>
+                            </HorizontalStack>
+                        </Box>
+                    );
+                })}
+                {hasLowConfidence ? (
+                    <Box paddingBlockStart="1">
+                        <Text variant="bodySm" color="subdued">
+                            Some evidence is low-confidence. If this looks like a false positive, use Triage - "False positive".
+                        </Text>
+                    </Box>
+                ) : null}
+            </VerticalStack>
+        </Banner>
+    );
+}
+
 function SampleDataList(props) {
 
     const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp} = props;
@@ -73,9 +141,42 @@ function SampleDataList(props) {
     const isWebSocket = isWebSocketProp === true || func.isWebSocketApiType(parsedSample?.type)
     const panelTypes = isWebSocket ? ['events'] : ['request', 'response'];
 
+    // Verification contract (keystone): only ever show evidence that can actually
+    // be located in the SAME text the editor renders. We validate REQUEST segments
+    // against the rendered request text and RESPONSE segments against the response
+    // text (and drop denylisted credential/token segments), then feed the identical
+    // validated list to BOTH the Evidence panel and the request/response editors -
+    // so the panel never lists a segment the editor cannot highlight.
+    const validatedCurrentSample = useMemo(() => {
+        if (!currentSample) {
+            return currentSample;
+        }
+        const segments = currentSample.vulnerabilitySegments;
+        if (!Array.isArray(segments) || segments.length === 0 || isWebSocket) {
+            return currentSample;
+        }
+        const { requestText, responseText } = transform.buildRenderedText(currentSample, { isNewDiff, redactHeaders, metadata });
+        // Informational segments (e.g. missing-header evidence) describe something
+        // ABSENT, so there is nothing to locate/highlight - they bypass the
+        // locatability filter and are panel-only. Everything else must be locatable.
+        const informationalSegments = segments.filter(s => s?.informational === true);
+        const locatableInput = segments.filter(s => s?.informational !== true);
+        const requestSegments = locatableInput.filter(s => String(s?.location || '').toUpperCase() === 'REQUEST');
+        const responseSegments = locatableInput.filter(s => String(s?.location || '').toUpperCase() !== 'REQUEST');
+        const validated = [
+            ...informationalSegments,
+            ...filterLocatableSegments(requestSegments, requestText),
+            ...filterLocatableSegments(responseSegments, responseText),
+        ];
+        return { ...currentSample, vulnerabilitySegments: validated };
+    }, [currentSample, isNewDiff, redactHeaders, metadata, isWebSocket]);
+
     return (
       <VerticalStack gap="3">
          <SchemaValidationError sampleData={currentSample} />
+         {SHOW_VULNERABILITY_EVIDENCE ? (
+           <VulnerabilityEvidence segments={validatedCurrentSample?.vulnerabilitySegments} />
+         ) : null}
         <HorizontalStack align='space-between'>
           <HorizontalStack gap="2">
             <Text variant='headingMd'>
@@ -123,7 +224,7 @@ function SampleDataList(props) {
                   <LegacyCard>
                     <SampleDataComponent
                       type={type}
-                      sampleData={sampleData[Math.min(page, sampleData.length-1)]}
+                      sampleData={validatedCurrentSample}
                       minHeight={minHeight}
                       showDiff={showDiff}
                       isNewDiff={isNewDiff}

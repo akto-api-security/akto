@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack } from '@shopify/polaris';
+import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList, Scrollable, Avatar, Box } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
@@ -8,8 +8,12 @@ import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
+import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from "./components/enterpriseLicenseComplianceCatalog"
 import api from "./api";
 import { transformPolicyForBackend, SEVERITY, normalizeBehaviourValue } from "./utils";
+import GUARDRAIL_PRESETS from "./guardrailPresets";
+import PersistStore from '../../../main/PersistStore';
+import { extractServiceName } from '../observe/agentic/constants';
 
 const resourceName = {
   singular: "policy",
@@ -129,7 +133,22 @@ function GuardrailPolicies() {
     const [loading, setLoading] = useState(true);
     const [editingPolicy, setEditingPolicy] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
+    const [isPreset, setIsPreset] = useState(false);
+    const [presetsPopoverActive, setPresetsPopoverActive] = useState(false);
     const [pendingPolicyName, setPendingPolicyName] = useState(null);
+
+    const allCollections = PersistStore(state => state.allCollections);
+
+    const getLlmServiceKeySet = () => {
+        const keys = new Set();
+        (allCollections || []).forEach(c => {
+            if (c.envType?.some(e => e.keyName === 'browser-llm')) {
+                const svcKey = extractServiceName(c.hostName || c.displayName || '') || c.displayName || '';
+                if (svcKey) keys.add(svcKey);
+            }
+        });
+        return keys;
+    };
 
     const policyName = new URLSearchParams(window.location.search).get("policy");
 
@@ -256,19 +275,32 @@ function GuardrailPolicies() {
         return [];
     };
 
-    // Helper function to get effective selected Agent servers with fallback logic
-    const getEffectiveSelectedAgentServers = (policy) => {
-        if (policy.selectedAgentServersV2?.length > 0) {
-            return policy.selectedAgentServersV2;
-        }
-        // Convert old format to new format for compatibility
-        if (policy.selectedAgentServers?.length > 0) {
-            return policy.selectedAgentServers.map(serverId => ({
-                id: serverId,
-                name: serverId // ID as name for old data
-            }));
-        }
-        return [];
+    // selectedAgentServersV2 stores both AI agent and browser-LLM entries merged together.
+    const splitAgentServersV2 = (rawEntries, llmKeySet) => {
+        const agents = [];
+        const llms = [];
+        (rawEntries || []).forEach(s => {
+            const col = (allCollections || []).find(c => c.id?.toString() === s.id?.toString());
+            const isLlm = col
+                ? col.envType?.some(e => e.keyName === 'browser-llm')
+                : llmKeySet.has(s.name || '');
+            if (isLlm) llms.push(s);
+            else agents.push(s);
+        });
+        return { agents, llms };
+    };
+
+    // Returns mcp, agent, and llm server lists for a policy in one pass.
+    const getEffectiveServers = (policy) => {
+        const raw = policy.selectedAgentServersV2?.length > 0
+            ? policy.selectedAgentServersV2
+            : (policy.selectedAgentServers || []).map(id => ({ id, name: id }));
+        const { agents, llms } = splitAgentServersV2(raw, getLlmServiceKeySet());
+        return {
+            mcp: getEffectiveSelectedMcpServers(policy),
+            agents,
+            llms
+        };
     };
 
     const generateStatusWithSummary = (policy) => {
@@ -286,14 +318,20 @@ function GuardrailPolicies() {
             details.push({ label: "Content Filters", value: filters.join(", ") });
         }
 
-        // Denied topics details
-        if (policy.deniedTopics?.length > 0) {
-            const topicNames = policy.deniedTopics.map(topic => topic.topic || topic.name).slice(0, 2);
-            const moreCount = policy.deniedTopics.length > 2 ? ` +${policy.deniedTopics.length - 2} more` : '';
-            details.push({ 
-                label: "Denied Topics", 
-                value: `${topicNames.join(", ")}${moreCount}` 
-            });
+        // User-defined denied topics (excluding enterprise derived ones)
+        const userDeniedTopics = (policy.deniedTopics || []).filter(t => t?.origin !== ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN);
+        if (userDeniedTopics.length > 0) {
+            const names = userDeniedTopics.map(t => t.topic || t.name).slice(0, 2);
+            const more = userDeniedTopics.length > 2 ? ` +${userDeniedTopics.length - 2} more` : '';
+            details.push({ label: "Denied Topics", value: `${names.join(", ")}${more}` });
+        }
+
+        // Enterprise license compliance topics
+        const enterpriseTopics = (policy.deniedTopics || []).filter(t => t?.origin === ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN);
+        if (enterpriseTopics.length > 0) {
+            const names = enterpriseTopics.map(t => t.topic || t.name).slice(0, 1);
+            const more = enterpriseTopics.length > 1 ? ` +${enterpriseTopics.length - 1} more` : '';
+            details.push({ label: "Enterprise License Compliance Filters", value: `${names.join(", ")}${more}` });
         }
 
         // Word filters
@@ -334,20 +372,15 @@ function GuardrailPolicies() {
             });
         }
 
-        // Server configuration details using effective methods
+        // Server configuration details
         if (policy.applyToAllServers || policy.applyToAllServers == null) {
             details.push({ label: "Target Servers", value: "All servers" });
         } else {
+            const { mcp, agents, llms } = getEffectiveServers(policy);
             const serverDetails = [];
-            const effectiveMcpServers = getEffectiveSelectedMcpServers(policy);
-            const effectiveAgentServers = getEffectiveSelectedAgentServers(policy);
-
-            if (effectiveMcpServers.length > 0) {
-                serverDetails.push(`${effectiveMcpServers.length} MCP Server${effectiveMcpServers.length > 1 ? 's' : ''}`);
-            }
-            if (effectiveAgentServers.length > 0) {
-                serverDetails.push(`${effectiveAgentServers.length} Agent Server${effectiveAgentServers.length > 1 ? 's' : ''}`);
-            }
+            if (mcp.length > 0) serverDetails.push(`${mcp.length} MCP Server${mcp.length > 1 ? 's' : ''}`);
+            if (agents.length > 0) serverDetails.push(`${agents.length} Agent${agents.length > 1 ? 's' : ''}`);
+            if (llms.length > 0) serverDetails.push(`${llms.length} LLM${llms.length > 1 ? 's' : ''}`);
             if (serverDetails.length > 0) {
                 details.push({ label: "Target Servers", value: serverDetails.join(", ") });
             }
@@ -386,7 +419,6 @@ function GuardrailPolicies() {
         );
     };
 
-
     const handleToggleStatus = async (policy) => {
         try {
             setLoading(true);
@@ -417,6 +449,14 @@ function GuardrailPolicies() {
     const handleEditPolicy = (policy) => {
         setEditingPolicy(policy.originalData);
         setIsEditMode(true);
+        setShowCreateModal(true);
+    };
+
+    const handleSelectPreset = (presetData) => {
+        setPresetsPopoverActive(false);
+        setEditingPolicy(presetData);
+        setIsEditMode(false);
+        setIsPreset(true);
         setShowCreateModal(true);
     };
 
@@ -497,6 +537,7 @@ function GuardrailPolicies() {
                 blockedHosts: guardrailData.blockedHosts || [],
                 blockPersonalAccounts: guardrailData.blockPersonalAccounts || false,
                 deniedTopics: guardrailData.deniedTopics || [],
+                enterpriseLicenseComplianceCategories: guardrailData.enterpriseLicenseComplianceCategories || [],
                 regexPatterns: guardrailData.regexPatterns || [],
                 // Add V2 field for enhanced regex data
                 regexPatternsV2: guardrailData.regexPatternsV2 || [],
@@ -542,6 +583,7 @@ function GuardrailPolicies() {
             setShowCreateModal(false);
             setEditingPolicy(null);
             setIsEditMode(false);
+            setIsPreset(false);
             await fetchGuardrailPolicies();
         } catch (error) {
             func.setToast(true, true, isEditMode ? "Failed to update guardrail" : "Failed to create guardrail");
@@ -559,10 +601,12 @@ function GuardrailPolicies() {
                     setShowCreateModal(false);
                     setEditingPolicy(null);
                     setIsEditMode(false);
+                    setIsPreset(false);
                 }}
                 onSave={handleCreateGuardrail}
                 editingPolicy={editingPolicy}
                 isEditMode={isEditMode}
+                isPreset={isPreset}
             />
         );
     }
@@ -584,6 +628,7 @@ function GuardrailPolicies() {
             rowClickable={true}
             getActions={getActionsList}
             hasRowActions={true}
+            preventRowClickOnActions={true}
             hardCodedKey={true}
             loading={loading || Boolean(pendingPolicyName)}
             loadingText={"Loading guardrail policies..."}
@@ -602,7 +647,41 @@ function GuardrailPolicies() {
                 />
             }
             isFirstPage={true}
-            primaryAction={<Button primary onClick={() => setShowCreateModal(true)}>Create Guardrail</Button>}
+            primaryAction={
+                <HorizontalStack gap="2">
+                    <Popover
+                        active={presetsPopoverActive}
+                        activator={
+                            <Button disclosure onClick={() => setPresetsPopoverActive(!presetsPopoverActive)}>
+                                Presets
+                            </Button>
+                        }
+                        onClose={() => setPresetsPopoverActive(false)}
+                    >
+                        <Popover.Pane>
+                            <Scrollable style={{ maxHeight: "350px" }}>
+                                <ActionList
+                                    actionRole="menuitem"
+                                    items={GUARDRAIL_PRESETS.map(preset => ({
+                                        content: preset.label,
+                                        prefix: (
+                                            <Box>
+                                                <Avatar
+                                                    source={func.getComplianceIcon(preset.icon || preset.label)}
+                                                    shape="square"
+                                                    size="extraSmall"
+                                                />
+                                            </Box>
+                                        ),
+                                        onAction: () => handleSelectPreset(preset.data),
+                                    }))}
+                                />
+                            </Scrollable>
+                        </Popover.Pane>
+                    </Popover>
+                    <Button primary onClick={() => setShowCreateModal(true)}>Create Guardrail</Button>
+                </HorizontalStack>
+            }
             components={components}
         />
 }

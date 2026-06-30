@@ -1,9 +1,10 @@
 import React from "react";
-import { HorizontalStack, Link, Text } from "@shopify/polaris";
+import { HorizontalStack, Text, Link } from "@shopify/polaris";
 import func from "@/util/func";
-import { formatCost, formatDurationMs, latencyColor, truncate } from "./constants";
+import { formatDurationMs, latencyColor, truncate } from "./constants";
 import { OsIcon } from "../agentic/DeviceEndpoints";
 import AssetIcon from "../agentic/AssetIcon";
+import ShowListInBadge from "../../../components/shared/ShowListInBadge";
 
 export { OsIcon };
 
@@ -117,13 +118,6 @@ export function DurationCell({ value }) {
     return <Text variant="bodySm" color={latencyColor(value)}>{formatDurationMs(value)}</Text>;
 }
 
-// Derived cost from token counts.
-export function CostCell({ data }) {
-    if (!data) return null;
-    const input = Number(data._inputTokens ?? data.inputTokens ?? 0);
-    const output = Number(data._outputTokens ?? data.outputTokens ?? 0);
-    return <Text variant="bodySm">{formatCost(input, output)}</Text>;
-}
 
 // Plain numeric count (traces / spans).
 export function CountCell({ value }) {
@@ -133,6 +127,32 @@ export function CountCell({ value }) {
 // Relative time from an epoch-ms value.
 export function TimeCell({ value }) {
     return <Text variant="bodySm">{func.prettifyEpoch(Math.floor((value || 0) / 1000))}</Text>;
+}
+
+
+export function TopicCell({ data, isTopic = true }) {
+    // Aggregated path: topicHierarchy = { domain: [subDomain, ...], ... }
+    // Flat path (searchPrompts): topic + subTopic as plain strings
+    let entries;
+    if (data?.topicHierarchy && Object.keys(data.topicHierarchy).length > 0) {
+        entries = Object.entries(data.topicHierarchy)
+    } else if (data?.topic) {
+        entries = [[data.topic, data.subTopic ? [data.subTopic] : []]];
+    } else {
+        return <Text variant="bodySm" color="subdued">{DASH}</Text>;
+    }
+    let subTopics = new Set();
+    const finalTopics = isTopic
+        ? entries.map(([topic]) => func.toSentenceCase(topic))
+        : entries.map(([, subtopic]) =>  (Array.isArray(subtopic) ? subtopic : [subtopic]).forEach(item => subTopics.add(item)));
+    return (
+       <ShowListInBadge
+            itemsArr={isTopic ? finalTopics : [...subTopics]}
+            maxItems={isTopic ? 3 : 4}
+            maxWidth={"80px"}
+            useTooltip={true}
+        />
+    );
 }
 
 // Clickable session id (used in unscoped Traces table).

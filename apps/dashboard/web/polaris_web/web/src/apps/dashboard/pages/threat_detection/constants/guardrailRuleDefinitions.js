@@ -13,7 +13,72 @@
  *   // info.heading, info.overview (array of { heading, body, items? }), info.remediation (markdown)
  */
 
+/**
+ * Pull the skill name out of a skill rule_violated value.
+ * Producer emits "skill:<skillName>"; the filterId form is
+ * "malicious_skill_detected~<agent>~skill:<skillName>". Handles both.
+ */
+function extractSkillName(ruleViolated) {
+    if (!ruleViolated || typeof ruleViolated !== 'string') return null;
+    const v = ruleViolated.trim();
+    const marker = 'skill:';
+    const idx = v.toLowerCase().lastIndexOf(marker);
+    if (idx === -1) return null; // no "skill:<name>" - e.g. the bare "malicious_skill_detected" form
+    const name = v.slice(idx + marker.length).trim();
+    return name.length > 0 ? name : null;
+}
+
+/** Skill-specific remediation. Concrete, scoped to the offending skill - not generic advice. */
+function buildSkillRemediation(skill) {
+    return `## What to do about \`${skill}\`
+
+### Right now
+1. **Disable \`${skill}\`** - remove or quarantine the skill file from the agent/device so it cannot be loaded again. This block stopped this run; deleting the file stops the next one.
+2. **Read why it fired** - open the Values tab and check the \`reason\` field. It tells you which pattern \`${skill}\` matched (remote-code download, credential exfiltration, or prompt injection) and what to clean up.
+3. **Find where it came from** - check who added \`${skill}\` and from what source (a copied gist, an untrusted registry, a teammate). If the source is compromised, every skill from it is suspect.
+
+### If \`${skill}\` could read secrets or run commands
+- Treat the host as compromised. **Rotate every credential, API key and token reachable from that machine** - assume they were read.
+- Review the agent's recent actions and outbound network calls for anything \`${skill}\` may have already triggered before it was blocked.
+
+### Stop it recurring
+- **Allowlist skills** for this agent/device so only reviewed skills load - reject anything not on the list.
+- **Review skill contents before enabling**: reject \`curl|bash\`-style download-and-run, any read of credential/secret files combined with a network call, and any text instructing the agent to ignore its own rules.
+- If \`${skill}\` is a known-good skill that was flagged by mistake, confirm its contents are clean, then add it to the allowlist so it is trusted explicitly rather than re-flagged each scan.`;
+}
+
 const GUARDRAIL_RULE_DEFINITIONS = [
+    // ─── Malicious Skill Detection ─────────────────────────────────────────────
+    // NOTE: rule_violated for skill events is "skill:<skillName>" (skillName is freeform).
+    // This entry MUST stay first so the "skill:" prefix is matched before broad
+    // substring prefixes below (e.g. a skill named "my-code-helper" would otherwise
+    // hit the BanCode "code" prefix via the matcher's includes() check).
+    {
+        prefixes: ["skill:", "malicious_skill_detected", "MaliciousSkill", "malicious_skill", "SkillDetection"],
+        heading: "Malicious Skill Detected",
+        // The skill name comes from the rule_violated value ("skill:<skillName>"), so the
+        // heading / overview / remediation are built per-event via customize(). See
+        // extractSkillName() and getGuardrailRuleInfo() below.
+        customize: (ruleViolated) => {
+            const skill = extractSkillName(ruleViolated) || "the skill";
+            const isNamed = skill !== "the skill";
+            return {
+                heading: isNamed ? `Malicious Skill Detected: ${skill}` : "Malicious Skill Detected",
+                overview: [
+                    {
+                        heading: "What was flagged?",
+                        body: `The skill **${skill}** was scanned and classified as malicious before the agent could use it. Skill detection only fires on three high-confidence attack patterns, so this is not a heuristic guess: (1) a download piped straight into a shell interpreter (\`curl ... | bash\`), (2) reading local credential/secret files **and** sending that data to an external URL, or (3) prompt injection - the skill explicitly telling the agent to ignore or override its own safety instructions. Open the Values tab and read the \`reason\` field to see exactly which one **${skill}** matched.`
+                    },
+                    {
+                        heading: "Why it matters",
+                        body: `Skills run with the agent's full privileges on the host that loaded them. If **${skill}** is left active it can execute remote code on that machine, exfiltrate API keys and secrets it can read, or quietly steer the agent off its guardrails - and because skills are shared across a device, the same file affects every agent and user on it.`
+                    }
+                ],
+                remediation: buildSkillRemediation(skill)
+            };
+        }
+    },
+
     // ─── Prompt Injection ──────────────────────────────────────────────────────
     {
         prefixes: ["PromptInjection", "prompt_injection"],
@@ -73,6 +138,36 @@ const GUARDRAIL_RULE_DEFINITIONS = [
 2. **Apply on both request and response** - ensure the policy is configured to scan both directions. Harmful inputs should not reach the model; harmful model outputs should not reach users.
 3. **Add a content moderation layer upstream** - for user-generated content platforms, run a lightweight moderation check before the guardrail to catch obvious abuse early.
 4. **Log and escalate repeat offenders** - track user IDs or session IDs that repeatedly trigger harmful content blocks and apply progressive restrictions.
+`
+    },
+
+    // ─── Enterprise License Compliance ─────────────────────────────────────────
+    {
+        prefixes: ["EnterpriseLicenseCompliance", "enterprise_license_compliance"],
+        heading: "Enterprise License Compliance Violation",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "This request matched a category that is restricted under enterprise AI service agreements and acceptable use policies. Examples include CSAM, malicious code generation, assistance related to weapons of mass destruction, violent extremism, hate speech, human trafficking, and non-consensual surveillance. These restrictions are defined by the AI provider and are not configurable organisation-level filters."
+            },
+            {
+                heading: "Why does it matter?",
+                body: "Enterprise AI providers require these categories to be blocked as part of their service terms. Requests in these areas may lead to provider enforcement actions, create legal or regulatory obligations, and increase organisational risk. Unlike custom policies, these safeguards cannot be overridden."
+            }
+        ],
+        remediation: `## What to do
+
+### Immediate steps
+- Review the blocked request and understand the context in which it occurred.
+- Identify the user or workflow involved and determine whether the request was intentional or accidental.
+- If the activity appears suspicious or inappropriate, involve the relevant security, compliance, or legal teams based on your internal processes.
+- If the request was made without awareness of the restriction, explain the limitation to the user and guide them toward approved alternatives where appropriate.
+
+### Longer-term actions
+1. **Educate users** - help users understand which categories are restricted under the enterprise license and why these safeguards exist.
+2. **Review access controls** - consider whether additional permissions or role-based restrictions are appropriate for higher-risk use cases.
+3. **Keep these protections enabled** - these checks reflect enterprise license requirements from the AI provider and are not intended to be disabled or customised.
+4. **Maintain audit records** - retain relevant event details to support internal reviews, investigations, and compliance processes where required.
 `
     },
 
@@ -521,6 +616,31 @@ This event means the guardrail **successfully protected** the data - the sensiti
 `
     },
 
+    // ─── Blocked Host ──────────────────────────────────────────────────────────
+    {
+        prefixes: ["BlockedHost", "blocked_host", "block_host", "BlockedHosts", "block_host_policy"],
+        capability: "blockedHosts",
+        heading: "Blocked Host",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "Someone tried to reach a host (domain or service) that your organisation has deliberately added to the blocked-hosts policy - for example an unsanctioned external AI service such as DeepSeek. This is an intentional policy block, not a detected attack: the request was stopped because company policy does not allow that destination."
+            },
+            {
+                heading: "Why is it blocked?",
+                body: "Organisations block specific hosts to keep data away from unapproved third parties - unsanctioned AI tools, file-sharing sites, or services that fall outside data-governance and compliance requirements. Sending prompts or data to such a host would move it outside the company's control."
+            }
+        ],
+        remediation: `## No remediation needed
+
+This is **working as intended**. The host was blocked on purpose by your organisation's policy (e.g. an external AI service the company does not permit), so there is no threat to fix and no action required - the block already did its job.
+
+### The only things worth doing
+- **If the host should actually be allowed** (it was blocked by mistake, or policy has changed), an administrator can add it to the allowed hosts in the block-host policy. Until then, requests to it will keep being blocked.
+- **If users keep hitting this block**, it usually means people are trying to use a tool the company has chosen not to allow - a reminder of the approved alternatives is more useful than any technical change.
+`
+    },
+
     // ─── Audit Controls (ComponentAccess, Approval, IP, Endpoint) ──────────────
     {
         prefixes: ["ComponentAccessRejected", "ApprovalConditionsNotDefined", "ApprovalExpired", "IPNotInAllowedList", "EndpointNotWhitelisted"],
@@ -556,7 +676,7 @@ Identify the specific rule from the \`ruleViolated\` field:
 
     // ─── Personal Account ──────────────────────────────────────────────────────
     {
-        prefixes: ["block_personal_account", "personal_account"],
+        prefixes: ["BlockPersonalAccounts", "block_personal_account", "personal_account", "personalaccount"],
         templateIdPrefixes: ["block-personal-account"],
         heading: "Personal Account Usage Blocked",
         overview: [
@@ -571,15 +691,12 @@ Identify the specific rule from the \`ruleViolated\` field:
         ],
         remediation: `## What to do
 
-### Immediate
-- Identify the personal account detected and the user/session associated with it.
-- Determine whether this was an accidental misconfiguration or an intentional bypass.
+### For the user
+**Use your company account instead of a personal one.** This is a deliberate policy block - the request used a personal account (e.g. a personal Gmail), which the organisation does not allow for work. Sign in with your organisational / SSO account and retry; the request will go through.
 
-### Structural fixes
-1. **Enforce enterprise SSO** - require SAML/OIDC single sign-on for all AI pipeline access. Block direct personal account authentication at the identity provider level.
-2. **Audit existing service connections** - review all connected integrations and tool authorisations for personal account usage. Migrate to scoped service accounts with the minimum required permissions.
-3. **Communicate policy to users** - notify users of the enterprise account requirement with clear migration instructions. Provide a self-service path to convert connections to enterprise accounts.
-4. **Monitor for repeat bypass attempts** - set up alerts for repeated personal account usage. Distinguish accidental misuse from intentional policy circumvention.
+### For an administrator
+- If this account *should* be allowed (it was blocked by mistake, or it is actually a valid work account), update the personal-accounts policy to permit it.
+- If the same user keeps hitting this block, it usually means they need a reminder to switch to their company account rather than any technical change.
 `
     }
 ];
@@ -587,7 +704,9 @@ Identify the specific rule from the \`ruleViolated\` field:
 /**
  * Returns the rule definition entry matching the given ruleViolated or templateId.
  * Tries ruleViolated first (prefix/includes match), then templateId.
- * Returns null if no match found.
+ * If the matched entry defines customize(ruleViolated), its returned fields
+ * (heading / overview / remediation) override the static ones - this is how
+ * skill events render the actual skill name. Returns null if no match found.
  */
 export function getGuardrailRuleInfo(ruleViolated, templateId) {
     const matches = (value, prefixes) => {
@@ -599,14 +718,17 @@ export function getGuardrailRuleInfo(ruleViolated, templateId) {
         });
     };
 
+    const resolve = (def, ruleViolatedValue) =>
+        typeof def.customize === 'function' ? { ...def, ...def.customize(ruleViolatedValue) } : def;
+
     if (ruleViolated && ruleViolated !== '-') {
         for (const def of GUARDRAIL_RULE_DEFINITIONS) {
-            if (matches(ruleViolated, def.prefixes)) return def;
+            if (matches(ruleViolated, def.prefixes)) return resolve(def, ruleViolated);
         }
     }
     if (templateId) {
         for (const def of GUARDRAIL_RULE_DEFINITIONS) {
-            if (def.templateIdPrefixes && matches(templateId, def.templateIdPrefixes)) return def;
+            if (def.templateIdPrefixes && matches(templateId, def.templateIdPrefixes)) return resolve(def, ruleViolated);
         }
     }
     return null;

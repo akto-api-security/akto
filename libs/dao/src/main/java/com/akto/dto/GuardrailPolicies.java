@@ -79,6 +79,13 @@ public class GuardrailPolicies {
     private boolean applyOnRequest;
     private boolean applyToAllServers;
 
+    // Team/Role targeting — controls which agentic users this policy applies to.
+    // applyToDeviceIds is resolved at fetch time (not stored) by the dashboard before serving to the enforcement layer.
+    private List<String> targetTeams;
+    private List<String> targetRoles;
+    @BsonIgnore
+    private List<String> applyToDeviceIds;
+
     // Blocked host/path list — any traffic from a listed host is blocked outright.
     // Modeled as objects (not bare strings) so the entry schema can be extended later
     // (e.g. match type, per-entry behaviour) without a data migration.
@@ -108,6 +115,8 @@ public class GuardrailPolicies {
 
     // Modal config
     private ArrayList<ModelConfig> modelConfigs;
+
+    private List<String> enterpriseLicenseComplianceCategories;
 
     public String getHexId() {
         if (this.id != null) {
@@ -203,10 +212,13 @@ public class GuardrailPolicies {
         private String description;
         private List<String> samplePhrases;
 
-        public DeniedTopic(String topic, String description, List<String> samplePhrases) {
+        private String origin;
+
+        public DeniedTopic(String topic, String description, List<String> samplePhrases, String origin) {
             this.topic = topic;
             this.description = description;
             this.samplePhrases = samplePhrases;
+            this.origin = origin;
         }
     }
 
@@ -371,14 +383,10 @@ public class GuardrailPolicies {
     @Getter
     @Setter
     @NoArgsConstructor
+    @AllArgsConstructor
     public static class TokenLimitDetection {
         private boolean enabled;
-        private double confidenceScore;
-
-        public TokenLimitDetection(boolean enabled, double confidenceScore) {
-            this.enabled = enabled;
-            this.confidenceScore = confidenceScore;
-        }
+        private int threshold; // max allowed tokens per prompt
     }
 
     public enum ModelRole {

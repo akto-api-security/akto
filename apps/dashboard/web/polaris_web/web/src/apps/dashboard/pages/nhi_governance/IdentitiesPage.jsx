@@ -87,6 +87,7 @@ const transformIdentityForUI = (apiIdentity) => {
         expiryStatus: formatExpiryStatus(apiIdentity.expiryDate),
         targetResource: apiIdentity.targetResource,
         status: apiIdentity.status,
+        discoveredTimestamp: formatRelativeTime(apiIdentity.createdAt, "Unknown"),
     };
 };
 
@@ -104,12 +105,13 @@ const makeSummaryItems = (data) => {
 
 // ── Headers ────────────────────────────────────────────────────────────────────
 const headers = [
-    { text: "Identity",      value: "identityComp",   title: "Identity"                           },
-    { text: "Agentic Asset", value: "agentComp",      title: "Agentic Asset"                      },
+    { text: "Identity",      value: "identityComp",       title: "Identity"                           },
+    { text: "Agentic Asset", value: "agentComp",          title: "Agentic Asset"                      },
     ...(isEndpointSecurityCategory() ? [{ text: "Owner", value: "owner", title: "Owner", type: CellType.TEXT }] : []),
-    { text: "Type",          value: "typeComp",       title: "Type"                               },
-    { text: "Violations",    value: "violationsComp", title: "Violations"                         },
-    { text: "Expiry Status", value: "expiryComp",     title: "Expiry Status"                      },
+    { text: "Type",          value: "typeComp",           title: "Type"                               },
+    { text: "Violations",    value: "violationsComp",     title: "Violations"                         },
+    { text: "Expiry Status", value: "expiryComp",         title: "Expiry Status"                      },
+    { text: "Discovered",    value: "discoveredTimestamp", title: "Discovered", type: CellType.TEXT   },
 ];
 
 const sortOptions = [
@@ -119,11 +121,14 @@ const sortOptions = [
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 const pageTitle = (
-    <TitleWithInfo
-        titleText="Identities"
-        tooltipContent="Non-human identities (API keys, tokens, service accounts) used by your AI agents."
-        docsUrl="https://ai-security-docs.akto.io/nhi-governance/identities"
-    />
+    <HorizontalStack gap="2" blockAlign="center">
+        <TitleWithInfo
+            titleText="Identities"
+            tooltipContent="Non-human identities (API keys, tokens, service accounts) used by your AI agents."
+            docsUrl="https://ai-security-docs.akto.io/nhi-governance/identities"
+        />
+        <Badge status="info">Beta</Badge>
+    </HorizontalStack>
 );
 
 export default function IdentitiesPage() {
@@ -136,7 +141,6 @@ export default function IdentitiesPage() {
     const [rawIdentities, setRawIdentities] = useState([]);
     const [rawViolations, setRawViolations] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
 
     // UI state
     const [selectedTab, setSelectedTab]         = useState(initialSelectedTab);
@@ -151,39 +155,28 @@ export default function IdentitiesPage() {
         values.ranges[2]
     );
 
+    const startTimestamp = parseInt(currDateRange.period.since.getTime() / 1000);
+    const endTimestamp = parseInt(currDateRange.period.until.getTime() / 1000);
+
     // Fetch identities and violations from API
     useEffect(() => {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                setError(null);
 
-                // Fetch identities from API
-                const identitiesResponse = await observeRequests.fetchNhiIdentities();
-                if (identitiesResponse && identitiesResponse.length > 0) {
-                    const transformed = identitiesResponse.map(transformIdentityForUI);
-                    setRawIdentities(transformed);
-                } else if (Array.isArray(identitiesResponse)) {
-                    setRawIdentities([]);
-                } else {
-                    setRawIdentities([]);
-                }
+                const identitiesResponse = await observeRequests.fetchNhiIdentities(startTimestamp, endTimestamp);
+                setRawIdentities(Array.isArray(identitiesResponse) ? identitiesResponse.map(transformIdentityForUI) : []);
+                setLoading(false);
 
-                // Fetch slim violation projection for per-identity counts
                 try {
                     const violationsResponse = await observeRequests.fetchViolationCountsByIdentity();
-                    if (Array.isArray(violationsResponse) && violationsResponse.length > 0) {
-                        setRawViolations(violationsResponse);
-                    } else {
-                        setRawViolations([]);
-                    }
+                    setRawViolations(Array.isArray(violationsResponse) ? violationsResponse : []);
                 } catch (violErr) {
                     console.error("Error fetching violations for counts:", violErr);
                     setRawViolations([]);
                 }
             } catch (err) {
                 console.error("Error fetching identities:", err);
-                setError(err.message);
                 setRawIdentities([]);
             } finally {
                 setLoading(false);
@@ -191,7 +184,7 @@ export default function IdentitiesPage() {
         };
 
         fetchData();
-    }, []);
+    }, [startTimestamp, endTimestamp]);
 
     // Build violation index from API violations
     const violationIndex = useMemo(() => {
