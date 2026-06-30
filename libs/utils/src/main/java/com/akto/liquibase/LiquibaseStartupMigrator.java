@@ -57,15 +57,30 @@ public final class LiquibaseStartupMigrator {
 
     private static void runScope(String baseUrl, String scope, String dbName) {
         String changelog = CHANGELOG_DIR + "/" + scope + ".xml";
+        String baselineChangelog = CHANGELOG_DIR + "/baseline-" + scope + ".xml";
+        String url = buildUrlForDb(baseUrl, dbName);
         logger.infoAndAddToDb("Applying " + scope + " migrations to DB " + dbName);
-        try (Database database = DatabaseFactory.getInstance()
-                .openDatabase(buildUrlForDb(baseUrl, dbName), null, null, null, RESOURCE_ACCESSOR);
-             Liquibase liquibase = new Liquibase(changelog, RESOURCE_ACCESSOR, database)) {
-            liquibase.update(new Contexts());
+        try {
+            // Mark the baseline as applied (don't run it): DaoInit already creates these collections,
+            // so createCollection would throw NamespaceExists. Separate Database — closing one closes its conn.
+            try (Database database = openDb(url);
+                 Liquibase baseline = new Liquibase(baselineChangelog, RESOURCE_ACCESSOR, database)) {
+                baseline.changeLogSync(new Contexts());
+            }
+
+            // Run the real migrations under <scope>/; baseline changesets are skipped as already-run.
+            try (Database database = openDb(url);
+                 Liquibase liquibase = new Liquibase(changelog, RESOURCE_ACCESSOR, database)) {
+                liquibase.update(new Contexts());
+            }
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Liquibase migrations failed for scope=" + scope + " db=" + dbName);
             throw new RuntimeException("Liquibase migrations failed for scope=" + scope + " db=" + dbName, e);
         }
+    }
+
+    private static Database openDb(String url) throws Exception {
+        return DatabaseFactory.getInstance().openDatabase(url, null, null, null, RESOURCE_ACCESSOR);
     }
 
     // Swaps the DB name in the connection string, keeping credentials, host(s) and options.

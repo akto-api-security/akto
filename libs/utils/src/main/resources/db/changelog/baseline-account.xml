@@ -63,10 +63,6 @@
         <mongodb:createCollection collectionName="agent_conversation_results"/>
     </changeSet>
 
-    <changeSet id="baseline-agent_health_check-collection" author="akto">
-        <mongodb:createCollection collectionName="agent_health_check"/>
-    </changeSet>
-
     <changeSet id="baseline-agent_models-collection" author="akto">
         <mongodb:createCollection collectionName="agent_models"/>
     </changeSet>
@@ -393,10 +389,6 @@
         <mongodb:createCollection collectionName="common_templates"/>
     </changeSet>
 
-    <changeSet id="baseline-compliance_infos-collection" author="akto">
-        <mongodb:createCollection collectionName="compliance_infos"/>
-    </changeSet>
-
     <changeSet id="baseline-crawler_runs-collection" author="akto">
         <mongodb:createCollection collectionName="crawler_runs"/>
     </changeSet>
@@ -668,10 +660,6 @@
         <mongodb:createCollection collectionName="generic_agent_conversations"/>
     </changeSet>
 
-    <changeSet id="baseline-guardrail_compliance_infos-collection" author="akto">
-        <mongodb:createCollection collectionName="guardrail_compliance_infos"/>
-    </changeSet>
-
     <changeSet id="baseline-guardrail_policies-collection" author="akto">
         <mongodb:createCollection collectionName="guardrail_policies"/>
     </changeSet>
@@ -733,37 +721,8 @@
         <mongodb:createCollection collectionName="ip_level_api_hit_count"/>
     </changeSet>
 
-    <changeSet id="baseline-ip_reputation_scores-collection" author="akto">
-        <mongodb:createCollection collectionName="ip_reputation_scores"/>
-    </changeSet>
-
-    <changeSet id="baseline-ip_reputation_scores-index-0" author="akto">
-        <mongodb:createIndex collectionName="ip_reputation_scores">
-            <mongodb:keys>{ &quot;ip&quot;: -1, &quot;timestamp&quot;: -1 }</mongodb:keys>
-            <mongodb:options>{ &quot;name&quot;: &quot;ip-timestamp_-1&quot; }</mongodb:options>
-        </mongodb:createIndex>
-    </changeSet>
-
     <changeSet id="baseline-jira_integration-collection" author="akto">
         <mongodb:createCollection collectionName="jira_integration"/>
-    </changeSet>
-
-    <changeSet id="baseline-jobs-collection" author="akto">
-        <mongodb:createCollection collectionName="jobs"/>
-    </changeSet>
-
-    <changeSet id="baseline-jobs-index-0" author="akto">
-        <mongodb:createIndex collectionName="jobs">
-            <mongodb:keys>{ &quot;jobExecutorType&quot;: 1, &quot;jobStatus&quot;: 1, &quot;scheduledAt&quot;: 1 }</mongodb:keys>
-            <mongodb:options>{ &quot;name&quot;: &quot;jobExecut-jobStatus-scheduled_1&quot; }</mongodb:options>
-        </mongodb:createIndex>
-    </changeSet>
-
-    <changeSet id="baseline-jobs-index-1" author="akto">
-        <mongodb:createIndex collectionName="jobs">
-            <mongodb:keys>{ &quot;jobExecutorType&quot;: 1, &quot;jobStatus&quot;: 1, &quot;heartbeatAt&quot;: 1 }</mongodb:keys>
-            <mongodb:options>{ &quot;name&quot;: &quot;jobExecut-jobStatus-heartbeat_1&quot; }</mongodb:options>
-        </mongodb:createIndex>
     </changeSet>
 
     <changeSet id="baseline-loaders-collection" author="akto">
@@ -1199,10 +1158,6 @@
 
     <changeSet id="baseline-relationship-collection" author="akto">
         <mongodb:createCollection collectionName="relationship"/>
-    </changeSet>
-
-    <changeSet id="baseline-remediations-collection" author="akto">
-        <mongodb:createCollection collectionName="remediations"/>
     </changeSet>
 
     <changeSet id="baseline-replace_details-collection" author="akto">
@@ -1715,7 +1670,9 @@
     </changeSet>
 
     <changeSet id="baseline-testing_run_result-capped" author="akto" failOnError="false">
-        <mongodb:runCommand>{ "convertToCapped": "testing_run_result", "size": 50000000000, "max": 5000000 }</mongodb:runCommand>
+        <mongodb:runCommand>
+            <mongodb:command>{ "convertToCapped": "testing_run_result", "size": 50000000000, "max": 5000000 }</mongodb:command>
+        </mongodb:runCommand>
     </changeSet>
 
     <changeSet id="baseline-testing_run_result_summaries-collection" author="akto">
@@ -1774,10 +1731,6 @@
 
     <changeSet id="baseline-threat_activity_webhook_integration-collection" author="akto">
         <mongodb:createCollection collectionName="threat_activity_webhook_integration"/>
-    </changeSet>
-
-    <changeSet id="baseline-threat_compliance_infos-collection" author="akto">
-        <mongodb:createCollection collectionName="threat_compliance_infos"/>
     </changeSet>
 
     <changeSet id="baseline-traces-collection" author="akto">
