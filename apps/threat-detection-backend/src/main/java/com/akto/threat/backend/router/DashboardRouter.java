@@ -114,12 +114,10 @@ public class DashboardRouter implements ARouter {
                     reqBody.asString()
                 ).orElse(FetchAlertFiltersRequest.newBuilder().build());
 
-                String contextSource = getContextSourceHeader(ctx);
                 ProtoMessageUtils.toString(
                     dsService.fetchAlertFilters(
                         ctx.get("accountId"),
-                        req,
-                        contextSource
+                        req
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });

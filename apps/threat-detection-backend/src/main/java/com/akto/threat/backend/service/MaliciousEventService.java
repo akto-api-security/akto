@@ -344,19 +344,16 @@ public class MaliciousEventService {
     return true;
   }
 
-  private void fetchAlertFilterData(String accountId, Set<String> subCategories, Set<String> urls, Set<String> hosts, Bson timeRangeFilter, String contextSource) {
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
-    Bson combinedFilter = Filters.and(timeRangeFilter, contextFilter);
-
-    subCategories.addAll(fetchDistinctFieldValues(accountId, "filterId", combinedFilter, String.class));
-    hosts.addAll(fetchDistinctFieldValues(accountId, "host", combinedFilter, String.class));
+  private void fetchAlertFilterData(String accountId, Set<String> subCategories, Set<String> urls, Set<String> hosts, Bson timeRangeFilter) {
+    subCategories.addAll(fetchDistinctFieldValues(accountId, "filterId", timeRangeFilter, String.class));
+    hosts.addAll(fetchDistinctFieldValues(accountId, "host", timeRangeFilter, String.class));
 
     try {
       // Use distinct() for DISTINCT_SCAN (index-covered, no doc fetch) but cap at 1000
       // to avoid 16MB BSON result size limit with large datasets
       Set<String> endpoints = new HashSet<>();
       maliciousEventDao.getCollection(accountId)
-          .distinct("latestApiEndpoint", combinedFilter, String.class)
+          .distinct("latestApiEndpoint", timeRangeFilter, String.class)
           .forEach(value -> {
             if (value != null && !value.isEmpty() && endpoints.size() < 1000) {
               endpoints.add(value);
@@ -369,7 +366,7 @@ public class MaliciousEventService {
   }
 
   public FetchAlertFiltersResponse fetchAlertFilters(
-      String accountId, FetchAlertFiltersRequest request, String contextSource) {
+      String accountId, FetchAlertFiltersRequest request) {
 
     Set<String> subCategories = new HashSet<>();
     Set<String> urls = new HashSet<>();
@@ -378,10 +375,10 @@ public class MaliciousEventService {
     Bson timeRangeFilter = buildTimeRangeFilter(
         request.getDetectedAtTimeRange(), "detectedAt");
 
-    Set<String> actors = fetchActorsForFilters(accountId, request, contextSource);
+    Set<String> actors = fetchActorsForFilters(accountId, request);
 
-    // Fetch remaining filters from malicious_events scoped to the current context source
-    fetchAlertFilterData(accountId, subCategories, urls, hosts, timeRangeFilter, contextSource);
+    // Fetch remaining filters from malicious_events
+    fetchAlertFilterData(accountId, subCategories, urls, hosts, timeRangeFilter);
 
     return FetchAlertFiltersResponse.newBuilder()
         .addAllActors(actors)
@@ -391,18 +388,16 @@ public class MaliciousEventService {
         .build();
   }
 
-  private Set<String> fetchActorsForFilters(String accountId, FetchAlertFiltersRequest request, String contextSource) {
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+  private Set<String> fetchActorsForFilters(String accountId, FetchAlertFiltersRequest request) {
     if (USE_ACTOR_INFO_TABLE) {
       ActorInfoDao actorInfoDao = ActorInfoDao.instance;
       Bson actorTimeRangeFilter = buildTimeRangeFilter(
           request.getDetectedAtTimeRange(), "discoveredAt");
-      Bson combinedFilter = Filters.and(actorTimeRangeFilter, contextFilter);
 
       try {
         Set<String> actors = new HashSet<>();
         actorInfoDao.getCollection(accountId)
-            .distinct("actorId", combinedFilter, String.class)
+            .distinct("actorId", actorTimeRangeFilter, String.class)
             .forEach(value -> {
               if (value != null && !value.isEmpty()) {
                 actors.add(value);
@@ -416,8 +411,7 @@ public class MaliciousEventService {
     } else {
       Bson timeRangeFilter = buildTimeRangeFilter(
           request.getDetectedAtTimeRange(), "detectedAt");
-      Bson combinedFilter = Filters.and(timeRangeFilter, contextFilter);
-      return fetchDistinctFieldValues(accountId, "actor", combinedFilter, String.class);
+      return fetchDistinctFieldValues(accountId, "actor", timeRangeFilter, String.class);
     }
   }
 
