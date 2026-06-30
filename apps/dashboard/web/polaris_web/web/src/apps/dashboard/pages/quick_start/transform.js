@@ -1211,6 +1211,18 @@ const copilotStudioImportObj = {
     />
 }
 
+const m365CopilotObj = {
+    icon: '/public/microsoft-copilot.svg',
+    label: "Microsoft 365 Copilot",
+    text: "Import your Microsoft 365 Copilot interactions across Teams, Excel and other Office products, seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-m365-copilot',
+    key: "M365_COPILOT",
+    component: <BannerComponent
+        content="Import your Microsoft 365 Copilot interactions across Teams, Excel and other Office products, seamlessly in AKTO."
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-m365-copilot'
+    />
+}
+
 const databricksImportObj = {
     icon: '/public/databricks.svg',
     label: "Databricks",
@@ -1322,6 +1334,15 @@ const claudeCodeCliHookObj = {
         content="Import your Claude Code CLI proxy traffic, seamlessly in AKTO."
         docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-cli-hooks'
     />
+}
+
+const claudeCoworkObj = {
+    icon: '/public/claude.svg',
+    label: "Claude Cowork",
+    text: "Secure your Claude Cowork interactions with Akto guardrails.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents',
+    key: "CLAUDE_COWORK",
+    component: <AddOnComponenet/>
 }
 
 const geminiCliHookObj = {
@@ -2169,7 +2190,7 @@ const quickStartFunc = {
 
         const aiAgentConnectors = [
             awsBedrockObj, awsAgentCoreObj, amazonQuickObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
-            n8nImportObj, langchainImportObj, copilotStudioImportObj, snowflakeObj,
+            n8nImportObj, langchainImportObj, copilotStudioImportObj, m365CopilotObj, snowflakeObj,
             vertexAICustomDeployedModelImportObj, salesforceImportObj,
             anthropicImportObj, openaiImportObj
         ]
@@ -2199,7 +2220,7 @@ const quickStartFunc = {
 
         // Endpoint Agents
         const endpointAgents = [
-            cursorHookObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, neovimHookObj, openCodeHookObj, ampHookObj, hermesHookObj,intellijHookObj, antigravityObj,
+            cursorHookObj, claudeCodeCliHookObj, claudeCoworkObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, neovimHookObj, openCodeHookObj, ampHookObj, hermesHookObj,intellijHookObj, antigravityObj,
         ]
 
         const localHostedModels = [
