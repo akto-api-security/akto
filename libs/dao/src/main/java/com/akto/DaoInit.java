@@ -384,7 +384,8 @@ public class DaoInit {
                 new EnumCodec<>(GuardrailPolicies.ModelRole.class),
                 new EnumCodec<>(EndpointRemoteCommand.Status.class),
                 new EnumCodec<>(EndpointRemoteCommand.TargetType.class),
-                new EnumCodec<>(EndpointRemoteCommandExecution.Status.class)
+                new EnumCodec<>(EndpointRemoteCommandExecution.Status.class),
+                new EnumCodec<>(Log.ActivityType.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,

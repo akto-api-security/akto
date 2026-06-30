@@ -2968,6 +2968,15 @@ public class DbAction extends ActionSupport {
                 return Action.SUCCESS.toUpperCase();
             }
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            dbLog.setActivityId(log.getString("activityId"));
+            String activityTypeStr = log.getString("activityType");
+            if (activityTypeStr != null) {
+                try {
+                    dbLog.setActivityType(Log.ActivityType.valueOf(activityTypeStr));
+                } catch (IllegalArgumentException e) {
+                    loggerMaker.errorAndAddToDb("Unknown activityType in insertTestingLog: " + activityTypeStr);
+                }
+            }
 
             // Skip writing cyborg call logs.
             if (dbLog.getLog().contains("ApiExecutor") &&
