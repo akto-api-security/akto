@@ -38,7 +38,7 @@ public final class LiquibaseStartupMigrator {
             throw new IllegalArgumentException("MongoDB connection string is empty.");
         }
 
-        logger.infoAndAddToDb(ENV_FLAG + "=true, running DB migrations");
+        logger.info(ENV_FLAG + "=true, running DB migrations");
 
         runScope(mongoUrl, "common", "common");
         runScope(mongoUrl, "billing", "billing");
@@ -52,30 +52,35 @@ public final class LiquibaseStartupMigrator {
                     "liquibase-account-migrations");
         }
 
-        logger.infoAndAddToDb("DB migrations complete");
+        logger.info("DB migrations complete");
     }
 
     private static void runScope(String baseUrl, String scope, String dbName) {
         String changelog = CHANGELOG_DIR + "/" + scope + ".xml";
         String baselineChangelog = CHANGELOG_DIR + "/baseline-" + scope + ".xml";
         String url = buildUrlForDb(baseUrl, dbName);
-        logger.infoAndAddToDb("Applying " + scope + " migrations to DB " + dbName);
-        try {
-            // Mark the baseline as applied (don't run it): DaoInit already creates these collections,
-            // so createCollection would throw NamespaceExists. Separate Database — closing one closes its conn.
-            try (Database database = openDb(url);
-                 Liquibase baseline = new Liquibase(baselineChangelog, RESOURCE_ACCESSOR, database)) {
-                baseline.changeLogSync(new Contexts());
-            }
-
-            // Run the real migrations under <scope>/; baseline changesets are skipped as already-run.
-            try (Database database = openDb(url);
-                 Liquibase liquibase = new Liquibase(changelog, RESOURCE_ACCESSOR, database)) {
-                liquibase.update(new Contexts());
-            }
+        logger.info("Applying " + scope + " migrations to DB " + dbName);
+        // Mark the baseline as applied (don't run it): DaoInit already creates these collections,
+        // so createCollection would throw NamespaceExists. Separate Database — closing one closes its conn.
+        try (Database database = openDb(url);
+             Liquibase baseline = new Liquibase(baselineChangelog, RESOURCE_ACCESSOR, database)) {
+            logger.info("Syncing baseline for scope=" + scope + " db=" + dbName);
+            baseline.changeLogSync(new Contexts());
+            logger.info("Baseline sync complete for scope=" + scope);
         } catch (Exception e) {
-            logger.errorAndAddToDb(e, "Liquibase migrations failed for scope=" + scope + " db=" + dbName);
-            throw new RuntimeException("Liquibase migrations failed for scope=" + scope + " db=" + dbName, e);
+            logger.errorAndAddToDb(e, "Baseline sync failed for scope=" + scope + " db=" + dbName + "; migrations will not run");
+            throw new RuntimeException("Baseline sync failed for scope=" + scope + " db=" + dbName, e);
+        }
+
+        // Run the real migrations under <scope>/; baseline changesets are skipped as already-run.
+        try (Database database = openDb(url);
+             Liquibase liquibase = new Liquibase(changelog, RESOURCE_ACCESSOR, database)) {
+            logger.info("Running migrations for scope=" + scope + " db=" + dbName);
+            liquibase.update(new Contexts());
+            logger.info("Migrations complete for scope=" + scope);
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Migrations failed for scope=" + scope + " db=" + dbName);
+            throw new RuntimeException("Migrations failed for scope=" + scope + " db=" + dbName, e);
         }
     }
 
