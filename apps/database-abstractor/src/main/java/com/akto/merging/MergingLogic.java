@@ -36,6 +36,7 @@ public class MergingLogic {
 
     public static final int STRING_MERGING_THRESHOLD = 10;
     private static final String AKTO_MCP_SERVER_TAG = "mcp-server";
+    static final Set<String> MERGE_NAMESPACE_LITERALS = new HashSet<>(Arrays.asList("skills", "skill"));
     private static final LoggerMaker loggerMaker = new LoggerMaker(MergingLogic.class, LogDb.DB_ABS);
     private static final int OPTIMIZED_MERGING_ACCOUNT_ID = 1736798101;
 
@@ -692,6 +693,14 @@ public class MergingLogic {
             if (DictionaryFilter.isEnglishWord(tempToken) || DictionaryFilter.isEnglishWord(dbToken)) {
                 if (!tempToken.equalsIgnoreCase(dbToken)) {
                     // Two different English words at the same position = no merge possible
+                    return null;
+                }
+                continue;
+            }
+
+            // Never merge tokens that follow a namespace literal (e.g. /skills/<name>)
+            if (i > 0 && MERGE_NAMESPACE_LITERALS.contains(newTokens[i - 1])) {
+                if (!tempToken.equalsIgnoreCase(dbToken)) {
                     return null;
                 }
                 continue;
