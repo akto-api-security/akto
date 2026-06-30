@@ -45,6 +45,9 @@ public class EndpointShieldLogsDao extends AccountsContextDao<EndpointShieldLog>
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { EndpointShieldLog.TIMESTAMP }, false);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { EndpointShieldLog.AGENT_ID}, false);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { EndpointShieldLog.DEVICE_ID }, false);
+        // Compound index for the paginated log query (agentId equality + timestamp range).
+        // Without this, countDocuments must scan all docs matching agentId.
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { EndpointShieldLog.AGENT_ID, EndpointShieldLog.TIMESTAMP }, false);
     }
     public List<EndpointShieldLog> findByAgentId(String agentId) {
         Bson filter = Filters.eq(EndpointShieldLog.AGENT_ID, agentId);
