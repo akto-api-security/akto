@@ -3591,4 +3591,13 @@ public class DbLayer {
             loggerMaker.errorAndAddToDb(e, "upsertNhiIdentity: policy eval failed: " + e.getMessage());
         }
     }
+
+    public static List<AgentGuardCorpusEntry> getAgentCorpus(String hostName) {
+        return AgentGuardCorpusDao.instance.findBucketsByAgentHost(hostName);
+    }
+    
+    public static void bulkSaveCorpusEntries(List<AgentGuardCorpusEntry> corpusEntries) {
+        AgentGuardCorpusDao.instance.upsertVectors(corpusEntries);
+    }
+
 }

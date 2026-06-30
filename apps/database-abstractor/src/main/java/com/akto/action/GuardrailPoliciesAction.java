@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import com.akto.data_actor.DbLayer;
+import com.akto.dto.AgentGuardCorpusEntry;
 import com.akto.dto.EnterpriseLicenseComplianceCatalog;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.log.LoggerMaker;
@@ -49,5 +50,30 @@ public class GuardrailPoliciesAction extends ActionSupport {
             loggerMaker.errorAndAddToDb("Error fetching guardrail policies: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
+    }
+
+    private String agentHost;
+    private List<AgentGuardCorpusEntry> examples;
+
+    public String loadResultsForAgent(){
+        if(this.agentHost == null || this.agentHost.isEmpty()){
+            addActionError("Agent host cannot be empty");
+            return ERROR.toUpperCase();
+        }
+
+        this.examples = DbLayer.getAgentCorpus(this.agentHost);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String bulkSaveCorpusEntries(){
+        if(this.examples == null || this.examples.size() == 0){
+            addActionError("Examples cannot be empty");
+            return ERROR.toUpperCase();
+        }
+
+        DbLayer.bulkSaveCorpusEntries(this.examples);
+
+        return SUCCESS.toUpperCase();
     }
 }
