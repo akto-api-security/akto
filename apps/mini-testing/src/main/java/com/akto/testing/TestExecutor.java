@@ -899,6 +899,25 @@ public class TestExecutor {
         return respMap;
     }
 
+    /**
+     * Establishes a clean activity context for a test run. Tests start from several flows that run on
+     * pooled/reused threads, so we always set explicitly when a summaryId is present and otherwise clear
+     * any stale value left behind by a previous task on the same thread.
+     */
+    public static void setTestRunActivityContext(ObjectId summaryId) {
+        if (summaryId != null) {
+            Context.activityId.set(summaryId.toHexString());
+            Context.activityType.set(Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY);
+        } else {
+            clearActivityContext();
+        }
+    }
+
+    public static void clearActivityContext() {
+        Context.activityId.remove();
+        Context.activityType.remove();
+    }
+
     public Void startWithLatch(
         List<String> testingRunSubCategories,int accountId,ApiInfo.ApiInfoKey apiInfoKey,
         List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
@@ -906,12 +925,7 @@ public class TestExecutor {
         List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, CountDownLatch latch, Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap) {
 
         Context.accountId.set(accountId);
-        String previousActivityId = Context.activityId.get();
-        Log.ActivityType previousActivityType = Context.activityType.get();
-        if (summaryId != null) {
-            Context.activityId.set(summaryId.toHexString());
-            Context.activityType.set(Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY);
-        }
+        setTestRunActivityContext(summaryId);
         loggerMaker.warnAndAddToDb("Starting test for " + apiInfoKey);
         AtomicBoolean isApiInfoTested = new AtomicBoolean(false);
         try {
@@ -928,8 +942,7 @@ public class TestExecutor {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
         } finally {
-            Context.activityId.set(previousActivityId);
-            Context.activityType.set(previousActivityType);
+            clearActivityContext();
         }
         if(isApiInfoTested.get()){
             loggerMaker.warnAndAddToDb("API: " + apiInfoKey.toString() + " has been successfully tested");
@@ -1120,18 +1133,14 @@ public class TestExecutor {
             TestingRunResult testingRunResult = null;
             Future<TestingRunResult> future = legacyTestTimeoutExecutor.submit(() -> {
                 Context.accountId.set(currentAccountId);
-                if (summaryId != null) {
-                    Context.activityId.set(summaryId.toHexString());
-                    Context.activityType.set(Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY);
-                }
+                setTestRunActivityContext(summaryId);
                 try {
                     TestingRunResult legacyResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig,
                         instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
                     persistTestLogsToDb(legacyResult != null ? legacyResult.getTestLogs() : null);
                     return legacyResult;
                 } finally {
-                    Context.activityId.remove();
-                    Context.activityType.remove();
+                    clearActivityContext();
                 }
             });
             try {

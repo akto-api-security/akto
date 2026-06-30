@@ -25,7 +25,6 @@ import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.Log;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResult;
@@ -72,10 +71,7 @@ public class ConsumerUtil {
         SingleTestPayload singleTestPayload = parseTestMessage(message);
         Context.accountId.set(singleTestPayload.getAccountId());
         ObjectId summaryId = singleTestPayload.getTestingRunResultSummaryId();
-        if (summaryId != null) {
-            Context.activityId.set(summaryId.toHexString());
-            Context.activityType.set(Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY);
-        }
+        TestExecutor.setTestRunActivityContext(summaryId);
         try {
             TestExecutor executor = new TestExecutor();
 
@@ -99,25 +95,28 @@ public class ConsumerUtil {
                 loggerMaker.insertImportantTestingLog("Test completed for: " + apiInfoKey + " with subcategory: " + subCategory + " in " + (Context.now() - timeNow) + " seconds");
             }
         } finally {
-            Context.activityId.remove();
-            Context.activityType.remove();
+            TestExecutor.clearActivityContext();
         }
     }
 
     private void createTimedOutResultFromMessage(String message){
         SingleTestPayload singleTestPayload = parseTestMessage(message);
         Context.accountId.set(singleTestPayload.getAccountId());
+        TestExecutor.setTestRunActivityContext(singleTestPayload.getTestingRunResultSummaryId());
+        try {
+            TestExecutor testExecutor = new TestExecutor();
 
-        TestExecutor testExecutor = new TestExecutor();
+            String subCategory = singleTestPayload.getSubcategory();
+            TestConfig testConfig = TestingConfigurations.getInstance().getTestConfigMap().get(subCategory);
 
-        String subCategory = singleTestPayload.getSubcategory();
-        TestConfig testConfig = TestingConfigurations.getInstance().getTestConfigMap().get(subCategory);
+            String testSuperType = testConfig.getInfo().getCategory().getName();
+            String testSubType = testConfig.getInfo().getSubCategory();
 
-        String testSuperType = testConfig.getInfo().getCategory().getName();
-        String testSubType = testConfig.getInfo().getSubCategory();
-
-        TestingRunResult runResult = Utils.generateFailedRunResultForMessage(singleTestPayload.getTestingRunId(), singleTestPayload.getApiInfoKey(), testSuperType, testSubType, singleTestPayload.getTestingRunResultSummaryId(), new ArrayList<>(),  TestError.TEST_TIMED_OUT.getMessage());
-        testExecutor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+            TestingRunResult runResult = Utils.generateFailedRunResultForMessage(singleTestPayload.getTestingRunId(), singleTestPayload.getApiInfoKey(), testSuperType, testSubType, singleTestPayload.getTestingRunResultSummaryId(), new ArrayList<>(),  TestError.TEST_TIMED_OUT.getMessage());
+            testExecutor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+        } finally {
+            TestExecutor.clearActivityContext();
+        }
     }
 
     /**
