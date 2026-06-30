@@ -17,9 +17,9 @@ const logLineStyle = {
 
 const formatLogLine = (entry) => {
     const message = entry.log ?? ""
-    const summaryId = entry.testRunResultSummaryId
-    if (summaryId && !message.includes("trrs:")) {
-        return `trrs: ${summaryId}, ${message}`
+    const activityId = entry.activityId
+    if (activityId && !message.includes("trrs:")) {
+        return `trrs: ${activityId}, ${message}`
     }
     return message
 }

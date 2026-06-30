@@ -175,14 +175,18 @@ public class LoggerMaker  {
         sendToSlack(slackWebhookUrl, err);
     }
 
-    private String trrsPrefix() {
-        String summaryId = Context.testRunResultSummaryId.get();
-        return (summaryId != null && !summaryId.isEmpty()) ? "trrs: " + summaryId + ", " : "";
+    private String activityPrefix() {
+        Log.ActivityType type = Context.activityType.get();
+        String id = Context.activityId.get();
+        if (type == Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY && id != null && !id.isEmpty()) {
+            return "trrs: " + id + ", ";
+        }
+        return "";
     }
 
     protected String basicError(String err, LogDb db) {
         if(Context.accountId.get() != null){
-            err = String.format("%s%s\nAccount id: %d", trrsPrefix(), err, Context.accountId.get());
+            err = String.format("%s%s\nAccount id: %d", activityPrefix(), err, Context.accountId.get());
         }
         if (!isSendToInfraOnly()) {
             logger.error(err);
@@ -242,7 +246,7 @@ public class LoggerMaker  {
     @Deprecated
     public void infoAndAddToDb(String info, LogDb db) {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String infoMessage = trrsPrefix() + "acc: " + accountId + ", " + info;
+        String infoMessage = activityPrefix() + "acc: " + accountId + ", " + info;
         if (!isSendToInfraOnly()) {
             logger.info(infoMessage);
         }
@@ -255,7 +259,7 @@ public class LoggerMaker  {
 
     public void warnAndAddToDb(String info, LogDb db) {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String infoMessage = trrsPrefix() + "acc: " + accountId + ", " + info;
+        String infoMessage = activityPrefix() + "acc: " + accountId + ", " + info;
         if (!isSendToInfraOnly()) {
             logger.warn(infoMessage);
         }
@@ -336,7 +340,8 @@ public class LoggerMaker  {
 
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
-        log.setTestRunResultSummaryId(Context.testRunResultSummaryId.get());
+        log.setActivityId(Context.activityId.get());
+        log.setActivityType(Context.activityType.get());
         if(checkUpdate() && db!=null){
             switch(db){
                 case TESTING: 
@@ -451,26 +456,29 @@ public class LoggerMaker  {
     }
 
     /**
-     * Fetches TESTING logs scoped to a specific testing run result summary id (instead of a time range).
-     * These are the logs stamped with the summary id at insert time, used by the per-run Logs tab.
+     * Fetches TESTING logs scoped to a specific activity (instead of a time range).
+     * These are the logs stamped with the activity id/type at insert time, used by the per-run Logs tab.
      */
-    public List<Log> fetchTestingLogRecordsBySummaryId(String testRunResultSummaryId, List<String> logKeysFilter) {
+    public List<Log> fetchTestingLogRecordsByActivity(Log.ActivityType activityType, String activityId, List<String> logKeysFilter) {
         List<Log> logs = new ArrayList<>();
-        if (testRunResultSummaryId == null || testRunResultSummaryId.isEmpty()) {
+        if (activityType == null || activityId == null || activityId.isEmpty()) {
             return logs;
         }
 
-        Bson summaryFilter = Filters.eq(Log.TEST_RUN_RESULT_SUMMARY_ID, testRunResultSummaryId);
+        Bson activityFilter = Filters.and(
+            Filters.eq(Log.ACTIVITY_TYPE, activityType),
+            Filters.eq(Log.ACTIVITY_ID, activityId)
+        );
         Bson filters;
         List<String> normalized = normalizeLogKeysFilter(logKeysFilter);
         if (normalized == null || normalized.size() >= STORED_LOG_KEYS.size()) {
-            filters = summaryFilter;
+            filters = activityFilter;
         } else {
-            filters = Filters.and(summaryFilter, Filters.in(Log.KEY, normalized));
+            filters = Filters.and(activityFilter, Filters.in(Log.KEY, normalized));
         }
 
         Bson sortAscending = Sorts.ascending(Log.TIMESTAMP);
-        Bson standardProjection = Projections.include("log", Log.TIMESTAMP, Log.KEY, Log.TEST_RUN_RESULT_SUMMARY_ID);
+        Bson standardProjection = Projections.include("log", Log.TIMESTAMP, Log.KEY, Log.ACTIVITY_ID, Log.ACTIVITY_TYPE);
         logs = LogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
         return logs;
     }

@@ -32,7 +32,7 @@ const TestRunLogs = ({ open, onClose, summaryHexId, startTimestamp, endTimestamp
     const matchesSearch = (entry) => {
         const term = searchValue.toLowerCase();
         return `${entry.log ?? ""}`.toLowerCase().includes(term)
-            || `${entry.testRunResultSummaryId ?? ""}`.toLowerCase().includes(term);
+            || `${entry.activityId ?? ""}`.toLowerCase().includes(term);
     };
 
     const displayedLogData = searchValue ? logData.filter(matchesSearch) : logData;

@@ -65,7 +65,7 @@ public class DbLogsAction extends UserAction {
             addActionError("Invalid testing run result summary id");
             return ERROR.toUpperCase();
         }
-        logs = loggerMaker.fetchTestingLogRecordsBySummaryId(testingRunResultSummaryId, logKeys);
+        logs = loggerMaker.fetchTestingLogRecordsByActivity(Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY, testingRunResultSummaryId, logKeys);
 
         return SUCCESS.toUpperCase();
     }
