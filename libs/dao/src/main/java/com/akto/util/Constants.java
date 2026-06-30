@@ -57,7 +57,8 @@ public class Constants {
     public static final String STDIO_TRANSPORT = "STDIO";
     public static final String HTTP_TRANSPORT = "HTTP";
 
-    // RAG and Vector Database Tags
+    // Protocol types
+    public static final String WEBSOCKET_PROTOCOL = "WEBSOCKET";
     public static final String AKTO_RAG_DATABASE_TAG = "rag-database";
     public static final String AKTO_VECTOR_SEARCH_TAG = "vector-search";
     public static final String AKTO_EMBEDDING_TAG = "embedding";
