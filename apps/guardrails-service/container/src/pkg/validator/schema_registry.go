@@ -10,6 +10,7 @@ import (
 
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 	"go.uber.org/zap"
+	"golang.org/x/sync/singleflight"
 )
 
 // aktoParamPattern matches Akto-style path parameters: INTEGER, STRING, FLOAT, BOOLEAN
@@ -149,70 +150,6 @@ func normalizePath(path string) string {
 	return strings.TrimPrefix(result, ".")
 }
 
-// GetValueAtPathFromJSON returns the string at dot path in JSON payload.
-// Supports both dot notation and bracket notation.
-func GetValueAtPathFromJSON(payload string, path string) (string, bool) {
-	if path == "" {
-		return "", false
-	}
-	var data any
-	if err := json.Unmarshal([]byte(payload), &data); err != nil {
-		return "", false
-	}
-	v := valueAtPath(data, strings.Split(normalizePath(path), "."))
-	if v == nil {
-		return "", false
-	}
-	s, ok := v.(string)
-	return s, ok
-}
-
-func valueAtPath(data any, parts []string) any {
-	if data == nil || len(parts) == 0 {
-		return data
-	}
-	key := parts[0]
-	rest := parts[1:]
-	switch m := data.(type) {
-	case map[string]any:
-		next, ok := m[key]
-		if !ok {
-			return nil
-		}
-		if len(rest) == 0 {
-			return next
-		}
-		return valueAtPath(next, rest)
-	case []any:
-		idx := 0
-		n := 0
-		for _, c := range key {
-			if c >= '0' && c <= '9' {
-				n = n*10 + int(c-'0')
-			} else if c == '-' {
-				idx = -1
-				continue
-			} else {
-				return nil
-			}
-		}
-		if idx < 0 {
-			idx = len(m) - n
-		} else {
-			idx = n
-		}
-		if idx < 0 || idx >= len(m) {
-			return nil
-		}
-		next := m[idx]
-		if len(rest) == 0 {
-			return next
-		}
-		return valueAtPath(next, rest)
-	}
-	return nil
-}
-
 // ExtractContent extracts and concatenates values from all provided fields in the JSON payload.
 // Values are prefixed with "[description]\n" if a description is set, joined with "\n---\n".
 // Returns "" if no fields match (caller should fall through to raw payload).
@@ -247,6 +184,7 @@ type SchemaFetcher struct {
 	mu              sync.RWMutex
 	logger          *zap.Logger
 	endpoints       map[string]map[string]bool // method -> path -> true
+	refreshGroup    singleflight.Group
 }
 
 // NewSchemaFetcher creates a new SchemaFetcher and performs an initial fetch.
@@ -270,10 +208,21 @@ func (sf *SchemaFetcher) RefreshIfNeeded() {
 	elapsed := time.Since(sf.lastFetchTime)
 	sf.mu.RUnlock()
 
-	if elapsed >= sf.refreshInterval {
-		if err := sf.FetchAndUpdate(); err != nil {
-			sf.logger.Warn("SchemaFetcher: refresh failed, using stale state", zap.Error(err))
+	if elapsed < sf.refreshInterval {
+		return
+	}
+
+	_, err, _ := sf.refreshGroup.Do("guardrail-schema", func() (interface{}, error) {
+		sf.mu.RLock()
+		if time.Since(sf.lastFetchTime) < sf.refreshInterval {
+			sf.mu.RUnlock()
+			return nil, nil
 		}
+		sf.mu.RUnlock()
+		return nil, sf.FetchAndUpdate()
+	})
+	if err != nil {
+		sf.logger.Warn("SchemaFetcher: refresh failed, using stale state", zap.Error(err))
 	}
 }
 

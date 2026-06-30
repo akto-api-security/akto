@@ -1,72 +1,98 @@
 services:
-  python-service:
+  executor:
+    image: aktosecurity/akto-agent-guard-worker:${AGENT_GUARD_WORKER_TAG:-local}
     build:
-      context: ./python-service/container
+      context: ./python-service/worker-py
       dockerfile: Dockerfile
-    container_name: agent-guard-python
+    container_name: agent-guard-executor
     ports:
-      - "127.0.0.1:8092:8092"
+      - "127.0.0.1:8090:8090"
+    env_file:
+      - .env
     environment:
-      - PYTHONUNBUFFERED=1
-      - PORT=8092
-      - HF_HOME=/app/.cache/huggingface
-      # LLM scanner config (consumed by container/src/llm_scanner.py).
-      # When SCANNER_LLM_PROVIDER is unset, only the local ML path runs.
-      - SCANNER_LLM_PROVIDER=${SCANNER_LLM_PROVIDER:-}
-      - FORCE_LLM_MODE=${FORCE_LLM_MODE:-}
-      
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - OPENAI_MODEL=${OPENAI_MODEL:-}
-      
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}
-      
-      - VERTEX_AI_PROJECT=${VERTEX_AI_PROJECT:-}
-      - VERTEX_AI_LOCATION=${VERTEX_AI_LOCATION:-}
-      - VERTEX_AI_ENDPOINT_ID=${VERTEX_AI_ENDPOINT_ID:-}
-      - VERTEX_AI_SA_KEY_JSON=${VERTEX_AI_SA_KEY_JSON:-}
-      
-      - GEMMA_VERTEX_SA_KEY_JSON=${GEMMA_VERTEX_SA_KEY_JSON:-}
-      - GEMMA_VERTEX_PROJECT=${GEMMA_VERTEX_PROJECT:-}
-      - GEMMA_VERTEX_LOCATION=${GEMMA_VERTEX_LOCATION:-}
-      - GEMMA_VERTEX_ENDPOINT_ID=${GEMMA_VERTEX_ENDPOINT_ID:-}
-      - GEMMA_VERTEX_DEDICATED_DNS=${GEMMA_VERTEX_DEDICATED_DNS:-}
-      
-      - QWEN3GUARD_SA_KEY_JSON=${QWEN3GUARD_SA_KEY_JSON:-}
-      - QWEN3GUARD_PROJECT=${QWEN3GUARD_PROJECT:-}
-      - QWEN3GUARD_LOCATION=${QWEN3GUARD_LOCATION:-}
-      - QWEN3GUARD_ENDPOINT_ID=${QWEN3GUARD_ENDPOINT_ID:-}
-      - QWEN3GUARD_DEDICATED_DNS=${QWEN3GUARD_DEDICATED_DNS:-}
-      # OpenAI-compatible base URL — set to http://host.docker.internal:11434/v1
-      # to use a locally running Ollama instance from inside the container.
-      - OPENAI_COMPATIBLE_BASE_URL=${OPENAI_COMPATIBLE_BASE_URL:-}
-      # DB abstractor endpoint for persisting per-model results when
-      # config.storeAllResults=true (POST /api/storeGuardrailModelResults).
-      - DATABASE_ABSTRACTOR_SERVICE_URL=${DATABASE_ABSTRACTOR_SERVICE_URL:-}
-      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
-    volumes:
-      - model-cache:/app/.cache/huggingface
-    deploy:
-      resources:
-        limits:
-          cpus: '4'
-          memory: 6G
-        reservations:
-          memory: 2G
+      ANONYMIZER_URL: http://anonymizer:8093
+      # Semantic cache (see python-service/worker-py/src/cache.py). CACHE_MODE,
+      # CACHE_DISTANCE_THRESHOLD, CACHE_TTL_SECONDS, CACHE_SHADOW_SLACK_WEBHOOK_URL
+      # come from .env; these two point at the sidecar services.
+      EMBEDDER_URL: http://embedder:8094
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      anonymizer:
+        condition: service_healthy
+      # Cache sidecars are fail-open — the worker runs fine before they're ready,
+      # so don't block the scan API on them becoming healthy (the embedder loads
+      # torch + a model and can take minutes on first boot).
+      embedder:
+        condition: service_started
+      redis:
+        condition: service_started
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8092/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    networks:
+      - agent-guard-network
+
+  anonymizer:
+    image: aktosecurity/akto-agent-guard-anonymizer:${AGENT_GUARD_ANONYMIZER_TAG:-local}
+    build:
+      context: ./python-service/anonymizer-container
+      dockerfile: Dockerfile
+    container_name: agent-guard-anonymizer
+    expose:
+      - "8093"
+    environment:
+      ANONYMIZER_DIAGNOSTICS: ${ANONYMIZER_DIAGNOSTICS:-true}
+      ANONYMIZER_LOG_LEVEL: ${ANONYMIZER_LOG_LEVEL:-info}
+      ANONYMIZER_SLOW_MS: ${ANONYMIZER_SLOW_MS:-200}
+      ANONYMIZER_WORKERS: ${ANONYMIZER_WORKERS:-4}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8093/health')"]
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 30s
+      start_period: 60s
+    networks:
+      - agent-guard-network
+
+  embedder:
+    image: aktosecurity/akto-agent-guard-embedder:${AGENT_GUARD_EMBEDDER_TAG:-local}
+    build:
+      context: ./python-service/embedder-container
+      dockerfile: Dockerfile
+    container_name: agent-guard-embedder
+    expose:
+      - "8094"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8094
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8094/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    networks:
+      - agent-guard-network
+
+  redis:
+    # redis-stack-server bundles the RediSearch module the vector cache needs;
+    # plain redis:7 will NOT work (no FT.* commands).
+    image: redis/redis-stack-server:7.4.0-v1
+    container_name: agent-guard-redis
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - agent-guard-network
 
 networks:
   agent-guard-network:
     driver: bridge
-
-volumes:
-  model-cache:
-    driver: local
-

@@ -16,7 +16,17 @@ import (
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/singleflight"
 )
+
+// policyRefreshResult bundles refreshed policy cache fields for singleflight callers.
+type policyRefreshResult struct {
+	policies      []types.Policy
+	auditPolicies map[string]*types.AuditPolicy
+	compiledRules map[string]*regexp.Regexp
+	hasAuditRules bool
+}
 
 // policyCache holds cached policies and their metadata
 type policyCache struct {
@@ -50,15 +60,17 @@ type mcpListCache struct {
 
 // Service handles payload validation using akto-gateway library
 type Service struct {
-	config              *config.Config
-	dbClient            *dbabstractor.Client
-	processor           mcp.RequestProcessor // Default processor (skipThreat=false)
-	logger              *zap.Logger
-	cache               *policyCache
-	mcpListCache        *mcpListCache
-	collectionTagsCache *collectionTagsCache
-	sessionMgr          *session.SessionManager // Our session manager implementation for session tracking
-	schemaFetcher       *SchemaFetcher
+	config                *config.Config
+	dbClient              *dbabstractor.Client
+	processor             mcp.RequestProcessor // Default processor (skipThreat=false)
+	logger                *zap.Logger
+	cache                 *policyCache
+	mcpListCache          *mcpListCache
+	collectionTagsCache   *collectionTagsCache
+	sessionMgr            *session.SessionManager // Our session manager implementation for session tracking
+	schemaFetcher         *SchemaFetcher
+	policyRefreshGroup    singleflight.Group
+	allowlistRefreshGroup singleflight.Group
 }
 
 // NewService creates a new validator service
@@ -115,7 +127,7 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 
 	schemaFetcher := NewSchemaFetcher(dbClient, time.Duration(cfg.PolicyRefreshIntervalMin)*time.Minute, logger)
 
-	return &Service{
+	svc := &Service{
 		config:              cfg,
 		dbClient:            dbClient,
 		processor:           defaultProcessor,
@@ -125,7 +137,22 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		collectionTagsCache: &collectionTagsCache{byHostName: make(map[string]map[string]string)},
 		sessionMgr:          sessionManager,
 		schemaFetcher:       schemaFetcher,
-	}, nil
+	}
+	bp := mcp.GetScanBackpressureSnapshot()
+	logger.Info("Scan backpressure breaker active (mcp processor, remote-scanner boundary)",
+		zap.Bool("enabled", bp.Enabled),
+		zap.Float64("thresholdMs", bp.ThresholdMs),
+		zap.Int("minSamples", bp.MinSamples),
+		zap.Float64("ttlSeconds", bp.TTLSeconds))
+	go func() {
+		if _, err := svc.getMcpAllowedHostList(); err != nil {
+			logger.Warn("Warm MCP allowlist cache failed", zap.Error(err))
+		}
+		if _, _, _, _, err := svc.getCachedPolicies(""); err != nil {
+			logger.Warn("Warm policy cache failed", zap.Error(err))
+		}
+	}()
+	return svc, nil
 }
 
 // policyNames extracts policy names for debug logging
@@ -180,10 +207,8 @@ func (s *Service) filterPoliciesByContextSource(policies []types.Policy, context
 // filterPoliciesByMcpServer filters policies by MCP server name.
 // Mirrors the logic in PolicyManager.GetPoliciesForMcpServer from the mcp-endpoint-shield library:
 // policies with an empty server map are skipped (not configured for any server).
+// filterPoliciesByMcpServer filters policies to those applicable to the given MCP server name.
 // YAML policies always pass through. If mcpServerName is empty, all policies are returned unchanged.
-// For block-mode policies with applyToAllServers=true, the policy only applies if the server's
-// collection has the mode=inline tag (i.e. the connector is in the synchronous request path
-// and can actually block requests).
 func (s *Service) filterPoliciesByMcpServer(policies []types.Policy, mcpServerName string) []types.Policy {
 	if mcpServerName == "" {
 		return policies
@@ -213,11 +238,57 @@ func (s *Service) filterPoliciesByMcpServer(policies []types.Policy, mcpServerNa
 			combinedServers[k] = v
 		}
 		if len(combinedServers) == 0 {
-			continue // Not configured for any server — skip
+			continue // not configured for any server
 		}
 		for serverName := range combinedServers {
-			if strings.ToLower(serverName) == mcpServerNameLower {
+			storedLower := strings.ToLower(serverName)
+			// Exact match: full hostname stored (old Argus) or short key equals incoming.
+			if storedLower == mcpServerNameLower {
 				filtered = append(filtered, policy)
+				break
+			}
+			// Suffix match: stored value is a trailing dot-segment — covers service names
+			// ('filesystem'), multi-segment LLM domains ('chatgpt.com'), and old device-stripped
+			// Atlas keys ('cursor.filesystem') since ".cursor.filesystem" is a valid suffix.
+			if strings.HasSuffix(mcpServerNameLower, "."+storedLower) {
+				filtered = append(filtered, policy)
+				break
+			}
+			// Middle-segment match: stored agent platform key sits between device-id and service name.
+			// e.g. stored='cursor' matches 'device.cursor.filesystem'.
+			if strings.Contains(mcpServerNameLower, "."+storedLower+".") {
+				filtered = append(filtered, policy)
+				break
+			}
+		}
+	}
+	return filtered
+}
+
+// filterPoliciesByDeviceId filters policies by the device label embedded in the MCP server name.
+// The device label is the first dot-delimited segment of "{deviceLabel}.{clientType}.{host}".
+// Policies with an empty ApplyToDeviceIds list apply to all devices and always pass through.
+// If mcpServerName is empty or has no device prefix, all policies are returned unchanged.
+func (s *Service) filterPoliciesByDeviceId(policies []types.Policy, mcpServerName string) []types.Policy {
+	if mcpServerName == "" {
+		return policies
+	}
+	deviceLabel := ""
+	if i := strings.IndexByte(mcpServerName, '.'); i > 0 {
+		deviceLabel = mcpServerName[:i]
+	}
+	if deviceLabel == "" {
+		return policies
+	}
+	filtered := make([]types.Policy, 0, len(policies))
+	for _, p := range policies {
+		if len(p.ApplyToDeviceIds) == 0 {
+			filtered = append(filtered, p)
+			continue
+		}
+		for _, id := range p.ApplyToDeviceIds {
+			if id == deviceLabel {
+				filtered = append(filtered, p)
 				break
 			}
 		}
@@ -237,27 +308,44 @@ func (s *Service) getMcpAllowedHostList() ([]types.McpAllowedList, error) {
 	}
 	s.mcpListCache.mu.RUnlock()
 
-	s.mcpListCache.mu.Lock()
-	defer s.mcpListCache.mu.Unlock()
+	v, err, _ := s.allowlistRefreshGroup.Do("mcp-allowlist", func() (interface{}, error) {
+		s.mcpListCache.mu.Lock()
+		defer s.mcpListCache.mu.Unlock()
 
-	rawResp, err := s.dbClient.FetchMcpAllowedHostList()
+		if !s.mcpListCache.lastFetched.IsZero() && time.Since(s.mcpListCache.lastFetched) < refreshInterval {
+			return s.mcpListCache.mcpAllowedList, nil
+		}
+
+		rawResp, fetchErr := s.dbClient.FetchMcpAllowedHostList()
+		if fetchErr != nil {
+			return nil, fetchErr
+		}
+
+		var mcpHostAllowedList struct {
+			McpAllowlist []types.McpAllowedList `json:"mcpAllowlist"`
+		}
+		if unmarshalErr := json.Unmarshal(rawResp, &mcpHostAllowedList); unmarshalErr != nil {
+			return nil, fmt.Errorf("failed to unmarshal outer response: %w", unmarshalErr)
+		}
+
+		s.mcpListCache.mcpAllowedList = mcpHostAllowedList.McpAllowlist
+		s.mcpListCache.lastFetched = time.Now()
+		s.logger.Info("MCP allowlist cache refreshed", zap.Int("count", len(mcpHostAllowedList.McpAllowlist)))
+		return mcpHostAllowedList.McpAllowlist, nil
+	})
 	if err != nil {
+		s.mcpListCache.mu.RLock()
+		if len(s.mcpListCache.mcpAllowedList) > 0 {
+			stale := s.mcpListCache.mcpAllowedList
+			s.mcpListCache.mu.RUnlock()
+			s.logger.Warn("MCP allowlist refresh failed, using stale cache", zap.Error(err))
+			return stale, nil
+		}
+		s.mcpListCache.mu.RUnlock()
 		s.logger.Error("Failed to fetch MCP allowlist from database-abstractor", zap.Error(err))
 		return nil, err
 	}
-
-	var mcpHostAllowedList struct {
-		McpAllowlist []types.McpAllowedList `json:"mcpAllowlist"`
-	}
-
-	if err := json.Unmarshal(rawResp, &mcpHostAllowedList); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal outer response: %w", err)
-	}
-
-	s.mcpListCache.mcpAllowedList = mcpHostAllowedList.McpAllowlist
-	s.mcpListCache.lastFetched = time.Now()
-	s.logger.Info("MCP allowlist cache refreshed", zap.Int("count", len(mcpHostAllowedList.McpAllowlist)))
-	return mcpHostAllowedList.McpAllowlist, nil
+	return v.([]types.McpAllowedList), nil
 }
 
 func (s *Service) getCachedPolicies(contextSource string) ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
@@ -282,15 +370,42 @@ func (s *Service) getCachedPolicies(contextSource string) ([]types.Policy, map[s
 	}
 	s.cache.mu.RUnlock()
 
-	// Cache is stale or empty, fetch fresh policies
-	allPolicies, auditPolicies, compiledRules, hasAuditRules, err := s.refreshPolicies()
-	if err != nil {
-		return nil, nil, nil, false, err
+	// Cache is stale or empty, coalesce refresh across concurrent requests.
+	v, refreshErr, _ := s.policyRefreshGroup.Do("guardrail-policies", func() (interface{}, error) {
+		policies, auditPolicies, compiledRules, hasAuditRules, err := s.refreshPolicies()
+		if err != nil {
+			return nil, err
+		}
+		return &policyRefreshResult{
+			policies:      policies,
+			auditPolicies: auditPolicies,
+			compiledRules: compiledRules,
+			hasAuditRules: hasAuditRules,
+		}, nil
+	})
+	if refreshErr != nil {
+		s.cache.mu.RLock()
+		hasStale := !s.cache.lastFetched.IsZero() && len(s.cache.policies) > 0
+		if hasStale {
+			filteredPolicies := s.filterPoliciesByContextSource(s.cache.policies, contextSource)
+			staleAudit := s.cache.auditPolicies
+			staleRules := s.cache.compiledRules
+			staleHasAudit := s.cache.hasAuditRules
+			lastFetched := s.cache.lastFetched
+			s.cache.mu.RUnlock()
+			s.logger.Warn("Policy refresh failed, using stale cache",
+				zap.String("contextSource", contextSource),
+				zap.Time("lastFetched", lastFetched),
+				zap.Error(refreshErr))
+			return filteredPolicies, staleAudit, staleRules, staleHasAudit, nil
+		}
+		s.cache.mu.RUnlock()
+		return nil, nil, nil, false, refreshErr
 	}
 
-	// Filter by contextSource before returning
-	filteredPolicies := s.filterPoliciesByContextSource(allPolicies, contextSource)
-	return filteredPolicies, auditPolicies, compiledRules, hasAuditRules, nil
+	bundle := v.(*policyRefreshResult)
+	filteredPolicies := s.filterPoliciesByContextSource(bundle.policies, contextSource)
+	return filteredPolicies, bundle.auditPolicies, bundle.compiledRules, bundle.hasAuditRules, nil
 }
 
 // refreshPolicies fetches fresh policies from database and updates the cache
@@ -612,9 +727,28 @@ func extractHostHeader(headers map[string]string) string {
 
 // fetchAndParsePolicies fetches policies from database abstractor and parses them
 func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, []mcp.BlockedHostRule, error) {
-	rawGuardrailPolicies, err := s.dbClient.FetchGuardrailPolicies()
-	if err != nil {
-		return nil, nil, nil, false, nil, fmt.Errorf("failed to fetch guardrail policies: %w", err)
+	var rawGuardrailPolicies, rawAuditPolicies []byte
+
+	g := new(errgroup.Group)
+	g.Go(func() error {
+		var err error
+		rawGuardrailPolicies, err = s.dbClient.FetchGuardrailPolicies()
+		if err != nil {
+			return fmt.Errorf("failed to fetch guardrail policies: %w", err)
+		}
+		return nil
+	})
+	g.Go(func() error {
+		var err error
+		rawAuditPolicies, err = s.dbClient.FetchMcpAuditInfo()
+		if err != nil {
+			s.logger.Warn("Failed to fetch MCP audit info", zap.Error(err))
+			rawAuditPolicies = []byte("{}")
+		}
+		return nil
+	})
+	if err := g.Wait(); err != nil {
+		return nil, nil, nil, false, nil, err
 	}
 
 	s.logger.Debug("Raw guardrail policies response",
@@ -650,14 +784,6 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		zap.String("feature", "blocked-host-v1"),
 		zap.Int("ruleCount", len(blockedHostRules)),
 		zap.Strings("patterns", mcp.BlockedHostPatterns(blockedHostRules)))
-
-	// Fetch MCP audit info from database abstractor
-	rawAuditPolicies, err := s.dbClient.FetchMcpAuditInfo()
-	if err != nil {
-		s.logger.Warn("Failed to fetch MCP audit info", zap.Error(err))
-		// Continue without audit policies rather than failing completely
-		rawAuditPolicies = []byte("{}")
-	}
 
 	s.logger.Debug("Raw audit policies response",
 		zap.Int("size", len(rawAuditPolicies)),
@@ -782,35 +908,29 @@ func (s *Service) validationContextFromParams(
 	}
 }
 
-// extractPayloadForValidation checks if a GuardrailSchema is configured for the endpoint.
-// If found, extracts only the configured content fields. Falls through to raw payload on any miss.
+// extractPayloadForValidation extracts configured JSON fields for guardrail evaluation.
+// Priority: dashboard guardrailSchema → GUARDRAIL_FIELD_MAPPING env → raw payload.
 func (s *Service) extractPayloadForValidation(payload, method, path string, isRequest bool) string {
 	key := EndpointKey(method, path)
 
-	gs, ok := GlobalGuardrailSchemaRegistry().Get(key)
-	if !ok {
-		s.logger.Debug("[SchemaExtract] no schema found for endpoint, using raw payload",
+	fields := resolveFieldsForEndpoint(method, path, isRequest)
+	if len(fields) == 0 {
+		s.logger.Debug("[SchemaExtract] no field mapping for endpoint, using raw payload",
 			zap.String("endpoint", key),
 			zap.Bool("isRequest", isRequest))
 		return payload
 	}
 
-	schemaJSON, _ := json.Marshal(gs)
-	s.logger.Info("[SchemaExtract] schema found for endpoint",
-		zap.String("endpoint", key),
-		zap.Bool("isRequest", isRequest),
-		zap.String("schema", string(schemaJSON)))
-
-	var fields []MessageFieldEntry
-	if isRequest {
-		fields = gs.RequestMessageFields
-	} else {
-		fields = gs.ResponseMessageFields
+	source := "dashboard"
+	if gs, ok := GlobalGuardrailSchemaRegistry().Get(key); !ok || gs == nil ||
+		(isRequest && !gs.HasRequestFields()) || (!isRequest && !gs.HasResponseFields()) {
+		source = "env"
 	}
 
 	s.logger.Info("[SchemaExtract] attempting field extraction",
 		zap.String("endpoint", key),
 		zap.Bool("isRequest", isRequest),
+		zap.String("source", source),
 		zap.Int("fieldCount", len(fields)))
 
 	extracted := ExtractContent(payload, fields)
@@ -838,6 +958,27 @@ func (s *Service) extractPayloadForValidation(payload, method, path string, isRe
 		zap.Int("finalPayloadLength", len(finalPayload)))
 
 	return finalPayload
+}
+
+// BackpressureSnapshot exposes the scan breaker's current state for diagnostics.
+// The breaker lives in the mcp processor (remote-scanner boundary); guardrails-
+// service just surfaces its snapshot on GET /backpressure.
+func (s *Service) BackpressureSnapshot() mcp.ScanBackpressureSnapshot {
+	return mcp.GetScanBackpressureSnapshot()
+}
+
+// withValidationDeadline caps the synchronous validate path with a single
+// absolute deadline (config.ValidationTimeoutMs). It cascades to every parallel
+// policy goroutine, async scanner wait, and /scan call at once — because
+// executeAsyncTasks honors a parent deadline and context.WithTimeout takes the
+// earlier of parent/child — so the whole request fails open before the caller's
+// client timeout fires. The returned cancel must always be called. Returns the
+// ctx unchanged (with a no-op cancel) when disabled (<=0).
+func (s *Service) withValidationDeadline(ctx context.Context) (context.Context, context.CancelFunc) {
+	if s.config == nil || s.config.ValidationTimeoutMs <= 0 {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, time.Duration(s.config.ValidationTimeoutMs)*time.Millisecond)
 }
 
 // ValidateRequest validates a request payload against guardrail policies with session tracking
@@ -928,6 +1069,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Filter policies by MCP server name so all subsequent checks only fire for
 	// rules that belong to policies applicable to this server.
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
+	policies = s.filterPoliciesByDeviceId(policies, valCtx.McpServerName)
 
 	// Check account-type guardrail after server filtering so the policy's server
 	// selection is respected (a personal-account policy scoped to server A should
@@ -972,9 +1114,14 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
 		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
 
-	// Use the default processor - skipThreat is passed via ValidationContext
+	// Use the default processor - skipThreat is passed via ValidationContext.
+	// Scan backpressure lives inside the mcp processor at the remote-scanner
+	// boundary (executeSingleScannerTask), so only the agent-guard /scan fan-out
+	// is shed when degraded — local PII/regex/token-limit filters always run.
 	processStart := time.Now()
-	processResult, err := s.processor.ProcessRequestParallel(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
+	procCtx, cancelProc := s.withValidationDeadline(ctx)
+	defer cancelProc()
+	processResult, err := s.processor.ProcessRequestParallel(procCtx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
 	if err != nil {
 		s.logger.Error("ValidateRequest - ProcessRequestParallel failed",
 			zap.String("path", params.Path),
@@ -1028,8 +1175,24 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Bool("modified", result.Modified),
 		zap.String("behaviour", result.Behaviour),
 		zap.String("reason", result.Reason),
-		zap.String("sessionID", sessionID),
+		zap.Int("policyCount", len(policies)),
+		zap.Int64("policiesMs", time.Since(policiesStart).Milliseconds()),
+		zap.Int64("processMs", time.Since(processStart).Milliseconds()),
 		zap.Int64("totalLatencyMs", time.Since(start).Milliseconds()))
+
+	totalMs := time.Since(start).Milliseconds()
+	if totalMs >= 1500 {
+		s.logger.Warn("ValidateRequest - slow",
+			zap.String("path", params.Path),
+			zap.String("method", params.Method),
+			zap.String("account", params.AktoAccountID),
+			zap.String("sessionID", sessionID),
+			zap.Int("policyCount", len(policies)),
+			zap.Int64("policiesMs", time.Since(policiesStart).Milliseconds()),
+			zap.Int64("processMs", time.Since(processStart).Milliseconds()),
+			zap.Int64("totalLatencyMs", totalMs),
+			zap.Bool("allowed", result.Allowed))
+	}
 
 	return result, nil
 }
@@ -1095,6 +1258,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 
 	// Filter policies by MCP server name — policies with no server configured are skipped
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
+	policies = s.filterPoliciesByDeviceId(policies, valCtx.McpServerName)
 
 	s.logger.Info("ValidateResponse - calling ProcessResponse",
 		zap.String("path", params.Path),
@@ -1113,9 +1277,13 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("method", params.Method),
 		zap.String("payloadToValidate", responseBodyForValidation))
 
-	// Use processor's ProcessResponse method with external policies
+	// Use processor's ProcessResponse method with external policies. Scan
+	// backpressure is applied inside the mcp processor at the remote-scanner
+	// boundary, so only the agent-guard /scan call is shed when degraded.
 	processStart := time.Now()
-	processResult, err := s.processor.ProcessResponseParallel(ctx, responseBodyForValidation, valCtx, policies)
+	procCtx, cancelProc := s.withValidationDeadline(ctx)
+	defer cancelProc()
+	processResult, err := s.processor.ProcessResponseParallel(procCtx, responseBodyForValidation, valCtx, policies)
 	if err != nil {
 		s.logger.Error("ValidateResponse - ProcessResponseParallel failed",
 			zap.String("path", params.Path),
@@ -1388,6 +1556,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 		// Filter policies by MCP server name for this specific batch item
 		itemPolicies := s.filterPoliciesByMcpServer(policies, mcpServerName)
+		itemPolicies = s.filterPoliciesByDeviceId(itemPolicies, mcpServerName)
 		s.logger.Debug("ValidateBatch - applicable policies for server",
 			zap.Int("index", i),
 			zap.String("mcpServerName", mcpServerName),

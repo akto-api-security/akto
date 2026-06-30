@@ -230,25 +230,6 @@ async def scan_payload(
             if isinstance(elapsed, (int, float)) and elapsed > 0:
                 cascade_backpressure.record_cascade_latency(float(elapsed))
             schedule(alerts.post_slack(scanner_name, scanner_type, text, result))
-            # Intent learning: stamp the LLM verdict's intent triple onto the
-            # result so observe() persists it as a learned mission example, and
-            # feed the embedding+label to both the per-agent classifier trainer
-            # and the durable corpus (database-abstractor → MongoDB).
-            #
-            # Learning loop closed:
-            #   1. enrich_result()    – derives specific task_intent from the
-            #                           LLM's categories/matchedTopic/reason
-            #                           (not just binary is_valid).
-            #   2. trainer.record()   – buffers (vec, label) in-process; fires
-            #                           /train when threshold is crossed so the
-            #                           per-agent LogReg improves this pod.
-            #   3. corpus.queue()     – buffers (vec, triple) for a
-            #                           batch flush to DATABASE_ABSTRACTOR_SERVICE_URL
-            #                           so all pods share the training corpus and
-            #                           examples survive pod restarts.
-            #   4. cache.observe()    – writes the embedding+verdict to Redis KNN
-            #                           so future requests hit the semantic cache
-            #                           (sentence similarity fast-path).
             if intent_on:
                 prefilter.enrich_result(result, norm_text or text)
                 details = result.get("details", {})

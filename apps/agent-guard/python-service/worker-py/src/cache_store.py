@@ -31,9 +31,6 @@ logger = logging.getLogger(__name__)
 EMBEDDING_DIM = 384  # all-MiniLM-L6-v2
 _KEY_PREFIX = "gcache:"
 _DEFAULT_INDEX = "guardrails_shadow_cache"
-# Intent fields (task/risk/scope) are stored on the hash and returned via RETURN.
-# They are not in the FT index SCHEMA — we never filter/sort by them — so adding
-# them needs no index migration and old entries simply read back as "".
 _RETURN_FIELDS = (
     "dist", "is_valid", "risk_score", "reason", "inserted_at",
     "task_intent", "risk_intent", "scope_bucket",

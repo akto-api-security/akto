@@ -1,10 +1,12 @@
 # Agent Guard - Production Guide
 
+> **ONNX executor (`:8092`).** Root [`docker-compose.yml`](docker-compose.yml) runs worker-py + anonymizer. For this legacy stack, use [`docker-compose.legacy.yml`](docker-compose.legacy.yml) or `make up-legacy`.
+
 ## Quick Deploy
 
 ```bash
 cd apps/agent-guard
-docker-compose up -d
+docker compose -f docker-compose.legacy.yml up -d
 ```
 
 **Services:**

@@ -25,8 +25,6 @@ class ScanRequest(BaseModel):
     scanner_type: str = "prompt"
     text: str = ""
     config: dict[str, Any] = Field(default_factory=dict)
-    # Agent identity (Host header, e.g. "dev.ai-agent.claude"); scopes the intent
-    # prefilter's cache partition + learned mission. Optional / back-compatible.
     agent_host: str = ""
 
 
