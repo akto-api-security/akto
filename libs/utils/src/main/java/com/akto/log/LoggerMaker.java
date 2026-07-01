@@ -161,7 +161,7 @@ public class LoggerMaker {
     }
 
     protected String basicError(String err, LogDb db) {
-        err = String.format("%s\nAccount id: %d", err, Context.getActualAccountId());
+        err = formatMessageWithAccountId(err);
         logger.error(err);
         try{
             insert(err, "error", db);
@@ -214,8 +214,33 @@ public class LoggerMaker {
         }
     }
 
+    private String activityPrefix() {
+        Log.ActivityType type = Context.activityType.get();
+        String id = Context.activityId.get();
+        if (type == Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY && id != null && !id.isEmpty()) {
+            return "trrs: " + id + ", ";
+        }
+        return "";
+    }
+
+    /**
+     * Stamps the current thread's activity context onto the log only when both the type and a
+     * non-empty id are present. Leaves the fields unset otherwise so null is never persisted/printed.
+     */
+    private static void applyActivityContext(Log log) {
+        Log.ActivityType type = Context.activityType.get();
+        String id = Context.activityId.get();
+        if (type != null && id != null && !id.isEmpty()) {
+            log.setActivityId(id);
+            log.setActivityType(type);
+        }
+    }
+
     private String formatMessageWithAccountId(String info) {
-        return "acc: " + Context.getActualAccountId() + ", " + info;
+        StringBuilder sb = new StringBuilder();
+        sb.append(activityPrefix());
+        sb.append("acc: ").append(Context.getActualAccountId()).append(", ").append(info);
+        return sb.toString();
     }
 
     @Deprecated
@@ -244,8 +269,9 @@ public class LoggerMaker {
         String infoMessage = formatMessageWithAccountId(info);
         logger.info(infoMessage);
         if(checkUpdate()){
-            String text = aClass + " : " + " [" + moduleId + " ] " + info;
+            String text = aClass + " : " + " [" + moduleId + " ] " + infoMessage;
             Log log = new Log(text, "info", Context.now());
+            applyActivityContext(log);
             dataActor.insertTestingLog(log);
             logCount++;
         }
@@ -300,7 +326,8 @@ public class LoggerMaker {
         }
 
         Log log = new Log(text, key, Context.now());
-        
+        applyActivityContext(log);
+
         if(checkUpdate() && db!=null){
             switch(db){
                 case TESTING:

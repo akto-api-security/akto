@@ -10,6 +10,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
+import com.akto.dto.Log;
 import com.akto.dto.DependencyNode;
 import com.akto.dto.DependencyNode.ParamInfo;
 import com.akto.dto.OriginalHttpRequest;
@@ -898,6 +899,25 @@ public class TestExecutor {
         return respMap;
     }
 
+    /**
+     * Establishes a clean activity context for a test run. Tests start from several flows that run on
+     * pooled/reused threads, so we always set explicitly when a summaryId is present and otherwise clear
+     * any stale value left behind by a previous task on the same thread.
+     */
+    public static void setTestRunActivityContext(ObjectId summaryId) {
+        if (summaryId != null) {
+            Context.activityId.set(summaryId.toHexString());
+            Context.activityType.set(Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY);
+        } else {
+            clearActivityContext();
+        }
+    }
+
+    public static void clearActivityContext() {
+        Context.activityId.remove();
+        Context.activityType.remove();
+    }
+
     public Void startWithLatch(
         List<String> testingRunSubCategories,int accountId,ApiInfo.ApiInfoKey apiInfoKey,
         List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
@@ -905,6 +925,7 @@ public class TestExecutor {
         List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, CountDownLatch latch, Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap) {
 
         Context.accountId.set(accountId);
+        setTestRunActivityContext(summaryId);
         loggerMaker.warnAndAddToDb("Starting test for " + apiInfoKey);
         AtomicBoolean isApiInfoTested = new AtomicBoolean(false);
         try {
@@ -920,6 +941,8 @@ public class TestExecutor {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
+        } finally {
+            clearActivityContext();
         }
         if(isApiInfoTested.get()){
             loggerMaker.warnAndAddToDb("API: " + apiInfoKey.toString() + " has been successfully tested");
@@ -1110,8 +1133,15 @@ public class TestExecutor {
             TestingRunResult testingRunResult = null;
             Future<TestingRunResult> future = legacyTestTimeoutExecutor.submit(() -> {
                 Context.accountId.set(currentAccountId);
-                return runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig,
-                    instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
+                setTestRunActivityContext(summaryId);
+                try {
+                    TestingRunResult legacyResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig,
+                        instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
+                    persistTestLogsToDb(legacyResult != null ? legacyResult.getTestLogs() : null);
+                    return legacyResult;
+                } finally {
+                    clearActivityContext();
+                }
             });
             try {
                 testingRunResult = future.get(MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
@@ -1131,6 +1161,27 @@ public class TestExecutor {
             return testingRunResult;
         }
         return null;
+    }
+
+    /**
+     * Persists the per-test transient testLogs (which are @BsonIgnore on TestingRunResult and would
+     * otherwise be dropped) into the TESTING logs collection. The current thread's
+     * Context.activityId/activityType (TESTING_RUN_RESULT_SUMMARY_ACTIVITY) is expected to be set so each line is scoped to the run summary.
+     */
+    public void persistTestLogsToDb(List<TestingRunResult.TestLog> testLogs) {
+        if (testLogs == null || testLogs.isEmpty()) {
+            return;
+        }
+        for (TestingRunResult.TestLog testLog : testLogs) {
+            if (testLog == null || testLog.getMessage() == null) {
+                continue;
+            }
+            if (testLog.getTestLogType() == TestingRunResult.TestLogType.ERROR) {
+                loggerMaker.errorAndAddToDb(testLog.getMessage(), LogDb.TESTING);
+            } else {
+                loggerMaker.infoAndAddToDb(testLog.getMessage(), LogDb.TESTING);
+            }
+        }
     }
 
     // Track auth status per test run: if auth fails, kill all remaining tests
