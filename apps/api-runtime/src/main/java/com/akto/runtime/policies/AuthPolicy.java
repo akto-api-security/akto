@@ -23,12 +23,14 @@ public class AuthPolicy {
     public static final String COOKIE_NAME = "cookie";
     private static final Logger logger = LoggerFactory.getLogger(AuthPolicy.class);
 
-    private static final Pattern API_KEY_PATTERN = Pattern.compile(".*(apikey|passkey).*");
-
     private static boolean isApiKeyHeader(String headerName) {
+        if (headerName == null || headerName.isEmpty()) {
+            return false;
+        }
+
         // Matches variations: x-api-key, x_api_key, api_key, api-key, apiKey, x-pass-key
-        String normalized = headerName.toLowerCase().replaceAll("[_-]", "");
-        return API_KEY_PATTERN.matcher(normalized).matches();
+        String normalized = headerName.toLowerCase().replace("_", "").replace("-", "");
+        return normalized.contains("apikey") || normalized.contains("passkey");
     }
 
     private static List<String> findBearerBasicAuth(String header, String value){
