@@ -10,7 +10,7 @@ POST /embed here whenever it needs a vector.
 """
 
 import os
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -52,7 +52,11 @@ class ClassifyRequest(BaseModel):
 
 
 class ClassifyResult(BaseModel):
-    p_malicious: Optional[float]
+    intent: Optional[str] = None
+    confidence: Optional[float] = None
+    margin: Optional[float] = None
+    centroid_similarity: Optional[float] = None
+    risk_category: Optional[str] = None
 
 
 class ClassifyResponse(BaseModel):
@@ -62,7 +66,8 @@ class ClassifyResponse(BaseModel):
 class TrainRequest(BaseModel):
     agent_host: str
     vectors: List[List[float]]
-    labels: List[int]  # 1 = malicious, 0 = benign
+    labels: List[str]  # fine-grained intent per vector, may include "__other__"/"__background__"
+    risk_categories: Dict[str, str] = {}  # intent -> delete|edit|create|fetch_pii|fetch_generic
 
 
 def _encode(texts: List[str]) -> List[List[float]]:
@@ -92,16 +97,21 @@ def embed_batch(req: EmbedBatchRequest):
 
 @app.post("/classify", response_model=ClassifyResponse)
 def classify(req: ClassifyRequest):
-    """Run the agent's task-intent classifier on already-computed embeddings.
+    """Run the agent's multi-class instruction-intent classifier on
+    already-computed embeddings (one per extracted instruction unit).
 
-    Returns p_malicious per vector (None when the agent has no model yet — the
-    worker then falls back to its regex signal + semantic cache).
+    Returns {intent, confidence, margin, centroid_similarity, risk_category}
+    per vector, or an all-None result when the agent has no model yet — the
+    worker treats that as unknown and ESCALATEs to the LLM cascade.
     """
-    probs = intent_classifier.predict(req.agent_host, req.vectors)
-    return ClassifyResponse(results=[ClassifyResult(p_malicious=p) for p in probs])
+    results = intent_classifier.predict(req.agent_host, req.vectors)
+    return ClassifyResponse(results=[
+        ClassifyResult(**r) if r is not None else ClassifyResult() for r in results
+    ])
 
 
 @app.post("/train")
 def train(req: TrainRequest):
-    """(Re)train an agent's classifier from learned examples (vectors + labels)."""
-    return intent_classifier.train(req.agent_host, req.vectors, req.labels)
+    """(Re)train an agent's multi-class classifier from learned examples
+    (vectors + fine-grained intent labels + the intent->risk_category map)."""
+    return intent_classifier.train(req.agent_host, req.vectors, req.labels, req.risk_categories)

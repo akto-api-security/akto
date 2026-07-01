@@ -11,13 +11,20 @@ tuned regex; everything is bounded so a hostile payload can't blow up cost.
 
 Public API:
     normalize(text, max_chunks) -> list[(chunk_text, weight)]
-        strip_to_nl + chunk, ready to embed/classify. weight reflects how much a
-        chunk should count toward the request decision (user prompt > metadata).
+        strip_to_nl + chunk, ready to embed/classify. Feeds the semantic verdict
+        cache (cache.py) — unchanged by the instruction/data split below.
+    extract_payload_structure(text) -> {"instruction_candidates", "data_candidates",
+                                        "ambiguous_candidates"}
+        Splits (rather than weights-and-merges) a payload into what the user is
+        asking for vs. the data/context it operates on, so intent/segmenter.py
+        can classify only the instruction text — never blending in attached
+        documents/logs/tool output, which would otherwise dominate the
+        embedding and misdirect the intent classifier.
 """
 
 import json
 import re
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # Keys whose string values are almost always the user's prompt language.
 _NL_KEYS = {
@@ -208,3 +215,226 @@ def normalize(text: str, max_chunks: int = 16) -> List[Tuple[str, float]]:
         keep_set = set(keep)
         chunks = [chunks[i] for i in range(len(chunks)) if i in keep_set]
     return chunks
+
+
+# --------------------------------------------------------------------------- #
+# Instruction / data structural split (tier 1+2 of intent/segmenter.py's
+# extraction cascade). Sibling to strip_to_nl: that function weights-and-merges
+# every NL leaf into one list for the semantic cache; this one *splits* leaves
+# into separate buckets so the intent classifier is never handed an embedding
+# that blends the user's ask with the data it operates on.
+# --------------------------------------------------------------------------- #
+Fragment = Tuple[str, Dict[str, Optional[str]]]  # (text, {"key": ..., "content_type": ...})
+
+# Keys whose string values are (almost) always the user's actual ask.
+_INSTRUCTION_KEYS = {
+    "instruction", "instructions", "prompt", "query", "task", "ask",
+    "question", "prompt_text", "query_text",
+}
+# Keys whose string values are (almost) always data/context the ask operates
+# on — even when the text reads as natural language (e.g. a prose document).
+_DATA_KEYS = {
+    "document", "documents", "data", "context", "attachment", "attachments",
+    "file", "files", "logs", "log", "output", "tool_result", "tool_results",
+    "results",
+}
+# content_type/mime_type/type/source_type values that force a fragment to data
+# regardless of key/role (tier 2: source metadata and content type).
+_DATA_CONTENT_TYPES = {
+    "application/json", "application/xml", "text/csv", "text/x-log",
+    "text/x-code", "application/octet-stream", "log", "code", "json",
+    "xml", "csv", "attachment", "file",
+}
+_CONTENT_TYPE_KEYS = {"content_type", "mime_type", "type", "source_type"}
+
+# Tier-3 structural data markers: fenced code, timestamp-prefixed log lines,
+# triple-quoted blocks, attachment markers. A structural (not heuristic) signal
+# that a fragment is data, regardless of how natural-language-like it reads.
+_FENCED_CODE_RE = re.compile(r"```[\s\S]*?```")
+_LOG_LINE_RE = re.compile(r"(?m)^\s*\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}")
+_QUOTED_BLOCK_RE = re.compile(r'"""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\'')
+_ATTACHMENT_MARKER_RE = re.compile(r"(?im)^-{2,}\s*(BEGIN|END)\s+(FILE|ATTACHMENT)\s*-{2,}\s*$")
+_STRUCTURAL_DATA_PATTERNS = (_FENCED_CODE_RE, _LOG_LINE_RE, _QUOTED_BLOCK_RE, _ATTACHMENT_MARKER_RE)
+
+
+def has_structural_data_marker(text: str) -> bool:
+    """True when text contains a fenced code block, log-line, quoted block, or
+    attachment marker — data, never an instruction, no matter how NL it reads."""
+    return any(p.search(text) for p in _STRUCTURAL_DATA_PATTERNS)
+
+
+def _source(key: str, content_type: Optional[str] = None) -> Dict[str, Optional[str]]:
+    return {"key": key, "content_type": content_type}
+
+
+def _is_data_content_type(ct: Optional[str]) -> bool:
+    return bool(ct) and ct.strip().lower() in _DATA_CONTENT_TYPES
+
+
+class _SplitState:
+    __slots__ = ("nodes", "chars")
+
+    def __init__(self) -> None:
+        self.nodes = 0
+        self.chars = 0
+
+
+def _emit(s: str, key: str, content_type: Optional[str], state: _SplitState,
+         bucket: List[Fragment]) -> None:
+    take = s[: _MAX_TOTAL_CHARS - state.chars]
+    if take:
+        bucket.append((take, _source(key, content_type)))
+        state.chars += len(take)
+
+
+def _walk_force_data(node: Any, parent_key: str, depth: int, state: _SplitState,
+                     data: List[Fragment], content_type: Optional[str] = None) -> None:
+    """Dump every string leaf under `node` into `data`, no NL/key gating.
+
+    Used for assistant/tool chat-message content: already known to be data
+    (prior model output or tool results), so every leaf goes to `data`
+    regardless of what key or shape it's nested under.
+    """
+    if state.nodes >= _MAX_NODES or state.chars >= _MAX_TOTAL_CHARS or depth > _MAX_DEPTH:
+        return
+    state.nodes += 1
+    if isinstance(node, dict):
+        for k, v in node.items():
+            _walk_force_data(v, str(k), depth + 1, state, data, content_type)
+        return
+    if isinstance(node, list):
+        for item in node:
+            _walk_force_data(item, parent_key, depth + 1, state, data, content_type)
+        return
+    if isinstance(node, str):
+        s = node.strip()
+        if s:
+            _emit(s, parent_key, content_type, state, data)
+
+
+def _walk_split(node: Any, parent_key: str, depth: int, state: _SplitState,
+                instr: List[Fragment], data: List[Fragment],
+                ambiguous: List[Fragment], content_type: Optional[str] = None,
+                default: Optional[List[Fragment]] = None,
+                extra_instruction_keys: frozenset = frozenset(),
+                extra_data_keys: frozenset = frozenset()) -> None:
+    """Bucket NL leaves into instruction / data / ambiguous, in document order.
+
+    `default` is where an NL-looking leaf with no explicit key/content-type
+    signal lands — `ambiguous` at the top level, but `instr` once we're inside
+    a role="user" chat message (a user turn IS the ask, by construction; an
+    explicit data key/content-type found within it still overrides to `data`).
+    System-role chat content is skipped entirely here — it's the system
+    prompt, handled separately by intent/prefilter.py's capability-profile
+    cache, never part of the instruction/data split for the current request.
+
+    `extra_instruction_keys`/`extra_data_keys` are per-agent additions to the
+    generic `_INSTRUCTION_KEYS`/`_DATA_KEYS` lexicon — keys intent/corpus.py has
+    observed this specific agent's traffic repeatedly using for instructions or
+    data (see intent/prefilter.py's structure-profile cache). Empty by default,
+    so behavior is unchanged for an agent with no learned profile yet.
+
+    Fine-grained intra-string splitting (e.g. a fenced code block embedded in
+    the middle of an otherwise-instructional sentence) is NOT done here — that
+    granularity is intent/segmenter.py's tier-3 job, operating on the text of
+    each fragment this function hands back.
+    """
+    if default is None:
+        default = ambiguous
+    if state.nodes >= _MAX_NODES or state.chars >= _MAX_TOTAL_CHARS or depth > _MAX_DEPTH:
+        return
+    state.nodes += 1
+
+    if isinstance(node, dict):
+        ct = content_type
+        for ck in _CONTENT_TYPE_KEYS:
+            v = node.get(ck)
+            if isinstance(v, str):
+                ct = v
+                break
+
+        role = node.get("role")
+        if isinstance(role, str) and "content" in node:
+            r = role.lower()
+            if r == "system":
+                pass
+            elif r == "user":
+                _walk_split(node["content"], "content", depth + 1, state, instr, data, ambiguous, ct, instr,
+                            extra_instruction_keys, extra_data_keys)
+            else:  # assistant, tool, or anything else non-user/system → data
+                _walk_force_data(node["content"], f"role:{r}", depth + 1, state, data, ct)
+            for k, v in node.items():
+                if k not in ("role", "content") and k not in _CONTENT_TYPE_KEYS:
+                    _walk_split(v, str(k), depth + 1, state, instr, data, ambiguous, ct, default,
+                                extra_instruction_keys, extra_data_keys)
+            return
+
+        for k, v in node.items():
+            if k in _CONTENT_TYPE_KEYS:
+                continue
+            _walk_split(v, str(k), depth + 1, state, instr, data, ambiguous, ct, default,
+                        extra_instruction_keys, extra_data_keys)
+        return
+
+    if isinstance(node, list):
+        for item in node:
+            _walk_split(item, parent_key, depth + 1, state, instr, data, ambiguous, content_type, default,
+                        extra_instruction_keys, extra_data_keys)
+        return
+
+    if isinstance(node, str):
+        s = node.strip()
+        if not s:
+            return
+        if _looks_like_json(s):
+            try:
+                _walk_split(json.loads(s), parent_key, depth + 1, state, instr, data, ambiguous, content_type, default,
+                            extra_instruction_keys, extra_data_keys)
+                return
+            except (ValueError, TypeError):
+                pass
+        key = parent_key.lower()
+        if _is_data_content_type(content_type):
+            _emit(s, key, content_type, state, data)
+        elif key in _INSTRUCTION_KEYS or key in extra_instruction_keys:
+            _emit(s, key, content_type, state, instr)
+        elif key in _DATA_KEYS or key in extra_data_keys:
+            _emit(s, key, content_type, state, data)
+        elif _is_nl_string(s):
+            _emit(s, key, content_type, state, default)
+        # else: machine-token leaf, dropped entirely (same as strip_to_nl)
+
+
+def extract_payload_structure(text: str, extra_instruction_keys: Optional[frozenset] = None,
+                              extra_data_keys: Optional[frozenset] = None) -> Dict[str, List[Fragment]]:
+    """Split a request body into instruction / data / ambiguous fragments.
+
+    Tier 1+2 of intent/segmenter.py's extraction cascade: explicit payload
+    structure (known instruction/data keys, chat roles) plus content-type/
+    source-metadata overrides. Whatever lands in "ambiguous_candidates" still
+    needs tier 3 (structural regex) or tier 4 (heuristic) segmentation.
+
+    extra_instruction_keys/extra_data_keys layer a per-agent learned key
+    lexicon on top of the generic one (see intent/prefilter.py's structure
+    profile) — omit for the generic-only behavior.
+    """
+    instr: List[Fragment] = []
+    data: List[Fragment] = []
+    ambiguous: List[Fragment] = []
+    if not text or not text.strip():
+        return {"instruction_candidates": instr, "data_candidates": data, "ambiguous_candidates": ambiguous}
+    stripped = text.strip()
+    if _looks_like_json(stripped):
+        try:
+            parsed = json.loads(stripped)
+        except (ValueError, TypeError):
+            ambiguous.append((stripped[:_MAX_TOTAL_CHARS], _source("")))
+            return {"instruction_candidates": instr, "data_candidates": data, "ambiguous_candidates": ambiguous}
+        _walk_split(parsed, "", 0, _SplitState(), instr, data, ambiguous,
+                   extra_instruction_keys=extra_instruction_keys or frozenset(),
+                   extra_data_keys=extra_data_keys or frozenset())
+        if not instr and not data and not ambiguous:
+            ambiguous.append((stripped[:_MAX_TOTAL_CHARS], _source("")))
+        return {"instruction_candidates": instr, "data_candidates": data, "ambiguous_candidates": ambiguous}
+    ambiguous.append((stripped[:_MAX_TOTAL_CHARS], _source("")))
+    return {"instruction_candidates": instr, "data_candidates": data, "ambiguous_candidates": ambiguous}

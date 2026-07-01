@@ -1,33 +1,34 @@
 """Append-only JSONL audit log for intent prefilter decisions.
 
 Writes one JSON line per intent decision so operators can review prompts,
-nearest-neighbour matches, classifier scores, and decision paths without
-parsing terminal logs.
+extracted instruction units, per-unit classifier scores, and decision paths
+without parsing terminal logs.
 
 Enabled when INTENT_LOG_FILE env var points to a writable path.
 Fail-open: any I/O error is warned and discarded — never blocks traffic.
 
 Each line is a JSON object:
 {
-  "ts":             ISO-8601 timestamp,
-  "path":           "intent_allow" | "intent_block" | "intent_allow_shadow" |
-                    "intent_block_shadow" | "intent_escalate",
-  "agent":          agent_host string,
-  "scanner":        scanner name,
-  "prompt":         original prompt text (capped at 500 chars),
-  "norm_text":      stripped/normalised text (omitted when identical to prompt),
-  "p_clf":          per-agent classifier p(malicious), or null if cold-start,
-  "reason":         human-readable decision reason,
-  "task":           task intent label ("benign" | "malicious" | "uncertain" | ...),
-  "risk":           risk signal string ("read,pii" | "none" | ...),
-  "scope_distance": distance to nearest allow-example used for ALLOW, or null,
-  "neighbor": {
-    "distance":     cosine distance to nearest cached example,
-    "is_valid":     whether that cached example was safe (true) or blocked (false),
-    "reason":       LLM reason stored with that cached example,
-    "task_intent":  task label of the cached example ("benign" | "system_override" | ...),
-    "scope_bucket": "allow" or "blocked"
-  } | null           (null when no KNN neighbour exists)
+  "ts":                    ISO-8601 timestamp,
+  "path":                  "intent_allow" | "intent_allow_shadow" | "intent_escalate",
+  "agent":                 agent_host string,
+  "scanner":                scanner name,
+  "prompt":                original prompt text (capped at 500 chars),
+  "reason":                human-readable decision reason (from intent/decision.py),
+  "extraction_method":     "structured" | "deterministic" | "heuristic" | "error",
+  "extraction_confidence": how confidently intent/segmenter.py separated
+                            instruction from data for this request,
+  "risk_category":         highest risk category across matched units, or null,
+  "units": [
+    {
+      "text":               extracted instruction unit (capped at 200 chars),
+      "intent":              matched intent, or null if unmatched,
+      "confidence":          calibrated classifier confidence, or null,
+      "margin":              top1/top2 probability margin, or null,
+      "centroid_similarity": cosine similarity to the matched class centroid, or null,
+      "risk_category":       this unit's risk category, or null
+    }, ...
+  ]
 }
 """
 
@@ -35,7 +36,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -73,45 +74,45 @@ def append(
     agent: str,
     scanner: str,
     prompt: str,
-    norm_text: str,
-    p_clf: Optional[float],
     reason: str,
-    task: str,
-    risk: str,
-    scope_distance: Optional[float],
-    neighbor: Optional[Dict[str, Any]],
+    extraction_method: str,
+    extraction_confidence: Optional[float],
+    risk_category: Optional[str],
+    units: List[Dict[str, Any]],
+    unit_texts: Optional[List[str]] = None,
 ) -> None:
-    """Write one audit entry. No-op when INTENT_LOG_FILE is unset."""
+    """Write one audit entry. No-op when INTENT_LOG_FILE is unset.
+
+    `units` is intent/prefilter.py's per-unit classify result list (one dict
+    or None per extracted unit); `unit_texts` is the parallel list of the
+    units' raw text, joined in here purely for a readable audit line.
+    """
     fh = _get_fh()
     if fh is None:
         return
+    texts = unit_texts or []
     entry: Dict[str, Any] = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "path": path,
         "agent": agent or "",
         "scanner": scanner or "",
         "prompt": (prompt or "")[:500],
-        "p_clf": round(p_clf, 4) if p_clf is not None else None,
         "reason": reason or "",
-        "task": task or "",
-        "risk": risk or "",
-        "scope_distance": round(scope_distance, 4) if scope_distance is not None else None,
-        "neighbor": None,
+        "extraction_method": extraction_method or "",
+        "extraction_confidence": round(extraction_confidence, 4) if extraction_confidence is not None else None,
+        "risk_category": risk_category,
+        "units": [
+            {
+                "text": (texts[i] if i < len(texts) else "")[:200],
+                "intent": (u or {}).get("intent"),
+                "confidence": round(u["confidence"], 4) if u and u.get("confidence") is not None else None,
+                "margin": round(u["margin"], 4) if u and u.get("margin") is not None else None,
+                "centroid_similarity": round(u["centroid_similarity"], 4) if u and u.get("centroid_similarity") is not None else None,
+                "risk_category": (u or {}).get("risk_category"),
+            }
+            for i, u in enumerate(units)
+        ],
     }
-    # Only include norm_text when it differs from the raw prompt (i.e. JSON was stripped).
-    stripped = (norm_text or "")[:500]
-    if stripped and stripped != entry["prompt"]:
-        entry["norm_text"] = stripped
-
-    if neighbor is not None:
-        entry["neighbor"] = {
-            "distance":    round(float(neighbor.get("distance", 1.0)), 4),
-            "is_valid":    bool(neighbor.get("is_valid", True)),
-            "reason":      (neighbor.get("reason") or "")[:200],
-            "task_intent": neighbor.get("task_intent") or "",
-            "scope_bucket": neighbor.get("scope_bucket") or "",
-        }
-
     try:
         fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception as exc:

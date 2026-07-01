@@ -1,14 +1,49 @@
-"""Durable cross-pod training corpus via database-abstractor.
+"""Durable cross-pod training corpus via database-abstractor — now keyed on
+extracted instruction UNITS, not whole prompts.
 
-Every time the LLM cascade produces a verdict (ESCALATE → cascade → result),
-the embedding vector + intent triple is queued here. When the buffer reaches
-BATCH_SIZE we fire one async POST to DATABASE_ABSTRACTOR_SERVICE_URL which
-writes the batch to MongoDB.
+Every time the LLM cascade produces a GOOD verdict (ESCALATE → cascade →
+is_valid=True), each instruction unit extracted from that request (see
+intent/segmenter.py) is queued here as its own row: {agentHost, unitText,
+vector, taskIntent, riskCategory, scopeBucket, isValid, extractionMethod,
+sourceKey}. taskIntent/riskCategory start empty — they're filled in later,
+OFFLINE, by the separate LLM-labeling service that reads this corpus from
+Mongo, clusters/labels each unit into a fine-grained intent + risk category
+(capped at ~50 per agent), and upserts the label back in place. Live cascade
+verdicts never carry that granularity, so this module never trains anything
+directly; it only feeds Mongo and, on warmup/refresh, pulls whatever's been
+labeled so far back into the per-agent multi-class classifier
+(intent/trainer.py + embedder-container's /train).
 
-This closes the loop that trainer.py's in-memory-only approach cannot: pod
-restarts keep all labelled examples, and every pod shares the same training
-corpus. trainer.py still drives the per-pod LogReg retraining cycle from its
-own in-memory buffer (fast, no DB hop); corpus.py just ensures nothing is lost.
+The offline service ALSO does its own from-scratch instruction/data breakdown
+of the request (real LLM understanding, not the worker's regex) and, once
+processed, upserts a `breakdown` field onto the row:
+    breakdown: {
+      rawText:                    the full original request text (duplicated
+                                   across every sibling unit-row from the same
+                                   request — acceptable, keeps the schema simple),
+      groundTruthSourceKey:        the LLM's own determination of which
+                                   key/chat-role held this instruction, same
+                                   flat-key convention as sourceKey (e.g.
+                                   "instruction", "userAsk", "role:user"),
+      groundTruthInstructionText:  the LLM's own extracted instruction text,
+                                   which may differ from the worker's unitText,
+    }
+This exists because the worker's own sourceKey/unitText are just a regex
+guess — without ground truth to check them against, a learned "structure
+profile" built purely from the worker's own guesses only reinforces its own
+blind spots. See build_structure_profile(): rows carrying `breakdown` are
+LLM-verified and trusted regardless of the worker's extractionMethod tier;
+rows without it yet fall back to the worker's own guess, but only when that
+guess came from the confident tier-1 (structured) path — unverified bootstrap
+signal, not confirmed truth. That's the whole feedback loop: regex bootstraps
+a cold-start guess, the LLM corrects/confirms it over time.
+
+Also, on every warmup()/refresh, this module aggregates the agent's raw
+corpus rows (ground-truth-preferred, regex-guess-as-fallback) into a small
+learned "structure profile" — which source keys and leading verbs reliably
+produce a confident instruction unit for THIS agent — and caches it in Redis
+for intent/segmenter.py to use as an addition to its generic key/verb lexicon
+(see build_structure_profile() and intent/prefilter.py's get_structure_profile()).
 
 Design:
   - Zero per-request synchronous overhead: queue() is pure in-process.
@@ -16,28 +51,46 @@ Design:
     cache.observe() — it runs after the response has been returned.
   - Fail-open: any HTTP error logs a warning and the batch is dropped rather
     than blocking traffic or retrying forever.
-  - The DB-abstractor endpoint is /api/intent-corpus/bulk (POST, JSON body
-    {"examples": [...]}). Add the corresponding handler on the abstractor side.
+  - warmup()/refresh is repeatable (cold-start priming AND the count-based
+    periodic refresh in scan_handler.py both call it), guarded by an in-flight
+    set so concurrent requests from the same agent never trigger redundant
+    concurrent Mongo loads + retrains.
 """
 
 import asyncio
+import json
 import logging
-from collections import deque
-from typing import Any, Dict, List, Optional, Tuple
+import re
+from collections import Counter, deque
+from typing import Any, Dict, List, Optional
 
 from settings import settings
 
 logger = logging.getLogger(__name__)
 
-_BATCH_SIZE = 20      # flush when buffer reaches this many examples
-_MAX_BUFFER  = 2000   # hard cap: deque drops oldest when full
-_ENDPOINT      = "/api/bulkInsertCorpusExamples"
+_BATCH_SIZE = 20      # flush when buffer reaches this many unit-rows
+_MAX_BUFFER = 2000    # hard cap: deque drops oldest when full
+_ENDPOINT = "/api/bulkInsertCorpusExamples"
 _LOAD_ENDPOINT = "/api/loadCorpusForAgent"
+_DEFAULT_REFRESH_EVERY_N = 200  # coarser than the old per-pod retrain cadence:
+                                # this now triggers a Mongo round-trip, not a
+                                # cheap in-memory fit.
+
+# Structure-profile learning (see build_structure_profile()).
+_STRUCTURE_CACHE_PREFIX = "agentstruct:"  # must match intent/prefilter.py's read side
+_STRUCTURE_TTL_SECONDS = 24 * 3600
+_MIN_OBSERVATIONS = 3    # a key/verb must recur at least this often before we
+                         # trust it enough to add to the lexicon — guards
+                         # against a one-off fluke promoting a bad signal.
+_MAX_LEARNED_KEYS = 25
+_MAX_LEARNED_VERBS = 25
+_LEADING_WORD_RE = re.compile(r"[A-Za-z']+")
 
 # In-process buffer shared across all async tasks on this pod.
 _buffer: "deque[Dict[str, Any]]" = deque(maxlen=_MAX_BUFFER)
 _flush_lock: Optional[asyncio.Lock] = None
-_warmed: set = set()
+_refreshing: set = set()               # agent_hosts currently mid-warmup/refresh
+_good_since_refresh: Dict[str, int] = {}  # per-agent GOOD-verdict counter
 
 
 def _get_lock() -> asyncio.Lock:
@@ -52,36 +105,70 @@ def _url() -> Optional[str]:
     return f"{base}{_ENDPOINT}" if base else None
 
 
-def queue(
-    agent_host: str,
-    vec: Optional[List[float]],
-    is_valid: bool,
-    triple: Dict[str, str],
-) -> bool:
-    """Append one learned example to the in-process buffer.
+def _refresh_every_n() -> int:
+    raw = str(getattr(settings, "INTENT_REFRESH_EVERY_N", "")).strip()
+    try:
+        return int(raw) if raw else _DEFAULT_REFRESH_EVERY_N
+    except ValueError:
+        return _DEFAULT_REFRESH_EVERY_N
+
+
+def queue(agent_host: str, units: List[Dict[str, Any]], is_valid: bool, scope_bucket: str) -> bool:
+    """Append one row per extracted instruction unit to the in-process buffer.
+
+    Each item in `units` is {"text": str, "vector": List[float] | None,
+    "extraction_method": str, "source_key": str} (intent/prefilter.py's
+    segmentation output — source_key is the originating JSON/chat-role key for
+    a tier-1 unit, "" otherwise). All units from one request share that
+    request's cascade verdict — taskIntent/riskCategory are left empty for the
+    offline service to fill in; sourceKey/extractionMethod are populated
+    immediately and feed build_structure_profile() below.
 
     Returns True when the batch threshold is crossed so the caller can
-    schedule flush() as a fire-and-forget coroutine.
-
-    vec=None is a no-op (no embedding → nothing to train on).
+    schedule flush() as a fire-and-forget coroutine. Units with no vector are
+    skipped (nothing to train on).
     """
-    if not vec:
+    crossed = False
+    for u in units:
+        vec = u.get("vector")
+        if not vec:
+            continue
+        _buffer.append({
+            "agentHost": agent_host,
+            "unitText": u.get("text", ""),
+            "vector": vec,
+            "taskIntent": "",
+            "riskCategory": "",
+            "scopeBucket": scope_bucket,
+            "isValid": is_valid,
+            "extractionMethod": u.get("extraction_method", ""),
+            "sourceKey": u.get("source_key", ""),
+        })
+        if len(_buffer) >= _BATCH_SIZE:
+            crossed = True
+    return crossed
+
+
+def record_good(agent_host: str) -> bool:
+    """Increment the per-agent GOOD-verdict counter. Returns True once
+    INTENT_REFRESH_EVERY_N is crossed, so the caller can schedule warmup()
+    (a fresh pull of whatever the offline service has labeled so far)."""
+    if not agent_host:
         return False
-    _buffer.append({
-        "agentHost":   agent_host,
-        "vectors":     [vec],          # Java expects List<List<Double>>
-        "isValid":     is_valid,
-        "taskIntent":  triple.get("task_intent", ""),
-        "scopeBucket": triple.get("scope_bucket", ""),
-    })
-    return len(_buffer) >= _BATCH_SIZE
+    n = _good_since_refresh.get(agent_host, 0) + 1
+    if n >= _refresh_every_n():
+        _good_since_refresh[agent_host] = 0
+        return True
+    _good_since_refresh[agent_host] = n
+    return False
 
 
-async def load(agent_host: str) -> List[Tuple[List[float], bool]]:
-    """Fetch stored training examples for agent_host from the database-abstractor.
-
-    Returns a list of (vector, is_valid) pairs ready to feed into trainer.record().
-    Returns [] on any error or when the URL is not configured — fail-open.
+async def _fetch_raw(agent_host: str) -> List[Dict[str, Any]]:
+    """Fetch this agent's full corpus rows from the database-abstractor,
+    unfiltered. Shared by load() (offline-labeled examples, for classifier
+    training) and build_structure_profile() (raw structural signal, for the
+    per-agent key/verb lexicon) — one Mongo round-trip serves both. Fail-open:
+    [] on any error or when the URL is unconfigured.
     """
     base = (getattr(settings, "DATABASE_ABSTRACTOR_SERVICE_URL", "") or "").rstrip("/")
     if not base:
@@ -99,53 +186,145 @@ async def load(agent_host: str) -> List[Tuple[List[float], bool]]:
         if resp.status_code >= 400:
             logger.warning(f"[corpus] load returned {resp.status_code} for agent={agent_host!r}")
             return []
-        data = resp.json()
-        examples = data.get("examples") or []
-        # Each item is a bucket: {vectors: [[384 floats], ...], is_valid: bool}.
-        # Flatten all vectors across all buckets into (vector, is_valid) pairs.
-        return [
-            (vec, bool(ex["is_valid"]))
-            for ex in examples
-            if "vectors" in ex and "is_valid" in ex
-            for vec in ex["vectors"]
-            if vec
-        ]
+        return resp.json().get("examples") or []
     except Exception as exc:
         logger.warning(f"[corpus] load failed for agent={agent_host!r}: {exc}")
         return []
 
 
-async def warmup(agent_host: str) -> None:
-    """Lazy-load prior corpus for agent_host and warm the per-agent LogReg classifier.
+def _labeled_examples(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Filter+shape raw corpus rows into offline-labeled training examples,
+    skipping rows the offline service hasn't labeled yet (empty taskIntent)."""
+    out: List[Dict[str, Any]] = []
+    for ex in raw_rows:
+        task_intent = ex.get("taskIntent") or ex.get("task_intent") or ""
+        if not task_intent:
+            continue  # not yet labeled offline — skip
+        vec = ex.get("vector") if ex.get("vector") is not None else ex.get("vectors")
+        if isinstance(vec, list) and vec and isinstance(vec[0], list):
+            vec = vec[0]  # tolerate a legacy bucketed {"vectors": [[...]]} shape
+        if not vec:
+            continue
+        out.append({
+            "vector": vec,
+            "task_intent": task_intent,
+            "risk_category": ex.get("riskCategory") or ex.get("risk_category") or "unknown",
+            "is_valid": bool(ex.get("isValid", ex.get("is_valid", True))),
+        })
+    return out
 
-    Called fire-and-forget on the first cold-start ESCALATE for an agent.
-    Runs once per agent per pod lifetime — the _warmed guard prevents duplicate
-    loads even when multiple requests race to the same cold agent simultaneously
-    (asyncio is single-threaded so the add happens before the first await).
+
+async def load(agent_host: str) -> List[Dict[str, Any]]:
+    """Fetch offline-labeled per-unit training examples for agent_host.
+
+    Returns [{"vector", "task_intent", "risk_category", "is_valid"}, ...].
+    Fail-open: [] on any error or when the URL is unconfigured.
     """
-    if not agent_host or agent_host in _warmed:
+    return _labeled_examples(await _fetch_raw(agent_host))
+
+
+def _leading_word(text: str) -> str:
+    m = _LEADING_WORD_RE.match((text or "").strip())
+    return m.group(0).lower() if m else ""
+
+
+def build_structure_profile(raw_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Aggregate this agent's corpus rows into a small learned lexicon: which
+    source keys and leading verbs reliably produce a confident instruction
+    unit. Two-tier trust, preferring ground truth over the worker's own guess:
+
+      1. A row carrying `breakdown` (the offline LLM-labeling service's own
+         from-scratch instruction/data split) is LLM-verified — counted
+         regardless of the worker's extractionMethod tier, since this is
+         confirmed truth, not a guess.
+      2. A row without `breakdown` yet falls back to the worker's own
+         sourceKey/unitText guess, but ONLY when extractionMethod=="structured"
+         (unverified bootstrap signal — the worker was confident, but nothing
+         has checked it yet).
+
+    This is what lets the profile improve over time instead of just
+    reinforcing the regex segmenter's own blind spots: cold-start runs on the
+    worker's guess alone, and each row the offline service processes either
+    confirms or corrects that guess.
+    """
+    key_counts: Counter = Counter()
+    verb_counts: Counter = Counter()
+    for row in raw_rows:
+        if not row.get("isValid", True):
+            continue
+        breakdown = row.get("breakdown") or {}
+        ground_truth_key = (breakdown.get("groundTruthSourceKey") or "").strip().lower()
+        ground_truth_text = breakdown.get("groundTruthInstructionText") or ""
+        if ground_truth_key or ground_truth_text:
+            if ground_truth_key:
+                key_counts[ground_truth_key] += 1
+            verb = _leading_word(ground_truth_text or row.get("unitText", ""))
+            if verb:
+                verb_counts[verb] += 1
+            continue
+        if row.get("extractionMethod") != "structured":
+            continue
+        key = (row.get("sourceKey") or "").strip().lower()
+        if key:
+            key_counts[key] += 1
+        verb = _leading_word(row.get("unitText", ""))
+        if verb:
+            verb_counts[verb] += 1
+    return {
+        "instruction_keys": [k for k, n in key_counts.most_common(_MAX_LEARNED_KEYS) if n >= _MIN_OBSERVATIONS],
+        "instruction_verbs": [v for v, n in verb_counts.most_common(_MAX_LEARNED_VERBS) if n >= _MIN_OBSERVATIONS],
+    }
+
+
+async def _cache_structure_profile(agent_host: str, profile: Dict[str, Any]) -> None:
+    """Best-effort: cache the freshly-built structure profile in Redis for
+    intent/prefilter.py's get_structure_profile() to read on the hot path.
+    Fail-open — a cache-write failure just means segmentation stays
+    generic-only for this agent until the next successful warmup()."""
+    try:
+        import cache_store
+        redis_client = cache_store.get_client()
+        if redis_client is None:
+            return
+        await redis_client.set(f"{_STRUCTURE_CACHE_PREFIX}{agent_host}", json.dumps(profile),
+                               ex=_STRUCTURE_TTL_SECONDS)
+    except Exception as exc:
+        logger.debug(f"[corpus] structure profile cache write failed for agent={agent_host!r}: {exc}")
+
+
+async def warmup(agent_host: str) -> None:
+    """Load the latest corpus rows for agent_host, refresh its learned
+    structure profile (key/verb lexicon), and refit its multi-class classifier
+    from whatever's been offline-labeled so far. Fire-and-forget, fail-open,
+    and safe to call repeatedly — the in-flight guard (`_refreshing`) prevents
+    concurrent requests from the same agent from firing redundant concurrent
+    Mongo loads + retrains. Called both on cold-start (first ESCALATE for a
+    never-seen or stale agent) and periodically via the count-based refresh in
+    scan_handler.py.
+    """
+    if not agent_host or agent_host in _refreshing:
         return
-    _warmed.add(agent_host)
+    _refreshing.add(agent_host)
+    try:
+        raw_rows = await _fetch_raw(agent_host)
+        if not raw_rows:
+            logger.debug(f"[corpus] no corpus rows for agent={agent_host!r} yet — staying cold")
+            return
 
-    examples = await load(agent_host)
-    if not examples:
-        logger.debug(f"[corpus] no prior examples for agent={agent_host!r} — staying cold")
-        return
+        await _cache_structure_profile(agent_host, build_structure_profile(raw_rows))
 
-    from intent import trainer as _trainer  # local import avoids circular dependency
-    crossed = False
-    for vec, is_valid in examples:
-        if _trainer.record(agent_host, vec, is_valid):
-            crossed = True
-
-    if crossed:
+        examples = _labeled_examples(raw_rows)
+        if not examples:
+            logger.debug(f"[corpus] no offline-labeled examples for agent={agent_host!r} yet")
+            return
+        from intent import trainer as _trainer  # local import avoids circular dependency
+        _trainer.load_examples(agent_host, examples)
         await _trainer.train_now(agent_host)
-        logger.info(f"[corpus] warmed agent={agent_host!r} classifier with {len(examples)} examples")
-    else:
-        logger.debug(
-            f"[corpus] loaded {len(examples)} examples for agent={agent_host!r}"
-            f" — below train threshold, classifier still cold"
-        )
+        logger.info(f"[corpus] refreshed agent={agent_host!r} classifier with {len(examples)} examples")
+    except Exception as exc:
+        logger.warning(f"[corpus] warmup failed for agent={agent_host!r}: {exc}")
+    finally:
+        _refreshing.discard(agent_host)
 
 
 async def flush() -> None:
@@ -181,6 +360,6 @@ async def flush() -> None:
         if resp.status_code >= 400:
             logger.warning(f"[corpus] db-abstractor returned {resp.status_code} — {len(batch)} examples lost")
         else:
-            logger.info(f"[corpus] flushed {len(batch)} examples to db-abstractor")
+            logger.info(f"[corpus] flushed {len(batch)} unit-examples to db-abstractor")
     except Exception as exc:
         logger.warning(f"[corpus] flush failed ({len(batch)} examples dropped): {exc}")

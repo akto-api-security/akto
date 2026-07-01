@@ -46,8 +46,12 @@ def _index_name() -> str:
     return (getattr(settings, "CACHE_REDIS_INDEX", "") or "").strip() or _DEFAULT_INDEX
 
 
-def _get_client():
-    """Return an async Redis client, or None when REDIS_URL is unset/unusable.
+def get_client():
+    """Return the shared async Redis client, or None when REDIS_URL is
+    unset/unusable. Public: this module's own KNN/hash helpers below use it,
+    and intent/prefilter.py's capability-profile cache reuses the same
+    lazily-created singleton connection pool for plain GET/SET rather than
+    opening a second one.
 
     decode_responses is left False so vector payloads stay as raw bytes; string
     metadata is decoded explicitly on read.
@@ -159,7 +163,7 @@ async def query(vec: List[float], scanner_key: str) -> Optional[Dict[str, Any]]:
     distance is RediSearch COSINE distance (1 - cosine similarity), so the
     caller's threshold/TTL logic carries over unchanged from the Vectorize path.
     """
-    client = _get_client()
+    client = get_client()
     if client is None or not await _ensure_index(client):
         return None
     try:
@@ -184,7 +188,7 @@ async def exact_get(scanner_key: str, text_hash: str) -> Optional[Dict[str, Any]
     so the caller falls through to the embed + KNN fuzzy path. Cheap enough to run
     on every request; it offloads both the embedder (CPU) and the search index.
     """
-    client = _get_client()
+    client = get_client()
     if client is None:
         return None
     try:
@@ -212,7 +216,7 @@ async def upsert(vec: List[float], scanner_key: str, entry_id: str,
     The intent triple (task/risk/scope) is stored alongside the verdict so a later
     cache hit returns the previously-computed intents without re-classifying.
     """
-    client = _get_client()
+    client = get_client()
     if client is None or not await _ensure_index(client):
         return
     try:

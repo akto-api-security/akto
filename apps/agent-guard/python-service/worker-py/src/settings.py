@@ -41,23 +41,39 @@ _FIELDS = (
     "REDIS_URL", "CACHE_REDIS_INDEX",
     # Separate webhook for cache shadow/served alerts (keeps SLACK_WEBHOOK_URL clean).
     "CACHE_SHADOW_SLACK_WEBHOOK_URL",
-    # --- Intent prefilter (task/risk/scope) layered on the semantic cache ---
-    # INTENT_ENABLED: master switch for JSON-strip → chunk → intent decisioning.
+    # --- Intent prefilter: instruction/data segmentation + per-agent
+    # multi-class intent classifier, layered on the semantic cache ---
+    # INTENT_ENABLED: master switch for segment → embed → classify → decide.
     "INTENT_ENABLED",
     # INTENT_EMBED_MODEL: informational; the embedder container owns the model.
     "INTENT_EMBED_MODEL",
-    # Decision thresholds (see intent/decision.py). ALLOW must clear a higher bar
-    # than ESCALATE because an ALLOW skips the LLM cascade (no safety net behind it).
-    "INTENT_ALLOW_THRESHOLD", "INTENT_BLOCK_THRESHOLD", "INTENT_SCOPE_DISTANCE",
-    # Max chunks embedded/classified per request (caps miss-path cost).
+    # Risk-scaled decision thresholds (see intent/decision.py). ALLOW must clear
+    # a higher bar than ESCALATE because an ALLOW skips the LLM cascade (no
+    # safety net behind it) — the bar itself scales with the matched unit's
+    # risk category (delete/edit/create need a much higher bar than a generic
+    # fetch/query).
+    "INTENT_EXTRACTION_CONFIDENCE_FLOOR",
+    "INTENT_BASE_CONFIDENCE", "INTENT_BASE_MARGIN", "INTENT_MARGIN_SCALE",
+    "INTENT_BASE_CENTROID_SIM", "INTENT_CENTROID_SCALE",
+    # INTENT_SCOPE_DISTANCE: still used by the semantic verdict cache's
+    # cache-neighbour check (cache.py) — unrelated to the multi-class classifier.
+    "INTENT_SCOPE_DISTANCE",
+    # Max chunks used by payload.normalize() for the semantic cache's canonical
+    # text (cache.py only — unrelated to intent/segmenter.py's unit extraction).
     "INTENT_MAX_CHUNKS",
-    # INTENT_ACT: when falsy (default), ALLOW/BLOCK decisions are only logged
-    # (shadow mode) and the request still ESCALATEs to the LLM cascade. Set to
-    # "true" to enforce intent decisions and skip the cascade.
+    # INTENT_REFRESH_EVERY_N: per-agent GOOD-verdict count that triggers a pull
+    # of the latest offline-labeled corpus + classifier refit (intent/corpus.py
+    # warmup()). Coarser than a typical retrain cadence since this now costs a
+    # Mongo round-trip, not just an in-memory fit.
+    "INTENT_REFRESH_EVERY_N",
+    # INTENT_ACT: when falsy (default), ALLOW decisions are only logged (shadow
+    # mode) and the request still ESCALATEs to the LLM cascade. Set to "true"
+    # to enforce intent decisions and skip the cascade on a fast ALLOW.
     "INTENT_ACT",
     # INTENT_LOG_FILE: path to an append-only JSONL audit log. Each line records
-    # the prompt, nearest-neighbour match, p_clf, and decision path so you can
-    # monitor classifier accuracy without tailing terminal logs. Unset = disabled.
+    # the prompt, extracted units, per-unit classifier scores, and decision path
+    # so you can monitor classifier accuracy without tailing terminal logs.
+    # Unset = disabled.
     "INTENT_LOG_FILE",
 )
 
