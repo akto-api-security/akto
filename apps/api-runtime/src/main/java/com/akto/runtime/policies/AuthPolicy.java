@@ -8,6 +8,8 @@ import com.akto.dto.type.KeyTypes;
 import com.akto.util.JSONUtils;
 
 import com.mongodb.BasicDBObject;
+
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,6 +26,7 @@ public class AuthPolicy {
     private static final Pattern API_KEY_PATTERN = Pattern.compile(".*(apikey|passkey).*");
 
     private static boolean isApiKeyHeader(String headerName) {
+        // Matches variations: x-api-key, x_api_key, api_key, api-key, apiKey, x-pass-key
         String normalized = headerName.toLowerCase().replaceAll("[_-]", "");
         return API_KEY_PATTERN.matcher(normalized).matches();
     }
@@ -93,8 +96,11 @@ public class AuthPolicy {
             }
         }
 
-        // find bearer or basic tokens in any header
+        // find bearer or basic tokens in any header, and check for API_KEY
         for (String header : headers.keySet()) {
+            if (StringUtils.startsWith(header, "x-akto-installer")) {
+                continue;
+            }
             List<String> headerValues = headers.getOrDefault(header, new ArrayList<>());
             if (isApiKeyHeader(header)) {
                 authTypes.add(ApiInfo.AuthType.API_KEY);
