@@ -249,6 +249,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/fetch_filters", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
 
     int accountId = Context.accountId.get();
     CONTEXT_SOURCE source = Context.contextSource.get();

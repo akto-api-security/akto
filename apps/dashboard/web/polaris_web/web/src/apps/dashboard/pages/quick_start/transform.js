@@ -460,6 +460,18 @@ const awsAgentCoreObj = {
     />
 }
 
+const amazonQuickObj = {
+    icon: '/public/aws.svg',
+    label: "Amazon Quick",
+    text: "Import your Amazon Quick AI agents and conversations, seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-amazon-quick',
+    key: "AMAZON_QUICK",
+    component: <BannerComponent
+        content="Import your Amazon Quick AI agents and conversations, seamlessly in AKTO."
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-amazon-quick'
+    />
+}
+
 const aiAgentGlobalProxy = {
     icon: '/public/aws_bedrock.svg',
     label: "Global Proxy",
@@ -1199,6 +1211,18 @@ const copilotStudioImportObj = {
     />
 }
 
+const m365CopilotObj = {
+    icon: '/public/microsoft-copilot.svg',
+    label: "Microsoft 365 Copilot",
+    text: "Import your Microsoft 365 Copilot interactions across Teams, Excel and other Office products, seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-m365-copilot',
+    key: "M365_COPILOT",
+    component: <BannerComponent
+        content="Import your Microsoft 365 Copilot interactions across Teams, Excel and other Office products, seamlessly in AKTO."
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-m365-copilot'
+    />
+}
+
 const databricksImportObj = {
     icon: '/public/databricks.svg',
     label: "Databricks",
@@ -1310,6 +1334,15 @@ const claudeCodeCliHookObj = {
         content="Import your Claude Code CLI proxy traffic, seamlessly in AKTO."
         docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-cli-hooks'
     />
+}
+
+const claudeCoworkObj = {
+    icon: '/public/claude.svg',
+    label: "Claude Cowork",
+    text: "Secure your Claude Cowork interactions with Akto guardrails.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-cowork-connector',
+    key: "CLAUDE_COWORK",
+    component: <AddOnComponenet/>
 }
 
 const geminiCliHookObj = {
@@ -2156,8 +2189,8 @@ const quickStartFunc = {
         ]
 
         const aiAgentConnectors = [
-            awsBedrockObj, awsAgentCoreObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
-            n8nImportObj, langchainImportObj, copilotStudioImportObj, snowflakeObj,
+            awsBedrockObj, awsAgentCoreObj, amazonQuickObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
+            n8nImportObj, langchainImportObj, copilotStudioImportObj, m365CopilotObj, snowflakeObj,
             vertexAICustomDeployedModelImportObj, salesforceImportObj,
             anthropicImportObj, openaiImportObj
         ]
@@ -2187,7 +2220,7 @@ const quickStartFunc = {
 
         // Endpoint Agents
         const endpointAgents = [
-            cursorHookObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, neovimHookObj, openCodeHookObj, ampHookObj, hermesHookObj,intellijHookObj, antigravityObj,
+            cursorHookObj, claudeCodeCliHookObj, claudeCoworkObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, neovimHookObj, openCodeHookObj, ampHookObj, hermesHookObj,intellijHookObj, antigravityObj,
         ]
 
         const localHostedModels = [
@@ -2295,7 +2328,7 @@ const quickStartFunc = {
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj,
-                awsBedrockObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
+                awsBedrockObj, amazonQuickObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
                 n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, anthropicImportObj, openaiImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj, neovimHookObj, openCodeHookObj,hermesHookObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj,
                 intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
