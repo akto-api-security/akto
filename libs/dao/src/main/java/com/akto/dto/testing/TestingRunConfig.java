@@ -47,6 +47,24 @@ public class TestingRunConfig {
     @Setter
     private ObjectId testRunResultSummaryId;
 
+    /** In-memory only: streaming subscription request declared by PRE_REQUEST script (not persisted). */
+    @BsonIgnore
+    @Getter
+    @Setter
+    private StreamingRequestConfig streamingRequest;
+
+    public static class StreamingRequestConfig {
+        public String url;
+        public String body;
+        public Map<String, String> headers;
+
+        public StreamingRequestConfig(String url, String body, Map<String, String> headers) {
+            this.url = url;
+            this.body = body;
+            this.headers = headers;
+        }
+    }
+
     public TestingRunConfig() {}
 
     public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,

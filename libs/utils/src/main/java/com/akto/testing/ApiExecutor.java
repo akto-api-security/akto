@@ -300,6 +300,11 @@ public class ApiExecutor {
         boolean executeScript = testingRunConfig != null;
         String tempPayload = ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript, testingRunConfig);
 
+        TestingRunConfig.StreamingRequestConfig streamingRequestConfig =
+                (testingRunConfig != null) ? testingRunConfig.getStreamingRequest() : null;
+        SseStreamingUtil.StreamingResult streamingResult =
+                (streamingRequestConfig != null) ? SseStreamingUtil.startStreaming(streamingRequestConfig) : null;
+
         String url = prepareUrl(request, testingRunConfig);
 
         if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertAgenticTestingLog") || url.contains("insertProtectionLog"))) {
@@ -398,6 +403,10 @@ public class ApiExecutor {
 
         if (url.contains("login_submit")) {
             loggerMaker.infoAndAddToDb("Response Payload " + response.getBody(), LogDb.TESTING);
+        }
+
+        if (streamingResult != null && response != null) {
+            response.setStreamingChunks(SseStreamingUtil.joinAndCollect(streamingResult));
         }
 
         if (executeScript) {
