@@ -11,6 +11,8 @@ import json
 import logging
 from urllib.parse import urlparse
 
+logging.basicConfig(level=logging.INFO)
+
 from pyodide.ffi import create_proxy
 from workers import Response, waitUntil
 
