@@ -80,6 +80,7 @@ public class Constants {
     public static final String AI_AGENT_TAG_CONNECTOR = "connector";
     public static final String AI_AGENT_CONNECTOR_MICROSOFT_DEFENDER = "MICROSOFT_DEFENDER";
     public static final String AI_AGENT_CONNECTOR_SENTINEL = "SENTINELONE";
+    public static final String AI_AGENT_CONNECTOR_CROWDSTRIKE = "CROWDSTRIKE";
     public static final String AI_AGENT_APP_NAME = "ai-agent";
 
     public static final String AKTO_ENDPOINT_SOURCE_TAG = "source";
