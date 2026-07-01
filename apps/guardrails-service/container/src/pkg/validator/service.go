@@ -902,6 +902,7 @@ func (s *Service) validationContextFromParams(
 		ContextSource:   types.ContextSource(contextSource),
 		McpServerName:   mcpServerName,
 		SessionID:       sessionID,
+		AktoAccountID:   params.AktoAccountID,
 		SkipThreat:      params.EffectiveSkipThreat(), // Set skipThreat directly in context
 		Tag:             params.Tag,
 		AllowedLists:    mcpAllowedHostList,
