@@ -518,11 +518,7 @@ func (s *Service) refreshCollectionTagsIfNeeded() {
 // and returns login-user-email-type, falling back to browser-llm-account-type.
 // The account type is resolved ONLY from the collection's tags; if the host is not
 // found in the collection cache, it returns "" (no fallback to the request tag).
-func (s *Service) getLoginUserEmailType(params *models.ValidateRequestParams) string {
-	var reqHeaders map[string]string
-	if params.RequestHeaders != "" {
-		json.Unmarshal([]byte(params.RequestHeaders), &reqHeaders)
-	}
+func (s *Service) getLoginUserEmailType(reqHeaders map[string]string) string {
 	host := extractHostHeader(reqHeaders)
 	s.logger.Info("getLoginUserEmailType - host extracted", zap.String("host", host))
 	if host == "" {
@@ -861,6 +857,7 @@ func (s *Service) validationContextFromParams(
 	responsePayloadForCtx string,
 	logPrefix string,
 	mcpAllowedHostList []types.McpAllowedList,
+	compiledRules map[string]*regexp.Regexp,
 ) *mcp.ValidationContext {
 	// Parse headers and status code
 	reqHeaders := make(map[string]string)
@@ -890,22 +887,23 @@ func (s *Service) validationContextFromParams(
 	contextSource := params.ContextSource
 
 	return &mcp.ValidationContext{
-		IP:              params.IP,
-		DestIP:          params.DestIP,
-		Endpoint:        params.Path,
-		Method:          params.Method,
-		RequestHeaders:  reqHeaders,
-		ResponseHeaders: respHeaders,
-		StatusCode:      statusCode,
-		RequestPayload:  requestPayloadForCtx,
-		ResponsePayload: responsePayloadForCtx,
-		ContextSource:   types.ContextSource(contextSource),
-		McpServerName:   mcpServerName,
-		SessionID:       sessionID,
-		AktoAccountID:   params.AktoAccountID,
-		SkipThreat:      params.EffectiveSkipThreat(), // Set skipThreat directly in context
-		Tag:             params.Tag,
-		AllowedLists:    mcpAllowedHostList,
+		IP:                 params.IP,
+		DestIP:             params.DestIP,
+		Endpoint:           params.Path,
+		Method:             params.Method,
+		RequestHeaders:     reqHeaders,
+		ResponseHeaders:    respHeaders,
+		StatusCode:         statusCode,
+		RequestPayload:     requestPayloadForCtx,
+		ResponsePayload:    responsePayloadForCtx,
+		ContextSource:      types.ContextSource(contextSource),
+		McpServerName:      mcpServerName,
+		SessionID:          sessionID,
+		AktoAccountID:      params.AktoAccountID,
+		SkipThreat:         params.EffectiveSkipThreat(), // Set skipThreat directly in context
+		Tag:                params.Tag,
+		AllowedLists:       mcpAllowedHostList,
+		CompiledRegexRules: compiledRules,
 	}
 }
 
@@ -1065,7 +1063,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
 
 	// Create validation context with full request metadata (matching batch flow)
-	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList)
+	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList, compiledRules)
 
 	// Filter policies by MCP server name so all subsequent checks only fire for
 	// rules that belong to policies applicable to this server.
@@ -1077,7 +1075,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// not block requests arriving on server B).
 	if policyName, ok := blockPersonalAccountPolicyName(policies); ok {
 		s.refreshCollectionTagsIfNeeded()
-		accountType := s.getLoginUserEmailType(params)
+		accountType := s.getLoginUserEmailType(valCtx.RequestHeaders)
 		s.logger.Info("ValidateRequest - account type check",
 			zap.String("path", params.Path),
 			zap.String("sessionID", sessionID),
@@ -1223,7 +1221,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 
 	// Get cached policies (refreshes if stale)
 	policiesStart := time.Now()
-	policies, _, _, _, err := s.getCachedPolicies(contextSource)
+	policies, _, compiledRules, _, err := s.getCachedPolicies(contextSource)
 	if err != nil {
 		s.logger.Error("ValidateResponse - failed to load policies",
 			zap.String("path", params.Path),
@@ -1255,7 +1253,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	}
 
 	// Create validation context with full request metadata (matching batch flow)
-	valCtx := s.validationContextFromParams(params, sessionID, params.RequestPayload, responseBody, "ValidateResponse", mcpAllowedHostList)
+	valCtx := s.validationContextFromParams(params, sessionID, params.RequestPayload, responseBody, "ValidateResponse", mcpAllowedHostList, compiledRules)
 
 	// Filter policies by MCP server name — policies with no server configured are skipped
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
@@ -1485,7 +1483,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 	s.schemaFetcher.RefreshIfNeeded()
 
-	policies, auditPolicies, _, hasAuditRules, err := s.getCachedPolicies(string(contextSource))
+	policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies(string(contextSource))
 	if err != nil {
 		s.logger.Error("ValidateBatch - failed to load policies",
 			zap.String("contextSource", contextSource),
@@ -1535,18 +1533,19 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 		// Create validation context with actual data and skipThreat flag
 		valCtx := &mcp.ValidationContext{
-			IP:              data.IP,
-			Endpoint:        data.Path,
-			Method:          data.Method,
-			RequestHeaders:  reqHeaders,
-			ResponseHeaders: respHeaders,
-			StatusCode:      statusCode,
-			RequestPayload:  data.RequestPayload,
-			ResponsePayload: data.ResponsePayload,
-			ContextSource:   types.ContextSource(contextSource),
-			McpServerName:   mcpServerName,
-			SkipThreat:      skipThreat, // Set skipThreat directly in context
-			AllowedLists:    mcpAllowedHostList,
+			IP:                 data.IP,
+			Endpoint:           data.Path,
+			Method:             data.Method,
+			RequestHeaders:     reqHeaders,
+			ResponseHeaders:    respHeaders,
+			StatusCode:         statusCode,
+			RequestPayload:     data.RequestPayload,
+			ResponsePayload:    data.ResponsePayload,
+			ContextSource:      types.ContextSource(contextSource),
+			McpServerName:      mcpServerName,
+			SkipThreat:         skipThreat, // Set skipThreat directly in context
+			AllowedLists:       mcpAllowedHostList,
+			CompiledRegexRules: compiledRules,
 		}
 
 		s.logger.Debug("ValidateBatch - created validation context for batch item",
