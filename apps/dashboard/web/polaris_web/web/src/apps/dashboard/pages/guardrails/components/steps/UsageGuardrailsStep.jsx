@@ -48,8 +48,9 @@ const UsageGuardrailsStep = ({
                                     label="Max tokens per prompt"
                                     type="number"
                                     value={String(tokenLimitThreshold)}
-                                    onChange={(val) => setTokenLimitThreshold(Math.max(1, parseInt(val, 10) || 1))}
+                                    onChange={(val) => setTokenLimitThreshold(Math.min(10000000, Math.max(1, parseInt(val, 10) || 1)))}
                                     min={1}
+                                    max={10000000}
                                     helpText="Prompts exceeding this token count will be blocked (or alerted, depending on policy behaviour). Tokens are estimated as characters ÷ 4."
                                     autoComplete="off"
                                 />
