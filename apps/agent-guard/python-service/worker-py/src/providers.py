@@ -86,6 +86,7 @@ class AnthropicProvider(LLMProvider):
         logger.info(f"[Anthropic] model={self.model}")
 
     async def complete(self, prompt: str) -> str:
+        logger.info(f"[Anthropic] prompt: {prompt}")
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
             resp = await client.post(
                 "https://api.anthropic.com/v1/messages",
