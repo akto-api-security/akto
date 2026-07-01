@@ -5,7 +5,8 @@ on:
     branches:
       - master
     paths:
-      - 'libs/dao/**'
+      - 'libs/dao/src/main/java/com/akto/dao/**'
+      - 'libs/dao/src/main/java/com/akto/DaoInit.java'
 
 jobs:
   check:
@@ -22,16 +23,21 @@ jobs:
             exit 0
           fi
 
-          CHANGED=$(git diff --name-only --diff-filter=AM "${{ github.event.pull_request.base.sha }}"..."${{ github.event.pull_request.head.sha }}")
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
 
-          DAO_CHANGED=$(echo "$CHANGED" | grep "libs/dao/" || true)
+          DAO_CHANGED=$(git diff --name-only --diff-filter=AM "$BASE"..."$HEAD" \
+            | grep -E "^libs/dao/src/main/java/com/akto/(dao/.*|DaoInit\.java)$" || true)
           if [ -z "$DAO_CHANGED" ]; then
             exit 0
           fi
 
-          MIGRATION_ADDED=$(echo "$CHANGED" | grep -E "libs/utils/src/main/resources/db/changelog/(common|billing|account)/.*\.xml" || true)
+          MIGRATION_ADDED=$(git diff --name-only --diff-filter=A "$BASE"..."$HEAD" \
+            | grep -E "^libs/utils/src/main/resources/db/changelog/(common|billing|account)/.*\.xml$" || true)
           if [ -z "$MIGRATION_ADDED" ]; then
             echo "DAO changed but no migration file added under db/changelog/common|billing|account/."
             echo "Add a migration file or label the PR 'no-migration-needed'."
             exit 1
           fi
+
+          echo "Migration check passed: $MIGRATION_ADDED"
