@@ -141,6 +141,7 @@ import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.jobs.EmptyCollectionCleanupJob;
 import com.akto.utils.jobs.JobUtils;
 import com.akto.utils.scripts.BackwardCompatibilityUtils;
+import com.akto.liquibase.LiquibaseStartupMigrator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.*;
@@ -2534,6 +2535,13 @@ public class InitializerListener implements ServletContextListener {
                         } catch (InterruptedException ignored) {}
                     }
                 } while (!connectedToMongo);
+
+                try {
+                    LiquibaseStartupMigrator.runIfEnabled(mongoURI);
+                } catch (Exception e) {
+                    logger.errorAndAddToDb(e, "Liquibase startup migrations failed — aborting initialization");
+                    throw new RuntimeException("Liquibase startup migrations failed", e);
+                }
 
                 if (DashboardMode.isOnPremDeployment()) {
                     Context.accountId.set(1_000_000);

@@ -984,14 +984,29 @@ const settingRequests = {
             }
         })
     },
-    getAgentLogs(agentId, startTime, endTime) {
+    getAgentLogs(agentId, startTime, endTime, logKey = null, afterId = null, pageSize = 500) {
         return request({
             url: '/api/getAgentLogs',
             method: 'post',
             data: {
                 agentId,
                 startTime,
-                endTime
+                endTime,
+                pageSize,
+                ...(logKey ? { logKey } : {}),
+                ...(afterId ? { afterId } : {})
+            }
+        })
+    },
+    exportAgentLogs(agentId, startTime, endTime, logKey = null) {
+        return request({
+            url: '/api/exportAgentLogs',
+            method: 'post',
+            data: {
+                agentId,
+                startTime,
+                endTime,
+                ...(logKey ? { logKey } : {})
             }
         })
     },

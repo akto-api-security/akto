@@ -8,6 +8,8 @@ import { formatDisplayName } from "../../../observe/agentic/mcpClientHelper";
 import OwaspTag from "../OwaspTag";
 import RuleEnforcementDropdown from "../RuleEnforcementDropdown";
 import { isEndpointSecurityCategory } from "../../../../../main/labelHelper";
+import { produce } from "immer";
+import func from "@/util/func";
 
 
 export const ServerSettingsConfig = {
@@ -46,27 +48,7 @@ export const ServerSettingsConfig = {
     }
 };
 
-const conditionsReducer = (state, action) => {
-    switch (action.type) {
-        case 'add':    return [...state, { type: action.condType, values: [] }];
-        case 'delete': return state.filter((_, i) => i !== action.index);
-        case 'update': return state.map((c, i) => i === action.index ? { ...c, ...action.updates } : c);
-        case 'clear':  return [];
-        case 'normalize': {
-            let changed = false;
-            const next = state.map(c => {
-                const valSet = action.valSets[c.type];
-                if (!valSet || valSet.size === 0) return c;
-                const valid = (c.values || []).filter(v => valSet.has(v));
-                if (valid.length === (c.values || []).length) return c;
-                changed = true;
-                return { ...c, values: valid };
-            });
-            return changed ? next : state;
-        }
-        default: return state;
-    }
-};
+const conditionsReducer = produce((draft, action) => func.conditionsReducer(draft, action));
 
 const CountPopover = ({ count, label, items }) => {
     const [active, setActive] = useState(false);
@@ -251,13 +233,18 @@ const ServerSettingsStep = ({
         const total = agentOptions.length + mcpOptions.length + llmOptions.length;
         if (total === 0) return;
         normalizedRef.current = true;
-        agenticDispatch({
-            type: 'normalize',
-            valSets: {
-                AGENT: new Set(agentOptions.map(o => o.value)),
-                MCP_SERVER: new Set(mcpOptions.map(o => o.value)),
-                LLM: new Set(llmOptions.map(o => o.value)),
-            },
+        const valSets = {
+            AGENT: new Set(agentOptions.map(o => o.value)),
+            MCP_SERVER: new Set(mcpOptions.map(o => o.value)),
+            LLM: new Set(llmOptions.map(o => o.value)),
+        };
+        agenticConditions.forEach((c, index) => {
+            const valSet = valSets[c.type];
+            if (!valSet || valSet.size === 0) return;
+            const valid = (c.values || []).filter(v => valSet.has(v));
+            if (valid.length !== (c.values || []).length) {
+                agenticDispatch({ type: 'updateKey', index, key: 'values', obj: valid });
+            }
         });
     }, [agentOptions.length, mcpOptions.length, llmOptions.length]);
 
@@ -302,7 +289,10 @@ const ServerSettingsStep = ({
                                     menuItems={rowTypeOptions}
                                     disabledOptions={rowTypeOptions.filter(o => o.disabled).map(o => o.value)}
                                     initial={rowTypeOptions.find(o => o.value === condition.type)?.label || rowTypeOptions[0]?.label}
-                                    selected={(val) => dispatch({ type: 'update', index, updates: { type: val, values: [] } })}
+                                    selected={(val) => {
+                                        dispatch({ type: 'updateKey', index, key: 'type', obj: val });
+                                        dispatch({ type: 'updateKey', index, key: 'values', obj: [] });
+                                    }}
                                 />
                             </div>
                             <Text variant="bodyMd" tone="subdued" fontWeight="medium">{getOptionsForType(condition.type).length > 1 ? 'are' : 'is'}</Text>
@@ -311,7 +301,7 @@ const ServerSettingsStep = ({
                                     id={`cond-val-${condition.type}-${index}`}
                                     placeholder="Select value"
                                     optionsList={sortSelectedFirst(getOptionsForType(condition.type), condition.values || [])}
-                                    setSelected={(vals) => dispatch({ type: 'update', index, updates: { values: vals } })}
+                                    setSelected={(vals) => dispatch({ type: 'updateKey', index, key: 'values', obj: vals })}
                                     preSelected={condition.values || []}
                                     allowMultiple={true}
                                     disabled={getOptionsForType(condition.type).length === 0}
@@ -324,7 +314,7 @@ const ServerSettingsStep = ({
                     );
                 })}
                 <HorizontalStack gap="4" blockAlign="center">
-                    {!allTypesFilled && <Button onClick={() => dispatch({ type: 'add', condType: nextUnusedType })}>Add condition</Button>}
+                    {!allTypesFilled && <Button onClick={() => dispatch({ type: 'add', obj: { type: nextUnusedType, values: [] } })}>Add condition</Button>}
                     {conditions.length > 0 && (
                         <Button plain destructive onClick={() => dispatch({ type: 'clear' })}>Clear all</Button>
                     )}
@@ -346,6 +336,9 @@ const ServerSettingsStep = ({
     useEffect(() => {
         // Atlas uses app-level groups — per-device inline filtering doesn't apply
         if (!isBlockMode || isAtlas) return;
+        // Guard: don't run until options have loaded — an empty options list would
+        // incorrectly clear every pre-selected value from a loaded policy.
+        if (!(mcpServers?.length || agentServers?.length || browserLlmServers?.length)) return;
         if (selectedMcpServers?.length > 0) {
             const compatible = selectedMcpServers.filter(val => (mcpServers || []).find(s => s.value === val && s.isInline));
             if (compatible.length !== selectedMcpServers.length) setSelectedMcpServers(compatible);
@@ -358,7 +351,7 @@ const ServerSettingsStep = ({
             const compatible = selectedBrowserLlms.filter(val => (browserLlmServers || []).find(s => s.value === val && s.isInline));
             if (compatible.length !== selectedBrowserLlms.length) setSelectedBrowserLlms(compatible);
         }
-    }, [policyBehaviour]);
+    }, [policyBehaviour, mcpServers?.length, agentServers?.length, browserLlmServers?.length]);
 
     return (
         <VerticalStack gap="4">
