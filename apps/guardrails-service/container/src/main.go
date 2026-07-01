@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
+	"strconv"
 
 	"time"
 
@@ -43,6 +45,13 @@ func main() {
 		zap.String("agent_guard_engine_url", cfg.AgentGuardEngineURL),
 		zap.Bool("kafka_enabled", cfg.KafkaEnabled))
 
+	if os.Getenv("GUARDRAILS_SKIP_PII_REDACTION") == "true" {
+		logger.Warn("GUARDRAILS_SKIP_PII_REDACTION=true: async PII redaction disabled — load-test only, never use in production")
+	}
+	if os.Getenv("GUARDRAILS_SKIP_PII_SYNC") == "true" {
+		logger.Warn("GUARDRAILS_SKIP_PII_SYNC=true: synchronous PII rules disabled — load-test only, never use in production")
+	}
+
 	if cfg.AgentGuardEngineURL != "" {
 		os.Setenv("AGENT_GUARD_ENGINE_URL", cfg.AgentGuardEngineURL)
 	}
@@ -63,6 +72,8 @@ func main() {
 }
 
 func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logger *zap.Logger) {
+	startPprofIfEnabled(logger)
+
 	fileRegistry := fileprocessor.DefaultRegistry(cfg.File.MaxTextFileBytes)
 	registerMediaProcessors(fileRegistry, cfg, logger)
 
@@ -287,6 +298,27 @@ func newMediaProviders(mc config.MediaConfig, logger *zap.Logger) (mediaprovider
 		}
 	}
 	return ocr, transcriber
+}
+
+// startPprofIfEnabled serves Go runtime profiles on PPROF_PORT (default 6060).
+// Set PPROF_ENABLED=true only during profiling — not for production.
+func startPprofIfEnabled(logger *zap.Logger) {
+	if os.Getenv("PPROF_ENABLED") != "true" {
+		return
+	}
+	port := 6060
+	if raw := os.Getenv("PPROF_PORT"); raw != "" {
+		if p, err := strconv.Atoi(raw); err == nil && p > 0 {
+			port = p
+		}
+	}
+	addr := fmt.Sprintf(":%d", port)
+	go func() {
+		logger.Info("pprof server listening", zap.String("addr", addr))
+		if err := http.ListenAndServe(addr, nil); err != nil {
+			logger.Error("pprof server stopped", zap.Error(err))
+		}
+	}()
 }
 
 func loggingMiddleware(logger *zap.Logger) gin.HandlerFunc {
