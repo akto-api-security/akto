@@ -51,7 +51,9 @@ import {
     BlockedHostsStep,
     BlockedHostsConfig,
     ServerSettingsStep,
-    ServerSettingsConfig
+    ServerSettingsConfig,
+    EnterpriseLicenseComplianceStep,
+    EnterpriseLicenseComplianceConfig
 } from './steps';
 import "./createGuardrailPage.css";
 
@@ -68,12 +70,11 @@ const groupToOption = (g) => ({
 // Converts stored V2 server entries back to the option-value keys used by the dropdowns.
 // Works for all stored formats: numeric collection ID, full hostname, or short service key.
 const reverseToServiceKeys = (v2Servers, allCollections) => {
-    const isArgus = !isEndpointSecurityCategory();
     const keys = (v2Servers || []).map(s => {
         const col = (allCollections || []).find(c => c.id?.toString() === s.id?.toString());
         const rawName = col ? (col.hostName || col.displayName || '') : (s.name || String(s.id || ''));
         // Argus stores full hostnames as option keys — don't extract service name
-        if (isArgus) return rawName;
+        if (!isEndpointSecurityCategory()) return rawName;
         return extractServiceName(rawName) || rawName;
     });
     return [...new Set(keys)];
@@ -198,6 +199,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [applyToAllUsers, setApplyToAllUsers] = useState(true);
     const [targetTeams, setTargetTeams] = useState([]);
     const [targetRoles, setTargetRoles] = useState([]);
+    const [enterpriseLicenseComplianceCategories, setEnterpriseLicenseComplianceCategories] = useState([]);
+
     const [agenticUsers, setAgenticUsers] = useState([]);
     const [usersLoading, setUsersLoading] = useState(false);
 
@@ -289,6 +292,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         applyToAllUsers,
         targetTeams,
         targetRoles,
+        enterpriseLicenseComplianceCategories,
         serverScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllServers &&
             (selectedMcpServers || []).length === 0 &&
             (selectedAgentServers || []).length === 0 &&
@@ -350,6 +354,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 title: AnomalyDetectionConfig.title,
                 summary: AnomalyDetectionConfig.getSummary(storedStateData),
                 ...AnomalyDetectionConfig.validate(storedStateData)
+            },
+            {
+                number: EnterpriseLicenseComplianceConfig.number,
+                title: EnterpriseLicenseComplianceConfig.title,
+                summary: EnterpriseLicenseComplianceConfig.getSummary(storedStateData),
+                beta: true,
+                ...EnterpriseLicenseComplianceConfig.validate(storedStateData)
             }
         ];
 
@@ -563,6 +574,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyToAllUsers(true);
         setTargetTeams([]);
         setTargetRoles([]);
+        setEnterpriseLicenseComplianceCategories([]);
     };
 
     const populateFormForEdit = (policy) => {
@@ -679,12 +691,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setConfidenceScore(nearestCheckpoint);
 
         // Server settings
-        const storedMcpV2 = policy.selectedMcpServersV2 || [];
-        setSelectedMcpServers(
-            storedMcpV2.length > 0
-                ? reverseToServiceKeys(storedMcpV2, allCollections)
-                : policy.selectedMcpServers || []
-        );
+        const storedMcpV2 = policy.selectedMcpServersV2?.length > 0
+            ? policy.selectedMcpServersV2
+            : (policy.selectedMcpServers || []).map(name => ({ id: name, name }));
+        setSelectedMcpServers(reverseToServiceKeys(storedMcpV2, allCollections));
 
         // selectedAgentServersV2 stores both gen-ai and browser-llm entries.
         // Split them back into their respective dropdowns.
@@ -721,6 +731,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyToAllUsers(!policy.targetTeams?.length && !policy.targetRoles?.length);
         setTargetTeams(policy.targetTeams || []);
         setTargetRoles(policy.targetRoles || []);
+        setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
     };
 
     const handleClose = () => {
@@ -832,6 +843,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 applyOnRequest,
                 targetTeams: applyToAllUsers ? [] : targetTeams,
                 targetRoles: applyToAllUsers ? [] : targetRoles,
+                enterpriseLicenseComplianceCategories,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
 
@@ -1022,6 +1034,24 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         collectionsLoading={collectionsLoading}
                         policyBehaviour={policyBehaviour}
                         setPolicyBehaviour={setPolicyBehaviour}
+                        targetTeams={targetTeams}
+                        setTargetTeams={setTargetTeams}
+                        targetRoles={targetRoles}
+                        setTargetRoles={setTargetRoles}
+                        availableTeams={availableTeams}
+                        availableRoles={availableRoles}
+                        usersLoading={usersLoading}
+                        applyToAllUsers={applyToAllUsers}
+                        setApplyToAllUsers={setApplyToAllUsers}
+                        showConditionError={leftSteps.has(ServerSettingsConfig.number)}
+                        showUserConditionError={leftSteps.has(ServerSettingsConfig.number)}
+                    />
+                );
+            case 12:
+                return (
+                    <EnterpriseLicenseComplianceStep
+                        enterpriseLicenseComplianceCategories={enterpriseLicenseComplianceCategories}
+                        setEnterpriseLicenseComplianceCategories={setEnterpriseLicenseComplianceCategories}
                         targetTeams={targetTeams}
                         setTargetTeams={setTargetTeams}
                         targetRoles={targetRoles}
@@ -1271,12 +1301,15 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                         (step.summary && step.summary !== 'Coming soon') ? 'configured' : 'pending'
                                     }`} />
                                     <div style={{ flex: 1, paddingTop: '4px' }}>
-                                        <Text
-                                            variant="bodyMd"
-                                            fontWeight={step.number === currentStep ? "semibold" : "regular"}
-                                        >
-                                            {step.title}
-                                        </Text>
+                                        <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                                            <Text
+                                                variant="bodyMd"
+                                                fontWeight={step.number === currentStep ? "semibold" : "regular"}
+                                            >
+                                                {step.title}
+                                            </Text>
+                                            {step.beta && <Badge status="info">Beta</Badge>}
+                                        </HorizontalStack>
                                         {step.summary && (
                                             <Text variant="bodySm" color="subdued" truncate>
                                                 <span className="guardrail-nav-summary" title={step.summary}>{step.summary}</span>
@@ -1293,9 +1326,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     <div className="guardrail-content-inner">
                         <Box padding="5">
                             <VerticalStack gap="4">
-                                <Text variant="headingMd" as="h2" fontWeight="semibold">
-                                    {steps.find(s => s.number === currentStep)?.title}
-                                </Text>
+                                <HorizontalStack gap="2" blockAlign="center">
+                                    <Text variant="headingMd" as="h2" fontWeight="semibold">
+                                        {steps.find(s => s.number === currentStep)?.title}
+                                    </Text>
+                                    {steps.find(s => s.number === currentStep)?.beta && <Badge status="info">Beta</Badge>}
+                                </HorizontalStack>
                                 <Box>
                                     {renderStepContent(currentStep)}
                                 </Box>
