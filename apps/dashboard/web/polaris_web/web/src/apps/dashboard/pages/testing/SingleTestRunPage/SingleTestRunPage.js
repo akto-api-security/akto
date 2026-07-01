@@ -28,7 +28,8 @@ import {
   PlusMinor,
   SettingsMinor,
   ViewMajor,
-  CircleAlertMajor
+  CircleAlertMajor,
+  FileMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import observeApi from "../../observe/api";
@@ -42,6 +43,7 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import TooltipText from "../../../components/shared/TooltipText";
 import PersistStore from "../../../../main/PersistStore";
 import TrendChart from "./TrendChart";
+import TestRunLogs from "./TestRunLogs";
 import useTable from "../../../components/tables/TableContext";
 import ReRunModal from "./ReRunModal";
 import TestingStore from "../testingStore";
@@ -141,6 +143,7 @@ function SingleTestRunPage() {
   const [selected, setSelected] = useState(0)
   const [workflowTest, setWorkflowTest] = useState(false);
   const [secondaryPopover, setSecondaryPopover] = useState(false)
+  const [logsModalActive, setLogsModalActive] = useState(false)
   const setErrorsObject = TestingStore((state) => state.setErrorsObject)
   const setTestingEndpointsApisList = TestingStore((state) => state.setTestingEndpointsApisList)
   const currentTestingRuns = []
@@ -1282,7 +1285,12 @@ function SingleTestRunPage() {
         content: 'Re-Calculate Issues Count',
         icon: RefreshMajor,
         onAction: () => { setConfirmationModal(true) }
-      }
+      },
+      ...(currentSummary?.hexId ? [{
+        content: 'View logs',
+        icon: FileMinor,
+        onAction: () => { setSecondaryPopover(false); setLogsModalActive(true) }
+      }] : [])
     ]
   })
   const moreActionsComp = (
@@ -1311,6 +1319,15 @@ function SingleTestRunPage() {
         components={useComponents}
       />
       <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false} />
+      {currentSummary?.hexId ? (
+        <TestRunLogs
+          open={logsModalActive}
+          onClose={() => setLogsModalActive(false)}
+          summaryHexId={currentSummary.hexId}
+          startTimestamp={currentSummary.startTimestamp}
+          endTimestamp={currentSummary.endTimestamp}
+        />
+      ) : null}
       <SeveritySelector
         open={severityModalActive}
         onClose={() => setSeverityModalActive(false)}
