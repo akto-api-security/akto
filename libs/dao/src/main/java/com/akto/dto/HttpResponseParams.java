@@ -36,6 +36,8 @@ public class HttpResponseParams {
     String sourceIP;
     String destIP;
     String direction;
+    // K8 pod tags in JSON string
+    String tags;
     Supplier<String> originalMsg;
 
     public HttpResponseParams() {}
@@ -224,6 +226,14 @@ public class HttpResponseParams {
 
     public void setDirection(String direction) {
         this.direction = direction;
+    }
+
+    public String getTags() {
+        return tags;
+    }
+
+    public void setTags(String tags) {
+        this.tags = tags;
     }
 
     public void setRequestParams(HttpRequestParams requestParams) {

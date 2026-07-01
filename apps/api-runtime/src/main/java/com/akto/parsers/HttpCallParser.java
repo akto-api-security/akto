@@ -505,8 +505,18 @@ public class HttpCallParser {
         boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(httpResponseParam).getFirst();
 
         List<CollectionTags> tagsToApply = new ArrayList<>();
+        
+        String tagsJson = httpResponseParam.getTags();
+        if (tagsJson != null && !tagsJson.isEmpty()) {
+            try {
+                BasicDBObject parsedTags = BasicDBObject.parse(tagsJson);
+                for (String key : parsedTags.keySet()) {
+                    tagsToApply.add(new CollectionTags(Context.now(), key, String.valueOf(parsedTags.get(key)), TagSource.AKTO));
+                }
+            } catch (Exception ignored) {}
+        }
+
         if (isMcpRequest) tagsToApply.add(getMcpServerTag());
-        if (httpResponseParam.getSource().equals(HttpResponseParams.Source.WIZ)) tagsToApply.add(getWizCollectionTag());
 
         if (useHostCondition(hostName, httpResponseParam.getSource())) {
             hostName = hostName.toLowerCase();
@@ -820,13 +830,9 @@ public class HttpCallParser {
         return new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES);
     }
 
-    private CollectionTags getWizCollectionTag() {
-        return new CollectionTags(Context.now(), Constants.AKTO_ENDPOINT_SOURCE_TAG, Constants.AKTO_WIZ_SOURCE_VALUE, TagSource.AKTO);
-    }
-
     private Bson getUpdatesForTags(List<CollectionTags> tagsToApply, Bson updates) {
         if (tagsToApply == null || tagsToApply.isEmpty()) return updates;
-        return Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, tagsToApply));
+        return Updates.combine(updates, Updates.setOnInsert(ApiCollection.TAGS_STRING, tagsToApply));
     }
 
     private SyncLimit fetchSyncLimit(MetricTypes metricType) {
