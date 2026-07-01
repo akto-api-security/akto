@@ -10,11 +10,11 @@
 
     <!-- Baseline schema for billing DB collections (organizations, usage, tokens) -->
 
-    <changeSet id="baseline-organization_flags-collection" author="akto">
+    <changeSet id="baseline-organization-flags-collection" author="akto">
         <mongodb:createCollection collectionName="organization_flags"/>
     </changeSet>
 
-    <changeSet id="baseline-organization_usage-collection" author="akto">
+    <changeSet id="baseline-organization-usage-collection" author="akto">
         <mongodb:createCollection collectionName="organization_usage"/>
     </changeSet>
 
@@ -26,15 +26,15 @@
         <mongodb:createCollection collectionName="tokens"/>
     </changeSet>
 
-    <changeSet id="baseline-usage_metric_info-collection" author="akto">
+    <changeSet id="baseline-usage-metric-info-collection" author="akto">
         <mongodb:createCollection collectionName="usage_metric_info"/>
     </changeSet>
 
-    <changeSet id="baseline-usage_metrics-collection" author="akto">
+    <changeSet id="baseline-usage-metrics-collection" author="akto">
         <mongodb:createCollection collectionName="usage_metrics"/>
     </changeSet>
 
-    <changeSet id="baseline-usage_sync-collection" author="akto">
+    <changeSet id="baseline-usage-sync-collection" author="akto">
         <mongodb:createCollection collectionName="usage_sync"/>
     </changeSet>
 </databaseChangeLog>

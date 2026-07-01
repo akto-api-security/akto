@@ -1,6 +1,5 @@
 package com.akto.liquibase;
 
-import com.akto.dao.context.Context;
 import com.akto.log.LoggerMaker;
 import com.akto.util.AccountTask;
 import com.akto.util.DashboardMode;
@@ -48,7 +47,7 @@ public final class LiquibaseStartupMigrator {
             runScope(mongoUrl, "account", String.valueOf(ON_PREM_ACCOUNT_ID));
         } else {
             AccountTask.instance.executeTask(
-                    account -> runScope(mongoUrl, "account", Context.accountId.get() + ""),
+                    account -> runScope(mongoUrl, "account", String.valueOf(account.getId())),
                     "liquibase-account-migrations");
         }
 
@@ -98,8 +97,9 @@ public final class LiquibaseStartupMigrator {
         String options = qIdx >= 0 ? baseUrl.substring(qIdx) : "";
         String withoutOptions = qIdx >= 0 ? baseUrl.substring(0, qIdx) : baseUrl;
 
-        int authStart = schemeEnd + 3;
-        int dbSlash = withoutOptions.indexOf('/', authStart);
+        // Search from after the last '@' to skip any '/' characters in credentials.
+        int atIdx = withoutOptions.lastIndexOf('@');
+        int dbSlash = withoutOptions.indexOf('/', atIdx >= 0 ? atIdx + 1 : schemeEnd + 3);
         String hostPart = dbSlash >= 0 ? withoutOptions.substring(0, dbSlash) : withoutOptions;
         return hostPart + "/" + dbName + options;
     }

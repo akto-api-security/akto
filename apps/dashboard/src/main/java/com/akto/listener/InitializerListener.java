@@ -3744,9 +3744,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void runInitializerFunctions() {
-        if (!LiquibaseStartupMigrator.isMigrationEnabled()) {
-            DaoInit.createIndices();
-        }
+        DaoInit.createIndices();
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
