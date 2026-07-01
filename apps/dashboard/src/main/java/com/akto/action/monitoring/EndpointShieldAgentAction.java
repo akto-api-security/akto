@@ -256,20 +256,19 @@ public class EndpointShieldAgentAction extends UserAction {
 
             agentLogs = new ArrayList<>(fetched);
             // Only count on the first page — subsequent pages discard the value anyway.
-            // Skip count for wide ranges (> 1 year) — scanning millions of index entries
-            // for a display-only number is not worth the latency. totalCount = -1 signals "unknown" to the UI.
+            // Count with the same agentId hint as the find so it narrows to this agent's
+            // documents (key/timestamp applied as residual) instead of scanning the timestamp
+            // range index across every agent — that scan is why the count previously had to be
+            // skipped for wide (e.g. all-time) ranges. Display-only and non-fatal: on timeout
+            // totalCount = -1, which the UI renders as "unknown" while pagination still works.
             if (afterId == null || afterId.isEmpty()) {
-                int ONE_YEAR_SECS = 365 * 24 * 3600;
-                if ((endTime - startTime) < ONE_YEAR_SECS) {
-                    try {
-                        totalCount = EndpointShieldLogsDao.instance.getMCollection()
-                            .countDocuments(baseFilter, new com.mongodb.client.model.CountOptions()
-                                .maxTime(10, java.util.concurrent.TimeUnit.SECONDS));
-                    } catch (Exception countErr) {
-                        loggerMaker.errorAndAddToDb("Error counting endpoint shield logs: " + countErr.getMessage());
-                        totalCount = -1;
-                    }
-                } else {
+                try {
+                    totalCount = EndpointShieldLogsDao.instance.getMCollection()
+                        .countDocuments(baseFilter, new com.mongodb.client.model.CountOptions()
+                            .hint(hint)
+                            .maxTime(10, java.util.concurrent.TimeUnit.SECONDS));
+                } catch (Exception countErr) {
+                    loggerMaker.errorAndAddToDb("Error counting endpoint shield logs: " + countErr.getMessage());
                     totalCount = -1;
                 }
             }
