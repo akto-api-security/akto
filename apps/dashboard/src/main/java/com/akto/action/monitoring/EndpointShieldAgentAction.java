@@ -24,9 +24,9 @@ import lombok.Setter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Comparator;
 
 public class EndpointShieldAgentAction extends UserAction {
+    private static final LoggerMaker loggerMaker = new LoggerMaker(EndpointShieldAgentAction.class, LogDb.DASHBOARD);
     private static final int MAX_LOGS_LIMIT = 10000;
     private static final int MAX_EXPORT_LIMIT = 100_000;
 
@@ -245,11 +245,18 @@ public class EndpointShieldAgentAction extends UserAction {
             }
 
             agentLogs = new ArrayList<>(fetched);
-            // Only count on the first page — subsequent pages discard the value anyway
+            // Only count on the first page — subsequent pages discard the value anyway.
+            // Count is display-only; a timeout must not fail the fetch since pagination
+            // works via hasMore regardless. totalCount = -1 signals "unknown" to the UI.
             if (afterId == null || afterId.isEmpty()) {
-                totalCount = EndpointShieldLogsDao.instance.getMCollection()
-                    .countDocuments(baseFilter, new com.mongodb.client.model.CountOptions()
-                        .maxTime(30, java.util.concurrent.TimeUnit.SECONDS));
+                try {
+                    totalCount = EndpointShieldLogsDao.instance.getMCollection()
+                        .countDocuments(baseFilter, new com.mongodb.client.model.CountOptions()
+                            .maxTime(30, java.util.concurrent.TimeUnit.SECONDS));
+                } catch (Exception countErr) {
+                    loggerMaker.errorAndAddToDb("Error counting endpoint shield logs: " + countErr.getMessage());
+                    totalCount = -1;
+                }
             }
 
             return SUCCESS.toUpperCase();
