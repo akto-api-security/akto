@@ -373,7 +373,7 @@ public class MaliciousEventService {
     Set<String> hosts = new HashSet<>();
 
     // Scope all dropdown values to the current context source, same filter the events table uses.
-    Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource);
+    Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId);
     Bson eventsFilter = Filters.and(
         buildTimeRangeFilter(request.getDetectedAtTimeRange(), "detectedAt"),
         contextFilter);
@@ -392,7 +392,7 @@ public class MaliciousEventService {
   }
 
   private Set<String> fetchActorsForFilters(String accountId, FetchAlertFiltersRequest request, String contextSource) {
-    Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource);
+    Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId);
     if (USE_ACTOR_INFO_TABLE) {
       ActorInfoDao actorInfoDao = ActorInfoDao.instance;
       // actor_info uses discoveredAt for its time field; scope to the current context source.
@@ -519,7 +519,7 @@ public class MaliciousEventService {
     // }
 
     // Apply simple context filter (only for ENDPOINT and AGENTIC)
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
     if (!contextFilter.isEmpty()) {
       query.putAll(contextFilter);
     }
@@ -633,13 +633,13 @@ public class MaliciousEventService {
         update = Updates.set("jiraTicketUrl", jiraTicketUrl);
       }
 
-      Document query = buildQuery(eventIds, filterMap, "update", contextSource);
+      Document query = buildQuery(eventIds, filterMap, "update", contextSource, accountId);
       if (query == null) {
         return 0;
       }
 
       String logMessage = String.format("Updating events %s to status: %s and jiraTicketUrl: %s",
-          getQueryDescription(eventIds, filterMap), status, jiraTicketUrl != null && !jiraTicketUrl.isEmpty() ? jiraTicketUrl : "null");
+          getQueryDescription(eventIds, filterMap, accountId), status, jiraTicketUrl != null && !jiraTicketUrl.isEmpty() ? jiraTicketUrl : "null");
       logger.info(logMessage);
 
       long modifiedCount = maliciousEventDao.getCollection(accountId).updateMany(query, update).getModifiedCount();
@@ -652,12 +652,12 @@ public class MaliciousEventService {
 
   public int deleteMaliciousEvents(String accountId, List<String> eventIds, Map<String, Object> filterMap, String contextSource) {
     try {
-      Document query = buildQuery(eventIds, filterMap, "delete", contextSource);
+      Document query = buildQuery(eventIds, filterMap, "delete", contextSource, accountId);
       if (query == null) {
         return 0;
       }
 
-      String logMessage = "Deleting events " + getQueryDescription(eventIds, filterMap);
+      String logMessage = "Deleting events " + getQueryDescription(eventIds, filterMap, accountId);
       logger.info(logMessage);
 
       long deletedCount = maliciousEventDao.getCollection(accountId).deleteMany(query).getDeletedCount();
@@ -670,24 +670,24 @@ public class MaliciousEventService {
     }
   }
 
-  private Document buildQuery(List<String> eventIds, Map<String, Object> filterMap, String operation, String contextSource) {
+  private Document buildQuery(List<String> eventIds, Map<String, Object> filterMap, String operation, String contextSource, String accountId) {
     if (eventIds != null && !eventIds.isEmpty()) {
       // Query by event IDs
       return new Document("_id", new Document("$in", eventIds));
     } else if (filterMap != null && !filterMap.isEmpty()) {
       // Query by filter criteria
-      return buildQueryFromFilter(filterMap, contextSource);
+      return buildQueryFromFilter(filterMap, contextSource, accountId);
     } else {
       logger.warn("Neither eventIds nor filterMap provided for " + operation);
       return null;
     }
   }
 
-  private String getQueryDescription(List<String> eventIds, Map<String, Object> filterMap) {
+  private String getQueryDescription(List<String> eventIds, Map<String, Object> filterMap, String accountId) {
     if (eventIds != null && !eventIds.isEmpty()) {
       return "by IDs: " + eventIds;
     } else if (filterMap != null && !filterMap.isEmpty()) {
-      Document query = buildQueryFromFilter(filterMap, null);
+      Document query = buildQueryFromFilter(filterMap, null, accountId);
       return "by filter: " + query.toJson();
     }
     return "";
@@ -710,7 +710,7 @@ public class MaliciousEventService {
     }
   }
 
-  private Document buildQueryFromFilter(Map<String, Object> filter, String contextSource) {
+  private Document buildQueryFromFilter(Map<String, Object> filter, String contextSource, String accountId) {
     Document query = new Document();
 
     // Handle ips/actors filter
@@ -789,7 +789,7 @@ public class MaliciousEventService {
     }
 
     // Apply simple context filter (only for ENDPOINT and AGENTIC)
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
     if (!contextFilter.isEmpty()) {
       query.putAll(contextFilter);
     }
