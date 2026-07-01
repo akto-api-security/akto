@@ -1,0 +1,37 @@
+name: Check DAO Migration
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'libs/dao/**'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check migration file present for DAO changes
+        run: |
+          LABELS="${{ join(github.event.pull_request.labels.*.name, ',') }}"
+          if echo "$LABELS" | grep -q "no-migration-needed"; then
+            exit 0
+          fi
+
+          CHANGED=$(git diff --name-only --diff-filter=AM "${{ github.event.pull_request.base.sha }}"..."${{ github.event.pull_request.head.sha }}")
+
+          DAO_CHANGED=$(echo "$CHANGED" | grep "libs/dao/" || true)
+          if [ -z "$DAO_CHANGED" ]; then
+            exit 0
+          fi
+
+          MIGRATION_ADDED=$(echo "$CHANGED" | grep -E "libs/utils/src/main/resources/db/changelog/(common|billing|account)/.*\.xml" || true)
+          if [ -z "$MIGRATION_ADDED" ]; then
+            echo "DAO changed but no migration file added under db/changelog/common|billing|account/."
+            echo "Add a migration file or label the PR 'no-migration-needed'."
+            exit 1
+          fi
