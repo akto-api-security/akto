@@ -2190,7 +2190,7 @@ const quickStartFunc = {
 
         const aiAgentConnectors = [
             awsBedrockObj, awsAgentCoreObj, amazonQuickObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
-            n8nImportObj, langchainImportObj, copilotStudioImportObj, m365CopilotObj, snowflakeObj,
+            n8nImportObj, langchainImportObj, copilotStudioImportObj, snowflakeObj,
             vertexAICustomDeployedModelImportObj, salesforceImportObj,
             anthropicImportObj, openaiImportObj
         ]
@@ -2272,7 +2272,7 @@ const quickStartFunc = {
                 "Endpoint Management": endpointManagement,
                 "MDM Tools": mdmTools,
                 "Agentic Proxies": agenticProxies,
-                "Platform connectors": [anthropicImportObj, openaiImportObj],
+                "Platform connectors": [anthropicImportObj, openaiImportObj, m365CopilotObj],
                 "Browser Extension": browserExtensions,
                 "Locally Hosted Models": localHostedModels,
                 "Secure Web Networks": secureWebNetworks,
