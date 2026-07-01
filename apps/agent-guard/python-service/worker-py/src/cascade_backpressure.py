@@ -1,22 +1,12 @@
-"""Adaptive, self-healing backpressure for slow downstream dependencies.
+"""Adaptive, self-healing backpressure for the slow Vertex cascade dependency.
 
-Two INDEPENDENT circuit breakers, each a rolling, *time-bounded* latency window:
+A single circuit breaker over a rolling, *time-bounded* latency window:
 
   MODEL  — Vertex cascade latency. When it trips the caller fail-opens the
            cascade (is_valid=True) so guardrails traffic is not blocked while
            Vertex is slow. Env prefix AGW_CASCADE_BACKPRESSURE_* (threshold 8000ms).
-  CACHE  — embedder /embed latency. When it trips the caller skips the fuzzy
-           embed+KNN cache lookup — the cheap exact-hash HGETALL still runs — so a
-           cache miss does not pay the embed cost while the embedder is saturated.
-           Env prefix AGW_CACHE_BACKPRESSURE_* (threshold 500ms).
 
-They are deliberately separate: embedder degradation must not inflate the cascade
-path, and Vertex degradation must not disable the cache lookup. A single latency
-signal can protect only one of the two dependencies — measured embed latency is
-~20ms healthy but ~2000ms when the embedder is saturated, entirely independent of
-Vertex, so it needs its own breaker.
-
-Recovery (both): samples older than the TTL are evicted on every read/write,
+Recovery: samples older than the TTL are evicted on every read/write,
 *independently of new traffic*. While tripped, the protected work doesn't run, so
 no fresh latency is recorded — a purely count-based window would stay full of
 stale high samples and latch ON forever. Time eviction ages them out; once fewer
@@ -197,30 +187,21 @@ class LatencyBreaker:
 
 
 # --------------------------------------------------------------------------- #
-# The two independent breakers (per-process singletons).
+# The cascade breaker (per-process singleton).
 # --------------------------------------------------------------------------- #
 MODEL = LatencyBreaker(
     "AGW_CASCADE_BACKPRESSURE", "cascade_backpressure",
     BackpressureConfig(threshold_ms=8000.0),
 )
-# Healthy embed averages ~20ms (up to ~180ms under a concurrent burst); a
-# saturated embedder averages ~2000ms. 500ms sits in that gap: high enough not to
-# flap on normal bursts, low enough to trip decisively when the embedder is choked.
-CACHE = LatencyBreaker(
-    "AGW_CACHE_BACKPRESSURE", "cache_backpressure",
-    BackpressureConfig(threshold_ms=500.0),
-)
 
 
 def configure_from_env() -> None:
-    """Configure both breakers from env (called once at startup)."""
+    """Configure the breaker from env (called once at startup)."""
     MODEL.configure_from_env()
-    CACHE.configure_from_env()
 
 
 def reset_for_tests() -> None:
     MODEL.reset_for_tests()
-    CACHE.reset_for_tests()
 
 
 # --------------------------------------------------------------------------- #

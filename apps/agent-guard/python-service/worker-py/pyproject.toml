@@ -8,8 +8,6 @@ dependencies = [
     "rsa",
     "pyasn1",
     "httpx",
-    # semantic cache vector store (RediSearch)
-    "redis",
     # local scanners
     "detect-secrets",
     "tiktoken",

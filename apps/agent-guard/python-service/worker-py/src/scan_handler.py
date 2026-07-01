@@ -5,7 +5,6 @@ from typing import Any, Callable, Coroutine, Dict, Optional
 
 import alerts
 import cascade_backpressure
-import cache
 import scan_diag
 from constants import (
     CASCADE_SCANNERS,
@@ -97,33 +96,8 @@ async def scan_payload(
         if config.get("storeAllResults"):
             store_fn = lambda completed, name: schedule(alerts.store_results(completed, name))
 
-        # Semantic cache, decide mode: consult the cache BEFORE applying
-        # backpressure, so a cached verdict (including a cached block) is still
-        # served correctly while Vertex is slow — backpressure must only short-
-        # circuit a genuine miss, never a known answer. A fresh within-threshold
-        # hit short-circuits — safe verdicts on a fuzzy match, blocks only on a
-        # (near-)exact repeat (see cache.try_serve); a miss/error falls through.
-        # The served verdict (is_valid) is honoured so cached blocks still block.
-        # `prep` is reused by observe() so a miss embeds only once.
-        prep = None
-        if cache.serving():
-            prep = await cache.prepare(scanner_name, scanner_type, text, config)
-            served = cache.try_serve(prep, scanner_name, scanner_type, text)
-            if served is not None:
-                schedule(alerts.post_cache_shadow(served["alert"]))
-                scan_diag.log_scan_outcome(
-                    "cache_hit",
-                    scanner_name,
-                    _elapsed_ms(),
-                    extra={"is_valid": served["is_valid"]},
-                    always=True,
-                )
-                return shape_response(
-                    scanner_name, served["is_valid"], served["risk_score"], text, served["details"]
-                )
-
-        # Cache miss (or cache not serving): only now does backpressure fail-open
-        # to avoid paying for the slow cascade while Vertex latency is elevated.
+        # Backpressure fail-open to avoid paying for the slow cascade while Vertex
+        # latency is elevated.
         if cascade_backpressure.should_skip_cascade():
             scan_diag.log_backpressure_skip(scanner_name)
             return shape_response(
@@ -142,10 +116,6 @@ async def scan_payload(
             if isinstance(elapsed, (int, float)) and elapsed > 0:
                 cascade_backpressure.record_cascade_latency(float(elapsed))
             schedule(alerts.post_slack(scanner_name, scanner_type, text, result))
-            # Per-scanner semantic cache: observe + warm (shadow in observe mode;
-            # cache-warm + miss-comparison in decide mode). Fire-and-forget.
-            if cache.enabled():
-                schedule(cache.observe(scanner_name, scanner_type, text, config, result, prep=prep))
             scan_diag.log_scan_outcome(
                 "cascade_run",
                 scanner_name,
