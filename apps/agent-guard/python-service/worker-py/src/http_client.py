@@ -1,4 +1,4 @@
-"""Shared httpx.AsyncClient for outbound HTTP (Vertex, embedder, etc.).
+"""Shared httpx.AsyncClient for outbound HTTP (Vertex, anonymizer, etc.).
 
 Reuses TCP connections under load instead of opening a new client per request.
 """
