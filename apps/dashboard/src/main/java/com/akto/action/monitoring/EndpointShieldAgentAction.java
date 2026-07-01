@@ -234,10 +234,20 @@ public class EndpointShieldAgentAction extends UserAction {
             Bson sort = Sorts.descending("_id");
             Bson projection = Projections.include("log", "timestamp", "key", "agentId", "deviceId", "level");
 
-            // Fetch one extra to detect whether a next page exists without an extra count query
-            List<EndpointShieldLog> fetched = EndpointShieldLogsDao.instance.findAll(
-                pagedFilter, 0, effectivePageSize + 1, sort, projection
-            );
+            // Force agentId index to avoid collection scans on sparse keys (proxy-logs, installation-logs).
+            // The agentId single-field index narrows the scan to this agent's documents; key/timestamp
+            // filtering is then applied as residual predicates, which is fast enough for per-agent volumes.
+            org.bson.Document hint = new org.bson.Document("agentId", -1);
+
+            List<EndpointShieldLog> fetched = new ArrayList<>();
+            EndpointShieldLogsDao.instance.getMCollection()
+                .find(pagedFilter)
+                .projection(projection)
+                .sort(sort)
+                .hint(hint)
+                .limit(effectivePageSize + 1)
+                .maxTime(30, java.util.concurrent.TimeUnit.SECONDS)
+                .into(fetched);
 
             hasMore = fetched.size() > effectivePageSize;
             if (hasMore) {
@@ -246,15 +256,20 @@ public class EndpointShieldAgentAction extends UserAction {
 
             agentLogs = new ArrayList<>(fetched);
             // Only count on the first page — subsequent pages discard the value anyway.
-            // Count is display-only; a timeout must not fail the fetch since pagination
-            // works via hasMore regardless. totalCount = -1 signals "unknown" to the UI.
+            // Skip count for wide ranges (> 1 year) — scanning millions of index entries
+            // for a display-only number is not worth the latency. totalCount = -1 signals "unknown" to the UI.
             if (afterId == null || afterId.isEmpty()) {
-                try {
-                    totalCount = EndpointShieldLogsDao.instance.getMCollection()
-                        .countDocuments(baseFilter, new com.mongodb.client.model.CountOptions()
-                            .maxTime(30, java.util.concurrent.TimeUnit.SECONDS));
-                } catch (Exception countErr) {
-                    loggerMaker.errorAndAddToDb("Error counting endpoint shield logs: " + countErr.getMessage());
+                int ONE_YEAR_SECS = 365 * 24 * 3600;
+                if ((endTime - startTime) < ONE_YEAR_SECS) {
+                    try {
+                        totalCount = EndpointShieldLogsDao.instance.getMCollection()
+                            .countDocuments(baseFilter, new com.mongodb.client.model.CountOptions()
+                                .maxTime(10, java.util.concurrent.TimeUnit.SECONDS));
+                    } catch (Exception countErr) {
+                        loggerMaker.errorAndAddToDb("Error counting endpoint shield logs: " + countErr.getMessage());
+                        totalCount = -1;
+                    }
+                } else {
                     totalCount = -1;
                 }
             }
