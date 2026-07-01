@@ -43,14 +43,17 @@ const createSortOptions = (label, sortKey, columnIndex, isTimeField = false) => 
     ];
 };
 
+// columnIndex must equal (heading index + 1) — GithubServerTable.handleSort matches
+// the Polaris heading index `col` against `columnIndex === col + 1`. The leading
+// non-sortable "Status" column occupies heading index 0, so sortable columns start at 2.
 const sortOptions = [
-    ...createSortOptions('Hostname', 'hostname', 1),
-    ...createSortOptions('Device ID', 'deviceId', 2),
-    ...createSortOptions('Agent Version', 'agentVersion', 3),
-    ...createSortOptions('OS', 'os', 4),
-    ...createSortOptions('Username', 'username', 5),
-    ...createSortOptions('Last Heartbeat', 'lastHeartbeat', 6, true),
-    ...createSortOptions('Last Deployed', 'lastDeployed', 7, true)
+    ...createSortOptions('Hostname', 'hostname', 2),
+    ...createSortOptions('Device ID', 'deviceId', 3),
+    ...createSortOptions('Agent Version', 'agentVersion', 4),
+    ...createSortOptions('OS', 'os', 5),
+    ...createSortOptions('Username', 'username', 6),
+    ...createSortOptions('Last Heartbeat', 'lastHeartbeat', 7, true),
+    ...createSortOptions('Last Deployed', 'lastDeployed', 8, true)
 ];
 
 const createFilter = (key, label) => ({
