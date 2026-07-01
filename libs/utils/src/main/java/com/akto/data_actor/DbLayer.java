@@ -289,8 +289,10 @@ public class DbLayer {
         }
         try {
             String userName = String.valueOf(additionalData.get("username"));
-            String teamName = additionalData.containsKey("team") ? String.valueOf(additionalData.get("team")) : null;
-            String userRole = additionalData.containsKey("userRole") ? String.valueOf(additionalData.get("userRole")) : null;
+            Object teamObj = additionalData.get("team");
+            Object roleObj = additionalData.get("userRole");
+            String teamName = teamObj == null ? null : StringUtils.trimToNull(teamObj.toString());
+            String userRole = roleObj == null ? null : StringUtils.trimToNull(roleObj.toString());
             String device = moduleInfo.getName();
             AgentUsersDao.instance.upsertAgentUser(userName, teamName, userRole, device, Context.now());
         } catch (Exception e) {

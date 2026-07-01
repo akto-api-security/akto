@@ -1,6 +1,7 @@
 package com.akto.dao;
 
 import com.akto.dto.AgenticUsers;
+import com.mongodb.MongoCommandException;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
@@ -16,30 +17,37 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[]{AgenticUsers.TEAM_NAME, AgenticUsers.USER_ROLE}, false);
 
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-            new String[]{AgenticUsers.USER_NAME}, false);
     }
 
-    /**
-     * Upserts an AgenticUsers record keyed by userName, setting team/role and
-     * adding the device name to the devices set (addToSet — no duplicates).
-     */
     public void upsertAgentUser(String userName, String teamName, String userRole, String device, int lastUpdatedAt) {
-        FindOneAndUpdateOptions options = new FindOneAndUpdateOptions()
-            .upsert(true)
-            .returnDocument(ReturnDocument.AFTER);
+        Bson userFilter = Filters.eq(AgenticUsers.USER_NAME, userName);
+        boolean hasTeam = teamName != null && !teamName.isEmpty();
+        boolean hasRole = userRole != null && !userRole.isEmpty();
 
-        getMCollection().findOneAndUpdate(
-            Filters.eq(AgenticUsers.USER_NAME, userName),
-            Updates.combine(
-                Updates.setOnInsert(AgenticUsers.USER_NAME, userName),
-                Updates.set(AgenticUsers.TEAM_NAME, teamName),
-                Updates.set(AgenticUsers.USER_ROLE, userRole),
-                Updates.set(AgenticUsers.LAST_UPDATED_AT, lastUpdatedAt),
-                Updates.addToSet(AgenticUsers.DEVICES, device)
-            ),
-            options
-        );
+        List<Bson> updates = new ArrayList<>();
+        updates.add(Updates.setOnInsert(AgenticUsers.USER_NAME, userName));
+        updates.add(Updates.set(AgenticUsers.LAST_UPDATED_AT, lastUpdatedAt));
+        updates.add(Updates.addToSet(AgenticUsers.DEVICES, device));
+        if (hasTeam) updates.add(Updates.set(AgenticUsers.SSO_TEAM_NAME, teamName));
+        if (hasRole) updates.add(Updates.set(AgenticUsers.SSO_USER_ROLE, userRole));
+
+        try {
+            getMCollection().findOneAndUpdate(userFilter, Updates.combine(updates),
+                new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER));
+        } catch (MongoCommandException e) {
+            if (e.getErrorCode() != 11000) throw e;
+            getMCollection().updateOne(userFilter, Updates.combine(updates));
+        }
+
+        // Set effective fields only on first write (when not yet populated)
+        if (hasTeam)
+            getMCollection().updateOne(
+                Filters.and(userFilter, Filters.in(AgenticUsers.TEAM_NAME, null, "")),
+                Updates.set(AgenticUsers.TEAM_NAME, teamName));
+        if (hasRole)
+            getMCollection().updateOne(
+                Filters.and(userFilter, Filters.in(AgenticUsers.USER_ROLE, null, "")),
+                Updates.set(AgenticUsers.USER_ROLE, userRole));
     }
 
     /**
