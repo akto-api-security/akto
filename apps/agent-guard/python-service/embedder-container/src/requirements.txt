@@ -1,3 +1,7 @@
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 sentence-transformers==3.3.1
+# Per-agent intent classifier. numpy + scikit-learn are already transitive deps
+# of sentence-transformers; pinned explicitly so /classify + /train are stable.
+numpy>=1.26
+scikit-learn>=1.3

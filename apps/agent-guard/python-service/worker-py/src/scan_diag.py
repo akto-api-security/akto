@@ -7,10 +7,12 @@ Cascade backpressure skips are always logged at INFO (low volume when tripped).
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import sys
-from typing import Any, Dict, Optional
+import time
+from typing import Any, Dict, Iterator, Optional
 
 import cascade_backpressure
 
@@ -113,6 +115,81 @@ def log_scan_outcome(
         f"pid={os.getpid()}",
         f"elapsed_ms={round(elapsed_ms, 2)}",
     ]
+    if extra:
+        for key, value in extra.items():
+            parts.append(f"{key}={value}")
+    logger.info("[scan-diag] %s", " ".join(parts))
+
+
+class StageTimer:
+    """Accumulate per-stage wall times (ms) for one request so the intent path can
+    report where time went and which stage dominated (the bottleneck).
+
+    Usage:
+        timer = StageTimer()
+        with timer.span("embed"):
+            ...
+        timer.record("knn", elapsed_ms)   # or record directly
+    """
+
+    __slots__ = ("stages",)
+
+    def __init__(self) -> None:
+        self.stages: Dict[str, float] = {}
+
+    def record(self, name: str, ms: float) -> None:
+        self.stages[name] = self.stages.get(name, 0.0) + ms
+
+    @contextlib.contextmanager
+    def span(self, name: str) -> Iterator[None]:
+        t0 = time.perf_counter()
+        try:
+            yield
+        finally:
+            self.record(name, (time.perf_counter() - t0) * 1000.0)
+
+    def total_ms(self) -> float:
+        return round(sum(self.stages.values()), 2)
+
+    def bottleneck(self) -> Optional[str]:
+        return max(self.stages, key=self.stages.get) if self.stages else None
+
+    def as_fields(self) -> str:
+        return " ".join(f"{k}_ms={round(v, 2)}" for k, v in self.stages.items())
+
+
+def log_intent_decision(
+    path: str,
+    agent: str,
+    scanner_name: str,
+    decision: str,
+    timer: Optional[StageTimer] = None,
+    *,
+    extra: Optional[Dict[str, Any]] = None,
+    always: bool = False,
+) -> None:
+    """Print one intent-prefilter outcome with per-stage timings + bottleneck.
+
+    Verbose for every request under AGW_SCAN_DIAGNOSTICS; otherwise only when
+    `always=True` (non-ALLOW / escalate / error — the low-volume, interesting paths).
+    Designed so a load/test script can read exactly what happened and why.
+    """
+    if not always and not enabled():
+        return
+    parts = [
+        f"path=intent_{path}",
+        f"agent={agent or '-'}",
+        f"scanner={scanner_name}",
+        f"decision={decision}",
+        f"pid={os.getpid()}",
+    ]
+    if timer is not None:
+        parts.append(f"total_ms={timer.total_ms()}")
+        bn = timer.bottleneck()
+        if bn:
+            parts.append(f"bottleneck={bn}")
+        if timer.stages:
+            parts.append(timer.as_fields())
     if extra:
         for key, value in extra.items():
             parts.append(f"{key}={value}")

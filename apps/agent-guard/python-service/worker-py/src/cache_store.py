@@ -31,7 +31,10 @@ logger = logging.getLogger(__name__)
 EMBEDDING_DIM = 384  # all-MiniLM-L6-v2
 _KEY_PREFIX = "gcache:"
 _DEFAULT_INDEX = "guardrails_shadow_cache"
-_RETURN_FIELDS = ("dist", "is_valid", "risk_score", "reason", "inserted_at")
+_RETURN_FIELDS = (
+    "dist", "is_valid", "risk_score", "reason", "inserted_at",
+    "task_intent", "risk_intent", "scope_bucket",
+)
 
 # Lazily-created singletons (one Redis connection pool per process).
 _client = None
@@ -43,8 +46,12 @@ def _index_name() -> str:
     return (getattr(settings, "CACHE_REDIS_INDEX", "") or "").strip() or _DEFAULT_INDEX
 
 
-def _get_client():
-    """Return an async Redis client, or None when REDIS_URL is unset/unusable.
+def get_client():
+    """Return the shared async Redis client, or None when REDIS_URL is
+    unset/unusable. Public: this module's own KNN/hash helpers below use it,
+    and intent/prefilter.py's capability-profile cache reuses the same
+    lazily-created singleton connection pool for plain GET/SET rather than
+    opening a second one.
 
     decode_responses is left False so vector payloads stay as raw bytes; string
     metadata is decoded explicitly on read.
@@ -114,6 +121,10 @@ def _shape_match(flat: Dict[str, Any]) -> Dict[str, Any]:
         "reason": _decode(flat.get("reason", "")),
         "distance": float(_decode(flat.get("dist", "0")) or 0.0),
         "inserted_at": float(_decode(flat.get("inserted_at", "0")) or 0.0),
+        # Intent triple — empty on entries written before the intent layer existed.
+        "task_intent": _decode(flat.get("task_intent", "")),
+        "risk_intent": _decode(flat.get("risk_intent", "")),
+        "scope_bucket": _decode(flat.get("scope_bucket", "")),
     }
 
 
@@ -152,7 +163,7 @@ async def query(vec: List[float], scanner_key: str) -> Optional[Dict[str, Any]]:
     distance is RediSearch COSINE distance (1 - cosine similarity), so the
     caller's threshold/TTL logic carries over unchanged from the Vectorize path.
     """
-    client = _get_client()
+    client = get_client()
     if client is None or not await _ensure_index(client):
         return None
     try:
@@ -177,7 +188,7 @@ async def exact_get(scanner_key: str, text_hash: str) -> Optional[Dict[str, Any]
     so the caller falls through to the embed + KNN fuzzy path. Cheap enough to run
     on every request; it offloads both the embedder (CPU) and the search index.
     """
-    client = _get_client()
+    client = get_client()
     if client is None:
         return None
     try:
@@ -196,12 +207,16 @@ async def exact_get(scanner_key: str, text_hash: str) -> Optional[Dict[str, Any]
 
 async def upsert(vec: List[float], scanner_key: str, entry_id: str,
                  is_valid: bool, risk_score: float, reason: str,
-                 inserted_at: int, ttl_seconds: int) -> None:
+                 inserted_at: int, ttl_seconds: int,
+                 task_intent: str = "", risk_intent: str = "",
+                 scope_bucket: str = "") -> None:
     """Store/refresh one verdict vector. Deterministic key → re-scan overwrites.
 
     EXPIRE gives the entry a native TTL, so expired matches vanish on their own.
+    The intent triple (task/risk/scope) is stored alongside the verdict so a later
+    cache hit returns the previously-computed intents without re-classifying.
     """
-    client = _get_client()
+    client = get_client()
     if client is None or not await _ensure_index(client):
         return
     try:
@@ -213,6 +228,9 @@ async def upsert(vec: List[float], scanner_key: str, entry_id: str,
             "risk_score": repr(float(risk_score or 0.0)),
             "reason": reason or "",
             "inserted_at": str(int(inserted_at)),
+            "task_intent": task_intent or "",
+            "risk_intent": risk_intent or "",
+            "scope_bucket": scope_bucket or "",
         })
         if ttl_seconds and ttl_seconds > 0:
             await client.expire(key, int(ttl_seconds))

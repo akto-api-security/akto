@@ -114,17 +114,22 @@ def _ttl_seconds() -> float:
 # --------------------------------------------------------------------------- #
 # Per-scanner key
 # --------------------------------------------------------------------------- #
-def config_hash(scanner_name: str, scanner_type: str, config: Dict[str, Any]) -> str:
+def config_hash(scanner_name: str, scanner_type: str, config: Dict[str, Any],
+                agent_host: str = "") -> str:
     """16-char fingerprint of a single scanner + its verdict-affecting config.
 
-    Two requests share cache entries only when the scanner, type, and config
-    (model lineup, thresholds, ban lists, …) all match. modelConfigs order is
+    Two requests share cache entries only when the scanner, type, config (model
+    lineup, thresholds, ban lists, …) and agent all match. modelConfigs order is
     preserved because cascade order can change the verdict; noise like
     storeAllResults is dropped so it never fragments the cache.
+
+    agent_host partitions the cache (and thus the learned mission) per agent: a
+    verdict learned for `dev.ai-agent.claude` is never served to another agent.
+    An empty agent_host keeps the pre-intent global partition unchanged.
     """
     cfg = {k: v for k, v in (config or {}).items() if k not in _NON_VERDICT_CONFIG_KEYS}
     canonical = json.dumps(cfg, sort_keys=True, separators=(",", ":"), default=str)
-    content = f"{scanner_name}|{scanner_type}|{canonical}"
+    content = f"{agent_host}|{scanner_name}|{scanner_type}|{canonical}"
     return hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
 
 
@@ -166,14 +171,14 @@ async def _embed(text: str) -> Optional[List[float]]:
 # Prepare / classify
 # --------------------------------------------------------------------------- #
 async def prepare(scanner_name: str, scanner_type: str, text: str,
-                  config: Dict[str, Any]) -> Dict[str, Any]:
+                  config: Dict[str, Any], agent_host: str = "") -> Dict[str, Any]:
     """Embed + KNN lookup once. Returns a reusable {scanner_key, vec, cached}.
 
     Used on the request path in decide mode; the same result is handed to
     observe() afterwards so a miss embeds only once. Fail-open: vec/cached may
-    be None.
+    be None. agent_host scopes the lookup to one agent's partition/mission.
     """
-    scanner_key = config_hash(scanner_name, scanner_type, config)
+    scanner_key = config_hash(scanner_name, scanner_type, config, agent_host)
     # Exact-repeat fast path: deterministic-key lookup (HGETALL), no embedding and
     # no vector search. Real traffic is ~99.7% exact repeats, so this serves the
     # bulk of requests while skipping the CPU embed + FT.SEARCH entirely — and
@@ -237,6 +242,9 @@ def try_serve(prep: Dict[str, Any], scanner_name: str, scanner_type: str,
         "reason": cached["reason"],
         "cache": "served",
         "cache_distance": cached["distance"],
+        "task_intent": cached.get("task_intent", ""),
+        "risk_intent": cached.get("risk_intent", ""),
+        "scope_bucket": cached.get("scope_bucket", ""),
     }
     alert_info = {
         "scanner_name": scanner_name,
@@ -261,12 +269,15 @@ def try_serve(prep: Dict[str, Any], scanner_name: str, scanner_type: str,
 # --------------------------------------------------------------------------- #
 async def observe(scanner_name: str, scanner_type: str, text: str,
                   config: Dict[str, Any], real_result: Dict[str, Any],
-                  prep: Optional[Dict[str, Any]] = None) -> None:
+                  prep: Optional[Dict[str, Any]] = None,
+                  agent_host: str = "") -> None:
     """Compare what the cache would have answered to the real verdict, alert,
     and store the real verdict to warm the cache.
 
     Must be scheduled fire-and-forget. Never raises; never affects the response.
-    Reuses `prep` (from decide mode) when given so a miss embeds only once.
+    Reuses `prep` (from decide mode) when given so a miss embeds only once. The
+    verdict's intent triple (from real_result["details"]) is persisted so this
+    warmed entry seeds the agent's learned mission for future similar requests.
     """
     if not enabled():
         return
@@ -299,7 +310,7 @@ async def observe(scanner_name: str, scanner_type: str, text: str,
         if prep is not None:
             scanner_key, vec, cached = prep["scanner_key"], prep.get("vec"), prep.get("cached")
         else:
-            scanner_key = config_hash(scanner_name, scanner_type, config)
+            scanner_key = config_hash(scanner_name, scanner_type, config, agent_host)
             vec = await _embed(text)
             cached = await cache_store.query(vec, scanner_key) if vec is not None else None
         info["scanner_key"] = scanner_key
@@ -328,7 +339,8 @@ async def observe(scanner_name: str, scanner_type: str, text: str,
 
         # Warm the cache for future requests (always, regardless of outcome). The
         # deterministic id means a re-scan overwrites this entry and refreshes its
-        # TTL instead of growing the index.
+        # TTL instead of growing the index. The intent triple is persisted so this
+        # entry doubles as a learned mission example (allow/blocked) for the agent.
         await cache_store.upsert(
             vec, scanner_key, _text_hash(text),
             is_valid=real_valid,
@@ -336,6 +348,9 @@ async def observe(scanner_name: str, scanner_type: str, text: str,
             reason=str(real_details.get("reason", "") or ""),
             inserted_at=int(now),
             ttl_seconds=int(info["ttl_s"]),
+            task_intent=str(real_details.get("task_intent", "") or ""),
+            risk_intent=str(real_details.get("risk_intent", "") or ""),
+            scope_bucket=str(real_details.get("scope_bucket", "") or ""),
         )
     except Exception as exc:  # absolute backstop — cache must never surface
         logger.warning(f"[cache] observe failed for {scanner_name}: {exc}")
