@@ -1,5 +1,6 @@
 package com.akto.dto.monitoring;
 
+import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
 
@@ -32,6 +33,9 @@ public class ModuleInfo {
     @Getter @Setter
     private boolean deleteTopicAndReboot;
     public static final String DELETE_TOPIC_AND_REBOOT = "deleteTopicAndReboot";
+
+    public static final String EXPIRES_AT = "expiresAt";
+    private Date expiresAt;
 
     public ModuleType getModuleType() {
         return moduleType;
@@ -90,6 +94,14 @@ public class ModuleInfo {
 
     public void setAdditionalData(Map<String, Object> additionalData) {
         this.additionalData = additionalData;
+    }
+
+    public Date getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(Date expiresAt) {
+        this.expiresAt = expiresAt;
     }
 
     public enum ModuleType {

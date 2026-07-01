@@ -254,6 +254,7 @@ public class DbLayer {
         updateList.add(Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()));
         updateList.add(Updates.set(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()));
         updateList.add(Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()));
+        updateList.add(Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS)));
         updateList.add(Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()));
         updateList.addAll(buildAdditionalDataUpdates(moduleInfo.getAdditionalData()));
 
@@ -317,6 +318,7 @@ public class DbLayer {
                     Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
                     Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
                     Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
+                    Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS)),
                     Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
                     Updates.set(ModuleInfo.MINI_RUNTIME_NAME, moduleInfo.getMiniRuntimeName()),
                     Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
