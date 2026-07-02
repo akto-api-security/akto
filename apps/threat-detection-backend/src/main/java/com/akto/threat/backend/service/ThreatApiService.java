@@ -26,6 +26,7 @@ public class ThreatApiService {
 
   private final MaliciousEventDao maliciousEventDao;
   private static final LoggerMaker loggerMaker = new LoggerMaker(ThreatApiService.class);
+  private static final java.util.concurrent.atomic.AtomicInteger getSubCategoryWiseCountCallCounter = new java.util.concurrent.atomic.AtomicInteger(0);
 
   public ThreatApiService(MaliciousEventDao maliciousEventDao) {
     this.maliciousEventDao = maliciousEventDao;
@@ -132,7 +133,10 @@ public class ThreatApiService {
   public ThreatCategoryWiseCountResponse getSubCategoryWiseCount(
     String accountId, ThreatCategoryWiseCountRequest req, String contextSource) {
 
-    loggerMaker.info("getSubCategoryWiseCount start ts " + Context.now());
+    int callCount = getSubCategoryWiseCountCallCounter.incrementAndGet();
+    long startMs = System.currentTimeMillis();
+    loggerMaker.info("getSubCategoryWiseCount start [call #" + callCount + "] at " +
+        new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new java.util.Date(startMs)));
 
     List<Document> pipeline = new ArrayList<>();
     Document match = new Document();
@@ -181,7 +185,10 @@ public class ThreatApiService {
       }
     }
 
-    loggerMaker.info("getSubCategoryWiseCount end ts " + Context.now());
+    long endMs = System.currentTimeMillis();
+    loggerMaker.info("getSubCategoryWiseCount end [call #" + callCount + "] at " +
+        new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new java.util.Date(endMs)) +
+        " duration=" + (endMs - startMs) + "ms");
 
     return ThreatCategoryWiseCountResponse.newBuilder()
         .addAllCategoryWiseCounts(categoryWiseCounts)
