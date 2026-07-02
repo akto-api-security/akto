@@ -1114,10 +1114,10 @@ public class ApiExecutor {
         
         // If no host header, return path as-is (fallback, unlikely)
         if (host == null || host.isEmpty()) {
-            return path.startsWith("ws") ? path : "ws://" + path;
+            return path.startsWith("ws") ? path : "wss://" + path;
         }
         
-        // Determine scheme based on whether host is localhost
+        // Use wss:// everywhere; fall back to ws:// only for localhost
         String scheme = host.toLowerCase().contains("localhost") ? "ws://" : "wss://";
         
         // Build full URL: scheme + host + path
