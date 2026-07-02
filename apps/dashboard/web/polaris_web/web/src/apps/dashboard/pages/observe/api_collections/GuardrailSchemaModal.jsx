@@ -87,7 +87,7 @@ function GuardrailSchemaModal({ open, onClose, endpoint, initialData, onSave, sa
                         requestMessageFields,
                         setRequestMessageFields,
                         'Request message fields',
-                        'e.g. messages[-1].content'
+                        'e.g. messages.role=user.content.0.text'
                     )}
                     <Divider />
                     {renderFieldList(

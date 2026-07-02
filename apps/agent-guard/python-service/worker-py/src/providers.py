@@ -11,9 +11,8 @@ import math
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-import httpx
-
 import gcp_auth
+import http_client
 from settings import settings
 
 logger = logging.getLogger(__name__)
@@ -21,7 +20,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 
-_HTTP_TIMEOUT_SECONDS = 120.0
 _IDENTITY = {"Accept-Encoding": "identity"}
 
 # Process-wide cache of built providers, keyed by (provider, model, base_url).
@@ -62,17 +60,17 @@ class OpenAIProvider(LLMProvider):
         headers = dict(_IDENTITY, **{"Content-Type": "application/json"})
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
-            resp = await client.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json={
-                    "model": self.model,
-                    "temperature": 0.1,
-                    "max_tokens": 256,
-                    "messages": [{"role": "user", "content": prompt}],
-                },
-            )
+        client = http_client.get_client()
+        resp = await client.post(
+            f"{self.base_url}/chat/completions",
+            headers=headers,
+            json={
+                "model": self.model,
+                "temperature": 0.1,
+                "max_tokens": 256,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+        )
         resp.raise_for_status()
         return resp.json()["choices"][0]["message"]["content"]
 
@@ -86,21 +84,21 @@ class AnthropicProvider(LLMProvider):
         logger.info(f"[Anthropic] model={self.model}")
 
     async def complete(self, prompt: str) -> str:
+        client = http_client.get_client()
         logger.info(f"[Anthropic] prompt: {prompt}")
-        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers=dict(_IDENTITY, **{
-                    "Content-Type": "application/json",
-                    "x-api-key": self.api_key,
-                    "anthropic-version": "2023-06-01",
-                }),
-                json={
-                    "model": self.model,
-                    "max_tokens": 256,
-                    "messages": [{"role": "user", "content": prompt}],
-                },
-            )
+        resp = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers=dict(_IDENTITY, **{
+                "Content-Type": "application/json",
+                "x-api-key": self.api_key,
+                "anthropic-version": "2023-06-01",
+            }),
+            json={
+                "model": self.model,
+                "max_tokens": 256,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+        )
         resp.raise_for_status()
         return resp.json()["content"][0]["text"]
 
@@ -129,15 +127,15 @@ class VertexAIProvider(LLMProvider):
 
     async def _post(self, instance: Dict[str, Any]) -> dict:
         token = await gcp_auth.get_token(self.sa_info)
-        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
-            resp = await client.post(
-                self._predict_url(),
-                headers=dict(_IDENTITY, **{
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {token}",
-                }),
-                json={"instances": [instance]},
-            )
+        client = http_client.get_client()
+        resp = await client.post(
+            self._predict_url(),
+            headers=dict(_IDENTITY, **{
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token}",
+            }),
+            json={"instances": [instance]},
+        )
         resp.raise_for_status()
         return resp.json()
 

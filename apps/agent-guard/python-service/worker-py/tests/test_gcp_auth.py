@@ -38,7 +38,7 @@ class _FakeResponse:
 
 
 class _FakeClient:
-    """Async-context-manager stand-in for httpx.AsyncClient."""
+    """Stand-in for the shared http_client.get_client() AsyncClient."""
 
     posts = []
     payload = {"access_token": "ya29.fake-token", "expires_in": 3600}
@@ -46,13 +46,7 @@ class _FakeClient:
     def __init__(self, *a, **kw):
         pass
 
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *a):
-        return False
-
-    async def post(self, url, headers=None, data=None):
+    async def post(self, url, headers=None, data=None, timeout=None):
         _FakeClient.posts.append({"url": url, "data": data})
         return _FakeResponse(_FakeClient.payload)
 
@@ -61,7 +55,7 @@ class _FakeClient:
 def patch_httpx_and_cache(monkeypatch):
     _FakeClient.posts = []
     gcp_auth._TOKEN_CACHE.clear()
-    monkeypatch.setattr(gcp_auth.httpx, "AsyncClient", _FakeClient)
+    monkeypatch.setattr(gcp_auth.http_client, "get_client", lambda: _FakeClient())
     yield
 
 

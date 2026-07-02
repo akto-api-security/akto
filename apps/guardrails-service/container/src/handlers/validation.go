@@ -3,11 +3,13 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/models"
+	"github.com/akto-api-security/guardrails-service/pkg/auth"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/metrics"
@@ -17,6 +19,17 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
+
+// applyAuthenticatedAccount overrides the caller-supplied akto_account_id with
+// the JWT accountId verified by the auth middleware. The body field is
+// untrusted, so cache partitioning, metrics, and logging must key off the
+// authenticated identity. When auth is disabled (local/dev) the body value is
+// left as-is.
+func applyAuthenticatedAccount(c *gin.Context, params *models.ValidateRequestParams) {
+	if acct, ok := auth.AccountIDFromContext(c); ok {
+		params.AktoAccountID = strconv.Itoa(acct)
+	}
+}
 
 // ValidationHandler handles validation requests
 type ValidationHandler struct {
@@ -125,6 +138,8 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		})
 		return
 	}
+
+	applyAuthenticatedAccount(c, &req)
 
 	if req.RequestPayload == "" {
 		h.logger.Error("ValidateRequest - missing requestPayload",
@@ -296,6 +311,8 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		return
 	}
 
+	applyAuthenticatedAccount(c, &req)
+
 	// Response body: prefer responsePayload; legacy field "payload" still supported (see models.ValidateRequestParams.LegacyPayload).
 	responseBody := req.ResponsePayload
 	if responseBody == "" {
@@ -399,4 +416,10 @@ func (h *ValidationHandler) HealthCheck(c *gin.Context) {
 		"success": true,
 		"status":  "healthy",
 	})
+}
+
+// BackpressureStatus returns the scan breaker's current window state, for
+// diagnostics and load-test observability (mirrors agent-guard's status snapshot).
+func (h *ValidationHandler) BackpressureStatus(c *gin.Context) {
+	c.JSON(http.StatusOK, h.validatorService.BackpressureSnapshot())
 }
