@@ -445,20 +445,6 @@ const settingFunctions = {
       })
       return trafficData
     },
-    addWizTrafficSource: async function() {
-      let result = {}
-      await settingRequests.addWizTrafficSource().then((resp)=>{
-        result = resp
-      })
-      return result
-    },
-    removeWizTrafficSource: async function() {
-      let result = {}
-      await settingRequests.removeWizTrafficSource().then((resp)=>{
-        result = resp
-      })
-      return result
-    },
     fetchNewRelicIntegration: async function(){
       let newRelicIntegration = {}
       await settingRequests.fetchNewRelicIntegration().then((resp)=>{

@@ -594,6 +594,8 @@ const transform = {
                 <Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>
             ) : undefined);
 
+            const resolvedServiceName = serviceName || c.serviceName || '';
+
             return{
                 ...c,
                 ...(iconComp ? { iconComp } : {}),
@@ -603,7 +605,7 @@ const transform = {
                 splitApiCollectionName: splitApiCollectionName,
                 endpointId: endpointId,
                 sourceId: sourceId || c.sourceId,
-                serviceName: serviceName || c.serviceName,
+                serviceName: resolvedServiceName,
                 displayNameComp: displayNameComp,
                 descriptionComp: descriptionComp,
                 outOfTestingScopeComp: outOfTestingScopeComp,

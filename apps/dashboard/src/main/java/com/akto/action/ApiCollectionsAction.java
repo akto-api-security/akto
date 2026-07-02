@@ -74,6 +74,8 @@ import com.akto.dto.type.URLMethods;
 import com.akto.utils.scripts.AcesssTypeCollectionLevel;
 import com.akto.dao.ApiCollectionIconsDao;
 import com.akto.dto.ApiCollectionIcon;
+import com.akto.gpt.handlers.gpt_prompts.AgentGuardSystemPromptClassifier;
+import com.akto.gpt.handlers.gpt_prompts.AzureOpenAIPromptHandler;
 import com.mongodb.client.model.Projections;
 
 public class ApiCollectionsAction extends UserAction {
@@ -105,7 +107,7 @@ public class ApiCollectionsAction extends UserAction {
             Context.accountId.set(CACHED_ACCOUNT_ID);
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude(
-                    "urls", "conditions", "serviceGraphEdges", "hostNames", "serviceTag",
+                    "urls", "conditions", "serviceGraphEdges", "hostNames",
                     "sampleCollectionsDropped", "redact", "runDependencyAnalyser",
                     "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
                     "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType"
@@ -135,11 +137,11 @@ public class ApiCollectionsAction extends UserAction {
             stepStart = System.currentTimeMillis();
 
             // Trim tags to service tag only
-            String serviceTagKey = "privatecloud.agoda.com/service";
+            String[] serviceTagKeys = new String[]{"privatecloud.agoda.com/service", "privatecloud.agoda.com/hostname"};
             for (ApiCollection c : collections) {
                 List<CollectionTags> tags = c.getTagsList();
                 if (tags != null && !tags.isEmpty()) {
-                    tags.removeIf(tag -> !serviceTagKey.equals(tag.getKeyName()));
+                    tags.removeIf(tag -> Arrays.stream(serviceTagKeys).noneMatch(k -> k.equals(tag.getKeyName())));
                 }
                 if (tags != null) {
                     for (CollectionTags tag : tags) {
@@ -1601,6 +1603,11 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     private String description;
+    private boolean isSystemPrompt;
+    public void setIsSystemPrompt(boolean isSystemPrompt) {
+        this.isSystemPrompt = isSystemPrompt;
+    }
+
     public String saveCollectionDescription() {
         if(description == null) {
             addActionError("No description provided");
@@ -1611,12 +1618,65 @@ public class ApiCollectionsAction extends UserAction {
                 ? Updates.unset(ApiCollection.DESCRIPTION)
                 : Updates.set(ApiCollection.DESCRIPTION, description);
 
-        ApiCollectionsDao.instance.updateOneNoUpsert(
-                Filters.eq(ApiCollection.ID, apiCollectionId),
-                update
-        );
+        if(!isSystemPrompt) {
+            ApiCollectionsDao.instance.updateOneNoUpsert(
+                    Filters.eq(ApiCollection.ID, apiCollectionId),
+                    update
+            );
+        }
+
+        if (isSystemPrompt && !description.isEmpty()) {
+            classifySystemPromptIntentsAsync(apiCollectionId, description);
+        }
 
         return SUCCESS.toUpperCase();
+    }
+    private void classifySystemPromptIntentsAsync(int collectionId, String systemPrompt) {
+        int accountId = Context.accountId.get();
+        AzureOpenAIPromptHandler.scheduler.execute(() -> {
+            Context.accountId.set(accountId);
+            try {
+                ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, collectionId));
+                String agentHost = (apiCollection != null && apiCollection.getHostName() != null)
+                        ? apiCollection.getHostName() : ("collection:" + collectionId);
+
+                List<BasicDBObject> intents = new AgentGuardSystemPromptClassifier().classify(systemPrompt);
+                if (intents.isEmpty()) return;
+
+                AgentGuardCorpusDao.instance.getMCollection().deleteMany(Filters.and(
+                        Filters.eq(AgentGuardCorpusEntry.AGENT_HOST, agentHost),
+                        Filters.eq(AgentGuardCorpusEntry.EXTRACTION_METHOD, AgentGuardSystemPromptClassifier.SOURCE_KEY)
+                ));
+
+                int now = Context.now();
+                List<AgentGuardCorpusEntry> entries = new ArrayList<>();
+                for (BasicDBObject intent : intents) {
+                    String taskIntent = intent.getString("taskIntent", "");
+                    if (taskIntent.isEmpty()) continue;
+
+                    AgentGuardCorpusEntry entry = new AgentGuardCorpusEntry();
+                    entry.setAgentHost(agentHost);
+                    entry.setExtractionMethod(AgentGuardSystemPromptClassifier.SOURCE_KEY);
+                    entry.setCreatedAt(now);
+                    entry.setTaskIntent(taskIntent);
+                    entry.setRiskCategory(intent.getString("riskCategory", ""));
+
+                    AgentGuardCorpusEntry.Breakdown breakdown = new AgentGuardCorpusEntry.Breakdown();
+                    breakdown.setGroundTruthSourceKey(AgentGuardSystemPromptClassifier.SOURCE_KEY);
+                    breakdown.setGroundTruthInstructionText(intent.getString("instructionText", ""));
+                    entry.setBreakdown(breakdown);
+
+                    entries.add(entry);
+                }
+
+                if (!entries.isEmpty()) {
+                    AgentGuardCorpusDao.instance.insertMany(entries);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed to classify system prompt intents for collection "
+                        + collectionId);
+            }
+        });
     }
 
     @Setter

@@ -39,7 +39,7 @@ const UsageGuardrailsStep = ({
                         label={<RuleLabelWithTag name="Enable token limit detection" threats={RULE_OWASP_THREATS.tokenLimit} />}
                         checked={enableTokenLimit}
                         onChange={setEnableTokenLimit}
-                        helpText="Block or alert when a prompt exceeds the specified token count."
+                        helpText="Block or alert when a prompt exceeds the specified token count per message."
                     />
                     {enableTokenLimit && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
@@ -48,8 +48,9 @@ const UsageGuardrailsStep = ({
                                     label="Max tokens per prompt"
                                     type="number"
                                     value={String(tokenLimitThreshold)}
-                                    onChange={(val) => setTokenLimitThreshold(Math.max(1, parseInt(val, 10) || 1))}
+                                    onChange={(val) => setTokenLimitThreshold(Math.min(10000000, Math.max(1, parseInt(val, 10) || 1)))}
                                     min={1}
+                                    max={10000000}
                                     helpText="Prompts exceeding this token count will be blocked (or alerted, depending on policy behaviour). Tokens are estimated as characters ÷ 4."
                                     autoComplete="off"
                                 />

@@ -187,6 +187,10 @@ public class UsageMetricCalculator {
         return UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.AGENTIC);
     }
 
+    public static Set<Integer> getEndpointCollections() {
+        return UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.ENDPOINT);
+    }
+
     public static List<String> getInvalidTestErrors() {
         List<String> invalidErrors = new ArrayList<String>() {{
             add(TestResult.TestError.DEACTIVATED_ENDPOINT.getMessage());
@@ -202,6 +206,7 @@ public class UsageMetricCalculator {
          */
         Set<Integer> collectionsToDiscard = getGenAiCollections();
         collectionsToDiscard.addAll(getMcpCollections());
+        collectionsToDiscard.addAll(getEndpointCollections());
         return calculateEndpoints(collectionsToDiscard);
     }
 

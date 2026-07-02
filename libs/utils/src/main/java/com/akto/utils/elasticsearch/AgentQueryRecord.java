@@ -26,6 +26,10 @@ public class AgentQueryRecord {
     public static final String F_TRACE_ID_KW           = "traceId.keyword";
     public static final String F_SPAN_ID_KW            = "spanId.keyword";
     public static final String F_IS_ATLAS_TRAFFIC      = "isAtlasTraffic";
+    public static final String F_TOPIC                 = "topic";
+    public static final String F_TOPIC_KW              = "topic.keyword";
+    public static final String F_SUB_TOPIC             = "subTopic";
+    public static final String F_SUB_TOPIC_KW          = "subTopic.keyword";
 
     private final String docId;
     private final int accountId;
@@ -41,12 +45,15 @@ public class AgentQueryRecord {
     private final String traceId;
     private final String spanId;
     private final boolean isAtlasTraffic;
+    private final String topic;
+    private final String subTopic;
 
     public AgentQueryRecord(String docId, int accountId, String serviceId, String deviceId,
                             String userName, String sessionIdentifier,
                             String queryPayload, String responsePayload,
                             long timeStampMs, int inputTokens, int outputTokens,
-                            String traceId, String spanId, boolean isAtlasTraffic) {
+                            String traceId, String spanId, boolean isAtlasTraffic,
+                            String topic, String subTopic) {
         this.docId = docId;
         this.accountId = accountId;
         this.serviceId = serviceId;
@@ -61,6 +68,8 @@ public class AgentQueryRecord {
         this.traceId = traceId;
         this.spanId = spanId;
         this.isAtlasTraffic = isAtlasTraffic;
+        this.topic = topic != null ? topic : "";
+        this.subTopic = subTopic != null ? subTopic : "";
     }
 
     public String getDocId() { return docId; }
@@ -77,4 +86,6 @@ public class AgentQueryRecord {
     public String getTraceId() { return traceId; }
     public String getSpanId() { return spanId; }
     public boolean getIsAtlasTraffic() { return isAtlasTraffic; }
+    public String getTopic() { return topic; }
+    public String getSubTopic() { return subTopic; }
 }

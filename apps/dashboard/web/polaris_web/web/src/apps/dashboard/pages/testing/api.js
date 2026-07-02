@@ -34,6 +34,17 @@ export default {
         })
         return resp        
     },
+    async fetchTestRunLogs(testingRunResultSummaryId, logKeys) {
+        const resp = await request({
+            url: '/api/fetchTestRunLogs',
+            method: 'post',
+            data: {
+                testingRunResultSummaryId,
+                ...(Array.isArray(logKeys) && logKeys.length > 0 ? { logKeys } : {})
+            }
+        })
+        return resp
+    },
     async fetchTestRunResultsCount(testingRunResultSummaryHexId, filters) {
         const resp = await request({
             url: '/api/fetchTestRunResultsCount',

@@ -11,7 +11,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.OwaspCategory;
-import java.util.Collections;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
@@ -96,29 +95,29 @@ public class MaliciousEventService {
     }
   }
 
-  // Helper method to apply label filter with backward compatibility
-  private static void applyLabelFilter(Document query, MaliciousEventDto.Label labelEnum) {
-    List<Document> orConditions = new ArrayList<>();
-    orConditions.add(new Document("label", labelEnum.name()));
+  // // Helper method to apply label filter with backward compatibility
+  // private static void applyLabelFilter(Document query, MaliciousEventDto.Label labelEnum) {
+  //   List<Document> orConditions = new ArrayList<>();
+  //   orConditions.add(new Document("label", labelEnum.name()));
 
-    if (labelEnum == MaliciousEventDto.Label.THREAT) {
-      // For backward compatibility: treat null/missing label as "threat"
-      orConditions.add(new Document("label", new Document("$exists", false)));
-      orConditions.add(new Document("label", null));
-    }
+  //   if (labelEnum == MaliciousEventDto.Label.THREAT) {
+  //     // For backward compatibility: treat null/missing label as "threat"
+  //     orConditions.add(new Document("label", new Document("$exists", false)));
+  //     orConditions.add(new Document("label", null));
+  //   }
 
-    if (orConditions.size() > 1) {
-      List<Document> andConditions = new ArrayList<>();
-      if (!query.isEmpty()) {
-        andConditions.add(new Document(query));
-      }
-      andConditions.add(new Document("$or", orConditions));
-      query.clear();
-      query.append("$and", andConditions);
-    } else {
-      query.append("label", labelEnum.name());
-    }
-  }
+  //   if (orConditions.size() > 1) {
+  //     List<Document> andConditions = new ArrayList<>();
+  //     if (!query.isEmpty()) {
+  //       andConditions.add(new Document(query));
+  //     }
+  //     andConditions.add(new Document("$or", orConditions));
+  //     query.clear();
+  //     query.append("$and", andConditions);
+  //   } else {
+  //     query.append("label", labelEnum.name());
+  //   }
+  // }
 
   public void recordMaliciousEvent(String accountId, RecordMaliciousEventRequest request) {
     MaliciousEventMessage evt = request.getMaliciousEvent();
@@ -345,45 +344,44 @@ public class MaliciousEventService {
     return true;
   }
 
-  private void fetchAlertFilterData(String accountId, Set<String> subCategories, Set<String> urls, Set<String> hosts, Bson timeRangeFilter) {
-    subCategories.addAll(fetchDistinctFieldValues(accountId, "filterId", timeRangeFilter, String.class));
-    hosts.addAll(fetchDistinctFieldValues(accountId, "host", timeRangeFilter, String.class));
+  private void fetchAlertFilterData(String accountId, Set<String> subCategories, Set<String> urls, Set<String> hosts, Bson eventsFilter) {
+    subCategories.addAll(fetchDistinctFieldValues(accountId, "filterId", eventsFilter, String.class));
+    hosts.addAll(fetchDistinctFieldValues(accountId, "host", eventsFilter, String.class));
 
     try {
-      // Get distinct latestApiEndpoint using aggregation pipeline with limit
-      // to avoid 16MB result size limit
-      List<Document> pipeline = Arrays.asList(
-          new Document("$match", timeRangeFilter),
-          new Document("$group", new Document("_id", "$latestApiEndpoint")),
-          new Document("$sort", new Document("_id", 1)),
-          new Document("$limit", 1000)
-      );
-      maliciousEventDao.aggregateRaw(accountId, pipeline)
-          .forEach(doc -> {
-            String endpoint = doc.getString("_id");
-            if (endpoint != null && !endpoint.isEmpty()) {
-              urls.add(endpoint);
+      // Use distinct() for DISTINCT_SCAN (index-covered, no doc fetch) but cap at 1000
+      // to avoid 16MB BSON result size limit with large datasets
+      Set<String> endpoints = new HashSet<>();
+      maliciousEventDao.getCollection(accountId)
+          .distinct("latestApiEndpoint", eventsFilter, String.class)
+          .forEach(value -> {
+            if (value != null && !value.isEmpty() && endpoints.size() < 1000) {
+              endpoints.add(value);
             }
           });
+      urls.addAll(endpoints);
     } catch (Exception e) {
       logger.error("Error fetching distinct latestApiEndpoint: " + e.getMessage(), e);
     }
   }
 
   public FetchAlertFiltersResponse fetchAlertFilters(
-      String accountId, FetchAlertFiltersRequest request) {
+      String accountId, FetchAlertFiltersRequest request, String contextSource) {
 
     Set<String> subCategories = new HashSet<>();
     Set<String> urls = new HashSet<>();
     Set<String> hosts = new HashSet<>();
 
-    Bson timeRangeFilter = buildTimeRangeFilter(
-        request.getDetectedAtTimeRange(), "detectedAt");
+    // Scope all dropdown values to the current context source, same filter the events table uses.
+    Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId);
+    Bson eventsFilter = Filters.and(
+        buildTimeRangeFilter(request.getDetectedAtTimeRange(), "detectedAt"),
+        contextFilter);
 
-    Set<String> actors = fetchActorsForFilters(accountId, request);
+    Set<String> actors = fetchActorsForFilters(accountId, request, contextSource);
 
-    // Fetch remaining filters from malicious_events
-    fetchAlertFilterData(accountId, subCategories, urls, hosts, timeRangeFilter);
+    // Fetch remaining filters from malicious_events scoped to the current context source
+    fetchAlertFilterData(accountId, subCategories, urls, hosts, eventsFilter);
 
     return FetchAlertFiltersResponse.newBuilder()
         .addAllActors(actors)
@@ -393,16 +391,19 @@ public class MaliciousEventService {
         .build();
   }
 
-  private Set<String> fetchActorsForFilters(String accountId, FetchAlertFiltersRequest request) {
+  private Set<String> fetchActorsForFilters(String accountId, FetchAlertFiltersRequest request, String contextSource) {
+    Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId);
     if (USE_ACTOR_INFO_TABLE) {
       ActorInfoDao actorInfoDao = ActorInfoDao.instance;
-      Bson actorTimeRangeFilter = buildTimeRangeFilter(
-          request.getDetectedAtTimeRange(), "discoveredAt");
+      // actor_info uses discoveredAt for its time field; scope to the current context source.
+      Bson actorFilter = Filters.and(
+          buildTimeRangeFilter(request.getDetectedAtTimeRange(), "discoveredAt"),
+          contextFilter);
 
       try {
         Set<String> actors = new HashSet<>();
         actorInfoDao.getCollection(accountId)
-            .distinct("actorId", actorTimeRangeFilter, String.class)
+            .distinct("actorId", actorFilter, String.class)
             .forEach(value -> {
               if (value != null && !value.isEmpty()) {
                 actors.add(value);
@@ -414,9 +415,10 @@ public class MaliciousEventService {
         return new HashSet<>();
       }
     } else {
-      Bson timeRangeFilter = buildTimeRangeFilter(
-          request.getDetectedAtTimeRange(), "detectedAt");
-      return fetchDistinctFieldValues(accountId, "actor", timeRangeFilter, String.class);
+      Bson actorFilter = Filters.and(
+          buildTimeRangeFilter(request.getDetectedAtTimeRange(), "detectedAt"),
+          contextFilter);
+      return fetchDistinctFieldValues(accountId, "actor", actorFilter, String.class);
     }
   }
 
@@ -510,14 +512,14 @@ public class MaliciousEventService {
       }
     }
 
-    if (filter.hasLabel()) {
-      String labelString = filter.getLabel();
-      MaliciousEventDto.Label labelEnum = convertStringLabelToModelLabel(labelString);
-      applyLabelFilter(query, labelEnum);
-    }
+    // if (filter.hasLabel()) {
+    //   String labelString = filter.getLabel();
+    //   MaliciousEventDto.Label labelEnum = convertStringLabelToModelLabel(labelString);
+    //   applyLabelFilter(query, labelEnum);
+    // }
 
     // Apply simple context filter (only for ENDPOINT and AGENTIC)
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
     if (!contextFilter.isEmpty()) {
       query.putAll(contextFilter);
     }
@@ -631,13 +633,13 @@ public class MaliciousEventService {
         update = Updates.set("jiraTicketUrl", jiraTicketUrl);
       }
 
-      Document query = buildQuery(eventIds, filterMap, "update", contextSource);
+      Document query = buildQuery(eventIds, filterMap, "update", contextSource, accountId);
       if (query == null) {
         return 0;
       }
 
       String logMessage = String.format("Updating events %s to status: %s and jiraTicketUrl: %s",
-          getQueryDescription(eventIds, filterMap), status, jiraTicketUrl != null && !jiraTicketUrl.isEmpty() ? jiraTicketUrl : "null");
+          getQueryDescription(eventIds, filterMap, accountId), status, jiraTicketUrl != null && !jiraTicketUrl.isEmpty() ? jiraTicketUrl : "null");
       logger.info(logMessage);
 
       long modifiedCount = maliciousEventDao.getCollection(accountId).updateMany(query, update).getModifiedCount();
@@ -650,12 +652,12 @@ public class MaliciousEventService {
 
   public int deleteMaliciousEvents(String accountId, List<String> eventIds, Map<String, Object> filterMap, String contextSource) {
     try {
-      Document query = buildQuery(eventIds, filterMap, "delete", contextSource);
+      Document query = buildQuery(eventIds, filterMap, "delete", contextSource, accountId);
       if (query == null) {
         return 0;
       }
 
-      String logMessage = "Deleting events " + getQueryDescription(eventIds, filterMap);
+      String logMessage = "Deleting events " + getQueryDescription(eventIds, filterMap, accountId);
       logger.info(logMessage);
 
       long deletedCount = maliciousEventDao.getCollection(accountId).deleteMany(query).getDeletedCount();
@@ -668,24 +670,24 @@ public class MaliciousEventService {
     }
   }
 
-  private Document buildQuery(List<String> eventIds, Map<String, Object> filterMap, String operation, String contextSource) {
+  private Document buildQuery(List<String> eventIds, Map<String, Object> filterMap, String operation, String contextSource, String accountId) {
     if (eventIds != null && !eventIds.isEmpty()) {
       // Query by event IDs
       return new Document("_id", new Document("$in", eventIds));
     } else if (filterMap != null && !filterMap.isEmpty()) {
       // Query by filter criteria
-      return buildQueryFromFilter(filterMap, contextSource);
+      return buildQueryFromFilter(filterMap, contextSource, accountId);
     } else {
       logger.warn("Neither eventIds nor filterMap provided for " + operation);
       return null;
     }
   }
 
-  private String getQueryDescription(List<String> eventIds, Map<String, Object> filterMap) {
+  private String getQueryDescription(List<String> eventIds, Map<String, Object> filterMap, String accountId) {
     if (eventIds != null && !eventIds.isEmpty()) {
       return "by IDs: " + eventIds;
     } else if (filterMap != null && !filterMap.isEmpty()) {
-      Document query = buildQueryFromFilter(filterMap, null);
+      Document query = buildQueryFromFilter(filterMap, null, accountId);
       return "by filter: " + query.toJson();
     }
     return "";
@@ -704,18 +706,11 @@ public class MaliciousEventService {
     } else if (ThreatDetectionConstants.TRAINING.equals(statusFilter)) {
       query.append("status", ThreatDetectionConstants.TRAINING);
     } else if (ThreatDetectionConstants.ACTIVE.equals(statusFilter) || ThreatDetectionConstants.EVENTS_FILTER.equals(statusFilter)) {
-      // For Events tab: show null, empty, or ACTIVE status
-      List<Document> orConditions = Arrays.asList(
-        new Document("status", new Document("$exists", false)),
-        new Document("status", null),
-        new Document("status", ""),
-        new Document("status", ThreatDetectionConstants.ACTIVE)
-      );
-      query.append("$or", orConditions);
+      query.append("status", ThreatDetectionConstants.ACTIVE);
     }
   }
 
-  private Document buildQueryFromFilter(Map<String, Object> filter, String contextSource) {
+  private Document buildQueryFromFilter(Map<String, Object> filter, String contextSource, String accountId) {
     Document query = new Document();
 
     // Handle ips/actors filter
@@ -778,16 +773,15 @@ public class MaliciousEventService {
       }
     }
 
-    // Handle status filter
     String statusFilter = (String) filter.get("statusFilter");
     applyStatusFilter(query, statusFilter);
 
-    // Handle label filter with backward compatibility
-    String label = (String) filter.get("label");
-    if (label != null && !label.isEmpty()) {
-      MaliciousEventDto.Label labelEnum = convertStringLabelToModelLabel(label);
-      applyLabelFilter(query, labelEnum);
-    }
+    // // Handle label filter with backward compatibility
+    // String label = (String) filter.get("label");
+    // if (label != null && !label.isEmpty()) {
+    //   MaliciousEventDto.Label labelEnum = convertStringLabelToModelLabel(label);
+    //   applyLabelFilter(query, labelEnum);
+    // }
 
     String latestApiOrigRegex = (String) filter.get("latestApiOrigRegex");
     if (latestApiOrigRegex != null && !latestApiOrigRegex.isEmpty()) {
@@ -795,7 +789,7 @@ public class MaliciousEventService {
     }
 
     // Apply simple context filter (only for ENDPOINT and AGENTIC)
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
     if (!contextFilter.isEmpty()) {
       query.putAll(contextFilter);
     }

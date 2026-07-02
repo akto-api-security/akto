@@ -37,7 +37,7 @@ import ReactFlow, {
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
 import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../../main/labelHelper";
 import useAgenticFilter, { FILTER_TYPES } from "./useAgenticFilter";
-import { AGENTIC_OBSERVE_BACK_PATHS, INVENTORY_FILTER_KEY } from "../agentic/constants";
+import { AGENTIC_OBSERVE_BACK_PATHS, INVENTORY_FILTER_KEY, fetchAndCacheSkillApiData } from "../agentic/constants";
 import AgentEndpointTreeTable from "./AgentEndpointTreeTable";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "./endpointShieldHelper";
 import { sendQuery } from "../../agentic/services/agenticService";
@@ -1110,6 +1110,16 @@ function ApiCollections(props) {
     }, [activeFilterType]);
 
     useEffect(() => {
+        if (!activeFilterType) return;
+        const collectionIds = normalData.map(c => c.id).filter(Boolean);
+        if (!collectionIds.length) return;
+        const alreadyCached = !!PersistStore.getState().skillRiskScoreCache?.ts;
+        fetchAndCacheSkillApiData(collectionIds, { api, PersistStore })
+            .then(() => { if (!alreadyCached) setRefreshData(v => !v); })
+            .catch(() => {});
+    }, [activeFilterType, normalData.length]);
+
+    useEffect(() => {
         const isMountedRef = { current: true };
 
         fetchData(isMountedRef, false); // Use cache on mount
@@ -1708,7 +1718,7 @@ function ApiCollections(props) {
         processAnalysisQuery(initialQuery, metadata);
     }
 
-    const secondaryActionsComp = (
+    const secondaryActionsComp = activeFilterType ? null : (
         <HorizontalStack gap={2}>
             <Popover
                 active={moreActions}
@@ -1914,6 +1924,7 @@ function ApiCollections(props) {
         if (useTreeView && filteredCollections.length > 0) {
             return (
                 <AgentEndpointTreeTable
+                    key={`tree-${String(refreshData)}`}
                     collections={filteredCollections}
                     promotedBulkActions={promotedBulkActions}
                     filterType={activeFilterType}

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider } from "@shopify/polaris";
+import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider, Link, Badge, List } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AgenticFlyoutShell from "./AgenticFlyoutShell";
@@ -12,6 +12,7 @@ import DetailGrid from "./DetailGrid";
 import { buildAgenticObserveChatMetadata, fetchAgenticViolations, openViolationInThreatActivity, deviceServiceKey, isClaudeConfigHost } from "./agenticObserveApi";
 import { extractServiceName, extractEndpointId } from "./constants";
 import func from "@/util/func";
+import settingsApi from "../../settings/api";
 import "../../../components/layouts/style.css";
 
 // ─── Risk factor computation ───────────────────────────────────────────────────
@@ -247,6 +248,113 @@ function TopologyGraph({ device, agents, collections = [] }) {
     return <AssetTopologyGraph nodes={nodes} edges={edges} />;
 }
 
+// ─── User analysis section ─────────────────────────────────────────────────────
+
+const LLM_OBS_PATH = "/dashboard/observe/llm-observability";
+
+function makeTopicUrl(username, topic, subTopic) {
+    const p = new URLSearchParams();
+    if (username) p.set("username", username);
+    if (topic) p.set("topic", topic);
+    if (subTopic) p.set("subTopic", subTopic);
+    return `${LLM_OBS_PATH}?${p.toString()}`;
+}
+
+function UserAnalysisSection({ username }) {
+    const [analysis, setAnalysis] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!username) { setLoading(false); return; }
+        let cancelled = false;
+        setLoading(true);
+        settingsApi.getUserAnalysis(username)
+            .then(data => {
+                if (cancelled) return;
+                setAnalysis(data || null);
+                setLoading(false);
+            })
+            .catch(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [username]);
+
+    const topicEntries = useMemo(() => {
+        const h = analysis?.topicHierarchy;
+        if (!h || typeof h !== "object") return [];
+        return Object.entries(h).sort((a, b) => {
+            const sumA = Object.values(a[1] || {}).reduce((s, v) => s + v, 0);
+            const sumB = Object.values(b[1] || {}).reduce((s, v) => s + v, 0);
+            return sumB - sumA;
+        });
+    }, [analysis]);
+
+    if (!username) return null;
+    if (loading) return (
+        <Box paddingBlockStart="2">
+            <Text variant="bodySm" color="subdued">Loading user analysis...</Text>
+        </Box>
+    );
+    if (!analysis) return null;
+
+    const inputTokens = analysis.totalInputTokens || 0;
+    const outputTokens = analysis.totalOutputTokens || 0;
+
+    return (
+        <VerticalStack gap="3">
+            <Text variant="headingXs" color="subdued">User Analysis</Text>
+
+            {analysis.aiSummary && (
+                <Text variant="bodySm">{analysis.aiSummary}</Text>
+            )}
+
+            <HorizontalGrid columns={2} gap="3">
+                <VerticalStack gap="1">
+                    <Text variant="headingMd" as="p">{inputTokens.toLocaleString("en-US")}</Text>
+                    <Text variant="bodySm" color="subdued">Input tokens</Text>
+                </VerticalStack>
+                <VerticalStack gap="1">
+                    <Text variant="headingMd" as="p">{outputTokens.toLocaleString("en-US")}</Text>
+                    <Text variant="bodySm" color="subdued">Output tokens</Text>
+                </VerticalStack>
+            </HorizontalGrid>
+
+            {topicEntries.length > 0 && (
+                <VerticalStack gap="2">
+                    <Text variant="headingXs" color="subdued">Topics Queried</Text>
+                    <VerticalStack gap="3">
+                        {topicEntries.map(([topic, subMap]) => {
+                            const subEntries = Object.entries(subMap || {}).sort((a, b) => b[1] - a[1]);
+                            return (
+                                <Box paddingInlineStart={"4"}key={topic}>
+                                    <List.Item>
+                                        <HorizontalStack gap="2">
+                                            <Link url={makeTopicUrl(username, topic)} target="_blank">
+                                                <Badge>{func.toSentenceCase(topic)}</Badge>
+                                            </Link>
+                                            {subEntries.length > 0 && (
+                                                <Text variant="bodySm" color="subdued" as="span">
+                                                    {subEntries.map(([sub], i) => (
+                                                        <React.Fragment key={sub}>
+                                                            <Link removeUnderline monochrome url={makeTopicUrl(username, topic, sub)} target="_blank">
+                                                                {func.toSentenceCase(sub)}
+                                                            </Link>
+                                                            {i < subEntries.length - 1 ? ", " : ""}
+                                                        </React.Fragment>
+                                                    ))}
+                                                </Text>
+                                            )}
+                                        </HorizontalStack>
+                                    </List.Item>
+                                </Box>
+                            );
+                        })}
+                    </VerticalStack>
+                </VerticalStack>
+            )}
+        </VerticalStack>
+    );
+}
+
 // ─── Overview tab ─────────────────────────────────────────────────────────────
 
 const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -335,6 +443,8 @@ function OverviewTab({ device, agents, collections, onTabChange }) {
                 </VerticalStack>
 
                 <DetailGrid heading="Device Details" items={deviceDetails} columns={3} />
+
+                <UserAnalysisSection username={safeVal(device.username)} />
             </VerticalStack>
         </Box>
     );

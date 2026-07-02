@@ -32,9 +32,11 @@ export default {
                 endTime,
                 sessionsLimit:    limit    || 20,
                 sessionsAfterKey: afterKey || "",
-                userNames:  filters?.userName  || [],
-                serviceIds: filters?.serviceId || [],
-                searchString: searchString.length >= 3 ? searchString: ""
+                userNames:        filters?.userName  || [],
+                serviceIds:       filters?.serviceId || [],
+                topicFilters:     filters?.topic     || [],
+                subTopicFilters:  filters?.subTopic  || [],
+                searchString:     searchString.length >= 3 ? searchString : "",
             },
         }).then(r => ({
             sessions:     (r?.sessions ?? []).map(enrichRow),
@@ -66,15 +68,17 @@ export default {
             data: {
                 startTime,
                 endTime,
-                traceId:         traceId       || "",
-                sessionId:       sessionId     || "",
-                sortKey:         sortKey        || "timestamp",
+                traceId:         traceId        || "",
+                sessionId:       sessionId      || "",
+                sortKey:         sortKey         || "timestamp",
                 sortOrder:       sortOrder === -1 ? -1 : 1,
-                skip:            skip           || 0,
-                limit:           limit          || 20,
+                skip:            skip            || 0,
+                limit:           limit           || 20,
                 userNames:       filters?.userName  || [],
                 serviceIds:      filters?.serviceId || [],
-                searchString:    searchString   || "",
+                topicFilters:    filters?.topic     || [],
+                subTopicFilters: filters?.subTopic  || [],
+                searchString:    searchString    || "",
                 searchAfterJson: searchAfterJson || "",
             },
         }).then(r => {
@@ -129,11 +133,16 @@ export default {
             url: "/api/fetchLLMPromptFilters",
             method: "post",
             data: { startTime, endTime },
-        }).then(r => ({
-            userName:  r?.userName  || [],
-            deviceId:  r?.deviceId  || [],
-            serviceId: r?.serviceId || [],
-        }));
+        }).then(r => {
+            const fc = r?.filterChoices ?? r ?? {};
+            return {
+                userName:  fc?.userName  || [],
+                deviceId:  fc?.deviceId  || [],
+                serviceId: fc?.serviceId || [],
+                topic:     fc?.topic     || [],
+                subTopic:  fc?.subTopic  || [],
+            };
+        });
     },
 
     // Spans for a single trace, ordered by timestamp asc.

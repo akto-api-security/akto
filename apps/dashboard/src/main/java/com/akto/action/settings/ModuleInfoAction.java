@@ -43,6 +43,9 @@ public class ModuleInfoAction extends UserAction {
     private String username;
     @Getter
     @Setter
+    private List<String> usernames;
+    @Getter
+    @Setter
     private String team;
     @Getter
     @Setter
@@ -266,12 +269,35 @@ public class ModuleInfoAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        AgentUsersDao.instance.upsertTag(username, userEmail, team, userRole, getSUser().getLogin());
+        AgentUsersDao.instance.upsertTagFromDashboard(username, userEmail, team, userRole, getSUser().getLogin());
+        return SUCCESS.toUpperCase();
+    }
+
+    public String bulkUpdateUserDeviceTag() {
+        if (usernames == null || usernames.isEmpty()) {
+            addActionError("At least one username is required");
+            return ERROR.toUpperCase();
+        }
+
+        String updatedBy = getSUser().getLogin();
+        for (String u : usernames) {
+            AgentUsersDao.instance.upsertTagFromDashboard(u, null, team, userRole, updatedBy);
+        }
         return SUCCESS.toUpperCase();
     }
 
     public String fetchAgenticUsers() {
         agenticUsers = AgentUsersDao.instance.findAll(Filters.empty());
+        // Overwrite teamName/userRole with SSO values for users not manually pinned,
+        // so callers always see a single consistent effective field.
+        for (AgenticUsers u : agenticUsers) {
+            if (!AgenticUsers.SOURCE_MANUAL.equals(u.getTeamSource()) && u.getSsoTeamName() != null) {
+                u.setTeamName(u.getSsoTeamName());
+            }
+            if (!AgenticUsers.SOURCE_MANUAL.equals(u.getRoleSource()) && u.getSsoUserRole() != null) {
+                u.setUserRole(u.getSsoUserRole());
+            }
+        }
         return SUCCESS.toUpperCase();
     }
 

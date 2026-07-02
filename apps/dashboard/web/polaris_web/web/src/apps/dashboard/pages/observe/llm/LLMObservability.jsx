@@ -28,6 +28,19 @@ export default function LLMObservability() {
     const dashboardCategory = PersistStore(state => state.dashboardCategory) || "API Security";
     const isArgus = dashboardCategory === "Agentic Security";
 
+    // Read username/topic/subTopic from URL query params once on mount.
+    const [urlFilters] = useState(() => {
+        const params = new URLSearchParams(window.location.search);
+        const username = params.get("username");
+        const topic    = params.get("topic");
+        const subTopic = params.get("subTopic");
+        const f = {};
+        if (username) f.userName = [username];
+        if (topic)    f.topic    = [topic];
+        if (subTopic) f.subTopic = [subTopic];
+        return Object.keys(f).length > 0 ? f : null;
+    });
+
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
         values.ranges[5]
@@ -340,7 +353,7 @@ export default function LLMObservability() {
                     isArgus ? (
                         <MessagesView key="traces-table" currDateRange={currDateRange} columnDefs={ARGUS_TRACE_COL_DEFS} onRowClicked={p => p.data && setSelectedTrace(p.data)} />
                     ) : (
-                        <SessionsView key="sessions-table" currDateRange={currDateRange} onOpenSession={openSession} />
+                        <SessionsView key="sessions-table" currDateRange={currDateRange} onOpenSession={openSession} initialFilters={urlFilters} />
                     ),
                 ]}
             />

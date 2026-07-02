@@ -2,6 +2,7 @@ package com.akto.dao.context;
 
 import com.akto.dao.AccountsDao;
 import com.akto.dto.Account;
+import com.akto.dto.Log;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
 import java.math.BigDecimal;
@@ -13,12 +14,16 @@ public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
 public static ThreadLocal<Integer> userId = new ThreadLocal<Integer>();
 public static ThreadLocal<CONTEXT_SOURCE> contextSource = new ThreadLocal<CONTEXT_SOURCE>();
 public static ThreadLocal<Boolean> isRedactPayload = new ThreadLocal<>();
+public static ThreadLocal<String> activityId = new ThreadLocal<String>();
+public static ThreadLocal<Log.ActivityType> activityType = new ThreadLocal<Log.ActivityType>();
 
     public static void resetContextThreadLocals() {
         accountId.remove();
         userId.remove();
         contextSource.remove();
         isRedactPayload.remove();
+        activityId.remove();
+        activityType.remove();
     }
 
     public static int getId() {

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Badge, HorizontalStack, Text, Modal, TextField, FormLayout } from "@shopify/polaris";
+import { IndexFiltersMode, Badge, HorizontalStack, Text, Modal, TextField, FormLayout, Banner, VerticalStack } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -48,7 +48,7 @@ function UsersAndDevices() {
     const [data, setData] = useState({ users: [], devices: [] });
     const [userEnrichVersion, setUserEnrichVersion] = useState(0);
     const [summaryData, setSummaryData] = useState({ profileCount: 0, collectionCount: 0 });
-    const [editTagModal, setEditTagModal] = useState({ active: false, usernames: [], team: '', userRole: '', saving: false });
+    const [editTagModal, setEditTagModal] = useState({ active: false, usernames: [], team: '', userRole: '', teamSource: 'sso', roleSource: 'sso', ssoHintTeam: '', ssoHintRole: '', saving: false });
 
     const { tabsInfo } = useTable();
     const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
@@ -95,11 +95,24 @@ function UsersAndDevices() {
         return "success";
     }, []);
 
+    const buildGroupNameDisplay = useCallback((group, extraBadges = []) => {
+        const badges = [...extraBadges];
+        if (group.hasPersonalAccount) badges.push(<Badge key="personal" size="small" status="warning">Contains personal account</Badge>);
+        if (group.hasLocalMcpServer) badges.push(<Badge key="local-mcp" size="small" status="critical">Local MCP Server</Badge>);
+        if (badges.length === 0) return group.groupName;
+        return (
+            <HorizontalStack gap="2" align="start" wrap={false}>
+                <Text>{group.groupName}</Text>
+                {badges}
+            </HorizontalStack>
+        );
+    }, []);
+
     const prettifyGroupData = useCallback(
         (groups) => {
             return groups.map((group) => ({
                 ...group,
-                groupNameDisplay: group.groupName,
+                groupNameDisplay: buildGroupNameDisplay(group),
                 sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes || [], false),
                 riskScoreComp:
                     group.riskScore !== null ? (
@@ -111,31 +124,28 @@ function UsersAndDevices() {
                     ),
             }));
         },
-        [getRiskScoreStatus],
+        [getRiskScoreStatus, buildGroupNameDisplay],
     );
 
     const applyMaliciousBadgeToUsers = useCallback((maliciousSkillsSet, misconfiguredCollectionIdsSet, isMountedRef) => {
         if (!isMountedRef.current) return;
+        const enrichRow = (row) => {
+            const skillNames = row.uniqueSkillNames || new Set(
+                (row.collections || []).flatMap(c => Array.isArray(c.skills) ? c.skills.map(s => String(s).toLowerCase()) : [])
+            );
+            const hasMalicious = [...skillNames].some((s) => maliciousSkillsSet.has(s));
+            const collectionIds = (row.collections || []).map((c) => c.id);
+            const hasMisconfigured = collectionIds.some((id) => misconfiguredCollectionIdsSet.has(id));
+            const extraBadges = [];
+            if (hasMalicious) extraBadges.push(<Badge key="malicious" size="small" status="critical">Malicious Skills</Badge>);
+            return { ...row, hasMaliciousSkill: hasMalicious, hasMisconfiguredConfig: hasMisconfigured, groupNameDisplay: buildGroupNameDisplay(row, extraBadges) };
+        };
         setData((prev) => ({
-            ...prev,
-            users: prev.users.map((row) => {
-                const skillNames = row.uniqueSkillNames || new Set();
-                const hasMalicious = [...skillNames].some((s) => maliciousSkillsSet.has(s));
-                const collectionIds = (row.collections || []).map((c) => c.id);
-                const hasMisconfigured = collectionIds.some((id) => misconfiguredCollectionIdsSet.has(id));
-                const badges = [];
-                if (hasMalicious) badges.push(<Badge key="malicious" size="small" status="critical">Malicious Skills</Badge>);
-                const groupNameDisplay = badges.length > 0 ? (
-                    <HorizontalStack gap="2" align="start" wrap={false}>
-                        <Text>{row.groupName}</Text>
-                        {badges}
-                    </HorizontalStack>
-                ) : row.groupName;
-                return { ...row, hasMaliciousSkill: hasMalicious, hasMisconfiguredConfig: hasMisconfigured, groupNameDisplay };
-            }),
+            users: prev.users.map(enrichRow),
+            devices: prev.devices.map(enrichRow),
         }));
         setUserEnrichVersion((v) => v + 1);
-    }, []);
+    }, [buildGroupNameDisplay]);
 
     const enrichUsersWithMaliciousSkills = useCallback(async (userRows, isMountedRef = { current: true }) => {
         const allCollectionIds = [];
@@ -186,7 +196,7 @@ function UsersAndDevices() {
             });
             setLoading(false);
 
-            enrichUsersWithMaliciousSkills(userGroups, isMountedRef);
+            enrichUsersWithMaliciousSkills([...userGroups, ...deviceGroups], isMountedRef);
         } catch {
             setLoading(false);
         }
@@ -216,28 +226,32 @@ function UsersAndDevices() {
 
     const openEditTagModal = useCallback((usernames) => {
         const firstUser = data.users.find((u) => usernames.includes(u.id));
+        const teamSrc = firstUser?.teamSource || 'sso';
+        const roleSrc = firstUser?.roleSource || 'sso';
         setEditTagModal({
             active: true,
             usernames,
-            team: firstUser?.team || '',
-            userRole: firstUser?.userRole || '',
+            team: teamSrc === 'manual' ? (firstUser?.team || '') : '',
+            userRole: roleSrc === 'manual' ? (firstUser?.userRole || '') : '',
+            teamSource: teamSrc,
+            roleSource: roleSrc,
+            // firstUser.team for SSO users is already the SSO value (post-processed by Java)
+            ssoHintTeam: teamSrc === 'sso' ? (firstUser?.team || '') : '',
+            ssoHintRole: roleSrc === 'sso' ? (firstUser?.userRole || '') : '',
             saving: false,
         });
     }, [data.users]);
 
     const closeEditTagModal = useCallback(() => {
-        setEditTagModal({ active: false, usernames: [], team: '', userRole: '', saving: false });
+        setEditTagModal({ active: false, usernames: [], team: '', userRole: '', teamSource: 'sso', roleSource: 'sso', ssoHintTeam: '', ssoHintRole: '', saving: false });
     }, []);
 
     const saveEditTag = useCallback(async () => {
         setEditTagModal((prev) => ({ ...prev, saving: true }));
         try {
             const selectedUsers = data.users.filter((u) => editTagModal.usernames.includes(u.id));
-            await Promise.all(
-                selectedUsers.map((u) =>
-                    settingRequests.updateUserDeviceTag(u.groupName, editTagModal.team, editTagModal.userRole)
-                )
-            );
+            const groupNames = selectedUsers.map((u) => u.groupName).filter(Boolean);
+            await settingRequests.bulkUpdateUserDeviceTag(groupNames, editTagModal.team, editTagModal.userRole);
             setData((prev) => ({
                 ...prev,
                 users: prev.users.map((u) =>
@@ -367,27 +381,43 @@ function UsersAndDevices() {
         <Modal
             open={editTagModal.active}
             onClose={closeEditTagModal}
-            title={`Edit team & role — ${editTagModal.usernames?.length > 1 ? `${editTagModal.usernames.length} users` : (data.users.find((u) => editTagModal.usernames?.[0] === u.id)?.groupName || '')}`}
+            title={`Edit team & role \u2014 ${editTagModal.usernames?.length > 1 ? `${editTagModal.usernames.length} users` : (data.users.find((u) => editTagModal.usernames?.[0] === u.id)?.groupName || '')}`}
             primaryAction={{ content: 'Save', onAction: saveEditTag, loading: editTagModal.saving }}
             secondaryActions={[{ content: 'Cancel', onAction: closeEditTagModal }]}
         >
             <Modal.Section>
-                <FormLayout>
-                    <TextField
-                        label="Team"
-                        value={editTagModal.team}
-                        onChange={(v) => setEditTagModal((prev) => ({ ...prev, team: v }))}
-                        placeholder="e.g. Backend, DevOps"
-                        autoComplete="off"
-                    />
-                    <TextField
-                        label="User role"
-                        value={editTagModal.userRole}
-                        onChange={(v) => setEditTagModal((prev) => ({ ...prev, userRole: v }))}
-                        placeholder="e.g. Engineer, Architect"
-                        autoComplete="off"
-                    />
-                </FormLayout>
+                <VerticalStack gap="4">
+                    {(editTagModal.teamSource === 'sso' || editTagModal.roleSource === 'sso') && (
+                        <Banner tone="info">
+                            <Text variant="bodySm">
+                                {editTagModal.teamSource === 'sso' && editTagModal.roleSource === 'sso'
+                                    ? 'Team and role are currently managed by SSO. Saving will override SSO values and pin them to your manual entries.'
+                                    : editTagModal.teamSource === 'sso'
+                                        ? 'Team is currently managed by SSO. Saving will override the SSO value and pin it to your manual entry.'
+                                        : 'Role is currently managed by SSO. Saving will override the SSO value and pin it to your manual entry.'
+                                }
+                            </Text>
+                        </Banner>
+                    )}
+                    <FormLayout>
+                        <TextField
+                            label="Team"
+                            value={editTagModal.team}
+                            onChange={(v) => setEditTagModal((prev) => ({ ...prev, team: v }))}
+                            placeholder={editTagModal.teamSource === 'sso' && editTagModal.ssoHintTeam ? `SSO: ${editTagModal.ssoHintTeam}` : 'e.g. Backend, DevOps'}
+                            autoComplete="off"
+                            helpText={editTagModal.teamSource === 'manual' ? 'Clear this field to fall back to SSO value.' : undefined}
+                        />
+                        <TextField
+                            label="User role"
+                            value={editTagModal.userRole}
+                            onChange={(v) => setEditTagModal((prev) => ({ ...prev, userRole: v }))}
+                            placeholder={editTagModal.roleSource === 'sso' && editTagModal.ssoHintRole ? `SSO: ${editTagModal.ssoHintRole}` : 'e.g. Engineer, Architect'}
+                            autoComplete="off"
+                            helpText={editTagModal.roleSource === 'manual' ? 'Clear this field to fall back to SSO value.' : undefined}
+                        />
+                    </FormLayout>
+                </VerticalStack>
             </Modal.Section>
         </Modal>
     );

@@ -1049,12 +1049,12 @@ export default {
         })
     },
     
-    async saveCollectionDescription(apiCollectionId, description) {
+    async saveCollectionDescription(apiCollectionId, description, isSystemPrompt = false) {
         return await request({
             url: '/api/saveCollectionDescription',
             method: 'post',
             data: {
-                apiCollectionId, description
+                apiCollectionId, description, isSystemPrompt
             }
         })
     },
