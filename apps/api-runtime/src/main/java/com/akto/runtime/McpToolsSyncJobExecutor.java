@@ -1,12 +1,13 @@
 package com.akto.runtime;
 
-
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.APIConfig;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.HttpResponseParams.Source;
+import com.akto.dto.McpAuditInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.traffic.CollectionTags;
@@ -106,6 +107,9 @@ public class McpToolsSyncJobExecutor {
 
         logger.debug("Found {} collections for MCP server.", eligibleCollections.size());
 
+        // Auto-approve existing pending records based on approved servers list
+        autoApproveExistingPendingRecords();
+
         if (eligibleCollections.isEmpty()) {
             return;
         }
@@ -113,6 +117,65 @@ public class McpToolsSyncJobExecutor {
         eligibleCollections.forEach(apiCollection -> {
             runJobforCollection(apiCollection, apiConfig, new HashMap<>());
         });
+    }
+
+    private void autoApproveExistingPendingRecords() {
+        try {
+            // Get all pending MCP audit records
+            Bson filter = Filters.or(
+                Filters.exists("remarks", false),
+                Filters.eq("remarks", ""),
+                Filters.eq("remarks", null)
+            );
+            
+            List<McpAuditInfo> pendingRecords = McpAuditInfoDao.instance.findAll(filter);
+            
+            if (pendingRecords.isEmpty()) {
+                logger.debug("No pending MCP audit records found");
+                return;
+            }
+            
+            logger.info("Found {} pending MCP audit records to check for auto-approval", pendingRecords.size());
+            
+            int currentTime = Context.now();
+            int approvedCount = 0;
+            
+            // Check each pending record against approved servers list using shared helper
+            for (McpAuditInfo record : pendingRecords) {
+                String mcpHost = record.getMcpHost();
+                
+                if (mcpHost == null || mcpHost.isEmpty()) {
+                    continue;
+                }
+                
+                // Reuse existing checkIfServerIsApproved from McpRequestResponseUtils
+                String approvalStatus = McpRequestResponseUtils.checkIfServerIsApproved(mcpHost);
+                
+                if ("Approved".equals(approvalStatus)) {
+                    // Auto-approve this record - EXACT SAME as updateAuditData()
+                    List<Bson> updates = new ArrayList<>();
+                    updates.add(Updates.set("remarks", "Approved"));
+                    updates.add(Updates.set("markedBy", "System (Auto-approved)"));
+                    updates.add(Updates.set("updatedTimestamp", currentTime));
+                    updates.add(Updates.set("approvedAt", currentTime));
+                    
+                    McpAuditInfoDao.instance.updateOne(
+                        Filters.eq("_id", record.getId()),
+                        Updates.combine(updates)
+                    );
+                    
+                    approvedCount++;
+                    logger.info("Auto-approved existing record: {} (resource: {})", mcpHost, record.getResourceName());
+                }
+            }
+            
+            if (approvedCount > 0) {
+                logger.info("Auto-approved {} existing MCP audit records", approvedCount);
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error auto-approving existing MCP records: " + e.getMessage(), e);
+        }
     }
 
     public void runJobforCollection(ApiCollection apiCollection, APIConfig apiConfig, Map<String, String> authHeader) {
