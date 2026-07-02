@@ -22,6 +22,9 @@ public class LastCronRunInfo {
     public static final String LAST_USER_ANALYSIS_CRON = "lastUserAnalysisCron";
     private int lastUserAnalysisCron;
 
+    public static final String LAST_AGENT_GUARD_CORPUS_CRON = "lastAgentGuardCorpusCron";
+    private long lastAgentGuardCorpusCron;
+
     public LastCronRunInfo() {
     }
 
@@ -86,5 +89,13 @@ public class LastCronRunInfo {
 
     public void setLastUserAnalysisCron(int lastUserAnalysisCron) {
         this.lastUserAnalysisCron = lastUserAnalysisCron;
+    }
+
+    public long getLastAgentGuardCorpusCron() {
+        return lastAgentGuardCorpusCron;
+    }
+
+    public void setLastAgentGuardCorpusCron(long lastAgentGuardCorpusCron) {
+        this.lastAgentGuardCorpusCron = lastAgentGuardCorpusCron;
     }
 }

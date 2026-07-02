@@ -4,8 +4,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.bson.codecs.pojo.annotations.BsonId;
-import java.util.List;
-
 @Getter
 @Setter
 @NoArgsConstructor
@@ -15,26 +13,36 @@ public class AgentGuardCorpusEntry {
     private String id;
     public static final String ID = "_id";
 
+    // ---- carried over from the queue row, unchanged -----------------------
+
     public static final String AGENT_HOST = "agentHost";
     private String agentHost;
 
-    // Intent category: "benign", "prompt_injection", "toxicity", "banned_finance", etc.
+    // How the worker's regex cascade segmented this unit:
+    // "structured" | "content_type" | "deterministic" | "heuristic".
+    public static final String EXTRACTION_METHOD = "extractionMethod";
+    private String extractionMethod;
+
+    public static final String CREATED_AT = "createdAt";
+    private int createdAt;
+
     public static final String TASK_INTENT = "taskIntent";
-    private String taskIntent;
+    private String taskIntent = "";
 
-    // Verdict bucket: "allow" | "blocked"
-    public static final String SCOPE_BUCKET = "scopeBucket";
-    private String scopeBucket;
+    public static final String RISK_CATEGORY = "riskCategory";
+    private String riskCategory = "";
+    public static final String BREAKDOWN = "breakdown";
+    private Breakdown breakdown;
 
-    // true for "allow", false for "blocked" — derived from scopeBucket, stored for fast read.
-    public static final String IS_VALID = "isValid";
-    private boolean isValid;
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class Breakdown {
 
-    // Rolling window of MiniLM embeddings (384-dim each) for this bucket, max 50.
-    // Maintained by $push + $slice(-50) on upsert — no application-level trimming needed.
-    public static final String VECTORS = "vectors";
-    private List<List<Double>> vectors;
+        public static final String GROUND_TRUTH_SOURCE_KEY = "groundTruthSourceKey";
+        private String groundTruthSourceKey;
 
-    public static final String UPDATED_AT = "updatedAt";
-    private int updatedAt;
+        public static final String GROUND_TRUTH_INSTRUCTION_TEXT = "groundTruthInstructionText";
+        private String groundTruthInstructionText;
+    }
 }
