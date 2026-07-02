@@ -142,6 +142,7 @@
 .guardrail-content-inner {
     flex: 1;
     overflow-y: auto;
+    overflow-anchor: none;
 }
 
 .guardrail-content-footer {

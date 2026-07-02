@@ -169,6 +169,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableLlmPrompt, setEnableLlmPrompt] = useState(false);
     const [llmPrompt, setLlmPrompt] = useState("");
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
+    const [llmCompliance, setLlmCompliance] = useState({});
     const [enableExternalModel, setEnableExternalModel] = useState(false);
     const [url, setUrl] = useState("");
     const [confidenceScore, setConfidenceScore] = useState(25);
@@ -556,6 +557,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableLlmPrompt(false);
         setLlmPrompt("");
         setLlmConfidenceScore(0.5);
+        setLlmCompliance({});
         setEnableExternalModel(false);
         setUrl("");
         setConfidenceScore(25);
@@ -663,6 +665,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableLlmPrompt(policy.llmRule?.enabled && !!policy.llmRule?.userPrompt);
         setLlmPrompt(policy.llmRule?.userPrompt || "");
         setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
+        setLlmCompliance(policy.llmRule?.compliance || {});
 
         // Base Prompt Based Validation (AI Agents)
         setEnableBasePromptRule(policy.basePromptRule?.enabled || false);
@@ -771,6 +774,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 .map(entry => ({ pattern: entry.pattern.trim() }));
 
             const b = normalizeBehaviourValue(policyBehaviour);
+
+            const transformedDeniedTopics = deniedTopics.map(topic => ({
+                ...topic,
+                compliance: topic.compliance && Object.keys(topic.compliance).length > 0
+                    ? topic.compliance
+                    : undefined
+            }));
+
             const guardrailData = {
                 name,
                 description,
@@ -786,7 +797,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 deniedTopics: enableDeniedTopics
                     ? [
                         ...GENERAL_BLOCKS.filter(b => selectedDefaultBlockKeys.has(b.key)).map(toDeniedTopic),
-                        ...deniedTopics
+                        ...transformedDeniedTopics
                       ]
                     : [],
                 wordFilters,
@@ -803,7 +814,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 llmRule: {
                     enabled: enableLlmPrompt && !!llmPrompt.trim(),
                     userPrompt: llmPrompt.trim(),
-                    confidenceScore: llmConfidenceScore
+                    confidenceScore: llmConfidenceScore,
+                    compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 },
                 basePromptRule: {
                     enabled: enableBasePromptRule,
@@ -904,6 +916,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableBasePromptRule={setEnableBasePromptRule}
                         basePromptConfidenceScore={basePromptConfidenceScore}
                         setBasePromptConfidenceScore={setBasePromptConfidenceScore}
+                        enterpriseLicenseComplianceCategories={enterpriseLicenseComplianceCategories}
                     />
                 );
             case 3:
@@ -968,6 +981,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setLlmRule={setLlmPrompt}
                         llmConfidenceScore={llmConfidenceScore}
                         setLlmConfidenceScore={setLlmConfidenceScore}
+                        llmCompliance={llmCompliance}
+                        setLlmCompliance={setLlmCompliance}
                         enableExternalModel={enableExternalModel}
                         setEnableExternalModel={setEnableExternalModel}
                         url={url}
@@ -1116,7 +1131,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 llmRule: {
                     enabled: true,
                     userPrompt: llmPrompt.trim(),
-                    confidenceScore: llmConfidenceScore
+                    confidenceScore: llmConfidenceScore,
+                    compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 }
             } : {}),
             ...(enableBasePromptRule ? {
