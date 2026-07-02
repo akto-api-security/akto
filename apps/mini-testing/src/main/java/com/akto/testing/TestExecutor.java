@@ -174,9 +174,18 @@ public class TestExecutor {
             }
             
             // Execute legacy testing
+            // WebSocket endpoints run serially to avoid broadcast mixing across parallel connections
+            boolean isWebSocket = rawApi != null &&
+                rawApi.getRequest().getProtocolType() == OriginalHttpRequest.ProtocolType.WEBSOCKET;
             try {
-                Future<Void> future = threadPool.submit(() -> startWithLatch(testingRunSubCategories, accountId, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, latch, finalApiInfoKeySubcategoryMap));
-                testingRecords.add(future);
+                if (isWebSocket) {
+                    startWithLatch(testingRunSubCategories, accountId, apiInfoKey, messages, summaryId,
+                        syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap,
+                        testLogs, testingRun, latch, finalApiInfoKeySubcategoryMap);
+                } else {
+                    Future<Void> future = threadPool.submit(() -> startWithLatch(testingRunSubCategories, accountId, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, latch, finalApiInfoKeySubcategoryMap));
+                    testingRecords.add(future);
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in starting with latch for API " + apiInfoKey + " : " + e.getMessage());
                 countDownLatch(latch);

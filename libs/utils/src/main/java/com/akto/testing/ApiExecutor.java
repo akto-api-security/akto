@@ -29,6 +29,8 @@ import okio.BufferedSink;
 
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.UUID;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -301,13 +303,14 @@ public class ApiExecutor {
         }
         removeAktoInternalHeaders(request);
 
-        long timeoutMs = 5000;  // Default 30 second timeout for WebSocket messages
+        long timeoutMs = 30000;  // Default 30 second timeout for WebSocket messages
 
         // For Kafka parallel execution (new testing mode), use direct (non-pooled) connections
         // to avoid message mixing between concurrent tasks
         if (Constants.IS_NEW_TESTING_ENABLED) {
             String wsUrl = request.isConnectionString() ? buildWebSocketUrl(request) : getWebSocketConnectionUrl(collectionId);
-            return WebSocketExecutor.sendMessageDirect(request, wsUrl, request.getHeaders(), timeoutMs);
+            String requestId = UUID.randomUUID().toString();
+            return WebSocketExecutor.sendMessageDirect(request, wsUrl, request.getHeaders(), timeoutMs, requestId);
         }
 
         // Connection-string endpoints: open a fresh WS connection, capture the initial server

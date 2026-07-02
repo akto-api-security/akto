@@ -146,13 +146,27 @@ public class WebSocketExecutor {
         }
     }
 
+    private static String enrichMessageWithRequestId(String requestBody, String requestId) {
+        if (requestId == null) {
+            return requestBody;
+        }
+        try {
+            BasicDBObject bodyObj = BasicDBObject.parse(requestBody);
+            bodyObj.put("requestId", requestId);
+            return bodyObj.toJson();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Failed to inject requestId into WS message body: " + e.getMessage(), LogDb.TESTING);
+            return requestBody;
+        }
+    }
+
     /**
      * For Kafka parallel execution: Opens a fresh WebSocket connection (non-pooled),
      * sends the message, receives the response, and closes the connection.
      * Each consumer task gets its own complete connection cycle to avoid message mixing.
      */
     public static OriginalHttpResponse sendMessageDirect(
-            OriginalHttpRequest request, String wsUrl, Map<String, List<String>> headers, long timeoutMs) {
+            OriginalHttpRequest request, String wsUrl, Map<String, List<String>> headers, long timeoutMs, String requestId) {
         if (timeoutMs <= 0) timeoutMs = DEFAULT_TIMEOUT_MS;
         Map<String, List<String>> filteredHeaders = filterWebSocketHeaders(headers);
         WebSocketConnection conn = new WebSocketConnection(wsUrl, filteredHeaders, "kafka-task");
@@ -166,9 +180,10 @@ public class WebSocketExecutor {
             if (requestBody == null || requestBody.isEmpty()) {
                 throw new IllegalArgumentException("WebSocket message body cannot be empty");
             }
-            // Inject URL into request body as "type" field
+            // Inject URL into request body as "type" field and requestId for correlation
             if(!request.isConnectionString()){
                 requestBody = enrichMessageWithUrl(requestBody, request.getUrl());
+                requestBody = enrichMessageWithRequestId(requestBody, requestId);
                 request.setBody(requestBody);
                 
                 // Drain any pending messages before sending to avoid response mismatch
@@ -177,8 +192,8 @@ public class WebSocketExecutor {
                 conn.sendMessage(requestBody);
             }
             
-            // Get response
-            String response = conn.getNextResponse(timeoutMs);
+            // Get response with request ID matching
+            String response = conn.getNextResponse(timeoutMs, requestId);
             
             return new OriginalHttpResponse(response, new HashMap<>(), 200);
         } catch (java.util.concurrent.TimeoutException e) {
@@ -190,6 +205,11 @@ public class WebSocketExecutor {
         } finally {
             conn.close();
         }
+    }
+
+    public static OriginalHttpResponse sendMessageDirect(
+            OriginalHttpRequest request, String wsUrl, Map<String, List<String>> headers, long timeoutMs) {
+        return sendMessageDirect(request, wsUrl, headers, timeoutMs, null);
     }
 
     public static void closeConnections() {

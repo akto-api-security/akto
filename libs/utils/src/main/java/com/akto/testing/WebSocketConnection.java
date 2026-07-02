@@ -2,6 +2,7 @@ package com.akto.testing;
 
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.mongodb.BasicDBObject;
 import okhttp3.WebSocket;
 import okio.ByteString;
 
@@ -72,7 +73,7 @@ public class WebSocketConnection {
         TimestampedMessage resultMsg = null;
         
         while (System.currentTimeMillis() < deadline) {
-            // Find the most recent valid message (since queue was drained before send)
+            // Find the most recent valid message after send
             TimestampedMessage msg = null;
             Iterator<TimestampedMessage> iter = receivedMessages.iterator();
             while (iter.hasNext()) {
@@ -94,6 +95,51 @@ public class WebSocketConnection {
         
         if (resultMsg != null) {
             loggerMaker.infoAndAddToDb("WebSocket response received: " + resultMsg.content.substring(0, Math.min(100, resultMsg.content.length())), LogDb.TESTING);
+            return resultMsg.content;
+        }
+        throw new TimeoutException("No response received within " + timeoutMs + "ms");
+    }
+
+    public String getNextResponse(long timeoutMs, String requestId) throws TimeoutException, InterruptedException {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        TimestampedMessage resultMsg = null;
+        
+        while (System.currentTimeMillis() < deadline) {
+            TimestampedMessage requestIdMatch = null;
+
+            Iterator<TimestampedMessage> iter = receivedMessages.iterator();
+            while (iter.hasNext()) {
+                TimestampedMessage candidate = iter.next();
+                if (candidate.receivedAt >= lastSentAt && !isPingPong(candidate.content)) {
+                    if (messageContainsRequestId(candidate.content, requestId)) {
+                        requestIdMatch = candidate;  // Keep updating to get most recent match
+                    }
+                }
+            }
+            
+            if (requestIdMatch != null) {
+                resultMsg = requestIdMatch;
+                break;
+            }
+            Thread.sleep(10);
+        }
+        
+        // If no requestId match found after timeout, fall back to most recent valid message
+        if (resultMsg == null) {
+            Iterator<TimestampedMessage> iter = receivedMessages.iterator();
+            while (iter.hasNext()) {
+                TimestampedMessage candidate = iter.next();
+                if (candidate.receivedAt >= lastSentAt && !isPingPong(candidate.content)) {
+                    resultMsg = candidate;
+                }
+            }
+        }
+
+        // Clear all messages (whether we found one or timed out)
+        receivedMessages.clear();
+        
+        if (resultMsg != null) {
+            loggerMaker.infoAndAddToDb("WebSocket response received (requestId=" + requestId + "): " + resultMsg.content.substring(0, Math.min(100, resultMsg.content.length())), LogDb.TESTING);
             return resultMsg.content;
         }
         throw new TimeoutException("No response received within " + timeoutMs + "ms");
@@ -164,6 +210,24 @@ public class WebSocketConnection {
             return true;
         }
         return msg.equalsIgnoreCase("PING") || msg.equalsIgnoreCase("PONG");
+    }
+
+    private boolean messageContainsRequestId(String messageContent, String requestId) {
+        if (requestId == null || messageContent == null) {
+            return false;
+        }
+        try {
+            BasicDBObject msgObj = BasicDBObject.parse(messageContent);
+            // Check if the message contains the matching requestId
+            String msgRequestId = msgObj.getString("requestId");
+            if (msgRequestId != null && msgRequestId.equals(requestId)) {
+                return true;
+            }
+            return false;
+        } catch (Exception e) {
+            // If message is not JSON, skip it
+            return false;
+        }
     }
 
     public String getUrl() {

@@ -2,6 +2,8 @@ package com.akto.testing;
 
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+
+import okhttp3.Dispatcher;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.WebSocket;
@@ -15,10 +17,16 @@ public class WebSocketConnectionPool {
     private static final Map<String, WebSocketConnection> connections = new ConcurrentHashMap<>();
     private static final Map<Integer, String> connectionUrlCache = new ConcurrentHashMap<>();  // Cache connection URL by collectionId
     private static final Object poolLock = new Object();
+    private static final Dispatcher dispatcher;
+    static {
+        dispatcher = new Dispatcher();
+        dispatcher.setMaxRequestsPerHost(64);
+    }
     // Single shared client so the dispatcher stays alive for all active WebSocket connections
     private static final OkHttpClient sharedClient = new OkHttpClient.Builder()
             .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
             .readTimeout(0, java.util.concurrent.TimeUnit.SECONDS)  // 0 = no read timeout (WS is persistent)
+            .dispatcher(dispatcher)
             .build();
 
     public static WebSocketConnection getOrCreate(String url, 
