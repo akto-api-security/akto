@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon, TextField } from "@shopify/polaris"
 import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import api from "../api"
 import { useEffect, useMemo, useState, isValidElement } from "react"
@@ -7,7 +7,7 @@ import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {useLocation, useNavigate, useParams } from "react-router-dom"
 import { saveAs } from 'file-saver'
-import {FileMinor, HideMinor, ViewMinor, MagicMinor} from '@shopify/polaris-icons';
+import {FileMinor, HideMinor, ViewMinor, MagicMinor, EditMinor} from '@shopify/polaris-icons';
 import "./api_inventory.css"
 import ApiDetails from "./ApiDetails"
 import UploadFile from "../../../components/shared/UploadFile"
@@ -35,8 +35,7 @@ import IssuesApi from "../../issues/api"
 import SequencesFlow from "./SequencesFlow"
 import SwaggerDependenciesFlow from "./SwaggerDependenciesFlow"
 import SchemaView from "./SchemaView"
-import { CATEGORY_API_SECURITY, getDashboardCategory, isCategory, mapLabel, isEndpointSecurityCategory, isAgenticSecurityCategory } from "../../../../main/labelHelper"
-import McpToolsGraph from "./McpToolsGraph"
+import {  getDashboardCategory, mapLabel, isEndpointSecurityCategory, isAgenticSecurityCategory } from "../../../../main/labelHelper"
 import { findTypeTag, TYPE_TAG_KEYS } from "../agentic/mcpClientHelper"
 import AgentDiscoverGraphWithDummyData from "./AgentDiscoveryGraphWithDummyData"
 import AgentDiscoverGraph from "./AgentDiscoverGraph"
@@ -346,9 +345,11 @@ function ApiEndpoints(props) {
     const [description, setDescription] = useState("");
     const [isEditingDescription, setIsEditingDescription] = useState(false)
     const [editableDescription, setEditableDescription] = useState(description)
-    const [isSystemPrompt, setIsSystemPrompt] = useState(false)
     const [currentKey, setCurrentKey] = useState(Date.now()); // to force remount InlineEditableText component
     const hasAccessToDiscoveryAgent = func.checkForFeatureSaas('STATIC_DISCOVERY_AI_AGENTS');
+    const [systemPrompt, setSystemPrompt] = useState("")
+    const [showSystemPromptModal, setShowSystemPromptModal] = useState(false)
+    const [savingSystemPrompt, setSavingSystemPrompt] = useState(false)
 
 
     const isSkillCollection = (apiInfoList || []).some(info => info?.id?.url?.includes('/skills/'))
@@ -832,18 +833,8 @@ function ApiEndpoints(props) {
 
     }, [selectedUrl, selectedMethod, endpointData])
 
-    // const checkGptActive = async() => {
-    //     await settingsRequests.fetchAktoGptConfig(apiCollectionId).then((resp) => {
-    //         if(resp.currentState[0].state === "ENABLED"){
-    //             setIsGptActive(true)
-    //         }
-    //     })
-    // }
 
     useEffect(() => {
-        // if (!isQueryPage) {
-        //     checkGptActive()
-        // }
         fetchData()
     }, [apiCollectionId, endpointListFromConditions, agenticView])
 
@@ -1006,7 +997,7 @@ function ApiEndpoints(props) {
             let blob = new Blob([csv], {
                 type: "application/csvcharset=UTF-8"
             });
-            saveAs(blob, ("All endpoints") + ".csv");
+            saveAs(blob, ("All endpoints.csv"));
             func.setToast(true, false, <div data-testid="csv_download_message">CSV exported successfully</div>)
         }
     }
@@ -1424,6 +1415,11 @@ function ApiEndpoints(props) {
                             {
                                 title: 'Others',
                                 items: [
+                                    isAgenticSecurityCategory() && {
+                                        content: 'Add system prompt',
+                                        onAction: () => { addSystemPrompt() },
+                                        prefix: <Box><Icon source={EditMinor} /></Box>
+                                    },
                                     {
                                         content: `${showWorkflowTests ? "Hide" : "Show"} workflow tests`,
                                         onAction: () => { toggleWorkflowTests(); setExportOpen(false) },
@@ -1499,6 +1495,32 @@ function ApiEndpoints(props) {
 
     function toggleApiGroupModal(){
         setShowApiGroupModal(false);
+    }
+
+    function addSystemPrompt(){
+        setShowSystemPromptModal(true);
+    }
+
+    function handleSaveSystemPrompt(){
+        setSavingSystemPrompt(true);
+        api.saveCollectionDescription(apiCollectionId, systemPrompt, true)
+            .then(() => {
+                func.setToast(true, false, "System prompt saved successfully");
+                setSystemPrompt("");
+                setShowSystemPromptModal(false);
+            })
+            .catch((err) => {
+                console.error("Failed to save system prompt:", err);
+                func.setToast(true, true, "Failed to save system prompt. Please try again.");
+            })
+            .finally(() => {
+                setSavingSystemPrompt(false);
+            })
+    }
+
+    function handleCancelSystemPrompt(){
+        setShowSystemPromptModal(false);
+        setSystemPrompt("");
     }
 
     function handleBulkDeMerge(selectedResources){
@@ -1725,15 +1747,6 @@ function ApiEndpoints(props) {
         return resourceId.split("###").slice(0, 3).join("###")
     }
 
-    function buildEndpointTagsMap() {
-        const map = {}
-        ;(endpointData["all"] || []).forEach(ep => {
-            const stableKey = `${ep.method}###${ep.endpoint}###${ep.apiCollectionId}`
-            map[stableKey] = ep.tagsList || []
-        })
-        return map
-    }
-
     async function updateEndpointTags(stableIds, tagObj) {
         const apiInfoKeys = stableIds.map(stableKey => {
             const tmp = stableKey.split("###")
@@ -1860,6 +1873,38 @@ function ApiEndpoints(props) {
                             : 'Guardrails will no longer be applied to these endpoints.'}
                     </Text>
                 </VerticalStack>
+            </Modal.Section>
+        </Modal>
+    )
+
+    let systemPromptModal = (
+        <Modal
+            open={showSystemPromptModal}
+            onClose={handleCancelSystemPrompt}
+            title="Add system prompt"
+            primaryAction={{
+                content: 'Save',
+                onAction: handleSaveSystemPrompt,
+                loading: savingSystemPrompt
+            }}
+            secondaryActions={[
+                {
+                    content: 'Cancel',
+                    onAction: handleCancelSystemPrompt
+                }
+            ]}
+            key="system-prompt-modal"
+        >
+            <Modal.Section>
+                <TextField
+                    label="System prompt"
+                    labelHidden
+                    value={systemPrompt}
+                    onChange={setSystemPrompt}
+                    multiline={6}
+                    placeholder="Enter the system prompt for this collection"
+                    autoComplete="off"
+                />
             </Modal.Section>
         </Modal>
     )
@@ -2045,6 +2090,7 @@ function ApiEndpoints(props) {
                   deleteApiModal,
                   bulkDeMergeModal,
                   bulkGuardrailModal,
+                  systemPromptModal,
                   <GuardrailSchemaModal
                       key="guardrail-schema-modal"
                       open={showGuardrailSchemaModal}
@@ -2110,11 +2156,7 @@ function ApiEndpoints(props) {
         }
         
         setIsEditingDescription(false);
-        if(editableDescription === description) {
-            setIsSystemPrompt(false);
-            return;
-        }
-        api.saveCollectionDescription(apiCollectionId, editableDescription, isSystemPrompt)
+        api.saveCollectionDescription(apiCollectionId, editableDescription)
             .then(() => {
                 updateCollectionDescription(allCollections, parseInt(apiCollectionId, 10), editableDescription);
                 setAllCollections(allCollections);
@@ -2125,7 +2167,6 @@ function ApiEndpoints(props) {
                 console.error("Failed to save description:", err);
                 func.setToast(true, true, "Failed to save description. Please try again.");
             })
-            .finally(() => setIsSystemPrompt(false));
     };
 
     return (
@@ -2167,11 +2208,6 @@ function ApiEndpoints(props) {
                                                     setIsEditing={setIsEditingDescription}
                                                     placeholder={"Add a brief description"}
                                                     fitParentWidth={true}
-                                                />
-                                                <Checkbox
-                                                    label="This is the agent's system prompt"
-                                                    checked={isSystemPrompt}
-                                                    onChange={setIsSystemPrompt}
                                                 />
                                             </VerticalStack>
                                         ) : (
