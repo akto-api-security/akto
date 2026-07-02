@@ -12,6 +12,7 @@ import (
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/models"
+	"github.com/akto-api-security/guardrails-service/pkg/auth"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
@@ -1543,6 +1544,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			ResponsePayload:    data.ResponsePayload,
 			ContextSource:      types.ContextSource(contextSource),
 			McpServerName:      mcpServerName,
+			AktoAccountID:      auth.AccountIDFromServiceToken(),
 			SkipThreat:         skipThreat, // Set skipThreat directly in context
 			AllowedLists:       mcpAllowedHostList,
 			CompiledRegexRules: compiledRules,

@@ -21,13 +21,18 @@ import (
 )
 
 // applyAuthenticatedAccount overrides the caller-supplied akto_account_id with
-// the JWT accountId verified by the auth middleware. The body field is
-// untrusted, so cache partitioning, metrics, and logging must key off the
-// authenticated identity. When auth is disabled (local/dev) the body value is
-// left as-is.
+// the JWT accountId verified by the auth middleware, falling back to the
+// accountId claim of DATABASE_ABSTRACTOR_SERVICE_TOKEN — the tenant every
+// policy fetch already runs under. The body field is untrusted, so cache
+// partitioning, metrics, and logging must key off a deployment-owned identity;
+// the body value survives only when neither source is available (local/dev).
 func applyAuthenticatedAccount(c *gin.Context, params *models.ValidateRequestParams) {
 	if acct, ok := auth.AccountIDFromContext(c); ok {
 		params.AktoAccountID = strconv.Itoa(acct)
+		return
+	}
+	if acct := auth.AccountIDFromServiceToken(); acct != "" {
+		params.AktoAccountID = acct
 	}
 }
 
