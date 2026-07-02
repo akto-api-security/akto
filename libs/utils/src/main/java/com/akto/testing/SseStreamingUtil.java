@@ -10,12 +10,14 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import okio.BufferedSource;
 
 public class SseStreamingUtil {
 
@@ -33,6 +35,7 @@ public class SseStreamingUtil {
 
     public static StreamingResult startStreaming(StreamingRequestConfig config) {
         List<String> chunks = new CopyOnWriteArrayList<>();
+        CountDownLatch connected = new CountDownLatch(1);
 
         Thread thread = new Thread(() -> {
             try {
@@ -55,32 +58,55 @@ public class SseStreamingUtil {
                         MediaType.parse("application/json"));
                 builder.post(body);
 
-                try (Response response = client.newCall(builder.build()).execute();
-                     BufferedReader reader = new BufferedReader(new InputStreamReader(response.body().byteStream()))) {
+                try (Response response = client.newCall(builder.build()).execute()) {
+                    BufferedSource source = response.body().source();
                     loggerMaker.infoAndAddToDb("SSE connection established, status: " + response.code());
+                    connected.countDown();
                     String line;
-                    while ((line = reader.readLine()) != null) {
+                    while ((line = source.readUtf8Line()) != null) {
                         if (line.startsWith("data: ")) {
-                            chunks.add(line.substring(6));
+                            String data = line.substring(6);
+                            chunks.add(data);
+                            if (config.lastKey != null && data.contains(config.lastKey)) {
+                                loggerMaker.infoAndAddToDb("SSE received lastKey: " + config.lastKey + ", closing stream");
+                                break;
+                            }
                         }
                     }
                     loggerMaker.infoAndAddToDb("SSE stream closed, total chunks collected: " + chunks.size());
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "SSE streaming failed for url: " + config.url + " error: " + e.getMessage());
+                connected.countDown();
             }
         });
 
         thread.start();
+        try {
+            loggerMaker.infoAndAddToDb("Waiting for SSE connection to be established for url: " + config.url);
+            boolean established = connected.await(30, TimeUnit.SECONDS);
+            if (established) {
+                loggerMaker.infoAndAddToDb("SSE connection ready, proceeding with API call for url: " + config.url);
+            } else {
+                loggerMaker.errorAndAddToDb("SSE connection timed out after 30s for url: " + config.url);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            loggerMaker.errorAndAddToDb(e, "SSE connection wait interrupted for url: " + config.url);
+        }
         return new StreamingResult(thread, chunks);
     }
 
     public static List<String> joinAndCollect(StreamingResult result) {
+        loggerMaker.infoAndAddToDb("Joining SSE streaming thread, total chunks collected so far: " + result.chunks.size());
         try {
-            result.thread.join(60000);
+            result.thread.join(30000);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        } finally {
+            result.thread.interrupt();
         }
+        loggerMaker.infoAndAddToDb("SSE streaming thread joined, total chunks collected: " + result.chunks.size());
         return new ArrayList<>(result.chunks);
     }
 }

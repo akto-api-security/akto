@@ -139,6 +139,7 @@ public class ApiExecutorUtil {
                 ScriptObjectMirror srMirror = (ScriptObjectMirror) srObj;
                 String srUrl = (String) srMirror.get("url");
                 String srBody = (String) srMirror.get("body");
+                String lastKey = (String) srMirror.get("lastKey");
                 Map<String, String> srHeaders = new HashMap<>();
                 Object headersObj = srMirror.get("headers");
                 if (headersObj instanceof ScriptObjectMirror) {
@@ -148,7 +149,7 @@ public class ApiExecutorUtil {
                         if (val != null) srHeaders.put(key, val.toString());
                     }
                 }
-                parsedStreamingRequest = new TestingRunConfig.StreamingRequestConfig(srUrl, srBody, srHeaders);
+                parsedStreamingRequest = new TestingRunConfig.StreamingRequestConfig(srUrl, srBody, srHeaders, lastKey);
             }
 
             if (useConversationCache && conversationId != null) {
@@ -200,7 +201,7 @@ public class ApiExecutorUtil {
     private static void applyCachedToRequest(OriginalHttpRequest request, ScriptResultCache cached,
             TestingRunConfig testingRunConfig) {
         if (cached.cachedMethod != null) request.setMethod(cached.cachedMethod);
-        if (cached.cachedHeaders != null) request.setHeaders(cached.cachedHeaders);
+        if (cached.cachedHeaders != null && !cached.cachedHeaders.isEmpty()) request.setHeaders(cached.cachedHeaders);
         if (cached.cachedUrl != null) request.setUrl(cached.cachedUrl);
         if (cached.cachedPayload != null) request.setBody(cached.cachedPayload);
         if (cached.cachedQueryParams != null) request.setQueryParams(cached.cachedQueryParams);

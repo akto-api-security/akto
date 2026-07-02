@@ -8,6 +8,7 @@ import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.TestingRunConfig.StreamingRequestConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
@@ -15,6 +16,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
+import com.akto.testing.SseStreamingUtil.StreamingResult;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.grpc.ProtoBufUtils;
@@ -300,9 +302,9 @@ public class ApiExecutor {
         boolean executeScript = testingRunConfig != null;
         String tempPayload = ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript, testingRunConfig);
 
-        TestingRunConfig.StreamingRequestConfig streamingRequestConfig =
+        StreamingRequestConfig streamingRequestConfig =
                 (testingRunConfig != null) ? testingRunConfig.getStreamingRequest() : null;
-        SseStreamingUtil.StreamingResult streamingResult =
+        StreamingResult streamingResult =
                 (streamingRequestConfig != null) ? SseStreamingUtil.startStreaming(streamingRequestConfig) : null;
 
         String url = prepareUrl(request, testingRunConfig);
@@ -406,6 +408,7 @@ public class ApiExecutor {
         }
 
         if (streamingResult != null && response != null) {
+            loggerMaker.infoAndAddToDb("[SSE] Actual Response: " + response.getBody(), LogDb.TESTING);
             response.setStreamingChunks(SseStreamingUtil.joinAndCollect(streamingResult));
         }
 

@@ -57,11 +57,13 @@ public class TestingRunConfig {
         public String url;
         public String body;
         public Map<String, String> headers;
+        public String lastKey;
 
-        public StreamingRequestConfig(String url, String body, Map<String, String> headers) {
+        public StreamingRequestConfig(String url, String body, Map<String, String> headers, String lastKey) {
             this.url = url;
             this.body = body;
             this.headers = headers;
+            this.lastKey = lastKey;
         }
     }
 
