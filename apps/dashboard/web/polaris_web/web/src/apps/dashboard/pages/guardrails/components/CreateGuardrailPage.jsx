@@ -7,7 +7,8 @@ import {
     Box,
     Icon,
     Button,
-    Badge
+    Badge,
+    Spinner
 } from "@shopify/polaris";
 import {
     CancelMajor,
@@ -26,6 +27,7 @@ import {
     resolveStoredPolicyBehaviour
 } from '../utils';
 import { getDefaultGeneralBlockTopics, GENERAL_BLOCKS, isGeneralBlockTopic, toDeniedTopic } from '../generalBlocks';
+import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from './enterpriseLicenseComplianceCatalog';
 import { groupCollectionsByAgent, groupCollectionsByService, extractServiceName } from '../../observe/agentic/constants';
 import { isEndpointSecurityCategory } from '../../../../main/labelHelper';
 import func from "@/util/func";
@@ -624,7 +626,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 .map(t => GENERAL_BLOCKS.find(b => b.topic === t.topic)?.key)
                 .filter(Boolean)
         );
-        const customTopics = loadedTopics.filter(t => !isGeneralBlockTopic(t.topic));
+        const customTopics = loadedTopics.filter(t => !isGeneralBlockTopic(t.topic) && t.origin !== ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN);
         setEnableDeniedTopics(loadedTopics.length > 0);
         setSelectedDefaultBlockKeys(defaultKeys);
         setDeniedTopics(customTopics);
@@ -1139,7 +1141,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 .map(entry => ({ pattern: entry.pattern.trim() })),
             blockPersonalAccounts,
             applyOnResponse: applyOnResponse,
-            applyOnRequest: applyOnRequest
+            applyOnRequest: applyOnRequest,
+            enterpriseLicenseComplianceCategories
         };
     };
 
@@ -1237,10 +1240,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         const inputToTest = playgroundInput;
         setPlaygroundInput("");
 
+        // Show the prompt immediately; the response bubble fills in once it arrives.
+        setPlaygroundMessages(prev => [...prev, { userPrompt: inputToTest, pending: true }]);
+
         try {
             // Prepare policy data from current form state
             const rawPolicyData = buildPlaygroundPolicyData();
-            
+
             // Transform field names to match backend DTO (same as createGuardrailPolicy)
             const policyData = transformPolicyForBackend(rawPolicyData);
 
@@ -1251,7 +1257,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
             // Transform the response from guardrail service to match UI format
             const response = transformPlaygroundResponse(result, inputToTest);
-            setPlaygroundMessages(prev => [...prev, response]);
+            setPlaygroundMessages(prev => prev.map((m, i) => i === prev.length - 1 ? response : m));
         } catch (error) {
             console.error("Error testing guardrail:", error);
             const errorResponse = {
@@ -1260,7 +1266,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 reason: 'Validation Failed',
                 message: error.response?.data?.actionErrors?.[0] || error.message || 'Failed to test guardrail. Please ensure the guardrail service is running.'
             };
-            setPlaygroundMessages(prev => [...prev, errorResponse]);
+            setPlaygroundMessages(prev => prev.map((m, i) => i === prev.length - 1 ? errorResponse : m));
         } finally {
             setPlaygroundLoading(false);
         }
@@ -1402,6 +1408,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                                     </Box>
                                                 </HorizontalStack>
 
+                                                {message.pending ? (
+                                                    <HorizontalStack align="start" gap="2" blockAlign="center">
+                                                        <Spinner size="small" />
+                                                        <Text variant="bodyMd" color="subdued">Testing against guardrail policy…</Text>
+                                                    </HorizontalStack>
+                                                ) : (
+                                                <>
                                                 <Box paddingBlockStart="1">
                                                     <Text
                                                         variant="bodyMd"
@@ -1442,6 +1455,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                                             </Text>
                                                         </Box>
                                                     </HorizontalStack>
+                                                )}
+                                                </>
                                                 )}
                                             </VerticalStack>
                                         ))}

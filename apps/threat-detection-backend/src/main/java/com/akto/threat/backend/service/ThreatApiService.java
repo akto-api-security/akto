@@ -62,7 +62,7 @@ public class ThreatApiService {
     }
 
     // Apply simple context filter (only for ENDPOINT and AGENTIC)
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
     if (!contextFilter.isEmpty()) {
       match.putAll(contextFilter);
     }
@@ -147,7 +147,7 @@ public class ThreatApiService {
     }
 
     // Apply simple context filter (only for ENDPOINT and AGENTIC)
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
     if (!contextFilter.isEmpty()) {
       match.putAll(contextFilter);
     }
@@ -208,7 +208,7 @@ public class ThreatApiService {
     }
 
       // Apply simple context filter (only for ENDPOINT and AGENTIC)
-      Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+      Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
       if (!contextFilter.isEmpty()) {
           match.putAll(contextFilter);
       }

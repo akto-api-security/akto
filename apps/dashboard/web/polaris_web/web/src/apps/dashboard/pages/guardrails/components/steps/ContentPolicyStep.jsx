@@ -16,7 +16,7 @@ import { PlusMinor, EditMinor, DeleteMinor, ChevronDownMinor, ChevronUpMinor } f
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
-import { GENERAL_BLOCKS, GENERAL_BLOCK_GROUPS, toDeniedTopic } from "../../generalBlocks";
+import { GENERAL_BLOCKS, GENERAL_BLOCK_GROUPS } from "../../generalBlocks";
 import func from "@/util/func";
 
 export const ContentPolicyConfig = {
@@ -172,11 +172,8 @@ const ContentPolicyStep = ({
         setSelectedDefaultBlockKeys(next);
     };
 
-    // Unified list for rendering: selected Akto defaults + user custom topics.
-    const activeDefaultTopics = GENERAL_BLOCKS
-        .filter(b => selectedDefaultBlockKeys.has(b.key))
-        .map(b => ({ ...toDeniedTopic(b), _isDefault: true, _key: b.key }));
-    const allActiveTopics = [...activeDefaultTopics, ...deniedTopics];
+    // Akto default topics are managed via the dropdown above; only custom topics get tiles below.
+    const totalActiveTopicsCount = selectedDefaultBlockKeys.size + deniedTopics.length;
 
     const addSamplePhrase = () => {
         const trimmedPhrase = newPhraseInput.trim();
@@ -379,22 +376,22 @@ const ContentPolicyStep = ({
                     {enableDeniedTopics && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
-                                {editingIndex === null && (
-                                    <VerticalStack gap="2">
+                                <VerticalStack gap="2">
+                                    {editingIndex === null && (
                                         <Button icon={PlusMinor} onClick={startAdding} fullWidth textAlign="left">Add denied topic</Button>
-                                        <Button
-                                            icon={defaultPickerOpen ? ChevronUpMinor : ChevronDownMinor}
-                                            onClick={() => setDefaultPickerOpen(o => !o)}
-                                            fullWidth
-                                            textAlign="left"
-                                        >
-                                            <HorizontalStack gap="2" blockAlign="center">
-                                                <span>{`Add Akto default topics${selectedDefaultBlockKeys.size > 0 ? ` (${selectedDefaultBlockKeys.size} selected)` : ''}`}</span>
-                                                <Badge status="info">Beta</Badge>
-                                            </HorizontalStack>
-                                        </Button>
-                                    </VerticalStack>
-                                )}
+                                    )}
+                                    <Button
+                                        icon={defaultPickerOpen ? ChevronUpMinor : ChevronDownMinor}
+                                        onClick={() => setDefaultPickerOpen(o => !o)}
+                                        fullWidth
+                                        textAlign="left"
+                                    >
+                                        <HorizontalStack gap="2" blockAlign="center">
+                                            <span>{`Add Akto default topics${selectedDefaultBlockKeys.size > 0 ? ` (${selectedDefaultBlockKeys.size} selected)` : ''}`}</span>
+                                            <Badge status="info">Beta</Badge>
+                                        </HorizontalStack>
+                                    </Button>
+                                </VerticalStack>
                                 {defaultPickerOpen && (
                                     <Box background="bg-surface-secondary" padding="3" borderRadius="2" borderWidth="1" borderColor="border">
                                         <VerticalStack gap="4">
@@ -405,7 +402,7 @@ const ContentPolicyStep = ({
                                                         <Checkbox
                                                             key={block.key}
                                                             label={block.label}
-                                                            helpText={block.description}
+                                                            helpText={block.shortDescription}
                                                             checked={isBlockEnabled(block)}
                                                             onChange={(checked) => toggleGeneralBlock(block, checked)}
                                                         />
@@ -417,14 +414,13 @@ const ContentPolicyStep = ({
                                 )}
                                 {editingIndex === deniedTopics.length && renderEditRow(true)}
 
-                                {/* Unified list: Akto defaults first, then custom topics */}
-                                {allActiveTopics.length > 0 && (
-                                    <Text variant="bodySm" tone="subdued">{allActiveTopics.length} denied topic{allActiveTopics.length !== 1 ? 's' : ''} active</Text>
+                                {/* Akto defaults are managed in the dropdown; only custom topics get tiles here */}
+                                {totalActiveTopicsCount > 0 && (
+                                    <Text variant="bodySm" tone="subdued">{totalActiveTopicsCount} denied topic{totalActiveTopicsCount !== 1 ? 's' : ''} active</Text>
                                 )}
-                                {allActiveTopics.map((topic) => {
-                                    const customIdx = topic._isDefault ? -1 : deniedTopics.indexOf(topic);
-                                    if (!topic._isDefault && editingIndex === customIdx) return renderEditRow(false);
-                                    return renderViewRow(topic, customIdx);
+                                {deniedTopics.map((topic, index) => {
+                                    if (editingIndex === index) return renderEditRow(false);
+                                    return renderViewRow(topic, index);
                                 })}
                             </VerticalStack>
                         </Box>

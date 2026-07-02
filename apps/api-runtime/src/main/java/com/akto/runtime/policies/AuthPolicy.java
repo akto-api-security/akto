@@ -8,10 +8,13 @@ import com.akto.dto.type.KeyTypes;
 import com.akto.util.JSONUtils;
 
 import com.mongodb.BasicDBObject;
+
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.regex.Pattern;
 import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class AuthPolicy {
@@ -19,6 +22,16 @@ public class AuthPolicy {
     public static final String AUTHORIZATION_HEADER_NAME = "authorization";
     public static final String COOKIE_NAME = "cookie";
     private static final Logger logger = LoggerFactory.getLogger(AuthPolicy.class);
+
+    private static boolean isApiKeyHeader(String headerName) {
+        if (headerName == null || headerName.isEmpty()) {
+            return false;
+        }
+
+        // Matches variations: x-api-key, x_api_key, api_key, api-key, apiKey, x-pass-key
+        String normalized = headerName.toLowerCase().replace("_", "").replace("-", "");
+        return normalized.contains("apikey") || normalized.contains("passkey");
+    }
 
     private static List<String> findBearerBasicAuth(String header, String value){
         value = value.trim();
@@ -85,9 +98,15 @@ public class AuthPolicy {
             }
         }
 
-        // find bearer or basic tokens in any header
+        // find bearer or basic tokens in any header, and check for API_KEY
         for (String header : headers.keySet()) {
+            if (StringUtils.startsWith(header, "x-akto-installer")) {
+                continue;
+            }
             List<String> headerValues = headers.getOrDefault(header, new ArrayList<>());
+            if (isApiKeyHeader(header)) {
+                authTypes.add(ApiInfo.AuthType.API_KEY);
+            }
             if (!headerValues.isEmpty()) {
                 for (String value : headerValues) {
                     authTypes.addAll(findBearerBasicAuth(header, value));
