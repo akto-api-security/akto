@@ -127,6 +127,8 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 
 	schemaFetcher := NewSchemaFetcher(dbClient, time.Duration(cfg.PolicyRefreshIntervalMin)*time.Minute, logger)
 
+	LogFieldMappingStartup()
+
 	svc := &Service{
 		config:              cfg,
 		dbClient:            dbClient,
@@ -932,7 +934,12 @@ func (s *Service) extractPayloadForValidation(payload, method, path string, isRe
 		zap.String("source", source),
 		zap.Int("fieldCount", len(fields)))
 
-	extracted := ExtractContent(payload, fields)
+	var extracted string
+	if source == "env" {
+		extracted = ExtractContentFirst(payload, fields)
+	} else {
+		extracted = ExtractContent(payload, fields)
+	}
 	if extracted == "" {
 		s.logger.Warn("[SchemaExtract] schema present but no fields matched payload, falling back to raw payload",
 			zap.String("endpoint", key),
