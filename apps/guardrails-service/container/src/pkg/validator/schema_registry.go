@@ -175,6 +175,20 @@ func ExtractContent(payload string, fields []MessageFieldEntry) string {
 	return strings.Join(parts, "\n---\n")
 }
 
+// ExtractContentFirst returns the first non-empty value from fields (used for env fallback paths).
+func ExtractContentFirst(payload string, fields []MessageFieldEntry) string {
+	if len(fields) == 0 || payload == "" {
+		return ""
+	}
+	for _, f := range fields {
+		val, ok := GetValueAtPathFromJSON(payload, f.FieldPath)
+		if ok && val != "" {
+			return val
+		}
+	}
+	return ""
+}
+
 // SchemaFetcher fetches and caches selected endpoints and GuardrailSchemas from db_abstractor.
 // Mirrors EndpointSelectorFetcher in ai-agent-shield.
 type SchemaFetcher struct {
