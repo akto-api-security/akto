@@ -81,6 +81,24 @@ public class HttpResponseParams {
         return statusCode >= 200 && (statusCode < 300 || statusCode == 302);
     }
 
+    public static boolean isWebSocketHandshake(String type, int statusCode, String payload) {
+        return "WEBSOCKET".equals(type)
+                && statusCode == 101
+                && (payload == null || payload.isEmpty());
+    }
+
+    public boolean isWebSocketHandshake() {
+        return isWebSocketHandshake(this.type, this.statusCode, this.payload);
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
     public HttpResponseParams copy() {
         return new HttpResponseParams(
                 this.type,
