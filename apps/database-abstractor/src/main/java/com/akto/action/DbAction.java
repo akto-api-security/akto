@@ -768,11 +768,13 @@ public class DbAction extends ActionSupport {
             return path;
         }
         
-        String protocol = "ws://";
+        // Prefer wss:// (secure WebSocket) as default for localhost testing
+        String protocol = "wss://";
         if (hostName.contains("https") || hostName.contains("wss")) {
             protocol = "wss://";
             hostName = hostName.replace("https://", "").replace("wss://", "");
-        } else if (hostName.contains("http")) {
+        } else if (hostName.contains("http") || hostName.contains("ws://")) {
+            // Only use ws:// if explicitly specified
             protocol = "ws://";
             hostName = hostName.replace("http://", "").replace("ws://", "");
         }
