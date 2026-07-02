@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "hooks": {
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "bash ./.github/hooks/akto-validate-prompt-wrapper.sh",
+        "powershell": "powershell -ExecutionPolicy Bypass -File .github/hooks/akto-validate-prompt-wrapper.ps1",
+        "comment": "Validate prompts against Akto Guardrails (monitoring only - cannot block per GitHub limitation)",
+        "timeoutSec": 30
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "bash ./.github/hooks/akto-validate-pre-tool-wrapper.sh",
+        "powershell": "powershell -ExecutionPolicy Bypass -File .github/hooks/akto-validate-pre-tool-wrapper.ps1",
+        "comment": "Validate and block tool execution based on Akto Guardrails policies",
+        "timeoutSec": 30
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "bash ./.github/hooks/akto-validate-post-tool-wrapper.sh",
+        "powershell": "powershell -ExecutionPolicy Bypass -File .github/hooks/akto-validate-post-tool-wrapper.ps1",
+        "comment": "Ingest tool execution results to Akto for monitoring and analytics",
+        "timeoutSec": 30
+      }
+    ],
+    "_disabled_SessionStart": [
+      {
+        "type": "command",
+        "bash": "bash ./.github/hooks/akto-hook-wrapper.sh akto-hooks.py SessionStart",
+        "powershell": "powershell -ExecutionPolicy Bypass -File .github/hooks/akto-hook-wrapper.ps1 akto-hooks.py SessionStart",
+        "comment": "DISABLED: not supported by current GitHub Copilot hook contract. To re-enable, rename key back to 'SessionStart' and ship akto-hook-wrapper.{sh,ps1} + akto-hooks.py.",
+        "timeoutSec": 10
+      }
+    ],
+    "_disabled_Stop": [
+      {
+        "type": "command",
+        "bash": "bash ./.github/hooks/akto-hook-wrapper.sh akto-hooks.py Stop",
+        "powershell": "powershell -ExecutionPolicy Bypass -File .github/hooks/akto-hook-wrapper.ps1 akto-hooks.py Stop",
+        "comment": "DISABLED: not supported by current GitHub Copilot hook contract. To re-enable, rename key back to 'Stop' and ship akto-hook-wrapper.{sh,ps1} + akto-hooks.py.",
+        "timeoutSec": 10
+      }
+    ],
+    "_disabled_PreCompact": [
+      {
+        "type": "command",
+        "bash": "bash ./.github/hooks/akto-hook-wrapper.sh akto-hooks.py PreCompact",
+        "powershell": "powershell -ExecutionPolicy Bypass -File .github/hooks/akto-hook-wrapper.ps1 akto-hooks.py PreCompact",
+        "comment": "DISABLED: not supported by current GitHub Copilot hook contract. To re-enable, rename key back to 'PreCompact' and ship akto-hook-wrapper.{sh,ps1} + akto-hooks.py.",
+        "timeoutSec": 10
+      }
+    ],
+    "_disabled_SubagentStart": [
+      {
+        "type": "command",
+        "bash": "bash ./.github/hooks/akto-hook-wrapper.sh akto-hooks.py SubagentStart",
+        "powershell": "powershell -ExecutionPolicy Bypass -File .github/hooks/akto-hook-wrapper.ps1 akto-hooks.py SubagentStart",
+        "comment": "DISABLED: not supported by current GitHub Copilot hook contract. To re-enable, rename key back to 'SubagentStart' and ship akto-hook-wrapper.{sh,ps1} + akto-hooks.py.",
+        "timeoutSec": 10
+      }
+    ],
+    "_disabled_SubagentStop": [
+      {
+        "type": "command",
+        "bash": "bash ./.github/hooks/akto-hook-wrapper.sh akto-hooks.py SubagentStop",
+        "powershell": "powershell -ExecutionPolicy Bypass -File .github/hooks/akto-hook-wrapper.ps1 akto-hooks.py SubagentStop",
+        "comment": "DISABLED: not supported by current GitHub Copilot hook contract. To re-enable, rename key back to 'SubagentStop' and ship akto-hook-wrapper.{sh,ps1} + akto-hooks.py.",
+        "timeoutSec": 10
+      }
+    ]
+  }
+}
