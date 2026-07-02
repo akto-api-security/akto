@@ -49,18 +49,25 @@ public class DashboardFilterCache<V> {
     /**
      * Floor epoch-seconds timestamp to day boundary.
      * Zero (no timestamp) is left as-is so "all time" queries share a stable key.
+     * Public so callers can build consistent composite cache keys.
      */
-    private static long bucketDay(long epochSeconds) {
+    public static long bucketDay(long epochSeconds) {
         if (epochSeconds <= 0) return 0;
         return (epochSeconds / ONE_DAY_S) * ONE_DAY_S;
     }
 
-    /**
-     * Get from cache or compute.
-     * Concurrent requests for the same key all block on one FutureTask — only one
-     * MongoDB round trip happens regardless of concurrency.
-     */
+    /** Convenience overload for the common (accountId, contextSource, startTs, endTs) key shape. */
     public V get(String accountId, String contextSource, long startTs, long endTs, Callable<V> loader) {
+        String key = accountId + "|" + contextSource + "|" + bucketDay(startTs) + "|" + bucketDay(endTs);
+        return get(key, loader);
+    }
+
+    /**
+     * Get from cache or compute using a caller-supplied key.
+     * Concurrent requests for the same key all block on one FutureTask — only one
+     * computation happens regardless of concurrency.
+     */
+    public V get(String cacheKey, Callable<V> loader) {
         if (TTL_MS == 0) {
             try { return loader.call(); } catch (Exception e) {
                 logger.error("Cache loader failed: " + e.getMessage(), e);
@@ -68,9 +75,8 @@ public class DashboardFilterCache<V> {
             }
         }
 
-        String key = accountId + "|" + contextSource + "|" + bucketDay(startTs) + "|" + bucketDay(endTs);
-
         while (true) {
+            String key = cacheKey;
             FutureTask<Entry<V>> existing = store.get(key);
 
             if (existing != null) {
