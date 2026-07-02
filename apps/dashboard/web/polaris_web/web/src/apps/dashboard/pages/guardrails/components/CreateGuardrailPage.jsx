@@ -206,6 +206,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     const [agenticUsers, setAgenticUsers] = useState([]);
     const [usersLoading, setUsersLoading] = useState(false);
+    const [deviceList, setDeviceList] = useState([]);
 
     // Collections data
     const [mcpServers, setMcpServers] = useState([]);
@@ -434,18 +435,31 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         return () => { isActive = false; };
     }, []);
 
-    // Fetch agentic users to populate team/role options
+    // Fetch agentic users to populate team/role options, and module infos for device count (Atlas only)
     useEffect(() => {
+        if (!isEndpointSecurityCategory()) return;
         let isActive = true;
         (async () => {
             setUsersLoading(true);
             try {
-                const response = await settingsApi.fetchAgenticUsers();
-                if (isActive && response?.agenticUsers) {
-                    setAgenticUsers(response.agenticUsers);
-                }
-            } catch (error) {
-                console.error("Error fetching agentic users:", error);
+                const [agenticUsersResp, moduleResp] = await Promise.all([
+                    settingsApi.fetchAgenticUsers().catch(() => ({})),
+                    settingsApi.fetchModuleInfo({ moduleType: 'MCP_ENDPOINT_SHIELD' }).catch(() => ({})),
+                ]);
+                if (!isActive) return;
+                setAgenticUsers(agenticUsersResp?.agenticUsers || []);
+                const seen = new Set();
+                setDeviceList(
+                    (moduleResp?.moduleInfos || []).reduce((acc, m) => {
+                        const ad = m?.additionalData || {};
+                        const label = ad.username || ad.userName || ad.user || m.name || '';
+                        if (label && !seen.has(label)) {
+                            seen.add(label);
+                            acc.push({ label, value: label });
+                        }
+                        return acc;
+                    }, [])
+                );
             } finally {
                 if (isActive) setUsersLoading(false);
             }
@@ -1061,6 +1075,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         usersLoading={usersLoading}
                         applyToAllUsers={applyToAllUsers}
                         setApplyToAllUsers={setApplyToAllUsers}
+                        deviceList={deviceList}
                         showConditionError={leftSteps.has(ServerSettingsConfig.number)}
                         showUserConditionError={leftSteps.has(ServerSettingsConfig.number)}
                     />
