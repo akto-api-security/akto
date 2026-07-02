@@ -8,6 +8,7 @@ import ssl
 import sys
 import time
 import urllib.request
+from datetime import datetime
 from typing import Any, Dict, Set, Tuple, Union
 from akto_machine_id import get_machine_id, get_username
 from akto_heartbeat import send_heartbeat
@@ -492,7 +493,18 @@ def main():
     tool_args = raw_args if isinstance(raw_args, str) else json.dumps(raw_args)
 
     cwd = input_data.get("cwd", "")
-    timestamp = input_data.get("timestamp", int(time.time() * 1000))
+    # timestamp: Copilot CLI sends a number (epoch ms); VS Code sends an ISO 8601 string.
+    # Normalise both to epoch ms so the ingested "time" field is consistent.
+    raw_ts = input_data.get("timestamp")
+    if isinstance(raw_ts, str):
+        try:
+            timestamp = int(datetime.fromisoformat(raw_ts.replace("Z", "+00:00")).timestamp() * 1000)
+        except ValueError:
+            timestamp = int(time.time() * 1000)
+    elif isinstance(raw_ts, (int, float)):
+        timestamp = int(raw_ts)
+    else:
+        timestamp = int(time.time() * 1000)
     is_mcp, mcp_server_name, mcp_tool_name = parse_github_tool(tool_name, logger)
 
     logger.info(

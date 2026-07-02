@@ -201,6 +201,17 @@ _SESSION_FIELD_MAP: Dict[str, Dict[str, Any]] = {
         "state_key": "session_id",
         "extra_fields": ("cwd", "hook_event_name"),
     },
+    # Unified GitHub Copilot connector — serves BOTH the Copilot CLI and VS Code Copilot
+    # the Copilot CLI sends "sessionId". akto_session_id normalises from session_id and we
+    # forward sessionId as a raw extra so the CLI's id reaches the backend either way.
+    "copilot": {
+        "session_id_field": "session_id",
+        "conversation_field": None,
+        "message_id_field": None,
+        "message_id_strategy": "turn_counter",
+        "state_key": "session_id",
+        "extra_fields": ("sessionId", "cwd", "hook_event_name"),
+    },
     # NOTE: codex_cli not yet verified against docs; uses the default map until confirmed.
 }
 _DEFAULT_FIELD_MAP: Dict[str, Any] = {
