@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Compound index for LogsDao.createIndicesIfAbsent's activity log query
+        (fetchTestingLogRecordsByActivity: filters on activityType+activityId, sorts on
+        timestamp).
+    -->
+
+    <changeSet id="003-account-logs-activity-compound-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="logs"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="logs">
+            <mongodb:keys>{ "activityType": -1, "activityId": -1, "timestamp": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "activityT-activityI-timestamp_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="logs">
+                <mongodb:keys>{ "activityType": -1, "activityId": -1, "timestamp": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
