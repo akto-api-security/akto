@@ -888,6 +888,13 @@ const settingRequests = {
             data: { username, team, userRole }
         })
     },
+    async bulkUpdateUserDeviceTag(usernames, team, userRole) {
+        return await request({
+            url: '/api/bulkUpdateUserDeviceTag',
+            method: 'post',
+            data: { usernames, team, userRole }
+        })
+    },
     async fetchAgenticUsers(params = {}) {
         return await request({
             url: '/api/fetchAgenticUsers',

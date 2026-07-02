@@ -250,11 +250,8 @@ function UsersAndDevices() {
         setEditTagModal((prev) => ({ ...prev, saving: true }));
         try {
             const selectedUsers = data.users.filter((u) => editTagModal.usernames.includes(u.id));
-            await Promise.all(
-                selectedUsers.map((u) =>
-                    settingRequests.updateUserDeviceTag(u.groupName, editTagModal.team, editTagModal.userRole)
-                )
-            );
+            const groupNames = selectedUsers.map((u) => u.groupName).filter(Boolean);
+            await settingRequests.bulkUpdateUserDeviceTag(groupNames, editTagModal.team, editTagModal.userRole);
             setData((prev) => ({
                 ...prev,
                 users: prev.users.map((u) =>
