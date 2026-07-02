@@ -10,12 +10,13 @@ import { Badge, IndexFiltersMode, Avatar, Box, HorizontalStack, Text } from "@sh
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
-import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap } from "../utils/formatUtils";
+import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "../../observe/api_collections/endpointShieldHelper";
 import IpReputationScore from "./IpReputationScore";
+import guardrailApi from "../../guardrails/api";
 
 const resourceName = {
   singular: "activity",
@@ -160,13 +161,22 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   useEffect(() => {
     if (!needsGuardrailCompliance) return;
-    api.fetchGuardrailComplianceInfos().then((resp) => {
+    Promise.all([
+      api.fetchGuardrailComplianceInfos(),
+      guardrailApi.fetchGuardrailPolicies()
+    ]).then(([complianceResp, policiesResp]) => {
       const capabilityMap = {};
-      (resp?.guardrailComplianceInfos || []).forEach((entry) => {
+
+      (complianceResp?.guardrailComplianceInfos || []).forEach((entry) => {
         const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
         if (capability) capabilityMap[capability] = entry.mapComplianceToListClauses;
       });
+
+      mergePolicyComplianceMap(capabilityMap, policiesResp?.guardrailPolicies);
+
       setGuardrailComplianceMap(capabilityMap);
+    }).catch((error) => {
+      console.error('Error loading guardrail compliance:', error);
     });
   }, [label]);
 

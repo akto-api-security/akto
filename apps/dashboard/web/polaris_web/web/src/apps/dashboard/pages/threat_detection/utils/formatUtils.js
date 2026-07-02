@@ -43,15 +43,49 @@ export const extractRuleViolated = (metadata) => {
  * API Security: lives on the threat filter template, keyed by filterId.
  * Returns {} when nothing matches (callers do Object.keys() on it).
  */
+const DB_COMPLIANCE_CAPABILITIES = [
+  { capability: "deniedTopics", prefixes: ["BanTopics", "BanSubstrings", "deniedTopics", "denied_topic"] },
+  { capability: "llmRule", prefixes: ["UserDefinedLLMRule", "LLMRule"] },
+];
+
+export const getDbComplianceCapability = (ruleViolated) => {
+  if (!ruleViolated || ruleViolated === "-") return null;
+  const v = ruleViolated.trim().toLowerCase();
+  const def = DB_COMPLIANCE_CAPABILITIES.find((d) => d.prefixes.some((p) => v.startsWith(p.toLowerCase())));
+  return def ? def.capability : null;
+};
+
+export const dbComplianceKey = (policyName, capability) => `${policyName}::${capability}`;
+
+export const mergePolicyComplianceMap = (capabilityMap, guardrailPolicies = []) => {
+  const addCompliance = (key, compliance) => {
+    if (!compliance || Object.keys(compliance).length === 0) return;
+    if (!capabilityMap[key]) capabilityMap[key] = {};
+    Object.entries(compliance).forEach(([framework, clauses]) => {
+      capabilityMap[key][framework] = [...new Set([...(capabilityMap[key][framework] || []), ...(clauses || [])])];
+    });
+  };
+  (guardrailPolicies || []).forEach((policy) => {
+    (policy.deniedTopics || []).forEach((topic) => addCompliance(dbComplianceKey(policy.name, "deniedTopics"), topic.compliance));
+    addCompliance(dbComplianceKey(policy.name, "llmRule"), policy.llmRule?.compliance);
+  });
+  return capabilityMap;
+};
+
 export const resolveComplianceClauseMap = (event, isGuardrail, threatFiltersMap = {}, guardrailComplianceMap = {}) => {
   let base = {};
   if (isGuardrail) {
-    const capability = getGuardrailCapabilityForRule(extractRuleViolated(event?.metadata));
-    base = guardrailComplianceMap[capability] || guardrailComplianceMap[event?.filterId] || {};
+    const ruleViolated = extractRuleViolated(event?.metadata);
+    const dbCapability = getDbComplianceCapability(ruleViolated);
+    if (dbCapability) {
+      base = guardrailComplianceMap[dbComplianceKey(event?.filterId, dbCapability)] || {};
+    } else {
+      const capability = getGuardrailCapabilityForRule(ruleViolated);
+      base = guardrailComplianceMap[capability] || guardrailComplianceMap[event?.filterId] || {};
+    }
   } else {
     base = threatFiltersMap[event?.filterId]?.compliance?.mapComplianceToListClauses || {};
   }
-
   if (event?.owaspCategories?.length > 0) {
     return { ...base, "OWASP Agentic Skills Top 10": event.owaspCategories.map(o => o.id) };
   }
