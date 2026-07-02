@@ -43,3 +43,9 @@ run-guardrails-service.sh
 scripts/**
 **.log
 apps/guardrails-service/container/scripts/**
+run-agent-guard.sh
+run-anonymizer.sh
+run-embedder.sh
+.venv
+.python-version
+*logs.txt

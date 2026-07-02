@@ -14,6 +14,8 @@ import model_map
 # decision_confidence < safeDecisionThreshold as unsafe.
 SAFE = {"is_valid": True, "risk_score": 0.02, "decision_confidence": 0.99, "details": {}}
 UNSAFE = {"is_valid": False, "risk_score": 0.97, "decision_confidence": 0.97, "details": {}}
+# Safe verdict below the 0.9 safeDecisionThreshold: escalates past the fast tiers.
+HEDGED_SAFE = {"is_valid": True, "risk_score": 0.3, "decision_confidence": 0.7, "details": {}}
 
 
 class FakeProvider:
@@ -67,10 +69,18 @@ async def _run(model_configs, script, **cfg):
 # ── default 2-entry config (tier1 + arbiter, no tier2): arbiter always decides ──
 
 
-async def test_default_config_arbiter_allows():
+async def test_confident_safe_tier1_skips_arbiter():
     cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"),
            _entry("gemma_vertexai", "FINAL_ARBITER")]
     r = await _run(cfg, {"qwen3guard": SAFE, "gemma_vertexai": SAFE})
+    assert r["is_valid"] is True
+    assert "gemma_vertexai" not in FakeScanner.calls  # no escalation needed
+
+
+async def test_hedged_tier1_escalates_and_arbiter_allows():
+    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"),
+           _entry("gemma_vertexai", "FINAL_ARBITER")]
+    r = await _run(cfg, {"qwen3guard": HEDGED_SAFE, "gemma_vertexai": SAFE})
     assert r["is_valid"] is True
     assert r["details"]["cascade_decision"] == "gemma_authority"
     assert "gemma_vertexai" in FakeScanner.calls  # arbiter consulted
@@ -79,7 +89,7 @@ async def test_default_config_arbiter_allows():
 async def test_default_config_arbiter_blocks():
     cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"),
            _entry("gemma_vertexai", "FINAL_ARBITER")]
-    r = await _run(cfg, {"qwen3guard": SAFE, "gemma_vertexai": UNSAFE})
+    r = await _run(cfg, {"qwen3guard": HEDGED_SAFE, "gemma_vertexai": UNSAFE})
     assert r["is_valid"] is False
 
 
@@ -127,7 +137,7 @@ async def test_provider_failure_counts_unsafe():
 async def test_result_shape_has_per_model_summaries():
     cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"),
            _entry("gemma_vertexai", "FINAL_ARBITER")]
-    r = await _run(cfg, {"qwen3guard": SAFE, "gemma_vertexai": SAFE})
+    r = await _run(cfg, {"qwen3guard": HEDGED_SAFE, "gemma_vertexai": SAFE})
     d = r["details"]
     assert d["scanner_type"] == "prompt"
     assert d["qwen"]["completed"] is True
@@ -135,8 +145,30 @@ async def test_result_shape_has_per_model_summaries():
     assert "execution_time_ms" in r
 
 
-async def test_no_arbiter_configured_fails_closed():
+async def test_no_arbiter_configured_fails_open_with_error():
     cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER")]
     r = await _run(cfg, {"qwen3guard": UNSAFE})
-    assert r["is_valid"] is False
-    assert r["risk_score"] == 1.0
+    assert r["is_valid"] is True
+    assert r["risk_score"] == 0.0
+    assert r["details"]["error"] == "no arbiter configured"
+
+
+async def test_all_arbiters_failed_fails_open_with_error():
+    # Arbiter timeout/error is an infrastructure failure, not a verdict: allow,
+    # and carry details.error so the caller can skip caching the degraded result.
+    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"),
+           _entry("gemma_vertexai", "FINAL_ARBITER")]
+    r = await _run(cfg, {"qwen3guard": UNSAFE, "gemma_vertexai": TimeoutError()})
+    assert r["is_valid"] is True
+    assert r["details"]["error"] == "all arbiters failed"
+
+
+async def test_arbiter_hedged_acquittal_allows():
+    # Arbiter says "not flagged" below safeDecisionThreshold (0.9): an acquittal
+    # must not be converted into a block by the confidence gate.
+    hedged_safe = {"is_valid": True, "risk_score": 0.15,
+                   "decision_confidence": 0.85, "details": {}}
+    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"),
+           _entry("gemma_vertexai", "FINAL_ARBITER")]
+    r = await _run(cfg, {"qwen3guard": UNSAFE, "gemma_vertexai": hedged_safe})
+    assert r["is_valid"] is True
