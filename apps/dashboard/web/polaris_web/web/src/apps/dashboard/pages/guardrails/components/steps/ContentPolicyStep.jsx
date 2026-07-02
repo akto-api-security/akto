@@ -195,6 +195,23 @@ const ContentPolicyStep = ({
         const isNewTopic = editingIndex === deniedTopics.length;
         if (isNewTopic) {
             updatedTopics.unshift(topicData); // new topics appear at the top
+            // Every existing topic shifts down by one and the new topic (currently
+            // keyed by the sentinel savedIndex) moves to index 0. Remap the
+            // index-keyed suggestion/request maps to match, or they desync with the rows.
+            setTopicComplianceSuggestions(prev => {
+                const shifted = {};
+                Object.keys(prev).forEach(k => {
+                    const ki = parseInt(k);
+                    shifted[ki === savedIndex ? 0 : ki + 1] = prev[k];
+                });
+                return shifted;
+            });
+            const shiftedRequestIds = {};
+            Object.keys(complianceRequestIdRef.current).forEach(k => {
+                const ki = parseInt(k);
+                shiftedRequestIds[ki === savedIndex ? 0 : ki + 1] = complianceRequestIdRef.current[k];
+            });
+            complianceRequestIdRef.current = shiftedRequestIds;
         } else {
             updatedTopics[editingIndex] = topicData;
         }
@@ -289,6 +306,11 @@ const ContentPolicyStep = ({
             }));
 
             setDeniedTopics(prev => {
+                // A new (not-yet-saved) topic uses the out-of-bounds sentinel index
+                // deniedTopics.length; its suggestion lives in topicComplianceSuggestions
+                // and is applied in saveRow. Never write it into deniedTopics here or we
+                // create a phantom entry with no topic/description/samplePhrases.
+                if (index < 0 || index >= prev.length) return prev;
                 const updatedTopics = [...prev];
                 const compliance = buildComplianceMap(suggested, accepted);
                 updatedTopics[index] = {
