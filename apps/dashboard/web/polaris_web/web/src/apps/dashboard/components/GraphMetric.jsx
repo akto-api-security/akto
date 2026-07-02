@@ -10,7 +10,7 @@ require("highcharts/modules/mouse-wheel-zoom")(Highcharts);
 
 function GraphMetric(props) {
 
-    const { height, backgroundColor, data, inputMetrics, title, text, defaultChartOptions, subtitle, timezoneOffsetMinutes } = props;
+    const { height, data, inputMetrics, title, text, defaultChartOptions, subtitle, timezoneOffsetMinutes } = props;
     const chartComponentRef = useRef(null)
 
     const fillColor = {
@@ -59,7 +59,7 @@ function GraphMetric(props) {
         chart: {
             type: 'spline',
             height: `${height}px`,
-            backgroundColor,
+            backgroundColor: '#ffffff',
             animation: false,
             spacingTop: 20,
             spacingLeft: 16,
@@ -115,7 +115,7 @@ function GraphMetric(props) {
                     text: title,
                 },
                 visible: text,
-                gridLineWidth: 1,
+                gridLineWidth: 0,
             },
             ...inputMetrics.map(() => ({
                 title: {
@@ -125,6 +125,11 @@ function GraphMetric(props) {
                 opposite: true,
             })),
         ],
+        exporting: {
+            chartOptions: {
+                chart: { backgroundColor: '#ffffff' }
+            }
+        },
         ...defaultChartOptions,
     };
     return (
