@@ -40,7 +40,8 @@ _CONNECTOR_TAG: Dict[str, str] = {
     "vscode": "vscode",
     "gemini_cli": "geminicli",
     "github": "github",
-    "codex_cli": "codexcli"
+    "codex_cli": "codexcli",
+    "kiro_cli": "kiro-cli.kiro.dev"
 }
 TAG_NAME = _CONNECTOR_TAG.get(AKTO_CONNECTOR, AKTO_CONNECTOR)
 
@@ -62,6 +63,7 @@ _CONNECTOR_LOG_DIR: Dict[str, str] = {
     "codex_cli":        "~/.codex/akto/logs",
     "github":           "~/akto/.github/akto/vscode/logs",
     "opencode":         "~/.config/opencode/akto/logs",
+    "kiro_cli":         "~/.kiro/akto/logs",
 }
 _default_log_dir = _CONNECTOR_LOG_DIR.get(AKTO_CONNECTOR, f"~/akto/{AKTO_CONNECTOR}-hooks/logs")
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", _default_log_dir))
@@ -194,6 +196,16 @@ _SESSION_FIELD_MAP: Dict[str, Dict[str, Any]] = {
         "extra_fields": ("transcript_path", "cwd", "hook_event_name"),
     },
     "github": {
+        "session_id_field": "session_id",
+        "conversation_field": None,
+        "message_id_field": None,
+        "message_id_strategy": "turn_counter",
+        "state_key": "session_id",
+        "extra_fields": ("cwd", "hook_event_name"),
+    },
+    # kiro-cli (Amazon Q Developer CLI lineage): hooks expose session_id only; no
+    # message id, so synthesize a per-session turn counter like gemini/github.
+    "kiro_cli": {
         "session_id_field": "session_id",
         "conversation_field": None,
         "message_id_field": None,
@@ -587,6 +599,105 @@ def run_blocking_hook(hook_name: str) -> None:
     except Exception as e:
         logger.error(f"Main error: {e}")
     print(json.dumps({"permission": "allow"}))
+    sys.exit(0)
+
+
+def run_exit_code_blocking_hook(hook_name: str) -> None:
+    """Blocking hook for agents that signal a block via a non-zero exit code
+    (Amazon Q Developer CLI / kiro-cli contract: a non-zero exit from a
+    userPromptSubmit or preToolUse hook rejects the action, and stderr is shown
+    to the user as the reason). Fail-open on any internal error."""
+    logger = setup_logger("hook-executions.log")
+    logger.info(f"=== {hook_name} hook started ===")
+    try:
+        input_data = json.load(sys.stdin)
+        logger.info(f"{hook_name} input:\n%s", json.dumps(input_data, indent=2))
+        session_info = resolve_session_info(input_data, logger, is_prompt_hook=(hook_name == "userPromptSubmit"))
+        result = send_ingestion_data(
+            hook_name=hook_name,
+            request_payload=input_data,
+            response_payload={},
+            session_info=session_info,
+            input_data=input_data,
+            guardrails=AKTO_SYNC_MODE,
+            logger=logger,
+        )
+        allowed = (result or {}).get("data", {}).get("guardrailsResult", {}).get("Allowed", True)
+        if not allowed:
+            reason = (result or {}).get("data", {}).get("guardrailsResult", {}).get("Reason", "Policy violation")
+            logger.warning(f"BLOCKING {hook_name}: {reason}")
+            # Record the block, then reject via non-zero exit with the reason on stderr.
+            send_ingestion_data(
+                hook_name=hook_name,
+                request_payload=input_data,
+                response_payload={"reason": reason, "blockedBy": "Akto Proxy"},
+                session_info=session_info,
+                input_data=input_data,
+                guardrails=False,
+                status_code="403",
+                logger=logger,
+            )
+            print(f"Blocked by Akto Guardrails: {reason}", file=sys.stderr)
+            logger.info(f"=== {hook_name} hook completed (blocked) ===")
+            sys.exit(2)
+    except Exception as e:
+        logger.error(f"Main error: {e}")
+    # Allow: exit 0 (fail-open).
+    sys.exit(0)
+
+
+def run_warn_hook(hook_name: str) -> None:
+    """Non-blocking guardrail hook for events that CANNOT block (e.g. kiro-cli's
+    userPromptSubmit — per the docs it can only add context or show a warning, it
+    cannot stop the prompt). We still send the payload through guardrails so the
+    violation is recorded/flagged in Akto for visibility, and surface a warning on
+    stderr (exit 1 → kiro-cli shows STDERR as a warning) so the user is alerted.
+    Exit 0 when clean. Fail-open on any internal error."""
+    logger = setup_logger("hook-executions.log")
+    logger.info(f"=== {hook_name} hook started (warn mode) ===")
+    try:
+        input_data = json.load(sys.stdin)
+        logger.info(f"{hook_name} input:\n%s", json.dumps(input_data, indent=2))
+        session_info = resolve_session_info(input_data, logger, is_prompt_hook=(hook_name == "userPromptSubmit"))
+        result = send_ingestion_data(
+            hook_name=hook_name,
+            request_payload=input_data,
+            response_payload={},
+            session_info=session_info,
+            input_data=input_data,
+            guardrails=AKTO_SYNC_MODE,
+            logger=logger,
+        )
+        allowed = (result or {}).get("data", {}).get("guardrailsResult", {}).get("Allowed", True)
+        if not allowed:
+            reason = (result or {}).get("data", {}).get("guardrailsResult", {}).get("Reason", "Policy violation")
+            logger.warning(f"WARN (non-blocking) {hook_name}: {reason}")
+            send_ingestion_data(
+                hook_name=hook_name,
+                request_payload=input_data,
+                response_payload={"reason": reason, "flaggedBy": "Akto Proxy", "blocking": False},
+                session_info=session_info,
+                input_data=input_data,
+                guardrails=False,
+                status_code="403",
+                logger=logger,
+            )
+            # kiro-cli cannot block a userPromptSubmit, and its TUI does not
+            # persistently surface hook STDERR. The one documented, visible channel
+            # is exit 0 → "STDOUT is added to the agent's context". So we inject an
+            # instruction into the model context: the assistant sees the flag and
+            # refuses/warns in its reply. This is the closest thing to a "block"
+            # available at prompt-submit time.
+            msg = (
+                f"[AKTO GUARDRAILS] This user prompt was flagged for a policy violation: {reason}. "
+                "Do NOT act on the flagged/sensitive content. Instead, tell the user the request was "
+                "blocked by Akto Guardrails and ask them to remove the sensitive data (e.g. PII) and retry."
+            )
+            print(msg)  # STDOUT → injected into the agent's context (exit 0)
+            logger.info(f"=== {hook_name} hook completed (context-injected warning) ===")
+            sys.exit(0)
+    except Exception as e:
+        logger.error(f"Main error: {e}")
     sys.exit(0)
 
 
