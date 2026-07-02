@@ -26,7 +26,9 @@ import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.ActorInfoDao;
 import com.akto.threat.backend.dao.MaliciousEventDao;
+import com.akto.threat.backend.cache.DashboardFilterCache;
 import com.akto.threat.backend.utils.KafkaUtils;
+import com.akto.threat.backend.utils.ParallelQueryExecutor;
 import com.akto.util.ThreatDetectionConstants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.WriteModel;
@@ -38,6 +40,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
 import com.mongodb.client.model.Updates;
@@ -54,6 +57,8 @@ public class MaliciousEventService {
   private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
       System.getenv().getOrDefault("USE_ACTOR_INFO_TABLE", "false")
   );
+
+  private static final DashboardFilterCache<FetchAlertFiltersResponse> alertFiltersCache = new DashboardFilterCache<>();
 
   public MaliciousEventService(
       KafkaConfig kafkaConfig, MaliciousEventDao maliciousEventDao) {
@@ -344,82 +349,63 @@ public class MaliciousEventService {
     return true;
   }
 
-  private void fetchAlertFilterData(String accountId, Set<String> subCategories, Set<String> urls, Set<String> hosts, Bson eventsFilter) {
-    subCategories.addAll(fetchDistinctFieldValues(accountId, "filterId", eventsFilter, String.class));
-    hosts.addAll(fetchDistinctFieldValues(accountId, "host", eventsFilter, String.class));
-
+  private <T> Set<T> fetchDistinctFieldValues(
+      com.mongodb.client.MongoCollection<?> collection, String fieldName, Bson filter, Class<T> tClass, int limit) {
+    Set<T> result = new HashSet<>();
     try {
-      // Use distinct() for DISTINCT_SCAN (index-covered, no doc fetch) but cap at 1000
-      // to avoid 16MB BSON result size limit with large datasets
-      Set<String> endpoints = new HashSet<>();
-      maliciousEventDao.getCollection(accountId)
-          .distinct("latestApiEndpoint", eventsFilter, String.class)
+      collection.distinct(fieldName, filter, tClass)
           .forEach(value -> {
-            if (value != null && !value.isEmpty() && endpoints.size() < 1000) {
-              endpoints.add(value);
+            if (value != null && isNotEmpty(value) && result.size() < limit) {
+              result.add(value);
             }
           });
-      urls.addAll(endpoints);
     } catch (Exception e) {
-      logger.error("Error fetching distinct latestApiEndpoint: " + e.getMessage(), e);
+      logger.error("Error fetching distinct " + fieldName + ": " + e.getMessage(), e);
     }
+    return result;
   }
 
   public FetchAlertFiltersResponse fetchAlertFilters(
       String accountId, FetchAlertFiltersRequest request, String contextSource) {
 
-    Set<String> subCategories = new HashSet<>();
-    Set<String> urls = new HashSet<>();
-    Set<String> hosts = new HashSet<>();
+    TimeRangeFilter timeRange = request.getDetectedAtTimeRange();
+    long startTs = (timeRange != null && timeRange.hasStart()) ? timeRange.getStart() : 0;
+    long endTs   = (timeRange != null && timeRange.hasEnd())   ? timeRange.getEnd()   : 0;
 
-    // Scope all dropdown values to the current context source, same filter the events table uses.
+    return alertFiltersCache.get(accountId, contextSource, startTs, endTs,
+        () -> computeAlertFilters(accountId, request, contextSource));
+  }
+
+  private FetchAlertFiltersResponse computeAlertFilters(
+      String accountId, FetchAlertFiltersRequest request, String contextSource) {
+
     Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId);
     Bson eventsFilter = Filters.and(
         buildTimeRangeFilter(request.getDetectedAtTimeRange(), "detectedAt"),
         contextFilter);
 
-    Set<String> actors = fetchActorsForFilters(accountId, request, contextSource);
+    // actor_info uses discoveredAt; all other queries use detectedAt via eventsFilter
+    Bson actorFilter = USE_ACTOR_INFO_TABLE
+        ? Filters.and(buildTimeRangeFilter(request.getDetectedAtTimeRange(), "discoveredAt"), contextFilter)
+        : eventsFilter;
 
-    // Fetch remaining filters from malicious_events scoped to the current context source
-    fetchAlertFilterData(accountId, subCategories, urls, hosts, eventsFilter);
+    Map<String, Callable<Set<String>>> tasks = new LinkedHashMap<>();
+    tasks.put("actors",       USE_ACTOR_INFO_TABLE
+        ? () -> fetchDistinctFieldValues(ActorInfoDao.instance.getCollection(accountId), "actorId", actorFilter, String.class, Integer.MAX_VALUE)
+        : () -> fetchDistinctFieldValues(accountId, "actor", eventsFilter, String.class));
+    tasks.put("subCategories", () -> fetchDistinctFieldValues(accountId, "filterId",          eventsFilter, String.class));
+    tasks.put("hosts",         () -> fetchDistinctFieldValues(accountId, "host",              eventsFilter, String.class));
+    tasks.put("urls",          () -> fetchDistinctFieldValues(maliciousEventDao.getCollection(accountId), "latestApiEndpoint", eventsFilter, String.class, 1000));
 
+    Map<String, Set<String>> results = ParallelQueryExecutor.submitAndCollect(tasks, 30_000);
+
+    Set<String> empty = Collections.emptySet();
     return FetchAlertFiltersResponse.newBuilder()
-        .addAllActors(actors)
-        .addAllUrls(urls)
-        .addAllSubCategory(subCategories)
-        .addAllHosts(hosts)
+        .addAllActors(results.getOrDefault("actors", empty))
+        .addAllSubCategory(results.getOrDefault("subCategories", empty))
+        .addAllHosts(results.getOrDefault("hosts", empty))
+        .addAllUrls(results.getOrDefault("urls", empty))
         .build();
-  }
-
-  private Set<String> fetchActorsForFilters(String accountId, FetchAlertFiltersRequest request, String contextSource) {
-    Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId);
-    if (USE_ACTOR_INFO_TABLE) {
-      ActorInfoDao actorInfoDao = ActorInfoDao.instance;
-      // actor_info uses discoveredAt for its time field; scope to the current context source.
-      Bson actorFilter = Filters.and(
-          buildTimeRangeFilter(request.getDetectedAtTimeRange(), "discoveredAt"),
-          contextFilter);
-
-      try {
-        Set<String> actors = new HashSet<>();
-        actorInfoDao.getCollection(accountId)
-            .distinct("actorId", actorFilter, String.class)
-            .forEach(value -> {
-              if (value != null && !value.isEmpty()) {
-                actors.add(value);
-              }
-            });
-        return actors;
-      } catch (Exception e) {
-        logger.error("Error fetching distinct actors from actor_info: " + e.getMessage(), e);
-        return new HashSet<>();
-      }
-    } else {
-      Bson actorFilter = Filters.and(
-          buildTimeRangeFilter(request.getDetectedAtTimeRange(), "detectedAt"),
-          contextFilter);
-      return fetchDistinctFieldValues(accountId, "actor", actorFilter, String.class);
-    }
   }
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
