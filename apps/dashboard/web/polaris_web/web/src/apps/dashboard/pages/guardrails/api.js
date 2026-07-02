@@ -65,4 +65,19 @@ export default {
         return resp
     },
 
+    async fetchViolations(startTimestamp, endTimestamp, skip = 0, limit = 1000) {
+        const resp = await request({
+            url: '/api/fetchSuspectSampleData',
+            method: 'post',
+            data: {
+                skip,
+                limit,
+                latestAttack: [],
+                ...(startTimestamp != null ? { startTimestamp } : {}),
+                ...(endTimestamp != null ? { endTimestamp } : {}),
+            }
+        })
+        return resp
+    },
+
 }

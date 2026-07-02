@@ -91,7 +91,34 @@
     align-items: center;
 }
 
+/* Name cell in top-list card: fill remaining flex space so text truncates correctly.
+   flex:1 cannot be expressed via Polaris Box — no flexGrow prop exists. */
+.agentic-name-fill {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* Hidden measurement layer for BreakdownLegend (AgenticStatsCard ResizeObserver pattern).
+   position/visibility/pointer-events cannot be expressed via Polaris Box. */
+.breakdown-legend-measure {
+    position: absolute;
+    visibility: hidden;
+    pointer-events: none;
+    display: flex;
+    gap: 4px;
+    top: 0;
+    left: 0;
+}
+
 /* Cursor + hover — DataTable owns all spacing/borders */
+.agentic-list-table table {
+    table-layout: fixed;
+    width: 100%;
+}
+.agentic-list-table .Polaris-DataTable__Cell:first-child {
+    width: 60%;
+}
 .agentic-list-table .Polaris-DataTable__Cell {
     cursor: pointer;
 }
@@ -169,6 +196,11 @@
     display: flex;
     flex-direction: column;
     min-height: 480px;
+}
+
+.violations-row-selected.ag-row {
+    background-color: var(--p-color-bg-surface-selected, #f3f0ff) !important;
+    border-left: 3px solid var(--p-color-border-interactive, #6d52c9) !important;
 }
 
 /* Chat message outer row — icon | divider | content, top-aligned.

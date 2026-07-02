@@ -15,7 +15,7 @@ export default function AgenticTopListCard({ title, columns = [], rows = [], emp
                 <Box key={`name-${row.id}`} className="agentic-list-cell-click" data-active={isActive} onClick={() => row.onClick?.(row)}>
                     <HorizontalStack gap="2" blockAlign="center" wrap={false}>
                         {iconFor(row)}
-                        <Box minWidth="0" overflowX="hidden">
+                        <Box className="agentic-name-fill">
                             <Text variant="bodyMd" as="span" truncate>{row.name}</Text>
                         </Box>
                     </HorizontalStack>

@@ -591,10 +591,19 @@ export default function LeftNav() {
                                 handleSelect("dashboard_guardrails_violations");
                                 setActive("active");
                             },
-                            selected: leftNavSelected === "dashboard_guardrails_violations",
+                            selected: leftNavSelected === "dashboard_guardrails_violations" || leftNavSelected === "dashboard_guardrails_activity",
+                        }] : []),
+                        ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
+                            label: "Actors",
+                            onClick: () => {
+                                navigate("/dashboard/protection/threat-actor");
+                                handleSelect("dashboard_threat_actor");
+                                setActive("active");
+                            },
+                            selected: leftNavSelected === "dashboard_threat_actor",
                         }] : []),
                         ...((dashboardCategory === CATEGORY_AGENTIC_SECURITY || dashboardCategory === CATEGORY_ENDPOINT_SECURITY) ? [{
-                            label: "Guardrail Policies",
+                            label: "Policies",
                             onClick: () => {
                                 navigate("/dashboard/guardrails/policies");
                                 handleSelect("dashboard_guardrails_policies");
@@ -700,7 +709,7 @@ export default function LeftNav() {
                             handleSelect("dashboard_guardrails_violations");
                             setActive("active");
                         },
-                        selected: leftNavSelected === "dashboard_guardrails_violations",
+                        selected: leftNavSelected === "dashboard_guardrails_violations" || leftNavSelected === "dashboard_guardrails_activity",
                     },
                     {
                         label: "Guardrails Policies",

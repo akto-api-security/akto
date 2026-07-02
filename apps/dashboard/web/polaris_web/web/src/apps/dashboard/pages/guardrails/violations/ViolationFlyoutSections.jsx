@@ -18,6 +18,11 @@ import MarkdownViewer from "@/apps/dashboard/components/shared/MarkdownViewer";
 import { HighlightedText } from "@/apps/dashboard/components/shared/MarkdownComponents";
 import ConversationHistory from "@/apps/dashboard/pages/testing/TestRunResultPage/components/ConversationHistory";
 import func from "@/util/func";
+import { GUARDRAIL_SECTIONS } from "@/apps/dashboard/pages/threat_detection/constants/guardrailDescriptions";
+import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/constants/guardrailRuleDefinitions";
+import { getOwaspThreatsForRule } from "@/apps/dashboard/pages/guardrails/components/owaspConfig";
+import OwaspTag from "@/apps/dashboard/pages/guardrails/components/OwaspTag";
+import ComplianceTags from "@/apps/dashboard/pages/guardrails/components/ComplianceTags";
 
 // ─── Evidence block (Blocked Prompt / Suspicious Skill / Suspicious Config) ──────
 
@@ -129,15 +134,36 @@ function buildViolationTopo(topology) {
 export function OverviewSection({ row, detail }) {
     const topo = useMemo(() => buildViolationTopo(detail?.topology), [detail]);
 
+    const guardrailRuleInfo = useMemo(
+        () => getGuardrailRuleInfo(row.violation, row.policyName),
+        [row.violation, row.policyName],
+    );
+
+    const guardrailSections = useMemo(() => {
+        if (guardrailRuleInfo) {
+            return [{
+                heading: guardrailRuleInfo.heading,
+                description: null,
+                subSections: guardrailRuleInfo.overview.map(o => ({ subHeading: o.heading, description: o.body })),
+            }];
+        }
+        return GUARDRAIL_SECTIONS;
+    }, [guardrailRuleInfo]);
+
+    const owaspThreats = useMemo(() => getOwaspThreatsForRule(row.violation), [row.violation]);
+
     const gridItems = [
         { label: "Detected", value: func.epochToDateTime(row.detected) },
         { label: "Device ID", value: detail?.deviceId || "—" },
         { label: "Session ID", value: detail?.sessionId || "—", tooltip: detail?.sessionId || undefined },
     ];
 
+    const hasCompliance = row.complianceMap && Object.keys(row.complianceMap).length > 0;
+    const hasBottomSection = owaspThreats.length > 0 || hasCompliance;
+
     return (
         <VerticalStack gap="0">
-            {/* Box 3 — Evidence + trigger reason */}
+            {/* 1. Guardrail Violation — evidence + trigger reason */}
             <Box padding="4" background="bg-critical-subdued">
                 <VerticalStack gap="3">
                     <EvidenceBlock evidence={detail?.evidence} />
@@ -149,32 +175,72 @@ export function OverviewSection({ row, detail }) {
 
             <Divider />
 
-            {/* Box 4 — Description, topology, impact, metadata */}
+            {/* 2. Numbered guardrail sections */}
+            <Box padding="4">
+                <VerticalStack gap="5">
+                    {guardrailSections.map((section, sectionIdx) => (
+                        <React.Fragment key={sectionIdx}>
+                            <VerticalStack gap="3">
+                                <Text variant="headingMd" fontWeight="bold">
+                                    {sectionIdx + 1}. {section.heading}
+                                </Text>
+                                {section.description && (
+                                    <Text variant="bodyMd">{section.description}</Text>
+                                )}
+                                {section.subSections && section.subSections.length > 0 && (
+                                    <VerticalStack gap="3" paddingBlockStart="2">
+                                        {section.subSections.map((sub, subIdx) => (
+                                            <VerticalStack key={subIdx} gap="2">
+                                                <Text variant="headingSm" fontWeight="semibold">
+                                                    {sub.subHeading}:
+                                                </Text>
+                                                {sub.description && (
+                                                    <Text variant="bodyMd">{sub.description}</Text>
+                                                )}
+                                                {sub.items && sub.items.length > 0 && (
+                                                    <Box paddingInlineStart="4" paddingBlockStart="1">
+                                                        <VerticalStack gap="2">
+                                                            {sub.items.map((item, itemIdx) => (
+                                                                <Text key={itemIdx} variant="bodyMd">• {item}</Text>
+                                                            ))}
+                                                        </VerticalStack>
+                                                    </Box>
+                                                )}
+                                            </VerticalStack>
+                                        ))}
+                                    </VerticalStack>
+                                )}
+                            </VerticalStack>
+                            {sectionIdx < guardrailSections.length - 1 && (
+                                <Box paddingBlockStart="4"><Divider /></Box>
+                            )}
+                        </React.Fragment>
+                    ))}
+                </VerticalStack>
+            </Box>
+
+            <Divider />
+
+            {/* 3. Other details — topology + device/session grid */}
             <Box padding="4">
                 <VerticalStack gap="4">
-                    {detail?.description && (
-                        <VerticalStack gap="2">
-                            <Text variant="headingXs" color="subdued">Description</Text>
-                            <Text variant="bodyMd">{detail.description}</Text>
-                        </VerticalStack>
-                    )}
-
                     {topo && <AssetTopologyGraph nodes={topo.nodes} edges={topo.edges} />}
-
-                    {detail?.impact && (
-                        <>
-                            <Divider />
-                            <VerticalStack gap="2">
-                                <Text variant="headingXs" color="subdued">Impact</Text>
-                                <Text variant="bodyMd">{detail.impact}</Text>
-                            </VerticalStack>
-                        </>
-                    )}
-
-                    <Divider />
                     <DetailGrid items={gridItems} columns={3} />
                 </VerticalStack>
             </Box>
+
+            {/* 4. OWASP + Compliance — only when data exists */}
+            {hasBottomSection && (
+                <>
+                    <Divider />
+                    <Box padding="4">
+                        <VerticalStack gap="4">
+                            {owaspThreats.length > 0 && <OwaspTag threats={owaspThreats} />}
+                            {hasCompliance && <ComplianceTags complianceMap={row.complianceMap} showDivider={false} />}
+                        </VerticalStack>
+                    </Box>
+                </>
+            )}
         </VerticalStack>
     );
 }

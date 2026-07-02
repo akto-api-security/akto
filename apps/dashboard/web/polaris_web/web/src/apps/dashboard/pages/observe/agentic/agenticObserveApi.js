@@ -118,10 +118,10 @@ export function aggregateViolationsByCollectionId(violationRows = [], collection
     return byCollection;
 }
 
-// Open the threat-activity page deep-linked to a single violation event.
-// Mirrors the URL shape the page expects: filters= first, then the event keys, #active hash.
+// Open the guardrail activity page deep-linked to a single violation event.
+// Mirrors the URL shape the page expects: event keys as query params, #active hash.
 export function openViolationInThreatActivity(row = {}) {
-    const base = "/dashboard/protection/threat-activity";
+    const base = "/dashboard/guardrails/activity";
     const { refId, eventType, actor, filterId, status } = row;
     if (refId && eventType && actor && filterId) {
         const params = new URLSearchParams();
