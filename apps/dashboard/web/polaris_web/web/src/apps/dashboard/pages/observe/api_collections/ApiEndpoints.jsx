@@ -346,6 +346,7 @@ function ApiEndpoints(props) {
     const [description, setDescription] = useState("");
     const [isEditingDescription, setIsEditingDescription] = useState(false)
     const [editableDescription, setEditableDescription] = useState(description)
+    const [isSystemPrompt, setIsSystemPrompt] = useState(false)
     const [currentKey, setCurrentKey] = useState(Date.now()); // to force remount InlineEditableText component
     const hasAccessToDiscoveryAgent = func.checkForFeatureSaas('STATIC_DISCOVERY_AI_AGENTS');
 
@@ -2109,8 +2110,11 @@ function ApiEndpoints(props) {
         }
         
         setIsEditingDescription(false);
-        if(editableDescription === description) return;
-        api.saveCollectionDescription(apiCollectionId, editableDescription)
+        if(editableDescription === description) {
+            setIsSystemPrompt(false);
+            return;
+        }
+        api.saveCollectionDescription(apiCollectionId, editableDescription, isSystemPrompt)
             .then(() => {
                 updateCollectionDescription(allCollections, parseInt(apiCollectionId, 10), editableDescription);
                 setAllCollections(allCollections);
@@ -2120,7 +2124,8 @@ function ApiEndpoints(props) {
             .catch((err) => {
                 console.error("Failed to save description:", err);
                 func.setToast(true, true, "Failed to save description. Please try again.");
-            });
+            })
+            .finally(() => setIsSystemPrompt(false));
     };
 
     return (
@@ -2154,14 +2159,21 @@ function ApiEndpoints(props) {
                                     </HorizontalStack>
                                     <HorizontalStack gap={2}>
                                         {isEditingDescription ? (
-                                            <InlineEditableText 
-                                                textValue={editableDescription} 
-                                                setTextValue={setEditableDescription} 
-                                                handleSaveClick={handleSaveDescription} 
-                                                setIsEditing={setIsEditingDescription} 
-                                                placeholder={"Add a brief description"} 
-                                                fitParentWidth={true}
-                                            />
+                                            <VerticalStack gap="1">
+                                                <InlineEditableText
+                                                    textValue={editableDescription}
+                                                    setTextValue={setEditableDescription}
+                                                    handleSaveClick={handleSaveDescription}
+                                                    setIsEditing={setIsEditingDescription}
+                                                    placeholder={"Add a brief description"}
+                                                    fitParentWidth={true}
+                                                />
+                                                <Checkbox
+                                                    label="This is the agent's system prompt"
+                                                    checked={isSystemPrompt}
+                                                    onChange={setIsSystemPrompt}
+                                                />
+                                            </VerticalStack>
                                         ) : (
                                             !description ? (
                                                 <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
