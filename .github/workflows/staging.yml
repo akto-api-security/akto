@@ -9,7 +9,60 @@ on:
   workflow_dispatch:
 
 jobs:
+  check-dao-migration:
+    if: (github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') || (github.event_name == 'workflow_dispatch') || (github.event_name == 'push')
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Check DAO migration
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-dao-migration-check') }}
+        run: |
+          if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
+            BASE=${{ github.event.pull_request.base.sha }}
+            HEAD=${{ github.event.pull_request.head.sha }}
+          else
+            # push / workflow_dispatch have no PR context - diff against the
+            # previous commit on this ref instead.
+            BASE=$(git rev-parse HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
+            HEAD=${{ github.sha }}
+          fi
+
+          # Only schema-affecting additions count, not any edit to a DAO file
+          # (e.g. business-logic-only changes like an upsert-vs-update branch).
+          SCHEMA_TOUCHED=$(git diff -U0 "$BASE"..."$HEAD" \
+              -- 'libs/dao/src/main/java/com/akto/dao/*.java' 'libs/dao/src/main/java/com/akto/DaoInit.java' \
+            | grep -E '^\+' \
+            | grep -E 'createIndex|createIndicesIfAbsent|createUniqueIndex|createCollection|dropIndex|dropCollection|renameCollection|convertToCappedCollection|compactCollection' || true)
+          if [ -z "$SCHEMA_TOUCHED" ]; then
+            exit 0
+          fi
+
+          MIGRATION_ADDED=$(git diff --name-only --diff-filter=A "$BASE"..."$HEAD" \
+            | grep -E "^libs/utils/src/main/resources/db/changelog/(common|billing|account)/.*\.xml$" || true)
+          if [ -z "$MIGRATION_ADDED" ]; then
+            echo "This change adds/changes an index or collection but no migration file was added under db/changelog/common|billing|account/. See libs/utils/src/main/resources/db/changelog/README.md."
+            exit 1
+          fi
+
+          echo "Migration check passed: $MIGRATION_ADDED"
+
+      - name: Send failure notification to Slack
+        if: failure()
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "❌ DAO migration check failed on Staging (${{ github.event_name }}, ${{ github.sha }}). Build blocked."
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
   build:
+    needs: check-dao-migration
     if: (github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') || (github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-22.04
     outputs:
