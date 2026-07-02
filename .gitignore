@@ -28,6 +28,7 @@ https:
 model.onnx
 test_scripts/*
 run-master.sh
+run-tbs.sh
 run-threat-consumer.sh
 run-account-jobs.sh
 run-data-ingestion.sh

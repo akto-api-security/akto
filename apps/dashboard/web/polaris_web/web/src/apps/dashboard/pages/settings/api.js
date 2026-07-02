@@ -888,11 +888,11 @@ const settingRequests = {
             data: { username, team, userRole }
         })
     },
-    async fetchAgenticUsers() {
+    async fetchAgenticUsers(params = {}) {
         return await request({
             url: '/api/fetchAgenticUsers',
             method: 'post',
-            data: {}
+            data: params
         })
     },
     async fetchCloudflareWafIntegration() {
@@ -984,23 +984,38 @@ const settingRequests = {
             }
         })
     },
-    getAgentLogs(agentId, startTime, endTime) {
+    getAgentLogs(agentId, startTime, endTime, logKey = null, afterId = null, pageSize = 500) {
         return request({
             url: '/api/getAgentLogs',
             method: 'post',
             data: {
                 agentId,
                 startTime,
-                endTime
+                endTime,
+                pageSize,
+                ...(logKey ? { logKey } : {}),
+                ...(afterId ? { afterId } : {})
             }
         })
     },
-    getUserAnalysis(deviceId) {
+    exportAgentLogs(agentId, startTime, endTime, logKey = null) {
+        return request({
+            url: '/api/exportAgentLogs',
+            method: 'post',
+            data: {
+                agentId,
+                startTime,
+                endTime,
+                ...(logKey ? { logKey } : {})
+            }
+        })
+    },
+    getUserAnalysis(username) {
         return request({
             url: '/api/getUserAnalysis',
             method: 'post',
             data: {
-                deviceId
+                username
             }
         })
     },
@@ -1098,20 +1113,6 @@ const settingRequests = {
     removeWizIntegration() {
         return request({
             url: '/api/removeWizIntegration',
-            method: 'post',
-            data: {}
-        })
-    },
-    addWizTrafficSource() {
-        return request({
-            url: '/api/addWizTrafficSource',
-            method: 'post',
-            data: {}
-        })
-    },
-    removeWizTrafficSource() {
-        return request({
-            url: '/api/removeWizTrafficSource',
             method: 'post',
             data: {}
         })

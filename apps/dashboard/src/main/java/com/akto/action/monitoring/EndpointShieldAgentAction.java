@@ -2,6 +2,7 @@ package com.akto.action.monitoring;
 
 import com.akto.action.UserAction;
 import com.akto.dao.agentic_sessions.UserAnalysisDataDao;
+import com.akto.dao.monitoring.EndpointShieldLogsDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.monitoring.EndpointShieldServer;
@@ -10,25 +11,36 @@ import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.Log;
+import com.akto.dao.context.Context;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Comparator;
 
 public class EndpointShieldAgentAction extends UserAction {
-    private static final int MAX_LOGS_LIMIT = 10000; // Maximum logs to fetch from database
-    
+    private static final LoggerMaker loggerMaker = new LoggerMaker(EndpointShieldAgentAction.class, LogDb.DASHBOARD);
+    private static final int MAX_LOGS_LIMIT = 10000;
+    private static final int MAX_EXPORT_LIMIT = 100_000;
+
     private String agentId;
     private String deviceId;
     private List<EndpointShieldServer> mcpServers;
     private List<Log> agentLogs;
     private int startTime;
     private int endTime;
+    private String logKey; // optional filter: "agent-logs", "proxy-logs", "installation-logs", etc.
+    private String afterId;  // ObjectId hex cursor — fetch logs older than this document
+    private int pageSize;    // number of logs per page; defaults to DEFAULT_PAGE_SIZE
+    private long totalCount; // total matching logs (without cursor), for display
+    private boolean hasMore; // whether older logs exist beyond the current page
 
     @Getter
     private UserAnalysisData userAnalysis;
@@ -39,7 +51,7 @@ public class EndpointShieldAgentAction extends UserAction {
     public String fetchUserAnalysisList() {
         userAnalysisList = UserAnalysisDataDao.instance.findAll(Filters.empty(),
                 Projections.include(UserAnalysisData.USER_NAME, UserAnalysisData.LAST_UPDATED_AT,
-                        UserAnalysisData.TOPIC_COUNTS, UserAnalysisData.TOTAL_INPUT_TOKENS,
+                        UserAnalysisData.TOTAL_INPUT_TOKENS,
                         UserAnalysisData.TOTAL_OUTPUT_TOKENS, UserAnalysisData.AI_SUMMARY,
                         UserAnalysisData.HARMFUL_TOPICS));
         return SUCCESS.toUpperCase();
@@ -189,33 +201,116 @@ public class EndpointShieldAgentAction extends UserAction {
                 addActionError("Agent ID is required");
                 return ERROR.toUpperCase();
             }
-            
+
             // If startTime and endTime are not provided, default to last 24 hours
             if (startTime == 0 && endTime == 0) {
                 int now = (int) (System.currentTimeMillis() / 1000);
                 endTime = now;
                 startTime = now - (24 * 60 * 60); // 24 hours ago
             }
-            
-            LoggerMaker loggerMaker = new LoggerMaker(EndpointShieldAgentAction.class, LogDb.ENDPOINT_SHIELD);
-            agentLogs = loggerMaker.fetchLogRecords(startTime, endTime, LogDb.ENDPOINT_SHIELD);
-            
-            // Filter logs by agentId and apply sorting with limit
-            agentLogs = agentLogs.stream()
-                .filter(log -> {
-                    if (log instanceof EndpointShieldLog) {
-                        EndpointShieldLog esLog = (EndpointShieldLog) log;
-                        return agentId.equals(esLog.getAgentId());
-                    }
-                    return false;
-                })
-                .sorted(Comparator.comparing(Log::getTimestamp).reversed()) // Sort by timestamp descending (newest first)
-                .limit(MAX_LOGS_LIMIT) // Apply upper cap
-                .collect(java.util.stream.Collectors.toList());
-                
+
+            // pageSize==0 means caller didn't send the field (Java int default); fall back to MAX_LOGS_LIMIT
+            // to preserve the pre-pagination behaviour for callers that don't paginate.
+            int effectivePageSize = (pageSize > 0) ? Math.min(pageSize, MAX_LOGS_LIMIT) : MAX_LOGS_LIMIT;
+
+            // Base filter (no cursor) — used for totalCount
+            Bson baseFilter = Filters.and(
+                Filters.eq(EndpointShieldLog.AGENT_ID, agentId),
+                Filters.gte(Log.TIMESTAMP, startTime),
+                Filters.lte(Log.TIMESTAMP, endTime)
+            );
+            if (logKey != null && !logKey.isEmpty()) {
+                baseFilter = Filters.and(baseFilter, Filters.eq("key", logKey));
+            }
+
+            // Add ObjectId cursor for paged requests — _id < afterId fetches older logs.
+            // Using _id instead of timestamp avoids skipping logs that share the same second.
+            Bson pagedFilter = baseFilter;
+            if (afterId != null && !afterId.isEmpty()) {
+                pagedFilter = Filters.and(baseFilter, Filters.lt("_id", new ObjectId(afterId)));
+            }
+
+            // Sort descending by _id (newest ObjectId = newest log)
+            Bson sort = Sorts.descending("_id");
+            Bson projection = Projections.include("log", "timestamp", "key", "agentId", "deviceId", "level");
+
+            // Force agentId index to avoid collection scans on sparse keys (proxy-logs, installation-logs).
+            // The agentId single-field index narrows the scan to this agent's documents; key/timestamp
+            // filtering is then applied as residual predicates, which is fast enough for per-agent volumes.
+            org.bson.Document hint = new org.bson.Document("agentId", -1);
+
+            List<EndpointShieldLog> fetched = new ArrayList<>();
+            EndpointShieldLogsDao.instance.getMCollection()
+                .find(pagedFilter)
+                .projection(projection)
+                .sort(sort)
+                .hint(hint)
+                .limit(effectivePageSize + 1)
+                .maxTime(30, java.util.concurrent.TimeUnit.SECONDS)
+                .into(fetched);
+
+            hasMore = fetched.size() > effectivePageSize;
+            if (hasMore) {
+                fetched = fetched.subList(0, effectivePageSize);
+            }
+
+            agentLogs = new ArrayList<>(fetched);
+            // Only count on the first page — subsequent pages discard the value anyway.
+            // Count with the same agentId hint as the find so it narrows to this agent's
+            // documents (key/timestamp applied as residual) instead of scanning the timestamp
+            // range index across every agent — that scan is why the count previously had to be
+            // skipped for wide (e.g. all-time) ranges. Display-only and non-fatal: on timeout
+            // totalCount = -1, which the UI renders as "unknown" while pagination still works.
+            if (afterId == null || afterId.isEmpty()) {
+                try {
+                    totalCount = EndpointShieldLogsDao.instance.getMCollection()
+                        .countDocuments(baseFilter, new com.mongodb.client.model.CountOptions()
+                            .hint(hint)
+                            .maxTime(10, java.util.concurrent.TimeUnit.SECONDS));
+                } catch (Exception countErr) {
+                    loggerMaker.errorAndAddToDb("Error counting endpoint shield logs: " + countErr.getMessage());
+                    totalCount = -1;
+                }
+            }
+
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             addActionError("Error fetching agent logs: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String exportAgentLogs() {
+        try {
+            if (agentId == null || agentId.trim().isEmpty()) {
+                addActionError("Agent ID is required");
+                return ERROR.toUpperCase();
+            }
+
+            if (startTime == 0 && endTime == 0) {
+                endTime = Context.now();
+                startTime = endTime - (24 * 60 * 60);
+            }
+
+            Bson filter = Filters.and(
+                Filters.eq(EndpointShieldLog.AGENT_ID, agentId),
+                Filters.gte(Log.TIMESTAMP, startTime),
+                Filters.lte(Log.TIMESTAMP, endTime)
+            );
+            if (logKey != null && !logKey.isEmpty()) {
+                filter = Filters.and(filter, Filters.eq("key", logKey));
+            }
+
+            Bson sort = Sorts.descending("_id");
+            Bson projection = Projections.include("log", "timestamp", "key", "agentId", "deviceId", "level");
+
+            agentLogs = new ArrayList<>(EndpointShieldLogsDao.instance.findAll(
+                filter, 0, MAX_EXPORT_LIMIT, sort, projection
+            ));
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error exporting agent logs: " + e.getMessage());
             return ERROR.toUpperCase();
         }
     }
@@ -245,15 +340,50 @@ public class EndpointShieldAgentAction extends UserAction {
         this.endTime = endTime;
     }
 
+    public String getLogKey() {
+        return logKey;
+    }
+
+    public void setLogKey(String logKey) {
+        this.logKey = logKey;
+    }
+
+    public String getAfterId() {
+        return afterId;
+    }
+
+    public void setAfterId(String afterId) {
+        this.afterId = afterId;
+    }
+
+    public int getPageSize() {
+        return pageSize;
+    }
+
+    public void setPageSize(int pageSize) {
+        this.pageSize = pageSize;
+    }
+
+    public long getTotalCount() {
+        return totalCount;
+    }
+
+    public boolean isHasMore() {
+        return hasMore;
+    }
+
+    @Setter
+    String username;
+
     public String fetchUserAnalysis() {
-        if (deviceId == null || deviceId.trim().isEmpty()) {
-            addActionError("Device ID is required");
+        if (this.username == null || this.username.isEmpty()) {
+            addActionError("Username is required");
             return ERROR.toUpperCase();
         }
 
         userAnalysis = UserAnalysisDataDao.instance.findOne(
             Filters.and(
-                Filters.eq(UserAnalysisData.ID_DEVICE_ID, deviceId)
+                Filters.eq(UserAnalysisData.USER_NAME, this.username)
             )
         );
 

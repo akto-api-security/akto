@@ -1,10 +1,11 @@
 package com.akto.action;
 
+import com.akto.dao.AgentUsersDao;
 import com.akto.dao.GuardrailPoliciesDao;
+import com.akto.dto.EnterpriseLicenseComplianceCatalog;
 import com.akto.dao.context.Context;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.GuardrailPolicies;
-import com.akto.dto.EnterpriseLicenseComplianceCatalog;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -74,10 +75,20 @@ public class GuardrailPoliciesAction extends UserAction {
 
     public String fetchGuardrailPolicies() {
         try {
-            this.guardrailPolicies  = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(0, 20);
+            this.guardrailPolicies = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(0, 20);
             this.total = GuardrailPoliciesDao.instance.getTotalCount();
-            for (GuardrailPolicies policy : this.guardrailPolicies) {
-                EnterpriseLicenseComplianceCatalog.applyToPolicy(policy);
+
+            // Resolve targetTeams/targetRoles → device IDs fresh on every fetch.
+            // Empty applyToDeviceIds = no targeting → apply to all devices.
+            // Non-empty = apply only to listed device labels.
+            for (GuardrailPolicies p : this.guardrailPolicies) {
+                boolean hasTargeting = (p.getTargetTeams() != null && !p.getTargetTeams().isEmpty())
+                        || (p.getTargetRoles() != null && !p.getTargetRoles().isEmpty());
+                if (hasTargeting) {
+                    p.setApplyToDeviceIds(AgentUsersDao.instance.findDeviceIdsByTeamsAndRoles(
+                            p.getTargetTeams(), p.getTargetRoles()));
+                }
+                EnterpriseLicenseComplianceCatalog.applyToPolicy(p);
             }
 
             loggerMaker.info("Fetched " + guardrailPolicies.size() + " guardrail policies out of " + total + " total");
@@ -265,6 +276,12 @@ public class GuardrailPoliciesAction extends UserAction {
         }
         if (p.getBlockedHosts() != null) {
             updates.add(Updates.set("blockedHosts", p.getBlockedHosts()));
+        }
+        if (p.getTargetTeams() != null) {
+            updates.add(Updates.set("targetTeams", p.getTargetTeams()));
+        }
+        if (p.getTargetRoles() != null) {
+            updates.add(Updates.set("targetRoles", p.getTargetRoles()));
         }
         updates.add(Updates.set("blockPersonalAccounts", p.isBlockPersonalAccounts()));
         if (StringUtils.isNotBlank(p.getBehaviour())) {

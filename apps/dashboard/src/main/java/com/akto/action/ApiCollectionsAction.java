@@ -105,7 +105,7 @@ public class ApiCollectionsAction extends UserAction {
             Context.accountId.set(CACHED_ACCOUNT_ID);
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude(
-                    "urls", "conditions", "serviceGraphEdges", "hostNames", "serviceTag",
+                    "urls", "conditions", "serviceGraphEdges", "hostNames",
                     "sampleCollectionsDropped", "redact", "runDependencyAnalyser",
                     "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
                     "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType"
@@ -135,11 +135,11 @@ public class ApiCollectionsAction extends UserAction {
             stepStart = System.currentTimeMillis();
 
             // Trim tags to service tag only
-            String serviceTagKey = "privatecloud.agoda.com/service";
+            String[] serviceTagKeys = new String[]{"privatecloud.agoda.com/service", "privatecloud.agoda.com/hostname"};
             for (ApiCollection c : collections) {
                 List<CollectionTags> tags = c.getTagsList();
                 if (tags != null && !tags.isEmpty()) {
-                    tags.removeIf(tag -> !serviceTagKey.equals(tag.getKeyName()));
+                    tags.removeIf(tag -> Arrays.stream(serviceTagKeys).noneMatch(k -> k.equals(tag.getKeyName())));
                 }
                 if (tags != null) {
                     for (CollectionTags tag : tags) {

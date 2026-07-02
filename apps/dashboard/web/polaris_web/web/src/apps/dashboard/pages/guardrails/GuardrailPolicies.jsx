@@ -12,6 +12,8 @@ import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from "./components/enterpriseLic
 import api from "./api";
 import { transformPolicyForBackend, SEVERITY, normalizeBehaviourValue } from "./utils";
 import GUARDRAIL_PRESETS from "./guardrailPresets";
+import PersistStore from '../../../main/PersistStore';
+import { extractServiceName } from '../observe/agentic/constants';
 
 const resourceName = {
   singular: "policy",
@@ -134,6 +136,19 @@ function GuardrailPolicies() {
     const [isPreset, setIsPreset] = useState(false);
     const [presetsPopoverActive, setPresetsPopoverActive] = useState(false);
     const [pendingPolicyName, setPendingPolicyName] = useState(null);
+
+    const allCollections = PersistStore(state => state.allCollections);
+
+    const getLlmServiceKeySet = () => {
+        const keys = new Set();
+        (allCollections || []).forEach(c => {
+            if (c.envType?.some(e => e.keyName === 'browser-llm')) {
+                const svcKey = extractServiceName(c.hostName || c.displayName || '') || c.displayName || '';
+                if (svcKey) keys.add(svcKey);
+            }
+        });
+        return keys;
+    };
 
     const policyName = new URLSearchParams(window.location.search).get("policy");
 
@@ -260,19 +275,32 @@ function GuardrailPolicies() {
         return [];
     };
 
-    // Helper function to get effective selected Agent servers with fallback logic
-    const getEffectiveSelectedAgentServers = (policy) => {
-        if (policy.selectedAgentServersV2?.length > 0) {
-            return policy.selectedAgentServersV2;
-        }
-        // Convert old format to new format for compatibility
-        if (policy.selectedAgentServers?.length > 0) {
-            return policy.selectedAgentServers.map(serverId => ({
-                id: serverId,
-                name: serverId // ID as name for old data
-            }));
-        }
-        return [];
+    // selectedAgentServersV2 stores both AI agent and browser-LLM entries merged together.
+    const splitAgentServersV2 = (rawEntries, llmKeySet) => {
+        const agents = [];
+        const llms = [];
+        (rawEntries || []).forEach(s => {
+            const col = (allCollections || []).find(c => c.id?.toString() === s.id?.toString());
+            const isLlm = col
+                ? col.envType?.some(e => e.keyName === 'browser-llm')
+                : llmKeySet.has(s.name || '');
+            if (isLlm) llms.push(s);
+            else agents.push(s);
+        });
+        return { agents, llms };
+    };
+
+    // Returns mcp, agent, and llm server lists for a policy in one pass.
+    const getEffectiveServers = (policy) => {
+        const raw = policy.selectedAgentServersV2?.length > 0
+            ? policy.selectedAgentServersV2
+            : (policy.selectedAgentServers || []).map(id => ({ id, name: id }));
+        const { agents, llms } = splitAgentServersV2(raw, getLlmServiceKeySet());
+        return {
+            mcp: getEffectiveSelectedMcpServers(policy),
+            agents,
+            llms
+        };
     };
 
     const generateStatusWithSummary = (policy) => {
@@ -344,20 +372,15 @@ function GuardrailPolicies() {
             });
         }
 
-        // Server configuration details using effective methods
+        // Server configuration details
         if (policy.applyToAllServers || policy.applyToAllServers == null) {
             details.push({ label: "Target Servers", value: "All servers" });
         } else {
+            const { mcp, agents, llms } = getEffectiveServers(policy);
             const serverDetails = [];
-            const effectiveMcpServers = getEffectiveSelectedMcpServers(policy);
-            const effectiveAgentServers = getEffectiveSelectedAgentServers(policy);
-
-            if (effectiveMcpServers.length > 0) {
-                serverDetails.push(`${effectiveMcpServers.length} MCP Server${effectiveMcpServers.length > 1 ? 's' : ''}`);
-            }
-            if (effectiveAgentServers.length > 0) {
-                serverDetails.push(`${effectiveAgentServers.length} Agent Server${effectiveAgentServers.length > 1 ? 's' : ''}`);
-            }
+            if (mcp.length > 0) serverDetails.push(`${mcp.length} MCP Server${mcp.length > 1 ? 's' : ''}`);
+            if (agents.length > 0) serverDetails.push(`${agents.length} Agent${agents.length > 1 ? 's' : ''}`);
+            if (llms.length > 0) serverDetails.push(`${llms.length} LLM${llms.length > 1 ? 's' : ''}`);
             if (serverDetails.length > 0) {
                 details.push({ label: "Target Servers", value: serverDetails.join(", ") });
             }
@@ -395,7 +418,6 @@ function GuardrailPolicies() {
             </VerticalStack>
         );
     };
-
 
     const handleToggleStatus = async (policy) => {
         try {
@@ -535,6 +557,8 @@ function GuardrailPolicies() {
                 ...(guardrailData.sentimentDetection ? { sentimentDetection: guardrailData.sentimentDetection } : {}),
                 ...(guardrailData.tokenLimitDetection ? { tokenLimitDetection: guardrailData.tokenLimitDetection } : {}),
                 applyToAllServers: guardrailData.applyToAllServers ?? true,
+                targetTeams: guardrailData.targetTeams || [],
+                targetRoles: guardrailData.targetRoles || [],
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
                 behaviour: guardrailData.behaviour != null

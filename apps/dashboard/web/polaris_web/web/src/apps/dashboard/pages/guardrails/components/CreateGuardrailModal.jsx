@@ -113,7 +113,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
 
     // Step 7: Usage based Guardrails
     const [enableTokenLimit, setEnableTokenLimit] = useState(false);
-    const [tokenLimitConfidenceScore, setTokenLimitConfidenceScore] = useState(0.7);
+    const [tokenLimitThreshold, setTokenLimitThreshold] = useState(4096);
 
     // Step 8: Anomaly Detection (coming soon)
 
@@ -182,7 +182,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         confidenceScore,
         // Step 7
         enableTokenLimit,
-        tokenLimitConfidenceScore,
+        tokenLimitThreshold,
         // Step 9
         enableToolMisuse,
         enableMaliciousTools,
@@ -385,7 +385,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setUrl("");
         setConfidenceScore(25);
         setEnableTokenLimit(false);
-        setTokenLimitConfidenceScore(0.7);
+        setTokenLimitThreshold(4096);
         setEnableToolMisuse(true);
         setEnableMaliciousTools(true);
         setEnableToolNameDescriptionMismatch(true);
@@ -512,7 +512,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setScannerState(policy.banCodeDetection, setEnableBanCode, setBanCodeConfidenceScore);
         setScannerState(policy.secretsDetection, setEnableSecrets, setSecretsConfidenceScore);
         setScannerState(policy.sentimentDetection, setEnableSentiment, setSentimentConfidenceScore);
-        setScannerState(policy.tokenLimitDetection, setEnableTokenLimit, setTokenLimitConfidenceScore);
+        setEnableTokenLimit(policy.tokenLimitDetection?.enabled || false);
+        setTokenLimitThreshold(policy.tokenLimitDetection?.threshold || 4096);
 
         // External model based evaluation
         const hasExternalModel = !!policy.url;
@@ -644,7 +645,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 },
                 tokenLimitDetection: {
                     enabled: enableTokenLimit,
-                    confidenceScore: tokenLimitConfidenceScore
+                    threshold: tokenLimitThreshold
                 },
                 url: enableExternalModel ? (url || null) : null,
                 confidenceScore: enableExternalModel ? confidenceScore : null,
@@ -888,8 +889,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     <UsageGuardrailsStep
                         enableTokenLimit={enableTokenLimit}
                         setEnableTokenLimit={setEnableTokenLimit}
-                        tokenLimitConfidenceScore={tokenLimitConfidenceScore}
-                        setTokenLimitConfidenceScore={setTokenLimitConfidenceScore}
+                        tokenLimitThreshold={tokenLimitThreshold}
+                        setTokenLimitThreshold={setTokenLimitThreshold}
                     />
                 );
             case 8:

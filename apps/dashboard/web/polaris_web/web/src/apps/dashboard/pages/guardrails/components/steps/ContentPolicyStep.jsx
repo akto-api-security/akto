@@ -16,7 +16,7 @@ import { PlusMinor, EditMinor, DeleteMinor, ChevronDownMinor, ChevronUpMinor } f
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
-import { GENERAL_BLOCKS, GENERAL_BLOCK_GROUPS, toDeniedTopic } from "../../generalBlocks";
+import { GENERAL_BLOCKS, GENERAL_BLOCK_GROUPS } from "../../generalBlocks";
 import func from "@/util/func";
 import guardrailApi from "../../api";
 import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
@@ -239,11 +239,8 @@ const ContentPolicyStep = ({
         setSelectedDefaultBlockKeys(next);
     };
 
-    // Unified list for rendering: selected Akto defaults + user custom topics.
-    const activeDefaultTopics = GENERAL_BLOCKS
-        .filter(b => selectedDefaultBlockKeys.has(b.key))
-        .map(b => ({ ...toDeniedTopic(b), _isDefault: true, _key: b.key }));
-    const allActiveTopics = [...activeDefaultTopics, ...deniedTopics];
+    // Akto default topics are managed via the dropdown above; only custom topics get tiles below.
+    const totalActiveTopicsCount = selectedDefaultBlockKeys.size + deniedTopics.length;
 
     const addSamplePhrase = () => {
         const trimmedPhrase = newPhraseInput.trim();
@@ -335,11 +332,10 @@ const ContentPolicyStep = ({
     };
 
     const renderViewRow = (topic, index) => {
-        const isDefault = topic._isDefault;
-        const suggestion = !isDefault ? topicComplianceSuggestions[index] : undefined;
+        const suggestion = topicComplianceSuggestions[index];
         const acceptedCompliance = buildComplianceMap(suggestion?.suggested || {}, suggestion?.accepted || {});
         return (
-            <Box key={isDefault ? topic._key : index} padding="4" borderColor="border" borderWidth="025" borderRadius="2">
+            <Box key={index} padding="4" borderColor="border" borderWidth="025" borderRadius="2">
                 <VerticalStack gap="2">
                     <Box style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: '12px' }}>
                         <Box style={{ flex: 1, minWidth: 0 }}>
@@ -354,32 +350,25 @@ const ContentPolicyStep = ({
                             </VerticalStack>
                         </Box>
                         <VerticalStack gap="2" inlineAlign="end">
-                            <Badge tone={isDefault ? "info" : undefined}>{isDefault ? "Akto default" : "Custom"}</Badge>
-                            {!isDefault && (
-                                <Button icon={EditMinor} size="slim" onClick={() => startEditing(index)} accessibilityLabel="Edit topic" />
-                            )}
+                            <Badge>Custom</Badge>
+                            <Button icon={EditMinor} size="slim" onClick={() => startEditing(index)} accessibilityLabel="Edit topic" />
                             <Button
                                 icon={DeleteMinor}
                                 size="slim"
                                 tone="critical"
                                 accessibilityLabel="Remove topic"
-                                onClick={() => isDefault
-                                    ? toggleGeneralBlock(GENERAL_BLOCKS.find(b => b.key === topic._key), false)
-                                    : deleteRow(index)
-                                }
+                                onClick={() => deleteRow(index)}
                             />
                         </VerticalStack>
                     </Box>
-                    {!isDefault && (
-                        <ComplianceMappingTags
-                            loading={suggestion?.loading}
-                            complianceMap={acceptedCompliance}
-                            onRemove={(framework) => toggleFrameworkAcceptance(index, framework)}
-                            onAdd={Object.keys(suggestion?.suggested || {}).length > 0
-                                ? (framework) => toggleFrameworkAcceptance(index, framework)
-                                : undefined}
-                        />
-                    )}
+                    <ComplianceMappingTags
+                        loading={suggestion?.loading}
+                        complianceMap={acceptedCompliance}
+                        onRemove={(framework) => toggleFrameworkAcceptance(index, framework)}
+                        onAdd={Object.keys(suggestion?.suggested || {}).length > 0
+                            ? (framework) => toggleFrameworkAcceptance(index, framework)
+                            : undefined}
+                    />
                 </VerticalStack>
             </Box>
         );
@@ -556,7 +545,7 @@ const ContentPolicyStep = ({
                                                         <Checkbox
                                                             key={block.key}
                                                             label={block.label}
-                                                            helpText={block.description}
+                                                            helpText={block.shortDescription}
                                                             checked={isBlockEnabled(block)}
                                                             onChange={(checked) => toggleGeneralBlock(block, checked)}
                                                         />
@@ -567,14 +556,13 @@ const ContentPolicyStep = ({
                                     </Box>
                                 )}
 
-                                {/* Unified list: Akto defaults first, then custom topics */}
-                                {allActiveTopics.length > 0 && (
-                                    <Text variant="bodySm" tone="subdued">{allActiveTopics.length} denied topic{allActiveTopics.length !== 1 ? 's' : ''} active</Text>
+                                {/* Akto defaults are managed in the dropdown; only custom topics get tiles here */}
+                                {totalActiveTopicsCount > 0 && (
+                                    <Text variant="bodySm" tone="subdued">{totalActiveTopicsCount} denied topic{totalActiveTopicsCount !== 1 ? 's' : ''} active</Text>
                                 )}
-                                {allActiveTopics.map((topic) => {
-                                    const customIdx = topic._isDefault ? -1 : deniedTopics.indexOf(topic);
-                                    if (!topic._isDefault && editingIndex === customIdx) return null;
-                                    return renderViewRow(topic, customIdx);
+                                {deniedTopics.map((topic, index) => {
+                                    if (editingIndex === index) return null;
+                                    return renderViewRow(topic, index);
                                 })}
                             </VerticalStack>
                         </Box>

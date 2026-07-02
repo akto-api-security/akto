@@ -58,6 +58,46 @@ public class ElasticSearchClient {
 
     public String getIndex() { return ES_INDEX; }
 
+    // ── Topic write-back (used by crons after classification) ─────────────────
+
+    public static class TopicUpdate {
+        public final String docId;
+        public final String topic;
+        public final String subTopic;
+        public TopicUpdate(String docId, String topic, String subTopic) {
+            this.docId    = docId;
+            this.topic    = topic;
+            this.subTopic = subTopic != null ? subTopic : "";
+        }
+    }
+
+    public void bulkUpdateTopics(List<TopicUpdate> updates) {
+        if (updates == null || updates.isEmpty() || !isConfigured()) return;
+        StringBuilder sb = new StringBuilder();
+        for (TopicUpdate u : updates) {
+            String safeDocId    = u.docId.replace("\\", "\\\\").replace("\"", "\\\"");
+            String safeTopic    = u.topic.replace("\\", "\\\\").replace("\"", "\\\"");
+            String safeSubTopic = u.subTopic.replace("\\", "\\\\").replace("\"", "\\\"");
+            sb.append("{\"update\":{\"_id\":\"").append(safeDocId).append("\"}}\n");
+            sb.append("{\"doc\":{\"topic\":\"").append(safeTopic)
+              .append("\",\"subTopic\":\"").append(safeSubTopic)
+              .append("\",\"topicProcessed\":true}}\n");
+        }
+        String url = trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_bulk";
+        Request.Builder rb = new Request.Builder()
+            .url(url)
+            .method("POST", RequestBody.create(sb.toString(), MediaType.parse("application/x-ndjson")))
+            .addHeader("Content-Type", "application/x-ndjson");
+        addAuthHeader(rb);
+        try (Response resp = http.newCall(rb.build()).execute()) {
+            if (!resp.isSuccessful()) {
+                logger.error("bulkUpdateTopics failed (" + resp.code() + ") for " + updates.size() + " docs");
+            }
+        } catch (Exception e) {
+            logger.error("bulkUpdateTopics error: " + e.getMessage());
+        }
+    }
+
     // ── Scroll API (used by crons) ────────────────────────────────────────────
 
     public void scrollQueryData(int accountId, long startTsMs, long endTsMs, int pageSize,
@@ -67,10 +107,16 @@ public class ElasticSearchClient {
         int delivered = 0;
         try {
             String url = trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_search?scroll=" + SCROLL_KEEP_ALIVE;
-            JSONObject response = httpPost(url, buildBaseQuery(accountId, startTsMs, endTsMs, null, null)
+            JSONObject baseQuery = buildBaseQuery(accountId, startTsMs, endTsMs, null, null);
+            // Only fetch records not yet topic-classified
+            baseQuery.getJSONObject("bool").put("must_not",
+                new JSONArray().put(new JSONObject().put("term",
+                    new JSONObject().put("topicProcessed", true))));
+            JSONObject requestBody = new JSONObject()
+                .put("query", baseQuery)
                 .put("size", pageSize)
-                .put("sort", new JSONArray().put(new JSONObject().put("timestamp", new JSONObject().put("order", "asc"))))
-                .toString());
+                .put("sort", new JSONArray().put(new JSONObject().put("timestamp", new JSONObject().put("order", "asc"))));
+            JSONObject response = httpPost(url, requestBody.toString());
             if (response == null) return;
 
             scrollId = response.optString("_scroll_id", null);
@@ -292,7 +338,9 @@ public class ElasticSearchClient {
             source.optInt("outputTokens", 0),
             source.optString("traceId", ""),
             source.optString("spanId", ""),
-            source.optBoolean("isAtlasTraffic", false)
+            source.optBoolean("isAtlasTraffic", false),
+            source.optString(AgentQueryRecord.F_TOPIC, ""),
+            source.optString(AgentQueryRecord.F_SUB_TOPIC, "")
         );
     }
 

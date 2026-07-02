@@ -24,24 +24,32 @@ public class ThreatUtils {
         "MCPGuardrails", "AuditPolicy", "MCPMaliciousComponent"
     );
 
-    public static Document buildSimpleContextFilterNew(String contextSource) {
+    public static Document buildSimpleContextFilterNew(String contextSource, String accountId) {
         if (contextSource == null || contextSource.isEmpty()) {
             contextSource = CONTEXT_SOURCE.API.name();
         }
 
-        if (USE_ACTOR_INFO_TABLE &&"API".equalsIgnoreCase(contextSource)) {
+        if (USE_ACTOR_INFO_TABLE && "API".equalsIgnoreCase(contextSource)) {
             return new Document("contextSource", "API");
         }
 
-        // For ENDPOINT and AGENTIC, need to include legacy filter for backward compatibility
         Document contextSourceFilter = new Document("contextSource", contextSource);
-        Document legacyFilter = buildLegacyContextFilter(contextSource);
 
-        return new Document("$or", Arrays.asList(contextSourceFilter, legacyFilter));
+        // For legacy accounts, include a legacy filter for backward compatibility
+        List<Integer> legacyAccounts = Arrays.asList(1700087964, 1726615470, 1728622642, 1737683011, 1745563576, 1760499072);
+        try {
+            if (accountId != null && legacyAccounts.contains(Integer.parseInt(accountId))) {
+                Document legacyFilter = buildLegacyContextFilter(contextSource);
+                return new Document("$or", Arrays.asList(contextSourceFilter, legacyFilter));
+            }
+        } catch (NumberFormatException ignored) {
+        }
+
+        return contextSourceFilter;
     }
 
-    public static Document buildSimpleContextFilter(String contextSource) {
-        return buildSimpleContextFilterNew(contextSource);
+    public static Document buildSimpleContextFilter(String contextSource, String accountId) {
+        return buildSimpleContextFilterNew(contextSource, accountId);
     }
 
     private static Document buildLegacyContextFilter(String contextSource) {
@@ -124,6 +132,7 @@ public class ThreatUtils {
         requiredIndexes.put("idx_context_detectedAt_severity", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("severity")));
         requiredIndexes.put("idx_context_detectedAt_status", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("status")));
         requiredIndexes.put("idx_detected_context_actor_country", Indexes.compoundIndex(Indexes.descending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("filterId"), Indexes.ascending("actor"), Indexes.ascending("country")));
+        requiredIndexes.put("idx_refId", Indexes.ascending("refId"));
 
         for (Map.Entry<String, Bson> entry : requiredIndexes.entrySet()) {
             if (!existingIndexes.contains(entry.getKey())) {

@@ -2181,7 +2181,7 @@ function ApiEndpoints(props) {
                             </Box>
                         )
                     }
-                    secondaryActions={secondaryActionsComponent}
+                    secondaryActions={agenticView ? null : secondaryActionsComponent}
                     components={[
                         ...components
                     ]}
