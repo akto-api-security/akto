@@ -59,6 +59,7 @@ public class MaliciousEventService {
   );
 
   private static final DashboardFilterCache<FetchAlertFiltersResponse> alertFiltersCache = new DashboardFilterCache<>();
+  private static final DashboardFilterCache<Long> countCache = new DashboardFilterCache<>();
 
   public MaliciousEventService(
       KafkaConfig kafkaConfig, MaliciousEventDao maliciousEventDao) {
@@ -513,7 +514,14 @@ public class MaliciousEventService {
     // Check if sortBySeverity flag is set
     boolean sortBySeverity = filter.hasSortBySeverity() && filter.getSortBySeverity();
 
-    long total = maliciousEventDao.countDocuments(accountId, query);
+    long startTs = filter.hasDetectedAtTimeRange() && filter.getDetectedAtTimeRange().hasStart() ? filter.getDetectedAtTimeRange().getStart() : 0;
+    long endTs   = filter.hasDetectedAtTimeRange() && filter.getDetectedAtTimeRange().hasEnd()   ? filter.getDetectedAtTimeRange().getEnd()   : 0;
+    String statusFilter = filter.hasStatusFilter() ? filter.getStatusFilter() : ThreatDetectionConstants.ACTIVE;
+    String countCacheKey = accountId + "|" + contextSource + "|" + statusFilter
+        + "|" + DashboardFilterCache.bucketDay(startTs)
+        + "|" + DashboardFilterCache.bucketDay(endTs);
+
+    long total = countCache.get(countCacheKey, () -> maliciousEventDao.countDocuments(accountId, query));
 
     MongoCursor<MaliciousEventDto> cursor;
     if (sortBySeverity) {
