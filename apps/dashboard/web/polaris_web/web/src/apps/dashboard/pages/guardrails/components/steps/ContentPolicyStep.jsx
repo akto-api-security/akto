@@ -531,9 +531,9 @@ const ContentPolicyStep = ({
                         helpText="Add up to 30 denied topics to block user inputs or model responses associated with the topic."
                     />
                     {enterpriseLicenseComplianceCategories?.length > 0 && (
-                        <Box paddingBlockStart="2" paddingInlineStart="6">
+                        <Box paddingBlockStart="2" paddingBlockEnd="4" style={{ paddingLeft: '28px' }}>
                             <Text variant="bodySm" tone="subdued">
-                                {enterpriseLicenseComplianceCategories.length} topic{enterpriseLicenseComplianceCategories.length !== 1 ? 's are' : ' is'} managed by Enterprise License Compliance Guardrails.
+                                {enterpriseLicenseComplianceCategories.length} topic{enterpriseLicenseComplianceCategories.length !== 1 ? 's are' : ' is'} also managed under Enterprise License Compliance Guardrails.
                             </Text>
                         </Box>
                     )}
@@ -560,7 +560,7 @@ const ContentPolicyStep = ({
                                 {defaultPickerOpen && editingIndex === null && (
                                     <Box background="bg-surface-secondary" padding="3" borderRadius="2" borderWidth="1" borderColor="border">
                                         <VerticalStack gap="4">
-                                            {Object.values(GENERAL_BLOCK_GROUPS).map(group => (
+                                            {Object.values(GENERAL_BLOCK_GROUPS).filter(group => GENERAL_BLOCKS.some(b => b.group === group)).map(group => (
                                                 <VerticalStack key={group} gap="2">
                                                     <Text variant="bodySm" fontWeight="semibold" tone="subdued">{group}</Text>
                                                     {GENERAL_BLOCKS.filter(b => b.group === group).map(block => (
