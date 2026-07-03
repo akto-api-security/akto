@@ -19,6 +19,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.TestingRunConfig.StreamingRequestConfig;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -116,7 +117,7 @@ public class ApiExecutorUtil {
             Map<String, Object> out = runScript(script, bindings,
                     "method", "headers", "url", "payload", "queryParams",
                     "parsedPayloadTemp", "cachedMethod", "cachedHeaders", "cachedUrl", "cachedPayload", "cachedQueryParams",
-                    "streamingRequest");
+                    "streamingRequest", "cachedStreamingRequest");
 
             String method = (String) out.get("method");
             Map<String, Object> headers = (Map) out.get("headers");
@@ -133,29 +134,13 @@ public class ApiExecutorUtil {
             Map<String, List<String>> hs = convertHeadersFromScript(headers);
             Map<String, List<String>> cachedHs = convertHeadersFromScript(cachedHeaders);
 
-            TestingRunConfig.StreamingRequestConfig parsedStreamingRequest = null;
-            Object srObj = out.get("streamingRequest");
-            if (srObj instanceof ScriptObjectMirror) {
-                ScriptObjectMirror srMirror = (ScriptObjectMirror) srObj;
-                String srUrl = (String) srMirror.get("url");
-                String srBody = (String) srMirror.get("body");
-                String lastKey = (String) srMirror.get("lastKey");
-                Map<String, String> srHeaders = new HashMap<>();
-                Object headersObj = srMirror.get("headers");
-                if (headersObj instanceof ScriptObjectMirror) {
-                    ScriptObjectMirror hm = (ScriptObjectMirror) headersObj;
-                    for (String key : hm.keySet()) {
-                        Object val = hm.get(key);
-                        if (val != null) srHeaders.put(key, val.toString());
-                    }
-                }
-                parsedStreamingRequest = new TestingRunConfig.StreamingRequestConfig(srUrl, srBody, srHeaders, lastKey);
-            }
+            StreamingRequestConfig parsedStreamingRequest = parseStreamingRequest(out.get("streamingRequest"));
+            StreamingRequestConfig cachedParsedStreamingRequest = parseStreamingRequest(out.get("cachedStreamingRequest"));
 
             if (useConversationCache && conversationId != null) {
                 conversationScriptCache.put(conversationId,
                         new ScriptResultCache(cachedMethod, cachedHs, cachedUrl, cachedPayload, cachedQueryParams,
-                                parsedStreamingRequest));
+                                cachedParsedStreamingRequest != null ? cachedParsedStreamingRequest : parsedStreamingRequest));
             }
 
             originalHttpRequest.setBody(payload);
@@ -178,6 +163,24 @@ public class ApiExecutorUtil {
             e.printStackTrace();
             return originalHttpRequest.getBody();
         }
+    }
+
+    private static StreamingRequestConfig parseStreamingRequest(Object srObj) {
+        if (!(srObj instanceof ScriptObjectMirror)) return null;
+        ScriptObjectMirror srMirror = (ScriptObjectMirror) srObj;
+        String srUrl = (String) srMirror.get("url");
+        String srBody = (String) srMirror.get("body");
+        String lastKey = (String) srMirror.get("lastKey");
+        Map<String, String> srHeaders = new HashMap<>();
+        Object headersObj = srMirror.get("headers");
+        if (headersObj instanceof ScriptObjectMirror) {
+            ScriptObjectMirror hm = (ScriptObjectMirror) headersObj;
+            for (String key : hm.keySet()) {
+                Object val = hm.get(key);
+                if (val != null) srHeaders.put(key, val.toString());
+            }
+        }
+        return new StreamingRequestConfig(srUrl, srBody, srHeaders, lastKey);
     }
 
     private static Map<String, List<String>> convertHeadersFromScript(Map<String, Object> headers) {
@@ -217,11 +220,11 @@ public class ApiExecutorUtil {
         final String cachedUrl;
         final String cachedPayload;
         final String cachedQueryParams;
-        final TestingRunConfig.StreamingRequestConfig streamingRequest;
+        final StreamingRequestConfig streamingRequest;
 
         ScriptResultCache(String cachedMethod, Map<String, List<String>> cachedHeaders, String cachedUrl,
                 String cachedPayload, String cachedQueryParams,
-                TestingRunConfig.StreamingRequestConfig streamingRequest) {
+                StreamingRequestConfig streamingRequest) {
             this.cachedMethod = cachedMethod;
             this.cachedHeaders = cachedHeaders;
             this.cachedUrl = cachedUrl;
