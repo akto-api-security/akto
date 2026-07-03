@@ -95,7 +95,10 @@ public class DashboardFilterCache<V> {
             } else {
                 FutureTask<Entry<V>> task = new FutureTask<>(() -> new Entry<>(loader.call()));
                 if (store.putIfAbsent(key, task) == null) {
+                    logger.info("DashboardFilterCache MISS key=" + key);
                     task.run();
+                } else {
+                    logger.info("DashboardFilterCache WAIT key=" + key);
                 }
                 // loop back to read result (ours or a concurrent winner's)
             }
