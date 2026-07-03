@@ -373,8 +373,11 @@ public class MaliciousEventService {
     long startTs = (timeRange != null && timeRange.hasStart()) ? timeRange.getStart() : 0;
     long endTs   = (timeRange != null && timeRange.hasEnd())   ? timeRange.getEnd()   : 0;
 
-    return alertFiltersCache.get(accountId, contextSource, startTs, endTs,
-        () -> computeAlertFilters(accountId, request, contextSource));
+    String cacheKey = "alertFilters|fetch_filters|" + accountId + "|" + contextSource
+        + "|" + DashboardFilterCache.bucketDay(startTs)
+        + "|" + DashboardFilterCache.bucketDay(endTs);
+
+    return alertFiltersCache.get(cacheKey, () -> computeAlertFilters(accountId, request, contextSource));
   }
 
   private FetchAlertFiltersResponse computeAlertFilters(
@@ -517,7 +520,7 @@ public class MaliciousEventService {
     long startTs = filter.hasDetectedAtTimeRange() && filter.getDetectedAtTimeRange().hasStart() ? filter.getDetectedAtTimeRange().getStart() : 0;
     long endTs   = filter.hasDetectedAtTimeRange() && filter.getDetectedAtTimeRange().hasEnd()   ? filter.getDetectedAtTimeRange().getEnd()   : 0;
     String statusFilter = filter.hasStatusFilter() ? filter.getStatusFilter() : ThreatDetectionConstants.ACTIVE;
-    String countCacheKey = accountId + "|" + contextSource + "|" + statusFilter
+    String countCacheKey = "maliciousCount|list_malicious_requests|" + accountId + "|" + contextSource + "|" + statusFilter
         + "|" + DashboardFilterCache.bucketDay(startTs)
         + "|" + DashboardFilterCache.bucketDay(endTs);
 

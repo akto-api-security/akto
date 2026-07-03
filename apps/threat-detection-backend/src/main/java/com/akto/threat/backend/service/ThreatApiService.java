@@ -1,13 +1,12 @@
 package com.akto.threat.backend.service;
 
-import com.akto.dao.context.Context;
-import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountResponse;
+import com.akto.threat.backend.cache.DashboardFilterCache;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.utils.ThreatUtils;
 import com.mongodb.client.MongoCursor;
@@ -25,16 +24,13 @@ import org.bson.Document;
 public class ThreatApiService {
 
   private final MaliciousEventDao maliciousEventDao;
-  private static final LoggerMaker loggerMaker = new LoggerMaker(ThreatApiService.class);
-  private static final java.util.concurrent.atomic.AtomicInteger getSubCategoryWiseCountCallCounter = new java.util.concurrent.atomic.AtomicInteger(0);
+  private static final DashboardFilterCache<ThreatCategoryWiseCountResponse> subCategoryCountCache = new DashboardFilterCache<>();
 
   public ThreatApiService(MaliciousEventDao maliciousEventDao) {
     this.maliciousEventDao = maliciousEventDao;
   }
 
   public ListThreatApiResponse listThreatApis(String accountId, ListThreatApiRequest request, String contextSource) {
-
-    loggerMaker.info("listThreatApis start ts " + Context.now());
 
     int skip = request.hasSkip() ? request.getSkip() : 0;
     int limit = request.getLimit();
@@ -126,17 +122,27 @@ public class ThreatApiService {
       e.printStackTrace();
     }
 
-    loggerMaker.info("listThreatApis end ts " + Context.now());
     return ListThreatApiResponse.newBuilder().addAllApis(apis).setTotal(total).build();
   }
 
   public ThreatCategoryWiseCountResponse getSubCategoryWiseCount(
     String accountId, ThreatCategoryWiseCountRequest req, String contextSource) {
 
-    int callCount = getSubCategoryWiseCountCallCounter.incrementAndGet();
-    long startMs = System.currentTimeMillis();
-    loggerMaker.info("getSubCategoryWiseCount start [call #" + callCount + "] at " +
-        new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new java.util.Date(startMs)));
+    // Skip cache when latestAttackList is present — results are filter-specific
+    if (!req.getLatestAttackList().isEmpty()) {
+      return computeSubCategoryWiseCount(accountId, req, contextSource);
+    }
+
+    String cacheKey = "subCategoryCount|get_subcategory_wise_count|" + accountId + "|" + contextSource
+        + "|" + DashboardFilterCache.bucketDay(req.getStartTs())
+        + "|" + DashboardFilterCache.bucketDay(req.getEndTs());
+
+    return subCategoryCountCache.get(cacheKey,
+        () -> computeSubCategoryWiseCount(accountId, req, contextSource));
+  }
+
+  private ThreatCategoryWiseCountResponse computeSubCategoryWiseCount(
+    String accountId, ThreatCategoryWiseCountRequest req, String contextSource) {
 
     List<Document> pipeline = new ArrayList<>();
     Document match = new Document();
@@ -185,11 +191,6 @@ public class ThreatApiService {
       }
     }
 
-    long endMs = System.currentTimeMillis();
-    loggerMaker.info("getSubCategoryWiseCount end [call #" + callCount + "] at " +
-        new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new java.util.Date(endMs)) +
-        " duration=" + (endMs - startMs) + "ms");
-
     return ThreatCategoryWiseCountResponse.newBuilder()
         .addAllCategoryWiseCounts(categoryWiseCounts)
         .build();
@@ -197,8 +198,6 @@ public class ThreatApiService {
 
   public ThreatSeverityWiseCountResponse getSeverityWiseCount(
     String accountId, ThreatSeverityWiseCountRequest req, String contextSource) {
-
-    loggerMaker.info("getSeverityWiseCount start ts " + Context.now());
 
     List<ThreatSeverityWiseCountResponse.SeverityCount> categoryWiseCounts = new ArrayList<>();
 
@@ -243,8 +242,6 @@ public class ThreatApiService {
                 .build());
       }
     }
-
-    loggerMaker.info("getSeverityWiseCount end ts " + Context.now());
 
     return ThreatSeverityWiseCountResponse.newBuilder()
         .addAllCategoryWiseCounts(categoryWiseCounts)
