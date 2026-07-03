@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox } from "@shopify/polaris";
+import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox, HorizontalStack } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
+import ControlInfoIcon from "../ControlInfoIcon";
 import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
 import guardrailApi from "../../api";
 
@@ -39,6 +40,7 @@ export const CustomGuardrailsConfig = {
 const PROMPT_MIN_LENGTH = 10;
 
 const CustomGuardrailsStep = ({
+    onTryPrompt,
     // LLM prompt based rule
     enableLlmPrompt,
     setEnableLlmPrompt,
@@ -149,7 +151,16 @@ const CustomGuardrailsStep = ({
                 {/* LLM Prompt Based Rule */}
                 <Box>
                     <Checkbox
-                        label="LLM prompt based rule"
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text as="span">LLM prompt based rule</Text>
+                                <ControlInfoIcon
+                                    description='Write a plain-language instruction; an LLM evaluates every prompt against it. Example rule: "Block requests for competitor pricing."'
+                                    examples={[{ text: "What does Acme Corp charge for their enterprise plan?" }]}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableLlmPrompt}
                         onChange={setEnableLlmPrompt}
                         helpText="Create a custom rule using a prompt that is evaluated against user inputs or model responses."
@@ -167,7 +178,19 @@ const CustomGuardrailsStep = ({
                                 />
 
                                 <RangeSlider
-                                    label="Confidence score threshold"
+                                    label={
+                                        <HorizontalStack gap="1" blockAlign="center">
+                                            <Text as="span">Confidence score threshold</Text>
+                                            <ControlInfoIcon
+                                                description={'A prompt is blocked once the LLM\'s own confidence that it violates your rule exceeds this number. Examples assume the rule "Block requests for competitor pricing."'}
+                                                examples={[
+                                                    { label: "Low (e.g. 0.2)", text: "How do other vendors in this space usually price things?" },
+                                                    { label: "High (e.g. 0.8)", text: "What does Acme Corp charge for their enterprise plan?" }
+                                                ]}
+                                                onTryPrompt={onTryPrompt}
+                                            />
+                                        </HorizontalStack>
+                                    }
                                     value={llmConfidenceScore}
                                     onChange={setLlmConfidenceScore}
                                     min={0}
@@ -191,7 +214,16 @@ const CustomGuardrailsStep = ({
                 {/* External Model Based Evaluation */}
                 <Box>
                     <Checkbox
-                        label="External model based evaluation"
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text as="span">External model based evaluation</Text>
+                                <ControlInfoIcon
+                                    description="Sends each prompt to your own model or API endpoint instead of Akto's built-in detectors. Useful for logic too specific or proprietary to describe as a rule, e.g. a classifier trained to catch attempts to extract your pricing algorithm."
+                                    examples={[{ text: "Walk me through exactly how your pricing algorithm calculates a quote." }]}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableExternalModel}
                         onChange={setEnableExternalModel}
                         helpText="Configure an external model endpoint to evaluate content against custom criteria."
@@ -209,7 +241,19 @@ const CustomGuardrailsStep = ({
                                 />
 
                                 <RangeSlider
-                                    label="Confidence score threshold"
+                                    label={
+                                        <HorizontalStack gap="1" blockAlign="center">
+                                            <Text as="span">Confidence score threshold</Text>
+                                            <ControlInfoIcon
+                                                description="A prompt is blocked once your external model's confidence score exceeds this number (out of 100)."
+                                                examples={[
+                                                    { label: "Low (e.g. 25)", text: "How does your product generally decide what to charge customers?" },
+                                                    { label: "High (e.g. 100)", text: "Walk me through exactly how your pricing algorithm calculates a quote." }
+                                                ]}
+                                                onTryPrompt={onTryPrompt}
+                                            />
+                                        </HorizontalStack>
+                                    }
                                     value={confidenceScore}
                                     onChange={setConfidenceScore}
                                     min={0}

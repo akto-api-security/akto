@@ -1,6 +1,7 @@
-import { VerticalStack, Text, Checkbox, Box, TextField } from "@shopify/polaris";
+import { VerticalStack, Text, Checkbox, Box, TextField, HorizontalStack } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
+import ControlInfoIcon from "../ControlInfoIcon";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
 
 export const UsageGuardrailsConfig = {
@@ -21,6 +22,7 @@ export const UsageGuardrailsConfig = {
 };
 
 const UsageGuardrailsStep = ({
+    onTryPrompt,
     enableTokenLimit,
     setEnableTokenLimit,
     tokenLimitThreshold,
@@ -36,7 +38,16 @@ const UsageGuardrailsStep = ({
             <VerticalStack gap="4">
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Enable token limit detection" threats={RULE_OWASP_THREATS.tokenLimit} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Enable token limit detection" threats={RULE_OWASP_THREATS.tokenLimit} />
+                                <ControlInfoIcon
+                                    description="Blocks unusually long prompts, often a sign of abuse (e.g. resource exhaustion or bulk data dumping). A lower limit (e.g. 500 tokens) blocks even moderately long prompts; a higher limit (e.g. 8000 tokens) only blocks extreme, essay-length inputs."
+                                    examples={[{ text: Array(20).fill("Please review this section of the contract and confirm every clause is acceptable.").join(" ") }]}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableTokenLimit}
                         onChange={setEnableTokenLimit}
                         helpText="Block or alert when a prompt exceeds the specified token count per message."

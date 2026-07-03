@@ -1,6 +1,7 @@
 import { VerticalStack, Text, Checkbox, HorizontalStack, Button, TextField, Box, DataTable, RangeSlider } from "@shopify/polaris";
 import { DeleteMajor } from '@shopify/polaris-icons';
 import OwaspTag from "../OwaspTag";
+import ControlInfoIcon from "../ControlInfoIcon";
 
 export const LanguageSafetyConfig = {
     number: 3,
@@ -21,6 +22,7 @@ export const LanguageSafetyConfig = {
 };
 
 const LanguageSafetyStep = ({
+    onTryPrompt,
     // Gibberish detection
     enableGibberishDetection,
     setEnableGibberishDetection,
@@ -48,7 +50,16 @@ const LanguageSafetyStep = ({
                 {/* Gibberish Detection */}
                 <Box>
                     <Checkbox
-                        label="Enable gibberish detection"
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text as="span">Enable gibberish detection</Text>
+                                <ControlInfoIcon
+                                    description="Blocks nonsensical or random text that could confuse the AI or probe for weaknesses."
+                                    examples={[{ text: "asdkjf qwoeicj zxlkjfoiqwe kejfoqiwej." }]}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableGibberishDetection}
                         onChange={setEnableGibberishDetection}
                         helpText="Detect and block gibberish or nonsensical text in user inputs. This helps prevent meaningless prompts that could confuse the AI or be used as attack vectors."
@@ -56,7 +67,17 @@ const LanguageSafetyStep = ({
                     {enableGibberishDetection && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                    <ControlInfoIcon
+                                        description="Higher values are more permissive (fewer prompts blocked); lower values are stricter."
+                                        examples={[
+                                            { label: "Low (e.g. 0.2)", text: "asdf can u pls hlp me wiht tihs kthing." },
+                                            { label: "High (e.g. 0.8)", text: "xkq93 !!zpqo alkj3 9!! qexlm." }
+                                        ]}
+                                        onTryPrompt={onTryPrompt}
+                                    />
+                                </HorizontalStack>
                                 <RangeSlider
                                     label=""
                                     value={gibberishConfidenceScore}
@@ -75,7 +96,16 @@ const LanguageSafetyStep = ({
                 {/* Sentiment Detection */}
                 <Box>
                     <Checkbox
-                        label="Enable sentiment detection"
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text as="span">Enable sentiment detection</Text>
+                                <ControlInfoIcon
+                                    description="Blocks negative, toxic, or hostile emotional tone in prompts."
+                                    examples={[{ text: "This is useless garbage and so are you." }]}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableSentiment}
                         onChange={setEnableSentiment}
                         helpText="Analyze sentiment in user inputs to detect negative, toxic, or inappropriate emotional content."
@@ -83,7 +113,17 @@ const LanguageSafetyStep = ({
                     {enableSentiment && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                    <ControlInfoIcon
+                                        description="Higher values are more permissive (fewer prompts blocked); lower values are stricter."
+                                        examples={[
+                                            { label: "Low (e.g. 0.2)", text: "This is frustrating and unhelpful." },
+                                            { label: "High (e.g. 0.8)", text: "I hate this and everyone involved should suffer." }
+                                        ]}
+                                        onTryPrompt={onTryPrompt}
+                                    />
+                                </HorizontalStack>
                                 <RangeSlider
                                     label=""
                                     value={sentimentConfidenceScore}
@@ -102,7 +142,16 @@ const LanguageSafetyStep = ({
                 {/* Profanity */}
                 <Box>
                     <Checkbox
-                        label="Profanity"
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text as="span">Profanity</Text>
+                                <ControlInfoIcon
+                                    description="Automatically redacts common swear words from prompts and responses before they reach the model. Add your own words below to extend the built-in list."
+                                    examples={[{ text: "This f***ing thing is broken." }]}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={wordFilters.profanity}
                         onChange={(checked) => setWordFilters({ ...wordFilters, profanity: checked })}
                         helpText="Redacts profanity words that are considered offensive."
