@@ -41,7 +41,7 @@ _CONNECTOR_TAG: Dict[str, str] = {
     "gemini_cli": "geminicli",
     "github": "github",
     "codex_cli": "codexcli",
-    "kiro_cli": "kiro-cli"
+    "kiro_cli": "kirocli"
 }
 TAG_NAME = _CONNECTOR_TAG.get(AKTO_CONNECTOR, AKTO_CONNECTOR)
 
