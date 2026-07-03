@@ -536,6 +536,7 @@ function GuardrailPolicies() {
                 // Block-only host blocklist
                 blockedHosts: guardrailData.blockedHosts || [],
                 blockPersonalAccounts: guardrailData.blockPersonalAccounts || false,
+                ignorePhrases: guardrailData.ignorePhrases || [],
                 deniedTopics: guardrailData.deniedTopics || [],
                 enterpriseLicenseComplianceCategories: guardrailData.enterpriseLicenseComplianceCategories || [],
                 regexPatterns: guardrailData.regexPatterns || [],
