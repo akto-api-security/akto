@@ -112,7 +112,7 @@ public class SseStreamingUtil {
     public static List<String> joinAndCollect(StreamingResult result) {
         loggerMaker.infoAndAddToDb("Joining SSE streaming thread, total chunks collected so far: " + result.chunks.size());
         try {
-            result.thread.join(30000);
+            result.thread.join(45000);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } finally {

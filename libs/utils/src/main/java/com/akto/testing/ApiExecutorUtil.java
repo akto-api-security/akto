@@ -23,6 +23,8 @@ import com.akto.dto.testing.TestingRunConfig.StreamingRequestConfig;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jdk.nashorn.api.scripting.ScriptObjectMirror;
 
 public class ApiExecutorUtil {
@@ -116,7 +118,7 @@ public class ApiExecutorUtil {
 
             Map<String, Object> out = runScript(script, bindings,
                     "method", "headers", "url", "payload", "queryParams",
-                    "parsedPayloadTemp", "cachedMethod", "cachedHeaders", "cachedUrl", "cachedPayload", "cachedQueryParams",
+                    "parsedPayloadTemp", "cachedMethod", "cachedHeaders", "cachedUrl", "cachedPayload", "cachedPayloadPatch", "cachedQueryParams",
                     "streamingRequest", "cachedStreamingRequest");
 
             String method = (String) out.get("method");
@@ -129,6 +131,7 @@ public class ApiExecutorUtil {
             Map<String, Object> cachedHeaders = (Map) out.get("cachedHeaders");
             String cachedUrl = (String) out.get("cachedUrl");
             String cachedPayload = (String) out.get("cachedPayload");
+            String cachedPayloadPatch = (String) out.get("cachedPayloadPatch");
             String cachedQueryParams = (String) out.get("cachedQueryParams");
 
             Map<String, List<String>> hs = convertHeadersFromScript(headers);
@@ -139,7 +142,7 @@ public class ApiExecutorUtil {
 
             if (useConversationCache && conversationId != null) {
                 conversationScriptCache.put(conversationId,
-                        new ScriptResultCache(cachedMethod, cachedHs, cachedUrl, cachedPayload, cachedQueryParams,
+                        new ScriptResultCache(cachedMethod, cachedHs, cachedUrl, cachedPayload, cachedPayloadPatch, cachedQueryParams,
                                 cachedParsedStreamingRequest != null ? cachedParsedStreamingRequest : parsedStreamingRequest));
             }
 
@@ -206,10 +209,25 @@ public class ApiExecutorUtil {
         if (cached.cachedMethod != null) request.setMethod(cached.cachedMethod);
         if (cached.cachedHeaders != null && !cached.cachedHeaders.isEmpty()) request.setHeaders(cached.cachedHeaders);
         if (cached.cachedUrl != null) request.setUrl(cached.cachedUrl);
-        if (cached.cachedPayload != null) request.setBody(cached.cachedPayload);
+        if (cached.cachedPayloadPatch != null) {
+            request.setBody(applyPayloadPatch(request.getBody(), cached.cachedPayloadPatch));
+        } else if (cached.cachedPayload != null) {
+            request.setBody(cached.cachedPayload);
+        }
         if (cached.cachedQueryParams != null) request.setQueryParams(cached.cachedQueryParams);
         if (testingRunConfig != null && cached.streamingRequest != null) {
             testingRunConfig.setStreamingRequest(cached.streamingRequest);
+        }
+    }
+
+    private static String applyPayloadPatch(String body, String patch) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode target = mapper.readTree(body);
+            return mapper.writeValueAsString(mapper.readerForUpdating(target).readValue(patch));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error applying cachedPayloadPatch: " + e.getMessage());
+            return body;
         }
     }
 
@@ -219,16 +237,18 @@ public class ApiExecutorUtil {
         final Map<String, List<String>> cachedHeaders;
         final String cachedUrl;
         final String cachedPayload;
+        final String cachedPayloadPatch;
         final String cachedQueryParams;
         final StreamingRequestConfig streamingRequest;
 
         ScriptResultCache(String cachedMethod, Map<String, List<String>> cachedHeaders, String cachedUrl,
-                String cachedPayload, String cachedQueryParams,
+                String cachedPayload, String cachedPayloadPatch, String cachedQueryParams,
                 StreamingRequestConfig streamingRequest) {
             this.cachedMethod = cachedMethod;
             this.cachedHeaders = cachedHeaders;
             this.cachedUrl = cachedUrl;
             this.cachedPayload = cachedPayload;
+            this.cachedPayloadPatch = cachedPayloadPatch;
             this.cachedQueryParams = cachedQueryParams;
             this.streamingRequest = streamingRequest;
         }
