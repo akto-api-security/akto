@@ -105,7 +105,7 @@ def get_connector_config(connector: str) -> dict:
             "ai_agent_tag": "vscode",
             "hook_header": "x-vscode-hook",
             "atlas_domain": "ai-agent.vscode",
-            "log_dir_default": "~/.github/akto/vscode/logs",
+            "log_dir_default": "~/.copilot/hooks/akto/logs",
             "blocked_exit_code": 2,
         }
     else:
@@ -117,7 +117,7 @@ def get_connector_config(connector: str) -> dict:
             "ai_agent_tag": "copilotcli",
             "hook_header": "x-copilot-hook",
             "atlas_domain": "ai-agent.copilot",
-            "log_dir_default": "~/.github/akto/copilot/logs",
+            "log_dir_default": "~/.copilot/hooks/akto/logs",
             "blocked_exit_code": 0,
         }
 

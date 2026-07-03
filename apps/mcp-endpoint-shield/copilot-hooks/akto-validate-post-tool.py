@@ -103,7 +103,7 @@ def get_connector_config(connector: str) -> dict:
             "ai_agent_tag": "vscode",
             "hook_header": "x-vscode-hook",
             "atlas_domain": "ai-agent.vscode",
-            "log_dir_default": "~/.github/akto/vscode/logs",
+            "log_dir_default": "~/.copilot/hooks/akto/logs",
         }
     else:
         api_url = os.getenv("GITHUB_COPILOT_API_URL", "https://api.github.com")
@@ -114,7 +114,7 @@ def get_connector_config(connector: str) -> dict:
             "ai_agent_tag": "copilotcli",
             "hook_header": "x-copilot-hook",
             "atlas_domain": "ai-agent.copilot",
-            "log_dir_default": "~/.github/akto/copilot/logs",
+            "log_dir_default": "~/.copilot/hooks/akto/logs",
         }
 
 
