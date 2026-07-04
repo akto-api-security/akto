@@ -211,6 +211,7 @@ public class GuardrailPolicies {
         private String topic;
         private String description;
         private List<String> samplePhrases;
+        private Map<String, List<String>> compliance;
 
         private String origin;
 
@@ -293,6 +294,7 @@ public class GuardrailPolicies {
         private boolean enabled;
         private String userPrompt;
         private double confidenceScore;
+        private Map<String, List<String>> compliance;
 
         public LLMRule(boolean enabled, String userPrompt, double confidenceScore) {
             this.enabled = enabled;

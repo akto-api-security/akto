@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Badge, HorizontalStack, Text, Modal, TextField, FormLayout, Banner, VerticalStack } from "@shopify/polaris";
+import { IndexFiltersMode, Badge, HorizontalStack, Text, Modal, FormLayout, Banner, VerticalStack, Autocomplete } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -250,11 +250,8 @@ function UsersAndDevices() {
         setEditTagModal((prev) => ({ ...prev, saving: true }));
         try {
             const selectedUsers = data.users.filter((u) => editTagModal.usernames.includes(u.id));
-            await Promise.all(
-                selectedUsers.map((u) =>
-                    settingRequests.updateUserDeviceTag(u.groupName, editTagModal.team, editTagModal.userRole)
-                )
-            );
+            const groupNames = selectedUsers.map((u) => u.groupName).filter(Boolean);
+            await settingRequests.bulkUpdateUserDeviceTag(groupNames, editTagModal.team, editTagModal.userRole);
             setData((prev) => ({
                 ...prev,
                 users: prev.users.map((u) =>
@@ -263,6 +260,7 @@ function UsersAndDevices() {
                         : u
                 ),
             }));
+            setUserEnrichVersion((v) => v + 1);
             func.setToast(true, false, "Team and role updated successfully");
             closeEditTagModal();
         } catch {
@@ -403,21 +401,43 @@ function UsersAndDevices() {
                         </Banner>
                     )}
                     <FormLayout>
-                        <TextField
-                            label="Team"
-                            value={editTagModal.team}
-                            onChange={(v) => setEditTagModal((prev) => ({ ...prev, team: v }))}
-                            placeholder={editTagModal.teamSource === 'sso' && editTagModal.ssoHintTeam ? `SSO: ${editTagModal.ssoHintTeam}` : 'e.g. Backend, DevOps'}
-                            autoComplete="off"
-                            helpText={editTagModal.teamSource === 'manual' ? 'Clear this field to fall back to SSO value.' : undefined}
+                        <Autocomplete
+                            options={(() => {
+                                const query = (editTagModal.team || '').toLowerCase();
+                                const all = [...new Set(data.users.map(u => u.team).filter(Boolean))].sort();
+                                return (query ? all.filter(t => t.toLowerCase().includes(query)) : all).map(t => ({ label: t, value: t }));
+                            })()}
+                            selected={editTagModal.team ? [editTagModal.team] : []}
+                            onSelect={(sel) => setEditTagModal((prev) => ({ ...prev, team: sel[0] || '' }))}
+                            textField={
+                                <Autocomplete.TextField
+                                    label="Team"
+                                    value={editTagModal.team}
+                                    onChange={(v) => setEditTagModal((prev) => ({ ...prev, team: v }))}
+                                    placeholder={editTagModal.teamSource === 'sso' && editTagModal.ssoHintTeam ? `SSO: ${editTagModal.ssoHintTeam}` : 'e.g. Backend, DevOps'}
+                                    autoComplete="off"
+                                    helpText={editTagModal.teamSource === 'manual' ? 'Clear this field to fall back to SSO value.' : undefined}
+                                />
+                            }
                         />
-                        <TextField
-                            label="User role"
-                            value={editTagModal.userRole}
-                            onChange={(v) => setEditTagModal((prev) => ({ ...prev, userRole: v }))}
-                            placeholder={editTagModal.roleSource === 'sso' && editTagModal.ssoHintRole ? `SSO: ${editTagModal.ssoHintRole}` : 'e.g. Engineer, Architect'}
-                            autoComplete="off"
-                            helpText={editTagModal.roleSource === 'manual' ? 'Clear this field to fall back to SSO value.' : undefined}
+                        <Autocomplete
+                            options={(() => {
+                                const query = (editTagModal.userRole || '').toLowerCase();
+                                const all = [...new Set(data.users.map(u => u.userRole).filter(Boolean))].sort();
+                                return (query ? all.filter(r => r.toLowerCase().includes(query)) : all).map(r => ({ label: r, value: r }));
+                            })()}
+                            selected={editTagModal.userRole ? [editTagModal.userRole] : []}
+                            onSelect={(sel) => setEditTagModal((prev) => ({ ...prev, userRole: sel[0] || '' }))}
+                            textField={
+                                <Autocomplete.TextField
+                                    label="User role"
+                                    value={editTagModal.userRole}
+                                    onChange={(v) => setEditTagModal((prev) => ({ ...prev, userRole: v }))}
+                                    placeholder={editTagModal.roleSource === 'sso' && editTagModal.ssoHintRole ? `SSO: ${editTagModal.ssoHintRole}` : 'e.g. Engineer, Architect'}
+                                    autoComplete="off"
+                                    helpText={editTagModal.roleSource === 'manual' ? 'Clear this field to fall back to SSO value.' : undefined}
+                                />
+                            }
                         />
                     </FormLayout>
                 </VerticalStack>

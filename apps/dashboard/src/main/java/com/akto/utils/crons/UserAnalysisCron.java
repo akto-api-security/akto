@@ -276,7 +276,7 @@ public class UserAnalysisCron {
         }
     }
 
-    private long resolveStartTs(AccountSettings settings) {
+    public static long resolveStartTs(AccountSettings settings) {
         if (settings == null) return 0;
         LastCronRunInfo info = settings.getLastUpdatedCronInfo();
         if (info == null) return 0;

@@ -5,7 +5,8 @@ import api from '../api'
 import func from '@/util/func'
 import { isApiSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, shortNameToCategory, getReportCategoryShortName } from '@/apps/main/labelHelper'
 import PersistStore from '@/apps/main/PersistStore'
-import { resolveComplianceClauseMap } from '../utils/formatUtils'
+import { resolveComplianceClauseMap, mergePolicyComplianceMap } from '../utils/formatUtils'
+import guardrailApi from '../../guardrails/api'
 import ThreatReportHeader from './ThreatReportHeader'
 import ThreatReportTOC from './ThreatReportTOC'
 import ThreatReportSummary from './ThreatReportSummary'
@@ -97,6 +98,8 @@ const ThreatReport = () => {
                             if (capability) localGuardrailComplianceMap[capability] = entry.mapComplianceToListClauses
                         })
                     }
+                    const policiesResp = await guardrailApi.fetchGuardrailPolicies()
+                    mergePolicyComplianceMap(localGuardrailComplianceMap, policiesResp?.guardrailPolicies)
                 }
             } catch (e) {
                 console.error(`Failed to fetch and merge threat compliance: ${e?.message}`)

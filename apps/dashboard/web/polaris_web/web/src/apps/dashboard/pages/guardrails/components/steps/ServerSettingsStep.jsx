@@ -40,8 +40,10 @@ export const ServerSettingsConfig = {
         if (applyToAllUsers) {
             summary += ' | All users';
         } else {
-            if (targetTeams?.length > 0) summary += ` | Teams: ${targetTeams.slice(0, 2).join(', ')}${targetTeams.length > 2 ? ` +${targetTeams.length - 2}` : ''}`;
-            if (targetRoles?.length > 0) summary += ` Roles: ${targetRoles.slice(0, 2).join(', ')}${targetRoles.length > 2 ? ` +${targetRoles.length - 2}` : ''}`;
+            const userParts = [];
+            if (targetTeams?.length > 0) userParts.push(`${targetTeams.length} Team${targetTeams.length !== 1 ? 's' : ''}`);
+            if (targetRoles?.length > 0) userParts.push(`${targetRoles.length} Role${targetRoles.length !== 1 ? 's' : ''}`);
+            if (userParts.length > 0) summary += ` | ${userParts.join(', ')}`;
         }
         summary += `${appSettings} ${behaviourSuffix}`;
         return summary;
@@ -127,6 +129,7 @@ const ServerSettingsStep = ({
     usersLoading,
     applyToAllUsers,
     setApplyToAllUsers,
+    deviceList = [],
     showConditionError = false,
     showUserConditionError = false,
 }) => {
@@ -435,23 +438,16 @@ const ServerSettingsStep = ({
                                         id="apply_to_all_users"
                                         name="userTargeting"
                                         onChange={() => setApplyToAllUsers(true)}
-                                        helpText={(() => {
-                                            const parts = [
-                                                (availableTeams || []).length > 0 && { count: (availableTeams || []).length, label: "Teams", items: (availableTeams || []).map(t => ({ label: t, value: t })) },
-                                                (availableRoles || []).length > 0 && { count: (availableRoles || []).length, label: "Roles", items: (availableRoles || []).map(r => ({ label: r, value: r })) },
-                                            ].filter(Boolean);
-                                            if (parts.length === 0) return "Applies to all users in your organization.";
-                                            return (
+                                        helpText={deviceList.length > 0
+                                            ? (
                                                 <HorizontalStack gap="1" blockAlign="center" wrap>
-                                                    <Text variant="bodyMd" tone="subdued">This includes</Text>
-                                                    {parts.flatMap((item, i) => [
-                                                        <CountPopover key={item.label} count={item.count} label={item.label} items={item.items} />,
-                                                        i < parts.length - 1 && <Text key={`sep-${i}`} variant="bodyMd" tone="subdued">&</Text>
-                                                    ]).filter(Boolean)}
-                                                    <Text variant="bodyMd" tone="subdued">.</Text>
+                                                    <Text variant="bodyMd" tone="subdued">Applies to all</Text>
+                                                    <CountPopover count={deviceList.length} label="Users" items={deviceList} />
+                                                    <Text variant="bodyMd" tone="subdued">in your organization.</Text>
                                                 </HorizontalStack>
-                                            );
-                                        })()}
+                                            )
+                                            : "Applies to all users in your organization."
+                                        }
                                     />
                                     <RadioButton
                                         label="Select Teams & Roles"

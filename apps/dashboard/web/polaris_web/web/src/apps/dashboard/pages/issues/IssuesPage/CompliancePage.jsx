@@ -26,11 +26,11 @@ import values from "@/util/values";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered.jsx";
 import TableStore from "../../../components/tables/TableStore.js";
 import CriticalFindingsGraph from "./CriticalFindingsGraph.jsx";
-import ComplianceMenu from "./ComplianceMenu.jsx";
+import ComplianceMenu, { getCompliances } from "./ComplianceMenu.jsx";
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
-import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, mapLabel, getDashboardCategory, categoryToShortName } from "../../../../main/labelHelper";
+import { mapLabel, getDashboardCategory, categoryToShortName } from "../../../../main/labelHelper";
 import testingApi from "../../testing/api.js"
 
 const sortOptions = [
@@ -42,18 +42,6 @@ const sortOptions = [
     { label: 'Discovered time', value: 'creationTime desc', directionLabel: 'Oldest', sortKey: 'creationTime', columnIndex: 7 },
 ];
 
-const getCompliances = () => {
-    const isMCP = isMCPSecurityCategory();
-    const isGenAiSecurity = isGenAISecurityCategory();
-    const isAgenticSecurity = isAgenticSecurityCategory();
-
-    if (isMCP || isAgenticSecurity || isGenAiSecurity) {
-        return ["OWASP Agentic Top 10", "OWASP LLM", "EU AI Act", "NIST AI Risk Management Framework", "CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP", "MITRE ATLAS"];
-    }
-    
-    // Default compliances
-    return ["CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP"];
-};
 
 const allCompliances = getCompliances();
 

@@ -13,6 +13,7 @@ import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.utils.Utils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.model.Filters;
@@ -25,7 +26,6 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
 
-import java.net.URL;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -47,6 +47,9 @@ public class AgentImportAction extends UserAction{
 
     @Getter @Setter
     private Map<String, String> customHeaders;
+
+    @Getter @Setter
+    private String collectionName;
 
     private int apiCollectionId;
     
@@ -82,27 +85,24 @@ public class AgentImportAction extends UserAction{
     
     private void createApiCollectionFromUrl() {
         try {
-            URL parsedUrl = new URL(url);
-            String hostName = parsedUrl.getHost();
-            if (hostName == null || hostName.trim().isEmpty()) {
-                throw new Exception("Invalid URL: no host found");
-            }
-            
-            hostName = hostName.toLowerCase().trim();
-            int id = hostName.hashCode();
+            String name = !StringUtils.isEmpty(collectionName)
+                    ? collectionName.trim()
+                    : HttpRequestResponseUtils.extractHostFromUrl(url);
+
+            int id = name.hashCode();
 
             // Check if collection already exists for this host
             ApiCollection existingCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, id));
             if (existingCollection != null) {
                 apiCollectionId = existingCollection.getId();
-                loggerMaker.info("Found existing API collection with ID: " + apiCollectionId + " for host: " + hostName, LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.info("Found existing API collection with ID: " + apiCollectionId + " for name: " + name, LoggerMaker.LogDb.DASHBOARD);
                 // Add Gen AI tag if not already present
                 addGenAiTagIfNeeded(existingCollection);
                 return;
             }
             
             // Create new collection using DAO
-            ApiCollection newCollection = ApiCollection.createManualCollection(id, hostName);
+            ApiCollection newCollection = ApiCollection.createManualCollection(id, name);
 
             // Insert the new collection
             ApiCollectionsDao.instance.insertOne(newCollection);
@@ -110,7 +110,7 @@ public class AgentImportAction extends UserAction{
             
             // Add Gen AI tag to the new collection
             addGenAiTagToCollection(apiCollectionId);
-            loggerMaker.info("Created new API collection with ID: " + apiCollectionId + " for host: " + hostName, LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.info("Created new API collection with ID: " + apiCollectionId + " for name: " + name, LoggerMaker.LogDb.DASHBOARD);
             
         } catch (Exception e) {
             loggerMaker.error("Error creating API collection from URL: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
