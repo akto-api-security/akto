@@ -11,3 +11,4 @@ export { default as ToolsGuardrailsStep, ToolsGuardrailsConfig } from './ToolsGu
 export { default as BlockedHostsStep, BlockedHostsConfig } from './BlockedHostsStep';
 export { default as ServerSettingsStep, ServerSettingsConfig } from './ServerSettingsStep';
 export { default as EnterpriseLicenseComplianceStep, EnterpriseLicenseComplianceConfig } from './EnterpriseLicenseComplianceStep';
+export { default as ExceptionsStep, ExceptionsConfig } from './ExceptionsStep';
