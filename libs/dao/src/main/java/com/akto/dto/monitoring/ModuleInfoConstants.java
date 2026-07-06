@@ -45,7 +45,7 @@ public class ModuleInfoConstants {
             put("ALLOWED_HTTP_METHODS", "Comma-separated list of allowed HTTP methods");
             put("APPLY_GUARDRAILS_TO_SSE", "Apply guardrails to SSE (Server-Sent Events / text/event-stream) requests");
             put("GUARDRAIL_ENDPOINTS", "Specific endpoints to apply guardrails");
-            put("GUARDRAIL_FIELD_MAPPING", "Per-endpoint JSON path for user prompt field, Format: METHOD:PATH:fieldPath");
+            put("GUARDRAIL_FIELD_MAPPING", "Per-endpoint JSON paths for user prompt field. Format: METHOD:PATH:requestPath,responsePath. Multiple paths per side are pipe-separated (first match wins).");
         }});
 
         put(ModuleInfo.ModuleType.THREAT_DETECTION, new HashMap<String, String>() {{

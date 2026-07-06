@@ -1,102 +1,111 @@
-"""Forward `Anonymize` scans to the anonymizer-worker service binding.
+"""Forward `Anonymize` scans to the anonymizer service.
 
-The anonymizer-worker is a thin JS Worker (sibling deployment) that owns the
-Cloudflare Container running Presidio. We can't bind the container directly
-here because Cloudflare's Containers SDK is JS-only — Python Workers can't
-declare the Durable Object class the binding requires.
+Portable deployments use ANONYMIZER_URL (HTTP). Cloudflare uses the
+ANONYMIZER_WORKER service binding on the Worker env object.
 
-Wire:
-    worker-py  ──service binding──▶  anonymizer-worker  ──DO/container──▶  anonymizer-container (FastAPI + Presidio)
+Wire (Cloudflare):
+    worker-py  ──service binding──▶  anonymizer-worker  ──DO/container──▶  anonymizer-container
+Wire (portable):
+    worker-py  ──HTTP──▶  anonymizer-container (FastAPI + Presidio)
 """
 
 import json
 import logging
 from typing import Any, Dict
 
-from js import Object
-from pyodide.ffi import to_js
+import httpx
+
+from settings import settings
 
 logger = logging.getLogger(__name__)
 
-
-def _js_init(method: str, headers: Dict[str, str], body: str):
-    """Build a JS RequestInit object from Python values.
-
-    binding.fetch on Python Workers does NOT marshal Python kwargs into a JS
-    RequestInit. Passing body= as a kwarg silently drops the body, which is
-    what makes FastAPI return 422. We have to construct the JS object
-    explicitly with `to_js` so headers and body actually travel.
-    """
-    return to_js(
-        {"method": method, "headers": headers, "body": body},
-        dict_converter=Object.fromEntries,
-    )
+_ANONYMIZE_TIMEOUT_S = 30.0
+_FAIL_OPEN = {
+    "is_valid": True,
+    "risk_score": 0.0,
+}
 
 
-async def scan_anonymize(text: str, config: Dict[str, Any], env) -> Dict[str, Any]:
-    """POST text to anonymizer-worker /anonymize and shape the response.
-
-    Returns a dict matching the scanner contract: keys is_valid, risk_score,
-    sanitized_text, details. is_valid is always True — Anonymize doesn't reject
-    traffic, it just rewrites it.
-    """
-    binding = getattr(env, "ANONYMIZER_WORKER", None)
-    if binding is None:
-        logger.warning("[remote] ANONYMIZER_WORKER binding not set; passing text through")
-        return {
-            "is_valid": True,
-            "risk_score": 0.0,
-            "sanitized_text": text,
-            "details": {"error": "binding_missing"},
-        }
-
+def _build_payload(text: str, config: Dict[str, Any]) -> dict:
     payload = {"text": text, "language": config.get("language", "en")}
     if config.get("entities"):
         payload["entities"] = config["entities"]
-    body = json.dumps(payload)
+    return payload
 
-    init = _js_init(
-        method="POST",
-        headers={"content-type": "application/json"},
-        body=body,
-    )
 
-    try:
-        response = await binding.fetch("https://anonymizer/anonymize", init)
-    except Exception as exc:
-        # Fail-open: if the container is unreachable, return the original text
-        # so the caller can still ship a (less-redacted) threat report.
-        logger.warning(f"[remote] anonymizer fetch failed: {exc}")
-        return {
-            "is_valid": True,
-            "risk_score": 0.0,
-            "sanitized_text": text,
-            "details": {"error": f"fetch_failed: {exc}"},
-        }
-
-    if response.status < 200 or response.status >= 300:
-        logger.warning(f"[remote] anonymizer returned {response.status}")
-        return {
-            "is_valid": True,
-            "risk_score": 0.0,
-            "sanitized_text": text,
-            "details": {"error": f"status_{response.status}"},
-        }
-
-    try:
-        parsed = json.loads(await response.text())
-    except Exception as exc:
-        logger.warning(f"[remote] anonymizer response not JSON: {exc}")
-        return {
-            "is_valid": True,
-            "risk_score": 0.0,
-            "sanitized_text": text,
-            "details": {"error": "bad_response"},
-        }
-
+def _shape_success(parsed: dict, text: str) -> Dict[str, Any]:
     return {
         "is_valid": True,
         "risk_score": 0.0,
         "sanitized_text": parsed.get("sanitized_text", text),
         "details": {"entities_found": parsed.get("entities_found", [])},
     }
+
+
+def _fail_open(text: str, error: str) -> Dict[str, Any]:
+    return {**_FAIL_OPEN, "sanitized_text": text, "details": {"error": error}}
+
+
+async def _scan_anonymize_http(text: str, config: Dict[str, Any], base_url: str) -> Dict[str, Any]:
+    payload = _build_payload(text, config)
+    url = f"{base_url.rstrip('/')}/anonymize"
+    try:
+        async with httpx.AsyncClient(timeout=_ANONYMIZE_TIMEOUT_S) as client:
+            response = await client.post(url, json=payload)
+    except Exception as exc:
+        logger.warning(f"[remote] anonymizer HTTP fetch failed: {exc}")
+        return _fail_open(text, f"fetch_failed: {exc}")
+
+    if response.status_code < 200 or response.status_code >= 300:
+        logger.warning(f"[remote] anonymizer returned {response.status_code}")
+        return _fail_open(text, f"status_{response.status_code}")
+
+    try:
+        return _shape_success(response.json(), text)
+    except Exception as exc:
+        logger.warning(f"[remote] anonymizer response not JSON: {exc}")
+        return _fail_open(text, "bad_response")
+
+
+async def _scan_anonymize_cf_binding(text: str, config: Dict[str, Any], binding) -> Dict[str, Any]:
+    from js import Object
+    from pyodide.ffi import to_js
+
+    body = json.dumps(_build_payload(text, config))
+    init = to_js(
+        {"method": "POST", "headers": {"content-type": "application/json"}, "body": body},
+        dict_converter=Object.fromEntries,
+    )
+
+    try:
+        response = await binding.fetch("https://anonymizer/anonymize", init)
+    except Exception as exc:
+        logger.warning(f"[remote] anonymizer fetch failed: {exc}")
+        return _fail_open(text, f"fetch_failed: {exc}")
+
+    if response.status < 200 or response.status >= 300:
+        logger.warning(f"[remote] anonymizer returned {response.status}")
+        return _fail_open(text, f"status_{response.status}")
+
+    try:
+        return _shape_success(json.loads(await response.text()), text)
+    except Exception as exc:
+        logger.warning(f"[remote] anonymizer response not JSON: {exc}")
+        return _fail_open(text, "bad_response")
+
+
+async def scan_anonymize(text: str, config: Dict[str, Any], env=None) -> Dict[str, Any]:
+    """POST text to the anonymizer and shape the response.
+
+    is_valid is always True — Anonymize doesn't reject traffic, it rewrites it.
+    """
+    base_url = (settings.ANONYMIZER_URL or "").strip()
+    if base_url:
+        return await _scan_anonymize_http(text, config, base_url)
+
+    binding = getattr(env, "ANONYMIZER_WORKER", None) if env is not None else None
+    if binding is not None:
+        return await _scan_anonymize_cf_binding(text, config, binding)
+
+    logger.warning("[remote] no ANONYMIZER_URL or ANONYMIZER_WORKER binding; passing text through")
+    return _fail_open(text, "anonymizer_unconfigured")

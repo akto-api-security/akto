@@ -162,6 +162,30 @@ func GetModifiedPayloadWithSummary(sessionMgr *SessionManager, logger *zap.Logge
 	return modifiedPayload
 }
 
+// requestPayloadEnvelope holds a parsed LiteLLM-style request wrapper (outer + optional request_body).
+type requestPayloadEnvelope struct {
+	outer          map[string]interface{}
+	requestBody    map[string]interface{}
+	hasRequestBody bool
+}
+
+func parseRequestPayloadEnvelope(payload string) (*requestPayloadEnvelope, error) {
+	var outer map[string]interface{}
+	if err := json.Unmarshal([]byte(payload), &outer); err != nil {
+		return nil, fmt.Errorf("failed to parse outer payload: %w", err)
+	}
+	env := &requestPayloadEnvelope{outer: outer}
+	if requestBodyStr, ok := outer["request_body"].(string); ok {
+		var requestBody map[string]interface{}
+		if err := json.Unmarshal([]byte(requestBodyStr), &requestBody); err != nil {
+			return nil, fmt.Errorf("failed to parse request_body JSON: %w", err)
+		}
+		env.requestBody = requestBody
+		env.hasRequestBody = true
+	}
+	return env, nil
+}
+
 // summaryInjector prepends a session summary into one specific user-visible
 // field of a parsed request body. Implementations return true only when they
 // recognized the shape AND mutated body in place.
@@ -232,27 +256,21 @@ func InjectSessionSummary(payload, sessionSummary string, logger *zap.Logger) (s
 		return payload, nil
 	}
 
-	var payloadObj map[string]interface{}
-	if err := json.Unmarshal([]byte(payload), &payloadObj); err != nil {
-		return payload, fmt.Errorf("failed to parse outer payload: %w", err)
+	env, err := parseRequestPayloadEnvelope(payload)
+	if err != nil {
+		return payload, err
 	}
 
-	// Wrapped envelope: request_body is itself a JSON string. Unwrap, inject,
-	// re-wrap.
-	if requestBodyStr, ok := payloadObj["request_body"].(string); ok {
-		var requestBodyObj map[string]interface{}
-		if err := json.Unmarshal([]byte(requestBodyStr), &requestBodyObj); err != nil {
-			return payload, fmt.Errorf("failed to parse request_body JSON: %w", err)
-		}
-		if !applySummaryInjectors(requestBodyObj, sessionSummary) {
+	if env.hasRequestBody {
+		if !applySummaryInjectors(env.requestBody, sessionSummary) {
 			return payload, fmt.Errorf("request_body has neither prompt nor messages to inject into")
 		}
-		modifiedRequestBodyBytes, err := json.Marshal(requestBodyObj)
+		modifiedRequestBodyBytes, err := json.Marshal(env.requestBody)
 		if err != nil {
 			return payload, fmt.Errorf("failed to re-encode request_body: %w", err)
 		}
-		payloadObj["request_body"] = string(modifiedRequestBodyBytes)
-		modifiedPayloadBytes, err := json.Marshal(payloadObj)
+		env.outer["request_body"] = string(modifiedRequestBodyBytes)
+		modifiedPayloadBytes, err := json.Marshal(env.outer)
 		if err != nil {
 			return payload, fmt.Errorf("failed to re-encode outer payload: %w", err)
 		}
@@ -260,10 +278,10 @@ func InjectSessionSummary(payload, sessionSummary string, logger *zap.Logger) (s
 	}
 
 	// Bare envelope: prompt or messages live at the top level.
-	if !applySummaryInjectors(payloadObj, sessionSummary) {
+	if !applySummaryInjectors(env.outer, sessionSummary) {
 		return payload, fmt.Errorf("payload has neither request_body, prompt, nor messages to inject into")
 	}
-	modifiedPayloadBytes, err := json.Marshal(payloadObj)
+	modifiedPayloadBytes, err := json.Marshal(env.outer)
 	if err != nil {
 		return payload, fmt.Errorf("failed to re-encode payload: %w", err)
 	}

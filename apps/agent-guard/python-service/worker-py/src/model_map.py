@@ -184,26 +184,32 @@ class ModelMapScanner:
 
         task_map = pre_submitted if pre_submitted is not None else self._submit(arbiters, _DEFAULT_ARBITER_TIMEOUT_MS)
         completed: List[Dict[str, Any]] = []
-        completed_entries: List[Dict[str, Any]] = []
         for result, entry in await self._await_map(task_map):
             if isinstance(result, Exception):
                 logger.error(f"[ModelMap] {_ROLE_ARBITER} '{entry.get('provider')}' failed: {result!r}")
                 continue
             completed.append(result)
-            completed_entries.append(entry)
 
         self.completed_all.extend(completed)
         if not completed:
             return self._error_result("all arbiters failed")
 
-        unsafe = [r for r, e in zip(completed, completed_entries) if _classify(r, e)]
+        # Convict only on an affirmative flag. safeDecisionThreshold is an
+        # escalation gate for the fast tiers; at the final stage there is no one
+        # left to escalate to, and applying it here would turn a low-confidence
+        # acquittal ("not banned, 85% sure") into a block.
+        unsafe = [r for r in completed if not r.get("is_valid", True)]
         winner = max(unsafe or completed, key=lambda r: r["risk_score"])
         winner["is_valid"] = not unsafe
         return winner
 
     @staticmethod
     def _error_result(error: str) -> Dict[str, Any]:
-        return {"is_valid": False, "risk_score": 1.0, "details": {"error": error}}
+        # Fail OPEN: an arbiter that never answered is an infrastructure failure,
+        # not a security verdict. Blocking here turns every arbiter timeout burst
+        # into false positives attributed to whichever scanner was in flight.
+        # details.error marks the verdict as degraded so callers skip caching it.
+        return {"is_valid": True, "risk_score": 0.0, "details": {"error": error}}
 
     # ── Result shaping (unchanged from container) ─────────────────────────────
 
@@ -227,6 +233,8 @@ class ModelMapScanner:
             "scanner_type": self.scanner_type,
             "cascade_decision": f"{winner_stem}_authority" if winner_stem else "no_authority",
         }
+        if "error" in winner_details:
+            details["error"] = winner_details["error"]
         if winner_details.get("values"):  # Password: exact secret substrings to redact
             details["values"] = winner_details["values"]
         completed_by_stem = self._index_completed_by_stem()
