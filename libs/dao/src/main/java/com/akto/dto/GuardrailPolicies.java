@@ -17,6 +17,7 @@ import com.mongodb.client.model.Projections;
 
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -105,6 +106,13 @@ public class GuardrailPolicies {
     // Blocked host/path list — block-only glob patterns matched against the request host+path.
     // Object-shaped so it can be extended later without a data migration.
     private List<BlockedHostEntry> blockedHosts;
+
+    // Exception phrases — stripped from the text (for evaluation only, never forwarded
+    // downstream) before every detector in this policy runs, to avoid false positives on
+    // known-safe strings (e.g. sample data, internal keywords). Applied as a union across
+    // all policies active for a given request; see guardrails-service validator for the
+    // actual redact/restore logic.
+    private List<IgnorePhrase> ignorePhrases;
 
     // Block personal / consumer accounts (non-enterprise email-type users).
     private boolean blockPersonalAccounts;
@@ -306,6 +314,42 @@ public class GuardrailPolicies {
 
         public BlockedHostEntry(String pattern) {
             this.pattern = pattern;
+        }
+    }
+
+    /**
+     * A single exception phrase for this policy. Matched occurrences are stripped from the
+     * text before any detector in this policy evaluates it; the original text is always
+     * restored before anything is forwarded downstream (see guardrails-service validator).
+     */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class IgnorePhrase {
+        private String phrase;
+        // Lombok's boolean accessor rules would generate isRegex()/setRegex() for a field
+        // named "isRegex" — java.beans.Introspector (used by struts2-json-plugin) then infers
+        // the bean property name as "regex", not "isRegex", so JSON {"isRegex": true} silently
+        // fails to bind and this field stays false. Same fix as ApiInfo.isSensitive: exclude
+        // from Lombok and hand-write getIsRegex()/setIsRegex() so the property name matches
+        // the "isRegex" JSON key used by the dashboard and guardrails-service.
+        @Getter(AccessLevel.NONE)
+        @Setter(AccessLevel.NONE)
+        private boolean isRegex;       // false = literal substring match
+        private boolean caseSensitive; // default false
+
+        public IgnorePhrase(String phrase, boolean isRegex, boolean caseSensitive) {
+            this.phrase = phrase;
+            this.isRegex = isRegex;
+            this.caseSensitive = caseSensitive;
+        }
+
+        public boolean getIsRegex() {
+            return isRegex;
+        }
+
+        public void setIsRegex(boolean isRegex) {
+            this.isRegex = isRegex;
         }
     }
 
