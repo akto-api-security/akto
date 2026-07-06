@@ -70,7 +70,8 @@ public class TestResult extends GenericTestResult {
         DEACTIVATED_ENDPOINT("This is a deactivated endpoint", true),
         USAGE_EXCEEDED("You have exceeded the limit of this feature, skipping execution", true),
         ROLE_NOT_FOUND("config doesn't exist, skipping execution", false),
-        TEST_TIMED_OUT("Test took too long for execution, exited out", true);
+        TEST_TIMED_OUT("Test took too long for execution, exited out", true),
+        SKIPPING_COPILOT_INTERNAL_ENDPOINT("Copilot Studio- Skipping test as it is already covered", true);
         private final String message;
         private final boolean skipTest;
 
