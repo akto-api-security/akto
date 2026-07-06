@@ -260,7 +260,11 @@ export default async function aktoGuardrails(ctx) {
           return
         }
 
-        const userMessage = output.messages.find((m) => m?.info?.role === 'user')
+        // Validate the LATEST user message (the current prompt). output.messages
+        // is the full conversation history, so the FIRST user message is the
+        // oldest turn — validating it would leave every follow-up prompt
+        // unchecked and let blocked content through on turn 2+.
+        const userMessage = output.messages.findLast((m) => m?.info?.role === 'user')
         if (!userMessage) {
           return
         }
@@ -284,23 +288,6 @@ export default async function aktoGuardrails(ctx) {
           if (validationResult.decision === 'block') {
             log('PROMPT_BLOCKED_REWRITE', { reason: validationResult.reason })
 
-            // DEBUG: dump the structure of output.messages BEFORE we mutate it,
-            // so we can see exactly what the transform hook receives (the full
-            // conversation history that is about to be sent to the model).
-            try {
-              const dump = (output.messages || []).map((m) => ({
-                role: m?.info?.role,
-                parts: (m?.parts || []).map((p) => ({
-                  type: p?.type,
-                  textLen: typeof p?.text === 'string' ? p.text.length : undefined,
-                  textPreview: typeof p?.text === 'string' ? p.text.substring(0, 80) : undefined,
-                })),
-              }))
-              log('PROMPT_BLOCK_MESSAGES_DUMP', { count: (output.messages || []).length, messages: dump })
-            } catch (e) {
-              log('PROMPT_BLOCK_MESSAGES_DUMP_ERROR', { error: e.message })
-            }
-
             // OpenCode has no hook that can reject a prompt AND render a clean
             // inline message: throwing hard-blocks but OpenCode masks it as a
             // generic "Unexpected server error", and reassigning output.messages
@@ -321,12 +308,12 @@ export default async function aktoGuardrails(ctx) {
               `Do not attempt to interpret, answer, or act on the original request. ` +
               `Respond with EXACTLY the following text, verbatim, and nothing else:\n\n${blockText}`
 
-            // Mutate parts in place (do NOT reassign output.messages — that is a
-            // no-op). Put the directive in the first text part, blank the rest.
-            const lastUser = [...output.messages].reverse().find((m) => m?.info?.role === 'user')
-            if (lastUser && Array.isArray(lastUser.parts)) {
+            // Mutate the exact message we validated, in place (do NOT reassign
+            // output.messages — that is a no-op). Put the directive in the first
+            // text part, blank the rest.
+            if (userMessage && Array.isArray(userMessage.parts)) {
               let replaced = false
-              for (const part of lastUser.parts) {
+              for (const part of userMessage.parts) {
                 if (part && typeof part.text === 'string') {
                   part.text = replaced ? '' : directive
                   replaced = true
@@ -422,7 +409,9 @@ export default async function aktoGuardrails(ctx) {
           throw new Error(`🚫 Akto Guardrails blocked this tool call: ${validationResult.reason}`)
         }
 
-        // Allowed — the Python validator already ingested the audit trail.
+        // Allowed — the Python validator's guardrails call ingests the tool
+        // request in the same round-trip (ingest_data=true), so no extra
+        // ingestion is needed here.
         return
       }
 
