@@ -227,6 +227,8 @@ class ModelMapScanner:
             "scanner_type": self.scanner_type,
             "cascade_decision": f"{winner_stem}_authority" if winner_stem else "no_authority",
         }
+        if winner_details.get("values"):  # Password: exact secret substrings to redact
+            details["values"] = winner_details["values"]
         completed_by_stem = self._index_completed_by_stem()
         for entry in self.config.get("modelConfigs", []):
             stem = self._stem(entry.get("provider", ""))
