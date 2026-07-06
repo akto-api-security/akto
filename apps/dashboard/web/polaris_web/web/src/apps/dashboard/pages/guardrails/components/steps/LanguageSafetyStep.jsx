@@ -54,8 +54,8 @@ const LanguageSafetyStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">Enable gibberish detection</Text>
                                 <ControlInfoIcon
-                                    description="Blocks nonsensical or random text that could confuse the AI or probe for weaknesses."
-                                    examples={[{ text: "asdkjf qwoeicj zxlkjfoiqwe kejfoqiwej." }]}
+                                    description="Blocks nonsensical or random text that could confuse the AI or probe for weaknesses. See the Confidence Threshold examples below."
+                                    examples={[]}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -100,8 +100,8 @@ const LanguageSafetyStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">Enable sentiment detection</Text>
                                 <ControlInfoIcon
-                                    description="Blocks negative, toxic, or hostile emotional tone in prompts."
-                                    examples={[{ text: "This is useless garbage and so are you." }]}
+                                    description="Blocks negative, toxic, or hostile emotional tone in prompts. See the Confidence Threshold examples below."
+                                    examples={[]}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>

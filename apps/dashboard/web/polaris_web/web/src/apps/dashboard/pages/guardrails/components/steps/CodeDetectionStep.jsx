@@ -45,8 +45,8 @@ const CodeDetectionStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Enable code detection filter" threats={RULE_OWASP_THREATS.codeFilter} />
                                 <ControlInfoIcon
-                                    description="Blocks source code written in specific programming languages."
-                                    examples={[{ text: "def hack(): import os; os.system('rm -rf /')" }]}
+                                    description="Blocks source code written in specific programming languages. See the Code Detection Level examples below."
+                                    examples={[]}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -93,8 +93,8 @@ const CodeDetectionStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Enable ban code detection" threats={RULE_OWASP_THREATS.banCode} />
                                 <ControlInfoIcon
-                                    description="A blanket filter that blocks any code at all, in any language, with no per-language configuration."
-                                    examples={[{ text: "SELECT * FROM users WHERE 1=1;" }]}
+                                    description="A blanket filter that blocks any code at all, in any language, with no per-language configuration. See the Confidence Threshold examples below."
+                                    examples={[]}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>

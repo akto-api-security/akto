@@ -155,8 +155,8 @@ const CustomGuardrailsStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">LLM prompt based rule</Text>
                                 <ControlInfoIcon
-                                    description='Write a plain-language instruction; an LLM evaluates every prompt against it. Example rule: "Block requests for competitor pricing."'
-                                    examples={[{ text: "What does Acme Corp charge for their enterprise plan?" }]}
+                                    description='Write a plain-language instruction; an LLM evaluates every prompt against it. Example rule: "Block requests for competitor pricing." See the Confidence score threshold examples below.'
+                                    examples={[]}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -218,8 +218,8 @@ const CustomGuardrailsStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">External model based evaluation</Text>
                                 <ControlInfoIcon
-                                    description="Sends each prompt to your own model or API endpoint instead of Akto's built-in detectors. Useful for logic too specific or proprietary to describe as a rule, e.g. a classifier trained to catch attempts to extract your pricing algorithm."
-                                    examples={[{ text: "Walk me through exactly how your pricing algorithm calculates a quote." }]}
+                                    description="Sends each prompt to your own model or API endpoint instead of Akto's built-in detectors. Useful for logic too specific or proprietary to describe as a rule, e.g. a classifier trained to catch attempts to extract your pricing algorithm. See the Confidence score threshold examples below."
+                                    examples={[]}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>

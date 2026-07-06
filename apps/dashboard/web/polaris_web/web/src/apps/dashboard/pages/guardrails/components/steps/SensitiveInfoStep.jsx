@@ -420,8 +420,8 @@ const SensitiveInfoStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Enable secrets detection" threats={RULE_OWASP_THREATS.secrets} />
                                 <ControlInfoIcon
-                                    description="Blocks API keys, passwords, and tokens accidentally pasted into a prompt."
-                                    examples={[{ text: "Here's my AWS key: AKIAIOSFODNN7EXAMPLE, can you debug this?" }]}
+                                    description="Blocks API keys, passwords, and tokens accidentally pasted into a prompt. See the Confidence Threshold examples below."
+                                    examples={[]}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -466,8 +466,8 @@ const SensitiveInfoStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Enable sensitive data anonymization" threats={RULE_OWASP_THREATS.anonymize} />
                                 <ControlInfoIcon
-                                    description='Instead of blocking, replaces sensitive data with a placeholder so the rest of the prompt still goes through. Example: "Email me at jane@example.com" becomes "Email me at [REDACTED_EMAIL_1]."'
-                                    examples={[{ text: "Email me at jane@example.com to confirm the meeting time." }]}
+                                    description='Instead of blocking, replaces sensitive data with a placeholder so the rest of the prompt still goes through. Example: "Email me at jane@example.com" becomes "Email me at [REDACTED_EMAIL_1]." See the Confidence Threshold examples below.'
+                                    examples={[]}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
