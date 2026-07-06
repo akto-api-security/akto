@@ -89,7 +89,6 @@ public class Executor {
         WorkflowTest workflowTest = null;
         if (node.getChildNodes().size() < 2) {
             testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "executor child nodes is less than 2, returning empty execution result"));
-            loggerMaker.errorAndAddToDb("executor child nodes is less than 2, returning empty execution result " + logId, LogDb.TESTING);
             result.add(invalidExecutionResult);
             yamlTestResult = new YamlTestResult(result, workflowTest);
             return yamlTestResult;
@@ -762,6 +761,16 @@ public class Executor {
 
         ExecutorSingleOperationResp ret = authMechanismForRole.addAuthToRequest(rawApi.getRequest(), eligibleForCachedToken);
 
+        for (AuthParam param : authParamList) {
+            if (param instanceof CopilotOAuthAuthParam) {
+                CopilotOAuthAuthParam copilotParam = (CopilotOAuthAuthParam) param;
+                if (copilotParam.isRefreshTokenRotated()
+                    && dataActor.updateCopilotRefreshToken(copilotParam.getRoleId(), copilotParam.getRefreshToken())) {
+                    copilotParam.setRefreshTokenRotated(false);
+                }
+            }
+        }
+
         return ret;
     }
 
@@ -818,6 +827,58 @@ public class Executor {
         }
 
         return valueStr.replace("${self}", existingValues.get(0));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> toConversationStringList(Object value) {
+        if (value instanceof List) {
+            return new ArrayList<>((List<String>) value);
+        }
+        if (value instanceof String) {
+            return new ArrayList<>(Collections.singletonList((String) value));
+        }
+        return new ArrayList<>();
+    }
+
+    private static String resolveEveryPromptSuffix(Map<String, Object> varMap) {
+        if (!varMap.containsKey("wordList_every_prompt")) {
+            return "";
+        }
+        @SuppressWarnings("unchecked")
+        List<String> everyPromptList = (List<String>) varMap.get("wordList_every_prompt");
+        if (everyPromptList == null || everyPromptList.isEmpty()) {
+            return "";
+        }
+        List<String> resolved = new ArrayList<>();
+        for (String entry : everyPromptList) {
+            if (StringUtils.isEmpty(entry)) {
+                continue;
+            }
+            if (VariableResolver.isWordListVariable(entry, varMap)) {
+                resolved.addAll(VariableResolver.resolveWordListVar(entry, varMap));
+            } else {
+                resolved.add(entry);
+            }
+        }
+        if (resolved.isEmpty()) {
+            return "";
+        }
+        return String.join("\n\n", resolved);
+    }
+
+    private static List<String> appendEveryPromptToConversations(List<String> conversations, String everyPromptSuffix) {
+        if (StringUtils.isEmpty(everyPromptSuffix)) {
+            return conversations;
+        }
+        List<String> result = new ArrayList<>();
+        for (String conversation : conversations) {
+            if (StringUtils.isEmpty(conversation)) {
+                result.add(everyPromptSuffix);
+            } else {
+                result.add(conversation + "\n\n" + everyPromptSuffix);
+            }
+        }
+        return result;
     }
 
     @SuppressWarnings("unchecked")
@@ -900,8 +961,14 @@ public class Executor {
                     return new ExecutorSingleOperationResp(false, response != null ? response.getString("error") : "Billing token required for SSRF");
                 }
             case "conversations_list":
-                List<String> conversationsList = (List<String>) value;
-                rawApi.setConversationsList(conversationsList);
+                @SuppressWarnings("unchecked")
+                List<String> initialConversations = (List<String>) varMap.getOrDefault("wordList_initial_conversations", new ArrayList<>());
+                List<String> conversationsList = toConversationStringList(value);
+                String everyPromptSuffix = resolveEveryPromptSuffix(varMap);
+                conversationsList = appendEveryPromptToConversations(conversationsList, everyPromptSuffix);
+                List<String> mergedConversations = new ArrayList<>(initialConversations);
+                mergedConversations.addAll(conversationsList);
+                rawApi.setConversationsList(mergedConversations);
                 return Operations.addHeader(rawApi, Constants.AKTO_AGENT_CONVERSATIONS , "0");
             case "attach_file":
                 String headerValue;

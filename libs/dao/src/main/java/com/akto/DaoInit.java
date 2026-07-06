@@ -253,6 +253,7 @@ public class DaoInit {
         ClassModel<JobParams> jobParams = ClassModel.builder(JobParams.class).enableDiscriminator(true).build();
         ClassModel<TLSAuthParam> tlsAuthClassModel = ClassModel.builder(TLSAuthParam.class).enableDiscriminator(true).build();
         ClassModel<DigestAuthParam> digestAuthParamClassModel = ClassModel.builder(DigestAuthParam.class).enableDiscriminator(true).build();
+        ClassModel<CopilotOAuthAuthParam> copilotOAuthAuthParamClassModel = ClassModel.builder(CopilotOAuthAuthParam.class).enableDiscriminator(true).build();
         ClassModel<CollectionTags> collectionTagsModel = ClassModel.builder(CollectionTags.class).enableDiscriminator(true).build();
         ClassModel<McpReconResult> mcpReconResultClassModel = ClassModel.builder(McpReconResult.class).enableDiscriminator(true).build();
         ClassModel<McpReconRequest> mcpReconRequestClassModel = ClassModel.builder(McpReconRequest.class).enableDiscriminator(true).build();
@@ -270,7 +271,7 @@ public class DaoInit {
                 cappedListClassModel,
                 equalsToPredicateClassModel, isNumberPredicateClassModel, testingRunClassModel,
                 testingRunResultClassModel, testResultClassModel, genericTestResultClassModel,
-                authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel, loginReqAuthParamClassModel,
+                authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel, loginReqAuthParamClassModel, copilotOAuthAuthParamClassModel,
                 testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
                 cappedSetClassModel, CustomWebhookClassModel, WorkflowNodeDetailsClassModel, CustomWebhookResultClassModel,
@@ -331,7 +332,8 @@ public class DaoInit {
                 new EnumCodec<>(FileUploadLog.UploadLogStatus.class),
                 new EnumCodec<>(TestCollectionProperty.Id.class),
                 new EnumCodec<>(CustomAuthType.TypeOfToken.class),
-                new EnumCodec<>(TLSAuthParam.CertificateType.class)
+                new EnumCodec<>(TLSAuthParam.CertificateType.class),
+                new EnumCodec<>(Log.ActivityType.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,

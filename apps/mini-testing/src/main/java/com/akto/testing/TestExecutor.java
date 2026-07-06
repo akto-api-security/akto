@@ -10,6 +10,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
+import com.akto.dto.Log;
 import com.akto.dto.DependencyNode;
 import com.akto.dto.DependencyNode.ParamInfo;
 import com.akto.dto.OriginalHttpRequest;
@@ -50,6 +51,7 @@ import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.mongodb.BasicDBList;
 
 import static com.akto.test_editor.execution.Build.modifyRequest;
 import com.akto.testing.kafka_utils.TestingConfigurations;
@@ -71,6 +73,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.akto.testing.workflow_node_executor.Utils;
+import com.akto.agent.AgentClient;
 
 public class TestExecutor {
 
@@ -102,9 +105,9 @@ public class TestExecutor {
         currentExecutionFallback = false;
     }
 
-    public static void initRunDeadline(TestingRun testingRun) {
-        runPickedUp = testingRun.getPickedUpTimestamp() > 0 ? testingRun.getPickedUpTimestamp() : Context.now();
-        runMaxSec = testingRun.getTestRunTime() <= 0 ? 30 * 60 : testingRun.getTestRunTime();
+    public static void initRunDeadline(TestingRunResultSummary trrs, int maxRunTime) {
+        runPickedUp = trrs.getStartTimestamp() > 0  ? trrs.getStartTimestamp() : 0;
+        runMaxSec = maxRunTime;
     }
 
     public static boolean shouldContinueTestExecution(ObjectId summaryId) {
@@ -385,15 +388,13 @@ public class TestExecutor {
 
         Set<Integer> collectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
         List<ApiCollection> apiCollections = dataActor.fetchApiCollectionsByIds(new ArrayList<>(collectionIds), LogDb.TESTING);
-        Map<Integer, String> apiCollectionDescriptionMap = new HashMap<>();
+        Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
         if (apiCollections != null) {
             for (ApiCollection col : apiCollections) {
-                if (!StringUtils.isEmpty(col.getDescription())) {
-                    apiCollectionDescriptionMap.put(col.getId(), col.getDescription());
-                }
+                apiCollectionMap.put(col.getId(), col);
             }
         }
-        TestingConfigurations.getInstance().setApiCollectionDescriptionMap(apiCollectionDescriptionMap);
+        testingUtil.setApiCollectionMap(apiCollectionMap);
 
         //Clear the cache for sample data
         VariableResolver.clearSampleDataCache();
@@ -898,6 +899,25 @@ public class TestExecutor {
         return respMap;
     }
 
+    /**
+     * Establishes a clean activity context for a test run. Tests start from several flows that run on
+     * pooled/reused threads, so we always set explicitly when a summaryId is present and otherwise clear
+     * any stale value left behind by a previous task on the same thread.
+     */
+    public static void setTestRunActivityContext(ObjectId summaryId) {
+        if (summaryId != null) {
+            Context.activityId.set(summaryId.toHexString());
+            Context.activityType.set(Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY);
+        } else {
+            clearActivityContext();
+        }
+    }
+
+    public static void clearActivityContext() {
+        Context.activityId.remove();
+        Context.activityType.remove();
+    }
+
     public Void startWithLatch(
         List<String> testingRunSubCategories,int accountId,ApiInfo.ApiInfoKey apiInfoKey,
         List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
@@ -905,6 +925,7 @@ public class TestExecutor {
         List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, CountDownLatch latch, Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap) {
 
         Context.accountId.set(accountId);
+        setTestRunActivityContext(summaryId);
         loggerMaker.warnAndAddToDb("Starting test for " + apiInfoKey);
         AtomicBoolean isApiInfoTested = new AtomicBoolean(false);
         try {
@@ -920,6 +941,8 @@ public class TestExecutor {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
+        } finally {
+            clearActivityContext();
         }
         if(isApiInfoTested.get()){
             loggerMaker.warnAndAddToDb("API: " + apiInfoKey.toString() + " has been successfully tested");
@@ -1110,8 +1133,15 @@ public class TestExecutor {
             TestingRunResult testingRunResult = null;
             Future<TestingRunResult> future = legacyTestTimeoutExecutor.submit(() -> {
                 Context.accountId.set(currentAccountId);
-                return runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig,
-                    instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
+                setTestRunActivityContext(summaryId);
+                try {
+                    TestingRunResult legacyResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig,
+                        instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
+                    persistTestLogsToDb(legacyResult != null ? legacyResult.getTestLogs() : null);
+                    return legacyResult;
+                } finally {
+                    clearActivityContext();
+                }
             });
             try {
                 testingRunResult = future.get(MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
@@ -1131,6 +1161,27 @@ public class TestExecutor {
             return testingRunResult;
         }
         return null;
+    }
+
+    /**
+     * Persists the per-test transient testLogs (which are @BsonIgnore on TestingRunResult and would
+     * otherwise be dropped) into the TESTING logs collection. The current thread's
+     * Context.activityId/activityType (TESTING_RUN_RESULT_SUMMARY_ACTIVITY) is expected to be set so each line is scoped to the run summary.
+     */
+    public void persistTestLogsToDb(List<TestingRunResult.TestLog> testLogs) {
+        if (testLogs == null || testLogs.isEmpty()) {
+            return;
+        }
+        for (TestingRunResult.TestLog testLog : testLogs) {
+            if (testLog == null || testLog.getMessage() == null) {
+                continue;
+            }
+            if (testLog.getTestLogType() == TestingRunResult.TestLogType.ERROR) {
+                loggerMaker.errorAndAddToDb(testLog.getMessage(), LogDb.TESTING);
+            } else {
+                loggerMaker.infoAndAddToDb(testLog.getMessage(), LogDb.TESTING);
+            }
+        }
     }
 
     // Track auth status per test run: if auth fails, kill all remaining tests
@@ -1175,6 +1226,24 @@ public class TestExecutor {
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
         Boolean agenticTestingAllowed = testConfig.getInfo().getAgenticTestingAllowed();
+
+        // Copilot Studio bots expose a /copilot/conversation endpoint that is a duplicate of the
+        // actual bot endpoint we already test. Skip it to avoid redundant test results.
+        TestingUtil testingUtil = TestingConfigurations.getInstance().getTestingUtil();
+        ApiCollection apiCollection = testingUtil != null
+                ? testingUtil.getApiCollectionMap().get(apiInfoKey.getApiCollectionId())
+                : null;
+        if (apiCollection == null) {
+            apiCollection = dataActor.fetchApiCollectionMeta(apiInfoKey.getApiCollectionId());
+        }
+        if (AgentClient.isCopilotBotCollection(apiCollection) &&
+                apiInfoKey.getUrl().startsWith(Constants.AKTO_COPILOT_CONVERSATION_URL_PREFIX)) {
+            loggerMaker.infoAndAddToDb("Skipping test for Copilot Studio endpoint already covered: " + apiInfoKey);
+            return generateFailedRunResultForMessage(testRunId, apiInfoKey, testSuperType, testSubType,
+                    testRunResultSummaryId, Collections.singletonList(rawApi.getOriginalMessage()),
+                    TestError.SKIPPING_COPILOT_INTERNAL_ENDPOINT.getMessage());
+        }
+
         if(shouldCallClientLayerForSampleData){
             try {
                 long start = System.currentTimeMillis();
@@ -1248,16 +1317,46 @@ public class TestExecutor {
             varMap.put("yaml_template_content", testConfig.getContent());
         }
 
-        String collectionDescription = TestingConfigurations.getInstance().getApiCollectionDescriptionMap().get(apiInfoKey.getApiCollectionId());
+        String collectionDescription = apiCollection != null ? apiCollection.getDescription() : null;
         if (!StringUtils.isEmpty(collectionDescription)) {
-            @SuppressWarnings("unchecked")
-            List<String> contextList = (List<String>) varMap.getOrDefault("wordList_data_context", new ArrayList<>());
-            if (contextList.isEmpty()) {
-                contextList.add(collectionDescription);
-            } else {
-                contextList.set(0, contextList.get(0) + "\n\n" + collectionDescription + "\n");
+            String collectionDataContext = extractCollectionDataContext(collectionDescription);
+            String collectionEveryPrompt = extractCollectionEveryPrompt(collectionDescription);
+
+            if (!StringUtils.isEmpty(collectionDataContext)) {
+                @SuppressWarnings("unchecked")
+                List<String> existingContext = (List<String>) varMap.get("wordList_data_context");
+                String yamlContext = null;
+                if (existingContext != null && !existingContext.isEmpty()) {
+                    yamlContext = existingContext.get(0);
+                }
+                String combinedContext;
+                if (yamlContext != null && !yamlContext.isEmpty()) {
+                    combinedContext = yamlContext.contains(collectionDataContext)
+                            ? yamlContext
+                            : yamlContext + "\n\n" + collectionDataContext;
+                } else {
+                    combinedContext = collectionDataContext;
+                }
+                varMap.put("wordList_data_context", Collections.singletonList(combinedContext));
             }
-            varMap.put("wordList_data_context", contextList);
+
+            if (!StringUtils.isEmpty(collectionEveryPrompt)) {
+                @SuppressWarnings("unchecked")
+                List<String> existingEveryPrompt = (List<String>) varMap.get("wordList_every_prompt");
+                String yamlEveryPrompt = null;
+                if (existingEveryPrompt != null && !existingEveryPrompt.isEmpty()) {
+                    yamlEveryPrompt = existingEveryPrompt.get(0);
+                }
+                String combinedEveryPrompt;
+                if (yamlEveryPrompt != null && !yamlEveryPrompt.isEmpty()) {
+                    combinedEveryPrompt = yamlEveryPrompt.contains(collectionEveryPrompt)
+                            ? yamlEveryPrompt
+                            : yamlEveryPrompt + "\n\n" + collectionEveryPrompt;
+                } else {
+                    combinedEveryPrompt = collectionEveryPrompt;
+                }
+                varMap.put("wordList_every_prompt", Collections.singletonList(combinedEveryPrompt));
+            }
         }
 
         String testExecutionLogId = UUID.randomUUID().toString();
@@ -1319,6 +1418,7 @@ public class TestExecutor {
 
         if (testingRunConfig!=null && testingRunConfig.getCleanUp()) {
             try {
+                loggerMaker.warnAndAddToDb("Initiating the cleanUp for apiInfoKey " + apiInfoKey + "test " + testSubType + " logId " + testExecutionLogId);
                 cleanUpTestArtifacts(Collections.singletonList(ret), apiInfoKey, sampleMessageStore, testingRunConfig);
             } catch(Exception e){
                 loggerMaker.errorAndAddToDb(e, "Error while cleaning up test artifacts: " + e.getMessage());
@@ -1329,7 +1429,7 @@ public class TestExecutor {
     }
 
     private Map<ApiInfoKey, List<ApiInfoKey>> cleanUpTestArtifacts(List<TestingRunResult> testingRunResults, ApiInfoKey apiInfoKey, SampleMessageStore sampleMessageStore, TestingRunConfig testingRunConfig) {
-
+        loggerMaker.warnAndAddToDb("cleanUpTestArtifacts starting for apiInfoKey: " + apiInfoKey);
         Map<ApiInfoKey, List<ApiInfoKey>> cleanedUpRequests = new HashMap<>();
 
         for (TestingRunResult trr: testingRunResults) {
@@ -1351,94 +1451,95 @@ public class TestExecutor {
                             loggerMaker.infoAndAddToDb("cleanUpTestArtifacts rawApiToBeReplayed status code invalid: " + rawApiToBeReplayed.getResponse().getStatusCode());
                             continue;
                         }
+                        loggerMaker.warnAndAddToDb("cleanUpTestArtifacts rawApiToBeReplayed url will be " + apiInfoKey.getUrl() + " collectionId " + apiInfoKey.getApiCollectionId() + " method " + apiInfoKey.getMethod().name());
                         switch (apiInfoKey.getMethod()) {
                             case POST:
                             case PUT:
                                 // TODO: Handle cases where the delete API does not have the delete method
                                 List<DependencyNode> children = dataActor.findDependencyNodes(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), "DELETE");
 
+                                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts findDependencyNodes returned " + (children != null ? children.size() : 0) + " nodes");
                                 if (children != null && !children.isEmpty()) {
                                     for(DependencyNode node: children) {
+                                        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts the node will be - urlResp: " + node.getUrlResp() 
+                                                    + " | methodResp: " + node.getMethodResp() 
+                                                    + " | urlReq: " + node.getUrlReq() 
+                                                    + " | methodReq: " + node.getMethodReq() 
+                                                    + " | paramInfos: " + node.getParamInfos()
+                                                    + " | isArrayResponse: " + node.isArrayResponse());
+
+
                                         Map<String, Set<Object>> valuesMap = Build.getValuesMap(rawApiToBeReplayed.getResponse());
+                                        Map<String, Set<Object>> requestBodyValuesMap = Build.getRequestValuesMap(rawApiToBeReplayed.getRequest());
+                                        String requestUrl = rawApiToBeReplayed.getRequest().getUrl();
 
                                         ApiInfoKey cleanUpApiInfoKey = new ApiInfoKey(Integer.valueOf(node.getApiCollectionIdReq()), node.getUrlReq(), Method.valueOf(node.getMethodReq()));
                                         List<String> samples = sampleMessageStore.getSampleDataMap().get(cleanUpApiInfoKey);
+
+                                        if (samples == null || samples.isEmpty()) {
+                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts fetching samples for cleanup endpoint");
+                                            List<ApiInfoKey> keyList = new ArrayList<>();
+                                            keyList.add(cleanUpApiInfoKey);
+                                            sampleMessageStore.fetchSampleMessages(keyList);
+                                            samples = sampleMessageStore.getSampleDataMap().get(cleanUpApiInfoKey);
+                                        }
+
+                                        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts samples count: " + (samples != null ? samples.size() : 0));
+
                                         if (samples == null || samples.isEmpty()) {
                                             loggerMaker.infoAndAddToDb(String.format("cleanUpTestArtifacts samples not found for: %s %s %s", node.getApiCollectionIdReq(), node.getUrlReq(), node.getMethodReq()));
                                             continue;
-                                        } else {
-                                            RawApi nextApi = RawApi.buildFromMessage(samples.get(0), true);
+                                        }
 
-                                            List<KVPair> kvPairs = new ArrayList<>();
-                                            boolean fullReplace = true;
-                                            for(ParamInfo paramInfo: node.getParamInfos()) {
-                                                // TODO: Handle for header
-                                                if (paramInfo.isHeader()) continue;
-                                                Set<Object> valuesFromResponse = valuesMap.get(paramInfo.getResponseParam());
+                                        String sampleMessage = samples.get(0);
+                                        boolean arrayCleanupHandled = false;
 
-                                                if (valuesFromResponse == null || valuesFromResponse.isEmpty()) {
-                                                    fullReplace = false;
-                                                    break;
+                                        if (node.isArrayResponse()) {
+                                            String responseBody = rawApiToBeReplayed.getResponse().getBody();
+                                            List<BasicDBObject> arrayElements = extractResponseArrayElements(responseBody);
+                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts the array elements will be " + arrayElements);
+
+                                            if (arrayElements.isEmpty()) {
+                                                String trimmedResponse = responseBody != null ? responseBody.trim() : "";
+                                                if (trimmedResponse.startsWith("[")) {
+                                                    loggerMaker.infoAndAddToDb("cleanUpTestArtifacts array response is empty, skipping cleanup");
+                                                    arrayCleanupHandled = true;
+                                                } else {
+                                                    loggerMaker.warnAndAddToDb("cleanUpTestArtifacts isArrayResponse=true but response is not an array, falling back to single-delete");
                                                 }
+                                            } else {
+                                                int totalElements = arrayElements.size();
+                                                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts array cleanup starting for " + totalElements + " elements");
+                                                for (int i = 0; i < totalElements; i++) {
+                                                    BasicDBObject element = arrayElements.get(i);
+                                                    Map<String, Set<Object>> elementValuesMap = JSONUtils.flatten(element);
+                                                    RawApi nextApi = RawApi.buildFromMessage(sampleMessage, true);
+                                                    List<KVPair> kvPairs = new ArrayList<>();
 
-                                                Object valueFromResponse = valuesFromResponse.iterator().next();
+                                                    if (!buildKvPairsFromParamInfos(node.getParamInfos(), elementValuesMap, requestBodyValuesMap, requestUrl, kvPairs)) {
+                                                        loggerMaker.warnAndAddToDb("cleanUpTestArtifacts array cleanup iteration " + (i + 1) + "/" + totalElements + " skipped: unable to extract all param values");
+                                                        continue;
+                                                    }
 
-                                                KVPair.KVType type = valueFromResponse instanceof Integer ? KVPair.KVType.INTEGER : KVPair.KVType.STRING;
-                                                KVPair kvPair = new KVPair(paramInfo.getRequestParam(), valueFromResponse.toString(), false, paramInfo.isUrlParam(), type);
-                                                kvPairs.add(kvPair);
+                                                    loggerMaker.infoAndAddToDb("cleanUpTestArtifacts array cleanup iteration " + (i + 1) + "/" + totalElements + " kvPairs: " + kvPairs);
+                                                    ReplaceDetail replaceDetail = new ReplaceDetail(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), kvPairs);
+                                                    executeCleanupDelete(nextApi, replaceDetail, apiInfoKey, cleanUpApiInfoKey, testingRunConfig, cleanedUpRequests);
+                                                }
+                                                arrayCleanupHandled = true;
                                             }
+                                        }
 
-                                            if (!fullReplace) {
+                                        if (!arrayCleanupHandled) {
+                                            RawApi nextApi = RawApi.buildFromMessage(sampleMessage, true);
+                                            List<KVPair> kvPairs = new ArrayList<>();
+
+                                            if (!buildKvPairsFromParamInfos(node.getParamInfos(), valuesMap, requestBodyValuesMap, requestUrl, kvPairs)) {
                                                 loggerMaker.infoAndAddToDb(String.format("cleanUpTestArtifacts unable to replace all values in dependency node %s %s %s", node.getApiCollectionIdReq(), node.getUrlReq(), node.getMethodReq()));
                                                 continue;
                                             }
 
-                                            if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
-                                                TestRoles role = Executor.fetchOrFindTestRole(testingRunConfig.getTestRoleId(), true);
-                                                if (role != null) {
-                                                    EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
-                                                    if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
-
-                                                        loggerMaker.infoAndAddToDb("attempting to override auth ");
-                                                        if (Executor.modifyAuthTokenInRawApi(role, nextApi) == null) {
-                                                            loggerMaker.infoAndAddToDb("Default auth mechanism absent");
-                                                        }
-                                                    } else {
-                                                        loggerMaker.infoAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole");
-                                                    }
-                                                } else {
-                                                    String reason = "Test role has been deleted";
-                                                    loggerMaker.infoAndAddToDb(reason + ", going ahead with sample auth");
-                                                }
-                                            }
-
                                             ReplaceDetail replaceDetail = new ReplaceDetail(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), kvPairs);
-                                            modifyRequest(nextApi.getRequest(), replaceDetail);
-                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: ====REQUEST====");
-                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST: " + nextApi.getRequest().getMethod() + " " + nextApi.getRequest().getUrl() + "?" + nextApi.getRequest().getQueryParams());
-                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST headers: " + nextApi.getRequest().getHeaders());
-                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST body: " + nextApi.getRequest().getBody());
-                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: ====RESPONSE====");
-                                            try {
-                                                OriginalHttpResponse nextResponse = ApiExecutor.sendRequest(nextApi.getRequest(), true, testingRunConfig, false, new ArrayList<>());
-                                                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE headers: " + nextApi.getResponse().getHeaders());
-                                                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE body: " + nextResponse.getBody());
-                                                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE status code: " + nextResponse.getStatusCode());
-
-                                                if(nextResponse.getStatusCode() < 300) {
-                                                    if(cleanedUpRequests.get(apiInfoKey) != null) {
-                                                        cleanedUpRequests.get(apiInfoKey).add(cleanUpApiInfoKey);
-                                                    } else {
-                                                        cleanedUpRequests.put(apiInfoKey, Arrays.asList(cleanUpApiInfoKey));
-                                                    }
-                                                }
-
-                                            } catch (Exception e) {
-                                                e.printStackTrace();
-                                                loggerMaker.errorAndAddToDb(e,
-                                                        "exception in sending api request for cleanup"
-                                                                + e.getMessage());
-                                            }
+                                            executeCleanupDelete(nextApi, replaceDetail, apiInfoKey, cleanUpApiInfoKey, testingRunConfig, cleanedUpRequests);
                                         }
                                     }
                                 } else {
@@ -1506,6 +1607,10 @@ public class TestExecutor {
         // Handle digest authentication
         if (LoginFlowEnums.AuthMechanismTypes.DIGEST_AUTH.toString().equalsIgnoreCase(authType)) {
             return true; // Digest auth doesn't require prefetch - works directly via DigestAuthParam.addAuthTokens()
+        }
+
+        if (LoginFlowEnums.AuthMechanismTypes.COPILOT_OAUTH.toString().equalsIgnoreCase(authType)) {
+            return true; // Copilot OAuth doesn't require prefetch - works directly via CopilotOAuthAuthParam.addAuthTokens()
         }
 
         if (!LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authType)) {
@@ -1612,6 +1717,193 @@ public class TestExecutor {
         } catch (Exception e) {
             throw new Exception("Error while modifying graphQL payload");
         }
+    }
+
+    private static final String EVERY_PROMPT_MARKER = "every_prompt:";
+
+    private static String extractCollectionDataContext(String collectionDescription) {
+        if (StringUtils.isEmpty(collectionDescription)) {
+            return "";
+        }
+        int markerIndex = indexOfEveryPromptMarker(collectionDescription);
+        if (markerIndex < 0) {
+            return collectionDescription.trim();
+        }
+        return collectionDescription.substring(0, markerIndex).trim();
+    }
+
+    private static String extractCollectionEveryPrompt(String collectionDescription) {
+        if (StringUtils.isEmpty(collectionDescription)) {
+            return "";
+        }
+        int markerIndex = indexOfEveryPromptMarker(collectionDescription);
+        if (markerIndex < 0) {
+            return "";
+        }
+        return collectionDescription.substring(markerIndex + EVERY_PROMPT_MARKER.length()).trim();
+    }
+
+    private static int indexOfEveryPromptMarker(String collectionDescription) {
+        return collectionDescription.toLowerCase().indexOf(EVERY_PROMPT_MARKER);
+    }
+
+    private static Object extractValueFromRequestUrlPath(String requestUrl, String urlPathIndex) {
+        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts extracted from request URL path: " + requestUrl + " = " + urlPathIndex);
+        if (requestUrl == null || requestUrl.isEmpty() || urlPathIndex == null || urlPathIndex.isEmpty()) {
+            return null;
+        }
+        try {
+            String[] urlSegments = requestUrl.split("/");
+            int index = Integer.parseInt(urlPathIndex);
+            if (index >= 0 && index < urlSegments.length) {
+                return urlSegments[index];
+            }
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        return null;
+    }
+
+    private static List<BasicDBObject> extractResponseArrayElements(String body) {
+        List<BasicDBObject> elements = new ArrayList<>();
+        if (body == null || body.trim().isEmpty()) {
+            return elements;
+        }
+
+        String trimmedBody = body.trim();
+        BasicDBList arrayList = null;
+
+        try {
+            if (trimmedBody.startsWith("[")) {
+                BasicDBObject wrapped = BasicDBObject.parse("{\"json\": " + trimmedBody + "}");
+                Object jsonVal = wrapped.get("json");
+                if (jsonVal instanceof BasicDBList) {
+                    arrayList = (BasicDBList) jsonVal;
+                }
+            } else if (trimmedBody.startsWith("{")) {
+                BasicDBObject obj = BasicDBObject.parse(trimmedBody);
+                Object jsonVal = obj.get("json");
+                if (jsonVal instanceof BasicDBList) {
+                    arrayList = (BasicDBList) jsonVal;
+                }
+            }
+        } catch (Exception e) {
+            return elements;
+        }
+
+        if (arrayList == null) {
+            return elements;
+        }
+
+        for (Object elem : arrayList) {
+            if (elem instanceof BasicDBObject) {
+                elements.add((BasicDBObject) elem);
+            }
+        }
+        return elements;
+    }
+
+    private static boolean buildKvPairsFromParamInfos(
+            List<ParamInfo> paramInfos,
+            Map<String, Set<Object>> responseValuesMap,
+            Map<String, Set<Object>> requestBodyValuesMap,
+            String requestUrl,
+            List<KVPair> outKvPairs) {
+        for (ParamInfo paramInfo : paramInfos) {
+            if (paramInfo.isHeader()) continue;
+
+            Object valueExtracted = null;
+            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts the paramInfo will be: " + paramInfo.getResponseParam() + " = " + valueExtracted);
+
+            if (paramInfo.getResponseBody() != null && !paramInfo.getResponseBody().isEmpty()) {
+                Set<Object> valuesFromRequestBody = requestBodyValuesMap.get(paramInfo.getResponseBody());
+                if (valuesFromRequestBody != null && !valuesFromRequestBody.isEmpty()) {
+                    valueExtracted = valuesFromRequestBody.iterator().next();
+                    loggerMaker.infoAndAddToDb("cleanUpTestArtifacts extracted from request body: " + paramInfo.getResponseBody() + " = " + valueExtracted);
+                }
+            } else if (paramInfo.getResponseUrlPath() != null && !paramInfo.getResponseUrlPath().isEmpty()) {
+                valueExtracted = extractValueFromRequestUrlPath(requestUrl, paramInfo.getResponseUrlPath());
+                if (valueExtracted != null) {
+                    loggerMaker.infoAndAddToDb("cleanUpTestArtifacts extracted from request URL path: " + paramInfo.getResponseUrlPath() + " = " + valueExtracted);
+                }
+            } else {
+                Set<Object> valuesFromResponse = responseValuesMap.get(paramInfo.getResponseParam());
+                if (valuesFromResponse != null && !valuesFromResponse.isEmpty()) {
+                    valueExtracted = valuesFromResponse.iterator().next();
+                    loggerMaker.infoAndAddToDb("cleanUpTestArtifacts extracted from response: " + paramInfo.getResponseParam() + " = " + valueExtracted);
+                }
+            }
+
+            if (valueExtracted == null) {
+                loggerMaker.warnAndAddToDb("cleanUpTestArtifacts unable to extract value for paramInfo: " + paramInfo.getRequestParam());
+                return false;
+            }
+
+            KVPair.KVType type = valueExtracted instanceof Integer ? KVPair.KVType.INTEGER : KVPair.KVType.STRING;
+            KVPair kvPair = new KVPair(paramInfo.getRequestParam(), valueExtracted.toString(), false, paramInfo.isUrlParam(), type);
+            loggerMaker.warnAndAddToDb("cleanUpTestArtifacts kvPair created - key: " + kvPair.getKey() + " | value: " + kvPair.getValue());
+            outKvPairs.add(kvPair);
+        }
+        return true;
+    }
+
+    private static boolean  executeCleanupDelete(
+            RawApi nextApi,
+            ReplaceDetail replaceDetail,
+            ApiInfoKey apiInfoKey,
+            ApiInfoKey cleanUpApiInfoKey,
+            TestingRunConfig testingRunConfig,
+            Map<ApiInfoKey, List<ApiInfoKey>> cleanedUpRequests) {
+        if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
+            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts overriding auth with test role: " + testingRunConfig.getTestRoleId());
+            try {
+                TestRoles role = Executor.fetchOrFindTestRole(testingRunConfig.getTestRoleId(), true);
+                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts role fetched: " + (role != null ? "YES" : "NULL"));
+                if (role != null) {
+                    String endpointLogicalGroupId = role.getEndpointLogicalGroupIdHexId();
+                    EndpointLogicalGroup endpointLogicalGroup = dataActor.fetchEndpointLogicalGroupById(endpointLogicalGroupId);
+                    if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
+                        if (Executor.modifyAuthTokenInRawApi(role, nextApi) == null) {
+                            loggerMaker.infoAndAddToDb("Default auth mechanism absent");
+                        }
+                    }
+                } else {
+                    loggerMaker.infoAndAddToDb("Test role not found, using sample auth");
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "cleanUpTestArtifacts auth override failed: " + e.getMessage());
+            }
+        }
+
+        modifyRequest(nextApi.getRequest(), replaceDetail);
+        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: ====REQUEST====");
+        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST: " + nextApi.getRequest().getMethod() + " " + nextApi.getRequest().getUrl() + "?" + nextApi.getRequest().getQueryParams());
+        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST headers: " + nextApi.getRequest().getHeaders());
+        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST body: " + nextApi.getRequest().getBody());
+        loggerMaker.warnAndAddToDb("cleanUpTestArtifacts final URL after replacement: " + nextApi.getRequest().getUrl());
+        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST: " + nextApi.getRequest().getMethod() + " " + nextApi.getRequest().getUrl());
+        loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: ====RESPONSE====");
+
+        try {
+            OriginalHttpResponse nextResponse = ApiExecutor.sendRequest(nextApi.getRequest(), true, testingRunConfig, false, new ArrayList<>());
+            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE headers: " + nextApi.getResponse().getHeaders());
+            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE body: " + nextResponse.getBody());
+            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE status code: " + nextResponse.getStatusCode());
+            loggerMaker.warnAndAddToDb("cleanUpTestArtifacts: RESPONSE status: " + nextResponse.getStatusCode());
+
+            if (nextResponse.getStatusCode() < 300) {
+                if (cleanedUpRequests.get(apiInfoKey) != null) {
+                    cleanedUpRequests.get(apiInfoKey).add(cleanUpApiInfoKey);
+                } else {
+                    cleanedUpRequests.put(apiInfoKey, Arrays.asList(cleanUpApiInfoKey));
+                }
+                return true;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "cleanUpTestArtifacts: exception in sending api request for cleanup" + e.getMessage());
+        }
+        return false;
     }
 
 }

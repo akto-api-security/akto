@@ -158,7 +158,7 @@ public class Main {
     
     private static boolean isInMemoryQueueMode() {
         int id = Context.getActualAccountId();
-        return id == 1745563576 || id == 1726615470;
+        return id == 1745563576;
     }
 
     private static boolean isProtoKafkaEnabled() {

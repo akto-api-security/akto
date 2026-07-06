@@ -226,6 +226,7 @@ public class Main {
     private static void handleRecordedJsonFlowPlayground(TestingRunPlayground testingRunPlayground) {
         File tmpOutputFile = null;
         File tmpErrorFile = null;
+        ScheduledExecutorService livePollerExecutor = null;
         try {
             tmpOutputFile = File.createTempFile("output", ".json");
             tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
@@ -233,15 +234,18 @@ public class Main {
             if (roleName != null && roleName.trim().isEmpty()) {
                 roleName = null;
             }
-            // userId 0 skips RecordedLoginInputDao / RecordedLoginScreenshotDao inside util (no direct DB from mini-testing).
-            // Token is returned via TestingRunPlayground + dataActor.updateTestingRunPlayground.
+            String screenshotSessionId = roleName != null ? UUID.randomUUID().toString() : null;
+            if (roleName != null) {
+                livePollerExecutor = startLiveScreenshotPoller(roleName, screenshotSessionId);
+            }
             RecordedLoginFlowUtil.triggerFlow(
                     testingRunPlayground.getRecordedFlowTokenFetchCommand(),
                     testingRunPlayground.getRecordedFlowContent(),
                     tmpOutputFile.getPath(),
                     tmpErrorFile.getPath(),
                     0,
-                    roleName);
+                    roleName,
+                    screenshotSessionId);
             String tokenJson = FileUtils.readFileToString(tmpOutputFile, StandardCharsets.UTF_8);
             testingRunPlayground.setRecordedFlowTokenResult(tokenJson);
         } catch (Exception e) {
@@ -249,6 +253,9 @@ public class Main {
             String msg = e.getMessage();
             testingRunPlayground.setRecordedFlowErrorMessage(msg != null ? msg : "Recorded JSON flow failed");
         } finally {
+            if (livePollerExecutor != null) {
+                livePollerExecutor.shutdownNow();
+            }
             testingRunPlayground.setState(State.COMPLETED);
             dataActor.updateTestingRunPlayground(testingRunPlayground);
             if (tmpOutputFile != null) {
@@ -258,6 +265,25 @@ public class Main {
                 tmpErrorFile.delete();
             }
         }
+    }
+
+    private static ScheduledExecutorService startLiveScreenshotPoller(String roleName, String screenshotSessionId) {
+        String puppeteerUrl = System.getenv("PUPPETEER_REPLAY_SERVICE_URL");
+        if (puppeteerUrl == null || puppeteerUrl.isEmpty()) return null;
+        List<String> accumulated = new ArrayList<>();
+        ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+        executor.scheduleAtFixedRate(() -> {
+            try {
+                String b64 = RecordedLoginFlowUtil.fetchLatestLiveScreenshot(puppeteerUrl, screenshotSessionId);
+                if (b64 != null && (accumulated.isEmpty() || !b64.equals(accumulated.get(accumulated.size() - 1)))) {
+                    accumulated.add(b64);
+                    dataActor.persistRecordedLoginFlowScreenshots(roleName, 0, new ArrayList<>(accumulated));
+                }
+            } catch (Exception e) {
+                // best effort
+            }
+        }, 2000, 2000, TimeUnit.MILLISECONDS);
+        return executor;
     }
 
     private static void handlePostmanImports(TestingRunPlayground testingRunPlayground) {
@@ -779,9 +805,9 @@ public class Main {
                 Executor.clearRoleCache();
 
                 if(!maxRetriesReached){
-                    TestExecutor.initRunDeadline(testingRun);
+                    int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+                    TestExecutor.initRunDeadline(trrs, maxRunTime);
                     if(Constants.IS_NEW_TESTING_ENABLED){
-                        int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
                         testingProducer.initProducer(testingRun, summaryId, false, syncLimit);
                         testingConsumer.init(maxRunTime);
                     }else{

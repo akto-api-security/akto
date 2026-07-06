@@ -1464,7 +1464,7 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType) {
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType, boolean isLatestRagDetection) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("colId", colId);
@@ -1472,6 +1472,7 @@ public class ClientActor extends DataActor {
         obj.put("vpcId", vpcId);
         obj.put("tagsList", tags);
         obj.put("accessType", accessType);
+        obj.put("isLatestRagDetection", isLatestRagDetection);
         String objString = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForHostAndVpc", "", "POST", objString, headers, "");
         try {
@@ -1486,13 +1487,14 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType) {
+    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType, boolean isLatestRagDetection) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("vxlanId", vxlanId);
         obj.put("vpcId", vpcId);
         obj.put("tagsList", tags);
         obj.put("accessType", accessType);
+        obj.put("isLatestRagDetection", isLatestRagDetection);
         String objString = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionSimpleForVpc", "", "POST", objString, headers, "");
         try {
@@ -2652,6 +2654,25 @@ public class ClientActor extends DataActor {
         return roleList;
     }
 
+    public boolean updateCopilotRefreshToken(String roleId, String newRefreshToken) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("roleId", roleId);
+        obj.put("newRefreshToken", newRefreshToken);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateCopilotRefreshToken", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateCopilotRefreshToken", LoggerMaker.LogDb.RUNTIME);
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateCopilotRefreshToken " + e, LoggerMaker.LogDb.RUNTIME);
+            return false;
+        }
+    }
+
     public List<SampleData> fetchSampleData(Set<Integer> apiCollectionIds, int skip) {
         Map<String, List<String>> headers = buildHeaders();
         List<SampleData> sampleDataList = new ArrayList<>();
@@ -2734,6 +2755,8 @@ public class ClientActor extends DataActor {
                     case "DIGEST_AUTH":
                         authParam.put("_t", "com.akto.dto.testing.DigestAuthParam");
                         break;
+                    case "COPILOT_OAUTH":
+                        authParam.put("_t", "com.akto.dto.testing.CopilotOAuthAuthParam");
                     default:
                         break;
                 }
@@ -2759,6 +2782,8 @@ public class ClientActor extends DataActor {
                     case "DIGEST_AUTH":
                         defaultAuthParam.put("_t", "com.akto.dto.testing.DigestAuthParam");
                         break;
+                    case "COPILOT_OAUTH":
+                        defaultAuthParam.put("_t", "com.akto.dto.testing.CopilotOAuthAuthParam");
                     default:
                         break;
                 }
@@ -2931,7 +2956,7 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType) {
+    public void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType, boolean isLatestRagDetection) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("colId", id);
@@ -2940,6 +2965,7 @@ public class ClientActor extends DataActor {
         obj.put("tagsList", tags);
         obj.put("hostName", hostName);
         obj.put("accessType", accessType);
+        obj.put("isLatestRagDetection", isLatestRagDetection);
         String objString = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForServiceTag", "", "POST", objString, headers, "");
         try {
@@ -3575,6 +3601,12 @@ public class ClientActor extends DataActor {
         logObj.put("key", log.getKey());
         logObj.put("log", log.getLog());
         logObj.put("timestamp", log.getTimestamp());
+        if (log.getActivityId() != null) {
+            logObj.put("activityId", log.getActivityId());
+        }
+        if (log.getActivityType() != null) {
+            logObj.put("activityType", log.getActivityType().name());
+        }
         obj.put("log", logObj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingLog", "", "POST", obj.toString(), headers, "");
         try {
@@ -4757,7 +4789,6 @@ public class ClientActor extends DataActor {
 
     private static void flushAgentQueryRecords() {
         List<AgentQueryRecord> batch;
-        loggerMaker.infoAndAddToDb("Flushing agent query records", LoggerMaker.LogDb.RUNTIME);
         synchronized (agentQueryRecordBuffer) {
             if (agentQueryRecordBuffer.isEmpty()) return;
             batch = new ArrayList<>(agentQueryRecordBuffer);

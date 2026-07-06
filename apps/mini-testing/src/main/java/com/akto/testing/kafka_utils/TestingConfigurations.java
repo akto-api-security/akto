@@ -28,7 +28,6 @@ public class TestingConfigurations {
     private  Map<ApiInfoKey, RawApi> rawApiMap = new HashMap<>();
     private boolean doNotMarkIssuesAsFixed;
     private boolean runAutomatedTests;
-    private Map<Integer, String> apiCollectionDescriptionMap = new HashMap<>();
 
     private TestingConfigurations() {
     }
@@ -124,11 +123,4 @@ public class TestingConfigurations {
         this.runAutomatedTests = runAutomatedTests;
     }
 
-    public Map<Integer, String> getApiCollectionDescriptionMap() {
-        return apiCollectionDescriptionMap;
-    }
-
-    public void setApiCollectionDescriptionMap(Map<Integer, String> apiCollectionDescriptionMap) {
-        this.apiCollectionDescriptionMap = apiCollectionDescriptionMap;
-    }
 }
