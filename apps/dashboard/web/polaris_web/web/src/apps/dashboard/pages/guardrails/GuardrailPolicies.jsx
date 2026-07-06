@@ -135,22 +135,8 @@ function GuardrailPolicies() {
     const [editingPolicy, setEditingPolicy] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
     const [isPreset, setIsPreset] = useState(false);
-    const [isTopicGuardrailPrefill, setIsTopicGuardrailPrefill] = useState(false);
     const [presetsPopoverActive, setPresetsPopoverActive] = useState(false);
     const [pendingPolicyName, setPendingPolicyName] = useState(null);
-
-    const allCollections = PersistStore(state => state.allCollections);
-
-    const getLlmServiceKeySet = () => {
-        const keys = new Set();
-        (allCollections || []).forEach(c => {
-            if (c.envType?.some(e => e.keyName === 'browser-llm')) {
-                const svcKey = extractServiceName(c.hostName || c.displayName || '') || c.displayName || '';
-                if (svcKey) keys.add(svcKey);
-            }
-        });
-        return keys;
-    };
 
     const allCollections = PersistStore(state => state.allCollections);
 
@@ -171,14 +157,14 @@ function GuardrailPolicies() {
     const policyName = new URLSearchParams(window.location.search).get("policy");
 
     // Prefill carried from the LLM Traces / Endpoints pages: open the Create
-    // Guardrail page prefilled as a NEW canonical topic-guardrail policy.
+    // Guardrail page prefilled with denied topics for every topic observed on that
+    // conversation/user. Always a brand-new, independently-named policy (editable name).
     useEffect(() => {
         const prefill = location.state?.topicGuardrailPrefill;
         if (!prefill) return;
         setEditingPolicy({ ...prefill, deniedTopics: prefill.deniedTopics || [] });
         setIsEditMode(false);
         setIsPreset(true);
-        setIsTopicGuardrailPrefill(true);
         setShowCreateModal(true);
         // Clear router state so this doesn't re-trigger on re-render / back-nav.
         navigate(location.pathname, { replace: true, state: {} });
@@ -651,13 +637,11 @@ function GuardrailPolicies() {
                     setEditingPolicy(null);
                     setIsEditMode(false);
                     setIsPreset(false);
-                    setIsTopicGuardrailPrefill(false);
                 }}
                 onSave={handleCreateGuardrail}
                 editingPolicy={editingPolicy}
                 isEditMode={isEditMode}
                 isPreset={isPreset}
-                nameReadOnly={isTopicGuardrailPrefill}
             />
         );
     }

@@ -130,7 +130,7 @@ const getLlmServiceKeySet = (allCollections) => {
     return keys;
 };
 
-const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false, nameReadOnly = false }) => {
+const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false }) => {
     // Step management
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
@@ -941,7 +941,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setSeverity={setSeverity}
                         applyToResponses={applyToResponses}
                         setApplyToResponses={setApplyToResponses}
-                        nameReadOnly={nameReadOnly}
                     />
                 );
             case 2:

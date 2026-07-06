@@ -73,10 +73,6 @@ public class GuardrailPoliciesDao extends AccountsContextDao<GuardrailPolicies> 
         return this.getMCollection().countDocuments(filter);
     }
 
-    public GuardrailPolicies fetchGuardrailPolicyByName(String name) {
-        return instance.findOne(Filters.and(Filters.eq("name", name), getContextSourceFilter()));
-    }
-
     private Bson getContextSourceFilter() {
         CONTEXT_SOURCE contextSource = Context.contextSource.get();
 
