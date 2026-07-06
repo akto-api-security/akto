@@ -20,13 +20,14 @@ import (
 
 // policyCache holds cached policies and their metadata
 type policyCache struct {
-	policies      []types.Policy
-	auditPolicies map[string]*types.AuditPolicy
-	compiledRules map[string]*regexp.Regexp
-	hasAuditRules bool
-	blockedHosts  []mcp.BlockedHostRule
-	lastFetched   time.Time
-	mu            sync.RWMutex
+	policies                     []types.Policy
+	auditPolicies                map[string]*types.AuditPolicy
+	compiledRules                map[string]*regexp.Regexp
+	hasAuditRules                bool
+	blockedHosts                 []mcp.BlockedHostRule
+	ignorePhraseMatchersByPolicy map[string]*ignorePhraseMatcher // keyed by policy name, pre-compiled
+	lastFetched                  time.Time
+	mu                           sync.RWMutex
 }
 
 // collectionTag represents a single key-value tag on a collection
@@ -352,7 +353,7 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 
 	s.logger.Info("Refreshing policies cache - fetching ALL policies")
 
-	policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, err := s.fetchAndParsePolicies()
+	policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, ignorePhraseMatchersByPolicy, err := s.fetchAndParsePolicies()
 	if err != nil {
 		return nil, nil, nil, false, err
 	}
@@ -363,6 +364,7 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	s.cache.compiledRules = compiledRules
 	s.cache.hasAuditRules = hasAuditRules
 	s.cache.blockedHosts = blockedHostRules
+	s.cache.ignorePhraseMatchersByPolicy = ignorePhraseMatchersByPolicy
 	s.cache.lastFetched = time.Now()
 
 	s.logger.Info("Policy cache refreshed with ALL policies",
@@ -655,10 +657,10 @@ func extractHostHeader(headers map[string]string) string {
 }
 
 // fetchAndParsePolicies fetches policies from database abstractor and parses them
-func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, []mcp.BlockedHostRule, error) {
+func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, []mcp.BlockedHostRule, map[string]*ignorePhraseMatcher, error) {
 	rawGuardrailPolicies, err := s.dbClient.FetchGuardrailPolicies()
 	if err != nil {
-		return nil, nil, nil, false, nil, fmt.Errorf("failed to fetch guardrail policies: %w", err)
+		return nil, nil, nil, false, nil, nil, fmt.Errorf("failed to fetch guardrail policies: %w", err)
 	}
 
 	s.logger.Debug("Raw guardrail policies response",
@@ -673,7 +675,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		s.logger.Error("Failed to parse guardrail policies",
 			zap.Error(err),
 			zap.String("rawResponse", string(rawGuardrailPolicies)))
-		return nil, nil, nil, false, nil, fmt.Errorf("failed to parse guardrail policies: %w", err)
+		return nil, nil, nil, false, nil, nil, fmt.Errorf("failed to parse guardrail policies: %w", err)
 	}
 
 	s.logger.Info("Parsed guardrail policies",
@@ -762,12 +764,17 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 
 	hasAuditRules := len(auditPolicies) > 0
 
+	// Compile the ignore-phrase matchers once here (refresh time), not per request —
+	// see compileIgnorePhraseMatchersByPolicy and groupPoliciesForIsolatedRedaction.
+	ignorePhraseMatchersByPolicy := compileIgnorePhraseMatchersByPolicy(policies)
+
 	s.logger.Info("Successfully fetched and parsed policies",
 		zap.Int("guardrailPolicies", len(policies)),
 		zap.Int("auditPolicies", len(auditPolicies)),
-		zap.Int("compiledRules", len(compiledRules)))
+		zap.Int("compiledRules", len(compiledRules)),
+		zap.Int("ignorePhrasePolicies", len(ignorePhraseMatchersByPolicy)))
 
-	return policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, nil
+	return policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, ignorePhraseMatchersByPolicy, nil
 }
 
 // validationContextFromParams builds mcp.ValidationContext from traffic params and explicit payload strings for the context.
@@ -1017,6 +1024,12 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
 		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
 
+	// Redact any configured ignore-phrases before the enforcement library ever sees the
+	// text — see ValidateRequest's plan-doc note on the shared-payload trade-off. Shared
+	// with ValidateResponse via redactIgnorePhrasesForEvaluation/reconcileIgnorePhraseRedaction.
+	payloadForEvaluation, preRedactionPayload, restore := s.redactIgnorePhrasesForEvaluation(payloadToValidate, policies, "ValidateRequest", sessionID)
+	payloadToValidate = payloadForEvaluation
+
 	// Use the default processor - skipThreat is passed via ValidationContext
 	processStart := time.Now()
 	processResult, err := s.processor.ProcessRequestParallel(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
@@ -1031,13 +1044,16 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		return nil, fmt.Errorf("failed to process request: %w", err)
 	}
 
+	// Reconcile ignore-phrase redaction: the real origin must never see a placeholder.
+	finalPayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, payloadToValidate, preRedactionPayload, restore, "ValidateRequest", sessionID)
+
 	s.logger.Info("ValidateRequest - ProcessRequestParallel result",
 		zap.String("path", params.Path),
 		zap.String("method", params.Method),
 		zap.String("sessionID", sessionID),
 		zap.Bool("isBlocked", processResult.IsBlocked),
 		zap.Bool("shouldForward", processResult.ShouldForward),
-		zap.Bool("payloadModified", processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload),
+		zap.Bool("payloadModified", finalPayload != "" && finalPayload != payload),
 		zap.Int64("latencyMs", time.Since(processStart).Milliseconds()))
 
 	if processResult.IsBlocked {
@@ -1053,11 +1069,13 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Track blocked response if request was blocked
 	session.TrackBlockedResponse(s.sessionMgr, s.logger, sessionID, requestID, processResult)
 
-	// Convert ProcessResult to ValidationResult
+	// Convert ProcessResult to ValidationResult. finalPayload is processResult.ModifiedPayload
+	// with any ignore-phrase placeholders reconciled back to real text (or discarded in
+	// favor of the untouched pre-redaction payload) — see reconciliation above.
 	result := &mcp.ValidationResult{
 		Allowed:         !processResult.IsBlocked,
-		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload,
-		ModifiedPayload: processResult.ModifiedPayload,
+		Modified:        finalPayload != "" && finalPayload != payload,
+		ModifiedPayload: finalPayload,
 		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
 		Metadata:        types.ThreatMetadata{},
 		Behaviour:       processResult.Behaviour,
@@ -1159,6 +1177,11 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("method", params.Method),
 		zap.String("payloadToValidate", responseBodyForValidation))
 
+	// Redact any configured ignore-phrases before the enforcement library ever sees the
+	// text — see ValidateRequest for the full rationale and the shared-payload trade-off.
+	payloadForEvaluation, preRedactionPayload, restore := s.redactIgnorePhrasesForEvaluation(responseBodyForValidation, policies, "ValidateResponse", sessionID)
+	responseBodyForValidation = payloadForEvaluation
+
 	// Use processor's ProcessResponse method with external policies
 	processStart := time.Now()
 	processResult, err := s.processor.ProcessResponseParallel(ctx, responseBodyForValidation, valCtx, policies)
@@ -1173,6 +1196,9 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		return nil, fmt.Errorf("failed to process response: %w", err)
 	}
 
+	// Reconcile ignore-phrase redaction: the real origin must never see a placeholder.
+	finalResponsePayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, responseBodyForValidation, preRedactionPayload, restore, "ValidateResponse", sessionID)
+
 	s.logger.Info("ValidateResponse - ProcessResponseParallel result",
 		zap.String("path", params.Path),
 		zap.String("method", params.Method),
@@ -1184,11 +1210,13 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	isMalicious := processResult.IsBlocked
 	session.TrackResponseAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, responseBody, isMalicious)
 
-	// Convert ProcessResult to ValidationResult for backward compatibility
+	// Convert ProcessResult to ValidationResult for backward compatibility. finalResponsePayload
+	// is processResult.ModifiedPayload with any ignore-phrase placeholders reconciled back to
+	// real text (or discarded in favor of the untouched pre-redaction payload).
 	result := &mcp.ValidationResult{
 		Allowed:         !processResult.IsBlocked,
-		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != responseBody,
-		ModifiedPayload: processResult.ModifiedPayload,
+		Modified:        finalResponsePayload != "" && finalResponsePayload != responseBody,
+		ModifiedPayload: finalResponsePayload,
 		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
 		Metadata:        types.ThreatMetadata{},
 		Behaviour:       processResult.Behaviour,
@@ -1313,6 +1341,14 @@ func (s *Service) ValidateRequestWithPolicy(
 		zap.Int("requestFiltersCount", len(providedPolicyConverted.Filters.RequestPayload)),
 		zap.Int("responseFiltersCount", len(providedPolicyConverted.Filters.ResponsePayload)))
 
+	// Redact any configured ignore-phrases before the enforcement library ever sees the
+	// text — same rationale as ValidateRequest, but the playground evaluates a single
+	// one-off provided policy that never goes through the policy cache, so matchers are
+	// compiled fresh for just this one policy rather than looked up from it.
+	matchersByPolicy := compileIgnorePhraseMatchersByPolicy(policies)
+	payloadForEvaluation, preRedactionPayload, restore := s.redactIgnorePhrasesForEvaluationWithMatchers(payloadToValidate, policies, matchersByPolicy, "ValidateRequestWithPolicy", sessionID)
+	payloadToValidate = payloadForEvaluation
+
 	// Use the default processor - skipThreat is passed via ValidationContext
 	processResult, err := s.processor.ProcessRequest(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
 	if err != nil {
@@ -1330,11 +1366,14 @@ func (s *Service) ValidateRequestWithPolicy(
 		zap.String("behaviour", processResult.Behaviour),
 		zap.String("fullProcessResultJSON", string(processResultJSON)))
 
+	// Reconcile ignore-phrase redaction: the real origin must never see a placeholder.
+	finalPayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, payloadToValidate, preRedactionPayload, restore, "ValidateRequestWithPolicy", sessionID)
+
 	// Convert ProcessResult to ValidationResult
 	result := &mcp.ValidationResult{
 		Allowed:         !processResult.IsBlocked,
-		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payloadToValidate,
-		ModifiedPayload: processResult.ModifiedPayload,
+		Modified:        finalPayload != "" && finalPayload != preRedactionPayload,
+		ModifiedPayload: finalPayload,
 		Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
 		Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
 		Behaviour:       processResult.Behaviour,
