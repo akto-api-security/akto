@@ -9,6 +9,7 @@ import com.akto.dto.traffic.CollectionTags;
 import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.policies.*;
 import com.akto.runtime.utils.Utils;
+import com.akto.util.Constants;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -20,10 +21,11 @@ import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
-import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
+import org.yaml.snakeyaml.scanner.Constant;
+
 import java.util.*;
 
 import static com.akto.hybrid_runtime.APICatalogSync.createUrlTemplate;
@@ -109,6 +111,8 @@ public class AktoPolicyNew {
         loggerMaker.infoAndAddToDb("Syncing with db");
         List<ApiInfo> apiInfoList = getUpdates(apiInfoCatalogMap);
         loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+ apiInfoList.size());
+        
+        
         try {
             if (apiInfoList.size() > 0) {
                 loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+apiInfoList.size());
@@ -162,6 +166,15 @@ public class AktoPolicyNew {
         PolicyCatalog policyCatalog = getApiInfoFromMap(apiInfoKey);
         policyCatalog.setSeenEarlier(true);
         ApiInfo apiInfo = policyCatalog.getApiInfo();
+
+        // Detect and set WebSocket connection string endpoints
+        boolean isWebSocketConnectionString = Constants.WEBSOCKET_PROTOCOL.equals(httpResponseParams.getType()) 
+            && httpResponseParams.getStatusCode() == 101 
+            && (httpResponseParams.getPayload() == null || httpResponseParams.getPayload().isEmpty());
+        if (isWebSocketConnectionString) {
+            apiInfo.setIsConnectionString(true);
+            loggerMaker.infoAndAddToDb("Detected WebSocket connection string for: " + apiInfo.getId().toString());
+        }
 
         if (Utils.printDebugUrlLog(httpResponseParams.getRequestParams().getURL())) {
             loggerMaker.infoAndAddToDb("Found debug url in process " + httpResponseParams.getRequestParams().getURL()

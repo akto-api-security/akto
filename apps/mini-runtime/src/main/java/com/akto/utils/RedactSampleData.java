@@ -397,7 +397,59 @@ public class RedactSampleData {
         m.put("direction", httpResponseParams.getDirection());
         m.put("is_pending", httpResponseParams.getIsPending() + "");
         m.put("source", httpResponseParams.getSource());
+        enrichWebSocketFieldsFromOrig(m, httpResponseParams);
         return m;
+    }
+
+    private static void enrichWebSocketFieldsFromOrig(Map<String, Object> m, HttpResponseParams httpResponseParams) {
+        if (!"WEBSOCKET".equalsIgnoreCase(String.valueOf(m.get("type")))) {
+            return;
+        }
+
+        String orig = httpResponseParams.getOrig();
+        if (orig == null || orig.isEmpty()) {
+            return;
+        }
+
+        try {
+            JSONObject jsonObject = JSON.parseObject(orig);
+            if (jsonObject.containsKey("events")) {
+                m.put("events", jsonObject.get("events"));
+            }
+
+            if (isBlankHeaderValue(m.get("requestHeaders"))) {
+                if (jsonObject.containsKey("requestHeaders") && !isBlankHeaderValue(jsonObject.get("requestHeaders"))) {
+                    m.put("requestHeaders", jsonObject.get("requestHeaders"));
+                } else if (jsonObject.containsKey("headers")) {
+                    m.put("requestHeaders", jsonObject.get("headers"));
+                }
+            }
+
+            if (isBlankPayloadValue(m.get("responsePayload")) && jsonObject.containsKey("responsePayload")) {
+                Object responsePayload = jsonObject.get("responsePayload");
+                if (!isBlankPayloadValue(responsePayload)) {
+                    m.put("responsePayload", responsePayload);
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "unable to enrich WebSocket sample from orig");
+        }
+    }
+
+    private static boolean isBlankHeaderValue(Object value) {
+        if (value == null) {
+            return true;
+        }
+        String str = value.toString().trim();
+        return str.isEmpty() || "{}".equals(str);
+    }
+
+    private static boolean isBlankPayloadValue(Object value) {
+        if (value == null) {
+            return true;
+        }
+        String str = value.toString().trim();
+        return str.isEmpty() || "{}".equals(str);
     }
 
     public static String convertHttpRespToOriginalString(HttpResponseParams httpResponseParams) throws JsonProcessingException {

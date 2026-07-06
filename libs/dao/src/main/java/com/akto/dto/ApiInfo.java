@@ -55,6 +55,9 @@ public class ApiInfo {
     public static final String PARENT_MCP_TOOL_NAMES = "parentMcpToolNames";
     private List<String> parentMcpToolNames;
 
+    public static final String IS_CONNECTION_STRING = "isConnectionString";
+    private boolean isConnectionString;
+
     public static class AuthType {
         public static final String UNAUTHENTICATED = "UNAUTHENTICATED";
         public static final String BASIC = "BASIC";
@@ -183,6 +186,7 @@ public class ApiInfo {
         this.lastSeen = Context.now();
         this.lastTested = 0 ;
         this.isSensitive = false;
+        this.isConnectionString = false;
         this.severityScore = 0;
         this.riskScore = 0 ;
         this.lastCalculatedTime = 0;
@@ -197,6 +201,11 @@ public class ApiInfo {
                 httpResponseParams.getRequestParams().getURL(),
                 URLMethods.Method.fromString(httpResponseParams.getRequestParams().getMethod())
         );
+        
+        String payload = httpResponseParams.getPayload();
+        this.isConnectionString = "WEBSOCKET".equals(httpResponseParams.getType()) 
+            && httpResponseParams.getStatusCode() == 101 
+            && (payload == null || payload.isEmpty());
     }
 
     public Map<String, Integer> getViolations() {
@@ -219,6 +228,7 @@ public class ApiInfo {
             this.lastTested = that.lastTested ;
         }
         this.isSensitive = that.isSensitive || this.isSensitive;
+        this.isConnectionString = that.isConnectionString || this.isConnectionString;
         this.severityScore = this.severityScore + that.severityScore;
         this.riskScore = Math.max(this.riskScore, that.riskScore);
 
@@ -423,5 +433,13 @@ public class ApiInfo {
 
     public void setTagsList(List<CollectionTags> tagsList) {
         this.tagsList = tagsList;
+    }
+
+    public boolean getIsConnectionString() {
+        return isConnectionString;
+    }
+
+    public void setIsConnectionString(boolean isConnectionString) {
+        this.isConnectionString = isConnectionString;
     }
 }
