@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+
 import {
     Text,
     HorizontalStack,
@@ -6,7 +7,8 @@ import {
     Box,
     Icon,
     Button,
-    Badge
+    Badge,
+    Spinner
 } from "@shopify/polaris";
 import {
     CancelMajor,
@@ -15,6 +17,7 @@ import {
 import PersistStore from '../../../../main/PersistStore';
 import AgenticSearchInput from '../../agentic/components/AgenticSearchInput';
 import guardrailApi from '../api';
+import settingsApi from '../../settings/api';
 import {
     transformPolicyForBackend,
     SEVERITY,
@@ -24,6 +27,9 @@ import {
     resolveStoredPolicyBehaviour
 } from '../utils';
 import { getDefaultGeneralBlockTopics, GENERAL_BLOCKS, isGeneralBlockTopic, toDeniedTopic } from '../generalBlocks';
+import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from './enterpriseLicenseComplianceCatalog';
+import { groupCollectionsByAgent, groupCollectionsByService, extractServiceName } from '../../observe/agentic/constants';
+import { isEndpointSecurityCategory } from '../../../../main/labelHelper';
 import func from "@/util/func";
 import {
     PolicyDetailsStep,
@@ -51,13 +57,85 @@ import {
     EnterpriseLicenseComplianceStep,
     EnterpriseLicenseComplianceConfig
 } from './steps';
-import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from "./enterpriseLicenseComplianceCatalog";
 import "./createGuardrailPage.css";
+
+// Store service keys so new devices are covered automatically via service-key matching in enforcement.
+const expandGroupsToV2 = (selectedKeys) =>
+    (selectedKeys || []).filter(key => key).map(key => ({ id: key, name: key }));
+
+const groupToOption = (g) => ({
+    label: g.groupKey,
+    value: g.groupKey,
+    isInline: g.collections.some(c => !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe'))
+});
+
+// Converts stored V2 server entries back to the option-value keys used by the dropdowns.
+// Works for all stored formats: numeric collection ID, full hostname, or short service key.
+const reverseToServiceKeys = (v2Servers, allCollections) => {
+    const keys = (v2Servers || []).map(s => {
+        const col = (allCollections || []).find(c => c.id?.toString() === s.id?.toString());
+        const rawName = col ? (col.hostName || col.displayName || '') : (s.name || String(s.id || ''));
+        // Argus stores full hostnames as option keys — don't extract service name
+        if (!isEndpointSecurityCategory()) return rawName;
+        return extractServiceName(rawName) || rawName;
+    });
+    return [...new Set(keys)];
+};
+
+const getLlmServiceKeySet = (allCollections) => {
+    const keys = new Set();
+    (allCollections || []).forEach(c => {
+        if (c.envType?.some(e => e.keyName === 'browser-llm')) {
+            const rawName = c.hostName || c.displayName || '';
+            const svcKey = extractServiceName(rawName) || rawName;
+            if (svcKey) keys.add(svcKey);
+        }
+    });
+    return keys;
+};
+
+
+// Store service keys so new devices are covered automatically via service-key matching in enforcement.
+const expandGroupsToV2 = (selectedKeys) =>
+    (selectedKeys || []).filter(key => key).map(key => ({ id: key, name: key }));
+
+const groupToOption = (g) => ({
+    label: g.groupKey,
+    value: g.groupKey,
+    isInline: g.collections.some(c => !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe'))
+});
+
+// Converts stored V2 server entries back to the option-value keys used by the dropdowns.
+// Works for all stored formats: numeric collection ID, full hostname, or short service key.
+const reverseToServiceKeys = (v2Servers, allCollections) => {
+    const keys = (v2Servers || []).map(s => {
+        const col = (allCollections || []).find(c => c.id?.toString() === s.id?.toString());
+        const rawName = col ? (col.hostName || col.displayName || '') : (s.name || String(s.id || ''));
+        // Argus stores full hostnames as option keys — don't extract service name
+        if (!isEndpointSecurityCategory()) return rawName;
+        return extractServiceName(rawName) || rawName;
+    });
+    return [...new Set(keys)];
+};
+
+const getLlmServiceKeySet = (allCollections) => {
+    const keys = new Set();
+    (allCollections || []).forEach(c => {
+        if (c.envType?.some(e => e.keyName === 'browser-llm')) {
+            const rawName = c.hostName || c.displayName || '';
+            const svcKey = extractServiceName(rawName) || rawName;
+            if (svcKey) keys.add(svcKey);
+        }
+    });
+    return keys;
+};
 
 const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false, nameReadOnly = false }) => {
     // Step management
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
+    const [leftSteps, setLeftSteps] = useState(new Set());
+    const prevStepRef = useRef(currentStep);
 
     // Playground state
     const [playgroundInput, setPlaygroundInput] = useState("");
@@ -127,6 +205,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableLlmPrompt, setEnableLlmPrompt] = useState(false);
     const [llmPrompt, setLlmPrompt] = useState("");
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
+    const [llmCompliance, setLlmCompliance] = useState({});
     const [enableExternalModel, setEnableExternalModel] = useState(false);
     const [url, setUrl] = useState("");
     const [confidenceScore, setConfidenceScore] = useState(25);
@@ -155,16 +234,36 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [applyOnRequest, setApplyOnRequest] = useState(false);
     const [policyBehaviour, setPolicyBehaviour] = useState(GUARDRAIL_BEHAVIOUR.BLOCK);
 
+    // Step 12: User targeting
+    const [applyToAllUsers, setApplyToAllUsers] = useState(true);
+    const [targetTeams, setTargetTeams] = useState([]);
+    const [targetRoles, setTargetRoles] = useState([]);
+    const [enterpriseLicenseComplianceCategories, setEnterpriseLicenseComplianceCategories] = useState([]);
+
+    const [agenticUsers, setAgenticUsers] = useState([]);
+    const [usersLoading, setUsersLoading] = useState(false);
+    const [deviceList, setDeviceList] = useState([]);
+
     // Collections data
     const [mcpServers, setMcpServers] = useState([]);
     const [agentServers, setAgentServers] = useState([]);
     const [browserLlmServers, setBrowserLlmServers] = useState([]);
     const [collectionsLoading, setCollectionsLoading] = useState(false);
 
-    const [enterpriseLicenseComplianceCategories, setEnterpriseLicenseComplianceCategories] = useState([]);
-
     // Get collections from PersistStore
     const allCollections = PersistStore(state => state.allCollections);
+
+    const availableTeams = useMemo(() => {
+        const teams = new Set();
+        (agenticUsers || []).forEach(u => { if (u.teamName) teams.add(u.teamName); });
+        return Array.from(teams).sort();
+    }, [agenticUsers]);
+
+    const availableRoles = useMemo(() => {
+        const roles = new Set();
+        (agenticUsers || []).forEach(u => { if (u.userRole) roles.add(u.userRole); });
+        return Array.from(roles).sort();
+    }, [agenticUsers]);
 
     // Create validation state object
     const getStoredStateData = () => ({
@@ -230,8 +329,17 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         applyOnRequest,
         applyOnResponse,
         policyBehaviour,
-        // Enterprise License Guardrails
+        applyToAllUsers,
+        targetTeams,
+        targetRoles,
         enterpriseLicenseComplianceCategories,
+        serverScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllServers &&
+            (selectedMcpServers || []).length === 0 &&
+            (selectedAgentServers || []).length === 0 &&
+            (selectedBrowserLlms || []).length === 0,
+        userScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllUsers &&
+            (targetTeams || []).length === 0 &&
+            (targetRoles || []).length === 0,
     });
 
     const getStepsWithSummary = () => {
@@ -286,7 +394,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 title: AnomalyDetectionConfig.title,
                 summary: AnomalyDetectionConfig.getSummary(storedStateData),
                 ...AnomalyDetectionConfig.validate(storedStateData)
-            }, 
+            },
             {
                 number: EnterpriseLicenseComplianceConfig.number,
                 title: EnterpriseLicenseComplianceConfig.title,
@@ -330,6 +438,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     }, []);
 
     useEffect(() => {
+        if (prevStepRef.current !== currentStep) {
+            setLeftSteps(prev => new Set([...prev, prevStepRef.current]));
+            prevStepRef.current = currentStep;
+        }
+    }, [currentStep]);
+
+    useEffect(() => {
         if (allCollections && allCollections.length > 0) {
             filterCollections();
         } else {
@@ -351,6 +466,38 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 }
             } catch (error) {
                 console.error("Error fetching browser extension configs:", error);
+            }
+        })();
+        return () => { isActive = false; };
+    }, []);
+
+    // Fetch agentic users to populate team/role options, and module infos for device count (Atlas only)
+    useEffect(() => {
+        if (!isEndpointSecurityCategory()) return;
+        let isActive = true;
+        (async () => {
+            setUsersLoading(true);
+            try {
+                const [agenticUsersResp, moduleResp] = await Promise.all([
+                    settingsApi.fetchAgenticUsers().catch(() => ({})),
+                    settingsApi.fetchModuleInfo({ moduleType: 'MCP_ENDPOINT_SHIELD' }).catch(() => ({})),
+                ]);
+                if (!isActive) return;
+                setAgenticUsers(agenticUsersResp?.agenticUsers || []);
+                const seen = new Set();
+                setDeviceList(
+                    (moduleResp?.moduleInfos || []).reduce((acc, m) => {
+                        const ad = m?.additionalData || {};
+                        const label = ad.username || ad.userName || ad.user || m.name || '';
+                        if (label && !seen.has(label)) {
+                            seen.add(label);
+                            acc.push({ label, value: label });
+                        }
+                        return acc;
+                    }, [])
+                );
+            } finally {
+                if (isActive) setUsersLoading(false);
             }
         })();
         return () => { isActive = false; };
@@ -380,49 +527,29 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const filterCollections = () => {
         setCollectionsLoading(true);
         try {
-            const mcpServerCollections = allCollections.filter(collection => {
-                const hasMcpEnvType = collection.envType && collection.envType.some(envType =>
-                    envType.keyName === 'mcp-server'
-                );
-                return hasMcpEnvType && !isVisibilityOnly(collection);
-            })
-            .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
-            .map(collection => ({
-                label: collection.displayName,
-                value: collection.id.toString(),
-                isInline: !collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe')
-            }));
-
-
-            const agentServerCollections = allCollections.filter(collection => {
-                const hasGenAiEnvType = collection.envType && collection.envType.some(envType =>
-                    envType.keyName === 'gen-ai'
-                );
-                return hasGenAiEnvType && !isVisibilityOnly(collection);
-            })
-            .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
-            .map(collection => ({
-                label: collection.displayName,
-                value: collection.id.toString(),
-                isInline: !collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe')
-            }));
-
-            const browserLlmCollections = allCollections.filter(collection => {
-                const hasBrowserLlmEnvType = collection.envType && collection.envType.some(envType =>
-                    envType.keyName === 'browser-llm'
-                );
-                return hasBrowserLlmEnvType && !isVisibilityOnly(collection);
-            })
-            .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
-            .map(collection => ({
-                label: collection.displayName,
-                value: collection.id.toString(),
-                isInline: !collection.envType?.some(tag => tag.keyName === 'mode' && tag.value === 'observe')
-            }));
-
-            setMcpServers(mcpServerCollections);
-            setAgentServers(agentServerCollections);
-            setBrowserLlmServers(browserLlmCollections);
+            const nonVisibility = allCollections.filter(c => !isVisibilityOnly(c));
+            if (isEndpointSecurityCategory()) {
+                // Atlas: group by service/platform key — one entry covers all devices running that service
+                const serviceGroups = groupCollectionsByService(nonVisibility);
+                const agentGroups = groupCollectionsByAgent(nonVisibility);
+                setMcpServers(serviceGroups.filter(g => g.clientType === 'MCP Server').map(groupToOption));
+                setAgentServers(agentGroups.map(groupToOption));
+                setBrowserLlmServers(serviceGroups.filter(g => g.clientType === 'LLM').map(groupToOption));
+            } else {
+                // Argus: each device+service is a distinct target — use full hostname as the option value
+                const toOption = (c) => {
+                    const name = c.hostName || c.displayName || c.name || '';
+                    return {
+                        label: name,
+                        value: name,
+                        isInline: !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe')
+                    };
+                };
+                const dedup = (opts) => [...new Map(opts.map(o => [o.value, o])).values()].filter(o => o.value);
+                setMcpServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'mcp-server')).map(toOption)));
+                setAgentServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'gen-ai')).map(toOption)));
+                setBrowserLlmServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'browser-llm')).map(toOption)));
+            }
         } catch (error) {
             console.error("Error filtering collections:", error);
         } finally {
@@ -480,6 +607,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableLlmPrompt(false);
         setLlmPrompt("");
         setLlmConfidenceScore(0.5);
+        setLlmCompliance({});
         setEnableExternalModel(false);
         setUrl("");
         setConfidenceScore(25);
@@ -497,6 +625,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyOnResponse(false);
         setApplyOnRequest(false);
         setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
+        setApplyToAllUsers(true);
+        setTargetTeams([]);
+        setTargetRoles([]);
         setEnterpriseLicenseComplianceCategories([]);
     };
 
@@ -539,7 +670,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             }
         }
 
-        // Denied topics - split into general blocks, enterprise license, and custom
+        // Split saved denied topics back into Akto defaults and user-custom.
         const loadedTopics = policy.deniedTopics || [];
         const defaultKeys = new Set(
             loadedTopics
@@ -547,13 +678,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 .map(t => GENERAL_BLOCKS.find(b => b.topic === t.topic)?.key)
                 .filter(Boolean)
         );
-        const customTopics = loadedTopics.filter(
-            t => !isGeneralBlockTopic(t.topic) && t?.origin !== ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN
-        );
+        const customTopics = loadedTopics.filter(t => !isGeneralBlockTopic(t.topic) && t.origin !== ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN);
         setEnableDeniedTopics(loadedTopics.length > 0);
         setSelectedDefaultBlockKeys(defaultKeys);
         setDeniedTopics(customTopics);
-        setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
 
         // Word filters
         setWordFilters({
@@ -587,6 +715,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableLlmPrompt(policy.llmRule?.enabled && !!policy.llmRule?.userPrompt);
         setLlmPrompt(policy.llmRule?.userPrompt || "");
         setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
+        setLlmCompliance(policy.llmRule?.compliance || {});
 
         // Base Prompt Based Validation (AI Agents)
         setEnableBasePromptRule(policy.basePromptRule?.enabled || false);
@@ -618,31 +747,33 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setConfidenceScore(nearestCheckpoint);
 
         // Server settings
-        setSelectedMcpServers(
-            policy.selectedMcpServersV2?.length > 0
-                ? policy.selectedMcpServersV2.map(server => server.id)
-                : policy.selectedMcpServers || []
-        );
+        const storedMcpV2 = policy.selectedMcpServersV2?.length > 0
+            ? policy.selectedMcpServersV2
+            : (policy.selectedMcpServers || []).map(name => ({ id: name, name }));
+        setSelectedMcpServers(reverseToServiceKeys(storedMcpV2, allCollections));
 
         // selectedAgentServersV2 stores both gen-ai and browser-llm entries.
-        // Split them back into their respective dropdowns using allCollections envType.
-        const rawAgentServers = policy.selectedAgentServersV2?.length > 0
-            ? policy.selectedAgentServersV2.map(server => server.id)
-            : policy.selectedAgentServers || [];
+        // Split them back into their respective dropdowns.
+        const rawAgentServersV2 = policy.selectedAgentServersV2?.length > 0
+            ? policy.selectedAgentServersV2
+            : (policy.selectedAgentServers || []).map(id => ({ id, name: id }));
 
-        const agentIds = [];
-        const browserLlmIds = [];
-        rawAgentServers.forEach(id => {
-            const col = allCollections?.find(c => c.id?.toString() === id?.toString());
-            const isBrowserLlm = col?.envType?.some(e => e.keyName === 'browser-llm');
-            if (isBrowserLlm) {
-                browserLlmIds.push(id);
-            } else {
-                agentIds.push(id);
-            }
+        // Compute llmServiceKeySet for both Atlas and Argus — needed to classify new-format
+        // V2 entries where the id is a service key (not a numeric collection id).
+        const llmServiceKeySet = getLlmServiceKeySet(allCollections);
+        const rawAgentEntries = [];
+        const rawLlmEntries = [];
+        rawAgentServersV2.forEach(s => {
+            const col = allCollections?.find(c => c.id?.toString() === s.id?.toString());
+            const isBrowserLlm = col
+                ? col.envType?.some(e => e.keyName === 'browser-llm')
+                : llmServiceKeySet.has(s.name || '');
+            if (isBrowserLlm) rawLlmEntries.push(s);
+            else rawAgentEntries.push(s);
         });
-        setSelectedAgentServers(agentIds);
-        setSelectedBrowserLlms(browserLlmIds);
+
+        setSelectedAgentServers(reverseToServiceKeys(rawAgentEntries, allCollections));
+        setSelectedBrowserLlms(reverseToServiceKeys(rawLlmEntries, allCollections));
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
         setApplyToAllServers(policy.applyToAllServers ?? true);
@@ -652,6 +783,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             pattern: entry.pattern || ""
         })));
         setBlockPersonalAccounts(policy.blockPersonalAccounts || false);
+
+        setApplyToAllUsers(!policy.targetTeams?.length && !policy.targetRoles?.length);
+        setTargetTeams(policy.targetTeams || []);
+        setTargetRoles(policy.targetRoles || []);
+        setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
     };
 
     const handleClose = () => {
@@ -676,36 +812,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const handleSave = async () => {
         setLoading(true);
         try {
-            // Transform selectedMcpServers and selectedAgentServers to include both ID and name
-            const transformedMcpServers = selectedMcpServers
-                .filter(serverId => serverId)
-                .map(serverId => {
-                    const server = mcpServers.find(s => s.value === serverId || s.value === serverId.toString());
-                    return {
-                        id: serverId.toString(),
-                        name: server ? server.label : serverId.toString()
-                    };
-                });
-
+            const transformedMcpServers = expandGroupsToV2(selectedMcpServers);
             const transformedAgentServers = [
-                ...selectedAgentServers
-                    .filter(serverId => serverId)
-                    .map(serverId => {
-                        const server = agentServers.find(s => s.value === serverId || s.value === serverId.toString());
-                        return {
-                            id: serverId.toString(),
-                            name: server ? server.label : serverId.toString()
-                        };
-                    }),
-                ...selectedBrowserLlms
-                    .filter(serverId => serverId)
-                    .map(serverId => {
-                        const server = browserLlmServers.find(s => s.value === serverId || s.value === serverId.toString());
-                        return {
-                            id: serverId.toString(),
-                            name: server ? server.label : serverId.toString()
-                        };
-                    })
+                ...expandGroupsToV2(selectedAgentServers),
+                ...expandGroupsToV2(selectedBrowserLlms)
             ];
 
             // Drop empty rows and normalize the glob patterns before persisting.
@@ -714,6 +824,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 .map(entry => ({ pattern: entry.pattern.trim() }));
 
             const b = normalizeBehaviourValue(policyBehaviour);
+
+            const transformedDeniedTopics = deniedTopics.map(topic => ({
+                ...topic,
+                compliance: topic.compliance && Object.keys(topic.compliance).length > 0
+                    ? topic.compliance
+                    : undefined
+            }));
+
             const guardrailData = {
                 name,
                 description,
@@ -729,7 +847,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 deniedTopics: enableDeniedTopics
                     ? [
                         ...GENERAL_BLOCKS.filter(b => selectedDefaultBlockKeys.has(b.key)).map(toDeniedTopic),
-                        ...deniedTopics
+                        ...transformedDeniedTopics
                       ]
                     : [],
                 wordFilters,
@@ -746,7 +864,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 llmRule: {
                     enabled: enableLlmPrompt && !!llmPrompt.trim(),
                     userPrompt: llmPrompt.trim(),
-                    confidenceScore: llmConfidenceScore
+                    confidenceScore: llmConfidenceScore,
+                    compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 },
                 basePromptRule: {
                     enabled: enableBasePromptRule,
@@ -787,8 +906,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 blockPersonalAccounts,
                 applyOnResponse,
                 applyOnRequest,
-                ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {}),
+                targetTeams: applyToAllUsers ? [] : targetTeams,
+                targetRoles: applyToAllUsers ? [] : targetRoles,
                 enterpriseLicenseComplianceCategories,
+                ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
 
 
@@ -911,6 +1032,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setLlmRule={setLlmPrompt}
                         llmConfidenceScore={llmConfidenceScore}
                         setLlmConfidenceScore={setLlmConfidenceScore}
+                        llmCompliance={llmCompliance}
+                        setLlmCompliance={setLlmCompliance}
                         enableExternalModel={enableExternalModel}
                         setEnableExternalModel={setEnableExternalModel}
                         url={url}
@@ -943,6 +1066,22 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableToolNameDescriptionMismatch={setEnableToolNameDescriptionMismatch}
                     />
                 );
+            case 11: {
+                const hostSuggestions = Array.from(new Set([
+                    ...(browserConfigs || []).map(c => (c.host || "").trim()),
+                    ...(mcpServers || []).map(s => (s.label || "").trim()),
+                    ...(agentServers || []).map(s => (s.label || "").trim()),
+                ].filter(Boolean))).sort();
+                return (
+                    <BlockedHostsStep
+                        blockedHosts={blockedHosts}
+                        setBlockedHosts={setBlockedHosts}
+                        blockPersonalAccounts={blockPersonalAccounts}
+                        setBlockPersonalAccounts={setBlockPersonalAccounts}
+                        hostSuggestions={hostSuggestions}
+                    />
+                );
+            }
             case 10:
                 return (
                     <ServerSettingsStep
@@ -964,29 +1103,36 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         collectionsLoading={collectionsLoading}
                         policyBehaviour={policyBehaviour}
                         setPolicyBehaviour={setPolicyBehaviour}
+                        targetTeams={targetTeams}
+                        setTargetTeams={setTargetTeams}
+                        targetRoles={targetRoles}
+                        setTargetRoles={setTargetRoles}
+                        availableTeams={availableTeams}
+                        availableRoles={availableRoles}
+                        usersLoading={usersLoading}
+                        applyToAllUsers={applyToAllUsers}
+                        setApplyToAllUsers={setApplyToAllUsers}
+                        deviceList={deviceList}
+                        showConditionError={leftSteps.has(ServerSettingsConfig.number)}
+                        showUserConditionError={leftSteps.has(ServerSettingsConfig.number)}
                     />
                 );
-            case 11: {
-                const hostSuggestions = Array.from(new Set([
-                    ...(browserConfigs || []).map(c => (c.host || "").trim()),
-                    ...(mcpServers || []).map(s => (s.label || "").trim()),
-                    ...(agentServers || []).map(s => (s.label || "").trim()),
-                ].filter(Boolean))).sort();
-                return (
-                    <BlockedHostsStep
-                        blockedHosts={blockedHosts}
-                        setBlockedHosts={setBlockedHosts}
-                        blockPersonalAccounts={blockPersonalAccounts}
-                        setBlockPersonalAccounts={setBlockPersonalAccounts}
-                        hostSuggestions={hostSuggestions}
-                    />
-                );
-            }
             case 12:
                 return (
                     <EnterpriseLicenseComplianceStep
                         enterpriseLicenseComplianceCategories={enterpriseLicenseComplianceCategories}
                         setEnterpriseLicenseComplianceCategories={setEnterpriseLicenseComplianceCategories}
+                        targetTeams={targetTeams}
+                        setTargetTeams={setTargetTeams}
+                        targetRoles={targetRoles}
+                        setTargetRoles={setTargetRoles}
+                        availableTeams={availableTeams}
+                        availableRoles={availableRoles}
+                        usersLoading={usersLoading}
+                        applyToAllUsers={applyToAllUsers}
+                        setApplyToAllUsers={setApplyToAllUsers}
+                        showConditionError={leftSteps.has(ServerSettingsConfig.number)}
+                        showUserConditionError={leftSteps.has(ServerSettingsConfig.number)}
                     />
                 );
             default:
@@ -1037,7 +1183,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 llmRule: {
                     enabled: true,
                     userPrompt: llmPrompt.trim(),
-                    confidenceScore: llmConfidenceScore
+                    confidenceScore: llmConfidenceScore,
+                    compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 }
             } : {}),
             ...(enableBasePromptRule ? {
@@ -1063,7 +1210,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             blockPersonalAccounts,
             applyOnResponse: applyOnResponse,
             applyOnRequest: applyOnRequest,
-            enterpriseLicenseComplianceCategories: enterpriseLicenseComplianceCategories,
+            enterpriseLicenseComplianceCategories
         };
     };
 
@@ -1161,10 +1308,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         const inputToTest = playgroundInput;
         setPlaygroundInput("");
 
+        // Show the prompt immediately; the response bubble fills in once it arrives.
+        setPlaygroundMessages(prev => [...prev, { userPrompt: inputToTest, pending: true }]);
+
         try {
             // Prepare policy data from current form state
             const rawPolicyData = buildPlaygroundPolicyData();
-            
+
             // Transform field names to match backend DTO (same as createGuardrailPolicy)
             const policyData = transformPolicyForBackend(rawPolicyData);
 
@@ -1175,7 +1325,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
             // Transform the response from guardrail service to match UI format
             const response = transformPlaygroundResponse(result, inputToTest);
-            setPlaygroundMessages(prev => [...prev, response]);
+            setPlaygroundMessages(prev => prev.map((m, i) => i === prev.length - 1 ? response : m));
         } catch (error) {
             console.error("Error testing guardrail:", error);
             const errorResponse = {
@@ -1184,7 +1334,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 reason: 'Validation Failed',
                 message: error.response?.data?.actionErrors?.[0] || error.message || 'Failed to test guardrail. Please ensure the guardrail service is running.'
             };
-            setPlaygroundMessages(prev => [...prev, errorResponse]);
+            setPlaygroundMessages(prev => prev.map((m, i) => i === prev.length - 1 ? errorResponse : m));
         } finally {
             setPlaygroundLoading(false);
         }
@@ -1326,6 +1476,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                                     </Box>
                                                 </HorizontalStack>
 
+                                                {message.pending ? (
+                                                    <HorizontalStack align="start" gap="2" blockAlign="center">
+                                                        <Spinner size="small" />
+                                                        <Text variant="bodyMd" color="subdued">Testing against guardrail policy…</Text>
+                                                    </HorizontalStack>
+                                                ) : (
+                                                <>
                                                 <Box paddingBlockStart="1">
                                                     <Text
                                                         variant="bodyMd"
@@ -1366,6 +1523,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                                             </Text>
                                                         </Box>
                                                     </HorizontalStack>
+                                                )}
+                                                </>
                                                 )}
                                             </VerticalStack>
                                         ))}

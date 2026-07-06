@@ -17,8 +17,10 @@ import io.swagger.v3.parser.core.models.ParseOptions;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 
@@ -80,7 +82,6 @@ public class WizApiEndpointsImporter {
 
             List<BasicDBObject> allEndpointMeta = WizApiClient.fetchAllEndpointMeta(apiUrl, accessToken);
             loggerMaker.infoAndAddToDb(String.format("Fetched metadata for %d total endpoints from Wiz", allEndpointMeta.size()));
-         
             heartbeat.run();
 
             int deltaTs = wizIntegration.getWizImportApiEndpointsJobDeltaTs();
@@ -99,25 +100,28 @@ public class WizApiEndpointsImporter {
                         "Failed to parse updatedAt '%s' for endpoint %s", updatedAt, meta.getString("id")));
                 }
             }
-            long cutoffEpochSeconds = deltaTs;
-            long secondsSinceCutoff = Instant.now().getEpochSecond() - cutoffEpochSeconds;
-            long hoursSinceCutoff = secondsSinceCutoff / 3600;
-            loggerMaker.infoAndAddToDb(String.format("%d endpoints updated since last sync (%d hrs ago, out of %d total)", updatedEndpointIds.size(), hoursSinceCutoff, allEndpointMeta.size()));
-            
-                
+
+            Map<String, String> canonicalKeyToQaHost = WizApiGatewayFilter.buildCanonicalKeyToQaHost(allEndpointMeta);
+
+            String sinceStr = deltaTs == 0 ? "first run" : ((Instant.now().getEpochSecond() - deltaTs) / 3600) + " hrs ago";
+            loggerMaker.infoAndAddToDb(String.format("%d endpoints updated since last sync (%s, out of %d total)", updatedEndpointIds.size(), sinceStr, allEndpointMeta.size()));
+
             totalFetched = 0;
             int totalErrors = 0;
 
             if (!updatedEndpointIds.isEmpty()) {
                 List<String> idList = new ArrayList<>(updatedEndpointIds);
                 int batchSize = WizApiClient.ENDPOINT_FETCH_PAGE_SIZE;
+                int totalBatches = (idList.size() + batchSize - 1) / batchSize;
 
                 for (int i = 0; i < idList.size(); i += batchSize) {
                     List<String> batch = idList.subList(i, Math.min(i + batchSize, idList.size()));
                     boolean isFirstBatch = (i == 0);
                     boolean isLastBatch = (i + batchSize) >= idList.size();
+                    int currentBatch = (i / batchSize) + 1;
 
                     List<JsonNode> pageSpecs = new ArrayList<>();
+                    Map<String, String> hostToGatewayName = new HashMap<>();
                     BasicDBObject root;
                     try {
                         root = WizApiClient.fetchEndpointsPageByIds(apiUrl, accessToken, batch);
@@ -134,9 +138,23 @@ public class WizApiEndpointsImporter {
                         String host = node.getString("host");
                         String path = node.getString("pathname");
                         String method = node.getString("httpMethod");
+                        List<?> relatedResources = (List<?>) node.get("relatedResources");
+                        List<?> authSchemes = (List<?>) node.get("authSchemes");
                         try {
                             JsonNode spec = WizSpecProcessor.resolveSpec(node.get("specification"), host, path, method);
-                            if (spec != null) pageSpecs.add(spec);
+                            if (spec != null) {
+                                spec = WizSpecProcessor.injectMissingAuthScheme(spec, authSchemes);
+                                String qaHost = WizApiGatewayFilter.resolveQaHost(host, relatedResources, canonicalKeyToQaHost);
+                                if (qaHost != null) {
+                                    spec = WizSpecProcessor.replaceSpecHost(spec, qaHost);
+                                }
+                                String effectiveHost = qaHost != null ? qaHost : host;
+                                String gatewayName = WizApiGatewayFilter.extractGatewayName(relatedResources);
+                                if (gatewayName != null) {
+                                    hostToGatewayName.putIfAbsent(effectiveHost, gatewayName);
+                                }
+                                pageSpecs.add(spec);
+                            }
                         } catch (Exception e) {
                             totalErrors++;
                             loggerMaker.errorAndAddToDb(String.format(
@@ -161,6 +179,7 @@ public class WizApiEndpointsImporter {
                                     if (aktoFormat != null) {
                                         BasicDBObject msg = BasicDBObject.parse(aktoFormat);
                                         msg.put("source", HttpResponseParams.Source.WIZ.name());
+                                        msg.put("tags", WizApiGatewayFilter.buildWizTagsJson(msg.getString("requestHeaders"), hostToGatewayName));
                                         log.setAktoFormat(msg.toJson());
                                     }
                                 }
@@ -173,6 +192,7 @@ public class WizApiEndpointsImporter {
                         }
                     }
 
+                    loggerMaker.infoAndAddToDb(String.format("Completed batch %d/%d (%d remaining)", currentBatch, totalBatches, totalBatches - currentBatch));
                     heartbeat.run();
                 }
             }

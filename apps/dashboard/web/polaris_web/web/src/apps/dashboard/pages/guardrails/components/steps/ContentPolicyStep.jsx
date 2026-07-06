@@ -16,8 +16,10 @@ import { PlusMinor, EditMinor, DeleteMinor, ChevronDownMinor, ChevronUpMinor } f
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
-import { GENERAL_BLOCKS, GENERAL_BLOCK_GROUPS, toDeniedTopic } from "../../generalBlocks";
+import { GENERAL_BLOCKS, GENERAL_BLOCK_GROUPS } from "../../generalBlocks";
 import func from "@/util/func";
+import guardrailApi from "../../api";
+import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
 
 export const ContentPolicyConfig = {
     number: 2,
@@ -91,15 +93,54 @@ const ContentPolicyStep = ({
         samplePhrases: []
     });
     const [newPhraseInput, setNewPhraseInput] = useState("");
+    const [topicComplianceSuggestions, setTopicComplianceSuggestions] = useState({});
+    const complianceTimerRef = useRef(null);
+    const complianceRequestIdRef = useRef({});
+    const editStartRef = useRef({ topic: '', description: '' });
 
-    // Denied topics functions
+    // Seed compliance suggestions from existing deniedTopics on mount (edit mode)
+    useEffect(() => {
+        const suggestions = {};
+        deniedTopics.forEach((topic, index) => {
+            if (topic.compliance && Object.keys(topic.compliance).length > 0) {
+                const accepted = Object.keys(topic.compliance).reduce((acc, framework) => {
+                    acc[framework] = true;
+                    return acc;
+                }, {});
+                suggestions[index] = { suggested: topic.compliance, accepted };
+            }
+        });
+        if (Object.keys(suggestions).length > 0) {
+            setTopicComplianceSuggestions(suggestions);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (editingIndex === null) return;
+        const { topic, description } = editFormData;
+        if (!topic.trim() || !description.trim()) return;
+        if (topic.trim() === editStartRef.current.topic.trim() && description.trim() === editStartRef.current.description.trim()) return;
+
+        clearTimeout(complianceTimerRef.current);
+        complianceTimerRef.current = setTimeout(() => {
+            fetchTopicCompliance(
+                { topic: topic.trim(), description: description.trim(), samplePhrases: editFormData.samplePhrases },
+                editingIndex
+            );
+        }, 1000);
+
+        return () => clearTimeout(complianceTimerRef.current);
+    }, [editFormData.description, editFormData.topic, editingIndex]);
+
     const startAdding = () => {
+        editStartRef.current = { topic: '', description: '' };
         setEditingIndex(deniedTopics.length);
         setEditFormData({ topic: "", description: "", samplePhrases: [] });
         setNewPhraseInput("");
     };
 
     const startEditing = (index) => {
+        editStartRef.current = { topic: deniedTopics[index]?.topic || '', description: deniedTopics[index]?.description || '' };
         setEditingIndex(index);
         // Default any missing fields so topics from other sources (e.g. conversation-derived
         // denied topics, which omit description) don't crash the edit form on .trim().
@@ -108,6 +149,7 @@ const ContentPolicyStep = ({
     };
 
     const cancelEditing = () => {
+        clearTimeout(complianceTimerRef.current);
         setEditingIndex(null);
         setEditFormData({ topic: "", description: "", samplePhrases: [] });
         setNewPhraseInput("");
@@ -140,25 +182,67 @@ const ContentPolicyStep = ({
         const invalidPhrase = editFormData.samplePhrases.find(phrase => validateSamplePhrase(phrase));
         if (invalidPhrase) return;
 
+        const savedIndex = editingIndex;
+        const suggestion = topicComplianceSuggestions[savedIndex];
+        const compliance = suggestion ? buildComplianceMap(suggestion.suggested || {}, suggestion.accepted || {}) : null;
+
         const topicData = {
             topic: editFormData.topic.trim(),
             description: editFormData.description.trim(),
-            samplePhrases: editFormData.samplePhrases
+            samplePhrases: editFormData.samplePhrases,
+            ...(compliance && Object.keys(compliance).length > 0 ? { compliance } : {})
         };
 
         const updatedTopics = [...deniedTopics];
-        if (editingIndex === deniedTopics.length) {
+        const isNewTopic = editingIndex === deniedTopics.length;
+        if (isNewTopic) {
             updatedTopics.unshift(topicData); // new topics appear at the top
+            // Every existing topic shifts down by one and the new topic (currently
+            // keyed by the sentinel savedIndex) moves to index 0. Remap the
+            // index-keyed suggestion/request maps to match, or they desync with the rows.
+            setTopicComplianceSuggestions(prev => {
+                const shifted = {};
+                Object.keys(prev).forEach(k => {
+                    const ki = parseInt(k);
+                    shifted[ki === savedIndex ? 0 : ki + 1] = prev[k];
+                });
+                return shifted;
+            });
+            const shiftedRequestIds = {};
+            Object.keys(complianceRequestIdRef.current).forEach(k => {
+                const ki = parseInt(k);
+                shiftedRequestIds[ki === savedIndex ? 0 : ki + 1] = complianceRequestIdRef.current[k];
+            });
+            complianceRequestIdRef.current = shiftedRequestIds;
         } else {
             updatedTopics[editingIndex] = topicData;
         }
         setDeniedTopics(updatedTopics);
         cancelEditing();
+
+        // Final fetch if compliance not yet available (user saved before debounce fired)
+        if (!suggestion?.loading && (!suggestion?.suggested || Object.keys(suggestion.suggested).length === 0)) {
+            fetchTopicCompliance(topicData, isNewTopic ? 0 : savedIndex);
+        }
     };
 
     const deleteRow = (index) => {
         const updatedTopics = deniedTopics.filter((_, i) => i !== index);
         setDeniedTopics(updatedTopics);
+        setTopicComplianceSuggestions(prev => {
+            const updated = {};
+            Object.keys(prev).forEach(k => {
+                const ki = parseInt(k);
+                if (ki !== index) updated[ki > index ? ki - 1 : ki] = prev[k];
+            });
+            return updated;
+        });
+        const updatedRequestIds = {};
+        Object.keys(complianceRequestIdRef.current).forEach(k => {
+            const ki = parseInt(k);
+            if (ki !== index) updatedRequestIds[ki > index ? ki - 1 : ki] = complianceRequestIdRef.current[k];
+        });
+        complianceRequestIdRef.current = updatedRequestIds;
     };
 
     // Akto default blocks are tracked by key in selectedDefaultBlockKeys (separate from custom deniedTopics).
@@ -174,11 +258,8 @@ const ContentPolicyStep = ({
         setSelectedDefaultBlockKeys(next);
     };
 
-    // Unified list for rendering: selected Akto defaults + user custom topics.
-    const activeDefaultTopics = GENERAL_BLOCKS
-        .filter(b => selectedDefaultBlockKeys.has(b.key))
-        .map(b => ({ ...toDeniedTopic(b), _isDefault: true, _key: b.key }));
-    const allActiveTopics = [...activeDefaultTopics, ...deniedTopics];
+    // Akto default topics are managed via the dropdown above; only custom topics get tiles below.
+    const totalActiveTopicsCount = selectedDefaultBlockKeys.size + deniedTopics.length;
 
     const addSamplePhrase = () => {
         const trimmedPhrase = newPhraseInput.trim();
@@ -205,51 +286,120 @@ const ContentPolicyStep = ({
         }
     };
 
-    // One unified card for every active denied topic. Recommended (catalogue)
-    // topics get a "Recommended" badge and no edit action since they are predefined;
-    // custom topics get "Custom" and full edit/delete.
+    const fetchTopicCompliance = async (topicData, index) => {
+        const reqId = (complianceRequestIdRef.current[index] || 0) + 1;
+        complianceRequestIdRef.current = { ...complianceRequestIdRef.current, [index]: reqId };
+        setTopicComplianceSuggestions(prev => ({ ...prev, [index]: { ...prev[index], loading: true } }));
+        try {
+            const resp = await guardrailApi.suggestGuardrailCompliance('denied_topic', {
+                topicName: topicData.topic,
+                topicDescription: topicData.description,
+                samplePhrases: topicData.samplePhrases
+            });
+            if (reqId !== complianceRequestIdRef.current[index]) return;
+            const suggested = resp?.response?.mapComplianceToListClauses || {};
+            const accepted = Object.keys(suggested).reduce((acc, framework) => {
+                acc[framework] = true;
+                return acc;
+            }, {});
+            setTopicComplianceSuggestions(prev => ({
+                ...prev,
+                [index]: { suggested, accepted, loading: false }
+            }));
+
+            setDeniedTopics(prev => {
+                // A new (not-yet-saved) topic uses the out-of-bounds sentinel index
+                // deniedTopics.length; its suggestion lives in topicComplianceSuggestions
+                // and is applied in saveRow. Never write it into deniedTopics here or we
+                // create a phantom entry with no topic/description/samplePhrases.
+                if (index < 0 || index >= prev.length) return prev;
+                const updatedTopics = [...prev];
+                const compliance = buildComplianceMap(suggested, accepted);
+                updatedTopics[index] = {
+                    ...updatedTopics[index],
+                    compliance: Object.keys(compliance).length > 0 ? compliance : undefined
+                };
+                return updatedTopics;
+            });
+        } catch (error) {
+            if (reqId !== complianceRequestIdRef.current[index]) return;
+            console.error('Error fetching compliance suggestions:', error);
+            setTopicComplianceSuggestions(prev => ({ ...prev, [index]: { ...prev[index], loading: false } }));
+        }
+    };
+
+    const toggleFrameworkAcceptance = (topicIndex, framework) => {
+        const currentEntry = topicComplianceSuggestions[topicIndex] || { suggested: {}, accepted: {} };
+        const isAccepted = !!currentEntry.accepted[framework];
+        const newAccepted = { ...currentEntry.accepted };
+
+        if (isAccepted) {
+            delete newAccepted[framework];
+        } else {
+            newAccepted[framework] = true;
+        }
+
+        setTopicComplianceSuggestions(prev => ({
+            ...prev,
+            [topicIndex]: { ...currentEntry, accepted: newAccepted }
+        }));
+
+        setDeniedTopics(prev => {
+            const updatedTopics = [...prev];
+            const compliance = buildComplianceMap(currentEntry.suggested, newAccepted);
+            updatedTopics[topicIndex] = {
+                ...updatedTopics[topicIndex],
+                compliance: Object.keys(compliance).length > 0 ? compliance : undefined
+            };
+            return updatedTopics;
+        });
+    };
+
     const renderViewRow = (topic, index) => {
-        const isDefault = topic._isDefault;
+        const suggestion = topicComplianceSuggestions[index];
+        const acceptedCompliance = buildComplianceMap(suggestion?.suggested || {}, suggestion?.accepted || {});
         return (
-            <Box key={isDefault ? topic._key : index} padding="4" borderColor="border" borderWidth="025" borderRadius="2">
-                <HorizontalStack align="space-between" blockAlign="start">
-                    <Box style={{ flex: 1 }}>
-                        <VerticalStack gap="2">
-                            <HorizontalStack gap="2" blockAlign="center">
+            <Box key={index} padding="4" borderColor="border" borderWidth="025" borderRadius="2">
+                <VerticalStack gap="2">
+                    <Box style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: '12px' }}>
+                        <Box style={{ flex: 1, minWidth: 0 }}>
+                            <VerticalStack gap="1">
                                 <Text variant="headingSm" fontWeight="semibold">{topic.topic}</Text>
-                                <Badge tone={isDefault ? "info" : undefined}>{isDefault ? "Akto default" : "Custom"}</Badge>
-                            </HorizontalStack>
-                            <Text variant="bodyMd" tone="subdued">{topic.description}</Text>
-                            {topic.samplePhrases.length > 0 && (
-                                <HorizontalStack gap="1">
+                                <Text variant="bodyMd" tone="subdued">{topic.description}</Text>
+                                {topic.samplePhrases.length > 0 && (
                                     <Text variant="bodySm" tone="subdued">
                                         {topic.samplePhrases.length} sample phrase{topic.samplePhrases.length !== 1 ? 's' : ''}
                                     </Text>
-                                </HorizontalStack>
-                            )}
+                                )}
+                            </VerticalStack>
+                        </Box>
+                        <VerticalStack gap="2" inlineAlign="end">
+                            <Badge>Custom</Badge>
+                            <Button icon={EditMinor} size="slim" onClick={() => startEditing(index)} accessibilityLabel="Edit topic" />
+                            <Button
+                                icon={DeleteMinor}
+                                size="slim"
+                                tone="critical"
+                                accessibilityLabel="Remove topic"
+                                onClick={() => deleteRow(index)}
+                            />
                         </VerticalStack>
                     </Box>
-                    <HorizontalStack gap="2">
-                        {!isDefault && (
-                            <Button icon={EditMinor} onClick={() => startEditing(index)} accessibilityLabel="Edit topic" />
-                        )}
-                        <Button
-                            icon={DeleteMinor}
-                            tone="critical"
-                            accessibilityLabel="Remove topic"
-                            onClick={() => isDefault
-                                ? toggleGeneralBlock(GENERAL_BLOCKS.find(b => b.key === topic._key), false)
-                                : deleteRow(index)
-                            }
-                        />
-                    </HorizontalStack>
-                </HorizontalStack>
+                    <ComplianceMappingTags
+                        loading={suggestion?.loading}
+                        complianceMap={acceptedCompliance}
+                        onRemove={(framework) => toggleFrameworkAcceptance(index, framework)}
+                        onAdd={Object.keys(suggestion?.suggested || {}).length > 0
+                            ? (framework) => toggleFrameworkAcceptance(index, framework)
+                            : undefined}
+                    />
+                </VerticalStack>
             </Box>
         );
     };
 
     const renderEditRow = (isNew) => (
-        <Box key={isNew ? "new" : editingIndex} padding="4" borderColor="border" borderWidth="025" borderRadius="2" background="bg-surface-secondary">
+        <Box key={isNew ? "new" : editingIndex} padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface-secondary">
             <VerticalStack gap="4">
                 <TextField
                     label="Name"
@@ -300,6 +450,17 @@ const ContentPolicyStep = ({
                         )}
                     </VerticalStack>
                 </Box>
+                <ComplianceMappingTags
+                    loading={topicComplianceSuggestions[editingIndex]?.loading}
+                    complianceMap={buildComplianceMap(
+                        topicComplianceSuggestions[editingIndex]?.suggested || {},
+                        topicComplianceSuggestions[editingIndex]?.accepted || {}
+                    )}
+                    onRemove={(framework) => toggleFrameworkAcceptance(editingIndex, framework)}
+                    onAdd={Object.keys(topicComplianceSuggestions[editingIndex]?.suggested || {}).length > 0
+                        ? (framework) => toggleFrameworkAcceptance(editingIndex, framework)
+                        : undefined}
+                />
                 <HorizontalStack align="end" gap="2">
                     <Button onClick={cancelEditing}>Cancel</Button>
                     <Button
@@ -372,14 +533,14 @@ const ContentPolicyStep = ({
                         helpText="Add up to 30 denied topics to block user inputs or model responses associated with the topic."
                     />
                     {enterpriseLicenseComplianceCategories?.length > 0 && (
-                        <Box paddingBlockStart="2" paddingInlineStart="6">
+                        <Box paddingBlockStart="2" paddingBlockEnd="4" style={{ paddingLeft: '28px' }}>
                             <Text variant="bodySm" tone="subdued">
-                                {enterpriseLicenseComplianceCategories.length} topic{enterpriseLicenseComplianceCategories.length !== 1 ? 's are' : ' is'} managed by Enterprise License Compliance Guardrails.
+                                {enterpriseLicenseComplianceCategories.length} topic{enterpriseLicenseComplianceCategories.length !== 1 ? 's are' : ' is'} also managed under Enterprise License Compliance Guardrails.
                             </Text>
                         </Box>
                     )}
                     {enableDeniedTopics && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
+                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px', overflowAnchor: 'none' }}>
                             <VerticalStack gap="3">
                                 {editingIndex === null && (
                                     <VerticalStack gap="2">
@@ -397,17 +558,18 @@ const ContentPolicyStep = ({
                                         </Button>
                                     </VerticalStack>
                                 )}
-                                {defaultPickerOpen && (
+                                {editingIndex !== null && renderEditRow(editingIndex === deniedTopics.length)}
+                                {defaultPickerOpen && editingIndex === null && (
                                     <Box background="bg-surface-secondary" padding="3" borderRadius="2" borderWidth="1" borderColor="border">
                                         <VerticalStack gap="4">
-                                            {Object.values(GENERAL_BLOCK_GROUPS).map(group => (
+                                            {Object.values(GENERAL_BLOCK_GROUPS).filter(group => GENERAL_BLOCKS.some(b => b.group === group)).map(group => (
                                                 <VerticalStack key={group} gap="2">
                                                     <Text variant="bodySm" fontWeight="semibold" tone="subdued">{group}</Text>
                                                     {GENERAL_BLOCKS.filter(b => b.group === group).map(block => (
                                                         <Checkbox
                                                             key={block.key}
                                                             label={block.label}
-                                                            helpText={block.description}
+                                                            helpText={block.shortDescription}
                                                             checked={isBlockEnabled(block)}
                                                             onChange={(checked) => toggleGeneralBlock(block, checked)}
                                                         />
@@ -417,16 +579,14 @@ const ContentPolicyStep = ({
                                         </VerticalStack>
                                     </Box>
                                 )}
-                                {editingIndex === deniedTopics.length && renderEditRow(true)}
 
-                                {/* Unified list: Akto defaults first, then custom topics */}
-                                {allActiveTopics.length > 0 && (
-                                    <Text variant="bodySm" tone="subdued">{allActiveTopics.length} denied topic{allActiveTopics.length !== 1 ? 's' : ''} active</Text>
+                                {/* Akto defaults are managed in the dropdown; only custom topics get tiles here */}
+                                {totalActiveTopicsCount > 0 && (
+                                    <Text variant="bodySm" tone="subdued">{totalActiveTopicsCount} denied topic{totalActiveTopicsCount !== 1 ? 's' : ''} active</Text>
                                 )}
-                                {allActiveTopics.map((topic) => {
-                                    const customIdx = topic._isDefault ? -1 : deniedTopics.indexOf(topic);
-                                    if (!topic._isDefault && editingIndex === customIdx) return renderEditRow(false);
-                                    return renderViewRow(topic, customIdx);
+                                {deniedTopics.map((topic, index) => {
+                                    if (editingIndex === index) return null;
+                                    return renderViewRow(topic, index);
                                 })}
                             </VerticalStack>
                         </Box>

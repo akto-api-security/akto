@@ -82,6 +82,45 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Check DAO Migration
+        run: |
+          # Other components (agent-guard-*, threat-*, data-ingestion-*, etc.) push tags
+          # into this same repo, so only bare-version tags (dashboard's own) count as BASE.
+          BASE=$(git tag --merged HEAD --sort=-creatordate | grep -E '^v?[0-9]+(\.[0-9]+)+$' | head -n1)
+          if [ -z "$BASE" ]; then
+            BASE=$(git rev-list --max-parents=0 HEAD)
+          fi
+          HEAD=${{ github.sha }}
+
+          DAO_CHANGED=$(git diff --name-only --diff-filter=AM "$BASE"..."$HEAD" \
+            | grep -E "^libs/dao/src/main/java/com/akto/(dao/.*|DaoInit\.java)$" || true)
+          if [ -z "$DAO_CHANGED" ]; then
+            exit 0
+          fi
+
+          MIGRATION_ADDED=$(git diff --name-only --diff-filter=A "$BASE"..."$HEAD" \
+            | grep -E "^libs/utils/src/main/resources/db/changelog/(common|billing|account)/.*\.xml$" || true)
+          if [ -z "$MIGRATION_ADDED" ]; then
+            echo "DAO changed since last release ($BASE) but no migration file added under db/changelog/common|billing|account/."
+            exit 1
+          fi
+
+          echo "Migration check passed: $MIGRATION_ADDED"
+      - name: Send failure notification to Slack
+        if: failure()
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "❌ DAO migration check failed for Akto Open Source v${{ github.event.inputs.release_version }} release! Production build blocked."
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
       - uses: actions/setup-java@v2
         with:
           distribution: "adopt"

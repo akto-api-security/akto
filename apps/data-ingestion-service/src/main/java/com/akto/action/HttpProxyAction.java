@@ -162,11 +162,13 @@ public class HttpProxyAction extends ActionSupport {
         if (!"true".equalsIgnoreCase(ingest_data)) return tag;
         try {
             BasicDBObject tagObj = (tag != null && !tag.isEmpty()) ? BasicDBObject.parse(tag) : new BasicDBObject();
-            String connector = akto_connector != null ? akto_connector.toLowerCase() : "";
-            String mode = AIAgentConnectorConstants.OBSERVE_MODE_CONNECTORS.contains(connector)
-                    ? Constants.AKTO_GUARDRAIL_MODE_OBSERVE
-                    : Constants.AKTO_GUARDRAIL_MODE_INLINE;
-            tagObj.put(Constants.AKTO_GUARDRAIL_MODE, mode);
+            if (!tagObj.containsField(Constants.AKTO_GUARDRAIL_MODE)) {
+                String connector = akto_connector != null ? akto_connector.toLowerCase() : "";
+                String mode = AIAgentConnectorConstants.OBSERVE_MODE_CONNECTORS.contains(connector)
+                        ? Constants.AKTO_GUARDRAIL_MODE_OBSERVE
+                        : Constants.AKTO_GUARDRAIL_MODE_INLINE;
+                tagObj.put(Constants.AKTO_GUARDRAIL_MODE, mode);
+            }
             return tagObj.toJson();
         } catch (Exception e) {
             return tag;

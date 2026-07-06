@@ -45,6 +45,17 @@ public class EndpointShieldLogsDao extends AccountsContextDao<EndpointShieldLog>
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { EndpointShieldLog.TIMESTAMP }, false);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { EndpointShieldLog.AGENT_ID}, false);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { EndpointShieldLog.DEVICE_ID }, false);
+
+        // The paged log query filters by (agentId, key) equality and sorts+ranges on _id
+        // (Filters.lt("_id", afterId) + Sorts.descending("_id")). Following the ESR rule
+        // (Equality, Sort, Range), _id trails the equality fields so a single index serves
+        // both the cursor range and the sort — no collection scan, no blocking in-memory sort.
+        // Without this, the planner falls back to the plain _id index and scans the whole
+        // collection filtering out other agents'/keys' logs, timing out on getMore for sparse
+        // keys (proxy/installation logs).
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { EndpointShieldLog.AGENT_ID, EndpointShieldLog.KEY, MCollection.ID }, false);
+        // countDocuments filters by (agentId, key) equality + timestamp range.
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { EndpointShieldLog.AGENT_ID, EndpointShieldLog.KEY, EndpointShieldLog.TIMESTAMP }, false);
     }
     public List<EndpointShieldLog> findByAgentId(String agentId) {
         Bson filter = Filters.eq(EndpointShieldLog.AGENT_ID, agentId);

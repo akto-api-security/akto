@@ -36,8 +36,12 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
 import org.apache.commons.lang3.StringUtils;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 
 public class DashboardRouter implements ARouter {
+
+    private static final LoggerMaker logger = new LoggerMaker(DashboardRouter.class, LogDb.THREAT_DETECTION);
 
     private final MaliciousEventService dsService;
     private final ThreatActorService threatActorService;
@@ -103,6 +107,16 @@ public class DashboardRouter implements ARouter {
     public Router setup(Vertx vertx) {
         Router router = Router.router(vertx);
 
+        router.route().handler(ctx -> {
+            long start = System.currentTimeMillis();
+            String path = ctx.request().path();
+            ctx.response().endHandler(v ->
+                logger.info("api=" + path + " status=" + ctx.response().getStatusCode()
+                    + " duration=" + (System.currentTimeMillis() - start) + "ms")
+            );
+            ctx.next();
+        });
+
         router
             .post("/fetch_filters")
             .blockingHandler(ctx -> {
@@ -114,10 +128,12 @@ public class DashboardRouter implements ARouter {
                     reqBody.asString()
                 ).orElse(FetchAlertFiltersRequest.newBuilder().build());
 
+                String contextSource = getContextSourceHeader(ctx);
                 ProtoMessageUtils.toString(
                     dsService.fetchAlertFilters(
                         ctx.get("accountId"),
-                        req
+                        req,
+                        contextSource
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });

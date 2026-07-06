@@ -3,6 +3,7 @@ package com.akto.action.gpt.result_fetchers;
 import com.akto.action.gpt.handlers.GptQuery;
 import com.akto.gpt.handlers.gpt_prompts.AnalyzeRequestResponseHeaders;
 import com.akto.gpt.handlers.gpt_prompts.AnalyzeVulnerabilityPromptHandler;
+import com.akto.gpt.handlers.gpt_prompts.GuardrailComplianceSuggestionHandler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
@@ -19,7 +20,9 @@ public class SelfHostedLlmResultFetcherStrategy implements ResultFetcherStrategy
         } else if (GptQuery.getQuery(queryType).equals(GptQuery.ANALYZE_VULNERABILITY)) {
             // For vulnerability analysis, use the proper PromptHandler
             return new AnalyzeVulnerabilityPromptHandler().handle(data);
-        } else {    
+        } else if (GptQuery.getQuery(queryType).equals(GptQuery.SUGGEST_GUARDRAIL_COMPLIANCE)) {
+            return new GuardrailComplianceSuggestionHandler().handle(data);
+        } else {
             BasicDBObject error = new BasicDBObject();
             logger.error("Error fetching result from Model Hosted on GCP");
             error.put("error", "Something went wrong. Please try again later." + data.get("query_type"));

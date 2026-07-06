@@ -79,6 +79,13 @@ public class GuardrailPolicies {
     private boolean applyOnRequest;
     private boolean applyToAllServers;
 
+    // Team/Role targeting — controls which agentic users this policy applies to.
+    // applyToDeviceIds is resolved at fetch time (not stored) by the dashboard before serving to the enforcement layer.
+    private List<String> targetTeams;
+    private List<String> targetRoles;
+    @BsonIgnore
+    private List<String> applyToDeviceIds;
+
     // Blocked host/path list — any traffic from a listed host is blocked outright.
     // Modeled as objects (not bare strings) so the entry schema can be extended later
     // (e.g. match type, per-entry behaviour) without a data migration.
@@ -204,6 +211,7 @@ public class GuardrailPolicies {
         private String topic;
         private String description;
         private List<String> samplePhrases;
+        private Map<String, List<String>> compliance;
 
         private String origin;
 
@@ -286,6 +294,7 @@ public class GuardrailPolicies {
         private boolean enabled;
         private String userPrompt;
         private double confidenceScore;
+        private Map<String, List<String>> compliance;
 
         public LLMRule(boolean enabled, String userPrompt, double confidenceScore) {
             this.enabled = enabled;
