@@ -618,7 +618,6 @@ function GuardrailPolicies() {
             setEditingPolicy(null);
             setIsEditMode(false);
             setIsPreset(false);
-            setIsTopicGuardrailPrefill(false);
             await fetchGuardrailPolicies();
         } catch (error) {
             func.setToast(true, true, isEditMode ? "Failed to update guardrail" : "Failed to create guardrail");

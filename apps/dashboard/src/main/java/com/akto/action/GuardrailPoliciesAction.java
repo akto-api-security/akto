@@ -61,12 +61,6 @@ public class GuardrailPoliciesAction extends UserAction {
     private List<GuardrailPolicies> guardrailPolicies;
 
     @Getter
-    private GuardrailPolicies guardrailPolicy;
-
-    @Setter
-    private String name;
-
-    @Getter
     private long total;
 
     @Setter
@@ -102,28 +96,6 @@ public class GuardrailPoliciesAction extends UserAction {
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching guardrail policies: " + e.getMessage(), LogDb.DASHBOARD);
-            return ERROR.toUpperCase();
-        }
-    }
-
-
-    public String fetchGuardrailPolicyByName() {
-        try {
-            if (StringUtils.isBlank(name)) {
-                loggerMaker.errorAndAddToDb("Policy name is required to fetch guardrail policy", LogDb.DASHBOARD);
-                return ERROR.toUpperCase();
-            }
-
-            this.guardrailPolicy = GuardrailPoliciesDao.instance.fetchGuardrailPolicyByName(name);
-            if (this.guardrailPolicy != null) {
-                EnterpriseLicenseComplianceCatalog.applyToPolicy(this.guardrailPolicy);
-            }
-
-            loggerMaker.info("Fetched guardrail policy by name: " + name + ", found: " + (this.guardrailPolicy != null));
-
-            return SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error fetching guardrail policy by name: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
     }
