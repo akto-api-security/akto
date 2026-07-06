@@ -1537,26 +1537,32 @@ public class HttpCallParser {
         Map<String, List<ExecutorNode>> executorNodesMap = ParseAndExecute.createExecutorNodeMap(apiCatalogSync.advancedFilterMap);
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
 
-            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
-                TrafficMetrics.Key totalRequestsKey = getTrafficMetricsKey(httpResponseParam, TrafficMetrics.Name.TOTAL_REQUESTS_RUNTIME);
-                incTrafficMetrics(totalRequestsKey,1);
-            }
-
-            boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
-            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.POSTMAN) && httpResponseParam.getStatusCode() <= 0) {
-                cond = true;
-            }
-
-            if (!cond){
-                if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams invalid response code "
-                            + httpResponseParam.getRequestParams().getURL() + " response code " + httpResponseParam.getStatusCode());
+            // WebSocket traffic bypasses HTTP-specific filters (status codes, content-types, etc.)
+            // but still goes through collection ID assignment
+            boolean isWebSocket = "WEBSOCKET".equals(httpResponseParam.getType());
+            
+            if (!isWebSocket) {
+                if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
+                    TrafficMetrics.Key totalRequestsKey = getTrafficMetricsKey(httpResponseParam, TrafficMetrics.Name.TOTAL_REQUESTS_RUNTIME);
+                    incTrafficMetrics(totalRequestsKey,1);
                 }
-                if(Utils.printDebugHostLog(httpResponseParam) != null){
-                    Utils.printDebugHostLog(" in filterHttpResponseParams invalid response code "
-                            + httpResponseParam.getRequestParams().getURL() + " response code " + httpResponseParam.getStatusCode());
+
+                boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
+                if (httpResponseParam.getSource().equals(HttpResponseParams.Source.POSTMAN) && httpResponseParam.getStatusCode() <= 0) {
+                    cond = true;
                 }
-                continue;
+
+                if (!cond){
+                    if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                        loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams invalid response code "
+                                + httpResponseParam.getRequestParams().getURL() + " response code " + httpResponseParam.getStatusCode());
+                    }
+                    if(Utils.printDebugHostLog(httpResponseParam) != null){
+                        Utils.printDebugHostLog(" in filterHttpResponseParams invalid response code "
+                                + httpResponseParam.getRequestParams().getURL() + " response code " + httpResponseParam.getStatusCode());
+                    }
+                    continue;
+                }
             }
 
             String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(),Constants.AKTO_IGNORE_FLAG);
