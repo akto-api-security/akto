@@ -298,8 +298,10 @@ export default async function aktoGuardrails(ctx) {
             // model to echo the block notice. This renders inline as a normal
             // assistant reply carrying the real reason, and the original request
             // is never fulfilled even if the model deviates from the script.
+            // NOTE: keep this text ASCII-only — some terminals (e.g. Windows
+            // PowerShell) mangle multi-byte emoji into mojibake ("ðŸš«").
             const blockText =
-              `🚫 **Akto Guardrails** blocked this prompt.\n\n` +
+              `**Akto Guardrails blocked this prompt.**\n\n` +
               `**Reason:** ${validationResult.reason}\n\n` +
               `Please rephrase your request and try again.`
 
@@ -406,7 +408,8 @@ export default async function aktoGuardrails(ctx) {
         if (validationResult.decision === 'block') {
           // Throw OUTSIDE any try/catch so OpenCode actually blocks the tool.
           log('TOOL_BLOCKED_THROWING', { tool: toolName, reason: validationResult.reason })
-          throw new Error(`🚫 Akto Guardrails blocked this tool call: ${validationResult.reason}`)
+          // ASCII-only to avoid emoji mojibake on some terminals (e.g. Windows).
+          throw new Error(`Akto Guardrails blocked this tool call: ${validationResult.reason}`)
         }
 
         // Allowed — the Python validator's guardrails call ingests the tool
