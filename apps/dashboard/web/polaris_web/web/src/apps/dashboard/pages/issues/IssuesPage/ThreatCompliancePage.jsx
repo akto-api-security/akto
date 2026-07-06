@@ -148,7 +148,7 @@ function ThreatCompliancePage() {
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges[5]
+        values.ranges.find((r) => r.alias === 'last7days') || values.ranges[2]
     );
 
     const getTimeEpoch = (key) => {
@@ -865,6 +865,10 @@ function ThreatCompliancePage() {
     const threatFiltersCount = threatFiltersMap ? Object.keys(threatFiltersMap).length : 0;
     const guardrailComplianceCount = guardrailComplianceMap ? Object.keys(guardrailComplianceMap).length : 0;
     const key = startTimestamp + endTimestamp + currentTab + complianceView + threatFiltersCount + guardrailComplianceCount;
+    // Agentic/Endpoint accounts can have an empty threatFiltersMap even with real threat data, so also check guardrailComplianceMap.
+    const noComplianceDataAvailable = needsGuardrailCompliance
+        ? (threatFiltersCount === 0 && guardrailComplianceCount === 0)
+        : threatFiltersCount === 0;
 
     return (
         <PageWithMultipleCards
@@ -909,7 +913,7 @@ function ThreatCompliancePage() {
                             <Spinner size="large" />
                         </HorizontalStack>
                     </Box>
-                ] : (!threatFiltersMap || Object.keys(threatFiltersMap).length === 0) ? [
+                ] : noComplianceDataAvailable ? [
                     <EmptyScreensLayout
                         key="emptyScreen"
                         iconSrc={"/public/alert_hexagon.svg"}
