@@ -1,180 +1,116 @@
-// Builds guardrail "denied topic" objects from conversation topics, seeded with
-// real sample phrases pulled from observability (LLM) traffic.
-//
-// Given a list of topics and a scope (a single session, or a user/device pair),
-// this queries the same prompt-search backend the LLM Messages tab uses and
-// extracts clean, human-readable prompt text to use as sample phrases.
-//
-// Pure except for the searchPrompts API call.
-
-import llmApi from "../observe/llm/api";
-import { parsePromptText } from "../observe/llm/constants";
-import guardrailApi from "./api";
-
-// Canonical policy that collects every topic-derived denied topic (per contextSource).
-export const TOPIC_GUARDRAIL_POLICY_NAME = "Akto-Topic-Guardrail";
-
-// How many rows to pull per topic. We only need 3 good phrases, but raw rows can
-// contain JSON-blob fallbacks we drop, so we over-fetch a little.
-const FETCH_LIMIT = 20;
-
-// Max phrases to keep per topic.
-const MAX_PHRASES = 3;
+import func from "@/util/func";
+import TOPIC_CATALOG from "./topicCatalog";
 
 export const CONVERSATION_ORIGIN = "CONVERSATION";
 
-// Translates the caller's `scope` into the searchPrompts param shape.
-//   { sessionId }            → top-level sessionId param (Traces scope)
-//   { userName, deviceId }   → filters.userName / filters.deviceId (Endpoints scope)
-// Returns { sessionId, filters } merged with the per-topic filter.
-function scopeToSearchParams(topic, scope) {
-    const s = scope || {};
-    const filters = { topic: [topic] };
-    if (s.userName) filters.userName = [s.userName];
-    if (s.deviceId) filters.deviceId = [s.deviceId];
-    return {
-        sessionId: s.sessionId || "",
-        filters,
-    };
-}
+// Guardrails page route — navigation target for the "Create guardrail" action on
+// SessionFlyout/DeviceFlyout, carrying the prefill via router location state.
+export const GUARDRAIL_POLICIES_PATH = "/dashboard/guardrails/policies";
 
-// Extracts up to MAX_PHRASES de-duplicated (case-insensitive) sample phrases
-// from a list of searchPrompts rows, using parsePromptText's output as-is.
-function extractSamplePhrases(rows) {
-    const phrases = [];
-    const seen = new Set();
-    for (const row of rows) {
-        const text = parsePromptText(row.queryPayload) || row._promptText || "";
-        const trimmed = (text || "").trim();
-        if (!trimmed) continue;
-        const key = trimmed.toLowerCase();
-        if (seen.has(key)) continue;
-        seen.add(key);
-        phrases.push(trimmed);
-        if (phrases.length >= MAX_PHRASES) break;
-    }
-    return phrases;
-}
+const MAX_PHRASES = 3;
 
-/**
- * Builds one denied-topic object per input topic, seeded with sample phrases
- * pulled from observability traffic matching that topic and the given scope.
- *
- * @param {string[]} topics  Topic names to build denied-topic objects for.
- * @param {Object}   scope   One of { sessionId } (Traces) or { userName, deviceId } (Endpoints).
- * @param {Object}   dateRange  { startTime, endTime } in epoch seconds.
- * @returns {Promise<Array<{ topic: string, samplePhrases: string[], origin: string }>>}
- *          One object per input topic (topics with no matching phrases get an
- *          empty samplePhrases array — they are never dropped).
- */
-export async function buildDeniedTopicsFromTopics(topics, scope, dateRange) {
-    const list = Array.isArray(topics) ? topics : [];
-    const { startTime, endTime } = dateRange || {};
+// Matches the Name field's own limit (PolicyDetailsStep.jsx helpText).
+const MAX_NAME_LENGTH = 50;
 
-    return Promise.all(
-        list.map(async (topic) => {
-            const { sessionId, filters } = scopeToSearchParams(topic, scope);
-            let samplePhrases = [];
-            try {
-                const { value } = await llmApi.searchPrompts({
-                    startTime,
-                    endTime,
-                    sessionId,
-                    filters,
-                    limit: FETCH_LIMIT,
-                });
-                samplePhrases = extractSamplePhrases(value || []);
-            } catch (_) {
-                samplePhrases = [];
-            }
-            // Denied topics require a non-empty description to save; seed a sensible default.
-            return { topic, description: topic, samplePhrases, origin: CONVERSATION_ORIGIN };
-        })
-    );
-}
+const DEFAULT_BLOCKED_MESSAGE = "This request has been blocked as it relates to a restricted topic.";
 
-// Case-insensitive, trimmed key for a topic name.
-function topicKey(topic) {
-    return (topic || "").trim().toLowerCase();
-}
-
-/**
- * Merges new denied topics into an existing list, deduping by topic name
- * (case-insensitive, trimmed). For a topic already present, its samplePhrases
- * are unioned with the new ones (case-insensitive dedupe) and re-capped at 3.
- * New topics are appended.
- *
- * @returns {{ deniedTopics: Array, addedCount: number }}
- *          deniedTopics is the merged full list; addedCount is the number of
- *          brand-new topics added (used for the success toast).
- */
-export function mergeDeniedTopics(existingTopics, newTopics) {
-    const merged = (existingTopics || []).map(t => ({ ...t }));
-    const indexByKey = new Map();
-    merged.forEach((t, i) => indexByKey.set(topicKey(t.topic), i));
-
-    let addedCount = 0;
-
-    (newTopics || []).forEach(incoming => {
-        const key = topicKey(incoming.topic);
-        if (indexByKey.has(key)) {
-            const existing = merged[indexByKey.get(key)];
-            const seen = new Set();
-            const unioned = [];
-            [...(existing.samplePhrases || []), ...(incoming.samplePhrases || [])].forEach(p => {
-                const pk = (p || "").trim().toLowerCase();
-                if (!pk || seen.has(pk)) return;
-                seen.add(pk);
-                unioned.push(p);
-            });
-            existing.samplePhrases = unioned.slice(0, MAX_PHRASES);
+// Normalizes the two shapes topicHierarchy shows up in:
+//   Traces (SessionFlyout):   { domain: [subDomain, ...] }
+//   Endpoints (DeviceFlyout): { domain: { subDomain: count } }
+// into a single { domain: [subDomain, ...] } shape.
+export function normalizeTopicHierarchy(topicHierarchy) {
+    const normalized = {};
+    Object.entries(topicHierarchy || {}).forEach(([domain, subTopics]) => {
+        if (Array.isArray(subTopics)) {
+            normalized[domain] = subTopics.filter(Boolean);
+        } else if (subTopics && typeof subTopics === "object") {
+            normalized[domain] = Object.keys(subTopics);
         } else {
-            const idx = merged.push({ ...incoming }) - 1;
-            indexByKey.set(key, idx);
-            addedCount += 1;
+            normalized[domain] = [];
+        }
+    });
+    return normalized;
+}
+
+// Joins natural-language labels into a readable clause:
+//   ["banking"]                          -> "banking"
+//   ["banking", "budgeting"]             -> "banking and budgeting"
+//   ["banking", "budgeting", "crypto"]   -> "banking, budgeting, and crypto"
+function naturalJoin(labels) {
+    if (labels.length === 0) return "";
+    if (labels.length === 1) return labels[0];
+    if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+    return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
+}
+
+// Builds one DeniedTopic for a domain. Description is a simple template — "Queries
+// regarding the topic: <Domain>" plus "about <subtopics>" for up to MAX_PHRASES observed
+// subtopics — the same subtopics used to prioritize sample-phrase selection, so the two
+// stay consistent. Works the same whether or not the domain is in the catalog: an
+// unrecognized domain just has no subtopics/phrases to add.
+function buildDomainDeniedTopic(domain, observedSubDomains) {
+    const entry = TOPIC_CATALOG[domain];
+    const matchedSubTopics = observedSubDomains
+        .map(sd => entry?.subTopics?.[sd])
+        .filter(Boolean)
+        .slice(0, MAX_PHRASES);
+
+    const labels = matchedSubTopics.map(st => st.label).filter(Boolean);
+    const description = labels.length === 0
+        ? `Requests/Messages regarding ${func.toSentenceCase(domain)}`
+        : `Requests/Messages regarding ${func.toSentenceCase(domain)} about ${naturalJoin(labels)}`;
+
+    const phrases = [];
+    matchedSubTopics.forEach(st => {
+        if (phrases.length < MAX_PHRASES && st.samplePhrases?.[0]) {
+            phrases.push(st.samplePhrases[0]);
+        }
+    });
+    (entry?.samplePhrases || []).forEach(p => {
+        if (phrases.length < MAX_PHRASES && !phrases.includes(p)) {
+            phrases.push(p);
         }
     });
 
-    return { deniedTopics: merged, addedCount };
+    return { topic: domain, description, samplePhrases: phrases, origin: CONVERSATION_ORIGIN };
 }
 
 /**
- * Decides whether to create a fresh canonical topic-guardrail policy or append
- * to the existing one, then performs the append (the create path is delegated
- * to the caller via the returned action so navigation can be handled in React).
- *
- * @param {Array} deniedTopics  denied-topic objects from buildDeniedTopicsFromTopics.
- * @returns {Promise<Object>} one of:
- *   { action: "create", prefill: { name, deniedTopics } }                — no existing policy
- *   { action: "append", addedCount }                                     — appended (or no-op) to existing policy
+ * Builds one DeniedTopic per domain present in topicHierarchy.
+ * @param {Object} topicHierarchy  Either topicHierarchy shape (see normalizeTopicHierarchy).
+ * @returns {Array<{ topic: string, description: string, samplePhrases: string[], origin: string }>}
  */
-export async function createOrAppendTopicGuardrail(deniedTopics) {
-    const resp = await guardrailApi.fetchGuardrailPolicyByName(TOPIC_GUARDRAIL_POLICY_NAME);
-    const existing = resp?.guardrailPolicy;
+export function buildDeniedTopicsFromHierarchy(topicHierarchy) {
+    const normalized = normalizeTopicHierarchy(topicHierarchy);
+    return Object.entries(normalized).map(([domain, subDomains]) => buildDomainDeniedTopic(domain, subDomains));
+}
 
-    if (!existing) {
-        return {
-            action: "create",
-            prefill: {
-                name: TOPIC_GUARDRAIL_POLICY_NAME,
-                deniedTopics,
-                description: "Blocks conversation topics flagged from LLM traffic.",
-                severity: "HIGH",
-                behaviour: "block",
-                blockedMessage: "This action has been blocked for restricted topics.",
-                active: true,
-                applyOnRequest: true,
-                applyOnResponse: true,
-                applyToAllServers: true,
-            },
-        };
+/**
+ * Builds the suggested (editable) policy name: "Topic - Finance, HR".
+ * Only includes whole domain names that fit within MAX_NAME_LENGTH (matching the
+ * Name field's own limit) — never cuts a domain name in half. Any domains that
+ * don't fit are counted off the end instead, e.g. "Topic - Finance, HR +3".
+ * @param {string[]} domains
+ */
+export function buildSuggestedPolicyName(domains) {
+    const labels = domains.map(d => func.toSentenceCase(d));
+    for (let count = labels.length; count > 1; count--) {
+        const remaining = labels.length - count;
+        const name = `Topic - ${labels.slice(0, count).join(", ")}` + (remaining > 0 ? ` +${remaining}` : "");
+        if (name.length <= MAX_NAME_LENGTH) return name;
     }
+    // Even a single domain name doesn't fit — return it as-is rather than mangle it.
+    return `Topic - ${labels[0] || ""}`;
+}
 
-    const { deniedTopics: mergedTopics, addedCount } = mergeDeniedTopics(existing.deniedTopics || [], deniedTopics);
-
-    // Server replaces deniedTopics wholesale; send the full existing policy with merged topics.
-    const updatedPolicy = { ...existing, deniedTopics: mergedTopics };
-    await guardrailApi.createGuardrailPolicy({ policy: updatedPolicy, hexId: existing.hexId });
-
-    return { action: "append", addedCount };
+/**
+ * Builds the full { name, deniedTopics, blockedMessage } prefill for the Create
+ * Guardrail page preset flow. blockedMessage is required on step 1 — without a
+ * default here, the prefilled page would block on save until the user typed one in.
+ * @param {Object} topicHierarchy
+ */
+export function buildTopicGuardrailPrefill(topicHierarchy) {
+    const deniedTopics = buildDeniedTopicsFromHierarchy(topicHierarchy);
+    const name = buildSuggestedPolicyName(deniedTopics.map(dt => dt.topic));
+    return { name, deniedTopics, blockedMessage: DEFAULT_BLOCKED_MESSAGE };
 }

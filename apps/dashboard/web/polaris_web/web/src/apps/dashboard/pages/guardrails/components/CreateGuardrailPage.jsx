@@ -94,42 +94,6 @@ const getLlmServiceKeySet = (allCollections) => {
     return keys;
 };
 
-
-// Store service keys so new devices are covered automatically via service-key matching in enforcement.
-const expandGroupsToV2 = (selectedKeys) =>
-    (selectedKeys || []).filter(key => key).map(key => ({ id: key, name: key }));
-
-const groupToOption = (g) => ({
-    label: g.groupKey,
-    value: g.groupKey,
-    isInline: g.collections.some(c => !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe'))
-});
-
-// Converts stored V2 server entries back to the option-value keys used by the dropdowns.
-// Works for all stored formats: numeric collection ID, full hostname, or short service key.
-const reverseToServiceKeys = (v2Servers, allCollections) => {
-    const keys = (v2Servers || []).map(s => {
-        const col = (allCollections || []).find(c => c.id?.toString() === s.id?.toString());
-        const rawName = col ? (col.hostName || col.displayName || '') : (s.name || String(s.id || ''));
-        // Argus stores full hostnames as option keys — don't extract service name
-        if (!isEndpointSecurityCategory()) return rawName;
-        return extractServiceName(rawName) || rawName;
-    });
-    return [...new Set(keys)];
-};
-
-const getLlmServiceKeySet = (allCollections) => {
-    const keys = new Set();
-    (allCollections || []).forEach(c => {
-        if (c.envType?.some(e => e.keyName === 'browser-llm')) {
-            const rawName = c.hostName || c.displayName || '';
-            const svcKey = extractServiceName(rawName) || rawName;
-            if (svcKey) keys.add(svcKey);
-        }
-    });
-    return keys;
-};
-
 const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false }) => {
     // Step management
     const [currentStep, setCurrentStep] = useState(1);

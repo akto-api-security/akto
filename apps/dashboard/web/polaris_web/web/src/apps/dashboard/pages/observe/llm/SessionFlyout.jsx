@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Box, Button, Divider, HorizontalGrid, HorizontalStack, Scrollable, Tabs, Text, VerticalStack } from "@shopify/polaris";
-import CreateTopicGuardrailModal from "../../guardrails/components/CreateTopicGuardrailModal";
+import { useNavigate } from "react-router-dom";
+import { Badge, Box, Divider, HorizontalGrid, HorizontalStack, Link, Scrollable, Tabs, Text, VerticalStack } from "@shopify/polaris";
+import { buildTopicGuardrailPrefill, GUARDRAIL_POLICIES_PATH } from "../../guardrails/topicGuardrailUtils";
 import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
 import AgenticFlyoutShell from "../agentic/AgenticFlyoutShell";
 import FlyoutBreadcrumb from "../agentic/FlyoutBreadcrumb";
@@ -41,20 +42,47 @@ function SessionFlowGraph({ session }) {
     return <AssetTopologyGraph nodes={nodes} edges={edges} />;
 }
 
+// ─── Topics section ───────────────────────────────────────────────────────────
+// Mirrors DeviceFlyout's UserAnalysisSection topic treatment: domain badges with
+// their observed subtopics, and the "Create guardrail" action colocated here
+// instead of floating disconnected from the topics it acts on.
+
+function SessionTopicsSection({ topicHierarchy, onCreateGuardrail }) {
+    const topicEntries = useMemo(() => Object.entries(topicHierarchy || {}), [topicHierarchy]);
+    if (topicEntries.length === 0) return null;
+
+    return (
+        <VerticalStack gap="2">
+            <HorizontalStack gap="2" blockAlign="center">
+                <Text variant="headingXs" color="subdued">Topics queried</Text>
+                <Link onClick={onCreateGuardrail}>Create guardrail</Link>
+            </HorizontalStack>
+            <VerticalStack gap="2">
+                {topicEntries.map(([topic, subTopics]) => (
+                    <HorizontalStack gap="2" key={topic} blockAlign="center">
+                        <Badge>{func.toSentenceCase(topic)}</Badge>
+                        {subTopics.length > 0 && (
+                            <Text variant="bodySm" color="subdued" as="span">
+                                {subTopics.map(st => func.toSentenceCase(st)).join(", ")}
+                            </Text>
+                        )}
+                    </HorizontalStack>
+                ))}
+            </VerticalStack>
+        </VerticalStack>
+    );
+}
+
 // ─── Overview ─────────────────────────────────────────────────────────────────
 
-function OverviewContent({ session, traceCount, currDateRange }) {
-    const [guardrailModalOpen, setGuardrailModalOpen] = useState(false);
+function OverviewContent({ session, traceCount }) {
+    const navigate = useNavigate();
     const totalTokens = (Number(session._inputTokens) || 0) + (Number(session._outputTokens) || 0);
 
-    const topics = useMemo(() => Object.keys(session.topicHierarchy || {}), [session.topicHierarchy]);
-    const guardrailDateRange = useMemo(() => {
-        if (!currDateRange?.period) return { startTime: undefined, endTime: undefined };
-        return {
-            startTime: Math.floor(Date.parse(currDateRange.period.since) / 1000),
-            endTime: Math.floor(Date.parse(currDateRange.period.until) / 1000),
-        };
-    }, [currDateRange]);
+    const handleCreateGuardrail = useCallback(() => {
+        const prefill = buildTopicGuardrailPrefill(session.topicHierarchy || {});
+        navigate(GUARDRAIL_POLICIES_PATH, { state: { topicGuardrailPrefill: prefill } });
+    }, [session.topicHierarchy, navigate]);
 
     const stats = [
         { label: "Traces",       value: traceCount },
@@ -68,17 +96,11 @@ function OverviewContent({ session, traceCount, currDateRange }) {
         { label: "Session ID",  value: truncate(session.sessionIdentifier, 36) },
         { label: "Models",      value: session._models?.length ? session._models.join(", ") : undefined },
         { label: "Endpoint ID", value: session.deviceId, href: session.deviceId ? `/dashboard/observe/inventory/${session.deviceId}` : undefined },
-        { label: "Topics queried",value: session.topicHierarchy ? Object.keys(session.topicHierarchy).map((x) => func.toSentenceCase(x)).join(", ") : undefined },
     ];
 
     return (
         <Box padding="4">
             <VerticalStack gap="5">
-                {topics.length > 0 && (
-                    <HorizontalStack align="end">
-                        <Button onClick={() => setGuardrailModalOpen(true)}>Create guardrail</Button>
-                    </HorizontalStack>
-                )}
                 <HorizontalGrid columns={4} gap="3">
                     {stats.map(s => (
                         <VerticalStack gap="1" key={s.label}>
@@ -105,14 +127,9 @@ function OverviewContent({ session, traceCount, currDateRange }) {
                     items={detailItems}
                     columns={3}
                 />
+
+                <SessionTopicsSection topicHierarchy={session.topicHierarchy} onCreateGuardrail={handleCreateGuardrail} />
             </VerticalStack>
-            <CreateTopicGuardrailModal
-                open={guardrailModalOpen}
-                onClose={() => setGuardrailModalOpen(false)}
-                topics={topics}
-                scope={{ sessionId: session.sessionIdentifier }}
-                dateRange={guardrailDateRange}
-            />
         </Box>
     );
 }
@@ -229,7 +246,7 @@ export default function SessionFlyout({ session, currDateRange, onClose }) {
         switch (activeTab) {
             case TAB_OVERVIEW: return (
                 <Scrollable style={{ flex: 1 }}>
-                    <OverviewContent session={session} traceCount={traceCount} currDateRange={currDateRange} />
+                    <OverviewContent session={session} traceCount={traceCount} />
                 </Scrollable>
             );
             case TAB_TRACES: return (

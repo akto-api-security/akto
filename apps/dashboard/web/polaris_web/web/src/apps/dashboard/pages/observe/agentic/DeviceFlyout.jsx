@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider, Link, Badge, List, Button } from "@shopify/polaris";
-import CreateTopicGuardrailModal from "../../guardrails/components/CreateTopicGuardrailModal";
+import { useNavigate } from "react-router-dom";
+import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider, Link, Badge, List } from "@shopify/polaris";
+import { buildTopicGuardrailPrefill, GUARDRAIL_POLICIES_PATH } from "../../guardrails/topicGuardrailUtils";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AgenticFlyoutShell from "./AgenticFlyoutShell";
@@ -261,10 +262,15 @@ function makeTopicUrl(username, topic, subTopic) {
     return `${LLM_OBS_PATH}?${p.toString()}`;
 }
 
-function UserAnalysisSection({ username, deviceId, startTimestamp, endTimestamp }) {
+function UserAnalysisSection({ username, startTimestamp, endTimestamp }) {
     const [analysis, setAnalysis] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [guardrailModalOpen, setGuardrailModalOpen] = useState(false);
+    const navigate = useNavigate();
+
+    const handleCreateGuardrail = useCallback(() => {
+        const prefill = buildTopicGuardrailPrefill(analysis?.topicHierarchy || {});
+        navigate(GUARDRAIL_POLICIES_PATH, { state: { topicGuardrailPrefill: prefill } });
+    }, [analysis, navigate]);
 
     useEffect(() => {
         if (!username) { setLoading(false); return; }
@@ -300,7 +306,6 @@ function UserAnalysisSection({ username, deviceId, startTimestamp, endTimestamp 
 
     const inputTokens = analysis.totalInputTokens || 0;
     const outputTokens = analysis.totalOutputTokens || 0;
-    const topics = Object.keys(analysis.topicHierarchy || {});
 
     return (
         <VerticalStack gap="3">
@@ -323,9 +328,9 @@ function UserAnalysisSection({ username, deviceId, startTimestamp, endTimestamp 
 
             {topicEntries.length > 0 && (
                 <VerticalStack gap="2">
-                    <HorizontalStack align="space-between" blockAlign="center">
+                    <HorizontalStack gap="2" blockAlign="center">
                         <Text variant="headingXs" color="subdued">Topics Queried</Text>
-                        <Button size="slim" onClick={() => setGuardrailModalOpen(true)}>Create guardrail</Button>
+                        <Link onClick={handleCreateGuardrail}>Create guardrail</Link>
                     </HorizontalStack>
                     <VerticalStack gap="3">
                         {topicEntries.map(([topic, subMap]) => {
@@ -357,13 +362,6 @@ function UserAnalysisSection({ username, deviceId, startTimestamp, endTimestamp 
                     </VerticalStack>
                 </VerticalStack>
             )}
-            <CreateTopicGuardrailModal
-                open={guardrailModalOpen}
-                onClose={() => setGuardrailModalOpen(false)}
-                topics={topics}
-                scope={{ userName: username, deviceId }}
-                dateRange={{ startTime: startTimestamp, endTime: endTimestamp }}
-            />
         </VerticalStack>
     );
 }
@@ -459,7 +457,6 @@ function OverviewTab({ device, agents, collections, onTabChange, startTimestamp,
 
                 <UserAnalysisSection
                     username={safeVal(device.username)}
-                    deviceId={device.path?.[0] || device.deviceId}
                     startTimestamp={startTimestamp}
                     endTimestamp={endTimestamp}
                 />
