@@ -77,6 +77,9 @@ public class ApiInfo {
     public static final String IS_SKILL_BLOCKED = "isSkillBlocked";
     private boolean isSkillBlocked;
 
+    public static final String IS_CONNECTION_STRING = "isConnectionString";
+    private boolean isConnectionString;
+
     public static class MessageFieldEntry {
         private String fieldPath;
         private String description;
@@ -355,6 +358,8 @@ public class ApiInfo {
         // Merge rateLimitConfidence - take the maximum confidence
         this.rateLimitConfidence = Math.max(this.rateLimitConfidence, that.rateLimitConfidence);
 
+        this.isConnectionString = this.isConnectionString || that.isConnectionString;
+
         if (that.tagsList != null && !that.tagsList.isEmpty()) {
             if (this.tagsList == null) {
                 this.tagsList = new ArrayList<>(that.tagsList);
@@ -599,4 +604,7 @@ public class ApiInfo {
 
     public boolean getIsSkillBlocked() { return isSkillBlocked; }
     public void setIsSkillBlocked(boolean isSkillBlocked) { this.isSkillBlocked = isSkillBlocked; }
+
+    public boolean getIsConnectionString() { return isConnectionString; }
+    public void setIsConnectionString(boolean isConnectionString) { this.isConnectionString = isConnectionString; }
 }

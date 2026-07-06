@@ -76,6 +76,10 @@ public class ApiInfoBulkUpdate {
                 subUpdates.add(Updates.addEachToSet(ApiInfo.RESPONSE_CODES, apiInfo.getResponseCodes()));
             }
 
+            if (apiInfo.getIsConnectionString()) {
+                subUpdates.add(Updates.set(ApiInfo.IS_CONNECTION_STRING, true));
+            }
+
             subUpdates.add(Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfo.getId().getApiCollectionId())));
 
             List<String> parentMcpToolNames = apiInfo.getParentMcpToolNames();

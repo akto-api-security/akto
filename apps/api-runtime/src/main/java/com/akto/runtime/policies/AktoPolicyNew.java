@@ -180,6 +180,11 @@ public class AktoPolicyNew {
         }
 
         int statusCode = httpResponseParams.getStatusCode();
+        if (httpResponseParams.isWebSocketHandshake()) {
+            apiInfo.setIsConnectionString(true);
+            apiInfo.setLastSeen(httpResponseParams.getTimeOrNow());
+            return;
+        }
         if (!HttpResponseParams.validHttpResponseCode(statusCode)) return; //todo: why?
 
         for (RuntimeFilter filter: filters) {
@@ -412,6 +417,10 @@ public class AktoPolicyNew {
 
             // last seen
             subUpdates.add(Updates.set(ApiInfo.LAST_SEEN, apiInfo.getLastSeen()));
+
+            if (apiInfo.getIsConnectionString()) {
+                subUpdates.add(Updates.set(ApiInfo.IS_CONNECTION_STRING, true));
+            }
 
             subUpdates.add(Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfo.getId().getApiCollectionId())));
 
