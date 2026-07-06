@@ -422,7 +422,7 @@ export default function LeftNav() {
                 ],
                 key: "5",
             }] : []),
-            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.NHI_GOVERNANCE?.isGranted && (dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security")) ? [{
+            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.NHI_GOVERNANCE?.isGranted && (dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
                         NHI Governance
