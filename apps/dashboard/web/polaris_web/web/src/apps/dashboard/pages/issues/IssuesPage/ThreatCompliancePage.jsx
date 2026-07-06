@@ -13,7 +13,7 @@ import values from "@/util/values";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import threatDetectionApi from "../../threat_detection/api.js"
 import SessionStore from "../../../../main/SessionStore"
-import { resolveComplianceClauseMap, mergePolicyComplianceMap } from "../../threat_detection/utils/formatUtils"
+import { resolveComplianceClauseMap, mergePolicyComplianceMap, extractRuleViolated } from "../../threat_detection/utils/formatUtils"
 import guardrailApi from "../../guardrails/api"
 import ShowListInBadge from "../../../components/shared/ShowListInBadge";
 import { CellType } from "../../../components/tables/rows/GithubRow.js";
@@ -73,72 +73,76 @@ function ThreatCompliancePage() {
     const { tabsInfo, selectItems } = useTable();
     const dashboardCategory = getDashboardCategory();
 
-    // Fetch threat filters data on mount
+    // Fetch threat filters + compliance data on mount. The API-Security template/compliance
+    // fetch and the Agentic/Endpoint guardrail-compliance fetch are independent of each other,
+    // so they run in parallel instead of one blocking the other.
     useEffect(() => {
-        const fetchThreatFiltersData = async () => {
-            setThreatFiltersLoading(true);
-            try {
-                // Fetch threat filter templates
-                const resp = await threatDetectionApi.fetchFilterYamlTemplate();
-                const templates = Array.isArray(resp?.templates) ? resp.templates : [];
-                
-                if (templates.length === 0) {
-                    setThreatFiltersLoading(false);
-                    return;
-                }
+        let cancelled = false;
 
-                // Update threat filters store
-                updateThreatFiltersStore(templates);
+        const fetchThreatFilterTemplates = async () => {
+            const resp = await threatDetectionApi.fetchFilterYamlTemplate();
+            const templates = Array.isArray(resp?.templates) ? resp.templates : [];
+            if (templates.length === 0) return;
 
-                // Fetch and merge compliance info
-                const currentThreatFiltersMap = SessionStore.getState().threatFiltersMap || {};
-                const updatedThreatFiltersMap = { ...currentThreatFiltersMap };
+            updateThreatFiltersStore(templates);
 
-                // API Security: threat_compliance/{filterId}.conf
-                const complianceResp = await threatDetectionApi.fetchThreatComplianceInfos();
-                if (complianceResp?.threatComplianceInfos && Array.isArray(complianceResp.threatComplianceInfos)) {
-                    const threatComplianceMap = {};
-                    complianceResp.threatComplianceInfos.forEach((compliance) => {
-                        threatComplianceMap[compliance._id] = compliance;
-                    });
-                    Object.keys(updatedThreatFiltersMap).forEach((filterId) => {
-                        const compliance = threatComplianceMap[`threat_compliance/${filterId}.conf`];
-                        if (compliance) {
-                            updatedThreatFiltersMap[filterId] = {
-                                ...updatedThreatFiltersMap[filterId],
-                                compliance: { mapComplianceToListClauses: compliance.mapComplianceToListClauses }
-                            };
-                        }
-                    });
-                }
+            const currentThreatFiltersMap = SessionStore.getState().threatFiltersMap || {};
+            const updatedThreatFiltersMap = { ...currentThreatFiltersMap };
 
-                // Agentic/Endpoint Security: guardrails/{capability}.conf
-                if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
-                    const capabilityKeyedMap = {};
-                    const guardrailComplianceResp = await threatDetectionApi.fetchGuardrailComplianceInfos();
-                    (guardrailComplianceResp?.guardrailComplianceInfos || []).forEach((entry) => {
-                        const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
-                        if (capability) capabilityKeyedMap[capability] = entry.mapComplianceToListClauses;
-                    });
-                    try {
-                        const policiesResp = await guardrailApi.fetchGuardrailPolicies();
-                        mergePolicyComplianceMap(capabilityKeyedMap, policiesResp?.guardrailPolicies);
-                    } catch (e) {
-                        console.error("Failed to load guardrail policies for compliance:", e);
+            const complianceResp = await threatDetectionApi.fetchThreatComplianceInfos();
+            if (complianceResp?.threatComplianceInfos && Array.isArray(complianceResp.threatComplianceInfos)) {
+                const threatComplianceMap = {};
+                complianceResp.threatComplianceInfos.forEach((compliance) => {
+                    threatComplianceMap[compliance._id] = compliance;
+                });
+                Object.keys(updatedThreatFiltersMap).forEach((filterId) => {
+                    const compliance = threatComplianceMap[`threat_compliance/${filterId}.conf`];
+                    if (compliance) {
+                        updatedThreatFiltersMap[filterId] = {
+                            ...updatedThreatFiltersMap[filterId],
+                            compliance: { mapComplianceToListClauses: compliance.mapComplianceToListClauses }
+                        };
                     }
-                    setGuardrailComplianceMap(capabilityKeyedMap);
-                }
-
-                setThreatFiltersMap(updatedThreatFiltersMap);
-            } catch (e) {
-                console.error(`Failed to fetch threat filters data: ${e?.message}`);
-            } finally {
-                setThreatFiltersLoading(false);
+                });
             }
+
+            if (!cancelled) setThreatFiltersMap(updatedThreatFiltersMap);
         };
 
-        fetchThreatFiltersData();
-    }, [setThreatFiltersMap, setGuardrailComplianceMap]);
+        const fetchGuardrailCompliance = async () => {
+            if (!needsGuardrailCompliance) return;
+
+            const [guardrailComplianceResp, policiesResp] = await Promise.all([
+                threatDetectionApi.fetchGuardrailComplianceInfos(),
+                guardrailApi.fetchGuardrailPolicies().catch((e) => {
+                    console.error("Failed to load guardrail policies for compliance:", e);
+                    return null;
+                })
+            ]);
+
+            const capabilityKeyedMap = {};
+            (guardrailComplianceResp?.guardrailComplianceInfos || []).forEach((entry) => {
+                const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
+                if (capability) capabilityKeyedMap[capability] = entry.mapComplianceToListClauses;
+            });
+            mergePolicyComplianceMap(capabilityKeyedMap, policiesResp?.guardrailPolicies);
+
+            if (!cancelled) setGuardrailComplianceMap(capabilityKeyedMap);
+        };
+
+        setThreatFiltersLoading(true);
+        Promise.allSettled([fetchThreatFilterTemplates(), fetchGuardrailCompliance()])
+            .then((results) => {
+                results.forEach((r) => {
+                    if (r.status === 'rejected') console.error(`Failed to fetch threat filters data: ${r.reason?.message}`);
+                });
+            })
+            .finally(() => {
+                if (!cancelled) setThreatFiltersLoading(false);
+            });
+
+        return () => { cancelled = true; };
+    }, [setThreatFiltersMap, setGuardrailComplianceMap, needsGuardrailCompliance]);
 
     const resetResourcesSelected = () => {
         TableStore.getState().setSelectedItems([])
@@ -291,7 +295,10 @@ function ThreatCompliancePage() {
                     method: threatData.method || '',
                     apiCollectionId: threatData.apiCollectionId,
                     templateId: threatData.filterId,
-                    sessionContext: threatData.sessionContext || ''
+                    sessionContext: threatData.sessionContext || '',
+                    severity: threatData.severity || '',
+                    ruleViolated: threatData.ruleViolated || '-',
+                    complianceMap: threatData.complianceMapData || {}
                 },
                 currentEventId: threatData.eventId || '',
                 currentEventStatus: threatData.status || '',
@@ -321,7 +328,10 @@ function ThreatCompliancePage() {
         status: item?.status,
         eventId: item?.id,
         jiraTicketUrl: item?.jiraTicketUrl,
-        sessionContext: item?.sessionContext || ''
+        sessionContext: item?.sessionContext || '',
+        severity: item?.severity || '',
+        ruleViolated: extractRuleViolated(item?.metadata),
+        complianceMapData: resolveComplianceClauseMap(item, needsGuardrailCompliance, threatFiltersMap, guardrailComplianceMap)
     });
 
 
@@ -458,7 +468,7 @@ function ThreatCompliancePage() {
                 startTimestamp,
                 endTimestamp,
                 latestAttack,
-                200,
+                2000,
                 currentTab.toUpperCase(),
                 successfulBool,
                 'THREAT',
