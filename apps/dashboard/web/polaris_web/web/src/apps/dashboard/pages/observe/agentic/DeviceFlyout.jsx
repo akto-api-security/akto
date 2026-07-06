@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider, Link, Badge, List } from "@shopify/polaris";
+import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider, Link, Tooltip, Badge } from "@shopify/polaris";
 import { buildTopicGuardrailPrefill, GUARDRAIL_POLICIES_PATH } from "../../guardrails/topicGuardrailUtils";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
@@ -252,14 +252,25 @@ function TopologyGraph({ device, agents, collections = [] }) {
 
 // ─── User analysis section ─────────────────────────────────────────────────────
 
-const LLM_OBS_PATH = "/dashboard/observe/llm-observability";
+// Domain names only (no subtopics), as badges on one line capped at 5 with a
+// "+N" tooltip badge for the rest.
+const MAX_INLINE_TOPICS = 5;
 
-function makeTopicUrl(username, topic, subTopic) {
-    const p = new URLSearchParams();
-    if (username) p.set("username", username);
-    if (topic) p.set("topic", topic);
-    if (subTopic) p.set("subTopic", subTopic);
-    return `${LLM_OBS_PATH}?${p.toString()}`;
+function TopicsLine({ topics }) {
+    const labels = topics.map(t => func.toSentenceCase(t));
+    const shown = labels.slice(0, MAX_INLINE_TOPICS);
+    const overflow = labels.slice(MAX_INLINE_TOPICS);
+
+    return (
+        <HorizontalStack gap="2" wrap>
+            {shown.map(label => <Badge key={label}>{label}</Badge>)}
+            {overflow.length > 0 && (
+                <Tooltip content={overflow.join(", ")}>
+                    <Badge>{`+${overflow.length}`}</Badge>
+                </Tooltip>
+            )}
+        </HorizontalStack>
+    );
 }
 
 function UserAnalysisSection({ username, startTimestamp, endTimestamp }) {
@@ -328,38 +339,10 @@ function UserAnalysisSection({ username, startTimestamp, endTimestamp }) {
 
             {topicEntries.length > 0 && (
                 <VerticalStack gap="2">
-                    <HorizontalStack gap="2" blockAlign="center">
-                        <Text variant="headingXs" color="subdued">Topics Queried</Text>
-                        <Link onClick={handleCreateGuardrail}>Create guardrail</Link>
-                    </HorizontalStack>
-                    <VerticalStack gap="3">
-                        {topicEntries.map(([topic, subMap]) => {
-                            const subEntries = Object.entries(subMap || {}).sort((a, b) => b[1] - a[1]);
-                            return (
-                                <Box paddingInlineStart={"4"}key={topic}>
-                                    <List.Item>
-                                        <HorizontalStack gap="2">
-                                            <Link url={makeTopicUrl(username, topic)} target="_blank">
-                                                <Badge>{func.toSentenceCase(topic)}</Badge>
-                                            </Link>
-                                            {subEntries.length > 0 && (
-                                                <Text variant="bodySm" color="subdued" as="span">
-                                                    {subEntries.map(([sub], i) => (
-                                                        <React.Fragment key={sub}>
-                                                            <Link removeUnderline monochrome url={makeTopicUrl(username, topic, sub)} target="_blank">
-                                                                {func.toSentenceCase(sub)}
-                                                            </Link>
-                                                            {i < subEntries.length - 1 ? ", " : ""}
-                                                        </React.Fragment>
-                                                    ))}
-                                                </Text>
-                                            )}
-                                        </HorizontalStack>
-                                    </List.Item>
-                                </Box>
-                            );
-                        })}
-                    </VerticalStack>
+                    <Divider />
+                    <Text variant="headingXs" color="subdued">Topics Queried</Text>
+                    <TopicsLine topics={topicEntries.map(([topic]) => topic)} />
+                    <Link onClick={handleCreateGuardrail}>Create guardrail</Link>
                 </VerticalStack>
             )}
         </VerticalStack>
