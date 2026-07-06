@@ -631,7 +631,7 @@ function ThreatCompliancePage() {
     }
 
     async function fillFilters() {
-        const res = await threatDetectionApi.fetchFiltersThreatTable();
+        const res = await threatDetectionApi.fetchFiltersThreatTable(startTimestamp, endTimestamp);
         let urlChoices = (res?.urls || []).map((x) => {
             const url = x || "/";
             return { label: url, value: x };
@@ -716,7 +716,7 @@ function ThreatCompliancePage() {
 
     useEffect(() => {
         fillFilters().then(f => setFilters(f));
-    }, [threatFiltersMap]);
+    }, [threatFiltersMap, startTimestamp, endTimestamp]);
 
     function disambiguateLabel(key, value) {
         switch (key) {
