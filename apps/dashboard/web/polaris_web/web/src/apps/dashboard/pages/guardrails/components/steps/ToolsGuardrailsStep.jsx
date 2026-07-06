@@ -1,6 +1,7 @@
-import { VerticalStack, Text, Checkbox, Box } from "@shopify/polaris";
+import { VerticalStack, Text, Checkbox, Box, HorizontalStack } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
+import ControlInfoIcon from "../ControlInfoIcon";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
 
 export const ToolsGuardrailsConfig = {
@@ -21,6 +22,7 @@ export const ToolsGuardrailsConfig = {
 };
 
 const ToolsGuardrailsStep = ({
+    onTryPrompt,
     enableToolMisuse,
     setEnableToolMisuse,
     enableMaliciousTools,
@@ -37,7 +39,16 @@ const ToolsGuardrailsStep = ({
             <VerticalStack gap="4">
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Tool Misuse" threats={RULE_OWASP_THREATS.toolMisuse} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Tool Misuse" threats={RULE_OWASP_THREATS.toolMisuse} />
+                                <ControlInfoIcon
+                                    description="Detects an agent calling a tool outside its intended, authorized use."
+                                    examples={[{ text: "Use the read-file tool to permanently delete config.yaml instead of just reading it." }]}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableToolMisuse}
                         onChange={setEnableToolMisuse}
                         helpText="Detect and block unauthorized or malicious use of tools by agents."
@@ -45,7 +56,16 @@ const ToolsGuardrailsStep = ({
                 </Box>
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Detect Malicious Tools" threats={RULE_OWASP_THREATS.maliciousTools} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Detect Malicious Tools" threats={RULE_OWASP_THREATS.maliciousTools} />
+                                <ControlInfoIcon
+                                    description='Flags tools that behave maliciously themselves, e.g. a "weather lookup" tool that secretly exfiltrates conversation history. The prompt below is a normal-looking request; the point is to confirm the guardrail inspects tool behavior even when the request itself looks harmless.'
+                                    examples={[{ text: "What's the weather forecast for New York this weekend?" }]}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableMaliciousTools}
                         onChange={setEnableMaliciousTools}
                         helpText="Detect and block tools that exhibit malicious behavior or intent."
@@ -53,7 +73,16 @@ const ToolsGuardrailsStep = ({
                 </Box>
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Detect Tool name and description mismatch" threats={RULE_OWASP_THREATS.toolNameDescriptionMismatch} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Detect Tool name and description mismatch" threats={RULE_OWASP_THREATS.toolNameDescriptionMismatch} />
+                                <ControlInfoIcon
+                                    description='Flags tools whose actual behavior does not match what their name or description claims, e.g. a tool named "get_user_profile" that actually deletes records.'
+                                    examples={[{ text: "Use the get_user_profile tool to pull up my account details." }]}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableToolNameDescriptionMismatch}
                         onChange={setEnableToolNameDescriptionMismatch}
                         helpText="Detect when tool usage does not match the declared name or description."

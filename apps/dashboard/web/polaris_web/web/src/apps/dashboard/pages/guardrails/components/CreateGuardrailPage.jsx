@@ -942,6 +942,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             case 2:
                 return (
                     <ContentPolicyStep
+                        onTryPrompt={handleSamplePayloadClick}
                         enablePromptAttacks={enablePromptAttacks}
                         setEnablePromptAttacks={setEnablePromptAttacks}
                         promptAttackLevel={promptAttackLevel}
@@ -968,6 +969,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             case 3:
                 return (
                     <LanguageSafetyStep
+                        onTryPrompt={handleSamplePayloadClick}
                         enableGibberishDetection={enableGibberishDetection}
                         setEnableGibberishDetection={setEnableGibberishDetection}
                         gibberishConfidenceScore={gibberishConfidenceScore}
@@ -985,6 +987,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             case 4:
                 return (
                     <SensitiveInfoStep
+                        onTryPrompt={handleSamplePayloadClick}
                         enablePiiTypes={enablePiiTypes}
                         setEnablePiiTypes={setEnablePiiTypes}
                         piiTypes={piiTypes}
@@ -1008,6 +1011,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             case 5:
                 return (
                     <CodeDetectionStep
+                        onTryPrompt={handleSamplePayloadClick}
                         enableCodeFilter={enableCodeFilter}
                         setEnableCodeFilter={setEnableCodeFilter}
                         codeFilterLevel={codeFilterLevel}
@@ -1021,6 +1025,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             case 6:
                 return (
                     <CustomGuardrailsStep
+                        onTryPrompt={handleSamplePayloadClick}
                         enableLlmPrompt={enableLlmPrompt}
                         setEnableLlmPrompt={setEnableLlmPrompt}
                         llmRule={llmPrompt}
@@ -1040,6 +1045,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             case 7:
                 return (
                     <UsageGuardrailsStep
+                        onTryPrompt={handleSamplePayloadClick}
                         enableTokenLimit={enableTokenLimit}
                         setEnableTokenLimit={setEnableTokenLimit}
                         tokenLimitThreshold={tokenLimitThreshold}
@@ -1053,6 +1059,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             case 9:
                 return (
                     <ToolsGuardrailsStep
+                        onTryPrompt={handleSamplePayloadClick}
                         enableToolMisuse={enableToolMisuse}
                         setEnableToolMisuse={setEnableToolMisuse}
                         enableMaliciousTools={enableMaliciousTools}
@@ -1122,6 +1129,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             case 12:
                 return (
                     <EnterpriseLicenseComplianceStep
+                        onTryPrompt={handleSamplePayloadClick}
                         enterpriseLicenseComplianceCategories={enterpriseLicenseComplianceCategories}
                         setEnterpriseLicenseComplianceCategories={setEnterpriseLicenseComplianceCategories}
                         targetTeams={targetTeams}

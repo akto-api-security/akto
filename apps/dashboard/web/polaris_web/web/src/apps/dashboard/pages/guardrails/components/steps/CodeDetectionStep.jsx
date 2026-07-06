@@ -1,6 +1,7 @@
-import { VerticalStack, Text, Checkbox, Box, RangeSlider } from "@shopify/polaris";
+import { VerticalStack, Text, Checkbox, Box, RangeSlider, HorizontalStack } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
+import ControlInfoIcon from "../ControlInfoIcon";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
 
 export const CodeDetectionConfig = {
@@ -20,6 +21,7 @@ export const CodeDetectionConfig = {
 };
 
 const CodeDetectionStep = ({
+    onTryPrompt,
     enableCodeFilter,
     setEnableCodeFilter,
     codeFilterLevel,
@@ -39,7 +41,16 @@ const CodeDetectionStep = ({
             <VerticalStack gap="4">
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Enable code detection filter" threats={RULE_OWASP_THREATS.codeFilter} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Enable code detection filter" threats={RULE_OWASP_THREATS.codeFilter} />
+                                <ControlInfoIcon
+                                    description="Blocks source code written in specific programming languages. See the Code Detection Level examples below."
+                                    examples={[]}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableCodeFilter}
                         onChange={setEnableCodeFilter}
                         helpText="Enable language-specific code detection that identifies and blocks code in specific programming languages (Python, Java, JavaScript, etc.). Provides granular control over which programming languages to allow or block."
@@ -47,7 +58,18 @@ const CodeDetectionStep = ({
                     {enableCodeFilter && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Code Detection Level</Text>
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text variant="bodyMd" fontWeight="medium">Code Detection Level</Text>
+                                    <ControlInfoIcon
+                                        description="Controls how much of a snippet needs to look like code before it's blocked."
+                                        examples={[
+                                            { label: "Low", text: "import os; def backup(): os.system('cp -r /data /backup'); return True" },
+                                            { label: "Medium", text: "def add(a, b): return a + b" },
+                                            { label: "High", text: "for i in range(10):" }
+                                        ]}
+                                        onTryPrompt={onTryPrompt}
+                                    />
+                                </HorizontalStack>
                                 <RangeSlider
                                     label=""
                                     value={codeFilterLevel === 'none' ? 0 : codeFilterLevel === 'low' ? 1 : codeFilterLevel === 'medium' ? 2 : 3}
@@ -67,7 +89,16 @@ const CodeDetectionStep = ({
 
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Enable ban code detection" threats={RULE_OWASP_THREATS.banCode} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Enable ban code detection" threats={RULE_OWASP_THREATS.banCode} />
+                                <ControlInfoIcon
+                                    description="A blanket filter that blocks any code at all, in any language, with no per-language configuration. See the Confidence Threshold examples below."
+                                    examples={[]}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableBanCode}
                         onChange={setEnableBanCode}
                         helpText="Enable binary code detection that blocks all code regardless of programming language. This is a simple, strict filter that treats any code as a violation without language-specific filtering."
@@ -75,7 +106,17 @@ const CodeDetectionStep = ({
                     {enableBanCode && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                    <ControlInfoIcon
+                                        description="Higher values are more permissive (fewer prompts blocked); lower values are stricter."
+                                        examples={[
+                                            { label: "Low (e.g. 0.2)", text: "for i in range(10):" },
+                                            { label: "High (e.g. 0.8)", text: "import os; def backup(): os.system('cp -r /data /backup'); return True" }
+                                        ]}
+                                        onTryPrompt={onTryPrompt}
+                                    />
+                                </HorizontalStack>
                                 <RangeSlider
                                     label=""
                                     value={banCodeConfidenceScore}
