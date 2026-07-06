@@ -1,4 +1,4 @@
-import { VerticalStack, Text, FormLayout, TextField, Checkbox, Select } from "@shopify/polaris";
+import { VerticalStack, FormLayout, TextField, Checkbox, Select } from "@shopify/polaris";
 import { SEVERITY_OPTIONS } from "../../utils";
 
 // Step metadata
@@ -32,8 +32,7 @@ const PolicyDetailsStep = ({
     applyToResponses,
     setApplyToResponses,
     severity,
-    setSeverity,
-    nameReadOnly = false
+    setSeverity
 }) => {
     return (
         <VerticalStack gap="4">
@@ -45,7 +44,6 @@ const PolicyDetailsStep = ({
                     placeholder="chatbot-guardrail"
                     helpText="Valid characters are a-z, A-Z, 0-9, _ (underscore) and - (hyphen). The name can have up to 50 characters."
                     requiredIndicator
-                    disabled={nameReadOnly}
                 />
                 <TextField
                     label="Description"
