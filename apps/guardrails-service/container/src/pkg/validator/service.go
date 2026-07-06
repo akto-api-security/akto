@@ -749,7 +749,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		return nil
 	})
 	if err := g.Wait(); err != nil {
-		return nil, nil, nil, false, nil, err
+		return nil, nil, nil, false, nil, nil, err
 	}
 
 	s.logger.Debug("Raw guardrail policies response",
