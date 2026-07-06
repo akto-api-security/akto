@@ -16,7 +16,7 @@ from providers import LLMProvider, Qwen3GuardProvider, parse_qwen3guard_result
 
 logger = logging.getLogger(__name__)
 
-LLM_SUPPORTED_SCANNERS = {"PromptInjection", "BanTopics", "Toxicity", "Gibberish", "BanCode"}
+LLM_SUPPORTED_SCANNERS = {"PromptInjection", "BanTopics", "Toxicity", "Gibberish", "BanCode", "Password"}
 
 _SCANNER_FLAG_KEYS = {
     "PromptInjection": "isInjection",
@@ -24,6 +24,7 @@ _SCANNER_FLAG_KEYS = {
     "Toxicity": "isToxic",
     "Gibberish": "isGibberish",
     "BanCode": "isCode",
+    "Password": "isPassword",
 }
 
 
@@ -55,12 +56,19 @@ def parse_llm_result(scanner_name: str, raw: str) -> Dict[str, Any]:
         return {"is_valid": True, "risk_score": 0.0, "details": details}
 
     flagged = bool(parsed.get(flag_key, False))
-    confidence = float(parsed.get("confidence", 0.0))
+    # Password uses "riskScore"; the other scanners use "confidence".
+    confidence = float(parsed.get("confidence", parsed.get("riskScore", 0.0)))
 
     if scanner_name == "BanTopics":
         matched = parsed.get("matchedTopic", "")
         if matched:
             details["matchedTopic"] = matched
+
+    if scanner_name == "Password":
+        # Exact secret substrings for the caller to redact.
+        values = parsed.get("values") or []
+        if values:
+            details["values"] = values
 
     return {
         "is_valid": not flagged,

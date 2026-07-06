@@ -235,6 +235,8 @@ class ModelMapScanner:
         }
         if "error" in winner_details:
             details["error"] = winner_details["error"]
+        if winner_details.get("values"):  # Password: exact secret substrings to redact
+            details["values"] = winner_details["values"]
         completed_by_stem = self._index_completed_by_stem()
         for entry in self.config.get("modelConfigs", []):
             stem = self._stem(entry.get("provider", ""))
