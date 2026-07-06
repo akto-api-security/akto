@@ -94,9 +94,9 @@ const getLlmServiceKeySet = (allCollections) => {
     return keys;
 };
 
-const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false }) => {
+const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false, initialStep = 1 }) => {
     // Step management
-    const [currentStep, setCurrentStep] = useState(1);
+    const [currentStep, setCurrentStep] = useState(initialStep);
     const [loading, setLoading] = useState(false);
     const [leftSteps, setLeftSteps] = useState(new Set());
     const prevStepRef = useRef(currentStep);

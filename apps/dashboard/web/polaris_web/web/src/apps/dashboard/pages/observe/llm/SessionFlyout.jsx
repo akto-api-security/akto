@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Badge, Box, Divider, HorizontalGrid, HorizontalStack, Link, Scrollable, Tabs, Text, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, Divider, HorizontalGrid, HorizontalStack, Link, Scrollable, Tabs, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 import { buildTopicGuardrailPrefill, GUARDRAIL_POLICIES_PATH } from "../../guardrails/topicGuardrailUtils";
 import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
 import AgenticFlyoutShell from "../agentic/AgenticFlyoutShell";
@@ -24,6 +24,7 @@ const TABS = [
     { id: "overview", content: "Overview", panelID: "panel-overview" },
     { id: "traces",   content: "Traces",   panelID: "panel-traces"   },
 ];
+const MAX_INLINE_TOPICS = 5;
 
 // ─── Session flow graph ───────────────────────────────────────────────────────
 
@@ -42,33 +43,33 @@ function SessionFlowGraph({ session }) {
     return <AssetTopologyGraph nodes={nodes} edges={edges} />;
 }
 
-// ─── Topics section ───────────────────────────────────────────────────────────
-// Mirrors DeviceFlyout's UserAnalysisSection topic treatment: domain badges with
-// their observed subtopics, and the "Create guardrail" action colocated here
-// instead of floating disconnected from the topics it acts on.
+function TopicsLine({ topics }) {
+    const labels = topics.map(t => func.toSentenceCase(t));
+    const shown = labels.slice(0, MAX_INLINE_TOPICS);
+    const overflow = labels.slice(MAX_INLINE_TOPICS);
+
+    return (
+        <HorizontalStack gap="2" wrap>
+            {shown.map(label => <Badge key={label}>{label}</Badge>)}
+            {overflow.length > 0 && (
+                <Tooltip content={overflow.join(", ")}>
+                    <Badge>{`+${overflow.length}`}</Badge>
+                </Tooltip>
+            )}
+        </HorizontalStack>
+    );
+}
 
 function SessionTopicsSection({ topicHierarchy, onCreateGuardrail }) {
-    const topicEntries = useMemo(() => Object.entries(topicHierarchy || {}), [topicHierarchy]);
-    if (topicEntries.length === 0) return null;
+    const topics = useMemo(() => Object.keys(topicHierarchy || {}), [topicHierarchy]);
+    if (topics.length === 0) return null;
 
     return (
         <VerticalStack gap="2">
-            <HorizontalStack gap="2" blockAlign="center">
-                <Text variant="headingXs" color="subdued">Topics queried</Text>
-                <Link onClick={onCreateGuardrail}>Create guardrail</Link>
-            </HorizontalStack>
-            <VerticalStack gap="2">
-                {topicEntries.map(([topic, subTopics]) => (
-                    <HorizontalStack gap="2" key={topic} blockAlign="center">
-                        <Badge>{func.toSentenceCase(topic)}</Badge>
-                        {subTopics.length > 0 && (
-                            <Text variant="bodySm" color="subdued" as="span">
-                                {subTopics.map(st => func.toSentenceCase(st)).join(", ")}
-                            </Text>
-                        )}
-                    </HorizontalStack>
-                ))}
-            </VerticalStack>
+            <Divider />
+            <Text variant="headingXs" color="subdued">Topics queried</Text>
+            <TopicsLine topics={topics} />
+            <Link onClick={onCreateGuardrail}>Create guardrail</Link>
         </VerticalStack>
     );
 }

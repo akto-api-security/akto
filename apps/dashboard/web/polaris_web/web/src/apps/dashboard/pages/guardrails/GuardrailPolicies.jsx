@@ -135,6 +135,7 @@ function GuardrailPolicies() {
     const [editingPolicy, setEditingPolicy] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
     const [isPreset, setIsPreset] = useState(false);
+    const [createInitialStep, setCreateInitialStep] = useState(1);
     const [presetsPopoverActive, setPresetsPopoverActive] = useState(false);
     const [pendingPolicyName, setPendingPolicyName] = useState(null);
 
@@ -165,6 +166,7 @@ function GuardrailPolicies() {
         setEditingPolicy({ ...prefill, deniedTopics: prefill.deniedTopics || [] });
         setIsEditMode(false);
         setIsPreset(true);
+        setCreateInitialStep(2); // Content & Policy Guardrails step — where denied topics live.
         setShowCreateModal(true);
         // Clear router state so this doesn't re-trigger on re-render / back-nav.
         navigate(location.pathname, { replace: true, state: {} });
@@ -481,6 +483,7 @@ function GuardrailPolicies() {
     const handleEditPolicy = (policy) => {
         setEditingPolicy(policy.originalData);
         setIsEditMode(true);
+        setCreateInitialStep(1);
         setShowCreateModal(true);
     };
 
@@ -489,6 +492,7 @@ function GuardrailPolicies() {
         setEditingPolicy(presetData);
         setIsEditMode(false);
         setIsPreset(true);
+        setCreateInitialStep(1);
         setShowCreateModal(true);
     };
 
@@ -636,11 +640,13 @@ function GuardrailPolicies() {
                     setEditingPolicy(null);
                     setIsEditMode(false);
                     setIsPreset(false);
+                    setCreateInitialStep(1);
                 }}
                 onSave={handleCreateGuardrail}
                 editingPolicy={editingPolicy}
                 isEditMode={isEditMode}
                 isPreset={isPreset}
+                initialStep={createInitialStep}
             />
         );
     }
