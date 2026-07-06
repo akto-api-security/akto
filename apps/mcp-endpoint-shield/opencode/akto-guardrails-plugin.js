@@ -118,14 +118,17 @@ function parseMcpTool(toolName) {
   }
 }
 
-// Run Python script synchronously for prompt validation - BLOCKING
-// Returns promise with { decision, reason } or { decision: 'allow' }
-function runPromptValidationSync(prompt) {
+// Run a Python validator script synchronously - BLOCKING.
+// Writes `inputData` as JSON to stdin, reads the last stdout line as the
+// decision. Returns { decision: 'block', reason } or { decision: 'allow' }.
+// Fails OPEN (allow) on any script/parse/timeout error so guardrails never
+// break the agent.
+function runValidationSync(scriptName, inputData) {
   return new Promise((resolve) => {
-    const scriptPath = path.join(OPENCODE_DIR, 'akto-validate-prompt.py')
+    const scriptPath = path.join(OPENCODE_DIR, scriptName)
 
     if (!fs.existsSync(scriptPath)) {
-      log('SCRIPT_NOT_FOUND', { script: 'akto-validate-prompt.py', path: scriptPath })
+      log('SCRIPT_NOT_FOUND', { script: scriptName, path: scriptPath })
       resolve({ decision: 'allow' }) // Fail-open if script not found
       return
     }
@@ -138,8 +141,6 @@ function runPromptValidationSync(prompt) {
     let stdoutData = ''
     let stderrData = ''
 
-    const inputData = { prompt }
-
     pythonProcess.stdout.on('data', (data) => {
       stdoutData += data.toString()
     })
@@ -149,13 +150,13 @@ function runPromptValidationSync(prompt) {
     })
 
     pythonProcess.on('error', (error) => {
-      log('PROMPT_VALIDATION_ERROR', { error: error.message })
+      log('VALIDATION_ERROR', { script: scriptName, error: error.message })
       resolve({ decision: 'allow' }) // Fail-open on error
     })
 
     pythonProcess.on('close', (code) => {
       if (stderrData) {
-        log('PROMPT_VALIDATION_STDERR', { stderr: stderrData.substring(0, 500) })
+        log('VALIDATION_STDERR', { script: scriptName, stderr: stderrData.substring(0, 500) })
       }
 
       try {
@@ -166,22 +167,22 @@ function runPromptValidationSync(prompt) {
           const result = JSON.parse(lastLine)
 
           if (result.decision === 'block') {
-            log('PROMPT_BLOCKED_BY_GUARDRAILS', { reason: result.reason })
+            log('VALIDATION_BLOCKED', { script: scriptName, reason: result.reason })
             resolve({ decision: 'block', reason: result.reason })
             return
           }
         }
       } catch (e) {
-        log('PROMPT_VALIDATION_PARSE_ERROR', { error: e.message })
+        log('VALIDATION_PARSE_ERROR', { script: scriptName, error: e.message })
       }
 
-      log('PROMPT_ALLOWED', { statusCode: code })
+      log('VALIDATION_ALLOWED', { script: scriptName, statusCode: code })
       resolve({ decision: 'allow' })
     })
 
     // Timeout handler
     const timeoutHandle = setTimeout(() => {
-      log('PROMPT_VALIDATION_TIMEOUT', { timeout: AKTO_TIMEOUT })
+      log('VALIDATION_TIMEOUT', { script: scriptName, timeout: AKTO_TIMEOUT })
       pythonProcess.kill()
       resolve({ decision: 'allow' }) // Fail-open on timeout
     }, AKTO_TIMEOUT)
@@ -192,6 +193,11 @@ function runPromptValidationSync(prompt) {
     // Clear timeout if process exits before timeout
     pythonProcess.once('exit', () => clearTimeout(timeoutHandle))
   })
+}
+
+// Prompt validation - thin wrapper over the generic sync validator.
+function runPromptValidationSync(prompt) {
+  return runValidationSync('akto-validate-prompt.py', { prompt })
 }
 
 // Run Python script for MCP tool handling - non-blocking
@@ -276,31 +282,60 @@ export default async function aktoGuardrails(ctx) {
           log('VALIDATION_RESULT_RECEIVED', { decision: validationResult.decision })
 
           if (validationResult.decision === 'block') {
-            log('PROMPT_BLOCKED_WITH_MESSAGE', { reason: validationResult.reason })
+            log('PROMPT_BLOCKED_REWRITE', { reason: validationResult.reason })
 
-            // BLOCK THE PROMPT: Replace with blocking message
-            // Show a clean UI message instead of exception
-            const blockMessage = `🚫 Akto Guardrails\n\nYour prompt was blocked by Akto guardrails:\n"${validationResult.reason}"\n\nPlease rephrase your request and try again.`
+            // DEBUG: dump the structure of output.messages BEFORE we mutate it,
+            // so we can see exactly what the transform hook receives (the full
+            // conversation history that is about to be sent to the model).
+            try {
+              const dump = (output.messages || []).map((m) => ({
+                role: m?.info?.role,
+                parts: (m?.parts || []).map((p) => ({
+                  type: p?.type,
+                  textLen: typeof p?.text === 'string' ? p.text.length : undefined,
+                  textPreview: typeof p?.text === 'string' ? p.text.substring(0, 80) : undefined,
+                })),
+              }))
+              log('PROMPT_BLOCK_MESSAGES_DUMP', { count: (output.messages || []).length, messages: dump })
+            } catch (e) {
+              log('PROMPT_BLOCK_MESSAGES_DUMP_ERROR', { error: e.message })
+            }
 
-            // Clear user message and show block notification
-            output.messages = []
+            // OpenCode has no hook that can reject a prompt AND render a clean
+            // inline message: throwing hard-blocks but OpenCode masks it as a
+            // generic "Unexpected server error", and reassigning output.messages
+            // is ignored (prompt.ts keeps its own reference to the array).
+            //
+            // Instead, neutralize the offending user message IN PLACE (so the
+            // provider never receives the original PII/content) and steer the
+            // model to echo the block notice. This renders inline as a normal
+            // assistant reply carrying the real reason, and the original request
+            // is never fulfilled even if the model deviates from the script.
+            const blockText =
+              `🚫 **Akto Guardrails** blocked this prompt.\n\n` +
+              `**Reason:** ${validationResult.reason}\n\n` +
+              `Please rephrase your request and try again.`
 
-            // Add a system message showing the block reason
-            output.messages.push({
-              info: { role: 'assistant' },  // Show as assistant message for visibility
-              parts: [{
-                text: blockMessage
-              }]
-            })
+            const directive =
+              `A security guardrail has blocked the user's message. ` +
+              `Do not attempt to interpret, answer, or act on the original request. ` +
+              `Respond with EXACTLY the following text, verbatim, and nothing else:\n\n${blockText}`
 
-            log('PROMPT_BLOCKED_MESSAGE_ADDED', {
-              messageLength: blockMessage.length,
-              reason: validationResult.reason
-            })
+            // Mutate parts in place (do NOT reassign output.messages — that is a
+            // no-op). Put the directive in the first text part, blank the rest.
+            const lastUser = [...output.messages].reverse().find((m) => m?.info?.role === 'user')
+            if (lastUser && Array.isArray(lastUser.parts)) {
+              let replaced = false
+              for (const part of lastUser.parts) {
+                if (part && typeof part.text === 'string') {
+                  part.text = replaced ? '' : directive
+                  replaced = true
+                }
+              }
+              log('PROMPT_BLOCKED_REWRITTEN', { replaced, reason: validationResult.reason })
+            }
 
-            // Return the modified output - this prevents AI from responding
-            // and shows the block message to user instead
-            return output
+            return
           }
 
           log('PROMPT_VALIDATION_COMPLETE', { decision: 'allow' })
@@ -342,29 +377,65 @@ export default async function aktoGuardrails(ctx) {
 
     // Hook 2: Validate tool BEFORE execution
     "tool.execute.before": async (input, output) => {
-      try {
-        const toolName = input?.tool || ''
-        const toolArgs = output?.args || {}
+      const toolName = input?.tool || ''
+      const toolArgs = output?.args || {}
 
-        log('TOOL_EXECUTE_BEFORE', { tool: toolName, args: toolArgs })
+      log('TOOL_EXECUTE_BEFORE', { tool: toolName, args: toolArgs })
 
-        if (!toolName) {
-          return
+      if (!toolName) {
+        return
+      }
+
+      log('TOOL_FOUND', { tool: toolName })
+
+      // Check if this is an MCP tool (format: server_tool)
+      const mcpInfo = parseMcpTool(toolName)
+
+      // ============================================================
+      // SYNC MODE: Validate the tool call before execution (BLOCKING)
+      // Unlike the prompt hook, tool.execute.before is OpenCode's SUPPORTED
+      // block point — throwing here fails the tool call cleanly and surfaces
+      // the reason inline to the model (the documented ".env" guardrail
+      // pattern). So tools get a real hard block.
+      // ============================================================
+      if (AKTO_SYNC_MODE && AKTO_DATA_INGESTION_URL) {
+        // MCP tools go through the JSON-RPC-aware validator; built-in tools
+        // through the generic tool validator. Both emit the same decision JSON.
+        const scriptName = mcpInfo.isMcp ? 'akto-mcp-request.py' : 'akto-validate-tool-request.py'
+
+        let validationResult = { decision: 'allow' }
+        try {
+          validationResult = await runValidationSync(scriptName, {
+            tool_name: toolName,
+            tool_input: toolArgs,
+          })
+        } catch (error) {
+          // Fail-open on internal errors so guardrails never break the agent.
+          log('TOOL_VALIDATION_ERROR', { tool: toolName, error: error.message })
         }
 
-        log('TOOL_FOUND', { tool: toolName })
+        log('TOOL_VALIDATION_RESULT', { tool: toolName, decision: validationResult.decision })
 
-        // Check if this is an MCP tool (format: server_tool)
-        const mcpInfo = parseMcpTool(toolName)
+        if (validationResult.decision === 'block') {
+          // Throw OUTSIDE any try/catch so OpenCode actually blocks the tool.
+          log('TOOL_BLOCKED_THROWING', { tool: toolName, reason: validationResult.reason })
+          throw new Error(`🚫 Akto Guardrails blocked this tool call: ${validationResult.reason}`)
+        }
 
+        // Allowed — the Python validator already ingested the audit trail.
+        return
+      }
+
+      // ============================================================
+      // LEGACY (non-sync): fire-and-forget ingestion only, never blocks.
+      // ============================================================
+      try {
         if (mcpInfo.isMcp) {
-          // Handle MCP tool with Python script
           log('MCP_TOOL_DETECTED', { tool: toolName, server: mcpInfo.server, mcpTool: mcpInfo.tool })
           if (AKTO_DATA_INGESTION_URL) {
             runPythonMcpScript('akto-mcp-request.py', toolName, toolArgs, false)
           }
         } else {
-          // Handle non-MCP tool (built-in like "read") with direct HTTP
           log('NON_MCP_TOOL_DETECTED', { tool: toolName })
           if (AKTO_DATA_INGESTION_URL) {
             log('SENDING_TO_AKTO', { tool: toolName, url: AKTO_DATA_INGESTION_URL })
