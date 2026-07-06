@@ -65,11 +65,13 @@ function SessionTopicsSection({ topicHierarchy, onCreateGuardrail }) {
     if (topics.length === 0) return null;
 
     return (
-        <VerticalStack gap="2">
+        <VerticalStack gap="2" inlineAlign="start">
             <Divider />
             <Text variant="headingXs" color="subdued">Topics queried</Text>
             <TopicsLine topics={topics} />
-            <Link onClick={onCreateGuardrail}>Create guardrail</Link>
+            <Tooltip content="Create a new blocking guardrail policy, pre-filled with these topics as denied topics">
+                <Link onClick={onCreateGuardrail}>Create guardrail</Link>
+            </Tooltip>
         </VerticalStack>
     );
 }

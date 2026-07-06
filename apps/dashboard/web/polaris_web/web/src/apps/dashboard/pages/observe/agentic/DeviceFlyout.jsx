@@ -338,11 +338,13 @@ function UserAnalysisSection({ username, startTimestamp, endTimestamp }) {
             </HorizontalGrid>
 
             {topicEntries.length > 0 && (
-                <VerticalStack gap="2">
+                <VerticalStack gap="2" inlineAlign="start">
                     <Divider />
                     <Text variant="headingXs" color="subdued">Topics Queried</Text>
                     <TopicsLine topics={topicEntries.map(([topic]) => topic)} />
-                    <Link onClick={handleCreateGuardrail}>Create guardrail</Link>
+                    <Tooltip content="Create a new blocking guardrail policy, pre-filled with these topics as denied topics">
+                        <Link onClick={handleCreateGuardrail}>Create guardrail</Link>
+                    </Tooltip>
                 </VerticalStack>
             )}
         </VerticalStack>
