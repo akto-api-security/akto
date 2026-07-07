@@ -185,6 +185,7 @@ public class InitializerListener implements ServletContextListener {
     UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
     AgentBasePromptDetectionCron agentBasePromptDetectionCron = new AgentBasePromptDetectionCron();
     UserAnalysisCron userAnalysisCron = new UserAnalysisCron();
+    AgentGuardCorpusLabelingCron labelingCron = new AgentGuardCorpusLabelingCron();
 
     private static String domain = null;
     public static String subdomain = "https://app.akto.io";
@@ -2597,6 +2598,7 @@ public class InitializerListener implements ServletContextListener {
                         logger.warn("Ending user analysis cron scheduler", LogDb.DASHBOARD);
                         logger.warn("Starting CATEGORY 2 job schedulers", LogDb.DASHBOARD);
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                        labelingCron.setUpAgentGuardCorpusLabelingCronScheduler();
                         syncCronInfo.setUpMcpMaliciousnessCronScheduler();
                         agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
                         setupAutomatedApiGroupsScheduler();
