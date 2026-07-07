@@ -61,6 +61,7 @@ function GithubSimpleTable(props) {
         supportsNegationFilter={true}
         onExportCsv={props?.onExportCsv}
         skipUrlFilters={props?.skipUrlFilters}
+        callFromOutside={props?.callFromOutside}
     />
 
 }
