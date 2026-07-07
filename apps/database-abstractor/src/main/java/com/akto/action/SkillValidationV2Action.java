@@ -3,15 +3,12 @@ package com.akto.action;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.ComponentRiskAnalysis;
 import com.akto.dto.OwaspAstCategory;
-import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.util.http_util.CoreHTTPClient;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
-import org.apache.struts2.ServletActionContext;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -20,17 +17,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 @Getter
 @Setter
@@ -38,16 +27,6 @@ public class SkillValidationV2Action extends ActionSupport {
 
     private static final LoggerMaker logger = new LoggerMaker(SkillValidationV2Action.class, LogDb.DB_ABS);
     private static final Gson gson = new Gson();
-
-    private static final OkHttpClient httpClient = CoreHTTPClient.client.newBuilder()
-            .connectTimeout(60, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
-            .build();
-
-    private static final String THREAT_DETECTION_API_URL = System.getenv().getOrDefault(
-            "THREAT_DETECTION_API_URL",
-            "https://tbs.akto.io/api/threat_detection/record_malicious_event");
 
     // Pattern number → OWASP category IDs (deterministic Java-side mapping)
     private static final Map<Integer, List<String>> PATTERN_TO_OWASP = new HashMap<Integer, List<String>>() {{
@@ -202,11 +181,6 @@ public class SkillValidationV2Action extends ActionSupport {
     private String skillDescription;
     private String skillContent;
     private String agentName;
-    private String filePath;
-    private String collectionName;
-    private String contextSource;
-    private String source;
-    private boolean reportThreat;
     private String localAnalysis;
 
     // Output field
@@ -223,10 +197,6 @@ public class SkillValidationV2Action extends ActionSupport {
         }
         if (skillDescription == null) skillDescription = "";
         if (agentName == null) agentName = "";
-        if (filePath == null) filePath = "";
-        if (collectionName == null) collectionName = "";
-        if (contextSource == null || contextSource.isEmpty()) contextSource = "AGENTIC";
-        if (source == null || source.isEmpty()) source = "AGENT_SKILL";
         if (localAnalysis == null || localAnalysis.isEmpty()) localAnalysis = "[]";
 
         // Step 1: build prompt
@@ -293,37 +263,7 @@ public class SkillValidationV2Action extends ActionSupport {
             logger.error("Failed to update audit DB for skill=" + skillName + ": " + e.getMessage());
         }
 
-        // Step 6: report threat if malicious and caller opted in (fire-and-forget)
-        // TODO: re-enable threat reporting after testing
-//        if (flagged && reportThreat) {
-//            final String finalReason = reason;
-//            final String finalEvidence = evidence;
-//            final double finalScore = maliciousScore;
-//            final double finalMatchScore = matchScore;
-//            final List<Map<String, String>> finalCategories = owaspCategories;
-//            String authToken = "";
-//            try {
-//                javax.servlet.http.HttpServletRequest httpReq = ServletActionContext.getRequest();
-//                if (httpReq != null) authToken = httpReq.getHeader("Authorization");
-//            } catch (Exception e) {
-//                addActionError("Failed to read Authorization header: " + e.getMessage());
-//                return Action.ERROR.toUpperCase();
-//            }
-//            if (authToken == null || authToken.isEmpty()) {
-//                addActionError("Authorization header missing — cannot report threat");
-//                return Action.ERROR.toUpperCase();
-//            }
-//            final String finalToken = authToken;
-//            new Thread(() -> {
-//                try {
-//                    reportThreat(finalScore, finalMatchScore, finalReason, finalEvidence, finalToken, finalCategories);
-//                } catch (Exception e) {
-//                    logger.error("Failed to report threat for skill=" + skillName + ": " + e.getMessage());
-//                }
-//            }, "skill-threat-reporter").start();
-//        }
-
-        // Step 7: return result
+        // Step 6: return result
         validationResult = new HashMap<>();
         validationResult.put("isMalicious", flagged);
         validationResult.put("maliciousMatchScore", maliciousScore);
@@ -416,115 +356,6 @@ public class SkillValidationV2Action extends ActionSupport {
         Object content = message.get("content");
         if (content == null) throw new RuntimeException("No content in LLM message");
         return content.toString();
-    }
-
-    private void reportThreat(double maliciousScore, double matchScore, String reason, String evidence,
-            String token, List<Map<String, String>> owaspCategories) throws Exception {
-        if (token == null || token.isEmpty()) {
-            logger.error("No auth token — skipping threat report for skill=" + skillName);
-            return;
-        }
-
-        String severity = "LOW";
-        if (maliciousScore >= 0.9) severity = "CRITICAL";
-        else if (maliciousScore >= 0.6) severity = "HIGH";
-        else if (maliciousScore >= 0.3) severity = "MEDIUM";
-
-        long now = System.currentTimeMillis() / 1000;
-        String endpoint = "/skills/" + skillName;
-
-        String owaspIds = owaspCategories.stream()
-                .map(c -> c.get("id") + "(" + c.get("confidence") + ")")
-                .collect(Collectors.joining(","));
-
-        String requestPayloadStr = String.format(
-                "{\"skill_name\":\"%s\",\"skill_description\":\"%s\",\"agent\":\"%s\",\"file_path\":\"%s\",\"content_length\":%d}",
-                escape(skillName), escape(skillDescription), escape(agentName), escape(filePath), skillContent.length());
-
-        String responsePayloadStr = String.format(
-                "{\"is_malicious\":true,\"malicious_score\":%.2f,\"match_score\":%.2f,\"reason\":\"%s\",\"severity\":\"%s\",\"evidence\":\"%s\",\"owasp_categories\":\"%s\"}",
-                maliciousScore, matchScore, escape(reason), severity, escape(evidence), escape(owaspIds));
-
-        JSONObject apiPayload = new JSONObject();
-        apiPayload.put("method", Method.POST.name());
-        apiPayload.put("requestPayload", requestPayloadStr);
-        apiPayload.put("responsePayload", responsePayloadStr);
-        apiPayload.put("ip", agentName);
-        apiPayload.put("destIp", agentName);
-        apiPayload.put("source", source);
-        apiPayload.put("type", "http");
-        apiPayload.put("akto_vxlan_id", "");
-        apiPayload.put("path", endpoint);
-        apiPayload.put("requestHeaders", "{}");
-        apiPayload.put("responseHeaders", "{}");
-        apiPayload.put("time", now);
-        apiPayload.put("akto_account_id", String.valueOf(com.akto.dao.context.Context.accountId.get()));
-        apiPayload.put("statusCode", 200);
-        apiPayload.put("status", "OK");
-
-        JSONObject metadata = new JSONObject();
-        metadata.put("policy_name", "malicious_skill_detected");
-        metadata.put("rule_violated", "skill:" + skillName);
-        metadata.put("risk_score", maliciousScore);
-        metadata.put("reason", reason);
-
-        JSONObject maliciousEvent = new JSONObject();
-        maliciousEvent.put("actor", agentName);
-        maliciousEvent.put("filterId", "malicious_skill_detected");
-        maliciousEvent.put("detectedAt", String.valueOf(now));
-        maliciousEvent.put("latestApiIp", agentName);
-        maliciousEvent.put("latestApiEndpoint", endpoint);
-        maliciousEvent.put("latestApiMethod", Method.POST.name());
-        maliciousEvent.put("latestApiCollectionId", now);
-        maliciousEvent.put("latestApiPayload", apiPayload.toString());
-        maliciousEvent.put("eventType", "EVENT_TYPE_SINGLE");
-        maliciousEvent.put("category", "malicious_skill_detected");
-        maliciousEvent.put("subCategory", "malicious_skill_detected");
-        maliciousEvent.put("severity", severity);
-        maliciousEvent.put("type", "Rule-Based");
-        maliciousEvent.put("metadata", metadata);
-        JSONArray owaspArray = new JSONArray();
-        for (Map<String, String> cat : owaspCategories) {
-            JSONObject catObj = new JSONObject();
-            catObj.put("id",         cat.getOrDefault("id", ""));
-            catObj.put("name",       cat.getOrDefault("name", ""));
-            catObj.put("severity",   cat.getOrDefault("severity", ""));
-            catObj.put("confidence", cat.getOrDefault("confidence", ""));
-            owaspArray.put(catObj);
-        }
-        maliciousEvent.put("owaspCategories", owaspArray);
-        maliciousEvent.put("contextSource", contextSource);
-        maliciousEvent.put("host", collectionName);
-        maliciousEvent.put("sessionId", "");
-        maliciousEvent.put("successfulExploit", true);
-
-        JSONObject body = new JSONObject();
-        body.put("maliciousEvent", maliciousEvent);
-
-        logger.infoAndAddToDb("[SkillValidation] THREAT_PAYLOAD skill=" + skillName
-                + " payload=" + body.toString(), LogDb.DB_ABS);
-
-        RequestBody rb = RequestBody.create(body.toString(), MediaType.parse("application/json"));
-        Request req = new Request.Builder()
-                .url(THREAT_DETECTION_API_URL)
-                .method(Method.POST.name(), rb)
-                .addHeader("Content-Type", "application/json")
-                .addHeader("Authorization", token)
-                .build();
-
-        try (Response resp = httpClient.newCall(req).execute()) {
-            if (!resp.isSuccessful()) {
-                logger.error("Threat report API returned " + resp.code() + " for skill=" + skillName);
-            } else {
-                logger.infoAndAddToDb("Threat reported for skill=" + skillName + " severity=" + severity
-                        + " owasp=" + owaspIds, LogDb.DB_ABS);
-            }
-        }
-    }
-
-    private static String escape(String s) {
-        if (s == null) return "";
-        return s.replace("\"", "\\\"");
     }
 
     private static String extractJson(String raw) {
