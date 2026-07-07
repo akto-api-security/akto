@@ -235,7 +235,7 @@ public class AktoPolicyNew {
 
         if (CONTEXT_SOURCE.ENDPOINT.name().equals(contextSource)){
             Map<String, List<String>> reqHeaders = httpResponseParams.getRequestParams().getHeaders();
-            String skillAgentHeader = RuntimeUtil.getHeaderValue(reqHeaders, "skill-agent");
+            String skillAgentHeader = RuntimeUtil.getHeaderValue(reqHeaders, "skill-tags");
             for (String skillAgent: parseSkillAgents(skillAgentHeader)) {
                 addClassifiedTag(apiInfo, "skill-tags", skillAgent);
             }
