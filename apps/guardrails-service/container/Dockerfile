@@ -1,63 +1,49 @@
-# Build stage - use native platform for building (avoids QEMU emulation issues)
-FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
+# Build stage — TARGETPLATFORM required for CGO + native Vectorscan per arch.
+FROM --platform=$TARGETPLATFORM golang:1.24-bookworm AS builder
 
-# Build arguments for cross-compilation (automatically set by BuildKit)
 ARG TARGETOS
 ARG TARGETARCH
 
-# Install build dependencies
-RUN apk add --no-cache git make
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git make gcc pkg-config libvectorscan-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
 
-# Set GOPRIVATE to skip checksum verification for private repos
 ENV GOPRIVATE=github.com/akto-api-security/*
 ENV GONOSUMDB=github.com/akto-api-security/*
+ENV CGO_ENABLED=1
 
-# Copy .netrc for GitHub authentication (create one with your token first)
-# Run: echo -e "machine github.com\nlogin x-access-token\npassword YOUR_TOKEN" > .netrc
 COPY --chmod=600 .netrc /root/.netrc
 
-# Copy go mod files from src directory
 COPY src/go.mod src/go.sum ./
 
-# Copy local replacement modules referenced by replace directives in go.mod
-# (required so `go mod download` can resolve them)
 COPY src/internal/stub/ ./internal/stub/
 
-# Download dependencies
 RUN go mod download
 
-# Clean up credentials after download
 RUN rm -f /root/.netrc
 
-# Copy source code from src directory
 COPY src/ .
 
-# Run unit tests before building the release binary.
 RUN go test ./...
 
-# Build the application with cross-compilation
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -installsuffix cgo -ldflags="-w -s" -o guardrails-service .
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -tags hyperscan -ldflags="-w -s" -o guardrails-service .
 
-# Final stage - use distroless for smaller image and better security
-FROM gcr.io/distroless/static-debian11:nonroot
+FROM debian:bookworm-slim
 
-# Copy ca-certificates from builder
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates libvectorscan5 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -u 65532 -r -s /usr/sbin/nologin nonroot
 
-# Set working directory
 WORKDIR /app
 
-# Copy the binary from builder
 COPY --from=builder /app/guardrails-service .
 
-# Create directory for mcp-endpoint-shield data
 USER nonroot:nonroot
 
-# Expose port
 EXPOSE 8080
 
-# Run the application
 ENTRYPOINT ["/app/guardrails-service"]

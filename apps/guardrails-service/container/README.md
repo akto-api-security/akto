@@ -464,6 +464,49 @@ go test ./...
 Tests also run automatically during the Docker image build (`docker build`).
 
 ### Building for Production
+
+**VM / Docker (Hyperscan/Vectorscan — recommended)**
+
+The container Dockerfile builds with `CGO_ENABLED=1`, `-tags hyperscan`, and links `libvectorscan5` at runtime (Debian bookworm). No extra flags needed for `docker build`.
+
+**Local binary with Hyperscan (macOS / Linux)**
+
+```bash
+# macOS
+brew install vectorscan
+
+# Debian/Ubuntu
+sudo apt install libvectorscan-dev pkg-config build-essential
+
+cd src
+CGO_ENABLED=1 go build -tags hyperscan -o guardrails-service .
+export GUARDRAILS_PII_ENGINE=hyperscan
+./guardrails-service
+```
+
+**Local binary without native lib (regexp fallback)**
+
+```bash
+cd src
+CGO_ENABLED=0 go build -o guardrails-service .
+export GUARDRAILS_PII_ENGINE=regexp
+./guardrails-service
+```
+
+**Test against unpublished akto-gateway changes**
+
+```bash
+cd apps/guardrails-service/container
+./scripts/link-local-akto-gateway.sh /path/to/akto-gateway
+./scripts/local-test-pii.sh
+# when done:
+./scripts/unlink-local-akto-gateway.sh
+```
+
+On startup, confirm the engine in logs: `[PIIFilterHandler] PII redact engine engine=hyperscan` (or `regexp` if Vectorscan is unavailable).
+
+**Legacy static build (no Hyperscan)**
+
 ```bash
 cd src
 CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o guardrails-service .
