@@ -208,10 +208,11 @@ class ModelMapScanner:
         return winner
 
     def _reason_rank(self, result: Dict[str, Any]) -> Tuple[int, float]:
-        # Winning verdict on disagreement: anthropic > gemma > qwen
+        # min() picks lowest rank first: 0=anthropic, 1=gemma, 2=qwen; ties broken by highest risk_score.
         stem = self._stem((result.get("details") or {}).get("llm_provider", ""))
         rank = {"anthropic": 0, "gemma": 1, "qwen": 2}[stem]
-        return (rank, -result["risk_score"])
+        highest_risk_score_first = -result["risk_score"]
+        return (rank, highest_risk_score_first)
 
     @staticmethod
     def _error_result(error: str) -> Dict[str, Any]:
