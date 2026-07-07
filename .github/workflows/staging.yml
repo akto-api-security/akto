@@ -222,6 +222,30 @@ jobs:
           GITHUB_TOKEN=${{ secrets.AKTO_GITHUB_TOKEN }} ./setup-netrc.sh
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/guardrails-service:$IMAGE_TAG . --push
 
+  build-otel-ingestion-service:
+    if: (github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') || (github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
+        id: docker_tag
+        run: echo "IMAGE_TAG=a-$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
+      - name: DockerHub login
+        env:
+          DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
+          DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+        run: |
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+      - name: Build and push otel-ingestion-service
+        env:
+          ECR_REGISTRY: aktosecurity
+          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
+        run: |
+          echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
+          docker buildx create --use
+          cd apps/otel-ingestion-service/container
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/otel-ingestion-service:$IMAGE_TAG . --push
+
   build-agent-guard:
     if: (github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') || (github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-22.04

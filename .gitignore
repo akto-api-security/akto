@@ -41,3 +41,5 @@ run-guardrails-service.sh
 .github/hooks
 **/CLAUDE.md
 scripts/**
+apps/guardrails-service/container/scripts/**
+**.log
