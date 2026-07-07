@@ -62,6 +62,16 @@ export const transformPolicyForBackend = (policyData) => {
     };
 };
 
+// Harmful-category severity used to be a "NONE"/"LOW"/"MEDIUM"/"HIGH" string; it's now a
+// continuous 0-1 slider. Policies saved before that migration still have the old strings.
+const LEGACY_HARMFUL_CATEGORY_SCORES = { NONE: 0, LOW: 0.3, MEDIUM: 0.6, HIGH: 0.9 };
+
+export const normalizeHarmfulCategoryScore = (value) => {
+    if (typeof value === "number") return value;
+    if (typeof value === "string") return LEGACY_HARMFUL_CATEGORY_SCORES[value.toUpperCase()] ?? 0.9;
+    return 0.9;
+};
+
 /** Defaults `minMatchCount` to 1 when loading policies for edit. */
 export const normalizePiiTypesFromPolicy = (policy) =>
     (policy?.piiTypes || []).map((p) => ({

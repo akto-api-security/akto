@@ -42,7 +42,7 @@ def _clean_json(raw: str) -> str:
     return raw
 
 
-def parse_llm_result(scanner_name: str, raw: str) -> Dict[str, Any]:
+def parse_llm_result(scanner_name: str, raw: str, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     parsed = json.loads(_clean_json(raw))
 
     details: Dict[str, Any] = {}
@@ -61,6 +61,22 @@ def parse_llm_result(scanner_name: str, raw: str) -> Dict[str, Any]:
         matched = parsed.get("matchedTopic", "")
         if matched:
             details["matchedTopic"] = matched
+
+    # Toxicity/Gibberish/BanCode's confidence-threshold sliders (the latter backs both
+    # "Ban code detection" and "Code Detection Level" — both build a BanCode FilterRule,
+    # just with a different Threshold source) are implemented as a required confidence
+    # bar rather than trusting the model's own boolean — confidence is already a
+    # calibrated p(flagged=true) per the prompt contract, so a lower threshold means
+    # "flag on weaker signal" (stricter); matches the dashboard's own "higher = more
+    # permissive, lower = stricter" copy. Scoped to these scanners only: PromptInjection
+    # and BanTopics keep trusting their own boolean.
+    if scanner_name in ("Toxicity", "Gibberish", "BanCode"):
+        threshold = (config or {}).get("threshold")
+        if threshold is not None:
+            flagged = confidence >= float(threshold)
+            category = (config or {}).get("category")
+            if category:
+                details["category"] = category
 
     return {
         "is_valid": not flagged,
@@ -91,7 +107,7 @@ class LLMScanner:
             if prompt is None:
                 raise ValueError(f"Scanner {scanner_name} not supported by LLM path")
             raw = await self.provider.complete(prompt)
-            result = parse_llm_result(scanner_name, raw)
+            result = parse_llm_result(scanner_name, raw, config)
 
         elapsed_ms = (time.time() - start) * 1000
         result["details"]["llm_provider"] = self.provider.name

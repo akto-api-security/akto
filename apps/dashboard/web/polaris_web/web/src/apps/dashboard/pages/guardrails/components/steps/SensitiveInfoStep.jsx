@@ -438,7 +438,7 @@ const SensitiveInfoStep = ({
                                     <ControlInfoIcon
                                         description="Higher values are more permissive (fewer prompts blocked); lower values are stricter."
                                         examples={[
-                                            { label: "Low (e.g. 0.2)", text: "Here's my key: sk_test_abc123, does this look valid to you?" },
+                                            { label: "Low (e.g. 0.2)", text: "Here's my key: sk_live_EXAMPLEKEYDONOTUSE1234, does this look valid to you?" },
                                             { label: "High (e.g. 0.8)", text: "Here's my AWS key: AKIAIOSFODNN7EXAMPLE, can you debug this?" }
                                         ]}
                                         onTryPrompt={onTryPrompt}

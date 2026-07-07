@@ -52,6 +52,85 @@ def test_parse_ban_topics_surfaces_matched_topic():
     assert r["details"]["matchedTopic"] == "weapons"
 
 
+def test_parse_toxicity_without_config_trusts_model_boolean():
+    # No threshold in config -> falls back to the model's own isToxic verdict.
+    r = llm_scanner.parse_llm_result(
+        "Toxicity", '{"isToxic": false, "confidence": 0.6, "reason": "borderline"}'
+    )
+    assert r["is_valid"] is True
+
+
+def test_parse_toxicity_low_threshold_flags_on_weak_signal():
+    # High sensitivity (0.9) -> threshold 0.1: even a "not toxic" call with some
+    # signal gets blocked, because the category was configured to catch more.
+    r = llm_scanner.parse_llm_result(
+        "Toxicity",
+        '{"isToxic": false, "confidence": 0.6, "reason": "mild insult"}',
+        {"threshold": 0.1, "category": "insults"},
+    )
+    assert r["is_valid"] is False
+    assert r["details"]["category"] == "insults"
+
+
+def test_parse_toxicity_high_threshold_requires_strong_signal():
+    # Low sensitivity -> threshold 0.9: even a flagged call needs high confidence.
+    r = llm_scanner.parse_llm_result(
+        "Toxicity",
+        '{"isToxic": true, "confidence": 0.6, "reason": "ambiguous"}',
+        {"threshold": 0.9, "category": "insults"},
+    )
+    assert r["is_valid"] is True
+
+
+def test_parse_gibberish_without_config_trusts_model_boolean():
+    r = llm_scanner.parse_llm_result(
+        "Gibberish", '{"isGibberish": false, "confidence": 0.3}'
+    )
+    assert r["is_valid"] is True
+
+
+def test_parse_gibberish_strict_threshold_flags_on_weak_signal():
+    # Dashboard: "lower values are stricter" -> a low threshold blocks on weak signal.
+    r = llm_scanner.parse_llm_result(
+        "Gibberish", '{"isGibberish": false, "confidence": 0.08}', {"threshold": 0.05}
+    )
+    assert r["is_valid"] is False
+
+
+def test_parse_gibberish_permissive_threshold_requires_strong_signal():
+    # Dashboard: "higher values are more permissive" -> needs high confidence to block.
+    r = llm_scanner.parse_llm_result(
+        "Gibberish", '{"isGibberish": true, "confidence": 0.6}', {"threshold": 0.9}
+    )
+    assert r["is_valid"] is True
+
+
+def test_parse_prompt_injection_ignores_threshold_config():
+    # Scope check: threshold override is Toxicity/Gibberish/BanCode only.
+    # PromptInjection keeps trusting its own boolean even with a threshold in config.
+    r = llm_scanner.parse_llm_result(
+        "PromptInjection",
+        '{"isInjection": false, "confidence": 0.6}',
+        {"threshold": 0.05},
+    )
+    assert r["is_valid"] is True
+
+
+def test_parse_bancode_strict_threshold_flags_on_weak_signal():
+    # Backs both "Ban code detection" and "Code Detection Level" sliders.
+    r = llm_scanner.parse_llm_result(
+        "BanCode", '{"isCode": false, "confidence": 0.08}', {"threshold": 0.05}
+    )
+    assert r["is_valid"] is False
+
+
+def test_parse_bancode_permissive_threshold_requires_strong_signal():
+    r = llm_scanner.parse_llm_result(
+        "BanCode", '{"isCode": true, "confidence": 0.6}', {"threshold": 0.9}
+    )
+    assert r["is_valid"] is True
+
+
 # ── providers.parse_qwen3guard_result ────────────────────────────────────────
 
 

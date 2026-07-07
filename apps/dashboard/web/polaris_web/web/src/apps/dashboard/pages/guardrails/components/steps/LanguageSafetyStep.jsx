@@ -72,7 +72,7 @@ const LanguageSafetyStep = ({
                                     <ControlInfoIcon
                                         description="Higher values are more permissive (fewer prompts blocked); lower values are stricter."
                                         examples={[
-                                            { label: "Low (e.g. 0.2)", text: "asdf can u pls hlp me wiht tihs kthing." },
+                                            { label: "Low (e.g. 0.2)", text: "Can you assist me with zxkqjw qplmnbv vhjklz this task please?" },
                                             { label: "High (e.g. 0.8)", text: "xkq93 !!zpqo alkj3 9!! qexlm." },
                                             { label: "Encoding artifacts (mojibake)", text: "â€œItâ€™s a beautiful day,â€ she said." }
                                         ]}

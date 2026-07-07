@@ -41,6 +41,7 @@ import {
     GUARDRAIL_BEHAVIOUR,
     normalizeBehaviourValue,
     normalizePiiTypesFromPolicy,
+    normalizeHarmfulCategoryScore,
     resolveStoredPolicyBehaviour
 } from '../utils';
 import func from "@/util/func";
@@ -65,11 +66,11 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [deniedTopics, setDeniedTopics] = useState([]);
     const [enableHarmfulCategories, setEnableHarmfulCategories] = useState(false);
     const [harmfulCategoriesSettings, setHarmfulCategoriesSettings] = useState({
-        hate: "HIGH",
-        insults: "HIGH",
-        sexual: "HIGH",
-        violence: "HIGH",
-        misconduct: "HIGH",
+        hate: 0.9,
+        insults: 0.9,
+        sexual: 0.9,
+        violence: 0.9,
+        misconduct: 0.9,
         useForResponses: false
     });
     const [enableBasePromptRule, setEnableBasePromptRule] = useState(false);
@@ -411,11 +412,11 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             if (policy.contentFiltering.harmfulCategories) {
                 setEnableHarmfulCategories(true);
                 setHarmfulCategoriesSettings({
-                    hate: policy.contentFiltering.harmfulCategories.hate || "HIGH",
-                    insults: policy.contentFiltering.harmfulCategories.insults || "HIGH",
-                    sexual: policy.contentFiltering.harmfulCategories.sexual || "HIGH",
-                    violence: policy.contentFiltering.harmfulCategories.violence || "HIGH",
-                    misconduct: policy.contentFiltering.harmfulCategories.misconduct || "HIGH",
+                    hate: normalizeHarmfulCategoryScore(policy.contentFiltering.harmfulCategories.hate),
+                    insults: normalizeHarmfulCategoryScore(policy.contentFiltering.harmfulCategories.insults),
+                    sexual: normalizeHarmfulCategoryScore(policy.contentFiltering.harmfulCategories.sexual),
+                    violence: normalizeHarmfulCategoryScore(policy.contentFiltering.harmfulCategories.violence),
+                    misconduct: normalizeHarmfulCategoryScore(policy.contentFiltering.harmfulCategories.misconduct),
                     useForResponses: policy.contentFiltering.harmfulCategories.useForResponses || false
                 });
             }

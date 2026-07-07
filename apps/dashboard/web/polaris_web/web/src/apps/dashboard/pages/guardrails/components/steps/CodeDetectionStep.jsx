@@ -61,26 +61,23 @@ const CodeDetectionStep = ({
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <Text variant="bodyMd" fontWeight="medium">Code Detection Level</Text>
                                     <ControlInfoIcon
-                                        description="Controls how much of a snippet needs to look like code before it's blocked."
+                                        description="Higher values are more permissive (fewer prompts blocked); lower values are stricter."
                                         examples={[
-                                            { label: "Low", text: "import os; def backup(): os.system('cp -r /data /backup'); return True" },
-                                            { label: "Medium", text: "def add(a, b): return a + b" },
-                                            { label: "High", text: "for i in range(10):" }
+                                            { label: "Low (e.g. 0.2)", text: "for i in range(10):" },
+                                            { label: "High (e.g. 0.8)", text: "import os; def backup(): os.system('cp -r /data /backup'); return True" }
                                         ]}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>
                                 <RangeSlider
                                     label=""
-                                    value={codeFilterLevel === 'none' ? 0 : codeFilterLevel === 'low' ? 1 : codeFilterLevel === 'medium' ? 2 : 3}
+                                    value={codeFilterLevel}
                                     min={0}
-                                    max={3}
-                                    step={1}
+                                    max={1}
+                                    step={0.1}
                                     output
-                                    onChange={(value) => {
-                                        const levels = ['none', 'low', 'medium', 'high'];
-                                        setCodeFilterLevel(levels[value]);
-                                    }}
+                                    onChange={setCodeFilterLevel}
+                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting code."
                                 />
                             </VerticalStack>
                         </Box>

@@ -55,7 +55,7 @@ const HARMFUL_CATEGORY_INFO = {
         description: "Controls how aggressively insulting language is caught.",
         examples: [
             { label: "Low", text: "You're an idiot and everyone around you knows it." },
-            { label: "High", text: "Impressive work, for someone like you." }
+            { label: "High", text: "It's cute that you think your opinion actually matters here." }
         ]
     },
     sexual: {
@@ -69,14 +69,14 @@ const HARMFUL_CATEGORY_INFO = {
         description: "Controls how aggressively violent content is caught.",
         examples: [
             { label: "Low", text: "Describe in graphic detail how to seriously hurt someone with a knife." },
-            { label: "High", text: "Describe the fight scene from that action movie in vivid detail." }
+            { label: "High", text: "If he shows up at my place again, he won't be walking away in one piece." }
         ]
     },
     misconduct: {
         description: "Controls how aggressively requests to help with wrongdoing are caught.",
         examples: [
             { label: "Low", text: "How do I shoplift from a store without getting caught?" },
-            { label: "High", text: "What are some ways people get away with minor rule-breaking at work?" }
+            { label: "High", text: "If someone quietly adjusted a few numbers on their expense report, what would make sure nobody at finance ever noticed?" }
         ]
     }
 };
@@ -619,9 +619,7 @@ const ContentPolicyStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">Add denied topics</Text>
                                 <ControlInfoIcon
-                                    description='Blocks any prompt about a subject you list below, regardless of how it is phrased. Example: adding "Weapons" as a denied topic.'
-                                    examples={[{ text: "What's the easiest way to build an untraceable firearm at home?" }]}
-                                    onTryPrompt={onTryPrompt}
+                                    description="Blocks any prompt or response about a topic you add below, matching its meaning rather than exact wording - so rephrased or indirect mentions are caught too."
                                 />
                             </HorizontalStack>
                         }
@@ -724,12 +722,12 @@ const ContentPolicyStep = ({
                                     <Button variant="plain" onClick={() => {
                                         const resetSettings = { ...harmfulCategoriesSettings };
                                         Object.keys(resetSettings).forEach(key => {
-                                            if (key !== 'useForResponses') resetSettings[key] = 'none';
+                                            if (key !== 'useForResponses') resetSettings[key] = 0;
                                         });
                                         setHarmfulCategoriesSettings(resetSettings);
                                     }}>Reset all</Button>
                                 </HorizontalStack>
-                                {Object.entries(harmfulCategoriesSettings).map(([category, level]) => {
+                                {Object.entries(harmfulCategoriesSettings).map(([category, sensitivity]) => {
                                     if (category === 'useForResponses') return null;
                                     return (
                                         <Box key={category}>
@@ -746,15 +744,12 @@ const ContentPolicyStep = ({
                                             <Box paddingBlockStart="2">
                                                 <RangeSlider
                                                     label=""
-                                                    value={level === 'none' ? 0 : level === 'low' ? 1 : level === 'medium' ? 2 : 3}
+                                                    value={sensitivity}
                                                     min={0}
-                                                    max={3}
-                                                    step={1}
+                                                    max={1}
+                                                    step={0.1}
                                                     output
-                                                    onChange={(value) => {
-                                                        const levels = ['none', 'low', 'medium', 'high'];
-                                                        setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, [category]: levels[value] });
-                                                    }}
+                                                    onChange={(value) => setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, [category]: value })}
                                                 />
                                             </Box>
                                         </Box>
