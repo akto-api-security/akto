@@ -51,7 +51,7 @@ func main() {
 	eventSink := sink.NewLoggingSink(logger, cfg.LogSensitive)
 	workers := pipeline.NewWorkerPool(queue, registry, eventSink, logger, cfg.WorkerCount)
 
-	handler := otlp.NewHandler(verifier, queue, cfg.MaxBatchBytes)
+	handler := otlp.NewHandler(verifier, queue, cfg.MaxBatchBytes, logger)
 	mux := http.NewServeMux()
 	handler.Register(mux)
 

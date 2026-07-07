@@ -17,19 +17,22 @@ import (
 	"github.com/akto-api-security/otel-ingestion-service/pkg/auth"
 	"github.com/akto-api-security/otel-ingestion-service/pkg/pipeline"
 	"go.opentelemetry.io/collector/pdata/plog/plogotlp"
+	"go.uber.org/zap"
 )
 
 type Handler struct {
 	verifier *auth.Verifier
 	queue    *pipeline.Queue
 	maxBytes int
+	logger   *zap.Logger
 }
 
-func NewHandler(verifier *auth.Verifier, queue *pipeline.Queue, maxBytes int) *Handler {
+func NewHandler(verifier *auth.Verifier, queue *pipeline.Queue, maxBytes int, logger *zap.Logger) *Handler {
 	return &Handler{
 		verifier: verifier,
 		queue:    queue,
 		maxBytes: maxBytes,
+		logger:   logger,
 	}
 }
 
@@ -60,22 +63,22 @@ func (h *Handler) ingest(signal pipeline.SignalType) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		accountID, err := h.verifier.Authenticate(r.Header.Get("Authorization"))
 		if err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			h.reject(w, r, signal, 0, http.StatusUnauthorized, "unauthorized", err)
 			return
 		}
 
 		if r.ContentLength > int64(h.maxBytes) {
-			http.Error(w, "payload too large", http.StatusRequestEntityTooLarge)
+			h.reject(w, r, signal, accountID, http.StatusRequestEntityTooLarge, "payload too large", nil)
 			return
 		}
 
 		body, err := readBody(r.Body, h.maxBytes, h.queue.BufferPool())
 		if err != nil {
 			if errors.Is(err, errTooLarge) {
-				http.Error(w, "payload too large", http.StatusRequestEntityTooLarge)
+				h.reject(w, r, signal, accountID, http.StatusRequestEntityTooLarge, "payload too large", err)
 				return
 			}
-			http.Error(w, "bad request", http.StatusBadRequest)
+			h.reject(w, r, signal, accountID, http.StatusBadRequest, "bad request", err)
 			return
 		}
 
@@ -87,12 +90,33 @@ func (h *Handler) ingest(signal pipeline.SignalType) http.HandlerFunc {
 		}
 		if !h.queue.TryEnqueue(job) {
 			h.queue.BufferPool().Put(body)
-			http.Error(w, "service unavailable", http.StatusServiceUnavailable)
+			h.reject(w, r, signal, accountID, http.StatusServiceUnavailable, "service unavailable", nil)
 			return
 		}
 
 		writeExportResponse(w, r.Header.Get("Content-Type"))
 	}
+}
+
+func (h *Handler) reject(w http.ResponseWriter, r *http.Request, signal pipeline.SignalType, accountID, status int, msg string, err error) {
+	fields := []zap.Field{
+		zap.Int("status", status),
+		zap.String("method", r.Method),
+		zap.String("path", r.URL.Path),
+		zap.String("signal", string(signal)),
+	}
+	if accountID > 0 {
+		fields = append(fields, zap.Int("account_id", accountID))
+	}
+	if err != nil {
+		fields = append(fields, zap.Error(err))
+	}
+	if status >= http.StatusInternalServerError {
+		h.logger.Error("request rejected", fields...)
+	} else {
+		h.logger.Warn("request rejected", fields...)
+	}
+	http.Error(w, msg, status)
 }
 
 var errTooLarge = errors.New("payload too large")
