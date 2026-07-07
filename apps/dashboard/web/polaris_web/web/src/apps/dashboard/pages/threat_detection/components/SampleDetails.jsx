@@ -18,7 +18,7 @@ import issuesFunctions from "../../issues/module";
 import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN, CLAUDE_SETTINGS_RISK_MAP } from "../constants/guardrailDescriptions";
 import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
-import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import { isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory } from "../../../../main/labelHelper";
 import OwaspTag from "../../guardrails/components/OwaspTag";
 import ComplianceTags from "../../guardrails/components/ComplianceTags";
 
@@ -959,20 +959,22 @@ Reference URL: ${window.location.href}`.trim();
                                 ].filter(item => item)}
                             />
                         </Popover>
-                        <Modal
-                            activator={<Button destructive size="slim" onClick={() => setShowModal(!showModal)}>Block IPs</Button>}
-                            open={showModal}
-                            onClose={() => setShowModal(false)}
-                            primaryAction={{content: 'Save', onAction: () => setShowModal(false)}}
-                            title={"Block IP ranges"}
-                        >
-                            <Modal.Section>
-                                <Text variant="bodyMd" color="subdued">
-                                    By blocking these IP ranges, no user will be able to access your application
-                                    Are you sure you want to block these IPs
-                                </Text>
-                            </Modal.Section>
-                        </Modal>
+                        {(isApiSecurityCategory() || isAgenticSecurityCategory()) && (
+                            <Modal
+                                activator={<Button destructive size="slim" onClick={() => setShowModal(!showModal)}>Block IPs</Button>}
+                                open={showModal}
+                                onClose={() => setShowModal(false)}
+                                primaryAction={{content: 'Save', onAction: () => setShowModal(false)}}
+                                title={"Block IP ranges"}
+                            >
+                                <Modal.Section>
+                                    <Text variant="bodyMd" color="subdued">
+                                        By blocking these IP ranges, no user will be able to access your application
+                                        Are you sure you want to block these IPs
+                                    </Text>
+                                </Modal.Section>
+                            </Modal>
+                        )}
                         {jiraTicketUrl ? (
                             transform.getJiraComponent(jiraTicketUrl)
                         ) : (

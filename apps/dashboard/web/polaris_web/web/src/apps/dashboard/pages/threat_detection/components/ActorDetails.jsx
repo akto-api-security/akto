@@ -4,7 +4,7 @@ import FlyLayout from "../../../components/layouts/FlyLayout"
 import { ActivityLog } from "./ActivityLog";
 import Store from "../../../store";
 import api from "../api";
-import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isApiSecurityCategory, isAgenticSecurityCategory } from "../../../../main/labelHelper";
 export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
     const [ipStatus, setIpStatus] = useState(actorDetails.status || "active")
     const [showModal, setShowModal] = useState(false)
@@ -61,27 +61,29 @@ export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
                             <Text variant="bodySm" color="subdued">Discovered: {actorDetails.discoveredAt}</Text>
                         </HorizontalStack>
                 </VerticalStack>
-                <Modal
-                    activator={<Button destructive={ipStatus.toLowerCase() === "active"} size="slim" onClick={() => setShowModal(!showModal)}>{ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP"}</Button>}
-                    open={showModal}
-                    onClose={() => setShowModal(false)}
-                    primaryAction={
-                        {
-                            content: ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP",
-                            onAction: () => handleBlockUnblockIp(ipStatus.toLowerCase() === "active" ? "blocked" : "active"),
-                            disabled: window.IS_AWS_WAF_INTEGRATED === 'false' && window.IS_CLOUDFLARE_WAF_INTEGRATED === 'false',
+                {(isApiSecurityCategory() || isAgenticSecurityCategory()) && (
+                    <Modal
+                        activator={<Button destructive={ipStatus.toLowerCase() === "active"} size="slim" onClick={() => setShowModal(!showModal)}>{ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP"}</Button>}
+                        open={showModal}
+                        onClose={() => setShowModal(false)}
+                        primaryAction={
+                            {
+                                content: ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP",
+                                onAction: () => handleBlockUnblockIp(ipStatus.toLowerCase() === "active" ? "blocked" : "active"),
+                                disabled: window.IS_AWS_WAF_INTEGRATED === 'false' && window.IS_CLOUDFLARE_WAF_INTEGRATED === 'false',
+                            }
                         }
-                    }
-                    title={ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP"}
-                >
-                    <Modal.Section>
-                        <Text variant="bodyMd" color="subdued">
-                            {ipStatus.toLowerCase() === "active" ?
-                            `Are you sure you want to block this IP - ${actorDetails.latestApiIp}?` :
-                            `Are you sure you want to unblock this IP - ${actorDetails.latestApiIp}?`}
-                        </Text>
-                    </Modal.Section>
-                </Modal>
+                        title={ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP"}
+                    >
+                        <Modal.Section>
+                            <Text variant="bodyMd" color="subdued">
+                                {ipStatus.toLowerCase() === "active" ?
+                                `Are you sure you want to block this IP - ${actorDetails.latestApiIp}?` :
+                                `Are you sure you want to unblock this IP - ${actorDetails.latestApiIp}?`}
+                            </Text>
+                        </Modal.Section>
+                    </Modal>
+                )}
                </HorizontalStack>
             </Box>
         )
