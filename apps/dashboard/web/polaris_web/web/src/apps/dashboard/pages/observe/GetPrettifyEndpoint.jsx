@@ -12,6 +12,8 @@ export const getMethod = (url, method, apiType) => {
     if(isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()){
         if(url.includes("tool")){
             return "TOOL";
+        }else if(url.includes("/config/")){
+            return "CONFIG";
         }else if(url.includes("skill")){
             return "SKILL";
         }else if(url.includes("resource")){
@@ -20,12 +22,10 @@ export const getMethod = (url, method, apiType) => {
             return "PROMPT";
         }else if(url.includes("server")){
             return "SERVER";
-        }else if(url.includes("settings") || url.includes("config")){
-            return "CONFIG";
+        }
         } else if (url.includes("v1/hooks")){
           return "HOOK"
         }
-    }
     return method;
 }
 

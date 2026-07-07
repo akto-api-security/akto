@@ -1,7 +1,23 @@
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from '../../../../main/labelHelper';
 import claudeSettingsRemediations from './claude_settings_remediations.json';
+import codexSettingsRemediations from './codex_settings_remediations.json';
+import copilotSettingsRemediations from './copilot_settings_remediations.json';
 
 export const CLAUDE_SETTINGS_RISK_MAP = claudeSettingsRemediations;
+export const CODEX_SETTINGS_RISK_MAP = codexSettingsRemediations;
+export const COPILOT_SETTINGS_RISK_MAP = copilotSettingsRemediations;
+
+/**
+ * Maps a settings-risk finding's policy_name (Go side's ThreatMetadata.PolicyName, which
+ * arrives on the frontend as moreInfoData.templateId) to its remediation lookup map and the
+ * endpoint path prefix used to derive a fieldPath key from moreInfoData.url as a fallback
+ * when ruleViolated isn't usable. Add a new tool by adding its JSON file + one entry here.
+ */
+export const SETTINGS_RISK_CONFIGS = {
+    claude_settings_risk: { riskMap: CLAUDE_SETTINGS_RISK_MAP, urlPrefix: '/claude/config/' },
+    codex_config_risk: { riskMap: CODEX_SETTINGS_RISK_MAP, urlPrefix: '/codex/config/' },
+    copilot_cli_settings_risk: { riskMap: COPILOT_SETTINGS_RISK_MAP, urlPrefix: '/copilot/config/' },
+};
 
 /**
  * Structured guardrail content with 7 main sections for Argus/Atlas dashboards

@@ -953,7 +953,7 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
                 const isMisconfigured = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
                 if (isMisconfigured) misconfiguredSkills.add(skillName);
             }
-            if (url.includes("/claude/config/")) {
+            if (url.includes("/config/")) {
                 const hasMisconfiguredTag = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
                 if (hasMisconfiguredTag) misconfiguredCollectionIds.add(collectionId);
             }

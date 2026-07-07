@@ -15,7 +15,7 @@ import settingFunctions from "../../settings/module";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal";
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
-import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN, CLAUDE_SETTINGS_RISK_MAP } from "../constants/guardrailDescriptions";
+import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN, SETTINGS_RISK_CONFIGS } from "../constants/guardrailDescriptions";
 import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
@@ -29,7 +29,11 @@ function SampleDetails(props) {
     // Determine if we should use hardcoded guardrail descriptions
     const useGuardrailDescription = isAgenticSecurityCategory() || isEndpointSecurityCategory();
 
-    const isClaudeSettingsRisk = moreInfoData?.templateId === 'claude_settings_risk';
+    // Settings-risk findings (Claude/Codex/Copilot config scanners) are keyed by policy_name,
+    // which arrives here as moreInfoData.templateId. Each tool has its own remediation lookup
+    // map and endpoint path prefix — see SETTINGS_RISK_CONFIGS for how to add a new tool.
+    const settingsRiskConfig = SETTINGS_RISK_CONFIGS[moreInfoData?.templateId];
+    const isSettingsRisk = !!settingsRiskConfig;
 
     // For guardrail events, look up the specific rule info based on ruleViolated / templateId
     const guardrailRuleInfo = useGuardrailDescription
@@ -41,40 +45,39 @@ function SampleDetails(props) {
         ? [{ heading: guardrailRuleInfo.heading, description: null, subSections: guardrailRuleInfo.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
         : GUARDRAIL_SECTIONS;
 
-    // Resolve the specific claude_settings_risk entry (used for both overview and remediation tabs)
-    const getClaudeSettingsKey = () => {
+    // Resolve the specific settings-risk entry (used for both overview and remediation tabs)
+    const getSettingsRiskKey = (urlPrefix) => {
         const stripArrayIndices = (key) => key?.replace(/\[\d+\]/g, '');
         if (moreInfoData?.ruleViolated && moreInfoData.ruleViolated !== '-') {
             return stripArrayIndices(moreInfoData.ruleViolated);
         }
-        const prefix = '/claude/settings/';
-        const idx = moreInfoData?.url?.indexOf(prefix) ?? -1;
-        return idx !== -1 ? stripArrayIndices(moreInfoData.url.slice(idx + prefix.length)) : null;
+        const idx = moreInfoData?.url?.indexOf(urlPrefix) ?? -1;
+        return idx !== -1 ? stripArrayIndices(moreInfoData.url.slice(idx + urlPrefix.length)) : null;
     };
-    const resolveClaudeSettingsEntry = (key) => {
+    const resolveSettingsRiskEntry = (riskMap, key) => {
         if (!key) return undefined;
-        if (CLAUDE_SETTINGS_RISK_MAP[key]) return CLAUDE_SETTINGS_RISK_MAP[key];
-        const bestMatch = Object.keys(CLAUDE_SETTINGS_RISK_MAP)
+        if (riskMap[key]) return riskMap[key];
+        const bestMatch = Object.keys(riskMap)
             .filter(k => key.startsWith(k))
             .sort((a, b) => b.length - a.length)[0];
-        return bestMatch ? CLAUDE_SETTINGS_RISK_MAP[bestMatch] : undefined;
+        return bestMatch ? riskMap[bestMatch] : undefined;
     };
-    const claudeSettingsEntry = isClaudeSettingsRisk
-        ? resolveClaudeSettingsEntry(getClaudeSettingsKey())
+    const settingsRiskEntry = isSettingsRisk
+        ? resolveSettingsRiskEntry(settingsRiskConfig.riskMap, getSettingsRiskKey(settingsRiskConfig.urlPrefix))
         : undefined;
 
-    const claudeSettingsSectionsToShow = claudeSettingsEntry?.overview
-        ? [{ heading: claudeSettingsEntry.title, description: null, subSections: claudeSettingsEntry.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
+    const settingsRiskSectionsToShow = settingsRiskEntry?.overview
+        ? [{ heading: settingsRiskEntry.title, description: null, subSections: settingsRiskEntry.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
         : [];
 
     // Get template object - either from hardcoded data or YAML templates
     let currentTemplateObj;
-    if (isClaudeSettingsRisk) {
-        // Claude settings risk takes priority — use per-field overview sections
+    if (isSettingsRisk) {
+        // Settings risk takes priority — use per-field overview sections
         currentTemplateObj = {
-            guardrailSections: claudeSettingsSectionsToShow,
-            testName: moreInfoData?.templateId || "Claude Settings Risk",
-            name: moreInfoData?.templateId || "Claude Settings Risk"
+            guardrailSections: settingsRiskSectionsToShow,
+            testName: moreInfoData?.templateId || "Settings Risk",
+            name: moreInfoData?.templateId || "Settings Risk"
         };
     } else if (useGuardrailDescription) {
         // For Argus/Atlas guardrails, use structured content
@@ -125,7 +128,7 @@ function SampleDetails(props) {
         ? getOwaspThreatsForRule(moreInfoData?.ruleViolated)
         : [];
 
-    const overviewComp = (useGuardrailDescription || isClaudeSettingsRisk) ? (
+    const overviewComp = (useGuardrailDescription || isSettingsRisk) ? (
         // Structured view for Argus/Atlas guardrails - show all 7 sections with hierarchy
         <Box padding={"4"}>
             <VerticalStack gap={"5"}>
@@ -282,11 +285,11 @@ function SampleDetails(props) {
     }
 
     const remediationTab = (() => {
-        if (isClaudeSettingsRisk) {
+        if (isSettingsRisk) {
             return {
                 id: "remediation",
                 content: "Remediation",
-                component: (<MarkdownViewer markdown={claudeSettingsEntry ? claudeSettingsEntry.remediation : GUARDRAIL_REMEDIATION_MARKDOWN} />)
+                component: (<MarkdownViewer markdown={settingsRiskEntry ? settingsRiskEntry.remediation : GUARDRAIL_REMEDIATION_MARKDOWN} />)
             };
         }
         if (useGuardrailDescription) {
