@@ -4,7 +4,7 @@ import FlyLayout from "../../../components/layouts/FlyLayout"
 import { ActivityLog } from "./ActivityLog";
 import Store from "../../../store";
 import api from "../api";
-import { getDashboardCategory, mapLabel, isApiSecurityCategory, isAgenticSecurityCategory } from "../../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
     const [ipStatus, setIpStatus] = useState(actorDetails.status || "active")
     const [showModal, setShowModal] = useState(false)
@@ -61,7 +61,7 @@ export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
                             <Text variant="bodySm" color="subdued">Discovered: {actorDetails.discoveredAt}</Text>
                         </HorizontalStack>
                 </VerticalStack>
-                {(isApiSecurityCategory() || isAgenticSecurityCategory()) && (
+                {!isEndpointSecurityCategory() && (
                     <Modal
                         activator={<Button destructive={ipStatus.toLowerCase() === "active"} size="slim" onClick={() => setShowModal(!showModal)}>{ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP"}</Button>}
                         open={showModal}
