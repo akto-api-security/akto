@@ -306,6 +306,9 @@ jobs:
           GAR_ENABLED: ${{ vars.GCP_PROJECT_ID != '' }}
         run: |
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
+          cd apps/guardrails-service/container/src
+          go test ./...
+          cd ..
           docker buildx create --use
           cd apps/guardrails-service/container
           chmod +x setup-netrc.sh

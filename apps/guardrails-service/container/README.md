@@ -461,7 +461,7 @@ cd src
 go test ./...
 ```
 
-Tests also run automatically during the Docker image build (`docker build`).
+Unit tests run in CI before the Docker image build (not inside `docker build`), so the image layer only compiles once with `-tags hyperscan`.
 
 ### Building for Production
 
