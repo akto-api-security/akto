@@ -1,3 +1,9 @@
 .git
 **/*_test.go
 **/*.md
+src/cmd/devtools
+scripts
+Makefile
+docker-compose.yml
+docker.env
+.env.example

@@ -13,29 +13,23 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/akto-api-security/otel-ingestion-service/pkg/auth"
 	"github.com/akto-api-security/otel-ingestion-service/pkg/pipeline"
 	"go.opentelemetry.io/collector/pdata/plog/plogotlp"
-	"go.uber.org/zap"
 )
 
 type Handler struct {
-	verifier    *auth.Verifier
-	queue       *pipeline.Queue
-	maxBytes    int
-	authEnabled bool
-	logger      *zap.Logger
+	verifier *auth.Verifier
+	queue    *pipeline.Queue
+	maxBytes int
 }
 
-func NewHandler(verifier *auth.Verifier, queue *pipeline.Queue, maxBytes int, authEnabled bool, logger *zap.Logger) *Handler {
+func NewHandler(verifier *auth.Verifier, queue *pipeline.Queue, maxBytes int) *Handler {
 	return &Handler{
-		verifier:    verifier,
-		queue:       queue,
-		maxBytes:    maxBytes,
-		authEnabled: authEnabled,
-		logger:      logger,
+		verifier: verifier,
+		queue:    queue,
+		maxBytes: maxBytes,
 	}
 }
 
@@ -64,14 +58,10 @@ func (h *Handler) backpressure(w http.ResponseWriter, _ *http.Request) {
 
 func (h *Handler) ingest(signal pipeline.SignalType) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		accountID := 0
-		if h.authEnabled {
-			id, err := h.verifier.Authenticate(r.Header.Get("Authorization"))
-			if err != nil {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
-				return
-			}
-			accountID = id
+		accountID, err := h.verifier.Authenticate(r.Header.Get("Authorization"))
+		if err != nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
 		}
 
 		if r.ContentLength > int64(h.maxBytes) {
@@ -94,7 +84,6 @@ func (h *Handler) ingest(signal pipeline.SignalType) http.HandlerFunc {
 			Signal:      signal,
 			ContentType: r.Header.Get("Content-Type"),
 			Body:        body,
-			ReceivedAt:  time.Now().UTC(),
 		}
 		if !h.queue.TryEnqueue(job) {
 			h.queue.BufferPool().Put(body)

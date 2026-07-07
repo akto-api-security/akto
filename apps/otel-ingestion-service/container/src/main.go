@@ -51,7 +51,7 @@ func main() {
 	eventSink := sink.NewLoggingSink(logger, cfg.LogSensitive)
 	workers := pipeline.NewWorkerPool(queue, registry, eventSink, logger, cfg.WorkerCount)
 
-	handler := otlp.NewHandler(verifier, queue, cfg.MaxBatchBytes, cfg.AuthEnabled, logger)
+	handler := otlp.NewHandler(verifier, queue, cfg.MaxBatchBytes)
 	mux := http.NewServeMux()
 	handler.Register(mux)
 
@@ -66,11 +66,9 @@ func main() {
 	go func() {
 		keySource := "disabled"
 		switch {
-		case !cfg.AuthEnabled:
-			keySource = "disabled"
-		case cfg.RSAPublicKey != "":
+		case cfg.AuthEnabled && cfg.RSAPublicKey != "":
 			keySource = "env:RSA_PUBLIC_KEY"
-		case cfg.MongoConn != "":
+		case cfg.AuthEnabled && cfg.MongoConn != "":
 			keySource = "mongo:common.configs/HYBRID_SAAS"
 		}
 		logger.Info("otel-ingestion-service starting",

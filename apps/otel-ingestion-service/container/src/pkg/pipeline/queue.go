@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"sync"
-	"time"
 )
 
 type SignalType string
@@ -18,7 +17,6 @@ type Job struct {
 	Signal      SignalType
 	ContentType string
 	Body        []byte
-	ReceivedAt  time.Time
 }
 
 type Queue struct {

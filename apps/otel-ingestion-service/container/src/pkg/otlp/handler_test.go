@@ -8,7 +8,6 @@ import (
 
 	"github.com/akto-api-security/otel-ingestion-service/pkg/auth"
 	"github.com/akto-api-security/otel-ingestion-service/pkg/pipeline"
-	"go.uber.org/zap"
 )
 
 func TestIngestAckFast(t *testing.T) {
@@ -17,7 +16,7 @@ func TestIngestAckFast(t *testing.T) {
 
 	verifier := auth.NewVerifier(false, nil, nil)
 
-	handler := NewHandler(verifier, queue, 1024*1024, false, zap.NewNop())
+	handler := NewHandler(verifier, queue, 1024*1024)
 	mux := http.NewServeMux()
 	handler.Register(mux)
 
@@ -50,7 +49,7 @@ func TestIngestQueueFullReturns503(t *testing.T) {
 	queue.TryEnqueue(pipeline.Job{Body: []byte("x")})
 
 	verifier := auth.NewVerifier(false, nil, nil)
-	handler := NewHandler(verifier, queue, 1024*1024, false, zap.NewNop())
+	handler := NewHandler(verifier, queue, 1024*1024)
 	mux := http.NewServeMux()
 	handler.Register(mux)
 

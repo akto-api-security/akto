@@ -5,7 +5,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/pem"
 	"testing"
 	"time"
 
@@ -73,9 +72,7 @@ func generateTestKeyPair(t *testing.T) (*rsa.PrivateKey, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der})
 	body := base64.StdEncoding.EncodeToString(der)
-	_ = pemBytes
 	return priv, body
 }
 

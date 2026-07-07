@@ -55,17 +55,3 @@ func isSensitiveKey(key string) bool {
 	}
 	return false
 }
-
-// KafkaSink is a Phase 2 placeholder for async Kafka publishing.
-type KafkaSink struct{}
-
-func (k *KafkaSink) Emit(_ context.Context, _ []model.OtelIngestEvent) error {
-	return nil
-}
-
-// HTTPSink is a Phase 2 placeholder for async HTTP downstream calls.
-type HTTPSink struct{}
-
-func (h *HTTPSink) Emit(_ context.Context, _ []model.OtelIngestEvent) error {
-	return nil
-}
