@@ -69,13 +69,7 @@ async def scan_payload(
     scanner_type = payload.get("scanner_type", "prompt")
     text = payload.get("text", "")
     config = payload.get("config") or {}
-    # Agent identity (Host header, e.g. "dev.ai-agent.claude"). Scopes the cache
-    # partition + learned mission per agent; "" keeps the global partition.
     agent_host = payload.get("agent_host") or (config.get("agent_host") if isinstance(config, dict) else "") or ""
-    # Optional separate system prompt — used only to build/retrieve a cached
-    # per-agent capability profile (intent/prefilter.py); never blended into
-    # the user-prompt instruction/data split.
-    system_prompt = payload.get("system_prompt") or ""
 
     def _elapsed_ms() -> float:
         return (time.perf_counter() - started) * 1000.0
@@ -160,7 +154,7 @@ async def scan_payload(
         # only LLM verdicts become learned examples, to avoid self-reinforcement.
         fast = None
         if intent_on:
-            fast = await prefilter.decide_fast(agent_host, system_prompt, text, timer=timer)
+            fast = await prefilter.decide_fast(agent_host, text, timer=timer)
             decided = fast["decision"]
             log_extra = {
                 "reason": fast["reason"],
@@ -168,6 +162,7 @@ async def scan_payload(
                 "units": len(fast["unit_texts"]),
                 "extraction_method": fast["extraction_method"],
                 "extraction_confidence": fast["extraction_confidence"],
+                "classifier_warm": fast["classifier_warm"],
             }
             _audit_kwargs = dict(
                 agent=agent_host,
@@ -205,14 +200,7 @@ async def scan_payload(
             scan_diag.log_intent_decision(
                 "escalate", agent_host, scanner_name, decided, timer, extra=log_extra,
             )
-            if decided == intent_decision.ESCALATE:
-                intent_audit.append("intent_escalate", **_audit_kwargs)
-            # Cold-start priming: any unit came back unmatched (no usable
-            # model yet, or the embedder/classifier errored) → pull whatever
-            # the offline labeling service has produced so far and refit.
-            # Fire-and-forget — this request already ESCALATEs; subsequent
-            # requests on this pod benefit from the refreshed classifier.
-            if any(u is None for u in (fast.get("units") or [None])):
+            if fast.get("classifier_warm") and any(u is None for u in (fast.get("units") or [None])):
                 schedule(intent_corpus.warmup(agent_host))
 
         # Cache miss (or cache not serving): only now does backpressure fail-open
@@ -242,13 +230,8 @@ async def scan_payload(
                 # ever looks at stored GOOD prompts; a BLOCKED verdict's units
                 # have nothing useful to teach the multi-class intent model.
                 if is_valid_bool and fast is not None and fast.get("unit_texts"):
-                    scope_bucket = result.get("details", {}).get("scope_bucket", "")
-                    units_for_queue = [
-                        {"text": t, "vector": v, "extraction_method": m, "source_key": s}
-                        for t, v, m, s in zip(fast["unit_texts"], fast["unit_vectors"],
-                                              fast["unit_methods"], fast["unit_sources"])
-                    ]
-                    if intent_corpus.queue(agent_host, units_for_queue, is_valid_bool, scope_bucket):
+                    units_for_queue = [{"text": t} for t in fast["unit_texts"]]
+                    if intent_corpus.queue(agent_host, units_for_queue):
                         schedule(intent_corpus.flush())
                     if intent_corpus.record_good(agent_host):
                         schedule(intent_corpus.warmup(agent_host))

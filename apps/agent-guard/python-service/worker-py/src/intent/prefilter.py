@@ -1,20 +1,20 @@
 """Worker-side orchestration of the intent prefilter.
 
-Ties together instruction/data segmentation (intent/segmenter.py), a cached
-per-agent capability profile derived from the system prompt, the per-agent
-multi-class instruction classifier (via the embedder), and the decision rule.
-Pure-Python + a couple of batched HTTP calls; fail-open throughout — any
-internal error degrades to ESCALATE, never a crash or a false ALLOW/BLOCK.
+Ties together instruction/data segmentation (intent/segmenter.py), the
+per-agent learned structure profile, the per-agent multi-class instruction
+classifier (via the embedder), and the decision rule. Pure-Python + a couple
+of batched HTTP calls; fail-open throughout — any internal error degrades to
+ESCALATE, never a crash or a false ALLOW/BLOCK.
 
-Latency shape: segmentation is regex-only (sub-ms); the capability-profile
+Latency shape: segmentation is regex-only (sub-ms); the structure-profile
 lookup is a single cached Redis GET; a request's instruction units are
 embedded in one batched /embed/batch call and classified in one batched
-/classify call — never one HTTP round-trip per unit. Target: ≤10-50ms for
-this whole step at 500 req/s (see the design plan for the budget breakdown).
+/classify call — never one HTTP round-trip per unit, and only once the agent
+has a structure profile (see decide_fast's `is_warm` check) — a cold agent
+skips both calls entirely. Target: ≤10-50ms for this whole step at 500 req/s
+(see the design plan for the budget breakdown).
 """
 
-import asyncio
-import hashlib
 import json
 import logging
 import re
@@ -26,9 +26,6 @@ from . import client, decision, payload, segmenter
 
 logger = logging.getLogger(__name__)
 
-_CAPABILITY_CACHE_PREFIX = "agentcap:"
-_CAPABILITY_TTL_SECONDS = 24 * 3600
-_CAPABILITY_EXCERPT_CHARS = 500
 _DEFAULT_MAX_CHUNKS = 16
 _STRUCTURE_CACHE_PREFIX = "agentstruct:"  # must match intent/corpus.py's write side
 
@@ -66,43 +63,6 @@ def normalized_text(text: str) -> Tuple[str, int]:
     joined = " ".join(c for c, _ in chunks)
     return joined, len(chunks)
 
-
-# --------------------------------------------------------------------------- #
-# Agent capability profile — a small, cached-per-agent summary of the system
-# prompt. Auxiliary context for segmentation only; never a decision-time gate.
-# Fail-open: Redis down/miss just proceeds with capability_profile=None.
-# --------------------------------------------------------------------------- #
-def _build_capability_profile(system_prompt: str) -> Dict[str, Any]:
-    """Cheap, no-LLM, no-embedding-call structural summary of the system
-    prompt — currently a capped excerpt. Room to grow (e.g. a declared-tools
-    list, if the caller passes tool schemas separately) without changing the
-    cache contract below."""
-    return {"excerpt": system_prompt[:_CAPABILITY_EXCERPT_CHARS]}
-
-
-async def get_capability_profile(agent_host: str, system_prompt: str) -> Optional[Dict[str, Any]]:
-    """Return the cached capability profile for agent_host, building it once.
-
-    Keyed by agent_host + hash(system_prompt), so a system-prompt change
-    naturally invalidates (a new key, the old one just expires via TTL)."""
-    if not agent_host or not system_prompt:
-        return None
-    try:
-        import cache_store  # local import: keeps this module importable stand-alone
-        redis_client = cache_store.get_client()
-        if redis_client is None:
-            return None
-        key_hash = hashlib.sha256(system_prompt.encode("utf-8")).hexdigest()[:16]
-        redis_key = f"{_CAPABILITY_CACHE_PREFIX}{agent_host}:{key_hash}"
-        raw = await redis_client.get(redis_key)
-        if raw:
-            return json.loads(raw)
-        profile = _build_capability_profile(system_prompt)
-        await redis_client.set(redis_key, json.dumps(profile), ex=_CAPABILITY_TTL_SECONDS)
-        return profile
-    except Exception as exc:
-        logger.debug(f"[intent] capability profile unavailable for agent={agent_host!r}: {exc}")
-        return None
 
 
 # --------------------------------------------------------------------------- #
@@ -191,7 +151,7 @@ def _slug(s: str) -> str:
 # --------------------------------------------------------------------------- #
 # decide_fast — the fast-path attempt on a cache miss.
 # --------------------------------------------------------------------------- #
-async def decide_fast(agent_host: str, system_prompt: str, user_text: str,
+async def decide_fast(agent_host: str, user_text: str,
                       timer: Optional[Any] = None) -> Dict[str, Any]:
     """Fast ALLOW/ESCALATE on the miss path (never BLOCK — see decision.py).
 
@@ -203,18 +163,15 @@ async def decide_fast(agent_host: str, system_prompt: str, user_text: str,
     raises (fail-open → ESCALATE).
     """
     try:
-        # Independent Redis reads — fetch concurrently rather than back-to-back.
-        profile, structure_profile = await asyncio.gather(
-            get_capability_profile(agent_host, system_prompt or ""),
-            get_structure_profile(agent_host),
-        )
+        structure_profile = await get_structure_profile(agent_host)
+        is_warm = structure_profile is not None
         extra_verbs = frozenset((structure_profile or {}).get("instruction_verbs") or ())
 
         if timer is not None:
             with timer.span("segment"):
-                seg = segmenter.segment(user_text, capability_profile=profile, structure_profile=structure_profile)
+                seg = segmenter.segment(user_text, structure_profile=structure_profile)
         else:
-            seg = segmenter.segment(user_text, capability_profile=profile, structure_profile=structure_profile)
+            seg = segmenter.segment(user_text, structure_profile=structure_profile)
 
         unit_texts: List[str] = []
         unit_sources: List[str] = []
@@ -226,8 +183,8 @@ async def decide_fast(agent_host: str, system_prompt: str, user_text: str,
             unit_methods.extend([meth] * len(sub_units))
 
         unit_vectors: List[Optional[List[float]]] = []
-        unit_results: List[Optional[Dict[str, Any]]] = []
-        if unit_texts:
+        unit_results: List[Optional[Dict[str, Any]]] = [None] * len(unit_texts)
+        if unit_texts and is_warm:
             if timer is not None:
                 with timer.span("embed_units"):
                     unit_vectors = await client.embed_units(unit_texts)
@@ -236,7 +193,6 @@ async def decide_fast(agent_host: str, system_prompt: str, user_text: str,
 
             valid_idx = [i for i, v in enumerate(unit_vectors) if v is not None]
             vecs_to_classify = [unit_vectors[i] for i in valid_idx]
-            unit_results = [None] * len(unit_texts)
             if vecs_to_classify:
                 if timer is not None:
                     with timer.span("classify"):
@@ -266,6 +222,7 @@ async def decide_fast(agent_host: str, system_prompt: str, user_text: str,
         result["unit_vectors"] = unit_vectors
         result["extraction_confidence"] = seg["extraction_confidence"]
         result["extraction_method"] = seg["method"]
+        result["classifier_warm"] = is_warm
         return result
     except Exception as exc:  # absolute backstop — prefilter must never block traffic
         logger.warning(f"[intent] decide_fast failed: {exc}")
@@ -273,5 +230,5 @@ async def decide_fast(agent_host: str, system_prompt: str, user_text: str,
             "decision": decision.ESCALATE, "reason": f"prefilter_error: {exc}",
             "intent": {"units": [], "risk_category": "unknown"},
             "units": [], "unit_texts": [], "unit_sources": [], "unit_methods": [], "unit_vectors": [],
-            "extraction_confidence": 0.0, "extraction_method": "error",
+            "extraction_confidence": 0.0, "extraction_method": "error", "classifier_warm": False,
         }

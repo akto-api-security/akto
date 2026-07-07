@@ -53,7 +53,7 @@ _MACHINE_PATTERNS = [
 ]
 
 # Bounds so deeply nested / huge payloads stay cheap and safe.
-_MAX_DEPTH = 4
+_MAX_DEPTH = 6
 _MAX_NODES = 5000
 _MAX_TOTAL_CHARS = 16000
 _MAX_CHUNK_TOKENS = 40
@@ -229,21 +229,21 @@ Fragment = Tuple[str, Dict[str, Optional[str]]]  # (text, {"key": ..., "content_
 # Keys whose string values are (almost) always the user's actual ask.
 _INSTRUCTION_KEYS = {
     "instruction", "instructions", "prompt", "query", "task", "ask",
-    "question", "prompt_text", "query_text",
+    "question", "prompt_text", "query_text", "request"
 }
 # Keys whose string values are (almost) always data/context the ask operates
 # on — even when the text reads as natural language (e.g. a prose document).
 _DATA_KEYS = {
     "document", "documents", "data", "context", "attachment", "attachments",
     "file", "files", "logs", "log", "output", "tool_result", "tool_results",
-    "results",
+    "results","background"
 }
 # content_type/mime_type/type/source_type values that force a fragment to data
 # regardless of key/role (tier 2: source metadata and content type).
 _DATA_CONTENT_TYPES = {
     "application/json", "application/xml", "text/csv", "text/x-log",
     "text/x-code", "application/octet-stream", "log", "code", "json",
-    "xml", "csv", "attachment", "file",
+    "xml", "csv", "attachment", "file"
 }
 _CONTENT_TYPE_KEYS = {"content_type", "mime_type", "type", "source_type"}
 
