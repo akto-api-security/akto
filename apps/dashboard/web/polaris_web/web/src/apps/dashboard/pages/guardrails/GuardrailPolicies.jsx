@@ -83,7 +83,6 @@ const agentFilterHeader = {
     filterLabel: 'Agent',
     title: 'Agent',
     showFilter: true,
-    singleSelect: true,
 };
 
 const tableHeaders = [...headings, agentFilterHeader];

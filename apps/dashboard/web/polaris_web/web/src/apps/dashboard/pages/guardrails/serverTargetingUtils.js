@@ -77,8 +77,6 @@ export const getApplicableAgentKeys = (policy, allCollections, agentOptions) => 
     agents.forEach(entry => {
         const resolved = resolveServerEntryKey(entry, allCollections);
         if (resolved) keys.add(resolved);
-        if (entry.id) keys.add(entry.id);
-        if (entry.name) keys.add(entry.name);
     });
     return [...keys];
 };
