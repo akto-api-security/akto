@@ -2,7 +2,7 @@ import {create} from "zustand"
 import { devtools, persist } from "zustand/middleware"
 
 import pako from "pako"; // Gzip Compression
-import { createGzipStorage } from "./PersistStore";
+import { createGzipStorage } from "./gzipStorage";
 
 // Custom Storage with Gzip Compression for localStorage
 const gzipLocalStorage = createGzipStorage(localStorage);
@@ -14,6 +14,9 @@ const initialState = {
     defaultIgnoreSummaryTime: 2 * 60 * 60,
     lastEndpointEpoch: 0,
     agenticNewLayout: false,
+    // Mirrors PersistStore.dashboardCategory's old default logic, kept inline (not imported
+    // from labelHelper.js) to avoid a circular import with PersistStore.js at module init time.
+    dashboardCategory: window.DASHBOARD_CATEGORY || "API Security",
 };
 
 let localStore = (set) => ({
@@ -64,6 +67,14 @@ let localStore = (set) => ({
             set({ agenticNewLayout });
         } catch (error) {
             console.error("Error setting agenticNewLayout:", error);
+        }
+    },
+
+    setDashboardCategory: (dashboardCategory) => {
+        try {
+            set({ dashboardCategory });
+        } catch (error) {
+            console.error("Error setting dashboardCategory:", error);
         }
     },
 
