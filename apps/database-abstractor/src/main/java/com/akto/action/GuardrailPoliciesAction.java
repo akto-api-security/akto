@@ -1,9 +1,10 @@
 package com.akto.action;
 
 import com.akto.data_actor.DbLayer;
-import com.akto.dto.AgentGuardCorpusEntry;
 import com.akto.dto.EnterpriseLicenseComplianceCatalog;
 import com.akto.dto.GuardrailPolicies;
+import com.akto.dto.agent_classifiers.AgentGuardCorpusEntry;
+import com.akto.dto.agent_classifiers.AgentGuardCorpusQueueEntry;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
@@ -53,7 +54,8 @@ public class GuardrailPoliciesAction extends ActionSupport {
     }
 
     private String agentHost;
-    private List<AgentGuardCorpusEntry> examples;
+    private List<AgentGuardCorpusQueueEntry> examples;
+    private List<AgentGuardCorpusEntry> corpusEntries;
 
     public String loadResultsForAgent(){
         if(this.agentHost == null || this.agentHost.isEmpty()){
@@ -61,7 +63,7 @@ public class GuardrailPoliciesAction extends ActionSupport {
             return ERROR.toUpperCase();
         }
 
-        this.examples = DbLayer.getAgentCorpus(this.agentHost);
+        this.corpusEntries = DbLayer.getAgentCorpus(this.agentHost);
 
         return SUCCESS.toUpperCase();
     }

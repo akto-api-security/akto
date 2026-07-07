@@ -23,6 +23,8 @@ import java.util.stream.Collectors;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
+import com.akto.dao.agent_classifiers.AgentGuardCorpusDao;
+import com.akto.dao.agent_classifiers.AgentGuardCorpusQueueDao;
 import com.akto.dao.agentic_sessions.AgentQueryDataDao;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.graph.SvcToSvcGraphEdgesDao;
@@ -81,7 +83,8 @@ import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.agentic_sessions.AgentQueryData;
+import com.akto.dto.agent_classifiers.AgentGuardCorpusEntry;
+import com.akto.dto.agent_classifiers.AgentGuardCorpusQueueEntry;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
@@ -3600,8 +3603,8 @@ public class DbLayer {
         return AgentGuardCorpusDao.instance.findBucketsByAgentHost(hostName);
     }
     
-    public static void bulkSaveCorpusEntries(List<AgentGuardCorpusEntry> corpusEntries) {
-        AgentGuardCorpusDao.instance.upsertVectors(corpusEntries);
+    public static void bulkSaveCorpusEntries(List<AgentGuardCorpusQueueEntry> corpusEntries) {
+        AgentGuardCorpusQueueDao.instance.insertMany(corpusEntries);
     }
 
 }
