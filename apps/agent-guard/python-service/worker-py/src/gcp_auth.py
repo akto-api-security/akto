@@ -16,9 +16,10 @@ import json
 import time
 from typing import Dict, Tuple
 
-import httpx
 import rsa
 from pyasn1.codec.der import decoder as der_decoder
+
+import http_client
 
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
 _SCOPE = "https://www.googleapis.com/auth/cloud-platform"
@@ -69,12 +70,13 @@ async def get_token(sa_info: dict) -> str:
     signature = rsa.sign(signing_input, privkey, "SHA-256")
     assertion = header + "." + payload + "." + _b64url(signature)
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(
-            _TOKEN_URL,
-            headers=_IDENTITY,
-            data={"grant_type": _GRANT, "assertion": assertion},
-        )
+    client = http_client.get_client()
+    resp = await client.post(
+        _TOKEN_URL,
+        headers=_IDENTITY,
+        data={"grant_type": _GRANT, "assertion": assertion},
+        timeout=30,
+    )
     resp.raise_for_status()
     body = resp.json()
     token = body["access_token"]

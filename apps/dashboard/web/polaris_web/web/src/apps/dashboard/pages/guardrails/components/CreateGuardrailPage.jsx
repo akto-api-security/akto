@@ -30,6 +30,7 @@ import { getDefaultGeneralBlockTopics, GENERAL_BLOCKS, isGeneralBlockTopic, toDe
 import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from './enterpriseLicenseComplianceCatalog';
 import { groupCollectionsByAgent, groupCollectionsByService, extractServiceName } from '../../observe/agentic/constants';
 import { isEndpointSecurityCategory } from '../../../../main/labelHelper';
+import { isVisibilityOnly, buildAgentFilterOptions } from '../serverTargetingUtils';
 import func from "@/util/func";
 import {
     PolicyDetailsStep,
@@ -498,11 +499,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
     }, [isEditMode, isPreset, editingPolicy]);
 
-    const isVisibilityOnly = (collection) =>
-        collection.envType && collection.envType.some(tag =>
-            tag.keyName === 'visibilityOnly' && tag.value === 'true'
-        );
-
     const filterCollections = () => {
         setCollectionsLoading(true);
         try {
@@ -525,8 +521,15 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     };
                 };
                 const dedup = (opts) => [...new Map(opts.map(o => [o.value, o])).values()].filter(o => o.value);
+                const genAiCollections = nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'gen-ai'));
                 setMcpServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'mcp-server')).map(toOption)));
-                setAgentServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'gen-ai')).map(toOption)));
+                setAgentServers(buildAgentFilterOptions(allCollections).map(opt => ({
+                    ...opt,
+                    isInline: !genAiCollections.some(c =>
+                        (c.hostName || c.displayName || c.name || '') === opt.value
+                        && !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe')
+                    )
+                })));
                 setBrowserLlmServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'browser-llm')).map(toOption)));
             }
         } catch (error) {

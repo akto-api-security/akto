@@ -1,12 +1,12 @@
 """Fire-and-forget alerting for cascade scans.
 
-Two async sinks, both no-ops when their target isn't configured:
-  - post_slack(...)      → Slack incoming webhook (SLACK_WEBHOOK_URL)
-  - store_results(...)   → DB abstractor /api/storeGuardrailModelResults
+Async sinks, all no-ops when their target isn't configured:
+  - post_slack(...)         → Slack incoming webhook (SLACK_WEBHOOK_URL)
+  - store_results(...)      → DB abstractor /api/storeGuardrailModelResults
 
-Both are scheduled via ctx.waitUntil() from entry.py so they never block the
-scan response, mirroring the container's daemon-thread behaviour. Neither ever
-raises into the caller.
+All are scheduled via the runtime's fire-and-forget hook (waitUntil on
+Cloudflare, asyncio.create_task on the container) so they never block the scan
+response. None ever raises into the caller.
 """
 
 import logging

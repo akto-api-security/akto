@@ -1,0 +1,8 @@
+rsa
+pyasn1
+httpx
+detect-secrets
+tiktoken
+fastapi
+uvicorn[standard]
+pydantic

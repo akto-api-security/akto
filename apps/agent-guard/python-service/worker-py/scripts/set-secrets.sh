@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Push every non-empty KEY=VALUE from a vars file into a Worker's secrets, so no
-# credentials live in committed config. With -c, targets a specific wrangler
-# config (i.e. a specific worker name); without it, the default wrangler.jsonc.
+# Push every non-empty KEY=VALUE from a vars file into a Worker's secrets.
 #
-#   ./scripts/set-secrets.sh                                   # .dev.vars -> wrangler.jsonc worker
+#   ./scripts/set-secrets.sh                              # .dev.vars → wrangler.jsonc
 #   ./scripts/set-secrets.sh .dev.vars.exec -c wrangler-exec.jsonc
+#   ./scripts/set-secrets.sh ../../.env                   # use root .env directly
 #
-# Requires: wrangler auth (CLOUDFLARE_API_TOKEN or `wrangler login`).
+# Setup: cp ../../.env.example ../../.env && cp ../../.env .dev.vars
+# See ../../ENV.md
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
