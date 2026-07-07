@@ -119,6 +119,9 @@ public class Gateway {
     private boolean isAllowed(Map<String, Object> result) {
         if (result == null) return false;
         Object val = result.get("Allowed");
+        if (val == null) {
+            val = result.get("allowed");
+        }
         if (val instanceof Boolean) return (Boolean) val;
         if (val != null) return Boolean.parseBoolean(val.toString());
         return false;

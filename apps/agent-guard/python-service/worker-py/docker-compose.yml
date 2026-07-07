@@ -1,0 +1,22 @@
+# Executor only. Point ANONYMIZER_URL at a running anonymizer (see anonymizer-container/docker-compose.yml).
+services:
+  executor:
+    image: aktosecurity/akto-agent-guard-worker:${AGENT_GUARD_WORKER_TAG:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agent-guard-executor
+    ports:
+      - "127.0.0.1:8090:8090"
+    env_file:
+      - path: ../../.env
+        required: false
+    environment:
+      ANONYMIZER_URL: ${ANONYMIZER_URL:-http://host.docker.internal:8093}
+      PORT: "8090"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 15s

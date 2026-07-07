@@ -1,12 +1,10 @@
-# Local secrets — never commit (any .dev.vars / .dev.vars.<env>), but keep the
-# .example templates tracked.
+# Local secrets — copy from ../../.env.example (see ../../ENV.md).
 .dev.vars
 .dev.vars.*
-!.dev.vars.example
-!.dev.vars.exec.example
 
 # uv / pywrangler / pyodide build artifacts
 .venv/
+.venv-test/
 .venv-workers/
 python_modules/
 .wrangler/
