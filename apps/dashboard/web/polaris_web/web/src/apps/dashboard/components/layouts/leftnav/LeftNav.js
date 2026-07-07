@@ -125,10 +125,6 @@ export default function LeftNav() {
     const isAllowedNhiUser = window.USER_NAME && allowedNhiUsers.includes(window.USER_NAME.toLowerCase());
 
     const navItems = useMemo(() => {
-        const hasThreatDetectionFeature = window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted;
-        const isGuardrailsCategory = dashboardCategory === CATEGORY_AGENTIC_SECURITY || dashboardCategory === CATEGORY_ENDPOINT_SECURITY;
-        const showThreatOrGuardrailsNav = dashboardCategory !== CATEGORY_DAST && (hasThreatDetectionFeature || isGuardrailsCategory);
-
         let items = [
             {
                 label: (!func.checkLocal()) ? (
@@ -529,7 +525,7 @@ export default function LeftNav() {
                     : reportsSubNavigationItems,
                 key: "6",
             },
-            ...(showThreatOrGuardrailsNav ? [{
+            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted && dashboardCategory !== CATEGORY_DAST  ? [{
                     label: (
                         <Text variant="bodyMd" fontWeight="medium">
                             {mapLabel("Threat Detection", dashboardCategory)}
