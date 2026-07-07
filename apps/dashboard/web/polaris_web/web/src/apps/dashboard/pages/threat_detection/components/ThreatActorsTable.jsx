@@ -11,7 +11,7 @@ import dayjs from "dayjs";
 import { flags } from "./flags/index.mjs";
 import { Tooltip } from "@shopify/polaris";
 import { useSearchParams } from "react-router-dom";
-import { isAgenticSecurityCategory, isMCPSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import { isAgenticSecurityCategory, isMCPSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory } from "../../../../main/labelHelper";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId, extractRuleViolated } from "../utils/formatUtils";
 import IpReputationScore from "./IpReputationScore";
@@ -400,6 +400,10 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   };
 
   const promotedBulkActions = (selectedIps) => {
+    if (!(isApiSecurityCategory() || isAgenticSecurityCategory())) {
+      return [];
+    }
+
     return [
       {
         content: `Block ${selectedIps.length} IP${selectedIps.length > 1 ? 's' : ''}`,
