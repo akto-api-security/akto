@@ -208,11 +208,11 @@ const api = {
         })
     },
 
-    importFromUrl(url, testRoleId, requestBody, customHeaders) {
+    importFromUrl(url, testRoleId, requestBody, customHeaders, collectionName) {
         return request({
             url: '/api/importFromUrl',
             method: 'post',
-            data: {url, testRoleId, requestBody, customHeaders}
+            data: {url, testRoleId, requestBody, customHeaders, collectionName}
         })
     },
 
@@ -411,6 +411,30 @@ const api = {
             url: '/api/getSentinelOneScriptTaskStatus',
             method: 'post',
             data: { parentTaskId }
+        })
+    },
+
+    fetchWizIntegration() {
+        return request({
+            url: '/api/fetchWizIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addWizTrafficSource() {
+        return request({
+            url: '/api/addWizTrafficSource',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    removeWizTrafficSource() {
+        return request({
+            url: '/api/removeWizTrafficSource',
+            method: 'post',
+            data: {}
         })
     },
 

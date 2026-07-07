@@ -1,4 +1,5 @@
-import { Text, HorizontalStack } from "@shopify/polaris"
+import { Text, HorizontalStack, Icon, Tooltip } from "@shopify/polaris"
+import { StatusActiveMajor, DiamondAlertMinor, RefreshMinor } from "@shopify/polaris-icons"
 import { useEffect, useReducer, useState, useCallback } from "react"
 import values from "@/util/values";
 import { produce } from "immer"
@@ -23,10 +24,11 @@ const createHeading = (text, value = null, sortKey = null) => ({
 });
 
 const headings = [
-    createHeading("Agent ID", "agentId"),
+    { ...createHeading("Status", "statusComp"), sortActive: false },
     createHeading("Hostname", "hostname"),
     createHeading("Device ID", "deviceId"),
     createHeading("Agent Version", "agentVersion"),
+    createHeading("OS", "osComp", "os"),
     createHeading("Username", "username"),
     createHeading("Last Heartbeat", "lastHeartbeatComp", "lastHeartbeat"),
     createHeading("Last Deployed", "lastDeployedComp", "lastDeployed")
@@ -41,14 +43,17 @@ const createSortOptions = (label, sortKey, columnIndex, isTimeField = false) => 
     ];
 };
 
+// columnIndex must equal (heading index + 1) — GithubServerTable.handleSort matches
+// the Polaris heading index `col` against `columnIndex === col + 1`. The leading
+// non-sortable "Status" column occupies heading index 0, so sortable columns start at 2.
 const sortOptions = [
-    ...createSortOptions('Agent ID', 'agentId', 1),
     ...createSortOptions('Hostname', 'hostname', 2),
     ...createSortOptions('Device ID', 'deviceId', 3),
     ...createSortOptions('Agent Version', 'agentVersion', 4),
-    ...createSortOptions('Username', 'username', 5),
-    ...createSortOptions('Last Heartbeat', 'lastHeartbeat', 6, true),
-    ...createSortOptions('Last Deployed', 'lastDeployed', 7, true)
+    ...createSortOptions('OS', 'os', 5),
+    ...createSortOptions('Username', 'username', 6),
+    ...createSortOptions('Last Heartbeat', 'lastHeartbeat', 7, true),
+    ...createSortOptions('Last Deployed', 'lastDeployed', 8, true)
 ];
 
 const createFilter = (key, label) => ({
@@ -63,12 +68,76 @@ const resourceName = {
     plural: 'agents',
 };
 
-const convertDataIntoTableFormat = (agentData) => ({
-    ...agentData,
-    id: agentData?.agentId,
-    lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
-    lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed)
-});
+const OS_ICON_MAP = { darwin: '/public/os-mac.svg', mac: '/public/os-mac.svg', windows: '/public/os-windows.svg', linux: '/public/os-linux.svg' };
+
+const getOsIcon = (os) => {
+    if (!os || os === DEFAULT_VALUE) return null;
+    const key = os.toLowerCase();
+    for (const [prefix, icon] of Object.entries(OS_ICON_MAP)) {
+        if (key.includes(prefix)) return icon;
+    }
+    return null;
+};
+
+const getStatusComp = (installStatus, lastHeartbeat) => {
+    if (installStatus === 'installing') {
+        return (
+            <Tooltip content="Installation in progress" dismissOnMouseOut>
+                <Icon source={RefreshMinor} color="warning" />
+            </Tooltip>
+        );
+    }
+    if (installStatus === 'failed') {
+        return (
+            <Tooltip content="Installation failed" dismissOnMouseOut>
+                <Icon source={DiamondAlertMinor} color="critical" />
+            </Tooltip>
+        );
+    }
+    if (lastHeartbeat > 0) {
+        return (
+            <Tooltip content="Running" dismissOnMouseOut>
+                <Icon source={StatusActiveMajor} color="success" />
+            </Tooltip>
+        );
+    }
+    return null;
+};
+
+const convertDataIntoTableFormat = (agentData) => {
+    const os = agentData?.os;
+    const osDisplayName = agentData?.osDisplayName;
+    const displayOs = (osDisplayName && osDisplayName !== DEFAULT_VALUE) ? osDisplayName : (os && os !== DEFAULT_VALUE ? os : null);
+    const osIcon = getOsIcon(os);
+    const osComp = displayOs ? (
+        <HorizontalStack gap="1" wrap={false} blockAlign="center">
+            {osIcon && <img src={osIcon} alt={os} style={{ width: '16px', height: '16px', flexShrink: 0 }} />}
+            <Text variant="bodySm">{displayOs}</Text>
+        </HorizontalStack>
+    ) : DEFAULT_VALUE;
+
+    return {
+        ...agentData,
+        id: agentData?.agentId,
+        lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
+        lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed),
+        osComp,
+        statusComp: getStatusComp(agentData?.installStatus, agentData?.lastHeartbeat),
+    };
+};
+
+const deduplicateAgents = (agents) => {
+    const map = new Map();
+    for (const agent of agents) {
+        const key = agent.hostname || agent.deviceId;
+        if (!key) continue;
+        const existing = map.get(key);
+        if (!existing || agent.lastHeartbeat > existing.lastHeartbeat) {
+            map.set(key, agent);
+        }
+    }
+    return Array.from(map.values());
+};
 
 function EndpointShieldMetadata() {
 
@@ -83,7 +152,8 @@ function EndpointShieldMetadata() {
     const [filters, setFilters] = useState([
         createFilter('username', 'Username'),
         createFilter('hostname', 'Hostname'),
-        createFilter('deviceId', 'Device ID')
+        createFilter('deviceId', 'Device ID'),
+        createFilter('os', 'OS')
     ]);
 
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
@@ -109,9 +179,31 @@ function EndpointShieldMetadata() {
                 username: module.additionalData?.username || DEFAULT_VALUE,
                 lastHeartbeat: module.lastHeartbeatReceived || 0,
                 lastDeployed: module.startedTs || 0,
+                os: module.additionalData?.os || DEFAULT_VALUE,
+                osDisplayName: module.additionalData?.osDisplayName || DEFAULT_VALUE,
+                osVersion: module.additionalData?.osVersion || DEFAULT_VALUE,
+                arch: module.additionalData?.arch || DEFAULT_VALUE,
+                kernelVersion: module.additionalData?.kernelVersion || DEFAULT_VALUE,
+                totalRamGB: module.additionalData?.totalRamGB ?? DEFAULT_VALUE,
+                cpuCount: module.additionalData?.cpuCount ?? DEFAULT_VALUE,
+                isVM: module.additionalData?.isVM ?? null,
+                locale: module.additionalData?.locale || DEFAULT_VALUE,
+                timezone: module.additionalData?.timezone || DEFAULT_VALUE,
+                publicIP: module.additionalData?.publicIP || DEFAULT_VALUE,
+                cpuModel: module.additionalData?.cpuModel || DEFAULT_VALUE,
+                macModel: module.additionalData?.macModel || DEFAULT_VALUE,
+                totalDiskGB: module.additionalData?.totalDiskGB ?? DEFAULT_VALUE,
+                availableDiskGB: module.additionalData?.availableDiskGB ?? DEFAULT_VALUE,
+                localIP: module.additionalData?.localIP || DEFAULT_VALUE,
+                localHostname: module.additionalData?.localHostname || DEFAULT_VALUE,
+                userFullName: module.additionalData?.userFullName || DEFAULT_VALUE,
+                userShell: module.additionalData?.userShell || DEFAULT_VALUE,
+                bootTime: module.additionalData?.bootTime || null,
+                installedApps: module.additionalData?.installedApps || [],
+                installStatus: module.additionalData?.installStatus || null,
                 _moduleData: module
             }));
-            setEndpointShieldData({ agents });
+            setEndpointShieldData({ agents: deduplicateAgents(agents) });
         } catch (error) {
         }
     }, []);
@@ -134,9 +226,31 @@ function EndpointShieldMetadata() {
             username: module.additionalData?.username || DEFAULT_VALUE,
             lastHeartbeat: module.lastHeartbeatReceived || 0,
             lastDeployed: module.startedTs || 0,
+            os: module.additionalData?.os || DEFAULT_VALUE,
+            osDisplayName: module.additionalData?.osDisplayName || DEFAULT_VALUE,
+            osVersion: module.additionalData?.osVersion || DEFAULT_VALUE,
+            arch: module.additionalData?.arch || DEFAULT_VALUE,
+            kernelVersion: module.additionalData?.kernelVersion || DEFAULT_VALUE,
+            totalRamGB: module.additionalData?.totalRamGB ?? DEFAULT_VALUE,
+            cpuCount: module.additionalData?.cpuCount ?? DEFAULT_VALUE,
+            isVM: module.additionalData?.isVM ?? null,
+            locale: module.additionalData?.locale || DEFAULT_VALUE,
+            timezone: module.additionalData?.timezone || DEFAULT_VALUE,
+            publicIP: module.additionalData?.publicIP || DEFAULT_VALUE,
+            cpuModel: module.additionalData?.cpuModel || DEFAULT_VALUE,
+            macModel: module.additionalData?.macModel || DEFAULT_VALUE,
+            totalDiskGB: module.additionalData?.totalDiskGB ?? DEFAULT_VALUE,
+            availableDiskGB: module.additionalData?.availableDiskGB ?? DEFAULT_VALUE,
+            localIP: module.additionalData?.localIP || DEFAULT_VALUE,
+            localHostname: module.additionalData?.localHostname || DEFAULT_VALUE,
+            userFullName: module.additionalData?.userFullName || DEFAULT_VALUE,
+            userShell: module.additionalData?.userShell || DEFAULT_VALUE,
+            bootTime: module.additionalData?.bootTime || null,
+            installedApps: module.additionalData?.installedApps || [],
+            installStatus: module.additionalData?.installStatus || null,
             _moduleData: module
         }));
-        setEndpointShieldData({ agents });
+        setEndpointShieldData({ agents: deduplicateAgents(agents) });
         setSelectedAgent(prev => {
             if (!prev) return prev;
             const fresh = agents.find(a => a.agentId === prev.agentId);
@@ -147,13 +261,15 @@ function EndpointShieldMetadata() {
     useEffect(() => {
         if (endpointShieldData?.agents) {
             const agentsData = endpointShieldData.agents;
-            const uniqueUsernames = [...new Set(agentsData.map(a => a.username).filter(Boolean))];
+            const uniqueUsernames = [...new Set(agentsData.map(a => a.username).filter(v => v && v !== DEFAULT_VALUE))];
             const uniqueHostnames = [...new Set(agentsData.map(a => a.hostname).filter(Boolean))];
-            const uniqueDeviceIds = [...new Set(agentsData.map(a => a.deviceId).filter(Boolean))];
+            const uniqueDeviceIds = [...new Set(agentsData.map(a => a.deviceId).filter(v => v && v !== DEFAULT_VALUE))];
+            const uniqueOSValues = [...new Set(agentsData.map(a => a.os).filter(v => v && v !== DEFAULT_VALUE))];
             setFilters([
                 { ...createFilter('username', 'Username'), choices: uniqueUsernames.map(u => ({ label: u, value: u })) },
                 { ...createFilter('hostname', 'Hostname'), choices: uniqueHostnames.map(h => ({ label: h, value: h })) },
-                { ...createFilter('deviceId', 'Device ID'), choices: uniqueDeviceIds.map(d => ({ label: d, value: d })) }
+                { ...createFilter('deviceId', 'Device ID'), choices: uniqueDeviceIds.map(d => ({ label: d, value: d })) },
+                { ...createFilter('os', 'OS'), choices: uniqueOSValues.map(o => ({ label: o, value: o })) }
             ]);
         }
     }, [endpointShieldData]);
@@ -169,6 +285,7 @@ function EndpointShieldMetadata() {
                 if (filters.username?.length > 0 && !filters.username.includes(agent.username)) return false;
                 if (filters.hostname?.length > 0 && !filters.hostname.includes(agent.hostname)) return false;
                 if (filters.deviceId?.length > 0 && !filters.deviceId.includes(agent.deviceId)) return false;
+                if (filters.os?.length > 0 && !filters.os.includes(agent.os)) return false;
                 if (queryValue) {
                     const q = queryValue.toLowerCase();
                     if (!agent.agentId?.toLowerCase().includes(q) &&

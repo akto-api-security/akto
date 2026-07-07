@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!-- Baseline schema for common DB collections (shared across all accounts) -->
+
+    <changeSet id="baseline-accounts-collection" author="akto">
+        <mongodb:createCollection collectionName="accounts"/>
+    </changeSet>
+
+    <changeSet id="baseline-api-collection-icons-collection" author="akto">
+        <mongodb:createCollection collectionName="api_collection_icons"/>
+    </changeSet>
+
+    <changeSet id="baseline-api-collection-icons-index-0" author="akto">
+        <mongodb:createIndex collectionName="api_collection_icons">
+            <mongodb:keys>{ &quot;domainName&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;domainName_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api-collection-icons-index-1" author="akto">
+        <mongodb:createIndex collectionName="api_collection_icons">
+            <mongodb:keys>{ &quot;matchingHostnames&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;matchingHostnames_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-api-configs-collection" author="akto">
+        <mongodb:createCollection collectionName="api_configs"/>
+    </changeSet>
+
+    <changeSet id="baseline-api-tokens-collection" author="akto">
+        <mongodb:createCollection collectionName="api_tokens"/>
+    </changeSet>
+
+    <changeSet id="baseline-configs-collection" author="akto">
+        <mongodb:createCollection collectionName="configs"/>
+    </changeSet>
+
+    <changeSet id="baseline-invite-codes-collection" author="akto">
+        <mongodb:createCollection collectionName="invite_codes"/>
+    </changeSet>
+
+    <changeSet id="baseline-kafka-health-metrics-collection" author="akto">
+        <mongodb:createCollection collectionName="kafka_health_metrics"/>
+    </changeSet>
+
+    <changeSet id="baseline-oauth-states-collection" author="akto">
+        <mongodb:createCollection collectionName="oauth_states"/>
+    </changeSet>
+
+    <changeSet id="baseline-oauth-states-index-0" author="akto">
+        <mongodb:createIndex collectionName="oauth_states">
+            <mongodb:keys>{ &quot;nonce&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;nonce_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-otp-test-data-collection" author="akto">
+        <mongodb:createCollection collectionName="otp_test_data"/>
+    </changeSet>
+
+    <changeSet id="baseline-rbac-collection" author="akto">
+        <mongodb:createCollection collectionName="rbac"/>
+    </changeSet>
+
+    <changeSet id="baseline-rbac-index-0" author="akto">
+        <mongodb:createIndex collectionName="rbac">
+            <mongodb:keys>{ &quot;userId&quot;: 1, &quot;accountId&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;userId-accountId_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-setup-collection" author="akto">
+        <mongodb:createCollection collectionName="setup"/>
+    </changeSet>
+
+    <changeSet id="baseline-signup-info-collection" author="akto">
+        <mongodb:createCollection collectionName="signup_info"/>
+    </changeSet>
+
+    <changeSet id="baseline-sso-configs-collection" author="akto">
+        <mongodb:createCollection collectionName="sso_configs"/>
+    </changeSet>
+
+    <changeSet id="baseline-testing-instance-heart-beat-collection" author="akto">
+        <mongodb:createCollection collectionName="testing_instance_heart_beat"/>
+    </changeSet>
+
+    <changeSet id="baseline-testing-run-webhook-collection" author="akto">
+        <mongodb:createCollection collectionName="testing_run_webhook"/>
+    </changeSet>
+
+    <changeSet id="baseline-testing-run-webhook-index-0" author="akto">
+        <mongodb:createIndex collectionName="testing_run_webhook">
+            <mongodb:keys>{ &quot;expiresAt&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;expiresAt_1&quot;, &quot;expireAfterSeconds&quot;: 0 }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-testing-run-webhook-index-1" author="akto">
+        <mongodb:createIndex collectionName="testing_run_webhook">
+            <mongodb:keys>{ &quot;uuid&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;uuid_1&quot;, &quot;unique&quot;: true }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-users-collection" author="akto">
+        <mongodb:createCollection collectionName="users"/>
+    </changeSet>
+
+    <changeSet id="baseline-users-index-0" author="akto">
+        <mongodb:createIndex collectionName="users">
+            <mongodb:keys>{ &quot;login&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;login_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-agent-health-check-collection" author="akto">
+        <mongodb:createCollection collectionName="agent_health_check"/>
+    </changeSet>
+
+    <changeSet id="baseline-compliance-infos-collection" author="akto">
+        <mongodb:createCollection collectionName="compliance_infos"/>
+    </changeSet>
+
+    <changeSet id="baseline-guardrail-compliance-infos-collection" author="akto">
+        <mongodb:createCollection collectionName="guardrail_compliance_infos"/>
+    </changeSet>
+
+    <changeSet id="baseline-ip-reputation-scores-collection" author="akto">
+        <mongodb:createCollection collectionName="ip_reputation_scores"/>
+    </changeSet>
+
+    <changeSet id="baseline-ip-reputation-scores-index-0" author="akto">
+        <mongodb:createIndex collectionName="ip_reputation_scores">
+            <mongodb:keys>{ &quot;ip&quot;: -1, &quot;timestamp&quot;: -1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;ip-timestamp_-1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-jobs-collection" author="akto">
+        <mongodb:createCollection collectionName="jobs"/>
+    </changeSet>
+
+    <changeSet id="baseline-jobs-index-0" author="akto">
+        <mongodb:createIndex collectionName="jobs">
+            <mongodb:keys>{ &quot;jobExecutorType&quot;: 1, &quot;jobStatus&quot;: 1, &quot;scheduledAt&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;jobExecut-jobStatus-scheduled_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-jobs-index-1" author="akto">
+        <mongodb:createIndex collectionName="jobs">
+            <mongodb:keys>{ &quot;jobExecutorType&quot;: 1, &quot;jobStatus&quot;: 1, &quot;heartbeatAt&quot;: 1 }</mongodb:keys>
+            <mongodb:options>{ &quot;name&quot;: &quot;jobExecut-jobStatus-heartbeat_1&quot; }</mongodb:options>
+        </mongodb:createIndex>
+    </changeSet>
+
+    <changeSet id="baseline-remediations-collection" author="akto">
+        <mongodb:createCollection collectionName="remediations"/>
+    </changeSet>
+
+    <changeSet id="baseline-threat-compliance-infos-collection" author="akto">
+        <mongodb:createCollection collectionName="threat_compliance_infos"/>
+    </changeSet>
+</databaseChangeLog>

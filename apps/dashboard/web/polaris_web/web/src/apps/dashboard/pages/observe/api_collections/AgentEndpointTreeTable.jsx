@@ -35,12 +35,11 @@ const parentHeadersBase = [
     {
         title: "Username",
         text: "Username",
-        value: "username",
+        value: "usernameComp",
         filterKey: "username",
         textValue: 'username',
         showFilter: true,
-        isText: CellType.TEXT,
-        boxWidth: '100px'
+        boxWidth: '100px',
     },
     {
         title: <HeadingWithTooltip content={<Text variant="bodySm">Risk score of collection is maximum risk score of the endpoints inside this collection</Text>} title="Risk score" />,
@@ -289,6 +288,11 @@ const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expand
             endpointId: group.endpointId,
             displayName: group.endpointId,
             username: group.username || '-',
+            usernameComp: (
+                <Box maxWidth="100px">
+                    <TooltipText tooltip={group.username || '-'} text={group.username || '-'} />
+                </Box>
+            ),
             riskScore: group.riskScore || 0,
             sensitiveInRespTypes: group.sensitiveInRespTypes || [],
             detectedTimestamp: group.detectedTimestamp || 0,

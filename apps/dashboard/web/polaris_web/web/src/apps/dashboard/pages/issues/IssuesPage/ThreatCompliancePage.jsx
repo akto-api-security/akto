@@ -10,17 +10,18 @@ import DateRangeFilter from "../../../components/layouts/DateRangeFilter.jsx";
 import { produce } from "immer";
 import "./style.css"
 import values from "@/util/values";
-import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
+import { isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import threatDetectionApi from "../../threat_detection/api.js"
 import SessionStore from "../../../../main/SessionStore"
-import { resolveComplianceClauseMap } from "../../threat_detection/utils/formatUtils"
+import { resolveComplianceClauseMap, mergePolicyComplianceMap } from "../../threat_detection/utils/formatUtils"
+import guardrailApi from "../../guardrails/api"
 import ShowListInBadge from "../../../components/shared/ShowListInBadge";
 import { CellType } from "../../../components/tables/rows/GithubRow.js";
 import SampleDetails from "../../threat_detection/components/SampleDetails";
 import useTable from "../../../components/tables/TableContext.js";
 import TableStore from "../../../components/tables/TableStore.js";
 import transform from "../transform.js";
-import ComplianceMenu from "./ComplianceMenu.jsx";
+import ComplianceMenu, { getCompliances } from "./ComplianceMenu.jsx";
 import useThreatReportDownload from "../../../hooks/useThreatReportDownload";
 import { updateThreatFiltersStore } from "../../threat_detection/utils/threatFilters";
 import { redactSampleDataByKeywords } from "../../threat_detection/utils/redactSampleData";
@@ -37,18 +38,6 @@ const resourceName = {
     plural: 'threats',
 };
 
-const getCompliances = () => {
-    const isMCP = isMCPSecurityCategory();
-    const isGenAiSecurity = isGenAISecurityCategory();
-    const isAgenticSecurity = isAgenticSecurityCategory();
-    const isEndpointSecurity = isEndpointSecurityCategory();
-
-    if (isMCP || isAgenticSecurity || isGenAiSecurity ||  isEndpointSecurity) {
-        return ["OWASP Agentic Top 10", "OWASP Agentic Skills Top 10", "OWASP LLM", "EU AI Act", "NIST AI Risk Management Framework", "CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP", "MITRE ATLAS"];
-    }
-
-    return ["CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP"];
-};
 
 const allCompliances = getCompliances();
 
@@ -125,17 +114,19 @@ function ThreatCompliancePage() {
 
                 // Agentic/Endpoint Security: guardrails/{capability}.conf
                 if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+                    const capabilityKeyedMap = {};
                     const guardrailComplianceResp = await threatDetectionApi.fetchGuardrailComplianceInfos();
-                    if (guardrailComplianceResp?.guardrailComplianceInfos && Array.isArray(guardrailComplianceResp.guardrailComplianceInfos)) {
-                        // Key by capability name (strip "guardrails/" prefix and ".conf" suffix)
-                        // so resolveComplianceClauseMap can look up by capability directly
-                        const capabilityKeyedMap = {};
-                        guardrailComplianceResp.guardrailComplianceInfos.forEach((entry) => {
-                            const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
-                            if (capability) capabilityKeyedMap[capability] = entry.mapComplianceToListClauses;
-                        });
-                        setGuardrailComplianceMap(capabilityKeyedMap);
+                    (guardrailComplianceResp?.guardrailComplianceInfos || []).forEach((entry) => {
+                        const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
+                        if (capability) capabilityKeyedMap[capability] = entry.mapComplianceToListClauses;
+                    });
+                    try {
+                        const policiesResp = await guardrailApi.fetchGuardrailPolicies();
+                        mergePolicyComplianceMap(capabilityKeyedMap, policiesResp?.guardrailPolicies);
+                    } catch (e) {
+                        console.error("Failed to load guardrail policies for compliance:", e);
                     }
+                    setGuardrailComplianceMap(capabilityKeyedMap);
                 }
 
                 setThreatFiltersMap(updatedThreatFiltersMap);
@@ -157,7 +148,7 @@ function ThreatCompliancePage() {
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges[5]
+        values.ranges.find((r) => r.alias === 'last7days') || values.ranges[2]
     );
 
     const getTimeEpoch = (key) => {
@@ -874,6 +865,10 @@ function ThreatCompliancePage() {
     const threatFiltersCount = threatFiltersMap ? Object.keys(threatFiltersMap).length : 0;
     const guardrailComplianceCount = guardrailComplianceMap ? Object.keys(guardrailComplianceMap).length : 0;
     const key = startTimestamp + endTimestamp + currentTab + complianceView + threatFiltersCount + guardrailComplianceCount;
+    // Agentic/Endpoint accounts can have an empty threatFiltersMap even with real threat data, so also check guardrailComplianceMap.
+    const noComplianceDataAvailable = needsGuardrailCompliance
+        ? (threatFiltersCount === 0 && guardrailComplianceCount === 0)
+        : threatFiltersCount === 0;
 
     return (
         <PageWithMultipleCards
@@ -918,7 +913,7 @@ function ThreatCompliancePage() {
                             <Spinner size="large" />
                         </HorizontalStack>
                     </Box>
-                ] : (!threatFiltersMap || Object.keys(threatFiltersMap).length === 0) ? [
+                ] : noComplianceDataAvailable ? [
                     <EmptyScreensLayout
                         key="emptyScreen"
                         iconSrc={"/public/alert_hexagon.svg"}

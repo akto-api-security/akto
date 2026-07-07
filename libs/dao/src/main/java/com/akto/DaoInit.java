@@ -467,7 +467,8 @@ public class DaoInit {
                 new EnumCodec<>(GlobalEnums.DashboardCategory.class),
                 new EnumCodec<>(McpRegistryConfig.RegistryType.class),
                 new EnumCodec<>(McpAllowlist.Source.class),
-                new EnumCodec<>(GuardrailPolicies.ModelRole.class)
+                new EnumCodec<>(GuardrailPolicies.ModelRole.class),
+                new EnumCodec<>(Log.ActivityType.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
@@ -570,5 +571,6 @@ public class DaoInit {
         AgentUsersDao.instance.createIndicesIfAbsent();
         OAuthStatesDao.instance.createIndicesIfAbsent();
         AgentGuardCorpusDao.instance.createIndicesIfAbsent();
+        AgentGuardCorpusQueueDao.instance.createIndicesIfAbsent();
     }
 }

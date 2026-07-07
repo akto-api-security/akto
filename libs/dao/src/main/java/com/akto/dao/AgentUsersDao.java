@@ -60,7 +60,9 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         }
 
         updates.add(Updates.set(AgenticUsers.USER_NAME, trimmedName));
-        updates.add(Updates.set(AgenticUsers.USER_EMAIL, userEmail == null ? "" : userEmail.trim()));
+        if (userEmail != null && !userEmail.trim().isEmpty()) {
+            updates.add(Updates.set(AgenticUsers.USER_EMAIL, userEmail.trim()));
+        }
         updates.add(Updates.set(AgenticUsers.TEAM_NAME, effectiveTeam));
         updates.add(Updates.set(AgenticUsers.USER_ROLE, effectiveRole));
         updates.add(Updates.set(AgenticUsers.LAST_UPDATED_AT, Context.now()));
@@ -68,7 +70,22 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         if (teamSourceToWrite != null) updates.add(Updates.set(AgenticUsers.TEAM_SOURCE, teamSourceToWrite));
         if (roleSourceToWrite != null) updates.add(Updates.set(AgenticUsers.ROLE_SOURCE, roleSourceToWrite));
 
-        instance.updateOne(Filters.eq(AgenticUsers.USER_NAME, trimmedName), Updates.combine(updates));
+        if (existing == null) {
+            AgenticUsers newUser = new AgenticUsers();
+            newUser.setUserName(trimmedName);
+            if (userEmail != null && !userEmail.trim().isEmpty()) {
+                newUser.setUserEmail(userEmail.trim());
+            }
+            newUser.setTeamName(effectiveTeam);
+            newUser.setUserRole(effectiveRole);
+            newUser.setTeamSource(teamSourceToWrite != null ? teamSourceToWrite : AgenticUsers.SOURCE_MANUAL);
+            newUser.setRoleSource(roleSourceToWrite != null ? roleSourceToWrite : AgenticUsers.SOURCE_MANUAL);
+            newUser.setLastUpdatedAt(Context.now());
+            newUser.setLastUpdatedBy(lastUpdatedBy);
+            instance.insertOne(newUser);
+        } else {
+            instance.updateMany(Filters.eq(AgenticUsers.USER_NAME, trimmedName), Updates.combine(updates));
+        }
     }
 
     /** SSO write — skips teamName/userRole if already pinned as "manual" by a dashboard override. */

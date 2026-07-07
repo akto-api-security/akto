@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
+import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
+import guardrailApi from "../../api";
 
 // URL validation function
 const validateUrl = (url) => {
@@ -34,6 +36,8 @@ export const CustomGuardrailsConfig = {
     }
 };
 
+const PROMPT_MIN_LENGTH = 10;
+
 const CustomGuardrailsStep = ({
     // LLM prompt based rule
     enableLlmPrompt,
@@ -42,6 +46,9 @@ const CustomGuardrailsStep = ({
     setLlmRule,
     llmConfidenceScore,
     setLlmConfidenceScore,
+    // LLM rule compliance (controlled by parent)
+    llmCompliance,
+    setLlmCompliance,
     // External model based evaluation
     enableExternalModel,
     setEnableExternalModel,
@@ -51,8 +58,77 @@ const CustomGuardrailsStep = ({
     setConfidenceScore
 }) => {
     const [urlError, setUrlError] = useState("");
+    const [llmRuleCompliance, setLlmRuleCompliance] = useState({ loading: false, suggested: {}, accepted: {} });
+    const requestIdRef = useRef(0);
+    const debounceTimerRef = useRef(null);
+    const isInitialMount = useRef(true);
 
-    // Handle URL input with validation
+    useEffect(() => {
+        if (llmCompliance && Object.keys(llmCompliance).length > 0) {
+            const accepted = Object.keys(llmCompliance).reduce((acc, framework) => { acc[framework] = true; return acc; }, {});
+            setLlmRuleCompliance({ loading: false, suggested: llmCompliance, accepted });
+        }
+    }, []);
+
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+        const rule = (llmRule || "").trim();
+        clearTimeout(debounceTimerRef.current);
+
+        if (rule.length < PROMPT_MIN_LENGTH) {
+            clearCompliance();
+            return;
+        }
+
+        debounceTimerRef.current = setTimeout(() => {
+            fetchLlmCompliance(rule);
+        }, 1000);
+
+        return () => clearTimeout(debounceTimerRef.current);
+    }, [llmRule]);
+
+    const fetchLlmCompliance = async (rule) => {
+        const reqId = ++requestIdRef.current;
+        setLlmRuleCompliance(prev => ({ ...prev, loading: true }));
+        try {
+            const resp = await guardrailApi.suggestGuardrailCompliance('llm_rule', { llmRule: rule });
+            if (reqId !== requestIdRef.current) return;
+            const suggested = resp?.response?.mapComplianceToListClauses || {};
+            const accepted = Object.keys(suggested).reduce((acc, framework) => {
+                acc[framework] = true;
+                return acc;
+            }, {});
+            setLlmRuleCompliance({ loading: false, suggested, accepted });
+            setLlmCompliance(buildComplianceMap(suggested, accepted));
+        } catch (error) {
+            if (reqId !== requestIdRef.current) return;
+            console.error('Error fetching compliance suggestions:', error);
+            setLlmRuleCompliance({ loading: false, suggested: {}, accepted: {} });
+        }
+    };
+
+    const clearCompliance = () => {
+        requestIdRef.current++;
+        setLlmRuleCompliance({ loading: false, suggested: {}, accepted: {} });
+        setLlmCompliance({});
+    };
+
+    const toggleLlmFramework = (framework) => {
+        const currentEntry = llmRuleCompliance;
+        const isAccepted = !!currentEntry.accepted[framework];
+        const newAccepted = { ...currentEntry.accepted };
+        if (isAccepted) {
+            delete newAccepted[framework];
+        } else {
+            newAccepted[framework] = true;
+        }
+        setLlmRuleCompliance({ ...currentEntry, accepted: newAccepted });
+        setLlmCompliance(buildComplianceMap(currentEntry.suggested, newAccepted));
+    };
+
     const handleUrlChange = (value) => {
         setUrl(value);
         if (value && value.trim() && !validateUrl(value.trim())) {
@@ -99,6 +175,13 @@ const CustomGuardrailsStep = ({
                                     step={0.1}
                                     output
                                     helpText="Content will be blocked if the LLM's confidence score exceeds this threshold"
+                                />
+
+                                <ComplianceMappingTags
+                                    loading={llmRuleCompliance.loading}
+                                    complianceMap={buildComplianceMap(llmRuleCompliance.suggested, llmRuleCompliance.accepted)}
+                                    onRemove={toggleLlmFramework}
+                                    onAdd={Object.keys(llmRuleCompliance.suggested).length > 0 ? toggleLlmFramework : undefined}
                                 />
                             </FormLayout>
                         </Box>

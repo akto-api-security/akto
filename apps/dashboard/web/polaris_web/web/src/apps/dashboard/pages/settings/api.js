@@ -888,6 +888,13 @@ const settingRequests = {
             data: { username, team, userRole }
         })
     },
+    async bulkUpdateUserDeviceTag(usernames, team, userRole) {
+        return await request({
+            url: '/api/bulkUpdateUserDeviceTag',
+            method: 'post',
+            data: { usernames, team, userRole }
+        })
+    },
     async fetchAgenticUsers(params = {}) {
         return await request({
             url: '/api/fetchAgenticUsers',
@@ -984,14 +991,29 @@ const settingRequests = {
             }
         })
     },
-    getAgentLogs(agentId, startTime, endTime) {
+    getAgentLogs(agentId, startTime, endTime, logKey = null, afterId = null, pageSize = 500) {
         return request({
             url: '/api/getAgentLogs',
             method: 'post',
             data: {
                 agentId,
                 startTime,
-                endTime
+                endTime,
+                pageSize,
+                ...(logKey ? { logKey } : {}),
+                ...(afterId ? { afterId } : {})
+            }
+        })
+    },
+    exportAgentLogs(agentId, startTime, endTime, logKey = null) {
+        return request({
+            url: '/api/exportAgentLogs',
+            method: 'post',
+            data: {
+                agentId,
+                startTime,
+                endTime,
+                ...(logKey ? { logKey } : {})
             }
         })
     },
@@ -1098,20 +1120,6 @@ const settingRequests = {
     removeWizIntegration() {
         return request({
             url: '/api/removeWizIntegration',
-            method: 'post',
-            data: {}
-        })
-    },
-    addWizTrafficSource() {
-        return request({
-            url: '/api/addWizTrafficSource',
-            method: 'post',
-            data: {}
-        })
-    },
-    removeWizTrafficSource() {
-        return request({
-            url: '/api/removeWizTrafficSource',
             method: 'post',
             data: {}
         })

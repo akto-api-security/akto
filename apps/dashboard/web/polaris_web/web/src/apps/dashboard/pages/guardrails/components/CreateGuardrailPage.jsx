@@ -7,7 +7,8 @@ import {
     Box,
     Icon,
     Button,
-    Badge
+    Badge,
+    Spinner
 } from "@shopify/polaris";
 import {
     CancelMajor,
@@ -26,6 +27,7 @@ import {
     resolveStoredPolicyBehaviour
 } from '../utils';
 import { getDefaultGeneralBlockTopics, GENERAL_BLOCKS, isGeneralBlockTopic, toDeniedTopic } from '../generalBlocks';
+import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from './enterpriseLicenseComplianceCatalog';
 import { groupCollectionsByAgent, groupCollectionsByService, extractServiceName } from '../../observe/agentic/constants';
 import { isEndpointSecurityCategory } from '../../../../main/labelHelper';
 import func from "@/util/func";
@@ -51,7 +53,11 @@ import {
     BlockedHostsStep,
     BlockedHostsConfig,
     ServerSettingsStep,
-    ServerSettingsConfig
+    ServerSettingsConfig,
+    EnterpriseLicenseComplianceStep,
+    EnterpriseLicenseComplianceConfig,
+    ExceptionsStep,
+    ExceptionsConfig
 } from './steps';
 import "./createGuardrailPage.css";
 
@@ -68,12 +74,11 @@ const groupToOption = (g) => ({
 // Converts stored V2 server entries back to the option-value keys used by the dropdowns.
 // Works for all stored formats: numeric collection ID, full hostname, or short service key.
 const reverseToServiceKeys = (v2Servers, allCollections) => {
-    const isArgus = !isEndpointSecurityCategory();
     const keys = (v2Servers || []).map(s => {
         const col = (allCollections || []).find(c => c.id?.toString() === s.id?.toString());
         const rawName = col ? (col.hostName || col.displayName || '') : (s.name || String(s.id || ''));
         // Argus stores full hostnames as option keys — don't extract service name
-        if (isArgus) return rawName;
+        if (!isEndpointSecurityCategory()) return rawName;
         return extractServiceName(rawName) || rawName;
     });
     return [...new Set(keys)];
@@ -166,13 +171,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableLlmPrompt, setEnableLlmPrompt] = useState(false);
     const [llmPrompt, setLlmPrompt] = useState("");
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
+    const [llmCompliance, setLlmCompliance] = useState({});
     const [enableExternalModel, setEnableExternalModel] = useState(false);
     const [url, setUrl] = useState("");
     const [confidenceScore, setConfidenceScore] = useState(25);
 
     // Step 7: Usage based Guardrails
     const [enableTokenLimit, setEnableTokenLimit] = useState(false);
-    const [tokenLimitConfidenceScore, setTokenLimitConfidenceScore] = useState(0.7);
+    const [tokenLimitThreshold, setTokenLimitThreshold] = useState(4096);
 
     // Step 9: Tools Guardrails
     const [enableToolMisuse, setEnableToolMisuse] = useState(true);
@@ -184,6 +190,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [blockedHosts, setBlockedHosts] = useState([]);
     const [blockPersonalAccounts, setBlockPersonalAccounts] = useState(false);
     const [browserConfigs, setBrowserConfigs] = useState([]);
+
+    // Step 13: Exceptions — phrases excluded from evaluation before this policy's detectors run
+    const [ignorePhrases, setIgnorePhrases] = useState([]);
 
     // Step 10: Server settings
     const [applyToAllServers, setApplyToAllServers] = useState(true);
@@ -198,8 +207,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [applyToAllUsers, setApplyToAllUsers] = useState(true);
     const [targetTeams, setTargetTeams] = useState([]);
     const [targetRoles, setTargetRoles] = useState([]);
+    const [enterpriseLicenseComplianceCategories, setEnterpriseLicenseComplianceCategories] = useState([]);
+
     const [agenticUsers, setAgenticUsers] = useState([]);
     const [usersLoading, setUsersLoading] = useState(false);
+    const [deviceList, setDeviceList] = useState([]);
 
     // Collections data
     const [mcpServers, setMcpServers] = useState([]);
@@ -268,13 +280,15 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         confidenceScore,
         // Step 7
         enableTokenLimit,
-        tokenLimitConfidenceScore,
+        tokenLimitThreshold,
         // Step 9
         enableToolMisuse,
         enableMaliciousTools,
         enableToolNameDescriptionMismatch,
         // Step 11
         blockedHosts,
+        // Step 13
+        ignorePhrases,
         // Step 10
         applyToAllServers,
         selectedMcpServers,
@@ -289,6 +303,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         applyToAllUsers,
         targetTeams,
         targetRoles,
+        enterpriseLicenseComplianceCategories,
         serverScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllServers &&
             (selectedMcpServers || []).length === 0 &&
             (selectedAgentServers || []).length === 0 &&
@@ -350,6 +365,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 title: AnomalyDetectionConfig.title,
                 summary: AnomalyDetectionConfig.getSummary(storedStateData),
                 ...AnomalyDetectionConfig.validate(storedStateData)
+            },
+            {
+                number: EnterpriseLicenseComplianceConfig.number,
+                title: EnterpriseLicenseComplianceConfig.title,
+                summary: EnterpriseLicenseComplianceConfig.getSummary(storedStateData),
+                beta: true,
+                ...EnterpriseLicenseComplianceConfig.validate(storedStateData)
             }
         ];
 
@@ -367,6 +389,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             title: BlockedHostsConfig.title,
             summary: BlockedHostsConfig.getSummary(storedStateData),
             ...BlockedHostsConfig.validate(storedStateData)
+        });
+
+        steps.push({
+            number: ExceptionsConfig.number,
+            title: ExceptionsConfig.title,
+            summary: ExceptionsConfig.getSummary(storedStateData),
+            beta: true,
+            ...ExceptionsConfig.validate(storedStateData)
         });
         
         steps.push({
@@ -420,18 +450,31 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         return () => { isActive = false; };
     }, []);
 
-    // Fetch agentic users to populate team/role options
+    // Fetch agentic users to populate team/role options, and module infos for device count (Atlas only)
     useEffect(() => {
+        if (!isEndpointSecurityCategory()) return;
         let isActive = true;
         (async () => {
             setUsersLoading(true);
             try {
-                const response = await settingsApi.fetchAgenticUsers();
-                if (isActive && response?.agenticUsers) {
-                    setAgenticUsers(response.agenticUsers);
-                }
-            } catch (error) {
-                console.error("Error fetching agentic users:", error);
+                const [agenticUsersResp, moduleResp] = await Promise.all([
+                    settingsApi.fetchAgenticUsers().catch(() => ({})),
+                    settingsApi.fetchModuleInfo({ moduleType: 'MCP_ENDPOINT_SHIELD' }).catch(() => ({})),
+                ]);
+                if (!isActive) return;
+                setAgenticUsers(agenticUsersResp?.agenticUsers || []);
+                const seen = new Set();
+                setDeviceList(
+                    (moduleResp?.moduleInfos || []).reduce((acc, m) => {
+                        const ad = m?.additionalData || {};
+                        const label = ad.username || ad.userName || ad.user || m.name || '';
+                        if (label && !seen.has(label)) {
+                            seen.add(label);
+                            acc.push({ label, value: label });
+                        }
+                        return acc;
+                    }, [])
+                );
             } finally {
                 if (isActive) setUsersLoading(false);
             }
@@ -543,11 +586,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableLlmPrompt(false);
         setLlmPrompt("");
         setLlmConfidenceScore(0.5);
+        setLlmCompliance({});
         setEnableExternalModel(false);
         setUrl("");
         setConfidenceScore(25);
         setEnableTokenLimit(false);
-        setTokenLimitConfidenceScore(0.7);
+        setTokenLimitThreshold(4096);
         setEnableToolMisuse(true);
         setEnableMaliciousTools(true);
         setEnableToolNameDescriptionMismatch(true);
@@ -557,12 +601,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setSelectedBrowserLlms([]);
         setBlockedHosts([]);
         setBlockPersonalAccounts(false);
+        setIgnorePhrases([]);
         setApplyOnResponse(false);
         setApplyOnRequest(false);
         setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
         setApplyToAllUsers(true);
         setTargetTeams([]);
         setTargetRoles([]);
+        setEnterpriseLicenseComplianceCategories([]);
     };
 
     const populateFormForEdit = (policy) => {
@@ -612,7 +658,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 .map(t => GENERAL_BLOCKS.find(b => b.topic === t.topic)?.key)
                 .filter(Boolean)
         );
-        const customTopics = loadedTopics.filter(t => !isGeneralBlockTopic(t.topic));
+        const customTopics = loadedTopics.filter(t => !isGeneralBlockTopic(t.topic) && t.origin !== ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN);
         setEnableDeniedTopics(loadedTopics.length > 0);
         setSelectedDefaultBlockKeys(defaultKeys);
         setDeniedTopics(customTopics);
@@ -649,6 +695,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableLlmPrompt(policy.llmRule?.enabled && !!policy.llmRule?.userPrompt);
         setLlmPrompt(policy.llmRule?.userPrompt || "");
         setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
+        setLlmCompliance(policy.llmRule?.compliance || {});
 
         // Base Prompt Based Validation (AI Agents)
         setEnableBasePromptRule(policy.basePromptRule?.enabled || false);
@@ -667,7 +714,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setScannerState(policy.banCodeDetection, setEnableBanCode, setBanCodeConfidenceScore);
         setScannerState(policy.secretsDetection, setEnableSecrets, setSecretsConfidenceScore);
         setScannerState(policy.sentimentDetection, setEnableSentiment, setSentimentConfidenceScore);
-        setScannerState(policy.tokenLimitDetection, setEnableTokenLimit, setTokenLimitConfidenceScore);
+        setEnableTokenLimit(policy.tokenLimitDetection?.enabled || false);
+        setTokenLimitThreshold(policy.tokenLimitDetection?.threshold || 4096);
 
         // External model based evaluation
         setEnableExternalModel(!!policy.url);
@@ -679,12 +727,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setConfidenceScore(nearestCheckpoint);
 
         // Server settings
-        const storedMcpV2 = policy.selectedMcpServersV2 || [];
-        setSelectedMcpServers(
-            storedMcpV2.length > 0
-                ? reverseToServiceKeys(storedMcpV2, allCollections)
-                : policy.selectedMcpServers || []
-        );
+        const storedMcpV2 = policy.selectedMcpServersV2?.length > 0
+            ? policy.selectedMcpServersV2
+            : (policy.selectedMcpServers || []).map(name => ({ id: name, name }));
+        setSelectedMcpServers(reverseToServiceKeys(storedMcpV2, allCollections));
 
         // selectedAgentServersV2 stores both gen-ai and browser-llm entries.
         // Split them back into their respective dropdowns.
@@ -718,9 +764,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         })));
         setBlockPersonalAccounts(policy.blockPersonalAccounts || false);
 
+        setIgnorePhrases((policy.ignorePhrases || []).map(entry => ({
+            phrase: entry.phrase || "",
+            isRegex: !!entry.isRegex,
+            caseSensitive: !!entry.caseSensitive
+        })));
+
         setApplyToAllUsers(!policy.targetTeams?.length && !policy.targetRoles?.length);
         setTargetTeams(policy.targetTeams || []);
         setTargetRoles(policy.targetRoles || []);
+        setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
     };
 
     const handleClose = () => {
@@ -756,7 +809,24 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 .filter(entry => entry && (entry.pattern || "").trim())
                 .map(entry => ({ pattern: entry.pattern.trim() }));
 
+            // Drop empty rows and normalize ignore phrases before persisting.
+            const cleanedIgnorePhrases = (ignorePhrases || [])
+                .filter(entry => entry && (entry.phrase || "").trim())
+                .map(entry => ({
+                    phrase: entry.phrase.trim(),
+                    isRegex: !!entry.isRegex,
+                    caseSensitive: !!entry.caseSensitive
+                }));
+
             const b = normalizeBehaviourValue(policyBehaviour);
+
+            const transformedDeniedTopics = deniedTopics.map(topic => ({
+                ...topic,
+                compliance: topic.compliance && Object.keys(topic.compliance).length > 0
+                    ? topic.compliance
+                    : undefined
+            }));
+
             const guardrailData = {
                 name,
                 description,
@@ -772,7 +842,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 deniedTopics: enableDeniedTopics
                     ? [
                         ...GENERAL_BLOCKS.filter(b => selectedDefaultBlockKeys.has(b.key)).map(toDeniedTopic),
-                        ...deniedTopics
+                        ...transformedDeniedTopics
                       ]
                     : [],
                 wordFilters,
@@ -789,7 +859,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 llmRule: {
                     enabled: enableLlmPrompt && !!llmPrompt.trim(),
                     userPrompt: llmPrompt.trim(),
-                    confidenceScore: llmConfidenceScore
+                    confidenceScore: llmConfidenceScore,
+                    compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 },
                 basePromptRule: {
                     enabled: enableBasePromptRule,
@@ -817,7 +888,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 },
                 tokenLimitDetection: {
                     enabled: enableTokenLimit,
-                    confidenceScore: tokenLimitConfidenceScore
+                    threshold: tokenLimitThreshold
                 },
                 url: enableExternalModel ? (url || null) : null,
                 confidenceScore: enableExternalModel ? confidenceScore : null,
@@ -828,10 +899,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 selectedAgentServersV2: transformedAgentServers,
                 blockedHosts: cleanedBlockedHosts,
                 blockPersonalAccounts,
+                ignorePhrases: cleanedIgnorePhrases,
                 applyOnResponse,
                 applyOnRequest,
                 targetTeams: applyToAllUsers ? [] : targetTeams,
                 targetRoles: applyToAllUsers ? [] : targetRoles,
+                enterpriseLicenseComplianceCategories,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
 
@@ -889,6 +962,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableBasePromptRule={setEnableBasePromptRule}
                         basePromptConfidenceScore={basePromptConfidenceScore}
                         setBasePromptConfidenceScore={setBasePromptConfidenceScore}
+                        enterpriseLicenseComplianceCategories={enterpriseLicenseComplianceCategories}
                     />
                 );
             case 3:
@@ -953,6 +1027,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setLlmRule={setLlmPrompt}
                         llmConfidenceScore={llmConfidenceScore}
                         setLlmConfidenceScore={setLlmConfidenceScore}
+                        llmCompliance={llmCompliance}
+                        setLlmCompliance={setLlmCompliance}
                         enableExternalModel={enableExternalModel}
                         setEnableExternalModel={setEnableExternalModel}
                         url={url}
@@ -966,8 +1042,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     <UsageGuardrailsStep
                         enableTokenLimit={enableTokenLimit}
                         setEnableTokenLimit={setEnableTokenLimit}
-                        tokenLimitConfidenceScore={tokenLimitConfidenceScore}
-                        setTokenLimitConfidenceScore={setTokenLimitConfidenceScore}
+                        tokenLimitThreshold={tokenLimitThreshold}
+                        setTokenLimitThreshold={setTokenLimitThreshold}
                     />
                 );
             case 8:
@@ -1031,6 +1107,32 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         usersLoading={usersLoading}
                         applyToAllUsers={applyToAllUsers}
                         setApplyToAllUsers={setApplyToAllUsers}
+                        deviceList={deviceList}
+                        showConditionError={leftSteps.has(ServerSettingsConfig.number)}
+                        showUserConditionError={leftSteps.has(ServerSettingsConfig.number)}
+                    />
+                );
+            case 13:
+                return (
+                    <ExceptionsStep
+                        ignorePhrases={ignorePhrases}
+                        setIgnorePhrases={setIgnorePhrases}
+                    />
+                );
+            case 12:
+                return (
+                    <EnterpriseLicenseComplianceStep
+                        enterpriseLicenseComplianceCategories={enterpriseLicenseComplianceCategories}
+                        setEnterpriseLicenseComplianceCategories={setEnterpriseLicenseComplianceCategories}
+                        targetTeams={targetTeams}
+                        setTargetTeams={setTargetTeams}
+                        targetRoles={targetRoles}
+                        setTargetRoles={setTargetRoles}
+                        availableTeams={availableTeams}
+                        availableRoles={availableRoles}
+                        usersLoading={usersLoading}
+                        applyToAllUsers={applyToAllUsers}
+                        setApplyToAllUsers={setApplyToAllUsers}
                         showConditionError={leftSteps.has(ServerSettingsConfig.number)}
                         showUserConditionError={leftSteps.has(ServerSettingsConfig.number)}
                     />
@@ -1083,7 +1185,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 llmRule: {
                     enabled: true,
                     userPrompt: llmPrompt.trim(),
-                    confidenceScore: llmConfidenceScore
+                    confidenceScore: llmConfidenceScore,
+                    compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 }
             } : {}),
             ...(enableBasePromptRule ? {
@@ -1097,7 +1200,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             banCodeDetection: buildDetectionConfig(enableBanCode, banCodeConfidenceScore),
             secretsDetection: buildDetectionConfig(enableSecrets, secretsConfidenceScore),
             sentimentDetection: buildDetectionConfig(enableSentiment, sentimentConfidenceScore),
-            tokenLimitDetection: buildDetectionConfig(enableTokenLimit, tokenLimitConfidenceScore),
+            tokenLimitDetection: { enabled: enableTokenLimit, threshold: tokenLimitThreshold },
             url: enableExternalModel ? (url || null) : null,
             confidenceScore: enableExternalModel ? confidenceScore : null,
             applyToAllServers: applyToAllServers,
@@ -1107,8 +1210,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 .filter(entry => entry && (entry.pattern || "").trim())
                 .map(entry => ({ pattern: entry.pattern.trim() })),
             blockPersonalAccounts,
+            ignorePhrases: (ignorePhrases || [])
+                .filter(entry => entry && (entry.phrase || "").trim())
+                .map(entry => ({
+                    phrase: entry.phrase.trim(),
+                    isRegex: !!entry.isRegex,
+                    caseSensitive: !!entry.caseSensitive
+                })),
             applyOnResponse: applyOnResponse,
-            applyOnRequest: applyOnRequest
+            applyOnRequest: applyOnRequest,
+            enterpriseLicenseComplianceCategories
         };
     };
 
@@ -1206,10 +1317,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         const inputToTest = playgroundInput;
         setPlaygroundInput("");
 
+        // Show the prompt immediately; the response bubble fills in once it arrives.
+        setPlaygroundMessages(prev => [...prev, { userPrompt: inputToTest, pending: true }]);
+
         try {
             // Prepare policy data from current form state
             const rawPolicyData = buildPlaygroundPolicyData();
-            
+
             // Transform field names to match backend DTO (same as createGuardrailPolicy)
             const policyData = transformPolicyForBackend(rawPolicyData);
 
@@ -1220,7 +1334,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
             // Transform the response from guardrail service to match UI format
             const response = transformPlaygroundResponse(result, inputToTest);
-            setPlaygroundMessages(prev => [...prev, response]);
+            setPlaygroundMessages(prev => prev.map((m, i) => i === prev.length - 1 ? response : m));
         } catch (error) {
             console.error("Error testing guardrail:", error);
             const errorResponse = {
@@ -1229,7 +1343,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 reason: 'Validation Failed',
                 message: error.response?.data?.actionErrors?.[0] || error.message || 'Failed to test guardrail. Please ensure the guardrail service is running.'
             };
-            setPlaygroundMessages(prev => [...prev, errorResponse]);
+            setPlaygroundMessages(prev => prev.map((m, i) => i === prev.length - 1 ? errorResponse : m));
         } finally {
             setPlaygroundLoading(false);
         }
@@ -1271,12 +1385,15 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                         (step.summary && step.summary !== 'Coming soon') ? 'configured' : 'pending'
                                     }`} />
                                     <div style={{ flex: 1, paddingTop: '4px' }}>
-                                        <Text
-                                            variant="bodyMd"
-                                            fontWeight={step.number === currentStep ? "semibold" : "regular"}
-                                        >
-                                            {step.title}
-                                        </Text>
+                                        <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                                            <Text
+                                                variant="bodyMd"
+                                                fontWeight={step.number === currentStep ? "semibold" : "regular"}
+                                            >
+                                                {step.title}
+                                            </Text>
+                                            {step.beta && <Badge status="info">Beta</Badge>}
+                                        </HorizontalStack>
                                         {step.summary && (
                                             <Text variant="bodySm" color="subdued" truncate>
                                                 <span className="guardrail-nav-summary" title={step.summary}>{step.summary}</span>
@@ -1293,9 +1410,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     <div className="guardrail-content-inner">
                         <Box padding="5">
                             <VerticalStack gap="4">
-                                <Text variant="headingMd" as="h2" fontWeight="semibold">
-                                    {steps.find(s => s.number === currentStep)?.title}
-                                </Text>
+                                <HorizontalStack gap="2" blockAlign="center">
+                                    <Text variant="headingMd" as="h2" fontWeight="semibold">
+                                        {steps.find(s => s.number === currentStep)?.title}
+                                    </Text>
+                                    {steps.find(s => s.number === currentStep)?.beta && <Badge status="info">Beta</Badge>}
+                                </HorizontalStack>
                                 <Box>
                                     {renderStepContent(currentStep)}
                                 </Box>
@@ -1365,6 +1485,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                                     </Box>
                                                 </HorizontalStack>
 
+                                                {message.pending ? (
+                                                    <HorizontalStack align="start" gap="2" blockAlign="center">
+                                                        <Spinner size="small" />
+                                                        <Text variant="bodyMd" color="subdued">Testing against guardrail policy…</Text>
+                                                    </HorizontalStack>
+                                                ) : (
+                                                <>
                                                 <Box paddingBlockStart="1">
                                                     <Text
                                                         variant="bodyMd"
@@ -1405,6 +1532,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                                             </Text>
                                                         </Box>
                                                     </HorizontalStack>
+                                                )}
+                                                </>
                                                 )}
                                             </VerticalStack>
                                         ))}

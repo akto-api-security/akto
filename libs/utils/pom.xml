@@ -137,6 +137,18 @@
             <artifactId>azure-storage-blob</artifactId>
             <version>12.25.1</version>
         </dependency>
+
+        <!-- Liquibase -->
+        <dependency>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+            <version>4.33.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.liquibase.ext</groupId>
+            <artifactId>liquibase-mongodb</artifactId>
+            <version>4.33.0</version>
+        </dependency>
         
     </dependencies>
     <build>

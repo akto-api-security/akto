@@ -235,8 +235,10 @@ def call_guardrails(
             mcp_server_name,
             mcp_tool_name,
         )
+        # Ingest the MCP tool request in the same round-trip so ALLOWED calls
+        # still land in Akto's audit trail (matches the prompt validator).
         result = post_payload_json(
-            build_http_proxy_url(ingest_data=False),
+            build_http_proxy_url(ingest_data=True),
             request_body,
         )
 

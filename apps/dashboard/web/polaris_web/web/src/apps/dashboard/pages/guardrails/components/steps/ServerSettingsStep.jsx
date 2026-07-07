@@ -8,6 +8,8 @@ import { formatDisplayName } from "../../../observe/agentic/mcpClientHelper";
 import OwaspTag from "../OwaspTag";
 import RuleEnforcementDropdown from "../RuleEnforcementDropdown";
 import { isEndpointSecurityCategory } from "../../../../../main/labelHelper";
+import { produce } from "immer";
+import func from "@/util/func";
 
 
 export const ServerSettingsConfig = {
@@ -38,35 +40,17 @@ export const ServerSettingsConfig = {
         if (applyToAllUsers) {
             summary += ' | All users';
         } else {
-            if (targetTeams?.length > 0) summary += ` | Teams: ${targetTeams.slice(0, 2).join(', ')}${targetTeams.length > 2 ? ` +${targetTeams.length - 2}` : ''}`;
-            if (targetRoles?.length > 0) summary += ` Roles: ${targetRoles.slice(0, 2).join(', ')}${targetRoles.length > 2 ? ` +${targetRoles.length - 2}` : ''}`;
+            const userParts = [];
+            if (targetTeams?.length > 0) userParts.push(`${targetTeams.length} Team${targetTeams.length !== 1 ? 's' : ''}`);
+            if (targetRoles?.length > 0) userParts.push(`${targetRoles.length} Role${targetRoles.length !== 1 ? 's' : ''}`);
+            if (userParts.length > 0) summary += ` | ${userParts.join(', ')}`;
         }
         summary += `${appSettings} ${behaviourSuffix}`;
         return summary;
     }
 };
 
-const conditionsReducer = (state, action) => {
-    switch (action.type) {
-        case 'add':    return [...state, { type: action.condType, values: [] }];
-        case 'delete': return state.filter((_, i) => i !== action.index);
-        case 'update': return state.map((c, i) => i === action.index ? { ...c, ...action.updates } : c);
-        case 'clear':  return [];
-        case 'normalize': {
-            let changed = false;
-            const next = state.map(c => {
-                const valSet = action.valSets[c.type];
-                if (!valSet || valSet.size === 0) return c;
-                const valid = (c.values || []).filter(v => valSet.has(v));
-                if (valid.length === (c.values || []).length) return c;
-                changed = true;
-                return { ...c, values: valid };
-            });
-            return changed ? next : state;
-        }
-        default: return state;
-    }
-};
+const conditionsReducer = produce((draft, action) => func.conditionsReducer(draft, action));
 
 const CountPopover = ({ count, label, items }) => {
     const [active, setActive] = useState(false);
@@ -145,6 +129,7 @@ const ServerSettingsStep = ({
     usersLoading,
     applyToAllUsers,
     setApplyToAllUsers,
+    deviceList = [],
     showConditionError = false,
     showUserConditionError = false,
 }) => {
@@ -251,13 +236,18 @@ const ServerSettingsStep = ({
         const total = agentOptions.length + mcpOptions.length + llmOptions.length;
         if (total === 0) return;
         normalizedRef.current = true;
-        agenticDispatch({
-            type: 'normalize',
-            valSets: {
-                AGENT: new Set(agentOptions.map(o => o.value)),
-                MCP_SERVER: new Set(mcpOptions.map(o => o.value)),
-                LLM: new Set(llmOptions.map(o => o.value)),
-            },
+        const valSets = {
+            AGENT: new Set(agentOptions.map(o => o.value)),
+            MCP_SERVER: new Set(mcpOptions.map(o => o.value)),
+            LLM: new Set(llmOptions.map(o => o.value)),
+        };
+        agenticConditions.forEach((c, index) => {
+            const valSet = valSets[c.type];
+            if (!valSet || valSet.size === 0) return;
+            const valid = (c.values || []).filter(v => valSet.has(v));
+            if (valid.length !== (c.values || []).length) {
+                agenticDispatch({ type: 'updateKey', index, key: 'values', obj: valid });
+            }
         });
     }, [agentOptions.length, mcpOptions.length, llmOptions.length]);
 
@@ -302,7 +292,10 @@ const ServerSettingsStep = ({
                                     menuItems={rowTypeOptions}
                                     disabledOptions={rowTypeOptions.filter(o => o.disabled).map(o => o.value)}
                                     initial={rowTypeOptions.find(o => o.value === condition.type)?.label || rowTypeOptions[0]?.label}
-                                    selected={(val) => dispatch({ type: 'update', index, updates: { type: val, values: [] } })}
+                                    selected={(val) => {
+                                        dispatch({ type: 'updateKey', index, key: 'type', obj: val });
+                                        dispatch({ type: 'updateKey', index, key: 'values', obj: [] });
+                                    }}
                                 />
                             </div>
                             <Text variant="bodyMd" tone="subdued" fontWeight="medium">{getOptionsForType(condition.type).length > 1 ? 'are' : 'is'}</Text>
@@ -311,7 +304,7 @@ const ServerSettingsStep = ({
                                     id={`cond-val-${condition.type}-${index}`}
                                     placeholder="Select value"
                                     optionsList={sortSelectedFirst(getOptionsForType(condition.type), condition.values || [])}
-                                    setSelected={(vals) => dispatch({ type: 'update', index, updates: { values: vals } })}
+                                    setSelected={(vals) => dispatch({ type: 'updateKey', index, key: 'values', obj: vals })}
                                     preSelected={condition.values || []}
                                     allowMultiple={true}
                                     disabled={getOptionsForType(condition.type).length === 0}
@@ -324,7 +317,7 @@ const ServerSettingsStep = ({
                     );
                 })}
                 <HorizontalStack gap="4" blockAlign="center">
-                    {!allTypesFilled && <Button onClick={() => dispatch({ type: 'add', condType: nextUnusedType })}>Add condition</Button>}
+                    {!allTypesFilled && <Button onClick={() => dispatch({ type: 'add', obj: { type: nextUnusedType, values: [] } })}>Add condition</Button>}
                     {conditions.length > 0 && (
                         <Button plain destructive onClick={() => dispatch({ type: 'clear' })}>Clear all</Button>
                     )}
@@ -346,6 +339,9 @@ const ServerSettingsStep = ({
     useEffect(() => {
         // Atlas uses app-level groups — per-device inline filtering doesn't apply
         if (!isBlockMode || isAtlas) return;
+        // Guard: don't run until options have loaded — an empty options list would
+        // incorrectly clear every pre-selected value from a loaded policy.
+        if (!(mcpServers?.length || agentServers?.length || browserLlmServers?.length)) return;
         if (selectedMcpServers?.length > 0) {
             const compatible = selectedMcpServers.filter(val => (mcpServers || []).find(s => s.value === val && s.isInline));
             if (compatible.length !== selectedMcpServers.length) setSelectedMcpServers(compatible);
@@ -358,7 +354,7 @@ const ServerSettingsStep = ({
             const compatible = selectedBrowserLlms.filter(val => (browserLlmServers || []).find(s => s.value === val && s.isInline));
             if (compatible.length !== selectedBrowserLlms.length) setSelectedBrowserLlms(compatible);
         }
-    }, [policyBehaviour]);
+    }, [policyBehaviour, mcpServers?.length, agentServers?.length, browserLlmServers?.length]);
 
     return (
         <VerticalStack gap="4">
@@ -442,23 +438,16 @@ const ServerSettingsStep = ({
                                         id="apply_to_all_users"
                                         name="userTargeting"
                                         onChange={() => setApplyToAllUsers(true)}
-                                        helpText={(() => {
-                                            const parts = [
-                                                (availableTeams || []).length > 0 && { count: (availableTeams || []).length, label: "Teams", items: (availableTeams || []).map(t => ({ label: t, value: t })) },
-                                                (availableRoles || []).length > 0 && { count: (availableRoles || []).length, label: "Roles", items: (availableRoles || []).map(r => ({ label: r, value: r })) },
-                                            ].filter(Boolean);
-                                            if (parts.length === 0) return "Applies to all users in your organization.";
-                                            return (
+                                        helpText={deviceList.length > 0
+                                            ? (
                                                 <HorizontalStack gap="1" blockAlign="center" wrap>
-                                                    <Text variant="bodyMd" tone="subdued">This includes</Text>
-                                                    {parts.flatMap((item, i) => [
-                                                        <CountPopover key={item.label} count={item.count} label={item.label} items={item.items} />,
-                                                        i < parts.length - 1 && <Text key={`sep-${i}`} variant="bodyMd" tone="subdued">&</Text>
-                                                    ]).filter(Boolean)}
-                                                    <Text variant="bodyMd" tone="subdued">.</Text>
+                                                    <Text variant="bodyMd" tone="subdued">Applies to all</Text>
+                                                    <CountPopover count={deviceList.length} label="Users" items={deviceList} />
+                                                    <Text variant="bodyMd" tone="subdued">in your organization.</Text>
                                                 </HorizontalStack>
-                                            );
-                                        })()}
+                                            )
+                                            : "Applies to all users in your organization."
+                                        }
                                     />
                                     <RadioButton
                                         label="Select Teams & Roles"

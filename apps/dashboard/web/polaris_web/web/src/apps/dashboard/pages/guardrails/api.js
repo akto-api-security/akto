@@ -65,4 +65,13 @@ export default {
         return resp
     },
 
+    async suggestGuardrailCompliance(inputType, payload) {
+        const resp = await request({
+            url: '/api/ask_ai',
+            method: 'post',
+            data: { type: 'suggest_guardrail_compliance', meta: { inputType, ...payload } }
+        })
+        return resp
+    },
+
 }

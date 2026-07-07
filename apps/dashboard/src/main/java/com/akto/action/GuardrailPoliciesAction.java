@@ -2,6 +2,7 @@ package com.akto.action;
 
 import com.akto.dao.AgentUsersDao;
 import com.akto.dao.GuardrailPoliciesDao;
+import com.akto.dto.EnterpriseLicenseComplianceCatalog;
 import com.akto.dao.context.Context;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.GuardrailPolicies;
@@ -87,6 +88,7 @@ public class GuardrailPoliciesAction extends UserAction {
                     p.setApplyToDeviceIds(AgentUsersDao.instance.findDeviceIdsByTeamsAndRoles(
                             p.getTargetTeams(), p.getTargetRoles()));
                 }
+                EnterpriseLicenseComplianceCatalog.applyToPolicy(p);
             }
 
             loggerMaker.info("Fetched " + guardrailPolicies.size() + " guardrail policies out of " + total + " total");
@@ -99,10 +101,48 @@ public class GuardrailPoliciesAction extends UserAction {
     }
 
 
+    private static final int MAX_IGNORE_PHRASES = 50;
+    private static final int MIN_IGNORE_PHRASE_LENGTH = 3;
+    private static final int MAX_IGNORE_PHRASE_LENGTH = 200;
+
+    private String validateIgnorePhrases(List<GuardrailPolicies.IgnorePhrase> ignorePhrases) {
+        if (ignorePhrases == null) {
+            return null;
+        }
+        if (ignorePhrases.size() > MAX_IGNORE_PHRASES) {
+            return "Too many ignore phrases: max " + MAX_IGNORE_PHRASES + " allowed per policy";
+        }
+        for (GuardrailPolicies.IgnorePhrase ignorePhrase : ignorePhrases) {
+            String phrase = ignorePhrase.getPhrase();
+            if (StringUtils.isBlank(phrase)) {
+                return "Ignore phrase cannot be blank";
+            }
+            if (phrase.length() < MIN_IGNORE_PHRASE_LENGTH || phrase.length() > MAX_IGNORE_PHRASE_LENGTH) {
+                return "Ignore phrase length must be between " + MIN_IGNORE_PHRASE_LENGTH
+                        + " and " + MAX_IGNORE_PHRASE_LENGTH + " characters: " + phrase;
+            }
+            if (ignorePhrase.getIsRegex()) {
+                try {
+                    java.util.regex.Pattern.compile(phrase);
+                } catch (java.util.regex.PatternSyntaxException e) {
+                    return "Invalid regex in ignore phrase: " + phrase;
+                }
+            }
+        }
+        return null;
+    }
+
     public String createGuardrailPolicy() {
         try {
             User user = getSUser();
             int currentTime = Context.now();
+
+            String ignorePhrasesError = validateIgnorePhrases(policy.getIgnorePhrases());
+            if (ignorePhrasesError != null) {
+                loggerMaker.errorAndAddToDb("Invalid ignore phrases: " + ignorePhrasesError, LogDb.DASHBOARD);
+                addActionError(ignorePhrasesError);
+                return ERROR.toUpperCase();
+            }
 
             boolean isGithubWorkflow = policy.getSource() == GuardrailSource.GITHUB_WORKFLOW
                     && StringUtils.isNotBlank(policy.getSourceHash());
@@ -161,6 +201,8 @@ public class GuardrailPoliciesAction extends UserAction {
                 ? Filters.eq(Constants.ID, new ObjectId(hexId))
                 : Filters.eq("name", policy.getName()); // or use another unique identifier
             
+            EnterpriseLicenseComplianceCatalog.applyToPolicy(policy);
+
             List<Bson> updates = buildPolicyUpdates(policy, contextSource);
 
             // Only set createdBy and createdTimestamp on insert
@@ -273,6 +315,9 @@ public class GuardrailPoliciesAction extends UserAction {
         if (p.getBlockedHosts() != null) {
             updates.add(Updates.set("blockedHosts", p.getBlockedHosts()));
         }
+        if (p.getIgnorePhrases() != null) {
+            updates.add(Updates.set("ignorePhrases", p.getIgnorePhrases()));
+        }
         if (p.getTargetTeams() != null) {
             updates.add(Updates.set("targetTeams", p.getTargetTeams()));
         }
@@ -294,6 +339,9 @@ public class GuardrailPoliciesAction extends UserAction {
         }
         if (StringUtils.isNotBlank(p.getSourceHash())) {
             updates.add(Updates.set("sourceHash", p.getSourceHash()));
+        }
+        if (p.getEnterpriseLicenseComplianceCategories() != null) {
+            updates.add(Updates.set("enterpriseLicenseComplianceCategories", p.getEnterpriseLicenseComplianceCategories()));
         }
 
         return updates;
@@ -378,6 +426,8 @@ public class GuardrailPoliciesAction extends UserAction {
             if (!policyToSend.isApplyOnRequest() && !policyToSend.isApplyOnResponse()) {
                 policyToSend.setApplyOnRequest(true);
             }
+
+            EnterpriseLicenseComplianceCatalog.applyToPolicy(policyToSend);
 
             // Serialize policy to JSON and add to request
             try {

@@ -141,6 +141,7 @@ import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.jobs.EmptyCollectionCleanupJob;
 import com.akto.utils.jobs.JobUtils;
 import com.akto.utils.scripts.BackwardCompatibilityUtils;
+import com.akto.liquibase.LiquibaseStartupMigrator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.*;
@@ -185,7 +186,7 @@ public class InitializerListener implements ServletContextListener {
     UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
     AgentBasePromptDetectionCron agentBasePromptDetectionCron = new AgentBasePromptDetectionCron();
     UserAnalysisCron userAnalysisCron = new UserAnalysisCron();
-    AgentGuardCorpusLabelingCron labelingCron = new AgentGuardCorpusLabelingCron();
+    AgentGuardCorpusLabelingCron agentGuardCorpusLabelingCron = new AgentGuardCorpusLabelingCron();
 
     private static String domain = null;
     public static String subdomain = "https://app.akto.io";
@@ -2536,6 +2537,13 @@ public class InitializerListener implements ServletContextListener {
                     }
                 } while (!connectedToMongo);
 
+                try {
+                    LiquibaseStartupMigrator.runIfEnabled(mongoURI);
+                } catch (Exception e) {
+                    logger.errorAndAddToDb(e, "Liquibase startup migrations failed — aborting initialization");
+                    throw new RuntimeException("Liquibase startup migrations failed", e);
+                }
+
                 if (DashboardMode.isOnPremDeployment()) {
                     Context.accountId.set(1_000_000);
                     logger.debugAndAddToDb("Dashboard started at " + Context.now());
@@ -2595,10 +2603,10 @@ public class InitializerListener implements ServletContextListener {
                     if (runJobFunctions == 2) {
                         logger.warn("Starting user analysis cron scheduler", LogDb.DASHBOARD);
                         userAnalysisCron.setUpUserAnalysisCronScheduler();
+                        agentGuardCorpusLabelingCron.setUpAgentGuardCorpusLabelingCronScheduler();
                         logger.warn("Ending user analysis cron scheduler", LogDb.DASHBOARD);
                         logger.warn("Starting CATEGORY 2 job schedulers", LogDb.DASHBOARD);
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                        labelingCron.setUpAgentGuardCorpusLabelingCronScheduler();
                         syncCronInfo.setUpMcpMaliciousnessCronScheduler();
                         agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
                         setupAutomatedApiGroupsScheduler();

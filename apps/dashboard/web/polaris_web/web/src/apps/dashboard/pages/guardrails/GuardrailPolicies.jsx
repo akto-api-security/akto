@@ -4,7 +4,7 @@ import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func";
-import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isEndpointSecurityCategory } from "../../../main/labelHelper";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
@@ -386,6 +386,20 @@ function GuardrailPolicies() {
             }
         }
 
+        // User targeting (Atlas only)
+        if (isEndpointSecurityCategory()) {
+            const targetTeams = policy.targetTeams || [];
+            const targetRoles = policy.targetRoles || [];
+            if (targetTeams.length === 0 && targetRoles.length === 0) {
+                details.push({ label: "Target Users", value: "All users" });
+            } else {
+                const userParts = [];
+                if (targetTeams.length > 0) userParts.push(`${targetTeams.length} Team${targetTeams.length !== 1 ? 's' : ''}`);
+                if (targetRoles.length > 0) userParts.push(`${targetRoles.length} Role${targetRoles.length !== 1 ? 's' : ''}`);
+                details.push({ label: "Target Users", value: userParts.join(", ") });
+            }
+        }
+
         // Application scope
         if (policy.applyOnRequest || policy.applyOnResponse) {
             const scope = [];
@@ -536,6 +550,7 @@ function GuardrailPolicies() {
                 // Block-only host blocklist
                 blockedHosts: guardrailData.blockedHosts || [],
                 blockPersonalAccounts: guardrailData.blockPersonalAccounts || false,
+                ignorePhrases: guardrailData.ignorePhrases || [],
                 deniedTopics: guardrailData.deniedTopics || [],
                 enterpriseLicenseComplianceCategories: guardrailData.enterpriseLicenseComplianceCategories || [],
                 regexPatterns: guardrailData.regexPatterns || [],
@@ -557,6 +572,8 @@ function GuardrailPolicies() {
                 ...(guardrailData.sentimentDetection ? { sentimentDetection: guardrailData.sentimentDetection } : {}),
                 ...(guardrailData.tokenLimitDetection ? { tokenLimitDetection: guardrailData.tokenLimitDetection } : {}),
                 applyToAllServers: guardrailData.applyToAllServers ?? true,
+                targetTeams: guardrailData.targetTeams || [],
+                targetRoles: guardrailData.targetRoles || [],
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
                 behaviour: guardrailData.behaviour != null

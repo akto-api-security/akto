@@ -84,20 +84,21 @@ class AnthropicProvider(LLMProvider):
         logger.info(f"[Anthropic] model={self.model}")
 
     async def complete(self, prompt: str) -> str:
-        client = http_client.get_client()
-        resp = await client.post(
-            "https://api.anthropic.com/v1/messages",
-            headers=dict(_IDENTITY, **{
-                "Content-Type": "application/json",
-                "x-api-key": self.api_key,
-                "anthropic-version": "2023-06-01",
-            }),
-            json={
-                "model": self.model,
-                "max_tokens": 256,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-        )
+        logger.info(f"[Anthropic] prompt: {prompt}")
+        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
+            resp = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers=dict(_IDENTITY, **{
+                    "Content-Type": "application/json",
+                    "x-api-key": self.api_key,
+                    "anthropic-version": "2023-06-01",
+                }),
+                json={
+                    "model": self.model,
+                    "max_tokens": 256,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+            )
         resp.raise_for_status()
         return resp.json()["content"][0]["text"]
 

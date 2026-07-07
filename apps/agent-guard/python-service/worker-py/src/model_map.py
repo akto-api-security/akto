@@ -152,6 +152,8 @@ class ModelMapScanner:
         return list(zip(results, entries))
 
     async def _collect_majority(self, task_map, label: str) -> Dict[str, Any]:
+        if not task_map:
+            return {"majority": _SAFE, "completed": []}
         completed: List[Dict[str, Any]] = []
         safe = unsafe = 0
         for result, entry in await self._await_map(task_map):

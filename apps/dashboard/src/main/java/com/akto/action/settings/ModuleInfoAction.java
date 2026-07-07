@@ -43,6 +43,9 @@ public class ModuleInfoAction extends UserAction {
     private String username;
     @Getter
     @Setter
+    private List<String> usernames;
+    @Getter
+    @Setter
     private String team;
     @Getter
     @Setter
@@ -267,6 +270,19 @@ public class ModuleInfoAction extends UserAction {
         }
 
         AgentUsersDao.instance.upsertTagFromDashboard(username, userEmail, team, userRole, getSUser().getLogin());
+        return SUCCESS.toUpperCase();
+    }
+
+    public String bulkUpdateUserDeviceTag() {
+        if (usernames == null || usernames.isEmpty()) {
+            addActionError("At least one username is required");
+            return ERROR.toUpperCase();
+        }
+
+        String updatedBy = getSUser().getLogin();
+        for (String u : usernames) {
+            AgentUsersDao.instance.upsertTagFromDashboard(u, null, team, userRole, updatedBy);
+        }
         return SUCCESS.toUpperCase();
     }
 

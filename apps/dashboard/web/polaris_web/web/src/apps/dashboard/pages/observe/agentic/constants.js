@@ -292,6 +292,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
     
     collections.forEach((c) => {
         if (c.deactivated) return;
+        if ((c.hostName || c.displayName || c.name || '').includes('not-attached')) return;
         const typeTag = findTypeTag(c.envType);
         if (!typeTag) return; // Skip collections without type tag
         // gen-ai collections that also have an asset tag (ai-agent/mcp-client) or a connector
