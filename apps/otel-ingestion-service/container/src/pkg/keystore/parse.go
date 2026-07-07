@@ -17,7 +17,15 @@ func ParseRSAPublicKeyPEM(raw string) (*rsa.PublicKey, error) {
 	body := raw
 	body = strings.ReplaceAll(body, "-----BEGIN PUBLIC KEY-----", "")
 	body = strings.ReplaceAll(body, "-----END PUBLIC KEY-----", "")
-	body = strings.ReplaceAll(body, "\n", "")
+	body = strings.Map(func(r rune) rune {
+		if r == ' ' || r == '\n' || r == '\r' || r == '\t' {
+			return -1
+		}
+		return r
+	}, body)
+	if body == "" {
+		return nil, fmt.Errorf("public key is empty")
+	}
 
 	der, err := base64.StdEncoding.DecodeString(body)
 	if err != nil {
