@@ -97,19 +97,6 @@ export const getAgentFilterValues = (filters) => {
     return [agentFilter];
 };
 
-export const buildAgentFilterChoices = (agentOptions, policyRows) => {
-    const choiceMap = new Map();
-    (agentOptions || []).forEach(o => {
-        if (o.value) choiceMap.set(o.value, o.label || o.value);
-    });
-    (policyRows || []).forEach(row => {
-        (row.agent || []).forEach(key => {
-            if (key && !choiceMap.has(key)) choiceMap.set(key, key);
-        });
-    });
-    return [...choiceMap.entries()].map(([value, label]) => ({ label, value }));
-};
-
 export const applyAgentFilterToRows = (rows, filters) => {
     const agentValues = getAgentFilterValues(filters);
     if (!agentValues.length) return rows;

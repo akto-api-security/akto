@@ -15,7 +15,6 @@ import GUARDRAIL_PRESETS from "./guardrailPresets";
 import PersistStore from '../../../main/PersistStore';
 import {
     buildAgentFilterOptions,
-    buildAgentFilterChoices,
     getApplicableAgentKeys,
     applyAgentFilterToRows,
     splitAgentServersV2,
@@ -77,6 +76,17 @@ const headings = [
     type: CellType.ACTION,
   }
 ];
+
+const agentFilterHeader = {
+    value: 'agent',
+    filterKey: 'agent',
+    filterLabel: 'Agent',
+    title: 'Agent',
+    showFilter: true,
+    singleSelect: true,
+};
+
+const tableHeaders = [...headings, agentFilterHeader];
 
 const sortOptions = [
   {
@@ -156,19 +166,6 @@ function GuardrailPolicies() {
             agent: getApplicableAgentKeys(row.originalData, allCollections, agentFilterOptions),
         }))
     ), [policyData, allCollections, agentFilterOptions]);
-
-    const tableFilterConfig = useMemo(() => {
-        const choices = buildAgentFilterChoices(agentFilterOptions, tablePolicyData);
-        if (!choices.length) return [];
-        return [{
-            key: 'agent',
-            label: 'Agent',
-            title: 'Agent',
-            type: 'select',
-            choices,
-            singleSelect: true,
-        }];
-    }, [agentFilterOptions, tablePolicyData]);
 
     const policyName = new URLSearchParams(window.location.search).get("policy");
 
@@ -643,14 +640,12 @@ function GuardrailPolicies() {
 
     const components = [
         <GithubSimpleTable
-            key={`policies-table-${JSON.stringify(policyData.map((row) => row.originalData))}-${agentFilterOptions.length}-${tableFilterConfig.length}`}
+            key={`policies-table-${tablePolicyData.length}-${agentFilterOptions.length}`}
             resourceName={resourceName}
             useNewRow={true}
-            headers={headings}
+            headers={tableHeaders}
             headings={headings}
             data={tablePolicyData}
-            tableFilterConfig={tableFilterConfig}
-            callFromOutside={`${tablePolicyData.length}-${tableFilterConfig[0]?.choices?.length || 0}`}
             filterStateUrl="/dashboard/guardrails/policies/"
             disambiguateLabel={disambiguateLabel}
             hideQueryField={true}
