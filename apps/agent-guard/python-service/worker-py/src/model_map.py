@@ -203,16 +203,9 @@ class ModelMapScanner:
         # Convict only on an affirmative flag; safeDecisionThreshold only gates the fast tiers, not the final call.
         unsafe = [r for r in completed if not r.get("is_valid", True)]
         pool = unsafe or completed
-        winner = min(pool, key=lambda r: self._reason_rank(r))
+        winner = pool[0]  # first-listed arbiter in modelConfigs wins ties/disagreement
         winner["is_valid"] = not unsafe
         return winner
-
-    def _reason_rank(self, result: Dict[str, Any]) -> Tuple[int, float]:
-        # min() picks lowest rank first: 0=anthropic, 1=gemma, 2=qwen; ties broken by highest risk_score.
-        stem = self._stem((result.get("details") or {}).get("llm_provider", ""))
-        rank = {"anthropic": 0, "gemma": 1, "qwen": 2}[stem]
-        highest_risk_score_first = -result["risk_score"]
-        return (rank, highest_risk_score_first)
 
     @staticmethod
     def _error_result(error: str) -> Dict[str, Any]:
