@@ -54,13 +54,45 @@ function SampleDetails(props) {
         const idx = moreInfoData?.url?.indexOf(urlPrefix) ?? -1;
         return idx !== -1 ? stripArrayIndices(moreInfoData.url.slice(idx + urlPrefix.length)) : null;
     };
+    
+    // Returns the dropped segment (the real instance id) when `key` matches `jsonKey` with
+    // exactly one extra segment in the middle, or null if they don't match this way.
+    const extractWildcardId = (key, jsonKey) => {
+        const keyParts = key.split('.');
+        const jsonKeyParts = jsonKey.split('.');
+        if (keyParts.length !== jsonKeyParts.length + 1) return null;
+        for (let i = 1; i < keyParts.length - 1; i++) {
+            const withoutSegment = [...keyParts.slice(0, i), ...keyParts.slice(i + 1)];
+            if (withoutSegment.join('.') === jsonKey) return keyParts[i];
+        }
+        return null;
+    };
+    // Substitutes the real instance id (e.g. "windows-akto-ai-mcp") for the literal `<id>`
+    // placeholder in the static JSON's text so users see which instance was actually flagged,
+    // instead of the generic template placeholder.
+    const fillIdPlaceholder = (entry, instanceId) => {
+        if (!entry || !instanceId) return entry;
+        const fill = (text) => typeof text === 'string' ? text.replace(/<id>/g, instanceId) : text;
+        return {
+            ...entry,
+            title: fill(entry.title),
+            remediation: fill(entry.remediation),
+            overview: entry.overview?.map(o => ({ ...o, heading: fill(o.heading), body: fill(o.body) }))
+        };
+    };
     const resolveSettingsRiskEntry = (riskMap, key) => {
         if (!key) return undefined;
         if (riskMap[key]) return riskMap[key];
-        const bestMatch = Object.keys(riskMap)
+        const riskMapKeys = Object.keys(riskMap);
+        const bestPrefixMatch = riskMapKeys
             .filter(k => key.startsWith(k))
             .sort((a, b) => b.length - a.length)[0];
-        return bestMatch ? riskMap[bestMatch] : undefined;
+        if (bestPrefixMatch) return riskMap[bestPrefixMatch];
+        for (const jsonKey of riskMapKeys) {
+            const instanceId = extractWildcardId(key, jsonKey);
+            if (instanceId) return fillIdPlaceholder(riskMap[jsonKey], instanceId);
+        }
+        return undefined;
     };
     const settingsRiskEntry = isSettingsRisk
         ? resolveSettingsRiskEntry(settingsRiskConfig.riskMap, getSettingsRiskKey(settingsRiskConfig.urlPrefix))
