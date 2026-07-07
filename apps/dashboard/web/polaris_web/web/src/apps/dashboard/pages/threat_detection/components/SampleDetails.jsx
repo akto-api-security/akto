@@ -16,6 +16,7 @@ import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreati
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
 import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN, SETTINGS_RISK_CONFIGS } from "../constants/guardrailDescriptions";
+import { extractOverviewAndRemediation } from "../utils/formatUtils";
 import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
@@ -30,10 +31,11 @@ function SampleDetails(props) {
     const useGuardrailDescription = isAgenticSecurityCategory() || isEndpointSecurityCategory();
 
     // Settings-risk findings (Claude/Codex/Copilot config scanners) are keyed by policy_name,
-    // which arrives here as moreInfoData.templateId. Each tool has its own remediation lookup
-    // map and endpoint path prefix — see SETTINGS_RISK_CONFIGS for how to add a new tool.
+    // which arrives here as moreInfoData.templateId. Some tools also have a static JSON
+    // fallback (riskMap + urlPrefix) for events without live metadata — see SETTINGS_RISK_CONFIGS.
+    const settingsRiskTemplateIds = Object.keys(SETTINGS_RISK_CONFIGS);
+    const isSettingsRisk = settingsRiskTemplateIds.includes(moreInfoData?.templateId);
     const settingsRiskConfig = SETTINGS_RISK_CONFIGS[moreInfoData?.templateId];
-    const isSettingsRisk = !!settingsRiskConfig;
 
     // For guardrail events, look up the specific rule info based on ruleViolated / templateId
     const guardrailRuleInfo = useGuardrailDescription
@@ -54,49 +56,26 @@ function SampleDetails(props) {
         const idx = moreInfoData?.url?.indexOf(urlPrefix) ?? -1;
         return idx !== -1 ? stripArrayIndices(moreInfoData.url.slice(idx + urlPrefix.length)) : null;
     };
-    
-    // Returns the dropped segment (the real instance id) when `key` matches `jsonKey` with
-    // exactly one extra segment in the middle, or null if they don't match this way.
-    const extractWildcardId = (key, jsonKey) => {
-        const keyParts = key.split('.');
-        const jsonKeyParts = jsonKey.split('.');
-        if (keyParts.length !== jsonKeyParts.length + 1) return null;
-        for (let i = 1; i < keyParts.length - 1; i++) {
-            const withoutSegment = [...keyParts.slice(0, i), ...keyParts.slice(i + 1)];
-            if (withoutSegment.join('.') === jsonKey) return keyParts[i];
-        }
-        return null;
-    };
-    // Substitutes the real instance id (e.g. "windows-akto-ai-mcp") for the literal `<id>`
-    // placeholder in the static JSON's text so users see which instance was actually flagged,
-    // instead of the generic template placeholder.
-    const fillIdPlaceholder = (entry, instanceId) => {
-        if (!entry || !instanceId) return entry;
-        const fill = (text) => typeof text === 'string' ? text.replace(/<id>/g, instanceId) : text;
-        return {
-            ...entry,
-            title: fill(entry.title),
-            remediation: fill(entry.remediation),
-            overview: entry.overview?.map(o => ({ ...o, heading: fill(o.heading), body: fill(o.body) }))
-        };
-    };
+
+    // Exact match first, else longest key that `key` starts with (handles nested paths like
+    // "mcp_servers.foo.command" falling back to a generic "mcp_servers.command" entry).
     const resolveSettingsRiskEntry = (riskMap, key) => {
         if (!key) return undefined;
         if (riskMap[key]) return riskMap[key];
-        const riskMapKeys = Object.keys(riskMap);
-        const bestPrefixMatch = riskMapKeys
+        const bestPrefixMatch = Object.keys(riskMap)
             .filter(k => key.startsWith(k))
             .sort((a, b) => b.length - a.length)[0];
-        if (bestPrefixMatch) return riskMap[bestPrefixMatch];
-        for (const jsonKey of riskMapKeys) {
-            const instanceId = extractWildcardId(key, jsonKey);
-            if (instanceId) return fillIdPlaceholder(riskMap[jsonKey], instanceId);
-        }
-        return undefined;
+        return bestPrefixMatch ? riskMap[bestPrefixMatch] : undefined;
     };
-    const settingsRiskEntry = isSettingsRisk
+    const settingsRiskEntry = settingsRiskConfig
         ? resolveSettingsRiskEntry(settingsRiskConfig.riskMap, getSettingsRiskKey(settingsRiskConfig.urlPrefix))
         : undefined;
+
+    // Settings-scanner events now carry their own LLM-generated overview/remediation markdown
+    // directly on metadata (per-event, more specific than the static per-field JSON). Prefer it
+    // when present; the static SETTINGS_RISK_CONFIGS JSON remains the fallback for older events.
+    const liveMetadata = isSettingsRisk ? extractOverviewAndRemediation(moreInfoData?.metadata) : { overview: null, remediation: null };
+    const hasLiveOverview = !!liveMetadata.overview;
 
     const settingsRiskSectionsToShow = settingsRiskEntry?.overview
         ? [{ heading: settingsRiskEntry.title, description: null, subSections: settingsRiskEntry.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
@@ -160,7 +139,12 @@ function SampleDetails(props) {
         ? getOwaspThreatsForRule(moreInfoData?.ruleViolated)
         : [];
 
-    const overviewComp = (useGuardrailDescription || isSettingsRisk) ? (
+    const overviewComp = hasLiveOverview ? (
+        // Per-event LLM-generated overview markdown (settings-scanners) takes priority over the static JSON
+        <Box padding={"4"}>
+            <MarkdownViewer markdown={liveMetadata.overview} />
+        </Box>
+    ) : (useGuardrailDescription || isSettingsRisk) ? (
         // Structured view for Argus/Atlas guardrails - show all 7 sections with hierarchy
         <Box padding={"4"}>
             <VerticalStack gap={"5"}>
@@ -318,10 +302,11 @@ function SampleDetails(props) {
 
     const remediationTab = (() => {
         if (isSettingsRisk) {
+            const remediationMarkdown = liveMetadata.remediation || settingsRiskEntry?.remediation || GUARDRAIL_REMEDIATION_MARKDOWN;
             return {
                 id: "remediation",
                 content: "Remediation",
-                component: (<MarkdownViewer markdown={settingsRiskEntry ? settingsRiskEntry.remediation : GUARDRAIL_REMEDIATION_MARKDOWN} />)
+                component: (<MarkdownViewer markdown={remediationMarkdown} />)
             };
         }
         if (useGuardrailDescription) {

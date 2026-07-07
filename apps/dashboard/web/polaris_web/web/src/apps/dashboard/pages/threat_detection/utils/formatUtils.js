@@ -69,5 +69,24 @@ export const extractBehaviour = (metadata) => {
   }
 };
 
+/**
+ * Extracts the LLM-generated overview/remediation markdown that settings-scanners
+ * (Claude/Codex/Copilot config risk) attach directly to metadata per-event. Callers
+ * fall back to the static per-field JSON maps (SETTINGS_RISK_CONFIGS) when these are absent.
+ */
+export const extractOverviewAndRemediation = (metadata) => {
+  if (!metadata) return { overview: null, remediation: null };
+
+  try {
+    const metadataObj = JSON.parse(metadata);
+    return {
+      overview: metadataObj.overview || null,
+      remediation: metadataObj.remediation || null
+    };
+  } catch (e) {
+    return { overview: null, remediation: null };
+  }
+};
+
 export const getBehaviourTone = (behaviour) =>
   behaviour === 'block' ? 'critical' : behaviour === 'warn' ? 'attention' : behaviour === 'alert' ? 'info' : undefined;
