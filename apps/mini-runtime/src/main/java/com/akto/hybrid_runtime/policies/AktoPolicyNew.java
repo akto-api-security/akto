@@ -235,8 +235,10 @@ public class AktoPolicyNew {
 
         if (CONTEXT_SOURCE.ENDPOINT.name().equals(contextSource)){
             Map<String, List<String>> reqHeaders = httpResponseParams.getRequestParams().getHeaders();
-            String skillAgent = RuntimeUtil.getHeaderValue(reqHeaders, "skill-agent");
-            addClassifiedTag(apiInfo, "skill-tags", skillAgent);
+            String skillAgentHeader = RuntimeUtil.getHeaderValue(reqHeaders, "skill-agent");
+            for (String skillAgent: parseSkillAgents(skillAgentHeader)) {
+                addClassifiedTag(apiInfo, "skill-tags", skillAgent);
+            }
         }
 
         if (!CONTEXT_SOURCE.ENDPOINT.name().equals(contextSource) && !CONTEXT_SOURCE.AGENTIC.name().equals(contextSource)) {
@@ -250,6 +252,20 @@ public class AktoPolicyNew {
             addClassifiedTag(apiInfo, "referer", UserAgentClassifier.extractRefererHost(referer));
         }
 
+    }
+
+    private static List<String> parseSkillAgents(String skillAgentHeader) {
+        if (skillAgentHeader == null || skillAgentHeader.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<String> skillAgents = new ArrayList<>();
+        for (String skillAgent: skillAgentHeader.split(",")) {
+            skillAgent = skillAgent.trim();
+            if (!skillAgent.isEmpty()) {
+                skillAgents.add(skillAgent);
+            }
+        }
+        return skillAgents;
     }
 
     private static void addClassifiedTag(ApiInfo apiInfo, String headerKey, String category) {
