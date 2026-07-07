@@ -220,6 +220,12 @@ public class AktoPolicyNew {
         Map<String, String> tagsMap = HttpCallParser.parseTagsMap(httpResponseParams.getTags());
         String contextSource = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_SOURCE) : null;
 
+        if (CONTEXT_SOURCE.ENDPOINT.name().equals(contextSource)){
+            Map<String, List<String>> reqHeaders = httpResponseParams.getRequestParams().getHeaders();
+            String skillAgent = RuntimeUtil.getHeaderValue(reqHeaders, "skill-agent");
+            addClassifiedTag(apiInfo, "skill-tags", skillAgent);
+        }
+
         if (!CONTEXT_SOURCE.ENDPOINT.name().equals(contextSource) && !CONTEXT_SOURCE.AGENTIC.name().equals(contextSource)) {
             Map<String, List<String>> reqHeaders = httpResponseParams.getRequestParams().getHeaders();
             String ua = RuntimeUtil.getHeaderValue(reqHeaders, "user-agent");
