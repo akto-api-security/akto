@@ -106,13 +106,11 @@ public class GuardrailsClient {
                     .post(body)
                     .addHeader("Content-Type", "application/json");
 
-            if (isGuardrailsAuthEnabled()) {
-                String authToken = loadGuardrailsAuthToken();
-                if (authToken == null || authToken.trim().isEmpty()) {
-                    loggerMaker.warnAndAddToDb("AKTO_GR_AUTHENTICATE is enabled but DATABASE_ABSTRACTOR_SERVICE_TOKEN is not set");
-                } else {
-                    requestBuilder.addHeader("Authorization", authToken.trim());
-                }
+            String authToken = loadGuardrailsAuthToken();
+            if (authToken == null || authToken.trim().isEmpty()) {
+                loggerMaker.warnAndAddToDb("DATABASE_ABSTRACTOR_SERVICE_TOKEN is not set");
+            } else {
+                requestBuilder.addHeader("Authorization", authToken.trim());
             }
 
             Request httpRequest = requestBuilder.build();

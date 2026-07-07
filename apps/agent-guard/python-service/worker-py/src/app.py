@@ -80,8 +80,6 @@ def _schedule_background(coro) -> None:
 def _response_path(details: dict[str, Any]) -> str:
     if details.get("cascade_skipped"):
         return "cascade_backpressure_skip"
-    if details.get("cache_hit") or details.get("cache_served"):
-        return "cache_hit"
     if details.get("error"):
         return "error"
     if "scan_time_ms" in details or "execution_time_ms" in details:

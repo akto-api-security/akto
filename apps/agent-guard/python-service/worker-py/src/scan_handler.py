@@ -5,7 +5,6 @@ from typing import Any, Callable, Coroutine, Dict, Optional
 
 import alerts
 import cascade_backpressure
-import cache
 import scan_diag
 from constants import (
     CASCADE_SCANNERS,
@@ -102,9 +101,6 @@ async def scan_payload(
         if config.get("storeAllResults"):
             store_fn = lambda completed, name: schedule(alerts.store_results(completed, name))
 
-        # Semantic verdict cache still keys off payload.normalize()'s canonical
-        # NL string exactly as before this redesign — entirely independent of
-        # the instruction/data segmentation the intent module now uses below.
         intent_on = prefilter.enabled()
         norm_text = ""
         cache_text = text
@@ -113,45 +109,8 @@ async def scan_payload(
             with timer.span("strip"):
                 norm_text, _ = prefilter.normalized_text(text)
             cache_text = norm_text or text
-
-        # Semantic cache, decide mode: consult the cache BEFORE applying
-        # backpressure, so a cached verdict (including a cached block) is still
-        # served correctly while Vertex is slow — backpressure must only short-
-        # circuit a genuine miss, never a known answer. A fresh within-threshold
-        # hit short-circuits — safe verdicts on a fuzzy match, blocks only on a
-        # (near-)exact repeat (see cache.try_serve); a miss/error falls through.
-        # The served verdict (is_valid) is honoured so cached blocks still block.
-        # `prep` is reused by observe() so a miss embeds only once. BLOCK is,
-        # and remains, exclusively this cache path's job — the intent module
-        # below never blocks, it only fast-ALLOWs or defers to the cascade.
         prep = None
-        if cache.serving():
-            if timer is not None:
-                with timer.span("prepare"):
-                    prep = await cache.prepare(scanner_name, scanner_type, cache_text, config, agent_host)
-            else:
-                prep = await cache.prepare(scanner_name, scanner_type, cache_text, config, agent_host)
-            served = cache.try_serve(prep, scanner_name, scanner_type, cache_text)
-            if served is not None:
-                schedule(alerts.post_cache_shadow(served["alert"]))
-                scan_diag.log_scan_outcome(
-                    "cache_hit",
-                    scanner_name,
-                    _elapsed_ms(),
-                    extra={"is_valid": served["is_valid"]},
-                    always=True,
-                )
-                return shape_response(
-                    scanner_name, served["is_valid"], served["risk_score"], text, served["details"]
-                )
-
-        # Intent fast-path: segment the user prompt into instruction units
-        # (separate from any attached data), classify each with the per-agent
-        # multi-class model, and decide. Runs independently of cache.serving()
-        # — it does its own batched embed/classify calls now, no longer reuses
-        # the cache's embedding. ESCALATE (the default) falls through to the
-        # cascade and seeds the mission. Fast ALLOWs do NOT warm the cache —
-        # only LLM verdicts become learned examples, to avoid self-reinforcement.
+        
         fast = None
         if intent_on:
             fast = await prefilter.decide_fast(agent_host, text, timer=timer)
@@ -226,20 +185,12 @@ async def scan_payload(
             if intent_on:
                 prefilter.enrich_result(result)
                 is_valid_bool = bool(result.get("is_valid", True))
-                # Only GOOD verdicts feed the corpus — analysis (offline) only
-                # ever looks at stored GOOD prompts; a BLOCKED verdict's units
-                # have nothing useful to teach the multi-class intent model.
                 if is_valid_bool and fast is not None and fast.get("unit_texts"):
                     units_for_queue = [{"text": t} for t in fast["unit_texts"]]
                     if intent_corpus.queue(agent_host, units_for_queue):
                         schedule(intent_corpus.flush())
                     if intent_corpus.record_good(agent_host):
                         schedule(intent_corpus.warmup(agent_host))
-            # Per-scanner semantic cache: observe + warm (shadow in observe mode;
-            # cache-warm + miss-comparison in decide mode). Fire-and-forget.
-            if cache.enabled():
-                schedule(cache.observe(scanner_name, scanner_type, cache_text, config, result,
-                                       prep=prep, agent_host=agent_host))
             scan_diag.log_scan_outcome(
                 "cascade_run",
                 scanner_name,

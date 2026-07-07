@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Optional
 
-from . import ban_topics, code, gibberish, prompt_injection, toxicity
+from . import ban_topics, code, gibberish, password, prompt_injection, toxicity
 
 
 def build_scan_prompt(
@@ -22,6 +22,8 @@ def build_scan_prompt(
         return gibberish.build(text)
     if scanner_name == "BanCode":
         return code.build(text)
+    if scanner_name == "Password":
+        return password.build(text)
     return None
 
 
