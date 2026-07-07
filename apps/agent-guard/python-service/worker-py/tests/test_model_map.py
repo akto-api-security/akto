@@ -209,13 +209,13 @@ async def test_arbiter_hedged_acquittal_allows():
     assert r["is_valid"] is True
 
 
-async def test_arbiter_reason_priority_gemma_beats_qwen_despite_lower_score():
-    # Qwen's discrete risk_score (1.0) usually beats Gemma's continuous confidence; rank should override that.
-    qwen_unsafe = {"is_valid": False, "risk_score": 1.0, "decision_confidence": 1.0, "details": {}}
+async def test_arbiter_reason_priority_first_listed_wins_despite_lower_score():
+    # gemma is listed before qwen in modelConfigs, so gemma wins even with a lower risk_score.
     gemma_unsafe = {"is_valid": False, "risk_score": 0.8, "decision_confidence": 0.8,
                      "details": {"reason": "Explicit instructions for making a weapon."}}
-    cfg = [_entry("qwen3guard", "FINAL_ARBITER"), _entry("gemma_vertexai", "FINAL_ARBITER")]
-    r = await _run(cfg, {"qwen3guard": qwen_unsafe, "gemma_vertexai": gemma_unsafe})
+    qwen_unsafe = {"is_valid": False, "risk_score": 1.0, "decision_confidence": 1.0, "details": {}}
+    cfg = [_entry("gemma_vertexai", "FINAL_ARBITER"), _entry("qwen3guard", "FINAL_ARBITER")]
+    r = await _run(cfg, {"gemma_vertexai": gemma_unsafe, "qwen3guard": qwen_unsafe})
     assert r["is_valid"] is False
     assert r["details"]["llm_provider"] == "gemma_vertexai"
     assert r["details"]["reason"] == "Explicit instructions for making a weapon."
@@ -223,16 +223,17 @@ async def test_arbiter_reason_priority_gemma_beats_qwen_despite_lower_score():
 
 async def test_arbiter_reason_empty_when_qwen_is_sole_objector():
     # Qwen alone flags it: no reason available, gateway shows its generic message instead.
-    qwen_unsafe = {"is_valid": False, "risk_score": 1.0, "decision_confidence": 1.0, "details": {}}
     gemma_safe = {"is_valid": True, "risk_score": 0.05, "decision_confidence": 0.95, "details": {}}
-    cfg = [_entry("qwen3guard", "FINAL_ARBITER"), _entry("gemma_vertexai", "FINAL_ARBITER")]
-    r = await _run(cfg, {"qwen3guard": qwen_unsafe, "gemma_vertexai": gemma_safe})
+    qwen_unsafe = {"is_valid": False, "risk_score": 1.0, "decision_confidence": 1.0, "details": {}}
+    cfg = [_entry("gemma_vertexai", "FINAL_ARBITER"), _entry("qwen3guard", "FINAL_ARBITER")]
+    r = await _run(cfg, {"gemma_vertexai": gemma_safe, "qwen3guard": qwen_unsafe})
     assert r["is_valid"] is False
     assert r["details"]["llm_provider"] == "qwen3guard"
     assert r["details"].get("reason", "") == ""
 
 
-async def test_arbiter_reason_priority_anthropic_beats_gemma():
+async def test_arbiter_reason_priority_follows_modelconfigs_order():
+    # anthropic is listed first, so it wins over gemma regardless of risk_score.
     anthropic_unsafe = {"is_valid": False, "risk_score": 0.6, "decision_confidence": 0.6,
                          "details": {"reason": "anthropic reason"}}
     gemma_unsafe = {"is_valid": False, "risk_score": 0.99, "decision_confidence": 0.99,
