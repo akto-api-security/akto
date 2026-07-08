@@ -118,22 +118,18 @@ function Endpoints() {
         });
     }, [getRiskScoreStatus]);
 
-    const applySkillRiskScores = useCallback((scoreMap, maliciousSkills, misconfiguredSkills, skillTagsMap, isMountedRef) => {
+    const applySkillRiskScores = useCallback((scoreMap, maliciousSkills, misconfiguredSkills, isMountedRef) => {
         if (!isMountedRef.current) return;
         setData((prev) => {
             const updatedSkills = prev.skills.map((row) => {
                 const riskScore = scoreMap[row.groupName] || 0;
                 const isMalicious = maliciousSkills.has(row.groupName);
                 const isMisconfigured = misconfiguredSkills.has(row.groupName);
-                const extraTags = skillTagsMap?.[row.groupName] || [];
                 const groupNameDisplay = (
                     <HorizontalStack gap="2" align="start" wrap={false}>
                         <Text>{row.groupName}</Text>
                         {isMalicious && <Badge size="small" status="critical">Malicious</Badge>}
                         {isMisconfigured && <Badge size="small" status="attention">Misconfigured</Badge>}
-                        {extraTags.map((tag) => (
-                            <Badge key={tag} size="small">{tag}</Badge>
-                        ))}
                     </HorizontalStack>
                 );
                 return {
@@ -170,10 +166,10 @@ function Endpoints() {
             });
         });
 
-        const { skillScoreMap, maliciousSkills, misconfiguredSkills, skillTagsMap } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
+        const { skillScoreMap, maliciousSkills, misconfiguredSkills } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
 
         if (!isMountedRef.current) return;
-        applySkillRiskScores(skillScoreMap, maliciousSkills, misconfiguredSkills || new Set(), skillTagsMap || {}, isMountedRef);
+        applySkillRiskScores(skillScoreMap, maliciousSkills, misconfiguredSkills || new Set(), isMountedRef);
     }, [applySkillRiskScores]);
 
     async function fetchData(isMountedRef = { current: true }) {
