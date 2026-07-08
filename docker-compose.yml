@@ -4,7 +4,7 @@ services:
   
   mongo:
     container_name: mongo
-    image: mongo:6.0.1
+    image: mongo:7.0.4
     restart: on-failure:10
     volumes:
       - mongodata:/data/db

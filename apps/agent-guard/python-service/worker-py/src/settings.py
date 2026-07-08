@@ -1,10 +1,11 @@
 """Worker configuration.
 
-Unlike the container (which read os.environ via pydantic-settings), Cloudflare
-Python Workers receive bindings/secrets on the `env` object passed to on_fetch.
-We populate a module-level singleton once per isolate from that `env`, so the
-rest of the code can keep doing `from settings import settings`.
+Cloudflare Python Workers receive bindings/secrets on the `env` object passed
+to on_fetch (`settings.init`). Portable deployments read the same fields from
+`os.environ` via `settings.init_from_env`.
 """
+
+import os
 
 _FIELDS = (
     # OpenAI / openai-compatible
@@ -23,6 +24,8 @@ _FIELDS = (
     "SLACK_WEBHOOK_URL", "DATABASE_ABSTRACTOR_SERVICE_URL",
     # Per-deployment cascade default modelMap (JSON). Empty → built-in default.
     "DEFAULT_MODEL_CONFIG_JSON",
+    # Portable anonymizer service URL (e.g. http://anonymizer:8093).
+    "ANONYMIZER_URL",
 )
 
 
@@ -32,14 +35,26 @@ class Settings:
             setattr(self, f, "")
         self._loaded = False
 
+    def _apply(self, values: dict[str, str]) -> None:
+        for f in _FIELDS:
+            setattr(self, f, values.get(f, ""))
+        self._loaded = True
+
     def init(self, env) -> None:
         """Populate from the Worker `env` binding object (idempotent)."""
         if self._loaded:
             return
+        values = {}
         for f in _FIELDS:
             v = getattr(env, f, None)
-            setattr(self, f, "" if v is None else str(v))
-        self._loaded = True
+            values[f] = "" if v is None else str(v)
+        self._apply(values)
+
+    def init_from_env(self) -> None:
+        """Populate from process environment (idempotent)."""
+        if self._loaded:
+            return
+        self._apply({f: os.environ.get(f, "") for f in _FIELDS})
 
 
 settings = Settings()

@@ -59,6 +59,7 @@ def test_qwen_safe():
     r = parse_qwen3guard_result("Toxicity", "Safety: Safe\nCategories: None")
     assert r["is_valid"] is True
     assert r["risk_score"] == 0.0
+    assert "reason" not in r["details"]
 
 
 def test_qwen_unsafe():
@@ -66,12 +67,14 @@ def test_qwen_unsafe():
     assert r["is_valid"] is False
     assert r["risk_score"] == 1.0
     assert r["details"]["categories"] == "Violent"
+    assert "reason" not in r["details"]
 
 
 def test_qwen_controversial_is_mid_risk():
     r = parse_qwen3guard_result("Toxicity", "Safety: Controversial")
     assert r["is_valid"] is False
     assert r["risk_score"] == 0.5
+    assert "reason" not in r["details"]
 
 
 def test_qwen_ban_topics_sets_matched_topic():

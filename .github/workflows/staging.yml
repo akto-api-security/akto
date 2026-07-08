@@ -1,5 +1,9 @@
 name: Staging
 
+env:
+  GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+  GAR_REGISTRY: ${{ vars.GCP_REGION || 'us-central1' }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}
+
 # Controls when the workflow will run
 on:
   push:
@@ -7,6 +11,28 @@ on:
   pull_request_review:
     types: [ submitted ]
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'Build target (PR review always runs all)'
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - main
+          - guardrails-service
+          - agent-guard
+          - agent-guard-worker
+          - agent-guard-anonymizer
+          - agent-guard-embedder
+      skipTests:
+        description: 'Skip unit tests'
+        type: boolean
+        default: false
+      skipFrontendBuild:
+        description: 'Skip dashboard frontend build and S3 sync'
+        type: boolean
+        default: false
 
 jobs:
   check-dao-migration:
@@ -63,7 +89,9 @@ jobs:
 
   build:
     needs: check-dao-migration
-    if: (github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') || (github.event_name == 'workflow_dispatch')
+    if: |
+      (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.target == 'all' || github.event.inputs.target == 'main'))
     runs-on: ubuntu-22.04
     outputs:
       IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
@@ -120,12 +148,18 @@ jobs:
         run: bash apps/dashboard/scripts/download-dashboard-vendor-assets.sh
 
       - name: Build Dashboard polaris UI
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.skipFrontendBuild != 'true'
         working-directory: ./apps/dashboard/web/polaris_web
         run: |
           npm install
           RELEASE_VERSION=${{ steps.docker_tag.outputs.IMAGE_TAG }} npm run build
 
-      - run: mvn package -Dakto-image-tag=${{ steps.docker_tag.outputs.IMAGE_TAG }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
+      - name: Run mvn package
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.skipTests != 'true'
+        run: mvn package -Dakto-image-tag=${{ steps.docker_tag.outputs.IMAGE_TAG }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
+      - name: Run mvn package (skip tests)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.skipTests == 'true'
+        run: mvn package -Dakto-image-tag=${{ steps.docker_tag.outputs.IMAGE_TAG }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}} -DskipTests
 
       - name: DockerHub login
         env:
@@ -133,57 +167,100 @@ jobs:
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-      - name: Build, tag, and push the image to DockerHub
+      - name: Authenticate to Google Cloud
+        if: vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - name: Set up Cloud SDK
+        if: vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Configure Docker for Artifact Registry
+        if: vars.GCP_PROJECT_ID != ''
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+      - name: Build, tag, and push the image to DockerHub and Artifact Registry
         id: build-image-dockerhub
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
           IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
+          GAR_ENABLED: ${{ vars.GCP_PROJECT_ID != '' }}
         run: |
           set -euo pipefail
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
+          gar_tag() {
+            if [ "$GAR_ENABLED" = "true" ]; then
+              echo "-t $GAR_REGISTRY/$1:$IMAGE_TAG"
+            fi
+          }
           # Build non-dashboard images in parallel.
           (
             cd apps/testing
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 \
+              -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG \
+              $(gar_tag akto-api-testing) \
+              . --push
           ) &
           PID_TESTING=$!
           (
             cd apps/billing
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 \
+              -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG \
+              $(gar_tag akto-billing) \
+              . --push
           ) &
           PID_BILLING=$!
           (
             cd apps/internal
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 \
+              -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG \
+              $(gar_tag akto-internal) \
+              . --push
           ) &
           PID_INTERNAL=$!
           (
             cd apps/threat-detection
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 \
+              -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG \
+              $(gar_tag akto-threat-detection) \
+              . --push
           ) &
           PID_THREAT=$!
           (
             cd apps/threat-detection-backend
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 \
+              -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG \
+              $(gar_tag akto-threat-detection-backend) \
+              . --push
           ) &
           PID_THREAT_BACKEND=$!
           (
             cd apps/account-job-executor
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_TAG . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 \
+              -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_TAG \
+              $(gar_tag akto-account-job-executor) \
+              . --push
           ) &
           PID_ACCOUNT_EXECUTOR=$!
           (
             cd apps/data-ingestion-service
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/data-ingestion-service:$IMAGE_TAG . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 \
+              -t $ECR_REGISTRY/data-ingestion-service:$IMAGE_TAG \
+              $(gar_tag data-ingestion-service) \
+              . --push
           ) &
           PID_DATA_INGESTION=$!
 
-          aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/$IMAGE_TAG/dist --delete
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ "${{ github.event.inputs.skipFrontendBuild }}" != "true" ]; then
+            aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/$IMAGE_TAG/dist --delete
+          fi
           (
             cd apps/dashboard
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 \
+              -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG \
+              $(gar_tag $ECR_REPOSITORY-dashboard) \
+              . --push
           )
 
           wait $PID_TESTING $PID_BILLING $PID_INTERNAL $PID_THREAT $PID_THREAT_BACKEND $PID_ACCOUNT_EXECUTOR $PID_DATA_INGESTION
@@ -196,7 +273,9 @@ jobs:
           restore-keys: ${{ runner.os }}-m2
 
   build-guardrails-service:
-    if: (github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') || (github.event_name == 'workflow_dispatch')
+    if: |
+      (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.target == 'all' || github.event.inputs.target == 'guardrails-service'))
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
@@ -209,10 +288,22 @@ jobs:
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+      - name: Authenticate to Google Cloud
+        if: vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - name: Set up Cloud SDK
+        if: vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Configure Docker for Artifact Registry
+        if: vars.GCP_PROJECT_ID != ''
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
       - name: Build and push guardrails-service
         env:
           ECR_REGISTRY: aktosecurity
           IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
+          GAR_ENABLED: ${{ vars.GCP_PROJECT_ID != '' }}
         run: |
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
@@ -220,7 +311,14 @@ jobs:
           chmod +x setup-netrc.sh
           # token expires in 1 year [2026-12-17]
           GITHUB_TOKEN=${{ secrets.AKTO_GITHUB_TOKEN }} ./setup-netrc.sh
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/guardrails-service:$IMAGE_TAG . --push
+          GAR_TAG=""
+          if [ "$GAR_ENABLED" = "true" ]; then
+            GAR_TAG="-t $GAR_REGISTRY/guardrails-service:$IMAGE_TAG"
+          fi
+          docker buildx build --platform linux/arm64/v8,linux/amd64 \
+            -t $ECR_REGISTRY/guardrails-service:$IMAGE_TAG \
+            $GAR_TAG \
+            . --push
 
   build-otel-ingestion-service:
     if: (github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') || (github.event_name == 'workflow_dispatch')
@@ -247,7 +345,9 @@ jobs:
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/otel-ingestion-service:$IMAGE_TAG . --push
 
   build-agent-guard:
-    if: (github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') || (github.event_name == 'workflow_dispatch')
+    if: |
+      (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') ||
+      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["all","agent-guard","agent-guard-worker","agent-guard-anonymizer","agent-guard-embedder"]'), github.event.inputs.target))
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
@@ -260,12 +360,62 @@ jobs:
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-      - name: Build and push agent-guard
+      - name: Authenticate to Google Cloud
+        if: vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - name: Set up Cloud SDK
+        if: vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Configure Docker for Artifact Registry
+        if: vars.GCP_PROJECT_ID != ''
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+      - name: Build and push agent-guard images
         env:
           ECR_REGISTRY: aktosecurity
           IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
+          GAR_ENABLED: ${{ vars.GCP_PROJECT_ID != '' }}
+          BUILD_WORKER: ${{ github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-worker"]'), github.event.inputs.target) }}
+          BUILD_ANONYMIZER: ${{ github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-anonymizer"]'), github.event.inputs.target) }}
+          BUILD_EMBEDDER: ${{ github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-embedder"]'), github.event.inputs.target) }}
         run: |
-          echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
+          set -euo pipefail
+          echo "$IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
-          cd apps/agent-guard/python-service/container
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-agent-guard-executor:$IMAGE_TAG . --push
+          gar_tag() {
+            if [ "$GAR_ENABLED" = "true" ]; then
+              echo "-t $GAR_REGISTRY/$1:$IMAGE_TAG"
+            fi
+          }
+          PIDS=()
+          if [ "$BUILD_WORKER" = "true" ]; then
+            (
+              docker buildx build --platform linux/arm64/v8,linux/amd64 \
+                -t $ECR_REGISTRY/akto-agent-guard-worker:$IMAGE_TAG \
+                $(gar_tag akto-agent-guard-worker) \
+                apps/agent-guard/python-service/worker-py --push
+            ) &
+            PIDS+=($!)
+          fi
+          if [ "$BUILD_ANONYMIZER" = "true" ]; then
+            (
+              docker buildx build --platform linux/arm64/v8,linux/amd64 \
+                -t $ECR_REGISTRY/akto-agent-guard-anonymizer:$IMAGE_TAG \
+                $(gar_tag akto-agent-guard-anonymizer) \
+                apps/agent-guard/python-service/anonymizer-container --push
+            ) &
+            PIDS+=($!)
+          fi
+          if [ "$BUILD_EMBEDDER" = "true" ]; then
+            (
+              docker buildx build --platform linux/arm64/v8,linux/amd64 \
+                -t $ECR_REGISTRY/akto-agent-guard-embedder:$IMAGE_TAG \
+                $(gar_tag akto-agent-guard-embedder) \
+                apps/agent-guard/python-service/embedder-container --push
+            ) &
+            PIDS+=($!)
+          fi
+          if [ ${#PIDS[@]} -gt 0 ]; then
+            wait "${PIDS[@]}"
+          fi

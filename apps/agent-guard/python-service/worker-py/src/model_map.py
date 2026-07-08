@@ -120,9 +120,15 @@ class ModelMapScanner:
             logger.info(f"[ModelMap] {_ROLE_TIER2}=UNSAFE → arbiter")
             return await self._run_arbiters(arbiters, arb)
 
+        completed_pool = res2["completed"] or res1["completed"]
+        if not completed_pool:
+            # Both tiers empty (no models assigned) means no real judgment was made — escalate, don't fabricate "safe".
+            logger.error(f"[ModelMap] {self.scanner_name}: {_ROLE_TIER1}/{_ROLE_TIER2} both empty, escalating to arbiter")
+            return await self._run_arbiters(arbiters, arb)
+
         logger.info(f"[ModelMap] {_ROLE_TIER2}={res2['majority']} → SAFE")
         self._cancel(arb)  # eager arbiters spawned but not needed
-        winner = max(res2["completed"] or res1["completed"], key=lambda r: r["risk_score"])
+        winner = max(completed_pool, key=lambda r: r["risk_score"])
         winner["is_valid"] = True
         return winner
 
@@ -184,26 +190,30 @@ class ModelMapScanner:
 
         task_map = pre_submitted if pre_submitted is not None else self._submit(arbiters, _DEFAULT_ARBITER_TIMEOUT_MS)
         completed: List[Dict[str, Any]] = []
-        completed_entries: List[Dict[str, Any]] = []
         for result, entry in await self._await_map(task_map):
             if isinstance(result, Exception):
                 logger.error(f"[ModelMap] {_ROLE_ARBITER} '{entry.get('provider')}' failed: {result!r}")
                 continue
             completed.append(result)
-            completed_entries.append(entry)
 
         self.completed_all.extend(completed)
         if not completed:
             return self._error_result("all arbiters failed")
 
-        unsafe = [r for r, e in zip(completed, completed_entries) if _classify(r, e)]
-        winner = max(unsafe or completed, key=lambda r: r["risk_score"])
+        # Convict only on an affirmative flag; safeDecisionThreshold only gates the fast tiers, not the final call.
+        unsafe = [r for r in completed if not r.get("is_valid", True)]
+        pool = unsafe or completed
+        winner = pool[0]  # first-listed arbiter in modelConfigs wins ties/disagreement
         winner["is_valid"] = not unsafe
         return winner
 
     @staticmethod
     def _error_result(error: str) -> Dict[str, Any]:
-        return {"is_valid": False, "risk_score": 1.0, "details": {"error": error}}
+        # Fail OPEN: an arbiter that never answered is an infrastructure failure,
+        # not a security verdict. Blocking here turns every arbiter timeout burst
+        # into false positives attributed to whichever scanner was in flight.
+        # details.error marks the verdict as degraded so callers skip caching it.
+        return {"is_valid": True, "risk_score": 0.0, "details": {"error": error}}
 
     # ── Result shaping (unchanged from container) ─────────────────────────────
 
@@ -227,6 +237,10 @@ class ModelMapScanner:
             "scanner_type": self.scanner_type,
             "cascade_decision": f"{winner_stem}_authority" if winner_stem else "no_authority",
         }
+        if "error" in winner_details:
+            details["error"] = winner_details["error"]
+        if winner_details.get("values"):  # Password: exact secret substrings to redact
+            details["values"] = winner_details["values"]
         completed_by_stem = self._index_completed_by_stem()
         for entry in self.config.get("modelConfigs", []):
             stem = self._stem(entry.get("provider", ""))

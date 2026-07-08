@@ -12,11 +12,22 @@ import (
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/models"
+	"github.com/akto-api-security/guardrails-service/pkg/auth"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/singleflight"
 )
+
+// policyRefreshResult bundles refreshed policy cache fields for singleflight callers.
+type policyRefreshResult struct {
+	policies      []types.Policy
+	auditPolicies map[string]*types.AuditPolicy
+	compiledRules map[string]*regexp.Regexp
+	hasAuditRules bool
+}
 
 // policyCache holds cached policies and their metadata
 type policyCache struct {
@@ -51,15 +62,17 @@ type mcpListCache struct {
 
 // Service handles payload validation using akto-gateway library
 type Service struct {
-	config              *config.Config
-	dbClient            *dbabstractor.Client
-	processor           mcp.RequestProcessor // Default processor (skipThreat=false)
-	logger              *zap.Logger
-	cache               *policyCache
-	mcpListCache        *mcpListCache
-	collectionTagsCache *collectionTagsCache
-	sessionMgr          *session.SessionManager // Our session manager implementation for session tracking
-	schemaFetcher       *SchemaFetcher
+	config                *config.Config
+	dbClient              *dbabstractor.Client
+	processor             mcp.RequestProcessor // Default processor (skipThreat=false)
+	logger                *zap.Logger
+	cache                 *policyCache
+	mcpListCache          *mcpListCache
+	collectionTagsCache   *collectionTagsCache
+	sessionMgr            *session.SessionManager // Our session manager implementation for session tracking
+	schemaFetcher         *SchemaFetcher
+	policyRefreshGroup    singleflight.Group
+	allowlistRefreshGroup singleflight.Group
 }
 
 // NewService creates a new validator service
@@ -116,7 +129,9 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 
 	schemaFetcher := NewSchemaFetcher(dbClient, time.Duration(cfg.PolicyRefreshIntervalMin)*time.Minute, logger)
 
-	return &Service{
+	LogFieldMappingStartup()
+
+	svc := &Service{
 		config:              cfg,
 		dbClient:            dbClient,
 		processor:           defaultProcessor,
@@ -126,7 +141,22 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		collectionTagsCache: &collectionTagsCache{byHostName: make(map[string]map[string]string)},
 		sessionMgr:          sessionManager,
 		schemaFetcher:       schemaFetcher,
-	}, nil
+	}
+	bp := mcp.GetScanBackpressureSnapshot()
+	logger.Info("Scan backpressure breaker active (mcp processor, remote-scanner boundary)",
+		zap.Bool("enabled", bp.Enabled),
+		zap.Float64("thresholdMs", bp.ThresholdMs),
+		zap.Int("minSamples", bp.MinSamples),
+		zap.Float64("ttlSeconds", bp.TTLSeconds))
+	go func() {
+		if _, err := svc.getMcpAllowedHostList(); err != nil {
+			logger.Warn("Warm MCP allowlist cache failed", zap.Error(err))
+		}
+		if _, _, _, _, err := svc.getCachedPolicies(""); err != nil {
+			logger.Warn("Warm policy cache failed", zap.Error(err))
+		}
+	}()
+	return svc, nil
 }
 
 // policyNames extracts policy names for debug logging
@@ -282,27 +312,44 @@ func (s *Service) getMcpAllowedHostList() ([]types.McpAllowedList, error) {
 	}
 	s.mcpListCache.mu.RUnlock()
 
-	s.mcpListCache.mu.Lock()
-	defer s.mcpListCache.mu.Unlock()
+	v, err, _ := s.allowlistRefreshGroup.Do("mcp-allowlist", func() (interface{}, error) {
+		s.mcpListCache.mu.Lock()
+		defer s.mcpListCache.mu.Unlock()
 
-	rawResp, err := s.dbClient.FetchMcpAllowedHostList()
+		if !s.mcpListCache.lastFetched.IsZero() && time.Since(s.mcpListCache.lastFetched) < refreshInterval {
+			return s.mcpListCache.mcpAllowedList, nil
+		}
+
+		rawResp, fetchErr := s.dbClient.FetchMcpAllowedHostList()
+		if fetchErr != nil {
+			return nil, fetchErr
+		}
+
+		var mcpHostAllowedList struct {
+			McpAllowlist []types.McpAllowedList `json:"mcpAllowlist"`
+		}
+		if unmarshalErr := json.Unmarshal(rawResp, &mcpHostAllowedList); unmarshalErr != nil {
+			return nil, fmt.Errorf("failed to unmarshal outer response: %w", unmarshalErr)
+		}
+
+		s.mcpListCache.mcpAllowedList = mcpHostAllowedList.McpAllowlist
+		s.mcpListCache.lastFetched = time.Now()
+		s.logger.Info("MCP allowlist cache refreshed", zap.Int("count", len(mcpHostAllowedList.McpAllowlist)))
+		return mcpHostAllowedList.McpAllowlist, nil
+	})
 	if err != nil {
+		s.mcpListCache.mu.RLock()
+		if len(s.mcpListCache.mcpAllowedList) > 0 {
+			stale := s.mcpListCache.mcpAllowedList
+			s.mcpListCache.mu.RUnlock()
+			s.logger.Warn("MCP allowlist refresh failed, using stale cache", zap.Error(err))
+			return stale, nil
+		}
+		s.mcpListCache.mu.RUnlock()
 		s.logger.Error("Failed to fetch MCP allowlist from database-abstractor", zap.Error(err))
 		return nil, err
 	}
-
-	var mcpHostAllowedList struct {
-		McpAllowlist []types.McpAllowedList `json:"mcpAllowlist"`
-	}
-
-	if err := json.Unmarshal(rawResp, &mcpHostAllowedList); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal outer response: %w", err)
-	}
-
-	s.mcpListCache.mcpAllowedList = mcpHostAllowedList.McpAllowlist
-	s.mcpListCache.lastFetched = time.Now()
-	s.logger.Info("MCP allowlist cache refreshed", zap.Int("count", len(mcpHostAllowedList.McpAllowlist)))
-	return mcpHostAllowedList.McpAllowlist, nil
+	return v.([]types.McpAllowedList), nil
 }
 
 func (s *Service) getCachedPolicies(contextSource string) ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
@@ -327,15 +374,42 @@ func (s *Service) getCachedPolicies(contextSource string) ([]types.Policy, map[s
 	}
 	s.cache.mu.RUnlock()
 
-	// Cache is stale or empty, fetch fresh policies
-	allPolicies, auditPolicies, compiledRules, hasAuditRules, err := s.refreshPolicies()
-	if err != nil {
-		return nil, nil, nil, false, err
+	// Cache is stale or empty, coalesce refresh across concurrent requests.
+	v, refreshErr, _ := s.policyRefreshGroup.Do("guardrail-policies", func() (interface{}, error) {
+		policies, auditPolicies, compiledRules, hasAuditRules, err := s.refreshPolicies()
+		if err != nil {
+			return nil, err
+		}
+		return &policyRefreshResult{
+			policies:      policies,
+			auditPolicies: auditPolicies,
+			compiledRules: compiledRules,
+			hasAuditRules: hasAuditRules,
+		}, nil
+	})
+	if refreshErr != nil {
+		s.cache.mu.RLock()
+		hasStale := !s.cache.lastFetched.IsZero() && len(s.cache.policies) > 0
+		if hasStale {
+			filteredPolicies := s.filterPoliciesByContextSource(s.cache.policies, contextSource)
+			staleAudit := s.cache.auditPolicies
+			staleRules := s.cache.compiledRules
+			staleHasAudit := s.cache.hasAuditRules
+			lastFetched := s.cache.lastFetched
+			s.cache.mu.RUnlock()
+			s.logger.Warn("Policy refresh failed, using stale cache",
+				zap.String("contextSource", contextSource),
+				zap.Time("lastFetched", lastFetched),
+				zap.Error(refreshErr))
+			return filteredPolicies, staleAudit, staleRules, staleHasAudit, nil
+		}
+		s.cache.mu.RUnlock()
+		return nil, nil, nil, false, refreshErr
 	}
 
-	// Filter by contextSource before returning
-	filteredPolicies := s.filterPoliciesByContextSource(allPolicies, contextSource)
-	return filteredPolicies, auditPolicies, compiledRules, hasAuditRules, nil
+	bundle := v.(*policyRefreshResult)
+	filteredPolicies := s.filterPoliciesByContextSource(bundle.policies, contextSource)
+	return filteredPolicies, bundle.auditPolicies, bundle.compiledRules, bundle.hasAuditRules, nil
 }
 
 // refreshPolicies fetches fresh policies from database and updates the cache
@@ -449,11 +523,7 @@ func (s *Service) refreshCollectionTagsIfNeeded() {
 // and returns login-user-email-type, falling back to browser-llm-account-type.
 // The account type is resolved ONLY from the collection's tags; if the host is not
 // found in the collection cache, it returns "" (no fallback to the request tag).
-func (s *Service) getLoginUserEmailType(params *models.ValidateRequestParams) string {
-	var reqHeaders map[string]string
-	if params.RequestHeaders != "" {
-		json.Unmarshal([]byte(params.RequestHeaders), &reqHeaders)
-	}
+func (s *Service) getLoginUserEmailType(reqHeaders map[string]string) string {
 	host := extractHostHeader(reqHeaders)
 	s.logger.Info("getLoginUserEmailType - host extracted", zap.String("host", host))
 	if host == "" {
@@ -658,9 +728,28 @@ func extractHostHeader(headers map[string]string) string {
 
 // fetchAndParsePolicies fetches policies from database abstractor and parses them
 func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, []mcp.BlockedHostRule, map[string]*ignorePhraseMatcher, error) {
-	rawGuardrailPolicies, err := s.dbClient.FetchGuardrailPolicies()
-	if err != nil {
-		return nil, nil, nil, false, nil, nil, fmt.Errorf("failed to fetch guardrail policies: %w", err)
+	var rawGuardrailPolicies, rawAuditPolicies []byte
+
+	g := new(errgroup.Group)
+	g.Go(func() error {
+		var err error
+		rawGuardrailPolicies, err = s.dbClient.FetchGuardrailPolicies()
+		if err != nil {
+			return fmt.Errorf("failed to fetch guardrail policies: %w", err)
+		}
+		return nil
+	})
+	g.Go(func() error {
+		var err error
+		rawAuditPolicies, err = s.dbClient.FetchMcpAuditInfo()
+		if err != nil {
+			s.logger.Warn("Failed to fetch MCP audit info", zap.Error(err))
+			rawAuditPolicies = []byte("{}")
+		}
+		return nil
+	})
+	if err := g.Wait(); err != nil {
+		return nil, nil, nil, false, nil, nil, err
 	}
 
 	s.logger.Debug("Raw guardrail policies response",
@@ -696,14 +785,6 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		zap.String("feature", "blocked-host-v1"),
 		zap.Int("ruleCount", len(blockedHostRules)),
 		zap.Strings("patterns", mcp.BlockedHostPatterns(blockedHostRules)))
-
-	// Fetch MCP audit info from database abstractor
-	rawAuditPolicies, err := s.dbClient.FetchMcpAuditInfo()
-	if err != nil {
-		s.logger.Warn("Failed to fetch MCP audit info", zap.Error(err))
-		// Continue without audit policies rather than failing completely
-		rawAuditPolicies = []byte("{}")
-	}
 
 	s.logger.Debug("Raw audit policies response",
 		zap.Int("size", len(rawAuditPolicies)),
@@ -786,6 +867,7 @@ func (s *Service) validationContextFromParams(
 	responsePayloadForCtx string,
 	logPrefix string,
 	mcpAllowedHostList []types.McpAllowedList,
+	compiledRules map[string]*regexp.Regexp,
 ) *mcp.ValidationContext {
 	// Parse headers and status code
 	reqHeaders := make(map[string]string)
@@ -815,56 +897,57 @@ func (s *Service) validationContextFromParams(
 	contextSource := params.ContextSource
 
 	return &mcp.ValidationContext{
-		IP:              params.IP,
-		DestIP:          params.DestIP,
-		Endpoint:        params.Path,
-		Method:          params.Method,
-		RequestHeaders:  reqHeaders,
-		ResponseHeaders: respHeaders,
-		StatusCode:      statusCode,
-		RequestPayload:  requestPayloadForCtx,
-		ResponsePayload: responsePayloadForCtx,
-		ContextSource:   types.ContextSource(contextSource),
-		McpServerName:   mcpServerName,
-		SessionID:       sessionID,
-		SkipThreat:      params.EffectiveSkipThreat(), // Set skipThreat directly in context
-		Tag:             params.Tag,
-		AllowedLists:    mcpAllowedHostList,
+		IP:                 params.IP,
+		DestIP:             params.DestIP,
+		Endpoint:           params.Path,
+		Method:             params.Method,
+		RequestHeaders:     reqHeaders,
+		ResponseHeaders:    respHeaders,
+		StatusCode:         statusCode,
+		RequestPayload:     requestPayloadForCtx,
+		ResponsePayload:    responsePayloadForCtx,
+		ContextSource:      types.ContextSource(contextSource),
+		McpServerName:      mcpServerName,
+		SessionID:          sessionID,
+		AktoAccountID:      params.AktoAccountID,
+		SkipThreat:         params.EffectiveSkipThreat(), // Set skipThreat directly in context
+		Tag:                params.Tag,
+		AllowedLists:       mcpAllowedHostList,
+		CompiledRegexRules: compiledRules,
 	}
 }
 
-// extractPayloadForValidation checks if a GuardrailSchema is configured for the endpoint.
-// If found, extracts only the configured content fields. Falls through to raw payload on any miss.
+// extractPayloadForValidation extracts configured JSON fields for guardrail evaluation.
+// Priority: dashboard guardrailSchema → GUARDRAIL_FIELD_MAPPING env → raw payload.
 func (s *Service) extractPayloadForValidation(payload, method, path string, isRequest bool) string {
 	key := EndpointKey(method, path)
 
-	gs, ok := GlobalGuardrailSchemaRegistry().Get(key)
-	if !ok {
-		s.logger.Debug("[SchemaExtract] no schema found for endpoint, using raw payload",
+	fields := resolveFieldsForEndpoint(method, path, isRequest)
+	if len(fields) == 0 {
+		s.logger.Debug("[SchemaExtract] no field mapping for endpoint, using raw payload",
 			zap.String("endpoint", key),
 			zap.Bool("isRequest", isRequest))
 		return payload
 	}
 
-	schemaJSON, _ := json.Marshal(gs)
-	s.logger.Info("[SchemaExtract] schema found for endpoint",
-		zap.String("endpoint", key),
-		zap.Bool("isRequest", isRequest),
-		zap.String("schema", string(schemaJSON)))
-
-	var fields []MessageFieldEntry
-	if isRequest {
-		fields = gs.RequestMessageFields
-	} else {
-		fields = gs.ResponseMessageFields
+	source := "dashboard"
+	if gs, ok := GlobalGuardrailSchemaRegistry().Get(key); !ok || gs == nil ||
+		(isRequest && !gs.HasRequestFields()) || (!isRequest && !gs.HasResponseFields()) {
+		source = "env"
 	}
 
 	s.logger.Info("[SchemaExtract] attempting field extraction",
 		zap.String("endpoint", key),
 		zap.Bool("isRequest", isRequest),
+		zap.String("source", source),
 		zap.Int("fieldCount", len(fields)))
 
-	extracted := ExtractContent(payload, fields)
+	var extracted string
+	if source == "env" {
+		extracted = ExtractContentFirst(payload, fields)
+	} else {
+		extracted = ExtractContent(payload, fields)
+	}
 	if extracted == "" {
 		s.logger.Warn("[SchemaExtract] schema present but no fields matched payload, falling back to raw payload",
 			zap.String("endpoint", key),
@@ -889,6 +972,27 @@ func (s *Service) extractPayloadForValidation(payload, method, path string, isRe
 		zap.Int("finalPayloadLength", len(finalPayload)))
 
 	return finalPayload
+}
+
+// BackpressureSnapshot exposes the scan breaker's current state for diagnostics.
+// The breaker lives in the mcp processor (remote-scanner boundary); guardrails-
+// service just surfaces its snapshot on GET /backpressure.
+func (s *Service) BackpressureSnapshot() mcp.ScanBackpressureSnapshot {
+	return mcp.GetScanBackpressureSnapshot()
+}
+
+// withValidationDeadline caps the synchronous validate path with a single
+// absolute deadline (config.ValidationTimeoutMs). It cascades to every parallel
+// policy goroutine, async scanner wait, and /scan call at once — because
+// executeAsyncTasks honors a parent deadline and context.WithTimeout takes the
+// earlier of parent/child — so the whole request fails open before the caller's
+// client timeout fires. The returned cancel must always be called. Returns the
+// ctx unchanged (with a no-op cancel) when disabled (<=0).
+func (s *Service) withValidationDeadline(ctx context.Context) (context.Context, context.CancelFunc) {
+	if s.config == nil || s.config.ValidationTimeoutMs <= 0 {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, time.Duration(s.config.ValidationTimeoutMs)*time.Millisecond)
 }
 
 // ValidateRequest validates a request payload against guardrail policies with session tracking
@@ -974,7 +1078,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
 
 	// Create validation context with full request metadata (matching batch flow)
-	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList)
+	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList, compiledRules)
 
 	// Filter policies by MCP server name so all subsequent checks only fire for
 	// rules that belong to policies applicable to this server.
@@ -986,7 +1090,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// not block requests arriving on server B).
 	if policyName, ok := blockPersonalAccountPolicyName(policies); ok {
 		s.refreshCollectionTagsIfNeeded()
-		accountType := s.getLoginUserEmailType(params)
+		accountType := s.getLoginUserEmailType(valCtx.RequestHeaders)
 		s.logger.Info("ValidateRequest - account type check",
 			zap.String("path", params.Path),
 			zap.String("sessionID", sessionID),
@@ -1024,6 +1128,10 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
 		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
 
+	// Use the default processor - skipThreat is passed via ValidationContext.
+	// Scan backpressure lives inside the mcp processor at the remote-scanner
+	// boundary (executeSingleScannerTask), so only the agent-guard /scan fan-out
+	// is shed when degraded — local PII/regex/token-limit filters always run.
 	// Redact any configured ignore-phrases before the enforcement library ever sees the
 	// text — see ValidateRequest's plan-doc note on the shared-payload trade-off. Shared
 	// with ValidateResponse via redactIgnorePhrasesForEvaluation/reconcileIgnorePhraseRedaction.
@@ -1032,7 +1140,9 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 
 	// Use the default processor - skipThreat is passed via ValidationContext
 	processStart := time.Now()
-	processResult, err := s.processor.ProcessRequestParallel(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
+	procCtx, cancelProc := s.withValidationDeadline(ctx)
+	defer cancelProc()
+	processResult, err := s.processor.ProcessRequestParallel(procCtx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
 	if err != nil {
 		s.logger.Error("ValidateRequest - ProcessRequestParallel failed",
 			zap.String("path", params.Path),
@@ -1091,8 +1201,24 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Bool("modified", result.Modified),
 		zap.String("behaviour", result.Behaviour),
 		zap.String("reason", result.Reason),
-		zap.String("sessionID", sessionID),
+		zap.Int("policyCount", len(policies)),
+		zap.Int64("policiesMs", time.Since(policiesStart).Milliseconds()),
+		zap.Int64("processMs", time.Since(processStart).Milliseconds()),
 		zap.Int64("totalLatencyMs", time.Since(start).Milliseconds()))
+
+	totalMs := time.Since(start).Milliseconds()
+	if totalMs >= 1500 {
+		s.logger.Warn("ValidateRequest - slow",
+			zap.String("path", params.Path),
+			zap.String("method", params.Method),
+			zap.String("account", params.AktoAccountID),
+			zap.String("sessionID", sessionID),
+			zap.Int("policyCount", len(policies)),
+			zap.Int64("policiesMs", time.Since(policiesStart).Milliseconds()),
+			zap.Int64("processMs", time.Since(processStart).Milliseconds()),
+			zap.Int64("totalLatencyMs", totalMs),
+			zap.Bool("allowed", result.Allowed))
+	}
 
 	return result, nil
 }
@@ -1122,7 +1248,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 
 	// Get cached policies (refreshes if stale)
 	policiesStart := time.Now()
-	policies, _, _, _, err := s.getCachedPolicies(contextSource)
+	policies, _, compiledRules, _, err := s.getCachedPolicies(contextSource)
 	if err != nil {
 		s.logger.Error("ValidateResponse - failed to load policies",
 			zap.String("path", params.Path),
@@ -1154,7 +1280,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	}
 
 	// Create validation context with full request metadata (matching batch flow)
-	valCtx := s.validationContextFromParams(params, sessionID, params.RequestPayload, responseBody, "ValidateResponse", mcpAllowedHostList)
+	valCtx := s.validationContextFromParams(params, sessionID, params.RequestPayload, responseBody, "ValidateResponse", mcpAllowedHostList, compiledRules)
 
 	// Filter policies by MCP server name — policies with no server configured are skipped
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
@@ -1177,6 +1303,9 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("method", params.Method),
 		zap.String("payloadToValidate", responseBodyForValidation))
 
+	// Use processor's ProcessResponse method with external policies. Scan
+	// backpressure is applied inside the mcp processor at the remote-scanner
+	// boundary, so only the agent-guard /scan call is shed when degraded.
 	// Redact any configured ignore-phrases before the enforcement library ever sees the
 	// text — see ValidateRequest for the full rationale and the shared-payload trade-off.
 	payloadForEvaluation, preRedactionPayload, restore := s.redactIgnorePhrasesForEvaluation(responseBodyForValidation, policies, "ValidateResponse", sessionID)
@@ -1184,7 +1313,9 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 
 	// Use processor's ProcessResponse method with external policies
 	processStart := time.Now()
-	processResult, err := s.processor.ProcessResponseParallel(ctx, responseBodyForValidation, valCtx, policies)
+	procCtx, cancelProc := s.withValidationDeadline(ctx)
+	defer cancelProc()
+	processResult, err := s.processor.ProcessResponseParallel(procCtx, responseBodyForValidation, valCtx, policies)
 	if err != nil {
 		s.logger.Error("ValidateResponse - ProcessResponseParallel failed",
 			zap.String("path", params.Path),
@@ -1401,7 +1532,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 	s.schemaFetcher.RefreshIfNeeded()
 
-	policies, auditPolicies, _, hasAuditRules, err := s.getCachedPolicies(string(contextSource))
+	policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies(string(contextSource))
 	if err != nil {
 		s.logger.Error("ValidateBatch - failed to load policies",
 			zap.String("contextSource", contextSource),
@@ -1451,18 +1582,20 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 		// Create validation context with actual data and skipThreat flag
 		valCtx := &mcp.ValidationContext{
-			IP:              data.IP,
-			Endpoint:        data.Path,
-			Method:          data.Method,
-			RequestHeaders:  reqHeaders,
-			ResponseHeaders: respHeaders,
-			StatusCode:      statusCode,
-			RequestPayload:  data.RequestPayload,
-			ResponsePayload: data.ResponsePayload,
-			ContextSource:   types.ContextSource(contextSource),
-			McpServerName:   mcpServerName,
-			SkipThreat:      skipThreat, // Set skipThreat directly in context
-			AllowedLists:    mcpAllowedHostList,
+			IP:                 data.IP,
+			Endpoint:           data.Path,
+			Method:             data.Method,
+			RequestHeaders:     reqHeaders,
+			ResponseHeaders:    respHeaders,
+			StatusCode:         statusCode,
+			RequestPayload:     data.RequestPayload,
+			ResponsePayload:    data.ResponsePayload,
+			ContextSource:      types.ContextSource(contextSource),
+			McpServerName:      mcpServerName,
+			AktoAccountID:      auth.AccountIDFromServiceToken(),
+			SkipThreat:         skipThreat, // Set skipThreat directly in context
+			AllowedLists:       mcpAllowedHostList,
+			CompiledRegexRules: compiledRules,
 		}
 
 		s.logger.Debug("ValidateBatch - created validation context for batch item",
