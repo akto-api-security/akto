@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Badge, Box, Divider, HorizontalGrid, HorizontalStack, Link, Scrollable, Tabs, Text, Tooltip, VerticalStack } from "@shopify/polaris";
-import { buildTopicGuardrailPrefill, GUARDRAIL_POLICIES_PATH } from "../../guardrails/topicGuardrailUtils";
+import { Box, Divider, HorizontalGrid, HorizontalStack, Scrollable, Tabs, Text, VerticalStack } from "@shopify/polaris";
+import TopicsGuardrailList from "../../guardrails/components/TopicsGuardrailList";
 import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
 import AgenticFlyoutShell from "../agentic/AgenticFlyoutShell";
 import FlyoutBreadcrumb from "../agentic/FlyoutBreadcrumb";
@@ -16,7 +15,6 @@ import api from "./api";
 import { enrichRow } from "./utils";
 import { getTraceColumnDefs } from "./columns";
 import { formatCompact, formatDurationMs, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
-import func from "@/util/func";
 
 const TAB_OVERVIEW = 0;
 const TAB_TRACES   = 1;
@@ -24,7 +22,6 @@ const TABS = [
     { id: "overview", content: "Overview", panelID: "panel-overview" },
     { id: "traces",   content: "Traces",   panelID: "panel-traces"   },
 ];
-const MAX_INLINE_TOPICS = 5;
 
 // ─── Session flow graph ───────────────────────────────────────────────────────
 
@@ -43,35 +40,14 @@ function SessionFlowGraph({ session }) {
     return <AssetTopologyGraph nodes={nodes} edges={edges} />;
 }
 
-function TopicsLine({ topics }) {
-    const labels = topics.map(t => func.toSentenceCase(t));
-    const shown = labels.slice(0, MAX_INLINE_TOPICS);
-    const overflow = labels.slice(MAX_INLINE_TOPICS);
-
-    return (
-        <HorizontalStack gap="2" wrap>
-            {shown.map(label => <Badge key={label}>{label}</Badge>)}
-            {overflow.length > 0 && (
-                <Tooltip content={overflow.join(", ")}>
-                    <Badge>{`+${overflow.length}`}</Badge>
-                </Tooltip>
-            )}
-        </HorizontalStack>
-    );
-}
-
-function SessionTopicsSection({ topicHierarchy, onCreateGuardrail }) {
-    const topics = useMemo(() => Object.keys(topicHierarchy || {}), [topicHierarchy]);
-    if (topics.length === 0) return null;
+function SessionTopicsSection({ topicHierarchy }) {
+    if (Object.keys(topicHierarchy || {}).length === 0) return null;
 
     return (
         <VerticalStack gap="2" inlineAlign="start">
             <Divider />
             <Text variant="headingXs" color="subdued">Topics queried</Text>
-            <TopicsLine topics={topics} />
-            <Tooltip content="Create a new blocking guardrail policy, pre-filled with these topics as denied topics">
-                <Link onClick={onCreateGuardrail}>Create guardrail</Link>
-            </Tooltip>
+            <TopicsGuardrailList topicHierarchy={topicHierarchy} />
         </VerticalStack>
     );
 }
@@ -79,13 +55,7 @@ function SessionTopicsSection({ topicHierarchy, onCreateGuardrail }) {
 // ─── Overview ─────────────────────────────────────────────────────────────────
 
 function OverviewContent({ session, traceCount }) {
-    const navigate = useNavigate();
     const totalTokens = (Number(session._inputTokens) || 0) + (Number(session._outputTokens) || 0);
-
-    const handleCreateGuardrail = useCallback(() => {
-        const prefill = buildTopicGuardrailPrefill(session.topicHierarchy || {});
-        navigate(GUARDRAIL_POLICIES_PATH, { state: { topicGuardrailPrefill: prefill } });
-    }, [session.topicHierarchy, navigate]);
 
     const stats = [
         { label: "Traces",       value: traceCount },
@@ -131,7 +101,7 @@ function OverviewContent({ session, traceCount }) {
                     columns={3}
                 />
 
-                <SessionTopicsSection topicHierarchy={session.topicHierarchy} onCreateGuardrail={handleCreateGuardrail} />
+                <SessionTopicsSection topicHierarchy={session.topicHierarchy} />
             </VerticalStack>
         </Box>
     );

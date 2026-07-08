@@ -1,15 +1,3 @@
-// Static catalog of curated descriptions + sample phrases for the fixed domain/subDomain
-// taxonomy used by UserQueryTopicClassifier.java (see that file for the source-of-truth
-// prompt). Keys are lowercase, verbatim matches of the classifier's `domain`/`subDomain`
-// output — lookups here are exact-match, not fuzzy.
-//
-// A domain/subDomain not present here is the classifier's free-form "closest real-world
-// domain" escape hatch; callers should treat a missing entry as "no curated content"
-// and fall back to the topic name itself (see topicGuardrailUtils.js).
-//
-// This mirrors the shape a future DB-backed, product-editable catalog would have, so the
-// lookup call site doesn't need to change when that lands.
-
 const TOPIC_CATALOG = {
     technology: {
         description: "General technical questions about building or operating software systems.",

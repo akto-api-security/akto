@@ -13,6 +13,7 @@ import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from "./components/enterpriseLic
 import api from "./api";
 import { transformPolicyForBackend, SEVERITY, normalizeBehaviourValue } from "./utils";
 import GUARDRAIL_PRESETS from "./guardrailPresets";
+import { addCreatedGuardrailPolicyName, clearGuardrailPolicyNamesCache } from "./topicGuardrailUtils";
 import PersistStore from '../../../main/PersistStore';
 import { extractServiceName } from '../observe/agentic/constants';
 
@@ -157,16 +158,13 @@ function GuardrailPolicies() {
     
     const policyName = new URLSearchParams(window.location.search).get("policy");
 
-    // Prefill carried from the LLM Traces / Endpoints pages: open the Create
-    // Guardrail page prefilled with denied topics for every topic observed on that
-    // conversation/user. Always a brand-new, independently-named policy (editable name).
     useEffect(() => {
         const prefill = location.state?.topicGuardrailPrefill;
         if (!prefill) return;
         setEditingPolicy({ ...prefill, deniedTopics: prefill.deniedTopics || [] });
         setIsEditMode(false);
         setIsPreset(true);
-        setCreateInitialStep(2); // Content & Policy Guardrails step — where denied topics live.
+        setCreateInitialStep(2);
         setShowCreateModal(true);
         // Clear router state so this doesn't re-trigger on re-render / back-nav.
         navigate(location.pathname, { replace: true, state: {} });
@@ -471,6 +469,12 @@ function GuardrailPolicies() {
             
             await api.createGuardrailPolicy(requestPayload);
 
+            if (newStatus) {
+                addCreatedGuardrailPolicyName(updatedPolicy.name);
+            } else {
+                clearGuardrailPolicyNamesCache();
+            }
+
             func.setToast(true, false, `Guardrail ${newStatus ? 'activated' : 'deactivated'} successfully`);
             await fetchGuardrailPolicies();
         } catch (error) {
@@ -516,6 +520,7 @@ function GuardrailPolicies() {
                     func.showConfirmationModal(deleteConfirmationMessage, "Delete", async () => {
                         try {
                             await api.deleteGuardrailPolicies(selectedPolicies);
+                            clearGuardrailPolicyNamesCache();
                             func.setToast(true, false, `${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"} deleted successfully`);
                             await fetchGuardrailPolicies();
                         } catch (error) {
@@ -613,6 +618,7 @@ function GuardrailPolicies() {
 
             const wasEdit = isEditMode && guardrailData.hexId;
             await api.createGuardrailPolicy(requestPayload);
+            addCreatedGuardrailPolicyName(guardrailData.name);
             func.setToast(
                 true,
                 false,

@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider, Link, Tooltip, Badge } from "@shopify/polaris";
-import { buildTopicGuardrailPrefill, GUARDRAIL_POLICIES_PATH } from "../../guardrails/topicGuardrailUtils";
+import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider } from "@shopify/polaris";
+import TopicsGuardrailList from "../../guardrails/components/TopicsGuardrailList";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AgenticFlyoutShell from "./AgenticFlyoutShell";
@@ -252,36 +251,9 @@ function TopologyGraph({ device, agents, collections = [] }) {
 
 // ─── User analysis section ─────────────────────────────────────────────────────
 
-// Domain names only (no subtopics), as badges on one line capped at 5 with a
-// "+N" tooltip badge for the rest.
-const MAX_INLINE_TOPICS = 5;
-
-function TopicsLine({ topics }) {
-    const labels = topics.map(t => func.toSentenceCase(t));
-    const shown = labels.slice(0, MAX_INLINE_TOPICS);
-    const overflow = labels.slice(MAX_INLINE_TOPICS);
-
-    return (
-        <HorizontalStack gap="2" wrap>
-            {shown.map(label => <Badge key={label}>{label}</Badge>)}
-            {overflow.length > 0 && (
-                <Tooltip content={overflow.join(", ")}>
-                    <Badge>{`+${overflow.length}`}</Badge>
-                </Tooltip>
-            )}
-        </HorizontalStack>
-    );
-}
-
 function UserAnalysisSection({ username, startTimestamp, endTimestamp }) {
     const [analysis, setAnalysis] = useState(null);
     const [loading, setLoading] = useState(true);
-    const navigate = useNavigate();
-
-    const handleCreateGuardrail = useCallback(() => {
-        const prefill = buildTopicGuardrailPrefill(analysis?.topicHierarchy || {});
-        navigate(GUARDRAIL_POLICIES_PATH, { state: { topicGuardrailPrefill: prefill } });
-    }, [analysis, navigate]);
 
     useEffect(() => {
         if (!username) { setLoading(false); return; }
@@ -297,14 +269,15 @@ function UserAnalysisSection({ username, startTimestamp, endTimestamp }) {
         return () => { cancelled = true; };
     }, [username]);
 
-    const topicEntries = useMemo(() => {
+    const sortedTopicHierarchy = useMemo(() => {
         const h = analysis?.topicHierarchy;
-        if (!h || typeof h !== "object") return [];
-        return Object.entries(h).sort((a, b) => {
+        if (!h || typeof h !== "object") return {};
+        const entries = Object.entries(h).sort((a, b) => {
             const sumA = Object.values(a[1] || {}).reduce((s, v) => s + v, 0);
             const sumB = Object.values(b[1] || {}).reduce((s, v) => s + v, 0);
             return sumB - sumA;
         });
+        return Object.fromEntries(entries);
     }, [analysis]);
 
     if (!username) return null;
@@ -337,14 +310,11 @@ function UserAnalysisSection({ username, startTimestamp, endTimestamp }) {
                 </VerticalStack>
             </HorizontalGrid>
 
-            {topicEntries.length > 0 && (
+            {Object.keys(sortedTopicHierarchy).length > 0 && (
                 <VerticalStack gap="2" inlineAlign="start">
                     <Divider />
                     <Text variant="headingXs" color="subdued">Topics Queried</Text>
-                    <TopicsLine topics={topicEntries.map(([topic]) => topic)} />
-                    <Tooltip content="Create a new blocking guardrail policy, pre-filled with these topics as denied topics">
-                        <Link onClick={handleCreateGuardrail}>Create guardrail</Link>
-                    </Tooltip>
+                    <TopicsGuardrailList topicHierarchy={sortedTopicHierarchy} username={username} />
                 </VerticalStack>
             )}
         </VerticalStack>

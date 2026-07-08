@@ -1,10 +1,11 @@
 import request from "../../../../util/request"
 
 export default {
-    async fetchGuardrailPolicies() {
+    async fetchGuardrailPolicies({ skip, limit } = {}) {
         const resp = await request({
             url: '/api/fetchGuardrailPolicies',
-            method: 'post'
+            method: 'post',
+            data: (skip != null || limit != null) ? { skip, limit } : undefined
         })
         return resp
     },

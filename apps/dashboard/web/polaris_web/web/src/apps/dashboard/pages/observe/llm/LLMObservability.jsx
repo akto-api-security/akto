@@ -20,6 +20,7 @@ import SessionsView from "./SessionsView";
 import SessionFlyout from "./SessionFlyout";
 import ArgusTraceFlyout from "./ArgusTraceFlyout";
 import MessagesView from "./MessagesView";
+import { fetchGuardrailPolicyNamesCached } from "../../guardrails/topicGuardrailUtils";
 
 const SERVICE_COLORS = ["#9642FC", "#4285F4", "#10A37F", "#EAB308", "#F97316", "#DC2626"];
 
@@ -52,6 +53,10 @@ export default function LLMObservability() {
     // Aggregated stats from the dedicated endpoint (accurate, not 500-capped)
     const [sessionStats, setSessionStats] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchGuardrailPolicyNamesCached();
+    }, []);
 
     const epochs = useMemo(() => ({
         since: Math.floor(Date.parse(currDateRange.period.since) / 1000),
