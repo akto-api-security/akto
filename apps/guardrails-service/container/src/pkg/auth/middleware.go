@@ -17,6 +17,22 @@ import (
 
 const AccountIDKey = "accountId"
 
+// AccountIDFromContext returns the accountId the auth middleware verified from
+// the JWT, or (0, false) when authentication is disabled or no valid account was
+// set. Callers use this to prefer the authenticated identity over any
+// caller-supplied account field in the request body.
+func AccountIDFromContext(c *gin.Context) (int, bool) {
+	v, exists := c.Get(AccountIDKey)
+	if !exists {
+		return 0, false
+	}
+	id, ok := v.(int)
+	if !ok || id <= 0 {
+		return 0, false
+	}
+	return id, true
+}
+
 func NewMiddleware(rsaPublicKey string, logger *zap.Logger) (gin.HandlerFunc, error) {
 	publicKey, err := parseRSAPublicKey(rsaPublicKey)
 	if err != nil {

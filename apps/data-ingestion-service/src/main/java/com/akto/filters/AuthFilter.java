@@ -80,6 +80,12 @@ public class AuthFilter implements Filter {
         HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
         String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
 
+        if (accessTokenFromRequest == null || accessTokenFromRequest.trim().isEmpty()) {
+            logger.error("No authorization header found in the request: {}", accessTokenFromRequest);
+        } else {
+            logger.error("Authorization header found in the request: {}", accessTokenFromRequest);
+        }
+
         // Reject revoked tokens up front, regardless of the AKTO_DI_AUTHENTICATE setting.
         if (accessTokenFromRequest != null && REVOKED_TOKENS.contains(accessTokenFromRequest.trim())) {
             logger.warn("Blocked request using a revoked token");
