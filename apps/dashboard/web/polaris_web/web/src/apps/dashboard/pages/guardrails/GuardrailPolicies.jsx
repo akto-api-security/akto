@@ -85,8 +85,6 @@ const agentFilterHeader = {
     showFilter: true,
 };
 
-const tableHeaders = [...headings, agentFilterHeader];
-
 const sortOptions = [
   {
     label: "Created",
@@ -165,6 +163,11 @@ function GuardrailPolicies() {
             agent: getApplicableAgentKeys(row.originalData, allCollections, agentFilterOptions),
         }))
     ), [policyData, allCollections, agentFilterOptions]);
+
+    // Agent filter is Argus-only; hide on Atlas.
+    const tableHeaders = isEndpointSecurityCategory()
+        ? headings
+        : [...headings, agentFilterHeader];
 
     const policyName = new URLSearchParams(window.location.search).get("policy");
 
