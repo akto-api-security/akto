@@ -16,6 +16,7 @@ Flag as a password (isPassword=true) ONLY when a concrete secret VALUE appears, 
 
 Do NOT flag (isPassword=false) when the value is not a real secret:
   - Environment / variable references:  $DB_PASSWORD, ${PASSWORD}, $SERVICES__X__PASSWORD, os.getenv("PW"), process.env.PASSWORD, config.password, env|DB_PASSWORD|
+  - CI/CD secret references (GitHub Actions, GitLab CI, etc.): ${{ secrets.E2E_ORCHESTRATOR_PASSWORD }}, ${{ secrets.API_KEY }} -- these are lookups by name into a secrets store, never the value itself
   - Placeholders / templates:           changeme, <password>, {{password}}, your_password_here, password_here, "password": "example"
   - Masked / redacted values (any value made up entirely of repeated mask chars * x X # . - _ or bullets): ****, xxxxxxxx, ########, --------, [REDACTED], "password": "********"
   - Redaction / state marker WORDS (a single dictionary word describing state, not a credential):
