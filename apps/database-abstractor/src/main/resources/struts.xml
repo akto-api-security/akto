@@ -2807,6 +2807,103 @@
             </result>
         </action>
 
+        <!-- Endpoint Config Remediations: Agent-facing -->
+        <action name="api/fetchEndpointConfigRemediations" class="com.akto.action.EndpointConfigRemediationAction" method="fetchEndpointConfigRemediations">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^executions.*,^executions\[\d+\]\.(id|mode|toolName|configPath|format|newContent|expectedChecksumBeforeApply).*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/updateEndpointConfigRemediationStatus" class="com.akto.action.EndpointConfigRemediationAction" method="updateEndpointConfigRemediationStatus">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="CONFLICT" type="json">
+                <param name="statusCode">409</param>
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/updateEndpointConfigRemediationResult" class="com.akto.action.EndpointConfigRemediationAction" method="updateEndpointConfigRemediationResult">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <!-- Endpoint Config Remediations: Dashboard-facing -->
+        <action name="api/queueEndpointConfigRemediation" class="com.akto.action.EndpointConfigRemediationAction" method="queueEndpointConfigRemediation">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^queuedRemediationId</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchEndpointConfigRemediationList" class="com.akto.action.EndpointConfigRemediationAction" method="fetchEndpointConfigRemediationList">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^remediations.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchEndpointConfigRemediationExecutions" class="com.akto.action.EndpointConfigRemediationAction" method="fetchEndpointConfigRemediationExecutions">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^executions.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/cancelEndpointConfigRemediation" class="com.akto.action.EndpointConfigRemediationAction" method="cancelEndpointConfigRemediation">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
          <action name="api/bulkInsertCorpusExamples" class="com.akto.action.GuardrailPoliciesAction" method="bulkSaveCorpusEntries">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

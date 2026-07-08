@@ -3467,6 +3467,296 @@ public class DbLayer {
         }
     }
 
+    // --- Endpoint Config Remediations ---
+
+    /**
+     * Lazy fan-out: for each ACTIVE remediation targeting this device that has not yet
+     * been executed (or is still PENDING), create/return an execution record.
+     * Stamps agentId on newly-created records.
+     * Returns at most 10 executions with transient job fields set for the agent response.
+     */
+    public static List<EndpointConfigRemediationExecution> fetchPendingEndpointConfigRemediationExecutions(
+            String agentId, String deviceId) {
+        try {
+            long now = (long) Context.now();
+            List<EndpointConfigRemediation> activeJobs = EndpointConfigRemediationDao.instance.findAll(
+                    Filters.and(
+                            Filters.eq(EndpointConfigRemediation.STATUS, EndpointConfigRemediation.Status.ACTIVE.name()),
+                            Filters.or(
+                                    Filters.eq(EndpointConfigRemediation.TARGET_TYPE,
+                                            EndpointConfigRemediation.TargetType.ALL.name()),
+                                    Filters.in(EndpointConfigRemediation.TARGET_DEVICE_IDS, deviceId))));
+
+            // No expiry check here — the background job transitions expired remediations to EXPIRED
+            // before agents can poll them, so any ACTIVE remediation is still within its window.
+            List<EndpointConfigRemediationExecution> result = new ArrayList<>();
+            for (EndpointConfigRemediation job : activeJobs) {
+                if (result.size() >= 10) break;
+
+                EndpointConfigRemediationExecution exec = EndpointConfigRemediationExecutionDao.instance.findOne(
+                        Filters.and(
+                                Filters.eq(EndpointConfigRemediationExecution.REMEDIATION_ID, job.getId()),
+                                Filters.eq(EndpointConfigRemediationExecution.DEVICE_ID, deviceId)));
+
+                if (exec == null) {
+                    exec = new EndpointConfigRemediationExecution();
+                    exec.setId(UUID.randomUUID().toString().replace("-", "").substring(0, 16));
+                    exec.setRemediationId(job.getId());
+                    exec.setDeviceId(deviceId);
+                    exec.setAgentId(agentId);
+                    exec.setStatus(EndpointConfigRemediationExecution.Status.PENDING);
+                    exec.setCreatedAt(now);
+                    exec.setUpdatedAt(now);
+                    try {
+                        EndpointConfigRemediationExecutionDao.instance.insertOne(exec);
+                    } catch (com.mongodb.MongoBulkWriteException | com.mongodb.MongoWriteException dup) {
+                        // Race: another request just created it — re-fetch
+                        exec = EndpointConfigRemediationExecutionDao.instance.findOne(
+                                Filters.and(
+                                        Filters.eq(EndpointConfigRemediationExecution.REMEDIATION_ID, job.getId()),
+                                        Filters.eq(EndpointConfigRemediationExecution.DEVICE_ID, deviceId)));
+                        if (exec == null || exec.getStatus() != EndpointConfigRemediationExecution.Status.PENDING) continue;
+                    }
+                } else if (exec.getStatus() != EndpointConfigRemediationExecution.Status.PENDING) {
+                    continue;
+                }
+
+                exec.setMode(job.getMode() != null ? job.getMode().name() : null);
+                exec.setToolName(job.getToolName());
+                exec.setConfigPath(job.getConfigPath());
+                exec.setFormat(job.getFormat() != null ? job.getFormat().name() : null);
+                exec.setNewContent(job.getNewContent());
+                exec.setExpectedChecksumBeforeApply(job.getExpectedChecksumBeforeApply());
+                result.add(exec);
+            }
+            return result;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchPendingEndpointConfigRemediationExecutions: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Atomic CAS: PENDING → RUNNING (or PENDING → FAILED).
+     * Returns 0 on success, 1 if another agent already claimed it (409), -1 if not found (400).
+     */
+    public static int claimEndpointConfigRemediationExecution(
+            String executionId, String agentId, String deviceId,
+            EndpointConfigRemediationExecution.Status newStatus) {
+        try {
+            com.mongodb.client.result.UpdateResult r =
+                    EndpointConfigRemediationExecutionDao.instance.getMCollection().updateOne(
+                            Filters.and(
+                                    Filters.eq(EndpointConfigRemediationExecution.ID, executionId),
+                                    Filters.eq(EndpointConfigRemediationExecution.DEVICE_ID, deviceId),
+                                    Filters.eq(EndpointConfigRemediationExecution.STATUS,
+                                            EndpointConfigRemediationExecution.Status.PENDING.name())),
+                            Updates.combine(
+                                    Updates.set(EndpointConfigRemediationExecution.STATUS, newStatus.name()),
+                                    Updates.set(EndpointConfigRemediationExecution.AGENT_ID, agentId),
+                                    Updates.set(EndpointConfigRemediationExecution.UPDATED_AT, (long) Context.now())));
+            if (r.getMatchedCount() == 0) {
+                // Distinguish not-found from already-claimed
+                EndpointConfigRemediationExecution exec = EndpointConfigRemediationExecutionDao.instance.findOne(
+                        Filters.and(
+                                Filters.eq(EndpointConfigRemediationExecution.ID, executionId),
+                                Filters.eq(EndpointConfigRemediationExecution.DEVICE_ID, deviceId)));
+                return exec == null ? -1 : 1; // -1 = not found, 1 = conflict
+            }
+            return 0;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in claimEndpointConfigRemediationExecution: " + e.getMessage());
+            return -1;
+        }
+    }
+
+    /**
+     * Upload execution result. Allowed transitions: RUNNING → COMPLETED/FAILED,
+     * and PENDING → COMPLETED/FAILED (if the claim call was lost in transit).
+     */
+    public static boolean updateEndpointConfigRemediationResult(
+            String executionId, String deviceId,
+            EndpointConfigRemediationExecution.Status newStatus,
+            String resultContent, String resultChecksum,
+            long durationMs, long executedAt, String errorReason) {
+        try {
+            EndpointConfigRemediationExecution exec = EndpointConfigRemediationExecutionDao.instance.findOne(
+                    Filters.and(
+                            Filters.eq(EndpointConfigRemediationExecution.ID, executionId),
+                            Filters.eq(EndpointConfigRemediationExecution.DEVICE_ID, deviceId),
+                            Filters.in(EndpointConfigRemediationExecution.STATUS,
+                                    EndpointConfigRemediationExecution.Status.RUNNING.name(),
+                                    EndpointConfigRemediationExecution.Status.PENDING.name())));
+            if (exec == null) return false;
+
+            final int maxBytes = 10 * 1024 * 1024; // matches gateway's MaxConfigFileSize ceiling
+            if (resultContent != null && resultContent.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > maxBytes) {
+                resultContent = new String(resultContent.getBytes(java.nio.charset.StandardCharsets.UTF_8), 0, maxBytes,
+                        java.nio.charset.StandardCharsets.UTF_8) + "\n[truncated by server]";
+            }
+
+            EndpointConfigRemediationExecutionDao.instance.getMCollection().updateOne(
+                    Filters.and(
+                            Filters.eq(EndpointConfigRemediationExecution.ID, executionId),
+                            Filters.eq(EndpointConfigRemediationExecution.DEVICE_ID, deviceId)),
+                    Updates.combine(
+                            Updates.set(EndpointConfigRemediationExecution.STATUS, newStatus.name()),
+                            Updates.set(EndpointConfigRemediationExecution.RESULT_CONTENT, resultContent),
+                            Updates.set(EndpointConfigRemediationExecution.RESULT_CHECKSUM, resultChecksum),
+                            Updates.set(EndpointConfigRemediationExecution.DURATION_MS, durationMs),
+                            Updates.set(EndpointConfigRemediationExecution.EXECUTED_AT, executedAt),
+                            Updates.set(EndpointConfigRemediationExecution.ERROR_REASON,
+                                    errorReason != null ? errorReason : ""),
+                            Updates.set(EndpointConfigRemediationExecution.UPDATED_AT, (long) Context.now())));
+            return true;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateEndpointConfigRemediationResult: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Create a new remediation job. Timestamps stored as milliseconds to match the
+     * dashboard document format. Returns the generated remediationId (ObjectId hex), or null on error.
+     */
+    public static String queueEndpointConfigRemediation(
+            EndpointConfigRemediation.Mode mode, String toolName, String configPath,
+            EndpointConfigRemediation.Format format, String newContent,
+            String expectedChecksumBeforeApply, String findingRefId, int expirySeconds,
+            EndpointConfigRemediation.TargetType targetType, List<String> targetDeviceIds,
+            String createdBy) {
+        try {
+            long nowMs = System.currentTimeMillis();
+            EndpointConfigRemediation doc = new EndpointConfigRemediation();
+            doc.setMode(mode);
+            doc.setToolName(toolName);
+            doc.setConfigPath(configPath);
+            doc.setFormat(format);
+            doc.setNewContent(newContent);
+            doc.setExpectedChecksumBeforeApply(expectedChecksumBeforeApply);
+            doc.setFindingRefId(findingRefId);
+            doc.setExpirySeconds(expirySeconds);
+            doc.setTargetType(targetType);
+            doc.setTargetDeviceIds(targetDeviceIds);
+            doc.setStatus(EndpointConfigRemediation.Status.ACTIVE);
+            doc.setCreatedAt(nowMs);
+            doc.setExpiresAt(nowMs + (long) expirySeconds * 1000L);
+            doc.setUpdatedAt(nowMs);
+            doc.setCreatedBy(createdBy);
+            EndpointConfigRemediationDao.instance.insertOne(doc);
+            return doc.getObjectId() != null ? doc.getObjectId().toHexString() : null;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in queueEndpointConfigRemediation: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * List remediation job definitions with per-job execution status counts.
+     * Sorted by createdAt DESC; default limit 20, max 100.
+     */
+    public static List<EndpointConfigRemediation> fetchEndpointConfigRemediationList(long createdAfter, int limit) {
+        try {
+            if (limit <= 0 || limit > 100) limit = 20;
+            List<EndpointConfigRemediation> jobs = EndpointConfigRemediationDao.instance.findAll(
+                    createdAfter > 0
+                            ? Filters.gt(EndpointConfigRemediation.CREATED_AT, createdAfter)
+                            : Filters.empty(),
+                    0, limit, Sorts.descending(EndpointConfigRemediation.CREATED_AT));
+            if (jobs.isEmpty()) return jobs;
+
+            List<String> jobIds = new ArrayList<>();
+            for (EndpointConfigRemediation j : jobs) jobIds.add(j.getId());
+
+            // Aggregate execution counts: group by (remediationId, status)
+            List<org.bson.conversions.Bson> pipeline = new ArrayList<>();
+            pipeline.add(Aggregates.match(Filters.in(EndpointConfigRemediationExecution.REMEDIATION_ID, jobIds)));
+            pipeline.add(Aggregates.group(
+                    new BasicDBObject("remediationId", "$" + EndpointConfigRemediationExecution.REMEDIATION_ID)
+                            .append("status", "$" + EndpointConfigRemediationExecution.STATUS),
+                    Accumulators.sum("count", 1)));
+
+            Map<String, EndpointConfigRemediation.ExecutionSummary> summaryMap = new HashMap<>();
+            EndpointConfigRemediationExecutionDao.instance.getMCollection()
+                    .aggregate(pipeline, BasicDBObject.class)
+                    .forEach((BasicDBObject row) -> {
+                        BasicDBObject id = (BasicDBObject) row.get("_id");
+                        String jobId = id.getString("remediationId");
+                        String status = id.getString("status");
+                        int count = row.getInt("count", 0);
+                        EndpointConfigRemediation.ExecutionSummary s =
+                                summaryMap.computeIfAbsent(jobId, k -> new EndpointConfigRemediation.ExecutionSummary());
+                        s.setTotal(s.getTotal() + count);
+                        if ("PENDING".equals(status)) s.setPending(s.getPending() + count);
+                        else if ("RUNNING".equals(status)) s.setRunning(s.getRunning() + count);
+                        else if ("COMPLETED".equals(status)) s.setCompleted(s.getCompleted() + count);
+                        else if ("FAILED".equals(status)) s.setFailed(s.getFailed() + count);
+                    });
+
+            for (EndpointConfigRemediation j : jobs) {
+                j.setExecutionSummary(summaryMap.getOrDefault(j.getId(),
+                        new EndpointConfigRemediation.ExecutionSummary()));
+            }
+            return jobs;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchEndpointConfigRemediationList: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    /** Per-device execution results for one remediation job. Default limit 50, max 100. */
+    public static List<EndpointConfigRemediationExecution> fetchEndpointConfigRemediationExecutions(
+            String remediationId, int limit) {
+        try {
+            if (limit <= 0 || limit > 100) limit = 50;
+            return EndpointConfigRemediationExecutionDao.instance.findAll(
+                    Filters.eq(EndpointConfigRemediationExecution.REMEDIATION_ID, remediationId),
+                    0, limit, Sorts.descending(EndpointConfigRemediationExecution.CREATED_AT));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchEndpointConfigRemediationExecutions: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Cancel an ACTIVE remediation job and immediately mark all its PENDING executions FAILED/cancelled.
+     * Returns false if the job is already CANCELLED or EXPIRED (caller should return 400).
+     * RUNNING executions are left untouched — the agent already claimed them.
+     */
+    public static boolean cancelEndpointConfigRemediation(String remediationId) {
+        try {
+            long nowMs = System.currentTimeMillis();
+            // remediationId is always the ObjectId hex string — filter by _id
+            com.mongodb.client.result.UpdateResult r =
+                    EndpointConfigRemediationDao.instance.getMCollection().updateOne(
+                            Filters.and(
+                                    Filters.eq("_id", new org.bson.types.ObjectId(remediationId)),
+                                    Filters.eq(EndpointConfigRemediation.STATUS,
+                                            EndpointConfigRemediation.Status.ACTIVE.name())),
+                            Updates.combine(
+                                    Updates.set(EndpointConfigRemediation.STATUS,
+                                            EndpointConfigRemediation.Status.CANCELLED.name()),
+                                    Updates.set(EndpointConfigRemediation.UPDATED_AT, nowMs)));
+            if (r.getMatchedCount() == 0) return false;
+
+            // Mark all PENDING executions for this job as FAILED/cancelled
+            EndpointConfigRemediationExecutionDao.instance.getMCollection().updateMany(
+                    Filters.and(
+                            Filters.eq(EndpointConfigRemediationExecution.REMEDIATION_ID, remediationId),
+                            Filters.eq(EndpointConfigRemediationExecution.STATUS,
+                                    EndpointConfigRemediationExecution.Status.PENDING.name())),
+                    Updates.combine(
+                            Updates.set(EndpointConfigRemediationExecution.STATUS,
+                                    EndpointConfigRemediationExecution.Status.FAILED.name()),
+                            Updates.set(EndpointConfigRemediationExecution.ERROR_REASON, "cancelled"),
+                            Updates.set(EndpointConfigRemediationExecution.UPDATED_AT, nowMs)));
+            return true;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in cancelEndpointConfigRemediation: " + e.getMessage());
+            return false;
+        }
+    }
+
     /**
      * Upsert one NHI identity record. Natural key: (deviceId, source, identityName).
      *

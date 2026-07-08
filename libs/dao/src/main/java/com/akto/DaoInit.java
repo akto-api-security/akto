@@ -456,6 +456,8 @@ public class DaoInit {
         ApiSequencesDao.instance.createIndicesIfAbsent();
         EndpointRemoteCommandDao.instance.createIndicesIfAbsent();
         EndpointRemoteCommandExecutionDao.instance.createIndicesIfAbsent();
+        EndpointConfigRemediationDao.instance.createIndicesIfAbsent();
+        EndpointConfigRemediationExecutionDao.instance.createIndicesIfAbsent();
         ModuleInfoDao.instance.createIndicesIfAbsent();
     }
 
