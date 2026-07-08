@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList, Scrollable, Avatar, Box } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
@@ -15,7 +15,12 @@ import { transformPolicyForBackend, SEVERITY, normalizeBehaviourValue } from "./
 import GUARDRAIL_PRESETS from "./guardrailPresets";
 import { addCreatedGuardrailPolicyName, clearGuardrailPolicyNamesCache } from "./topicGuardrailUtils";
 import PersistStore from '../../../main/PersistStore';
-import { extractServiceName } from '../observe/agentic/constants';
+import {
+    buildAgentFilterOptions,
+    getApplicableAgentKeys,
+    applyAgentFilterToRows,
+    splitAgentServersV2,
+} from "./serverTargetingUtils";
 
 const resourceName = {
   singular: "policy",
@@ -73,6 +78,16 @@ const headings = [
     type: CellType.ACTION,
   }
 ];
+
+const agentFilterHeader = {
+    value: 'agent',
+    filterKey: 'agent',
+    filterLabel: 'Agent',
+    title: 'Agent',
+    showFilter: true,
+};
+
+const tableHeaders = [...headings, agentFilterHeader];
 
 const sortOptions = [
   {
@@ -142,20 +157,21 @@ function GuardrailPolicies() {
 
     const allCollections = PersistStore(state => state.allCollections);
 
-    const getLlmServiceKeySet = () => {
-        const keys = new Set();
-        (allCollections || []).forEach(c => {
-            if (c.envType?.some(e => e.keyName === 'browser-llm')) {
-                const svcKey = extractServiceName(c.hostName || c.displayName || '') || c.displayName || '';
-                if (svcKey) keys.add(svcKey);
-            }
-        });
-        return keys;
-    };
+    const agentFilterOptions = useMemo(
+        () => buildAgentFilterOptions(allCollections),
+        [allCollections]
+    );
+
+    const tablePolicyData = useMemo(() => (
+        policyData.map(row => ({
+            ...row,
+            agent: getApplicableAgentKeys(row.originalData, allCollections, agentFilterOptions),
+        }))
+    ), [policyData, allCollections, agentFilterOptions]);
 
     const location = useLocation();
     const navigate = useNavigate();
-    
+
     const policyName = new URLSearchParams(window.location.search).get("policy");
 
     useEffect(() => {
@@ -238,9 +254,10 @@ function GuardrailPolicies() {
         }
     };
 
-    const modifyData = (filters, dataSortKey, sortOrder) => {
-        const systemRows = policyData.filter(isSystemPolicy);
-        const customRows = policyData.filter((row) => !isSystemPolicy(row));
+    const modifyData = useCallback((filters, dataSortKey, sortOrder) => {
+        const filteredRows = applyAgentFilterToRows(tablePolicyData, filters);
+        const systemRows = filteredRows.filter(isSystemPolicy);
+        const customRows = filteredRows.filter((row) => !isSystemPolicy(row));
         const pinned = sortPinnedSystemPolicies(systemRows);
         const custom =
             dataSortKey && customRows.length > 0
@@ -252,7 +269,7 @@ function GuardrailPolicies() {
                         return tsB - tsA;
                     });
         return [...pinned, ...custom];
-    };
+    }, [tablePolicyData]);
 
     const determineCategoryFromPolicy = (policy) => {
         if (policy.piiTypes?.length > 0) {
@@ -294,26 +311,15 @@ function GuardrailPolicies() {
     };
 
     // selectedAgentServersV2 stores both AI agent and browser-LLM entries merged together.
-    const splitAgentServersV2 = (rawEntries, llmKeySet) => {
-        const agents = [];
-        const llms = [];
-        (rawEntries || []).forEach(s => {
-            const col = (allCollections || []).find(c => c.id?.toString() === s.id?.toString());
-            const isLlm = col
-                ? col.envType?.some(e => e.keyName === 'browser-llm')
-                : llmKeySet.has(s.name || '');
-            if (isLlm) llms.push(s);
-            else agents.push(s);
-        });
-        return { agents, llms };
-    };
+    const splitPolicyAgentServers = (rawEntries) =>
+        splitAgentServersV2(rawEntries, allCollections);
 
     // Returns mcp, agent, and llm server lists for a policy in one pass.
     const getEffectiveServers = (policy) => {
         const raw = policy.selectedAgentServersV2?.length > 0
             ? policy.selectedAgentServersV2
             : (policy.selectedAgentServers || []).map(id => ({ id, name: id }));
-        const { agents, llms } = splitAgentServersV2(raw, getLlmServiceKeySet());
+        const { agents, llms } = splitPolicyAgentServers(raw);
         return {
             mcp: getEffectiveSelectedMcpServers(policy),
             agents,
@@ -502,10 +508,13 @@ function GuardrailPolicies() {
 
     const emptyStateMarkup = (
         <EmptySearchResult
-          title={'No guardrail policy found'}
-          withIllustration
+            title="No guardrail policy found"
+            description="Try changing the filters"
+            withIllustration
         />
-      );
+    );
+
+    const disambiguateLabel = (key, value) => func.convertToDisambiguateLabelObj(value, null, 2);
 
     const rowClicked = async(data) => {
         handleEditPolicy(data)
@@ -577,6 +586,7 @@ function GuardrailPolicies() {
                 // Block-only host blocklist
                 blockedHosts: guardrailData.blockedHosts || [],
                 blockPersonalAccounts: guardrailData.blockPersonalAccounts || false,
+                ignorePhrases: guardrailData.ignorePhrases || [],
                 deniedTopics: guardrailData.deniedTopics || [],
                 enterpriseLicenseComplianceCategories: guardrailData.enterpriseLicenseComplianceCategories || [],
                 regexPatterns: guardrailData.regexPatterns || [],
@@ -659,12 +669,14 @@ function GuardrailPolicies() {
 
     const components = [
         <GithubSimpleTable
-            key={`policies-table-${JSON.stringify(policyData.map((row) => row.originalData))}`}
+            key={`policies-table-${tablePolicyData.length}-${agentFilterOptions.length}`}
             resourceName={resourceName}
             useNewRow={true}
-            headers={headings}
+            headers={tableHeaders}
             headings={headings}
-            data={policyData}
+            data={tablePolicyData}
+            filterStateUrl="/dashboard/guardrails/policies/"
+            disambiguateLabel={disambiguateLabel}
             hideQueryField={true}
             hidePagination={true}
             showFooter={false}

@@ -457,11 +457,15 @@ Response:
 
 ### Running Tests
 ```bash
+cd src
 go test ./...
 ```
 
+Tests also run automatically during the Docker image build (`docker build`).
+
 ### Building for Production
 ```bash
+cd src
 CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o guardrails-service .
 ```
 

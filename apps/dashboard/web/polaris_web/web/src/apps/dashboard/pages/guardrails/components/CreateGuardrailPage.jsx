@@ -30,6 +30,7 @@ import { getDefaultGeneralBlockTopics, GENERAL_BLOCKS, isGeneralBlockTopic, toDe
 import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from './enterpriseLicenseComplianceCatalog';
 import { groupCollectionsByAgent, groupCollectionsByService, extractServiceName } from '../../observe/agentic/constants';
 import { isEndpointSecurityCategory } from '../../../../main/labelHelper';
+import { isVisibilityOnly, buildAgentFilterOptions } from '../serverTargetingUtils';
 import func from "@/util/func";
 import {
     PolicyDetailsStep,
@@ -55,7 +56,9 @@ import {
     ServerSettingsStep,
     ServerSettingsConfig,
     EnterpriseLicenseComplianceStep,
-    EnterpriseLicenseComplianceConfig
+    EnterpriseLicenseComplianceConfig,
+    ExceptionsStep,
+    ExceptionsConfig
 } from './steps';
 import "./createGuardrailPage.css";
 
@@ -189,6 +192,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [blockPersonalAccounts, setBlockPersonalAccounts] = useState(false);
     const [browserConfigs, setBrowserConfigs] = useState([]);
 
+    // Step 13: Exceptions — phrases excluded from evaluation before this policy's detectors run
+    const [ignorePhrases, setIgnorePhrases] = useState([]);
+
     // Step 10: Server settings
     const [applyToAllServers, setApplyToAllServers] = useState(true);
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
@@ -282,6 +288,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableToolNameDescriptionMismatch,
         // Step 11
         blockedHosts,
+        // Step 13
+        ignorePhrases,
         // Step 10
         applyToAllServers,
         selectedMcpServers,
@@ -383,6 +391,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             summary: BlockedHostsConfig.getSummary(storedStateData),
             ...BlockedHostsConfig.validate(storedStateData)
         });
+
+        steps.push({
+            number: ExceptionsConfig.number,
+            title: ExceptionsConfig.title,
+            summary: ExceptionsConfig.getSummary(storedStateData),
+            beta: true,
+            ...ExceptionsConfig.validate(storedStateData)
+        });
         
         steps.push({
             number: ServerSettingsConfig.number,
@@ -483,11 +499,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
     }, [isEditMode, isPreset, editingPolicy]);
 
-    const isVisibilityOnly = (collection) =>
-        collection.envType && collection.envType.some(tag =>
-            tag.keyName === 'visibilityOnly' && tag.value === 'true'
-        );
-
     const filterCollections = () => {
         setCollectionsLoading(true);
         try {
@@ -510,8 +521,15 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     };
                 };
                 const dedup = (opts) => [...new Map(opts.map(o => [o.value, o])).values()].filter(o => o.value);
+                const genAiCollections = nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'gen-ai'));
                 setMcpServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'mcp-server')).map(toOption)));
-                setAgentServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'gen-ai')).map(toOption)));
+                setAgentServers(buildAgentFilterOptions(allCollections).map(opt => ({
+                    ...opt,
+                    isInline: !genAiCollections.some(c =>
+                        (c.hostName || c.displayName || c.name || '') === opt.value
+                        && !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe')
+                    )
+                })));
                 setBrowserLlmServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'browser-llm')).map(toOption)));
             }
         } catch (error) {
@@ -586,6 +604,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setSelectedBrowserLlms([]);
         setBlockedHosts([]);
         setBlockPersonalAccounts(false);
+        setIgnorePhrases([]);
         setApplyOnResponse(false);
         setApplyOnRequest(false);
         setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
@@ -748,6 +767,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         })));
         setBlockPersonalAccounts(policy.blockPersonalAccounts || false);
 
+        setIgnorePhrases((policy.ignorePhrases || []).map(entry => ({
+            phrase: entry.phrase || "",
+            isRegex: !!entry.isRegex,
+            caseSensitive: !!entry.caseSensitive
+        })));
+
         setApplyToAllUsers(!policy.targetTeams?.length && !policy.targetRoles?.length);
         setTargetTeams(policy.targetTeams || []);
         setTargetRoles(policy.targetRoles || []);
@@ -786,6 +811,15 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             const cleanedBlockedHosts = (blockedHosts || [])
                 .filter(entry => entry && (entry.pattern || "").trim())
                 .map(entry => ({ pattern: entry.pattern.trim() }));
+
+            // Drop empty rows and normalize ignore phrases before persisting.
+            const cleanedIgnorePhrases = (ignorePhrases || [])
+                .filter(entry => entry && (entry.phrase || "").trim())
+                .map(entry => ({
+                    phrase: entry.phrase.trim(),
+                    isRegex: !!entry.isRegex,
+                    caseSensitive: !!entry.caseSensitive
+                }));
 
             const b = normalizeBehaviourValue(policyBehaviour);
 
@@ -868,6 +902,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 selectedAgentServersV2: transformedAgentServers,
                 blockedHosts: cleanedBlockedHosts,
                 blockPersonalAccounts,
+                ignorePhrases: cleanedIgnorePhrases,
                 applyOnResponse,
                 applyOnRequest,
                 targetTeams: applyToAllUsers ? [] : targetTeams,
@@ -1080,6 +1115,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         showUserConditionError={leftSteps.has(ServerSettingsConfig.number)}
                     />
                 );
+            case 13:
+                return (
+                    <ExceptionsStep
+                        ignorePhrases={ignorePhrases}
+                        setIgnorePhrases={setIgnorePhrases}
+                    />
+                );
             case 12:
                 return (
                     <EnterpriseLicenseComplianceStep
@@ -1171,6 +1213,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 .filter(entry => entry && (entry.pattern || "").trim())
                 .map(entry => ({ pattern: entry.pattern.trim() })),
             blockPersonalAccounts,
+            ignorePhrases: (ignorePhrases || [])
+                .filter(entry => entry && (entry.phrase || "").trim())
+                .map(entry => ({
+                    phrase: entry.phrase.trim(),
+                    isRegex: !!entry.isRegex,
+                    caseSensitive: !!entry.caseSensitive
+                })),
             applyOnResponse: applyOnResponse,
             applyOnRequest: applyOnRequest,
             enterpriseLicenseComplianceCategories

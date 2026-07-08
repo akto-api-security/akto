@@ -959,20 +959,22 @@ Reference URL: ${window.location.href}`.trim();
                                 ].filter(item => item)}
                             />
                         </Popover>
-                        <Modal
-                            activator={<Button destructive size="slim" onClick={() => setShowModal(!showModal)}>Block IPs</Button>}
-                            open={showModal}
-                            onClose={() => setShowModal(false)}
-                            primaryAction={{content: 'Save', onAction: () => setShowModal(false)}}
-                            title={"Block IP ranges"}
-                        >
-                            <Modal.Section>
-                                <Text variant="bodyMd" color="subdued">
-                                    By blocking these IP ranges, no user will be able to access your application
-                                    Are you sure you want to block these IPs
-                                </Text>
-                            </Modal.Section>
-                        </Modal>
+                        {!isEndpointSecurityCategory() && (
+                            <Modal
+                                activator={<Button destructive size="slim" onClick={() => setShowModal(!showModal)}>Block IPs</Button>}
+                                open={showModal}
+                                onClose={() => setShowModal(false)}
+                                primaryAction={{content: 'Save', onAction: () => setShowModal(false)}}
+                                title={"Block IP ranges"}
+                            >
+                                <Modal.Section>
+                                    <Text variant="bodyMd" color="subdued">
+                                        By blocking these IP ranges, no user will be able to access your application
+                                        Are you sure you want to block these IPs
+                                    </Text>
+                                </Modal.Section>
+                            </Modal>
+                        )}
                         {jiraTicketUrl ? (
                             transform.getJiraComponent(jiraTicketUrl)
                         ) : (

@@ -108,10 +108,48 @@ public class GuardrailPoliciesAction extends UserAction {
     }
 
 
+    private static final int MAX_IGNORE_PHRASES = 50;
+    private static final int MIN_IGNORE_PHRASE_LENGTH = 3;
+    private static final int MAX_IGNORE_PHRASE_LENGTH = 200;
+
+    private String validateIgnorePhrases(List<GuardrailPolicies.IgnorePhrase> ignorePhrases) {
+        if (ignorePhrases == null) {
+            return null;
+        }
+        if (ignorePhrases.size() > MAX_IGNORE_PHRASES) {
+            return "Too many ignore phrases: max " + MAX_IGNORE_PHRASES + " allowed per policy";
+        }
+        for (GuardrailPolicies.IgnorePhrase ignorePhrase : ignorePhrases) {
+            String phrase = ignorePhrase.getPhrase();
+            if (StringUtils.isBlank(phrase)) {
+                return "Ignore phrase cannot be blank";
+            }
+            if (phrase.length() < MIN_IGNORE_PHRASE_LENGTH || phrase.length() > MAX_IGNORE_PHRASE_LENGTH) {
+                return "Ignore phrase length must be between " + MIN_IGNORE_PHRASE_LENGTH
+                        + " and " + MAX_IGNORE_PHRASE_LENGTH + " characters: " + phrase;
+            }
+            if (ignorePhrase.getIsRegex()) {
+                try {
+                    java.util.regex.Pattern.compile(phrase);
+                } catch (java.util.regex.PatternSyntaxException e) {
+                    return "Invalid regex in ignore phrase: " + phrase;
+                }
+            }
+        }
+        return null;
+    }
+
     public String createGuardrailPolicy() {
         try {
             User user = getSUser();
             int currentTime = Context.now();
+
+            String ignorePhrasesError = validateIgnorePhrases(policy.getIgnorePhrases());
+            if (ignorePhrasesError != null) {
+                loggerMaker.errorAndAddToDb("Invalid ignore phrases: " + ignorePhrasesError, LogDb.DASHBOARD);
+                addActionError(ignorePhrasesError);
+                return ERROR.toUpperCase();
+            }
 
             boolean isGithubWorkflow = policy.getSource() == GuardrailSource.GITHUB_WORKFLOW
                     && StringUtils.isNotBlank(policy.getSourceHash());
@@ -284,6 +322,9 @@ public class GuardrailPoliciesAction extends UserAction {
         if (p.getBlockedHosts() != null) {
             updates.add(Updates.set("blockedHosts", p.getBlockedHosts()));
         }
+        if (p.getIgnorePhrases() != null) {
+            updates.add(Updates.set("ignorePhrases", p.getIgnorePhrases()));
+        }
         if (p.getTargetTeams() != null) {
             updates.add(Updates.set("targetTeams", p.getTargetTeams()));
         }
@@ -350,6 +391,11 @@ public class GuardrailPoliciesAction extends UserAction {
 
             int accountId = Context.accountId.get();
             String guardrailServiceUrl = "https://" + accountId + "-guardrails.akto.io";
+            
+            if (accountId == 1768175789) {
+                guardrailServiceUrl = "https://ingest.akto.io";
+            }
+
             String validateUrl = guardrailServiceUrl + "/api/validate/requestWithPolicy";
 
             // Prepare request payload - wrap testInput in JSON with "prompt" key

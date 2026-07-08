@@ -335,31 +335,23 @@ func ExtractPromptFromRequestPayload(payload string) string {
 		return ""
 	}
 
-	// Parse outer payload
-	var payloadObj map[string]interface{}
-	if err := json.Unmarshal([]byte(payload), &payloadObj); err != nil {
-		return payload // Return original if parsing fails
+	env, err := parseRequestPayloadEnvelope(payload)
+	if err != nil {
+		return payload
 	}
 
-	// Get request_body string
-	requestBodyStr, ok := payloadObj["request_body"].(string)
-	if !ok {
-		return payload // Return original if request_body not found
+	if env.hasRequestBody {
+		if prompt, ok := env.requestBody["prompt"].(string); ok {
+			return prompt
+		}
+		return payload
 	}
 
-	// Parse request_body JSON
-	var requestBodyObj map[string]interface{}
-	if err := json.Unmarshal([]byte(requestBodyStr), &requestBodyObj); err != nil {
-		return payload // Return original if parsing fails
+	if prompt, ok := env.outer["prompt"].(string); ok {
+		return prompt
 	}
 
-	// Get prompt field
-	prompt, ok := requestBodyObj["prompt"].(string)
-	if !ok {
-		return payload // Return original if prompt not found
-	}
-
-	return prompt
+	return payload
 }
 
 // ExtractResponseFromResponsePayload extracts response_body.response from the payload JSON

@@ -1,0 +1,46 @@
+services:
+  executor:
+    image: aktosecurity/akto-agent-guard-executor:${AGENT_GUARD_EXECUTOR_TAG:-local}
+    build:
+      context: ./python-service/container
+      dockerfile: Dockerfile
+    container_name: agent-guard-executor-legacy
+    ports:
+      - "127.0.0.1:8092:8092"
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8092
+      - HF_HOME=/app/.cache/huggingface
+      - SCANNER_LLM_PROVIDER=${SCANNER_LLM_PROVIDER:-}
+      - FORCE_LLM_MODE=${FORCE_LLM_MODE:-}
+      - VERTEX_AI_PROJECT=${VERTEX_AI_PROJECT:-}
+      - VERTEX_AI_LOCATION=${VERTEX_AI_LOCATION:-}
+      - VERTEX_AI_ENDPOINT_ID=${VERTEX_AI_ENDPOINT_ID:-}
+      - VERTEX_AI_SA_KEY_JSON=${VERTEX_AI_SA_KEY_JSON:-}
+    volumes:
+      - model-cache:/app/.cache/huggingface
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 6G
+        reservations:
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8092/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    networks:
+      - agent-guard-legacy-network
+
+networks:
+  agent-guard-legacy-network:
+    driver: bridge
+
+volumes:
+  model-cache:
+    driver: local

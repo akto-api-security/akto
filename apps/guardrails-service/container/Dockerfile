@@ -35,6 +35,9 @@ RUN rm -f /root/.netrc
 # Copy source code from src directory
 COPY src/ .
 
+# Run unit tests before building the release binary.
+RUN go test ./...
+
 # Build the application with cross-compilation
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -installsuffix cgo -ldflags="-w -s" -o guardrails-service .
 
