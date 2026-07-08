@@ -366,6 +366,22 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
     const riskScore = rawCollection.urlsCount === 0 ? 0 : (riskScoreMap[rawCollection.id] || 0);
     const envType = Array.isArray(rawCollection?.envType) ? rawCollection.envType.map(func.formatCollectionType) : [];
 
+    // Extract individual tag key-value pairs from envTypeOriginal for filtering
+    const tagKeyValues = {};
+    if (Array.isArray(rawCollection?.envTypeOriginal)) {
+        rawCollection.envTypeOriginal.forEach(tagObj => {
+            if (tagObj?.keyName && tagObj?.value) {
+                const key = `tagKey_${tagObj.keyName}`;
+                // For each tag key, store the value
+                if (tagKeyValues[key]) {
+                    tagKeyValues[key] = `${tagKeyValues[key]}, ${tagObj.value}`;
+                } else {
+                    tagKeyValues[key] = tagObj.value;
+                }
+            }
+        });
+    }
+
     let calcCoverage = '0%';
     if(!rawCollection.isOutOfTestingScope && rawCollection.urlsCount > 0){
         if(rawCollection.urlsCount < testedEndpoints){
@@ -449,6 +465,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         deactivatedRiskScore: rawCollection.deactivated ? (riskScore - 10) : riskScore,
         activatedRiskScore: -1 * (rawCollection.deactivated ? riskScore : (riskScore - 10)),
         username: getUsernameForCollection(rawCollection, usernameMap),
+        ...tagKeyValues  // Add individual tag key-value pairs for filtering
     };
 };
 
@@ -1903,6 +1920,32 @@ function ApiCollections(props) {
     };
     const dynamicSortOptions = getModifiedSortOptions();
 
+    // Extract available tag keys from collections in envTypeMap
+    const availableTagKeys = new Set();
+
+    Object.values(envTypeMap || {}).forEach((envTypeArray) => {
+        if (Array.isArray(envTypeArray)) {
+            envTypeArray.forEach(tagObj => {
+                if (tagObj?.keyName && tagObj.keyName !== 'envType') {
+                    availableTagKeys.add(tagObj.keyName);
+                }
+            });
+        }
+    });
+
+    // Create filter-only headers for each tag key (these will be filters but NOT columns)
+    const tagFilterHeaders = Array.from(availableTagKeys)
+        .sort()
+        .map(tagKeyName => ({
+            text: `Tag: ${tagKeyName}`,
+            title: `Tag: ${tagKeyName}`,
+            value: `tagKeyFilter_${tagKeyName}`,  // Different from filterKey so it's filter-only
+            filterKey: `tagKey_${tagKeyName}`,     // This is the actual data field
+            textValue: `tagKey_${tagKeyName}`,
+            filterLabel: `Tag: ${tagKeyName}`,
+            showFilter: true
+        }));
+
     // Ensure all headers have unique IDs for IndexTable headings to avoid duplicate key warnings
     const headingsWithIds = dynamicHeaders.map((header, index) => ({
         ...header,
@@ -1910,6 +1953,17 @@ function ApiCollections(props) {
         // Replace empty titles with a space to avoid empty string keys
         title: (typeof header.title === 'string' && header.title.trim() === '') ? ' ' : header.title
     }));
+
+    // Add IDs to tag filter headers
+    const tagFilterHeadersWithIds = tagFilterHeaders.map((header, index) => ({
+        ...header,
+        id: `tag-filter-${index}`
+    }));
+
+    // Combine headers: regular headers + tag filter headers
+    // This way filters will include tag filters, but columns (headings) won't
+    const allHeaders = [...headingsWithIds, ...tagFilterHeadersWithIds];
+
 
     // Check if we should use tree view (for agentic filter types) - only for Atlas (Endpoint Security)
     const useTreeView = isEndpointSecurityCategory() && (
@@ -1962,18 +2016,39 @@ function ApiCollections(props) {
             );
         }
         
+        // Add tagKey_* fields to data for filtering
+        const dataWithTagKeys = (data[selectedTab] || []).map(item => {
+            const tagKeyFields = {};
+            if (envTypeMap[item.id]) {
+                const envTypeArray = envTypeMap[item.id];
+                if (Array.isArray(envTypeArray)) {
+                    envTypeArray.forEach(tagObj => {
+                        if (tagObj?.keyName && tagObj?.value && tagObj.keyName !== 'envType') {
+                            const key = `tagKey_${tagObj.keyName}`;
+                            if (tagKeyFields[key]) {
+                                tagKeyFields[key] = `${tagKeyFields[key]}, ${tagObj.value}`;
+                            } else {
+                                tagKeyFields[key] = tagObj.value;
+                            }
+                        }
+                    });
+                }
+            }
+            return { ...item, ...tagKeyFields };
+        });
+
         // Default table view
         return (
             <GithubSimpleTable
                 key={refreshData}
                 filterStateUrl={"/dashboard/observe/inventory/"}
                 pageLimit={100}
-                data={data[selectedTab]}
+                data={dataWithTagKeys}
                 sortOptions={dynamicSortOptions}
                 resourceName={resourceName}
                 filters={[]}
                 disambiguateLabel={disambiguateLabel}
-                headers={headingsWithIds}
+                headers={allHeaders}
                 selectable={true}
                 promotedBulkActions={promotedBulkActions}
                 mode={IndexFiltersMode.Default}
