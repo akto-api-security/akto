@@ -9,6 +9,7 @@ import com.akto.util.Constants;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class AgentQueryRecord {
 
@@ -32,6 +33,9 @@ public class AgentQueryRecord {
     private static final String HEADER_USER_EMAIL = "user_email";
     private static final String HEADER_SESSION_ID = "akto_session_id";
     private static final String HEADER_TRACE_ID   = "akto_message_id";
+
+    private static final int ATLAS_SESSION_TTL = Constants.ONE_DAY_TIMESTAMP;
+    private static final Map<String, Integer> ATLAS_SESSION_LAST_SEEN = new ConcurrentHashMap<>();
 
     public AgentQueryRecord(String docId, int accountId, String serviceId, String deviceId,
                             String userName, String sessionIdentifier,
@@ -79,8 +83,18 @@ public class AgentQueryRecord {
         }
 
         Map<String, List<String>> headers = p.getRequestParams().getHeaders();
+        String sessionIdentifier = getFirstHeader(headers, HEADER_PREFIX + HEADER_SESSION_ID);
+
         String source = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_SOURCE) : null;
         boolean isAtlasTraffic = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(source);
+
+        if (isAtlasTraffic) {
+            if (sessionIdentifier != null) {
+                ATLAS_SESSION_LAST_SEEN.put(sessionIdentifier, Context.now());
+            }
+        } else if (sessionIdentifier != null && isKnownAtlasSession(sessionIdentifier)) {
+            isAtlasTraffic = true;
+        }
 
         String serviceId, deviceId, userName;
 
@@ -109,7 +123,6 @@ public class AgentQueryRecord {
             userName  = getFirstHeader(headers, HEADER_PREFIX + HEADER_USER_EMAIL);
         }
 
-        String sessionIdentifier = getFirstHeader(headers, HEADER_PREFIX + HEADER_SESSION_ID);
         String traceId           = getFirstHeader(headers, HEADER_PREFIX + HEADER_TRACE_ID);
         String spanId = "span_" + UUID.randomUUID().toString();
 
@@ -134,6 +147,18 @@ public class AgentQueryRecord {
                 spanId,
                 isAtlasTraffic
         );
+    }
+
+    private static boolean isKnownAtlasSession(String sessionIdentifier) {
+        int lastSeen = ATLAS_SESSION_LAST_SEEN.get(sessionIdentifier);
+        if (lastSeen == 0) {
+            return false;
+        }
+        if (Context.now() - lastSeen > ATLAS_SESSION_TTL) {
+            ATLAS_SESSION_LAST_SEEN.remove(sessionIdentifier);
+            return false;
+        }
+        return true;
     }
 
     private static String getFirstHeader(Map<String, List<String>> headers, String name) {
