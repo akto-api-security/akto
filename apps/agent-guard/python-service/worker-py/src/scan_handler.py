@@ -8,11 +8,13 @@ import cascade_backpressure
 import scan_diag
 from constants import (
     CASCADE_SCANNERS,
+    FORCE_GEMMA_ONLY_SCANNERS,
     GEMMA_ONLY_SCANNERS,
     LOCAL_SCANNERS,
     REMOTE_SCANNERS,
     SUPPORTED_SCANNERS,
     canonical_scanner,
+    force_gemma_only,
     get_default_config,
     strip_qwen_tier,
 )
@@ -90,7 +92,9 @@ async def scan_payload(
         if not config.get("modelConfigs"):
             default_cfg = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)
             config = {**default_cfg, **config, "modelConfigs": default_cfg["modelConfigs"]}
-        if scanner_name in GEMMA_ONLY_SCANNERS:
+        if scanner_name in FORCE_GEMMA_ONLY_SCANNERS:
+            config = {**config, "modelConfigs": force_gemma_only(config.get("modelConfigs"))}
+        elif scanner_name in GEMMA_ONLY_SCANNERS:
             config = {**config, "modelConfigs": strip_qwen_tier(config.get("modelConfigs"))}
         store_fn = None
         if config.get("storeAllResults"):
