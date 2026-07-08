@@ -3599,7 +3599,7 @@ public class DbLayer {
         }
     }
 
-    public static List<AgentGuardCorpusEntry> getAgentCorpus(String hostName) {
+    public static List<BasicDBObject> getAgentCorpus(String hostName) {
         return AgentGuardCorpusDao.instance.findBucketsByAgentHost(hostName);
     }
     

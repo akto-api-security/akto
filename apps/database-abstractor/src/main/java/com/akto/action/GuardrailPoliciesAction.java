@@ -3,11 +3,11 @@ package com.akto.action;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.EnterpriseLicenseComplianceCatalog;
 import com.akto.dto.GuardrailPolicies;
-import com.akto.dto.agent_classifiers.AgentGuardCorpusEntry;
 import com.akto.dto.agent_classifiers.AgentGuardCorpusQueueEntry;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.ActionSupport;
 import java.util.List;
 import lombok.Getter;
@@ -55,7 +55,7 @@ public class GuardrailPoliciesAction extends ActionSupport {
 
     private String agentHost;
     private List<AgentGuardCorpusQueueEntry> examples;
-    private List<AgentGuardCorpusEntry> corpusEntries;
+    private List<BasicDBObject> corpusEntries;
 
     public String loadResultsForAgent(){
         if(this.agentHost == null || this.agentHost.isEmpty()){
