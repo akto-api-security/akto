@@ -4,6 +4,9 @@ import func from '@/util/func'
 import transform from '../onboarding/transform'
 import observeFunc from "./transform"
 import { isAgenticSecurityCategory, isMCPSecurityCategory, isEndpointSecurityCategory } from '../../../main/labelHelper'
+import ShowListInBadge from '../../components/shared/ShowListInBadge'
+
+const MAX_VISIBLE_SKILL_TAGS = 2
 
 export const getMethod = (url, method, apiType) => {
     if (func.shouldHideHttpMethodForEndpoint({ apiType, url })) {
@@ -56,7 +59,7 @@ export function MethodBox({method, methodBoxWidth, url, apiType}){
     )
 }
 
-function GetPrettifyEndpoint({method, url, isNew, maxWidth, methodBoxWidth, guardrailEnabled, isMalicious, isMisconfigured, apiType}){
+function GetPrettifyEndpoint({method, url, isNew, maxWidth, methodBoxWidth, guardrailEnabled, isMalicious, isMisconfigured, skillTags, apiType}){
     const ref = useRef(null)
     const localUrl = url || "/"
     const [copyActive, setCopyActive] = useState(false)
@@ -101,6 +104,14 @@ function GetPrettifyEndpoint({method, url, isNew, maxWidth, methodBoxWidth, guar
                 <Tooltip content="Misconfigured Claude settings detected on this skill" dismissOnMouseOut>
                   <Badge status="attention" size="small">Misconfigured</Badge>
                 </Tooltip>
+              ) : null}
+              {skillTags && skillTags.length > 0 ? (
+                <ShowListInBadge
+                  itemsArr={skillTags}
+                  maxItems={MAX_VISIBLE_SKILL_TAGS}
+                  status="warning"
+                  useTooltip={true}
+                />
               ) : null}
               {copyActive ? (
                 <div
