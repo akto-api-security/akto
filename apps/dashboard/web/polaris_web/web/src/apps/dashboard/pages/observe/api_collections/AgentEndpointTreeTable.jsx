@@ -346,7 +346,7 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
         return new Set((cached?.maliciousSkills || []).map(s => String(s).toLowerCase()));
     }, []);
 
-    // Config endpoints (/claude/config/*) and skill endpoints (/skills/*) coexist in one collection.
+    // Config endpoints (/<tool>/config/*) and skill endpoints (/skills/*) coexist in one collection.
     // Scope the inventory view so the config row shows only config endpoints and a skill-bearing
     // row shows only its skills, instead of mixing both.
     const handleChildClick = useCallback((collection) => {
