@@ -36,29 +36,19 @@ function naturalJoin(labels) {
 
 function buildDomainDeniedTopic(domain, observedSubDomains) {
     const entry = TOPIC_CATALOG[domain];
-    const matchedSubTopics = observedSubDomains
-        .map(sd => entry?.subTopics?.[sd])
-        .filter(Boolean)
-        .slice(0, MAX_PHRASES);
+    const baseDescription = entry?.description || `Requests/Messages regarding ${func.toSentenceCase(domain)}`;
 
-    const labels = matchedSubTopics.map(st => st.label).filter(Boolean);
-    const description = labels.length === 0
-        ? `Requests/Messages regarding ${func.toSentenceCase(domain)}`
-        : `Requests/Messages regarding ${func.toSentenceCase(domain)} about ${naturalJoin(labels)}`;
+    const subLabels = observedSubDomains.slice(0, MAX_PHRASES).map(sd => func.toSentenceCase(sd));
+    const description = subLabels.length === 0
+        ? baseDescription
+        : `${baseDescription} Includes ${naturalJoin(subLabels)}.`;
 
-    const phrases = [];
-    matchedSubTopics.forEach(st => {
-        if (phrases.length < MAX_PHRASES && st.samplePhrases?.[0]) {
-            phrases.push(st.samplePhrases[0]);
-        }
-    });
-    (entry?.samplePhrases || []).forEach(p => {
-        if (phrases.length < MAX_PHRASES && !phrases.includes(p)) {
-            phrases.push(p);
-        }
-    });
-
-    return { topic: domain, description, samplePhrases: phrases, origin: CONVERSATION_ORIGIN };
+    return {
+        topic: domain,
+        description,
+        samplePhrases: (entry?.samplePhrases || []).slice(0, MAX_PHRASES),
+        origin: CONVERSATION_ORIGIN,
+    };
 }
 
 export function buildSuggestedPolicyName(domains) {
