@@ -3,14 +3,7 @@ import claudeSettingsRemediations from './claude_settings_remediations.json';
 
 export const CLAUDE_SETTINGS_RISK_MAP = claudeSettingsRemediations;
 
-/**
- * Maps a settings-risk finding's policy_name (Go side's ThreatMetadata.PolicyName, which
- * arrives on the frontend as moreInfoData.templateId) to every tool that reports settings-risk
- * findings, and — where one exists — a static JSON fallback (riskMap + urlPrefix) for events
- * recorded before that tool's scanner started sending live overview/remediation on metadata.
- * Codex and Copilot have no static fallback: their events always carry live metadata, so
- * older-event display for them isn't a concern the way it is for Claude's pre-existing backlog.
- */
+
 export const SETTINGS_RISK_CONFIGS = {
     claude_settings_risk: { riskMap: CLAUDE_SETTINGS_RISK_MAP, urlPrefix: '/claude/config/' },
     codex_config_risk: null,
