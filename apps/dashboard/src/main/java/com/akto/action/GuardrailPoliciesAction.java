@@ -343,6 +343,11 @@ public class GuardrailPoliciesAction extends UserAction {
 
             int accountId = Context.accountId.get();
             String guardrailServiceUrl = "https://" + accountId + "-guardrails.akto.io";
+            
+            if (accountId == 1768175789) {
+                guardrailServiceUrl = "https://ingest.akto.io";
+            }
+
             String validateUrl = guardrailServiceUrl + "/api/validate/requestWithPolicy";
 
             // Prepare request payload - wrap testInput in JSON with "prompt" key
