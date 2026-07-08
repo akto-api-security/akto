@@ -15,7 +15,8 @@ Flag as a password (isPassword=true) ONLY when a concrete secret VALUE appears, 
   - password committed as `Prod$Pass99` -> value: Prod$Pass99
 
 Do NOT flag (isPassword=false) when the value is not a real secret:
-  - Environment / variable references:  $DB_PASSWORD, ${PASSWORD}, $SERVICES__X__PASSWORD, os.getenv("PW"), process.env.PASSWORD, config.password
+  - Environment / variable references:  $DB_PASSWORD, ${PASSWORD}, $SERVICES__X__PASSWORD, os.getenv("PW"), process.env.PASSWORD, config.password, env|DB_PASSWORD|
+  - CI/CD secret references (GitHub Actions, GitLab CI, etc.): ${{ secrets.E2E_ORCHESTRATOR_PASSWORD }}, ${{ secrets.API_KEY }} -- these are lookups by name into a secrets store, never the value itself
   - Placeholders / templates:           changeme, <password>, {{password}}, your_password_here, password_here, "password": "example"
   - Masked / redacted values (any value made up entirely of repeated mask chars * x X # . - _ or bullets): ****, xxxxxxxx, ########, --------, [REDACTED], "password": "********"
   - Redaction / state marker WORDS (a single dictionary word describing state, not a credential):
@@ -25,7 +26,7 @@ Do NOT flag (isPassword=false) when the value is not a real secret:
   - Bare field names / keys with no value: "password", password_field, has_password
 
 Rules:
-  - Judge the VALUE, not the surrounding key or sentence.
+  - Judge the VALUE, not the surrounding key or sentence — this includes NAME inside a reference wrapper (env|NAME|, $NAME, ${NAME}, os.getenv(...), process.env.X): NAME containing "PASSWORD"/"PWD"/"SECRET" never makes the wrapper a real value.
   - A value that is a single common English word (hidden, masked, secret, changeme, example) is a placeholder, NOT a real password — do not flag it. Real passwords are non-dictionary strings, usually mixing case/digits/symbols.
   - When uncertain, prefer isPassword=false (minimise false positives).
   - "values" must hold the EXACT secret substring(s) as they appear in the payload so they can be redacted; empty when isPassword=false.
