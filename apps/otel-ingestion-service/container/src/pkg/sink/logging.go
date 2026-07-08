@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/akto-api-security/otel-ingestion-service/pkg/model"
 	"go.uber.org/zap"
 )
 
@@ -24,8 +23,8 @@ func NewLoggingSink(logger *zap.Logger, logSensitive bool) *LoggingSink {
 	return &LoggingSink{logger: logger, logSensitive: logSensitive}
 }
 
-func (s *LoggingSink) Emit(_ context.Context, events []model.OtelIngestEvent) error {
-	for _, e := range events {
+func (s *LoggingSink) Emit(_ context.Context, batch Batch) error {
+	for _, e := range batch.Events {
 		fields := []zap.Field{
 			zap.Int("account_id", e.AccountID),
 			zap.String("source", e.Source),

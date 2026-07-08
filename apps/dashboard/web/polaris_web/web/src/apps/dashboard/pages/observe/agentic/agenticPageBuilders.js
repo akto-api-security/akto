@@ -4,6 +4,7 @@ import {
 } from "./constants";
 import {
     formatDisplayName,
+    getFriendlyLlmName,
     getTypeFromTags,
     hasPersonalAccountTag,
     hasMisconfiguredConfigTag,
@@ -72,6 +73,36 @@ export function getAgentLinkedComponents(asset, agenticTreeData = [], agenticFla
         linked.push({ name: flat?.name || name, type: flat?.type || "MCP Server" });
     });
     return linked;
+}
+
+// LLM traffic on the agent host (/v1/messages) — Cowork, Claude CLI, etc.
+export function isAgentLlmMessagesUrl(url) {
+    const u = String(url || "");
+    return u === "/v1/messages" || u.startsWith("/v1/messages/");
+}
+
+// Observed tools + inline LLM on the agent collection for topology graphs.
+export function buildAgentInlineTopologyComponents(stiEndpoints = [], builtinTools = [], asset = {}) {
+    const items = [];
+    const hasLlm = (stiEndpoints || []).some((ep) => {
+        const url = ep?.url || ep?._id?.url;
+        return isAgentLlmMessagesUrl(url);
+    });
+    if (hasLlm) {
+        const tag = asset?.assetTagValue || asset?.name || "claude";
+        const label = tag.toLowerCase().includes("claude")
+            ? getFriendlyLlmName("claude.ai")
+            : formatDisplayName(tag);
+        items.push({ id: "inline-llm", cat: "ai-model", type: "LLM", label, edgeColor: "#ec4899" });
+    }
+    const seenTools = new Set();
+    (builtinTools || []).forEach((tool, i) => {
+        const name = tool?.name;
+        if (!name || seenTools.has(name)) return;
+        seenTools.add(name);
+        items.push({ id: `inline-tool-${i}`, cat: "mcp", type: "Tool", label: name, edgeColor: "#4cbebb" });
+    });
+    return items;
 }
 
 export function inferOsFromDeviceId(deviceId) {
@@ -180,6 +211,21 @@ function bucketFromUrl(url) {
     // MCP protocol paths (initialize, tools/list, ping) are server infrastructure, not user tools
     if (/^\/mcp\b/.test(u) || u === "initialize" || u === "ping") return "Server";
     return "Tool";
+}
+
+// Claude Cowork / shield built-in tools are ingested on the agent host as /tool/{name}.
+export function isAgentBuiltinToolUrl(url) {
+    const u = String(url || "");
+    return u.startsWith("/tool/") && u.length > "/tool/".length;
+}
+
+// Built-in agent tools from agent-host STI (/tool/*). MCP tools stay on MCP collections.
+export function buildAgentBuiltinToolsFromStis(stiEndpoints = [], apiInfoList = [], apiCollectionId, auditRows = []) {
+    const toolEndpoints = (stiEndpoints || []).filter((ep) => {
+        const url = ep?.url || ep?._id?.url;
+        return isAgentBuiltinToolUrl(url);
+    });
+    return buildMcpComponentsFromStis(toolEndpoints, apiInfoList, apiCollectionId, auditRows).tools;
 }
 
 // Build flyout component rows from the collection's STI endpoints (real url+method, used to fetch sample

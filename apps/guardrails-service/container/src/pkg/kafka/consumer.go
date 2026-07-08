@@ -17,7 +17,6 @@ import (
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
-	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/segmentio/kafka-go"
 	"github.com/segmentio/kafka-go/sasl/plain"
 	"go.uber.org/zap"
@@ -436,8 +435,9 @@ func (c *Consumer) processBatch(ctx context.Context, batch []models.IngestDataBa
 
 	c.logger.Info("Processing batch from Kafka", zap.Int("size", len(batch)))
 
-	// Kafka mode: always report threats (skipThreat=false)
-	results, err := c.validatorService.ValidateBatch(ctx, batch, string(types.ContextSourceAgentic), false)
+	// Context source is resolved per message from tag metadata (tag.source=ENDPOINT for ATLAS /
+	// Cowork) inside ValidateBatch; empty fallback keeps legacy Argus-tagged traffic on AGENTIC.
+	results, err := c.validatorService.ValidateBatch(ctx, batch, "", false)
 	if err != nil {
 		c.logger.Error("Failed to validate batch", zap.Error(err))
 		return

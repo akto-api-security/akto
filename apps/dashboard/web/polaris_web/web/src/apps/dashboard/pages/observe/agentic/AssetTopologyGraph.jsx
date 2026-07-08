@@ -85,7 +85,7 @@ export function findParentAgents(asset, agenticFlatData = []) {
     });
 }
 
-export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], nodes: externalNodes, edges: externalEdges }) {
+export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], inlineComponents = [], nodes: externalNodes, edges: externalEdges }) {
     const { nodes, edges, height } = useMemo(() => {
         if (externalNodes && externalEdges) {
             return { nodes: externalNodes, edges: externalEdges, height: GRAPH_H };
@@ -100,12 +100,20 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
             const llms = children.filter(c => c.type === "LLM");
             const names = asset.skillNames || [];
             const skillItems = names.map((name, i) => ({ id: `skl-${i}`, cat: "skill", type: "Skill", label: name, edgeColor: "#7C3AED" }));
+            const inlineItems = (inlineComponents || []).map((item, i) => ({
+                id: item.id || `inline-${i}`,
+                cat: item.cat,
+                type: item.type,
+                label: item.label,
+                edgeColor: item.edgeColor || "#9ca3af",
+            }));
 
-            // MCPs, LLMs, Skills all at col3 — same hierarchy level
+            // MCPs, LLMs, Skills, inline tools/LLM on agent host — same hierarchy level
             const col3Items = [
                 ...mcps.map((m, i) => ({ id: `mcp-${i}`, cat: "mcp",      type: "MCP Server", label: m.name, edgeColor: "#4cbebb" })),
                 ...llms.map((l, i) => ({ id: `llm-${i}`, cat: "ai-model", type: "LLM",        label: l.name, edgeColor: "#ec4899" })),
                 ...skillItems,
+                ...inlineItems,
             ];
 
             const maxRows   = Math.max(devices.length, col3Items.length, 1);
@@ -165,7 +173,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
             ],
             edges: devices.map((_, i) => ({ id: `e-d${i}-a`, source: `dev-${i}`, target: "asset", type: "smoothstep", style: { stroke: edgeCol, strokeWidth: 1.5 } })),
         };
-    }, [asset, assetDevices, agenticTreeData, agenticFlatData, externalNodes, externalEdges]);
+    }, [asset, assetDevices, agenticTreeData, agenticFlatData, inlineComponents, externalNodes, externalEdges]);
 
     return (
         <Box style={{ height, borderRadius: 8, border: "1px solid #E1E5E9", overflow: "hidden", background: "#F8FAFC" }}>

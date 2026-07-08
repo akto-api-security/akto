@@ -16,6 +16,7 @@ import (
 	"github.com/akto-api-security/otel-ingestion-service/pkg/otlp"
 	"github.com/akto-api-security/otel-ingestion-service/pkg/pipeline"
 	"github.com/akto-api-security/otel-ingestion-service/pkg/sink"
+	"github.com/akto-api-security/otel-ingestion-service/pkg/tenant"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -48,7 +49,23 @@ func main() {
 
 	queue := pipeline.NewQueue(cfg.QueueSize)
 	registry := adapter.NewRegistry()
-	eventSink := sink.NewLoggingSink(logger, cfg.LogSensitive)
+
+	urlOverrides, err := tenant.ParseURLMap(cfg.TenantDIURLMap)
+	if err != nil {
+		logger.Fatal("invalid TENANT_DI_URL_MAP", zap.Error(err))
+	}
+	diRouter := tenant.NewRouter(cfg.DefaultDataIngestionURL, cfg.TenantDIURLTemplate, urlOverrides)
+
+	loggingSink := sink.NewLoggingSink(logger, cfg.LogSensitive)
+	var eventSink sink.EventSink = loggingSink
+	if cfg.HTTPSinkEnabled {
+		if cfg.DefaultDataIngestionURL == "" && len(urlOverrides) == 0 && cfg.TenantDIURLTemplate == "" {
+			logger.Fatal("OTLP_HTTP_SINK_ENABLED requires TENANT_DI_URL_TEMPLATE, DEFAULT_DATA_INGESTION_URL, or TENANT_DI_URL_MAP")
+		}
+		httpSink := sink.NewHTTPSink(diRouter, time.Duration(cfg.HTTPSinkTimeoutMs)*time.Millisecond, logger)
+		eventSink = sink.NewMultiSink(loggingSink, httpSink)
+	}
+
 	workers := pipeline.NewWorkerPool(queue, registry, eventSink, logger, cfg.WorkerCount)
 
 	handler := otlp.NewHandler(verifier, queue, cfg.MaxBatchBytes, logger)
@@ -75,6 +92,9 @@ func main() {
 			zap.Int("port", cfg.ServerPort),
 			zap.Bool("auth_enabled", cfg.AuthEnabled),
 			zap.String("key_source", keySource),
+			zap.Bool("http_sink_enabled", cfg.HTTPSinkEnabled),
+			zap.String("default_di_url", cfg.DefaultDataIngestionURL),
+			zap.String("tenant_di_template", cfg.TenantDIURLTemplate),
 			zap.Int("queue_size", cfg.QueueSize),
 			zap.Int("workers", cfg.WorkerCount))
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

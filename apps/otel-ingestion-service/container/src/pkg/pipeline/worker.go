@@ -59,8 +59,15 @@ func (wp *WorkerPool) process(job Job) {
 		if len(events) == 0 {
 			return
 		}
-		if err := wp.sink.Emit(context.Background(), events); err != nil {
-			wp.logger.Warn("sink emit failed", zap.Error(err))
+		batch := sink.Batch{
+			AccountID: job.AccountID,
+			AuthToken: job.AuthToken,
+			Events:    events,
+		}
+		if err := wp.sink.Emit(context.Background(), batch); err != nil {
+			wp.logger.Warn("sink emit failed",
+				zap.Int("account_id", job.AccountID),
+				zap.Error(err))
 		}
 	default:
 		wp.logger.Debug("signal accepted for future processing",

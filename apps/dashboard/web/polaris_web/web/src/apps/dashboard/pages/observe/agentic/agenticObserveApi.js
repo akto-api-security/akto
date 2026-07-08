@@ -1,6 +1,6 @@
 import request from "@/util/request";
 import observeApi from "../api";
-import { buildMcpComponentsFromStis, buildSkillsFlyoutData, normalizeSeverity } from "./agenticPageBuilders";
+import { buildMcpComponentsFromStis, buildAgentBuiltinToolsFromStis, buildSkillsFlyoutData, normalizeSeverity } from "./agenticPageBuilders";
 
 function extractRuleViolated(metadata) {
     if (!metadata) return "-";
@@ -209,10 +209,7 @@ const agenticObserveApi = {
         return [];
     },
 
-    // Tools/resources/prompts sourced from the collection's STI endpoints (for real url+method, used
-    // to fetch sample traffic) classified by the MCP audit `type` field (the authoritative source for
-    // tool/resource/prompt/server — same as the legacy Audit Data page), joined with apiInfoList for risk.
-    async fetchMcpComponentsData(apiCollectionId) {
+    async fetchCollectionStiBundle(apiCollectionId) {
         const id = typeof apiCollectionId === "string" ? parseInt(apiCollectionId, 10) : apiCollectionId;
         const [stiResp, apiResp, auditRows] = await Promise.all([
             observeApi.fetchApisFromStis(id),
@@ -223,7 +220,26 @@ const agenticObserveApi = {
             method: x?._id?.method,
             url: x?._id?.url,
         }));
-        return buildMcpComponentsFromStis(stiEndpoints, apiResp?.apiInfoList || [], id, auditRows || []);
+        return {
+            id,
+            stiEndpoints,
+            apiInfoList: apiResp?.apiInfoList || [],
+            auditRows: auditRows || [],
+        };
+    },
+
+    // Tools/resources/prompts sourced from the collection's STI endpoints (for real url+method, used
+    // to fetch sample traffic) classified by the MCP audit `type` field (the authoritative source for
+    // tool/resource/prompt/server — same as the legacy Audit Data page), joined with apiInfoList for risk.
+    async fetchMcpComponentsData(apiCollectionId) {
+        const { id, stiEndpoints, apiInfoList, auditRows } = await this.fetchCollectionStiBundle(apiCollectionId);
+        return buildMcpComponentsFromStis(stiEndpoints, apiInfoList, id, auditRows);
+    },
+
+    // Built-in tools on the agent host (/tool/*) — Claude Cowork, Claude CLI, etc.
+    async fetchAgentBuiltinToolsData(apiCollectionId) {
+        const { id, stiEndpoints, apiInfoList, auditRows } = await this.fetchCollectionStiBundle(apiCollectionId);
+        return buildAgentBuiltinToolsFromStis(stiEndpoints, apiInfoList, id, auditRows);
     },
 
     async fetchSkillsFlyoutData(apiCollectionId, collection = null) {

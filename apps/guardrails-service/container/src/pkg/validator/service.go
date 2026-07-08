@@ -1532,23 +1532,44 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 	s.schemaFetcher.RefreshIfNeeded()
 
-	policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies(string(contextSource))
-	if err != nil {
-		s.logger.Error("ValidateBatch - failed to load policies",
-			zap.String("contextSource", contextSource),
-			zap.Error(err))
-		return nil, fmt.Errorf("failed to load policies: %w", err)
+	type batchPolicyBundle struct {
+		policies        []types.Policy
+		auditPolicies   map[string]*types.AuditPolicy
+		compiledRules   map[string]*regexp.Regexp
+		hasAuditRules   bool
 	}
-
-	s.logger.Debug("ValidateBatch - loaded policies for contextSource",
-		zap.String("contextSource", contextSource),
-		zap.Int("policiesCount", len(policies)),
-		zap.Int("auditPoliciesCount", len(auditPolicies)),
-		zap.Strings("policyNames", policyNames(policies)))
+	policyByContext := make(map[string]batchPolicyBundle)
 
 	results := make([]ValidationBatchResult, 0, len(batchData))
 
 	for i, data := range batchData {
+		itemContextSource := ResolveIngestContextSource(data, contextSource)
+		bundle, ok := policyByContext[itemContextSource]
+		if !ok {
+			policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies(itemContextSource)
+			if err != nil {
+				s.logger.Error("ValidateBatch - failed to load policies",
+					zap.String("contextSource", itemContextSource),
+					zap.Error(err))
+				return nil, fmt.Errorf("failed to load policies: %w", err)
+			}
+			bundle = batchPolicyBundle{
+				policies:      policies,
+				auditPolicies: auditPolicies,
+				compiledRules: compiledRules,
+				hasAuditRules: hasAuditRules,
+			}
+			policyByContext[itemContextSource] = bundle
+			s.logger.Debug("ValidateBatch - loaded policies for contextSource",
+				zap.String("contextSource", itemContextSource),
+				zap.Int("policiesCount", len(policies)),
+				zap.Int("auditPoliciesCount", len(auditPolicies)),
+				zap.Strings("policyNames", policyNames(policies)))
+		}
+		policies := bundle.policies
+		auditPolicies := bundle.auditPolicies
+		compiledRules := bundle.compiledRules
+		hasAuditRules := bundle.hasAuditRules
 		result := ValidationBatchResult{
 			Index:  i,
 			Method: data.Method,
@@ -1590,7 +1611,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			StatusCode:         statusCode,
 			RequestPayload:     data.RequestPayload,
 			ResponsePayload:    data.ResponsePayload,
-			ContextSource:      types.ContextSource(contextSource),
+			ContextSource:      types.ContextSource(itemContextSource),
+			Tag:                data.Tag,
 			McpServerName:      mcpServerName,
 			AktoAccountID:      auth.AccountIDFromServiceToken(),
 			SkipThreat:         skipThreat, // Set skipThreat directly in context

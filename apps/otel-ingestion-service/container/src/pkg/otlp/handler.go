@@ -66,6 +66,7 @@ func (h *Handler) ingest(signal pipeline.SignalType) http.HandlerFunc {
 			h.reject(w, r, signal, 0, http.StatusUnauthorized, "unauthorized", err)
 			return
 		}
+		authToken := auth.TokenFromHeader(r.Header.Get("Authorization"))
 
 		if r.ContentLength > int64(h.maxBytes) {
 			h.reject(w, r, signal, accountID, http.StatusRequestEntityTooLarge, "payload too large", nil)
@@ -84,6 +85,7 @@ func (h *Handler) ingest(signal pipeline.SignalType) http.HandlerFunc {
 
 		job := pipeline.Job{
 			AccountID:   accountID,
+			AuthToken:   authToken,
 			Signal:      signal,
 			ContentType: r.Header.Get("Content-Type"),
 			Body:        body,

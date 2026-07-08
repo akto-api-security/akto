@@ -4,7 +4,7 @@ import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AgenticFlyoutShell from "./AgenticFlyoutShell";
 import AiChatSection from "./AiChatSection";
-import { getAgentLinkedComponents } from "./agenticPageBuilders";
+import { getAgentLinkedComponents, buildAgentInlineTopologyComponents } from "./agenticPageBuilders";
 import { RiskScoreCellRenderer } from "./AgenticCellRenderers";
 import agenticObserveApi, { buildAgenticObserveChatMetadata, selectConfigViolationRows, summarizeViolations } from "./agenticObserveApi";
 import OverviewTab from "./OverviewTab";
@@ -93,8 +93,28 @@ export default function AgenticAssetFlyout({
     const [topNav,         setTopNav]         = useState(null);
     const [topNavPicker,   setTopNavPicker]   = useState(null);
     const [mcpComponentCount, setMcpComponentCount] = useState(0);
+    const [inlineTopology, setInlineTopology] = useState([]);
 
     useEffect(() => { setSelectedTab(0); setTopNav(null); setTopNavPicker(null); }, [asset?.id]);
+
+    useEffect(() => {
+        const collectionIds = asset?.collectionIds;
+        const type = asset?.type;
+        if (!collectionIds?.length || type !== "AI Agent") { setInlineTopology([]); return; }
+        let cancelled = false;
+        (async () => {
+            try {
+                const bundles = await Promise.all(collectionIds.map(id => agenticObserveApi.fetchCollectionStiBundle(id)));
+                const toolBundles = await Promise.all(collectionIds.map(id => agenticObserveApi.fetchAgentBuiltinToolsData(id)));
+                const sti = bundles.flatMap(b => b.stiEndpoints || []);
+                const builtinTools = toolBundles.flat();
+                if (!cancelled) setInlineTopology(buildAgentInlineTopologyComponents(sti, builtinTools, asset));
+            } catch {
+                if (!cancelled) setInlineTopology([]);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [asset?.id, asset?.type, asset?.collectionIds, asset?.assetTagValue, asset?.name]);
 
     useEffect(() => {
         const collectionIds = asset?.collectionIds;
@@ -229,6 +249,7 @@ export default function AgenticAssetFlyout({
                         agenticTreeData={agenticTreeData}
                         agenticFlatData={agenticFlatData}
                         mcpComponentCount={mcpComponentCount}
+                        inlineComponents={inlineTopology}
                     />
                 )}
                 {selectedTab === 1 && (

@@ -14,6 +14,7 @@ const (
 
 type Job struct {
 	AccountID   int
+	AuthToken   string
 	Signal      SignalType
 	ContentType string
 	Body        []byte

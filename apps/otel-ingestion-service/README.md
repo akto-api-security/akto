@@ -2,12 +2,24 @@
 
 Multi-tenant OTLP HTTP ingestion service for [Claude Cowork](https://claude.com/docs/cowork/monitoring) and other OTel exporters.
 
-## Phase 1 (current)
+## Phase 1
 
 - Ack-fast `POST /v1/logs` — **http/json** and **http/protobuf**
 - Multi-tenant JWT auth (Mongo `HYBRID_SAAS` or `RSA_PUBLIC_KEY`)
 - Parse Cowork events → structured logs (`LoggingSink`)
-- Phase 2 will forward to per-tenant data-ingestion-service
+
+## Phase 2
+
+- `HTTPSink` → `POST {tenant}/api/ingestData` with forwarded customer JWT
+- `publishToGuardrails: true`, `akto_connector: claude_cowork`, observe-mode tag
+- Tenant routing: `TENANT_DI_URL_TEMPLATE` (default `https://{accountId}-guardrails.akto.io`) + optional `TENANT_DI_URL_MAP` overrides
+
+```bash
+OTLP_HTTP_SINK_ENABLED=true
+TENANT_DI_URL_TEMPLATE=https://{accountId}-guardrails.akto.io
+# account 1726615470 → https://1726615470-guardrails.akto.io/api/ingestData
+HTTP_SINK_TIMEOUT_MS=5000
+```
 
 ## Build image
 

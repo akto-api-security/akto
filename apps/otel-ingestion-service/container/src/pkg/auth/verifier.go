@@ -34,7 +34,7 @@ func (v *Verifier) Authenticate(authHeader string) (int, error) {
 		return 0, nil
 	}
 
-	token := normalizeAuthHeader(authHeader)
+	token := TokenFromHeader(authHeader)
 	if token == "" {
 		return 0, fmt.Errorf("missing Authorization header")
 	}
@@ -58,12 +58,16 @@ func (v *Verifier) Authenticate(authHeader string) (int, error) {
 	return accountID, nil
 }
 
-func normalizeAuthHeader(header string) string {
+func TokenFromHeader(header string) string {
 	header = strings.TrimSpace(header)
 	if len(header) >= 7 && strings.EqualFold(header[:7], "bearer ") {
 		return strings.TrimSpace(header[7:])
 	}
 	return header
+}
+
+func normalizeAuthHeader(header string) string {
+	return TokenFromHeader(header)
 }
 
 func verifyToken(tokenString string, publicKey *rsa.PublicKey) (int, time.Time, error) {

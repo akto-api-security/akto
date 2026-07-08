@@ -9,8 +9,9 @@ import { TypeBadge, SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import AssetTopologyGraph from "./AssetTopologyGraph";
 import { RiskFactorRow } from "./RiskFactorRow";
 import DetailGrid from "./DetailGrid";
-import { buildAgenticObserveChatMetadata, fetchAgenticViolations, openViolationInThreatActivity, deviceServiceKey, isClaudeConfigHost } from "./agenticObserveApi";
+import agenticObserveApi, { buildAgenticObserveChatMetadata, fetchAgenticViolations, openViolationInThreatActivity, deviceServiceKey, isClaudeConfigHost } from "./agenticObserveApi";
 import { extractServiceName, extractEndpointId } from "./constants";
+import { getFriendlyLlmName } from "./mcpClientHelper";
 import func from "@/util/func";
 import settingsApi from "../../settings/api";
 import "../../../components/layouts/style.css";
@@ -167,7 +168,7 @@ const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 // Build col3 items (MCPs, LLMs, Skills) linked to a given AI Agent using collections data.
 // The agent's collectionIds tell us which collections it owns; service names on those
 // collections (excluding the agent's own service segment) are its linked MCP/LLM servers.
-function buildAgentCol3Items(agent, collections, agentIdx) {
+function buildAgentCol3Items(agent, collections, agentIdx, builtinTools = []) {
     const agentIdSet = new Set((agent.collectionIds || []).map(Number));
     const deviceId = agent.path?.[0];
     const agentServiceKey = agent.rawServiceName?.toLowerCase();
@@ -196,10 +197,30 @@ function buildAgentCol3Items(agent, collections, agentIdx) {
         items.push({ id: `skl-${agentIdx}-${si}`, cat: "skill", type: "Skill", label: name, agentIdx, edgeColor: "#7C3AED" });
     });
 
+    // Inline LLM on agent host (e.g. Cowork /v1/messages on *.ai-agent.* collection)
+    const hasAgentHostCollection = collections.some((c) => {
+        if (!agentIdSet.has(Number(c.id))) return false;
+        const hostName = c.hostName || c.displayName || c.name || "";
+        return hostName.includes(".ai-agent.") && extractEndpointId(hostName) === deviceId;
+    });
+    if (hasAgentHostCollection) {
+        const tag = agentServiceKey || "claude";
+        const label = tag.includes("claude") ? getFriendlyLlmName("claude.ai") : tag;
+        items.push({ id: `inline-llm-${agentIdx}`, cat: "ai-model", type: "LLM", label, agentIdx, edgeColor: "#ec4899" });
+    }
+
+    const seenTools = new Set();
+    (builtinTools || []).forEach((tool, ti) => {
+        const name = tool?.name;
+        if (!name || seenTools.has(name)) return;
+        seenTools.add(name);
+        items.push({ id: `inline-tool-${agentIdx}-${ti}`, cat: "mcp", type: "Tool", label: name, agentIdx, edgeColor: "#4cbebb" });
+    });
+
     return items;
 }
 
-function TopologyGraph({ device, agents, collections = [] }) {
+function TopologyGraph({ device, agents, collections = [], agentTools = {} }) {
     const { nodes, edges } = useMemo(() => {
         const aiAgents = agents.filter(a => a.type === "AI Agent");
         const hasAgents = aiAgents.length > 0;
@@ -213,7 +234,7 @@ function TopologyGraph({ device, agents, collections = [] }) {
 
         if (hasAgents) {
             // Build col3 items for all agents, tagged with agentIdx
-            const col3Items = aiAgents.flatMap((a, ai) => buildAgentCol3Items(a, collections, ai));
+            const col3Items = aiAgents.flatMap((a, ai) => buildAgentCol3Items(a, collections, ai, agentTools[ai] || []));
             const maxRows = Math.max(aiAgents.length, col3Items.length, 1);
             const totalH  = maxRows * NODE_H;
             const devY    = (totalH - 44) / 2;
@@ -243,7 +264,7 @@ function TopologyGraph({ device, agents, collections = [] }) {
         }
 
         return { nodes: ns, edges: es };
-    }, [agents, device.endpoint, device.username, collections]);
+    }, [agents, device.endpoint, device.username, collections, agentTools]);
 
     return <AssetTopologyGraph nodes={nodes} edges={edges} />;
 }
@@ -360,12 +381,58 @@ function UserAnalysisSection({ username }) {
 const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 
 function OverviewTab({ device, agents, collections, onTabChange }) {
+    const [agentTools, setAgentTools] = useState({});
+
+    const aiAgents = useMemo(() => agents.filter(a => a.type === "AI Agent"), [agents]);
+
+    useEffect(() => {
+        if (!aiAgents.length) { setAgentTools({}); return; }
+        let cancelled = false;
+        (async () => {
+            try {
+                const entries = await Promise.all(aiAgents.map(async (agent, idx) => {
+                    const ids = agent.collectionIds || [];
+                    if (!ids.length) return [idx, []];
+                    const bundles = await Promise.all(ids.map(id => agenticObserveApi.fetchAgentBuiltinToolsData(id)));
+                    const seen = new Set();
+                    const tools = [];
+                    bundles.flat().forEach((tool) => {
+                        if (!tool?.name || seen.has(tool.name)) return;
+                        seen.add(tool.name);
+                        tools.push(tool);
+                    });
+                    return [idx, tools];
+                }));
+                if (!cancelled) setAgentTools(Object.fromEntries(entries));
+            } catch {
+                if (!cancelled) setAgentTools({});
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [aiAgents]);
+
+    const inlineToolCount = useMemo(
+        () => Object.values(agentTools).reduce((n, tools) => n + (tools?.length || 0), 0),
+        [agentTools],
+    );
+    const inlineLlmCount = aiAgents.length > 0
+        ? aiAgents.filter((agent) => {
+            const agentIdSet = new Set((agent.collectionIds || []).map(Number));
+            const deviceId = agent.path?.[0];
+            return collections.some((c) => {
+                if (!agentIdSet.has(Number(c.id))) return false;
+                const hostName = c.hostName || c.displayName || c.name || "";
+                return hostName.includes(".ai-agent.") && extractEndpointId(hostName) === deviceId;
+            });
+        }).length
+        : 0;
+
     const { aiCount, mcpCount, llmCount, totalV } = useMemo(() => ({
-        aiCount:  agents.filter(a => a.type === "AI Agent").length,
+        aiCount:  aiAgents.length,
         mcpCount: agents.filter(a => a.type === "MCP Server").length,
-        llmCount: agents.filter(a => a.type === "LLM").length,
+        llmCount: agents.filter(a => a.type === "LLM").length + inlineLlmCount,
         totalV:   (device.violations?.critical || 0) + (device.violations?.high || 0) + (device.violations?.medium || 0) + (device.violations?.low || 0),
-    }), [agents, device.violations]);
+    }), [agents, aiAgents.length, device.violations, inlineLlmCount]);
 
     const osLabel = useMemo(() => {
         if (device.os === "mac") return "macOS";
@@ -377,12 +444,18 @@ function OverviewTab({ device, agents, collections, onTabChange }) {
     const rawFactors = useMemo(() => computeRiskFactors(device, agents), [device, agents]);
     const factors    = useMemo(() => [...rawFactors].sort((a, b) => (SEV_ORDER[a.severity] ?? 99) - (SEV_ORDER[b.severity] ?? 99)), [rawFactors]);
 
-    const stats = useMemo(() => [
-        { label: aiCount  === 1 ? "AI Agent"   : "AI Agents",   value: aiCount  },
-        { label: mcpCount === 1 ? "MCP Server" : "MCP Servers", value: mcpCount },
-        { label: llmCount === 1 ? "LLM"        : "LLMs",        value: llmCount },
-        { label: totalV   === 1 ? "Violation"  : "Violations",  value: totalV   },
-    ], [aiCount, mcpCount, llmCount, totalV]);
+    const stats = useMemo(() => {
+        const rows = [
+            { label: aiCount  === 1 ? "AI Agent"   : "AI Agents",   value: aiCount  },
+            { label: mcpCount === 1 ? "MCP Server" : "MCP Servers", value: mcpCount },
+            { label: llmCount === 1 ? "LLM"        : "LLMs",        value: llmCount },
+        ];
+        if (inlineToolCount > 0) {
+            rows.push({ label: inlineToolCount === 1 ? "Tool" : "Tools", value: inlineToolCount });
+        }
+        rows.push({ label: totalV === 1 ? "Violation" : "Violations", value: totalV });
+        return rows;
+    }, [aiCount, mcpCount, llmCount, inlineToolCount, totalV]);
 
     const safeVal = (v) => (v && v !== "-" ? v : null);
     const deviceDetails = useMemo(() => [
@@ -399,7 +472,7 @@ function OverviewTab({ device, agents, collections, onTabChange }) {
     return (
         <Box padding="4">
             <VerticalStack gap="5">
-                <HorizontalGrid columns={4} gap="3">
+                <HorizontalGrid columns={stats.length} gap="3">
                     {stats.map(s => (
                         <VerticalStack gap="1" key={s.label}>
                             <Text variant="heading2xl" as="p">{s.value}</Text>
@@ -408,7 +481,7 @@ function OverviewTab({ device, agents, collections, onTabChange }) {
                     ))}
                 </HorizontalGrid>
 
-                <TopologyGraph device={device} agents={agents} collections={collections} />
+                <TopologyGraph device={device} agents={agents} collections={collections} agentTools={agentTools} />
 
                 <VerticalStack gap="2">
                     <Text variant="headingXs" color="subdued">Risk Analysis</Text>
