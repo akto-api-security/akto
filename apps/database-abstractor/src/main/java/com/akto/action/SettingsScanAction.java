@@ -395,7 +395,7 @@ public class SettingsScanAction extends ActionSupport {
         }
 
         findings = parsed != null ? parsed : new ArrayList<>();
-        logger.infoAndAddToDb(String.format(
+        logger.info(String.format(
                 "[SettingsScan] tool=%s cfgPath=%s findings=%d", tool, cfgPath, findings.size()), LogDb.DB_ABS);
         return Action.SUCCESS.toUpperCase();
     }
