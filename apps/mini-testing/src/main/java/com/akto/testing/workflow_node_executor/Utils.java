@@ -317,27 +317,23 @@ public class Utils {
                 }
 
                 // checking on the value of if this is valid jwt token or valid cookie which has expiry time
+                String ogValue = param.getValue();
                 String tempVal = new String(value);
-                if(tempVal.contains(" ")){
-                    tempVal = value.split(" ")[1];
-                }
-                if(KeyTypes.isJWT(tempVal)){
-                    try {
-                        String[] parts = tempVal.split("\\.");
-                        if (parts.length != 3) {
-                            throw new IllegalArgumentException("Invalid JWT token format");
-                        }
-                        String payload = new String(Base64.getUrlDecoder().decode(parts[1]));
-                        JSONObject payloadJson = new JSONObject(payload);
-                        if (payloadJson.has("exp")) {
-                            newExpiryTime = Math.min(payloadJson.getInt("exp"), newExpiryTime);
-
-                        } else {
-                            throw new IllegalArgumentException("JWT does not have an 'exp' claim");
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
+                if (ogValue != null && ogValue.endsWith("response.body.cookieHeader}")) {
+                    // Cookie header value is a semicolon-separated list of key=value pairs;
+                    // expand it and check each cookie value for a JWT with an exp claim.
+                    String[] cookieParts = tempVal.split(";\\s*");
+                    for (String cookiePart : cookieParts) {
+                        int eqIdx = cookiePart.indexOf('=');
+                        if (eqIdx < 0) continue;
+                        String cookieVal = cookiePart.substring(eqIdx + 1).trim();
+                        newExpiryTime = Math.min(extractJwtExpiry(cookieVal), newExpiryTime);
                     }
+                } else {
+                    if (tempVal.contains(" ")) {
+                        tempVal = value.split(" ")[1];
+                    }
+                    newExpiryTime = Math.min(extractJwtExpiry(tempVal), newExpiryTime);
                 }
 
                 calculatedAuthParams.add(new HardcodedAuthParam(param.getWhere(), param.getKey(), value, param.getShowHeader()));
@@ -513,6 +509,22 @@ public class Utils {
         matcher.appendTail(sb);
 
         return sb.toString();
+    }
+
+    private static int extractJwtExpiry(String token) {
+        if (!KeyTypes.isJWT(token)) return Integer.MAX_VALUE;
+        try {
+            String[] parts = token.split("\\.");
+            if (parts.length != 3) return Integer.MAX_VALUE;
+            String payload = new String(Base64.getUrlDecoder().decode(parts[1]));
+            JSONObject payloadJson = new JSONObject(payload);
+            if (payloadJson.has("exp")) {
+                return payloadJson.getInt("exp");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return Integer.MAX_VALUE;
     }
 
     public static String generateKey(String nodeId, boolean isHeader, String param, boolean isRequest) {

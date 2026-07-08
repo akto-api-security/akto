@@ -19,9 +19,12 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.TestingRunConfig.StreamingRequestConfig;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jdk.nashorn.api.scripting.ScriptObjectMirror;
 
 public class ApiExecutorUtil {
@@ -100,7 +103,7 @@ public class ApiExecutorUtil {
             ScriptResultCache cachedForScript = useConversationCache ? conversationScriptCache.get(conversationId) : null;
 
             if (cachedForScript != null) {
-                applyCachedToRequest(originalHttpRequest, cachedForScript);
+                applyCachedToRequest(originalHttpRequest, cachedForScript, testingRunConfig);
                 return originalHttpRequest.getBody();
             }
 
@@ -115,7 +118,8 @@ public class ApiExecutorUtil {
 
             Map<String, Object> out = runScript(script, bindings,
                     "method", "headers", "url", "payload", "queryParams",
-                    "parsedPayloadTemp", "cachedMethod", "cachedHeaders", "cachedUrl", "cachedPayload", "cachedQueryParams");
+                    "parsedPayloadTemp", "cachedMethod", "cachedHeaders", "cachedUrl", "cachedPayload", "cachedPayloadPatch", "cachedQueryParams",
+                    "streamingRequest", "cachedStreamingRequest");
 
             String method = (String) out.get("method");
             Map<String, Object> headers = (Map) out.get("headers");
@@ -127,14 +131,19 @@ public class ApiExecutorUtil {
             Map<String, Object> cachedHeaders = (Map) out.get("cachedHeaders");
             String cachedUrl = (String) out.get("cachedUrl");
             String cachedPayload = (String) out.get("cachedPayload");
+            String cachedPayloadPatch = (String) out.get("cachedPayloadPatch");
             String cachedQueryParams = (String) out.get("cachedQueryParams");
 
             Map<String, List<String>> hs = convertHeadersFromScript(headers);
             Map<String, List<String>> cachedHs = convertHeadersFromScript(cachedHeaders);
 
+            StreamingRequestConfig parsedStreamingRequest = parseStreamingRequest(out.get("streamingRequest"));
+            StreamingRequestConfig cachedParsedStreamingRequest = parseStreamingRequest(out.get("cachedStreamingRequest"));
+
             if (useConversationCache && conversationId != null) {
                 conversationScriptCache.put(conversationId,
-                        new ScriptResultCache(cachedMethod, cachedHs, cachedUrl, cachedPayload, cachedQueryParams));
+                        new ScriptResultCache(cachedMethod, cachedHs, cachedUrl, cachedPayload, cachedPayloadPatch, cachedQueryParams,
+                                cachedParsedStreamingRequest != null ? cachedParsedStreamingRequest : parsedStreamingRequest));
             }
 
             originalHttpRequest.setBody(payload);
@@ -142,6 +151,10 @@ public class ApiExecutorUtil {
             originalHttpRequest.setUrl(url);
             originalHttpRequest.setHeaders(hs);
             originalHttpRequest.setQueryParams(queryParams);
+
+            if (testingRunConfig != null && parsedStreamingRequest != null) {
+                testingRunConfig.setStreamingRequest(parsedStreamingRequest);
+            }
 
             if (parsedPayloadTemp != null) {
                 return parsedPayloadTemp;
@@ -153,6 +166,24 @@ public class ApiExecutorUtil {
             e.printStackTrace();
             return originalHttpRequest.getBody();
         }
+    }
+
+    private static StreamingRequestConfig parseStreamingRequest(Object srObj) {
+        if (!(srObj instanceof ScriptObjectMirror)) return null;
+        ScriptObjectMirror srMirror = (ScriptObjectMirror) srObj;
+        String srUrl = (String) srMirror.get("url");
+        String srBody = (String) srMirror.get("body");
+        String lastKey = (String) srMirror.get("lastKey");
+        Map<String, String> srHeaders = new HashMap<>();
+        Object headersObj = srMirror.get("headers");
+        if (headersObj instanceof ScriptObjectMirror) {
+            ScriptObjectMirror hm = (ScriptObjectMirror) headersObj;
+            for (String key : hm.keySet()) {
+                Object val = hm.get(key);
+                if (val != null) srHeaders.put(key, val.toString());
+            }
+        }
+        return new StreamingRequestConfig(srUrl, srBody, srHeaders, lastKey);
     }
 
     private static Map<String, List<String>> convertHeadersFromScript(Map<String, Object> headers) {
@@ -173,12 +204,31 @@ public class ApiExecutorUtil {
         return hs;
     }
 
-    private static void applyCachedToRequest(OriginalHttpRequest request, ScriptResultCache cached) {
+    private static void applyCachedToRequest(OriginalHttpRequest request, ScriptResultCache cached,
+            TestingRunConfig testingRunConfig) {
         if (cached.cachedMethod != null) request.setMethod(cached.cachedMethod);
-        if (cached.cachedHeaders != null) request.setHeaders(cached.cachedHeaders);
+        if (cached.cachedHeaders != null && !cached.cachedHeaders.isEmpty()) request.setHeaders(cached.cachedHeaders);
         if (cached.cachedUrl != null) request.setUrl(cached.cachedUrl);
-        if (cached.cachedPayload != null) request.setBody(cached.cachedPayload);
+        if (cached.cachedPayloadPatch != null) {
+            request.setBody(applyPayloadPatch(request.getBody(), cached.cachedPayloadPatch));
+        } else if (cached.cachedPayload != null) {
+            request.setBody(cached.cachedPayload);
+        }
         if (cached.cachedQueryParams != null) request.setQueryParams(cached.cachedQueryParams);
+        if (testingRunConfig != null && cached.streamingRequest != null) {
+            testingRunConfig.setStreamingRequest(cached.streamingRequest);
+        }
+    }
+
+    private static String applyPayloadPatch(String body, String patch) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode target = mapper.readTree(body);
+            return mapper.writeValueAsString(mapper.readerForUpdating(target).readValue(patch));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error applying cachedPayloadPatch: " + e.getMessage());
+            return body;
+        }
     }
 
     /** Cached script outputs per conversationId; when present, script is skipped and these are applied. */
@@ -187,15 +237,20 @@ public class ApiExecutorUtil {
         final Map<String, List<String>> cachedHeaders;
         final String cachedUrl;
         final String cachedPayload;
+        final String cachedPayloadPatch;
         final String cachedQueryParams;
+        final StreamingRequestConfig streamingRequest;
 
         ScriptResultCache(String cachedMethod, Map<String, List<String>> cachedHeaders, String cachedUrl,
-                String cachedPayload, String cachedQueryParams) {
+                String cachedPayload, String cachedPayloadPatch, String cachedQueryParams,
+                StreamingRequestConfig streamingRequest) {
             this.cachedMethod = cachedMethod;
             this.cachedHeaders = cachedHeaders;
             this.cachedUrl = cachedUrl;
             this.cachedPayload = cachedPayload;
+            this.cachedPayloadPatch = cachedPayloadPatch;
             this.cachedQueryParams = cachedQueryParams;
+            this.streamingRequest = streamingRequest;
         }
     }
 
@@ -222,6 +277,7 @@ public class ApiExecutorUtil {
             bindings.put("statusCode", response.getStatusCode());
             bindings.put("headers", response.getHeaders());
             bindings.put("body", response.getBody());
+            bindings.put("streamingResponse", response.getStreamingChunks());
             if (request != null) {
                 bindings.put("method", request.getMethod());
                 bindings.put("requestHeaders", request.getHeaders());
