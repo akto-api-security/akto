@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Badge, Box, HorizontalStack, Link, List, Text, Tooltip } from "@shopify/polaris";
+import { Badge, Box, HorizontalStack, Link, List, Text } from "@shopify/polaris";
 import func from "@/util/func";
 import {
     normalizeTopicHierarchy,
@@ -48,13 +48,9 @@ function TopicRow({ topic, subTopics, username, existingPolicyName, onCreateGuar
                         </Text>
                     )}
                     {hovered && (existingPolicyName ? (
-                        <Tooltip content="A guardrail policy already covers this topic">
-                            <Link onClick={() => onViewGuardrail(existingPolicyName)}>View guardrail</Link>
-                        </Tooltip>
+                        <Link onClick={() => onViewGuardrail(existingPolicyName)}>View guardrail</Link>
                     ) : (
-                        <Tooltip content="Create a new blocking guardrail policy for this topic">
-                            <Link onClick={() => onCreateGuardrail(topic)}>Create guardrail</Link>
-                        </Tooltip>
+                        <Link onClick={() => onCreateGuardrail(topic)}>Create guardrail</Link>
                     ))}
                 </HorizontalStack>
             </Box>
