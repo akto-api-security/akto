@@ -22,6 +22,7 @@ import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig"
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import OwaspTag from "../../guardrails/components/OwaspTag";
 import ComplianceTags from "../../guardrails/components/ComplianceTags";
+import ConfigRemediationAction from "./ConfigRemediationAction";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
@@ -300,13 +301,52 @@ function SampleDetails(props) {
             </Box>)
     }
 
+    // templateId for settings-risk findings is "<toolName>_settings_risk" / "<toolName>_config_risk" /
+    // "<toolName>_cli_settings_risk" (see SETTINGS_RISK_CONFIGS keys) — strip the known suffixes to
+    // recover the plain tool name the gateway/cyborg queue expects ("claude" | "codex" | "copilot").
+    const settingsRiskToolName = isSettingsRisk
+        ? moreInfoData?.templateId?.replace(/_cli_settings_risk$|_settings_risk$|_config_risk$/, '')
+        : null;
+    const settingsRiskFormat = settingsRiskToolName === "codex" ? "TOML" : "JSON";
+
+    // The scanner embeds the absolute config file path and full raw file content inside the
+    // first sample's "orig" JSON string (see settings_scanner/reporter.go buildRequestPayload/
+    // buildResponsePayload) rather than as separate top-level fields, so pull them out here the
+    // same way createAzureBoardsWorkItem() below parses requestHeaders out of orig.
+    let settingsRiskConfigPath = null;
+    if (isSettingsRisk && data && data.length > 0 && data[0]?.orig) {
+        try {
+            const origParsed = typeof data[0].orig === 'string' ? JSON.parse(data[0].orig) : data[0].orig;
+            const responsePayload = typeof origParsed?.responsePayload === 'string'
+                ? JSON.parse(origParsed.responsePayload)
+                : origParsed?.responsePayload;
+            settingsRiskConfigPath = responsePayload?.config_path || null;
+        } catch (err) {
+            // If parsing fails, the "Edit File" action simply won't be offered.
+        }
+    }
+
     const remediationTab = (() => {
         if (isSettingsRisk) {
             const remediationMarkdown = liveMetadata.remediation || settingsRiskEntry?.remediation || GUARDRAIL_REMEDIATION_MARKDOWN;
+            const canEditFile = settingsRiskToolName && settingsRiskConfigPath && moreInfoData?.host;
             return {
                 id: "remediation",
                 content: "Remediation",
-                component: (<MarkdownViewer markdown={remediationMarkdown} />)
+                component: (
+                    <VerticalStack gap="4">
+                        {canEditFile && (
+                            <ConfigRemediationAction
+                                toolName={settingsRiskToolName}
+                                configPath={settingsRiskConfigPath}
+                                format={settingsRiskFormat}
+                                host={moreInfoData.host}
+                                findingRefId={eventId}
+                            />
+                        )}
+                        <MarkdownViewer markdown={remediationMarkdown} />
+                    </VerticalStack>
+                )
             };
         }
         if (useGuardrailDescription) {

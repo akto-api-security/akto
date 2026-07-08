@@ -1278,6 +1278,26 @@ const settingRequests = {
             method: 'post',
             data: { commandId }
         })
+    },
+    queueEndpointConfigRemediation(mode, toolName, configPath, format, newContent, expectedChecksumBeforeApply, findingRefId, host, deviceId) {
+        return request({
+            url: '/api/queueEndpointConfigRemediation',
+            method: 'post',
+            data: {
+                mode, toolName, configPath, format, findingRefId,
+                ...(newContent !== undefined ? { newContent } : {}),
+                ...(expectedChecksumBeforeApply ? { expectedChecksumBeforeApply } : {}),
+                ...(host ? { host } : {}),
+                ...(deviceId ? { deviceId } : {})
+            }
+        })
+    },
+    fetchEndpointConfigRemediationExecutions(remediationId, limit) {
+        return request({
+            url: '/api/fetchEndpointConfigRemediationExecutions',
+            method: 'post',
+            data: { remediationId, limit }
+        })
     }
 }
 
