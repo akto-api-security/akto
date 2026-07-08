@@ -36,12 +36,15 @@ function naturalJoin(labels) {
 
 function buildDomainDeniedTopic(domain, observedSubDomains) {
     const entry = TOPIC_CATALOG[domain];
-    const baseDescription = entry?.description || `Requests/Messages regarding ${func.toSentenceCase(domain)}`;
 
-    const subLabels = observedSubDomains.slice(0, MAX_PHRASES).map(sd => func.toSentenceCase(sd));
-    const description = subLabels.length === 0
-        ? baseDescription
-        : `${baseDescription} Includes ${naturalJoin(subLabels)}.`;
+    let description;
+    if (entry) {
+        description = entry.description;
+    } else {
+        const subLabels = observedSubDomains.slice(0, MAX_PHRASES).map(sd => func.toSentenceCase(sd));
+        const base = `Requests/Messages regarding ${func.toSentenceCase(domain)}`;
+        description = subLabels.length === 0 ? base : `${base} Includes ${naturalJoin(subLabels)}.`;
+    }
 
     return {
         topic: domain,
