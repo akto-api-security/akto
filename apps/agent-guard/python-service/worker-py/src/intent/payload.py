@@ -243,7 +243,7 @@ _DATA_KEYS = {
 _DATA_CONTENT_TYPES = {
     "application/json", "application/xml", "text/csv", "text/x-log",
     "text/x-code", "application/octet-stream", "log", "code", "json",
-    "xml", "csv", "attachment", "file"
+    "xml", "csv", "attachment", "file","tool_result", "tool_use",
 }
 _CONTENT_TYPE_KEYS = {"content_type", "mime_type", "type", "source_type"}
 

@@ -46,8 +46,11 @@ def load_examples(agent_host: str, examples: List[Dict[str, Any]]) -> None:
         if not ex.get("is_valid", True):
             continue
         vectors.append(ex["vector"])
-        labels.append(ex["task_intent"])
-        risk_map[ex["task_intent"]] = ex.get("risk_category", "unknown")
+        intent = ex["task_intent"]
+        labels.append(intent)
+        risk = ex.get("risk_category", "unknown")
+        if risk != "unknown" or intent not in risk_map:
+            risk_map[intent] = risk
     _buffers[agent_host] = (vectors, labels)
     _risk_maps[agent_host] = risk_map
 

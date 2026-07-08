@@ -15,7 +15,6 @@ skips both calls entirely. Target: ≤10-50ms for this whole step at 500 req/s
 (see the design plan for the budget breakdown).
 """
 
-import json
 import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -27,7 +26,6 @@ from . import client, decision, payload, segmenter
 logger = logging.getLogger(__name__)
 
 _DEFAULT_MAX_CHUNKS = 16
-_STRUCTURE_CACHE_PREFIX = "agentstruct:"  # must match intent/corpus.py's write side
 
 
 def enabled() -> bool:
@@ -72,20 +70,11 @@ def normalized_text(text: str) -> Tuple[str, int]:
 # only ever happens in the background (warmup), never on this hot path.
 # --------------------------------------------------------------------------- #
 async def get_structure_profile(agent_host: str) -> Optional[Dict[str, Any]]:
-    """Fail-open: Redis down/miss -> None, segmentation falls back to the
-    generic-only key/verb lexicon in intent/segmenter.py."""
-    if not agent_host:
-        return None
-    try:
-        import cache_store
-        redis_client = cache_store.get_client()
-        if redis_client is None:
-            return None
-        raw = await redis_client.get(f"{_STRUCTURE_CACHE_PREFIX}{agent_host}")
-        return json.loads(raw) if raw else None
-    except Exception as exc:
-        logger.debug(f"[intent] structure profile unavailable for agent={agent_host!r}: {exc}")
-        return None
+    """Fail-open: no cached profile yet -> None, segmentation falls back to
+    the generic-only key/verb lexicon in intent/segmenter.py. Backed by
+    intent/structure_cache.py's in-process, per-pod cache — no Redis, no I/O."""
+    from intent import structure_cache
+    return structure_cache.get(agent_host)
 
 
 # --------------------------------------------------------------------------- #

@@ -102,15 +102,7 @@ async def scan_payload(
             store_fn = lambda completed, name: schedule(alerts.store_results(completed, name))
 
         intent_on = prefilter.enabled()
-        norm_text = ""
-        cache_text = text
         timer = scan_diag.StageTimer() if intent_on else None
-        if intent_on:
-            with timer.span("strip"):
-                norm_text, _ = prefilter.normalized_text(text)
-            cache_text = norm_text or text
-        prep = None
-        
         fast = None
         if intent_on:
             fast = await prefilter.decide_fast(agent_host, text, timer=timer)
@@ -133,6 +125,7 @@ async def scan_payload(
                 risk_category=fast["intent"].get("risk_category"),
                 units=fast["units"],
                 unit_texts=fast["unit_texts"],
+                timer=timer,
             )
             if decided == intent_decision.ALLOW:
                 if prefilter.act():
@@ -159,7 +152,13 @@ async def scan_payload(
             scan_diag.log_intent_decision(
                 "escalate", agent_host, scanner_name, decided, timer, extra=log_extra,
             )
-            if fast.get("classifier_warm") and any(u is None for u in (fast.get("units") or [None])):
+            intent_audit.append("intent_escalate", **_audit_kwargs)
+            # An unmatched unit means either a never-seen agent (cold — no
+            # structure profile yet) or a warm agent that hit something its
+            # current model doesn't recognize (stale). Either way, try a
+            # warmup(); it fails open and its own cooldown keeps a busy cold
+            # agent from re-triggering a db-abstractor pull on every request.
+            if any(u is None for u in (fast.get("units") or [None])):
                 schedule(intent_corpus.warmup(agent_host))
 
         # Cache miss (or cache not serving): only now does backpressure fail-open

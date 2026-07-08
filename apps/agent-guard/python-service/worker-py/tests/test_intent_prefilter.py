@@ -1,15 +1,20 @@
 """intent.prefilter — structure profile caching (fail-open) and
 decide_fast()'s warm/cold gating around the embed+classify calls."""
 
-from intent import prefilter
+from intent import prefilter, structure_cache
 
 
-async def test_get_structure_profile_fail_open_without_redis(monkeypatch):
-    monkeypatch.setattr(prefilter.settings, "REDIS_URL", "")
-    import cache_store
-    cache_store._client = None
-    cache_store._client_init = False
+async def test_get_structure_profile_fail_open_before_any_warmup():
+    structure_cache._profiles.pop("agentA", None)
     assert await prefilter.get_structure_profile("agentA") is None
+
+
+async def test_get_structure_profile_round_trips_a_cached_profile():
+    structure_cache.set("agentA", {"instruction_keys": ["userask"], "instruction_verbs": ["delete"]})
+    assert await prefilter.get_structure_profile("agentA") == {
+        "instruction_keys": ["userask"], "instruction_verbs": ["delete"],
+    }
+    structure_cache._profiles.pop("agentA", None)
 
 
 async def test_get_structure_profile_empty_agent_host_returns_none():
@@ -36,7 +41,7 @@ async def test_decide_fast_cold_agent_skips_classifier_warm_flag(monkeypatch):
 
 async def test_decide_fast_never_raises_on_internal_error(monkeypatch):
     async def _boom(agent_host):
-        raise RuntimeError("redis exploded")
+        raise RuntimeError("structure cache exploded")
     monkeypatch.setattr(prefilter, "get_structure_profile", _boom)
 
     out = await prefilter.decide_fast("agentA", "list my orders")

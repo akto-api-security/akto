@@ -27,8 +27,9 @@ concurrent /classify always sees a fully-built model, never a half-trained one.
 """
 
 import logging
+import os
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from sklearn.calibration import CalibratedClassifierCV
@@ -41,6 +42,10 @@ logger = logging.getLogger(__name__)
 _MIN_PER_CLASS = 2
 # Calibration needs ≥ cv samples per class; cap cv at 3 (the user-provided shape).
 _MAX_CV = 3
+
+
+def _debug_enabled() -> bool:
+    return os.getenv("INTENT_CLASSIFY_DEBUG", "").strip().lower() in ("1", "true", "yes", "on")
 
 _models: Dict[str, "_AgentModel"] = {}
 _lock = threading.Lock()
@@ -67,9 +72,10 @@ class _AgentModel:
             return 0.0
         return float(np.dot(x, c) / xn)  # c is already unit-norm
 
-    def predict_intent(self, X: np.ndarray) -> List[Dict[str, Any]]:
+    def predict_intent(self, X: np.ndarray, agent_host: str = "") -> List[Dict[str, Any]]:
         proba = self.clf.predict_proba(X)
         classes = self.clf.classes_
+        debug = _debug_enabled()
         out: List[Dict[str, Any]] = []
         for i in range(X.shape[0]):
             row = proba[i]
@@ -77,14 +83,34 @@ class _AgentModel:
             top1_idx = int(order[0])
             top2_idx = int(order[1]) if len(order) > 1 else top1_idx
             top1_class = str(classes[top1_idx])
-            out.append({
+            result = {
                 "intent": top1_class,
                 "confidence": float(row[top1_idx]),
                 "margin": float(row[top1_idx] - row[top2_idx]),
                 "centroid_similarity": self._cosine_to_centroid(X[i], top1_class),
                 "risk_category": self.class_risk.get(top1_class, "unknown"),
-            })
+            }
+            if debug:
+                top_k = [(str(classes[j]), round(float(row[j]), 4)) for j in order[:5]]
+                logger.info(f"[intent_clf] agent={agent_host!r} unit={i} n_classes={len(classes)} "
+                           f"top5={top_k} centroid_sim={result['centroid_similarity']:.4f}")
+            out.append(result)
         return out
+
+
+def _filter_min_class(X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+    """Drop rows belonging to any class with fewer than _MIN_PER_CLASS samples,
+    so one singleton/rare intent doesn't sink training for every other class
+    the agent already has enough examples for. Returns (X, y, dropped_classes)
+    — dropped classes just won't be predicted, so those requests ESCALATE
+    (safe) instead of the agent staying cold entirely."""
+    classes, counts = np.unique(y, return_counts=True)
+    keep = set(classes[counts >= _MIN_PER_CLASS].tolist())
+    dropped = sorted(str(c) for c in classes.tolist() if c not in keep)
+    if not dropped:
+        return X, y, []
+    mask = np.isin(y, list(keep))
+    return X[mask], y[mask], dropped
 
 
 def _fit(X: np.ndarray, y: np.ndarray):
@@ -130,17 +156,22 @@ def train(agent_host: str, vectors: List[List[float]], labels: List[str],
         return {"trained": False, "reason": "empty_or_mismatched"}
     X = np.asarray(vectors, dtype=np.float32)
     y = np.asarray(labels, dtype=object)
+    X, y, dropped = _filter_min_class(X, y)
+    if dropped:
+        logger.info(f"[intent_clf] agent={agent_host} dropping sparse classes "
+                   f"(< {_MIN_PER_CLASS} samples): {dropped}")
     clf = _fit(X, y)
     if clf is None:
         return {"trained": False, "reason": "insufficient_per_class_samples",
-                "n_samples": int(len(y))}
+                "n_samples": int(len(y)), "dropped_classes": dropped}
     centroids = _compute_centroids(X, y)
     model = _AgentModel(clf, centroids, dict(risk_categories or {}), int(len(y)))
     with _lock:
         _models[agent_host] = model  # atomic swap
-    classes = sorted(set(labels))
-    logger.info(f"[intent_clf] trained agent={agent_host} n={len(y)} classes={classes}")
-    return {"trained": True, "n_samples": int(len(y)), "classes": classes}
+    classes = sorted(set(y.tolist()))
+    logger.info(f"[intent_clf] trained agent={agent_host} n={len(y)} classes={classes}"
+               + (f" dropped={dropped}" if dropped else ""))
+    return {"trained": True, "n_samples": int(len(y)), "classes": classes, "dropped_classes": dropped}
 
 
 def predict(agent_host: str, vectors: List[List[float]]) -> List[Optional[Dict[str, Any]]]:

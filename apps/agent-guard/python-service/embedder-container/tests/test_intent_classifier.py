@@ -46,6 +46,26 @@ def test_train_requires_min_per_class_samples():
     assert res["trained"] is False
 
 
+def test_train_drops_a_singleton_class_and_trains_on_the_rest():
+    """A single sparse intent (e.g. only ever seen once in the corpus)
+    shouldn't sink training for every other intent the agent has enough
+    examples for — it's just dropped and its requests fall through to
+    ESCALATE via the caller's unmatched-unit path."""
+    rng = np.random.default_rng(0)
+    c_flight, c_hotel, c_rare = _basis(16, 0), _basis(16, 1), _basis(16, 2)
+    vectors = _cluster(rng, c_flight) + _cluster(rng, c_hotel) + _cluster(rng, c_rare, n=1)
+    labels = ["flight_booking"] * 6 + ["hotel_booking"] * 6 + ["rare_singleton"] * 1
+
+    res = ic.train("agentA", vectors, labels, {})
+    assert res["trained"] is True
+    assert sorted(res["classes"]) == ["flight_booking", "hotel_booking"]
+    assert res["dropped_classes"] == ["rare_singleton"]
+
+    query = (c_flight + rng.normal(scale=0.02, size=16)).tolist()
+    result = ic.predict("agentA", [query])[0]
+    assert result["intent"] == "flight_booking"
+
+
 def test_train_and_predict_confident_match():
     rng = np.random.default_rng(0)
     c_flight, c_hotel = _basis(16, 0), _basis(16, 1)

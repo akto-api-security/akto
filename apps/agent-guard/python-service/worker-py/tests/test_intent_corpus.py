@@ -1,21 +1,24 @@
 """intent.corpus — per-unit queuing, the GOOD-verdict refresh counter, and
-the per-agent structure-profile lexicon. Every row build_structure_profile()
+the per-agent structure-profile lexicon. Every bucket build_structure_profile()
 and load() ever see is LLM ground-truthed by construction (the Java-side
-labeling cron only ever writes a row to the final corpus once an LLM has
-classified it), so there is no worker's-own-guess fallback tier to test."""
+labeling cron only ever writes a bucket to the final corpus once an LLM has
+classified it), so there is no worker's-own-guess fallback tier to test.
+
+Buckets are the grouped-aggregation shape AgentGuardCorpusDao.findBucketsByAgentHost
+returns: {"_id": {agentHost, taskIntent, riskCategory}, "breakDowns": [...]}."""
 
 import intent
 from intent import corpus
 
 
-def _row(unit_text="delete the record", task_intent="delete_record", breakdown=None):
-    row = {"unitText": unit_text, "taskIntent": task_intent, "riskCategory": "delete"}
-    if breakdown is not None:
-        row["breakdown"] = breakdown
-    return row
+def _bucket(task_intent="delete_record", risk_category="delete", breakdowns=None):
+    return {
+        "_id": {"agentHost": "agentA", "taskIntent": task_intent, "riskCategory": risk_category},
+        "breakDowns": breakdowns if breakdowns is not None else [_gt()],
+    }
 
 
-def _gt(key="instruction", text=None):
+def _gt(key="instruction", text="delete the record"):
     return {"groundTruthSourceKey": key, "groundTruthInstructionText": text}
 
 
@@ -24,8 +27,7 @@ def test_queue_stores_unit_text_only():
     corpus.queue("agentA", [{"text": "delete the record"}])
     row = dict(corpus._buffer[-1])
     row.pop("createdAt")
-    assert row == {"agentHost": "agentA", "unitText": "delete the record",
-                    "taskIntent": "", "riskCategory": ""}
+    assert row == {"agentHost": "agentA", "unitText": "delete the record"}
     corpus._buffer.clear()
 
 
@@ -48,69 +50,80 @@ def test_record_good_crosses_threshold(monkeypatch):
 # build_structure_profile — single-tier, ground-truth only
 # --------------------------------------------------------------------------- #
 def test_build_structure_profile_requires_minimum_observations():
-    rows = [_row(breakdown=_gt(text="reconcile the ledger")) for _ in range(2)]  # below _MIN_OBSERVATIONS=3
-    profile = corpus.build_structure_profile(rows)
+    buckets = [_bucket(breakdowns=[_gt(text="reconcile the ledger")]) for _ in range(2)]  # below _MIN_OBSERVATIONS=3
+    profile = corpus.build_structure_profile(buckets)
     assert profile["instruction_keys"] == []
     assert profile["instruction_verbs"] == []
 
 
 def test_build_structure_profile_learns_frequent_key_and_verb():
-    rows = [_row(breakdown=_gt(key="userask", text="delete the record")) for _ in range(5)]
-    profile = corpus.build_structure_profile(rows)
+    buckets = [_bucket(breakdowns=[_gt(key="userask", text="delete the record")]) for _ in range(5)]
+    profile = corpus.build_structure_profile(buckets)
     assert "userask" in profile["instruction_keys"]
     assert "delete" in profile["instruction_verbs"]
 
 
-def test_build_structure_profile_falls_back_to_unit_text_when_ground_truth_text_missing():
-    rows = [_row(unit_text="reconcile the ledger", breakdown=_gt(key="userask", text=None))
-           for _ in range(corpus._MIN_OBSERVATIONS)]
-    profile = corpus.build_structure_profile(rows)
-    assert "reconcile" in profile["instruction_verbs"]
-
-
-def test_build_structure_profile_ignores_rows_without_a_ground_truth_key():
-    rows = [_row(breakdown={"groundTruthSourceKey": "", "groundTruthInstructionText": ""})
-           for _ in range(5)]
-    profile = corpus.build_structure_profile(rows)
+def test_build_structure_profile_ignores_breakdowns_without_a_ground_truth_key():
+    buckets = [_bucket(breakdowns=[{"groundTruthSourceKey": "", "groundTruthInstructionText": ""}])
+              for _ in range(5)]
+    profile = corpus.build_structure_profile(buckets)
     assert profile["instruction_keys"] == []
 
 
 def test_build_structure_profile_caps_learned_keys():
-    rows = []
+    buckets = []
     for i in range(corpus._MAX_LEARNED_KEYS + 5):
-        rows.extend(_row(breakdown=_gt(key=f"key{i}", text="do something"))
-                   for _ in range(corpus._MIN_OBSERVATIONS))
-    profile = corpus.build_structure_profile(rows)
+        buckets.extend(_bucket(breakdowns=[_gt(key=f"key{i}", text="do something")])
+                       for _ in range(corpus._MIN_OBSERVATIONS))
+    profile = corpus.build_structure_profile(buckets)
     assert len(profile["instruction_keys"]) == corpus._MAX_LEARNED_KEYS
+
+
+def test_build_structure_profile_aggregates_multiple_breakdowns_per_bucket():
+    buckets = [_bucket(breakdowns=[_gt(key="userask", text="delete the record")] * 3)]
+    profile = corpus.build_structure_profile(buckets)
+    assert "userask" in profile["instruction_keys"]
+    assert "delete" in profile["instruction_verbs"]
 
 
 # --------------------------------------------------------------------------- #
 # _labeled_examples / load — ground-truth text preferred, embedded at load time
 # --------------------------------------------------------------------------- #
-def test_labeled_examples_skips_unlabeled_rows():
-    assert corpus._labeled_examples([_row(task_intent="")]) == []
+def test_labeled_examples_skips_unlabeled_buckets():
+    assert corpus._labeled_examples([_bucket(task_intent="")]) == []
 
 
-def test_labeled_examples_prefers_ground_truth_text_over_unit_text():
-    rows = [_row(unit_text="wrong guess", breakdown=_gt(text="the corrected instruction"))]
-    examples = corpus._labeled_examples(rows)
+def test_labeled_examples_skips_breakdowns_with_no_ground_truth_text():
+    buckets = [_bucket(breakdowns=[_gt(text=None), _gt(text="the corrected instruction")])]
+    examples = corpus._labeled_examples(buckets)
+    assert len(examples) == 1
     assert examples[0]["text"] == "the corrected instruction"
 
 
-def test_labeled_examples_falls_back_to_unit_text_without_ground_truth():
-    rows = [_row(unit_text="delete the record")]
-    examples = corpus._labeled_examples(rows)
-    assert examples[0]["text"] == "delete the record"
+def test_labeled_examples_emits_one_example_per_breakdown():
+    buckets = [_bucket(task_intent="delete_record", risk_category="delete",
+                       breakdowns=[_gt(text="delete the record"), _gt(text="remove the record")])]
+    examples = corpus._labeled_examples(buckets)
+    assert [e["text"] for e in examples] == ["delete the record", "remove the record"]
+    assert all(e["task_intent"] == "delete_record" and e["risk_category"] == "delete" for e in examples)
+
+
+def test_labeled_examples_defaults_missing_risk_category_to_unknown():
+    bucket = _bucket(task_intent="delete_record", risk_category=None)
+    examples = corpus._labeled_examples([bucket])
+    assert examples[0]["risk_category"] == "unknown"
 
 
 async def test_load_embeds_text_and_drops_failed_embeddings(monkeypatch):
-    raw_rows = [
-        _row(unit_text="delete the record", task_intent="delete_record"),
-        _row(unit_text="summarize the doc", task_intent="summarize"),
+    buckets = [
+        _bucket(task_intent="delete_record", risk_category="delete",
+               breakdowns=[_gt(text="delete the record")]),
+        _bucket(task_intent="summarize", risk_category="fetch_generic",
+               breakdowns=[_gt(text="summarize the doc")]),
     ]
 
     async def _fetch_raw(agent_host):
-        return raw_rows
+        return buckets
     monkeypatch.setattr(corpus, "_fetch_raw", _fetch_raw)
 
     async def _embed_units(texts):
@@ -141,16 +154,15 @@ async def test_load_returns_empty_when_nothing_labeled(monkeypatch):
 # warmup — builds the structure profile and retrains from whatever's labeled
 # --------------------------------------------------------------------------- #
 async def test_warmup_builds_structure_profile_and_trains(monkeypatch):
-    raw_rows = [_row(unit_text="delete the record", task_intent="delete_record",
-                     breakdown=_gt(key="userask", text="delete the record"))
-               for _ in range(corpus._MIN_OBSERVATIONS)]
+    buckets = [_bucket(task_intent="delete_record", risk_category="delete",
+                       breakdowns=[_gt(key="userask", text="delete the record")] * corpus._MIN_OBSERVATIONS)]
 
     async def _fetch_raw(agent_host):
-        return raw_rows
+        return buckets
     monkeypatch.setattr(corpus, "_fetch_raw", _fetch_raw)
 
     cached = {}
-    async def _cache(agent_host, profile):
+    def _cache(agent_host, profile):
         cached["agent_host"] = agent_host
         cached["profile"] = profile
     monkeypatch.setattr(corpus, "_cache_structure_profile", _cache)
@@ -186,7 +198,7 @@ async def test_warmup_stays_cold_when_no_rows_exist(monkeypatch):
     monkeypatch.setattr(corpus, "_fetch_raw", _fetch_raw)
 
     cache_calls = {"n": 0}
-    async def _cache(agent_host, profile):
+    def _cache(agent_host, profile):
         cache_calls["n"] += 1
     monkeypatch.setattr(corpus, "_cache_structure_profile", _cache)
 

@@ -13,12 +13,19 @@ Each line is a JSON object:
   "path":                  "intent_allow" | "intent_allow_shadow" | "intent_escalate",
   "agent":                 agent_host string,
   "scanner":                scanner name,
-  "prompt":                original prompt text (capped at 500 chars),
+  "prompt":                original prompt text (capped at 300 words),
   "reason":                human-readable decision reason (from intent/decision.py),
   "extraction_method":     "structured" | "deterministic" | "heuristic" | "error",
   "extraction_confidence": how confidently intent/segmenter.py separated
                             instruction from data for this request,
   "risk_category":         highest risk category across matched units, or null,
+  "total_ms":              decide_fast's total wall time for this request, or
+                            null when no timer was passed,
+  "stage_ms":              {"segment": ..., "embed_units": ..., "classify": ...}
+                            — see scan_diag.StageTimer; only the stages actually
+                            run for this request are present (a cold agent skips
+                            embed_units/classify entirely). {} when no timer was
+                            passed,
   "units": [
     {
       "text":               extracted instruction unit (capped at 200 chars),
@@ -30,6 +37,9 @@ Each line is a JSON object:
     }, ...
   ]
 }
+
+See scripts/analyze_intent_audit.py (repo root ../../../../scripts) for latency
+percentile / hit-rate analysis over this file.
 """
 
 import json
@@ -42,6 +52,12 @@ logger = logging.getLogger(__name__)
 
 _fh = None
 _fh_path: Optional[str] = None
+
+_MAX_PROMPT_WORDS = 300
+
+
+def _trim_to_words(text: str, max_words: int = _MAX_PROMPT_WORDS) -> str:
+    return " ".join((text or "").split()[:max_words])
 
 
 def _get_fh():
@@ -80,12 +96,18 @@ def append(
     risk_category: Optional[str],
     units: List[Dict[str, Any]],
     unit_texts: Optional[List[str]] = None,
+    timer: Optional[Any] = None,
 ) -> None:
     """Write one audit entry. No-op when INTENT_LOG_FILE is unset.
 
     `units` is intent/prefilter.py's per-unit classify result list (one dict
     or None per extracted unit); `unit_texts` is the parallel list of the
     units' raw text, joined in here purely for a readable audit line.
+    `timer` is the scan_diag.StageTimer decide_fast ran under (duck-typed, not
+    imported, to avoid coupling this module to scan_diag) — its total_ms()/
+    stages give per-request latency and the segment/embed_units/classify
+    breakdown; omitted (None) fields are written as null/{} rather than 0, so
+    "no timer" and "all stages measured 0ms" stay distinguishable.
     """
     fh = _get_fh()
     if fh is None:
@@ -96,11 +118,13 @@ def append(
         "path": path,
         "agent": agent or "",
         "scanner": scanner or "",
-        "prompt": (prompt or "")[:500],
+        "prompt": _trim_to_words(prompt),
         "reason": reason or "",
         "extraction_method": extraction_method or "",
         "extraction_confidence": round(extraction_confidence, 4) if extraction_confidence is not None else None,
         "risk_category": risk_category,
+        "total_ms": round(timer.total_ms(), 2) if timer is not None else None,
+        "stage_ms": {k: round(v, 2) for k, v in timer.stages.items()} if timer is not None else {},
         "units": [
             {
                 "text": (texts[i] if i < len(texts) else "")[:200],
