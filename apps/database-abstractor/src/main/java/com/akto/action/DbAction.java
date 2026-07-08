@@ -86,6 +86,7 @@ import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.DataInsertionPreChecks;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.CustomAuthUtil;
 import com.akto.utils.KafkaUtils;
@@ -3625,9 +3626,11 @@ public class DbAction extends ActionSupport {
 
     List<String> testSuiteId;
     List<String> testSuiteTestSubCategories;
+    CONTEXT_SOURCE contextSource;
+
     public String findTestSubCategoriesByTestSuiteId() {
         try {
-            testSuiteTestSubCategories = DbLayer.findTestSubCategoriesByTestSuiteId(testSuiteId);
+            testSuiteTestSubCategories = DbLayer.findTestSubCategoriesByTestSuiteId(testSuiteId, contextSource);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchTestSubCategoriesByTestSuiteId " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -5622,6 +5625,14 @@ public class DbAction extends ActionSupport {
 
     public void setTestSuiteId(List<String> testSuiteId) {
         this.testSuiteId = testSuiteId;
+    }
+
+    public CONTEXT_SOURCE getContextSource() {
+        return contextSource;
+    }
+
+    public void setContextSource(CONTEXT_SOURCE contextSource) {
+        this.contextSource = contextSource;
     }
 
     public List<String> getTestSuiteTestSubCategories() {

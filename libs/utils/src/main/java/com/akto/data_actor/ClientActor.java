@@ -7,6 +7,7 @@ import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
@@ -4014,9 +4015,10 @@ public class ClientActor extends DataActor {
         return null;
     }
 
-    public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
+    public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId, CONTEXT_SOURCE contextSource) {
         BasicDBObject obj = new BasicDBObject();
         obj.put("testSuiteId", testSuiteId);
+        obj.put("contextSource", contextSource);
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findTestSubCategoriesByTestSuiteId", "", "POST", obj.toString(), headers, "");
         try {

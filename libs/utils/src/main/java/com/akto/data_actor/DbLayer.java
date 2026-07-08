@@ -2653,12 +2653,12 @@ public class DbLayer {
 
         SvcToSvcGraphNodesDao.instance.bulkWrite(bulkList, options);
     }
-    public static List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
+    public static List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId, CONTEXT_SOURCE contextSource) {
         List<ObjectId> testSuiteIds = new ArrayList<>();
         for (String testSuiteIdStr : testSuiteId) {
             testSuiteIds.add(new ObjectId(testSuiteIdStr));
         }
-        return TestSuiteDao.getAllTestSuitesSubCategories(testSuiteIds);
+        return TestSuiteDao.getAllTestSuitesSubCategories(testSuiteIds, contextSource);
     }
 
     public static TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){

@@ -43,6 +43,7 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.WriteModel;
@@ -691,8 +692,8 @@ public class DbActor extends DataActor {
         DbLayer.updateTestingRunPlayground(testingRunPlayground);
     }
 
-    public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
-        return DbLayer.findTestSubCategoriesByTestSuiteId(testSuiteId);
+    public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId, CONTEXT_SOURCE contextSource) {
+        return DbLayer.findTestSubCategoriesByTestSuiteId(testSuiteId, contextSource);
     }
 
     public void bulkInsertApiHitCount(List<ApiHitCountInfo> apiHitCountInfoList) throws Exception {

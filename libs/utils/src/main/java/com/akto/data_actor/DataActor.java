@@ -49,6 +49,8 @@ import java.util.Set;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+
 public abstract class DataActor {
 
     public abstract AccountSettings fetchAccountSettings();
@@ -368,7 +370,7 @@ public abstract class DataActor {
             start += 1000;
         } while (start < updateNodes.size());
     }
-    public abstract List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId);
+    public abstract List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId, CONTEXT_SOURCE contextSource);
     
     public abstract TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp);
 
