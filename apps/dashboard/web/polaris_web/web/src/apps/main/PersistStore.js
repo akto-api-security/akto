@@ -1,19 +1,61 @@
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 
-import { createGzipStorage } from "./gzipStorage";
-import LocalStore from "./LocalStorageStore";
+import pako from "pako"; // Gzip Compression
 
-export { createGzipStorage };
+import { getInitialDashboardCategory } from "./labelHelper";
+
+// Factory function to create Custom Storage with Gzip Compression
+export const createGzipStorage = (storage) => ({
+    getItem: (name) => {
+        const compressedData = storage.getItem(name);
+        if (!compressedData) return null;
+
+        try {
+            // Try to decode base64 & Gunzip (decompress)
+            const binaryData = atob(compressedData);
+            const uint8Array = new Uint8Array(binaryData.length);
+            for (let i = 0; i < binaryData.length; i++) {
+                uint8Array[i] = binaryData.charCodeAt(i);
+            }
+            const decompressed = pako.inflate(uint8Array, { to: "string" });
+            return JSON.parse(decompressed);
+        } catch (error) {
+            // Fallback: Try to parse as plain JSON (for backward compatibility with old uncompressed data)
+            try {
+                const parsed = JSON.parse(compressedData);
+                // If successful, re-save it in compressed format
+                storage.setItem(name, btoa(Array.from(pako.deflate(compressedData, { level: 9 }))
+                    .map((byte) => String.fromCharCode(byte))
+                    .join("")));
+                return parsed;
+            } catch (fallbackError) {
+                console.error("Error reading state (tried both compressed and uncompressed):", error);
+                return null;
+            }
+        }
+    },
+    setItem: (name, value) => {
+        try {
+            // Stringify, Gzip compress, then convert to Base64
+            const jsonString = JSON.stringify(value);
+            const compressed = pako.deflate(jsonString, { level: 9 });
+            const binaryString = Array.from(compressed)
+                .map((byte) => String.fromCharCode(byte))
+                .join("");
+            const base64Encoded = btoa(binaryString);
+            storage.setItem(name, base64Encoded);
+        } catch (error) {
+            console.error("Error compressing state:", error);
+        }
+    },
+    removeItem: (name) => storage.removeItem(name),
+});
 
 // Custom Storage with Gzip Compression for sessionStorage
 const gzipStorage = createGzipStorage(sessionStorage);
 
 const initialState = {
-    // dashboardCategory mirrors LocalStore's persisted (localStorage) value so it stays
-    // consistent across tabs opened via window.open/target=_blank, unlike sessionStorage
-    // which is only unreliably cloned into new tabs by some browsers.
-    dashboardCategory: LocalStore.getState().dashboardCategory,
     quickstartTasksCompleted: 0,
     subCategoryFromSourceConfigMap: {},
     active: '',
@@ -39,6 +81,7 @@ const initialState = {
     trafficAlerts: [],
     sendEventOnLogin: false,
     tableSelectedTab: {},
+    dashboardCategory: getInitialDashboardCategory(), // Persisted across page reloads
     selectedCollectionScope: null,
 };
 
@@ -244,21 +287,18 @@ let persistStore = (set, get) => ({
             console.error("Error setting selectedCollectionScope:", error);
         }
     },
-    setDashboardCategory: (dashboardCategory) => {
-        try {
-            // Source of truth is LocalStore (localStorage) so it's shared across tabs;
-            // mirror it here too since components read it via PersistStore.
-            LocalStore.getState().setDashboardCategory(dashboardCategory);
-            set({ dashboardCategory });
-        } catch (error) {
-            console.error("Error setting dashboardCategory:", error);
-        }
-    },
     resetAll: () => {
         try {
             set(initialState);
         } catch (error) {
             console.error("Error resetting store:", error);
+        }
+    },
+    setDashboardCategory: (dashboardCategory) => {
+        try {
+            set({ dashboardCategory });
+        } catch (error) {
+            console.error("Error setting dashboardCategory:", error);
         }
     },
 });
@@ -284,6 +324,7 @@ persistStore = persist(persistStore, {
         trafficAlerts: state.trafficAlerts,
         sendEventOnLogin: state.sendEventOnLogin,
         tableSelectedTab: state.tableSelectedTab,
+        dashboardCategory: state.dashboardCategory, // Persist dashboard category selection across page reloads
         selectedCollectionScope: state.selectedCollectionScope,
     })
 });

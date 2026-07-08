@@ -337,7 +337,7 @@ function ApiEndpoints(props) {
     const queryParams = new URLSearchParams(location.search);
     const selectedUrl = queryParams.get('selected_url')
     const selectedMethod = queryParams.get('selected_method')
-    // Scope an agentic collection's inventory to only config (/claude/config/*) or only
+    // Scope an agentic collection's inventory to only config (/<tool>/config/*) or only
     // skill (/skills/*) endpoints — config and skills share one collection.
     const agenticView = queryParams.get('agentic_view')
     const [isEditing, setIsEditing] = useState(false);
@@ -476,7 +476,7 @@ function ApiEndpoints(props) {
         // Scope to config-only or skills-only endpoints when navigated from the agent tree.
         // Config and skill endpoints live in the same collection; this keeps the two views distinct.
         if (agenticView === 'config') {
-            allEndpoints = allEndpoints.filter(e => e?.endpoint?.includes('/claude/config/'))
+            allEndpoints = allEndpoints.filter(e => e?.endpoint?.includes('/config/'))
         } else if (agenticView === 'skills') {
             allEndpoints = allEndpoints.filter(e => e?.endpoint?.includes('/skills/'))
         }

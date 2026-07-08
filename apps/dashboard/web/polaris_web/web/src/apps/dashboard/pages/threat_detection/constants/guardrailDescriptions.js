@@ -3,6 +3,13 @@ import claudeSettingsRemediations from './claude_settings_remediations.json';
 
 export const CLAUDE_SETTINGS_RISK_MAP = claudeSettingsRemediations;
 
+
+export const SETTINGS_RISK_CONFIGS = {
+    claude_settings_risk: { riskMap: CLAUDE_SETTINGS_RISK_MAP, urlPrefix: '/claude/config/' },
+    codex_config_risk: null,
+    copilot_cli_settings_risk: null,
+};
+
 /**
  * Structured guardrail content with 7 main sections for Argus/Atlas dashboards
  * This is displayed instead of YAML template data when in

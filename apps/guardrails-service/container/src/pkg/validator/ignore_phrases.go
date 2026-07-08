@@ -38,7 +38,17 @@ func compileIgnorePhraseMatcher(phrases []types.IgnorePhrase) *ignorePhraseMatch
 			// "Acme") doesn't also strip a substring out of an unrelated larger word
 			// (e.g. "AcmeCorp2024"). Regex phrases are used as-is — the author controls
 			// their own boundaries.
-			pattern = `\b` + regexp.QuoteMeta(phrase.Phrase) + `\b`
+			//
+			// Treat a literal escape-sequence pair as an additional valid
+			// boundary alongside \b so this common case (test payloads/logs with escaped
+			// newlines pasted verbatim) doesn't silently defeat redaction.
+			boundary := `(?:\\[nrtbf"\\/]|\b)`
+			pattern = boundary + regexp.QuoteMeta(phrase.Phrase) + boundary
+		}
+		if phrase.IsRegex {
+			if _, err := regexp.Compile(pattern); err != nil {
+				continue
+			}
 		}
 		if phrase.CaseSensitive {
 			caseSensitiveParts = append(caseSensitiveParts, pattern)
