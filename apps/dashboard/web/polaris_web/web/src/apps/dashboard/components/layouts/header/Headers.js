@@ -48,6 +48,7 @@ export default function Header() {
     const setDashboardCategory = PersistStore((state) => state.setDashboardCategory);
 
     useEffect(() => {
+        console.log("hey", dashboardCategory)
         if (window.beamer_config) {
             const isOnPrem = window.DASHBOARD_MODE === 'ON_PREM';
             const isAgentic = dashboardCategory === 'Agentic Security';

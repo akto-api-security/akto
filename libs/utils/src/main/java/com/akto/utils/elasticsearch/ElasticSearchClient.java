@@ -279,6 +279,7 @@ public class ElasticSearchClient {
             .put(new JSONObject().put("range", new JSONObject()
                 .put("timestamp", new JSONObject().put("gte", startTsMs).put("lt", endTsMs))))
             .put(new JSONObject().put("term", new JSONObject().put("accountId", accountId)));
+        JSONArray mustNot = new JSONArray();
 
         if (multiFilters != null) {
             for (Map.Entry<String, List<String>> e : multiFilters.entrySet()) {
@@ -286,8 +287,12 @@ public class ElasticSearchClient {
                 if (vals == null || vals.isEmpty()) continue;
                 // Boolean fields must use a term clause with an actual boolean value, not a terms array.
                 if (vals.size() == 1 && isBooleanField(e.getKey())) {
-                    must.put(new JSONObject().put("term", new JSONObject()
-                        .put(e.getKey(), Boolean.parseBoolean(vals.get(0)))));
+                    if (Boolean.parseBoolean(vals.get(0))) {
+                        must.put(new JSONObject().put("term", new JSONObject().put(e.getKey(), true)));
+                    } else {
+                        // "false" also covers docs that predate this field and never had it set.
+                        mustNot.put(new JSONObject().put("term", new JSONObject().put(e.getKey(), true)));
+                    }
                 } else {
                     JSONArray arr = new JSONArray();
                     for (String v : vals) arr.put(v);
@@ -298,7 +303,9 @@ public class ElasticSearchClient {
 
         applySearchString(must, searchString);
 
-        return new JSONObject().put("bool", new JSONObject().put("must", must));
+        JSONObject boolQuery = new JSONObject().put("must", must);
+        if (mustNot.length() > 0) boolQuery.put("must_not", mustNot);
+        return new JSONObject().put("bool", boolQuery);
     }
 
     // ── Query helpers ─────────────────────────────────────────────────────────

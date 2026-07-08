@@ -20,13 +20,15 @@ import SessionsView from "./SessionsView";
 import SessionFlyout from "./SessionFlyout";
 import ArgusTraceFlyout from "./ArgusTraceFlyout";
 import MessagesView from "./MessagesView";
+import { CATEGORY_ENDPOINT_SECURITY, CATEGORY_AGENTIC_SECURITY } from "../../../../main/labelHelper";
 
 const SERVICE_COLORS = ["#9642FC", "#4285F4", "#10A37F", "#EAB308", "#F97316", "#DC2626"];
 
 
 export default function LLMObservability() {
     const dashboardCategory = PersistStore(state => state.dashboardCategory) || "API Security";
-    const isArgus = dashboardCategory === "Agentic Security";
+    const setDashboardCategory = PersistStore(state => state.setDashboardCategory) || "API Security";
+    const isArgus = dashboardCategory === CATEGORY_AGENTIC_SECURITY
 
     // Read username/topic/subTopic from URL query params once on mount.
     const [urlFilters] = useState(() => {
@@ -38,7 +40,13 @@ export default function LLMObservability() {
         if (username) f.userName = [username];
         if (topic)    f.topic    = [topic];
         if (subTopic) f.subTopic = [subTopic];
-        return Object.keys(f).length > 0 ? f : null;
+        if(Object.keys(f).length > 0){
+            setDashboardCategory(CATEGORY_ENDPOINT_SECURITY)
+            return f
+        }else{
+            return null;
+        }
+            
     });
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
