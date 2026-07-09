@@ -47,6 +47,9 @@ func toIngestDataRequest(batch Batch) ([]byte, error) {
 		if skipsIngestDiscovery(hookNameFromEvent(e.EventName)) {
 			continue
 		}
+		if skipsMcpToolDecisionIngest(e) {
+			continue
+		}
 		rec, err := eventToIngestRecord(e)
 		if err != nil {
 			return nil, err
@@ -69,6 +72,19 @@ func skipsIngestDiscovery(hookName string) bool {
 	default:
 		return false
 	}
+}
+
+// skipsMcpToolDecisionIngest drops MCP tool_decision rows. Cowork emits decision before
+// result; shield only mirrors PostToolUse with tools/call + JSON-RPC result. Ingesting
+// tool_decision with response "{}" wins sample dedup and leaves MCP calls blank in UI.
+func skipsMcpToolDecisionIngest(e model.OtelIngestEvent) bool {
+	hookName := hookNameFromEvent(e.EventName)
+	if hookName != "tool_decision" {
+		return false
+	}
+	toolName := toolNameFromEvent(e.EventName, e.Attributes)
+	_, _, _, isMCP := resolveCoworkToolRouting(e.Attributes, toolName)
+	return isMCP
 }
 
 // skipsPromptMerge returns true for events handled outside per-prompt LLM turn merging.
@@ -214,8 +230,11 @@ func eventToIngestRecord(e model.OtelIngestEvent) (ingestDataRecord, error) {
 	userEmail := strutil.FirstNonEmpty(e.Attributes, "user.email", "user_email")
 
 	toolName := toolNameFromEvent(e.EventName, e.Attributes)
-	mcpServer, mcpTool := parseMCPToolName(toolName)
-	isMCP := mcpServer != "" && mcpTool != ""
+	mcpServer, mcpTool := "", ""
+	isMCP := false
+	if toolName != "" {
+		toolName, mcpServer, mcpTool, isMCP = resolveCoworkToolRouting(e.Attributes, toolName)
+	}
 
 	// Shield parity: MCP tools land on {device}.{connector}.{mcpServer};
 	// agent-owned traffic (prompts, built-in tools, etc.) on {device}.ai-agent.{connector}.
@@ -225,7 +244,6 @@ func eventToIngestRecord(e model.OtelIngestEvent) (ingestDataRecord, error) {
 	}
 
 	tagObj := map[string]string{
-		"gen-ai":         genAITagValue,
 		utils.SourceTag:  utils.EndpointSource,
 		"hook":           hookName,
 		"akto_connector": connectorClaudeCowork,
@@ -235,6 +253,7 @@ func eventToIngestRecord(e model.OtelIngestEvent) (ingestDataRecord, error) {
 		tagObj["mcp-server"] = "MCP Server"
 		tagObj["mcp-client"] = connectorClaudeCowork
 	} else {
+		tagObj["gen-ai"] = genAITagValue
 		tagObj[utils.AgentSource] = connectorClaudeCowork
 	}
 	if promptID != "" {
@@ -352,17 +371,33 @@ func buildPathAndPayloads(
 				"method":  "tools/call",
 				"params": map[string]interface{}{
 					"name":      mcpTool,
-					"arguments": e.Attributes,
+					"arguments": mcpToolArguments(e.Attributes),
 				},
 				"id": 1,
 			})
 			if mErr != nil {
 				return "", "", "", mErr
 			}
-			return path, string(rpc), respPayload, nil
+			reqPayload = string(rpc)
+			if hookName == "tool_result" {
+				respPayload, mErr = marshalMcpToolsCallResponse(e.Attributes)
+				if mErr != nil {
+					return "", "", "", mErr
+				}
+			} else {
+				respPayload = "{}"
+			}
+			return path, reqPayload, respPayload, nil
 		}
 		normalized := normalizeToolPathName(toolName)
 		path = toolPathPrefix + "/" + normalized
+		if hookName == "tool_decision" {
+			reqPayload, respPayload, err = marshalToolDecisionPayloads(e.Attributes, toolName)
+			if err != nil {
+				return "", "", "", err
+			}
+			return path, reqPayload, respPayload, nil
+		}
 		toolBody := builtinToolPayloadBody(e.Attributes)
 		payload, mErr := json.Marshal(map[string]interface{}{
 			"body":     toolBody,
@@ -372,15 +407,12 @@ func buildPathAndPayloads(
 			return "", "", "", mErr
 		}
 		reqPayload = string(payload)
-		if hookName == "tool_result" {
-			respBody := builtinToolResponseBody(e.Attributes)
-			respJSON, mErr := json.Marshal(map[string]interface{}{"body": map[string]interface{}{"result": respBody}})
-			if mErr != nil {
-				return "", "", "", mErr
-			}
-			return path, reqPayload, string(respJSON), nil
+		respBody := builtinToolResponseBody(e.Attributes)
+		respJSON, mErr := json.Marshal(map[string]interface{}{"body": map[string]interface{}{"result": respBody}})
+		if mErr != nil {
+			return "", "", "", mErr
 		}
-		return path, reqPayload, respPayload, nil
+		return path, reqPayload, string(respJSON), nil
 
 	default:
 		path = fmt.Sprintf("/cowork/%s", e.EventName)
@@ -432,7 +464,71 @@ func toolNameFromEvent(eventName string, attrs map[string]string) string {
 	return strutil.FirstNonEmpty(attrs, "tool_name", "tool.name")
 }
 
-// builtinToolPayloadBody mirrors shield pre-tool shape: {"body": <input>, "toolName": ...}.
+// resolveCoworkToolRouting classifies tool telemetry: external/user MCP (mcp__ prefix or
+// tool_parameters server/name), vs direct builtins (Read, etc.) on /tool/*.
+func resolveCoworkToolRouting(attrs map[string]string, displayName string) (string, string, string, bool) {
+	if s, t := parseMCPToolName(displayName); s != "" && t != "" {
+		return displayName, s, t, true
+	}
+	if s, t := mcpNamesFromToolParameters(attrs); s != "" && t != "" {
+		return displayName, s, t, true
+	}
+	return displayName, "", "", false
+}
+
+func mcpNamesFromToolParameters(attrs map[string]string) (server, tool string) {
+	raw := attrs["tool_parameters"]
+	if raw == "" {
+		return "", ""
+	}
+	var params map[string]interface{}
+	if json.Unmarshal([]byte(raw), &params) != nil {
+		return "", ""
+	}
+	server = stringParam(params, "mcp_server_name")
+	tool = stringParam(params, "mcp_tool_name")
+	return server, tool
+}
+
+func stringParam(params map[string]interface{}, key string) string {
+	v, ok := params[key]
+	if !ok || v == nil {
+		return ""
+	}
+	s, ok := v.(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(s)
+}
+
+func mcpToolArguments(attrs map[string]string) map[string]interface{} {
+	if raw := attrs["tool_parameters"]; raw != "" {
+		var params map[string]interface{}
+		if json.Unmarshal([]byte(raw), &params) == nil {
+			args := make(map[string]interface{}, len(params))
+			for k, v := range params {
+				if k == "mcp_server_name" || k == "mcp_tool_name" {
+					continue
+				}
+				args[k] = v
+			}
+			if len(args) > 0 {
+				return args
+			}
+		}
+	}
+	if raw := strutil.FirstNonEmpty(attrs, "tool_input", "tool.input", "tool_args"); raw != "" {
+		if v := jsonRawOrString(raw); v != nil {
+			if m, ok := v.(map[string]interface{}); ok {
+				return m
+			}
+		}
+	}
+	return map[string]interface{}{}
+}
+
+// builtinToolPayloadBody mirrors shield post-tool request shape for tool_result rows.
 func builtinToolPayloadBody(attrs map[string]string) interface{} {
 	if raw := strutil.FirstNonEmpty(attrs, "tool_input", "tool.input", "tool_args"); raw != "" {
 		return jsonRawOrString(raw)
@@ -442,10 +538,140 @@ func builtinToolPayloadBody(attrs map[string]string) interface{} {
 
 // builtinToolResponseBody mirrors shield post-tool shape: {"body": {"result": <output>}}.
 func builtinToolResponseBody(attrs map[string]string) interface{} {
-	if raw := strutil.FirstNonEmpty(attrs, "tool_response", "tool.response", "tool_output"); raw != "" {
+	return toolResultBody(attrs)
+}
+
+// marshalMcpToolsCallResponse builds JSON-RPC 2.0 tools/call result for MCP tool_result rows.
+func marshalMcpToolsCallResponse(attrs map[string]string) (string, error) {
+	return buildToolsCallResultJSONRPC(mcpCallToolResult(attrs))
+}
+
+// buildToolsCallResultJSONRPC wraps an MCP CallToolResult-shaped body in JSON-RPC 2.0.
+func buildToolsCallResultJSONRPC(resultBody map[string]interface{}) (string, error) {
+	b, err := json.Marshal(map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"result":  resultBody,
+	})
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// mcpCallToolResult uses MCP schema content[] for inventory/samples; Cowork OTLP often
+// omits tool output text and only ships metadata (success, duration_ms, tool_result_size_bytes).
+func mcpCallToolResult(attrs map[string]string) map[string]interface{} {
+	if raw := strutil.FirstNonEmpty(attrs, "tool_response", "tool.response", "tool_output", "tool.result"); raw != "" {
+		body := jsonRawOrString(raw)
+		switch v := body.(type) {
+		case string:
+			return map[string]interface{}{
+				"content": []map[string]interface{}{{"type": "text", "text": v}},
+			}
+		case map[string]interface{}:
+			if _, ok := v["content"]; ok {
+				return v
+			}
+			if b, err := json.Marshal(v); err == nil {
+				return map[string]interface{}{
+					"content": []map[string]interface{}{{"type": "text", "text": string(b)}},
+				}
+			}
+		}
+	}
+	text := mcpResultSummaryText(attrs)
+	if text == "" {
+		text = "(no tool output in OTLP event)"
+	}
+	return map[string]interface{}{
+		"content": []map[string]interface{}{{"type": "text", "text": text}},
+	}
+}
+
+func mcpResultSummaryText(attrs map[string]string) string {
+	var parts []string
+	if v := attrs["success"]; v != "" {
+		parts = append(parts, "success="+v)
+	}
+	if v := attrs["duration_ms"]; v != "" {
+		parts = append(parts, "duration_ms="+v+"ms")
+	}
+	if v := attrs["tool_result_size_bytes"]; v != "" {
+		parts = append(parts, "tool_result_size_bytes="+v)
+	}
+	if v := attrs["error"]; v != "" {
+		parts = append(parts, "error="+v)
+	}
+	if raw := attrs["tool_input"]; raw != "" {
+		parts = append(parts, "tool_input="+raw)
+	}
+	return strings.Join(parts, "\n")
+}
+
+// toolResultBody extracts tool output when present; Cowork OTLP often omits body text and
+// only ships metadata (success, duration_ms, tool_result_size_bytes, tool_input).
+func toolResultBody(attrs map[string]string) interface{} {
+	if raw := strutil.FirstNonEmpty(attrs, "tool_response", "tool.response", "tool_output", "tool.result"); raw != "" {
 		return jsonRawOrString(raw)
 	}
-	return attrs
+	meta := map[string]interface{}{}
+	if v := attrs["success"]; v != "" {
+		meta["success"] = v == "true"
+	}
+	if v := attrs["error"]; v != "" {
+		meta["error"] = v
+	}
+	if v := attrs["duration_ms"]; v != "" {
+		meta["duration_ms"] = v
+	}
+	if v := attrs["tool_result_size_bytes"]; v != "" {
+		meta["tool_result_size_bytes"] = v
+	}
+	if raw := attrs["tool_input"]; raw != "" {
+		meta["tool_input"] = jsonRawOrString(raw)
+	}
+	if len(meta) > 0 {
+		return meta
+	}
+	return map[string]interface{}{"output": ""}
+}
+
+// marshalToolDecisionPayloads splits Cowork tool_decision telemetry: parameters in the
+// request, decision/metadata in the response (tool_result keeps input/result split).
+func marshalToolDecisionPayloads(attrs map[string]string, toolName string) (string, string, error) {
+	reqBody := interface{}(map[string]string{})
+	if raw := attrs["tool_parameters"]; raw != "" {
+		reqBody = jsonRawOrString(raw)
+	}
+	req := map[string]interface{}{
+		"body":     reqBody,
+		"toolName": toolName,
+	}
+	if id := attrs["tool_use_id"]; id != "" {
+		req["tool_use_id"] = id
+	}
+	reqBytes, err := json.Marshal(req)
+	if err != nil {
+		return "", "", err
+	}
+
+	meta := make(map[string]string)
+	for k, v := range attrs {
+		if v == "" {
+			continue
+		}
+		switch k {
+		case "tool_parameters", "tool_use_id", "tool_name", "tool.name":
+			continue
+		}
+		meta[k] = v
+	}
+	respBytes, err := json.Marshal(map[string]interface{}{"body": meta})
+	if err != nil {
+		return "", "", err
+	}
+	return string(reqBytes), string(respBytes), nil
 }
 
 func jsonRawOrString(s string) interface{} {
@@ -495,6 +721,12 @@ func hookNameFromEvent(eventName string) string {
 }
 
 func deriveDevicePrefix(attrs map[string]string) string {
+	if id := strutil.FirstNonEmpty(attrs, "user.account_uuid", "user_account_uuid"); id != "" {
+		return truncateDevicePrefix(id)
+	}
+	if id := strutil.FirstNonEmpty(attrs, "user.account_id", "user_account_id"); id != "" {
+		return truncateDevicePrefix(strings.TrimPrefix(id, "user_"))
+	}
 	if id := attrs["user.id"]; id != "" {
 		return truncateDevicePrefix(id)
 	}

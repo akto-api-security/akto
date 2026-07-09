@@ -126,6 +126,191 @@ func TestEventToIngestRecord(t *testing.T) {
 	}
 }
 
+func TestToIngestDataRequestSkipsMcpToolDecision(t *testing.T) {
+	batch := Batch{
+		AccountID: 1000000,
+		Events: []model.OtelIngestEvent{
+			{
+				EventName: "claude_code.tool_decision",
+				Timestamp: time.Unix(1783577792, 0).UTC(),
+				Attributes: map[string]string{
+					"tool_name":       "Bash",
+					"tool_use_id":     "toolu_01R8q7zzP3qnoaDxpdW4zTFC",
+					"tool_parameters": `{"bash_command":"find","mcp_server_name":"workspace","mcp_tool_name":"bash"}`,
+					"decision":        "accept",
+					"user.account_uuid": "19bc4c9a-880a-4294-908d-522e9bb54b8f",
+					"user.email":      "shivansh@akto.io",
+					"session.id":      "c806e88e-af7e-4f1f-bd95-ede175eba20a",
+				},
+			},
+		},
+	}
+	body, err := toIngestDataRequest(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var req ingestDataRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		t.Fatal(err)
+	}
+	if len(req.BatchData) != 0 {
+		t.Fatalf("MCP tool_decision must be skipped at ingest, got %d records", len(req.BatchData))
+	}
+	if !skipsMcpToolDecisionIngest(batch.Events[0]) {
+		t.Fatal("skipsMcpToolDecisionIngest should be true for MCP tool_decision")
+	}
+}
+
+func TestEventToIngestRecordMcpToolDecisionPayload(t *testing.T) {
+	e := model.OtelIngestEvent{
+		AccountID: 1000000,
+		EventName: "claude_code.tool_decision",
+		Timestamp: time.Unix(1783577792, 0).UTC(),
+		Attributes: map[string]string{
+			"tool_name":       "Bash",
+			"tool_use_id":     "toolu_01R8q7zzP3qnoaDxpdW4zTFC",
+			"tool_parameters": `{"bash_command":"find","mcp_server_name":"workspace","mcp_tool_name":"bash"}`,
+			"decision":        "accept",
+			"source":          "config",
+			"user.account_uuid": "19bc4c9a-880a-4294-908d-522e9bb54b8f",
+			"user.email":      "shivansh@akto.io",
+			"session.id":      "c806e88e-af7e-4f1f-bd95-ede175eba20a",
+		},
+	}
+
+	rec, err := eventToIngestRecord(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec.Path != "/mcp" {
+		t.Fatalf("unexpected path %q", rec.Path)
+	}
+	if rec.AktoVxlanID != "19bc4c9a" {
+		t.Fatalf("unexpected vxlan id %q", rec.AktoVxlanID)
+	}
+
+	var tag map[string]string
+	if err := json.Unmarshal([]byte(rec.Tag), &tag); err != nil {
+		t.Fatal(err)
+	}
+	if tag["mcp-server"] != "MCP Server" {
+		t.Fatalf("expected mcp-server tag, got %q", tag["mcp-server"])
+	}
+	if tag["ai-agent"] != "" {
+		t.Fatalf("MCP traffic should not set ai-agent, got %q", tag["ai-agent"])
+	}
+
+	var headers map[string]string
+	if err := json.Unmarshal([]byte(rec.RequestHeaders), &headers); err != nil {
+		t.Fatal(err)
+	}
+	if headers["host"] != "19bc4c9a.claude_cowork.workspace" {
+		t.Fatalf("unexpected host %q", headers["host"])
+	}
+	if headers["x-mcp-server"] != "workspace" {
+		t.Fatalf("unexpected x-mcp-server %q", headers["x-mcp-server"])
+	}
+
+	var rpc map[string]interface{}
+	if err := json.Unmarshal([]byte(rec.RequestPayload), &rpc); err != nil {
+		t.Fatal(err)
+	}
+	params, ok := rpc["params"].(map[string]interface{})
+	if !ok || params["name"] != "bash" {
+		t.Fatalf("expected MCP tools/call name bash, got %v", params["name"])
+	}
+	args, ok := params["arguments"].(map[string]interface{})
+	if !ok || args["bash_command"] != "find" {
+		t.Fatalf("expected bash_command in MCP args, got %v", params["arguments"])
+	}
+	if args["mcp_server_name"] != nil {
+		t.Fatal("mcp metadata should be stripped from MCP arguments")
+	}
+}
+
+func TestEventToIngestRecordMCPToolResultResponse(t *testing.T) {
+	e := model.OtelIngestEvent{
+		AccountID: 1000000,
+		EventName: "claude_code.tool_result",
+		Timestamp: time.Unix(1783577793, 0).UTC(),
+		Attributes: map[string]string{
+			"tool_name":              "Bash",
+			"tool_use_id":            "toolu_01R8q7zzP3qnoaDxpdW4zTFC",
+			"tool_parameters":        `{"bash_command":"find","mcp_server_name":"workspace","mcp_tool_name":"bash"}`,
+			"tool_input":             `{"command":"find /tmp -type f | head -20"}`,
+			"success":                "true",
+			"duration_ms":            "554",
+			"tool_result_size_bytes": "1906",
+			"user.account_uuid":      "19bc4c9a-880a-4294-908d-522e9bb54b8f",
+		},
+	}
+
+	rec, err := eventToIngestRecord(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec.Path != "/mcp" {
+		t.Fatalf("unexpected path %q", rec.Path)
+	}
+
+	var rpcResp map[string]interface{}
+	if err := json.Unmarshal([]byte(rec.ResponsePayload), &rpcResp); err != nil {
+		t.Fatalf("response must be JSON-RPC: %v", err)
+	}
+	if rpcResp["jsonrpc"] != "2.0" {
+		t.Fatalf("expected jsonrpc 2.0, got %v", rpcResp["jsonrpc"])
+	}
+	result, ok := rpcResp["result"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected result object, got %T", rpcResp["result"])
+	}
+	content, ok := result["content"].([]interface{})
+	if !ok || len(content) == 0 {
+		t.Fatalf("expected MCP content array in result, got %v", result["content"])
+	}
+	first, ok := content[0].(map[string]interface{})
+	if !ok || first["type"] != "text" {
+		t.Fatalf("expected text content block, got %v", content[0])
+	}
+	text, ok := first["text"].(string)
+	if !ok || text == "" {
+		t.Fatalf("expected non-empty summary text, got %v", first["text"])
+	}
+	if !strings.Contains(text, "success=true") || !strings.Contains(text, "duration_ms=554ms") {
+		t.Fatalf("expected metadata summary in content text, got %q", text)
+	}
+}
+
+func TestEventToIngestRecordReadBuiltinTool(t *testing.T) {
+	e := model.OtelIngestEvent{
+		AccountID: 1000000,
+		EventName: "claude_code.tool_decision",
+		Timestamp: time.Unix(1783577797, 0).UTC(),
+		Attributes: map[string]string{
+			"tool_name":  "Read",
+			"tool_use_id": "toolu_014Ku6wAYT4axH7ZGYiM36Zc",
+			"decision":   "accept",
+			"user.id":    "0571cbc5",
+		},
+	}
+
+	rec, err := eventToIngestRecord(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec.Path != "/tool/read" {
+		t.Fatalf("unexpected path %q", rec.Path)
+	}
+
+	var tag map[string]string
+	if err := json.Unmarshal([]byte(rec.Tag), &tag); err != nil {
+		t.Fatal(err)
+	}
+	if tag["ai-agent"] != "claude_cowork" {
+		t.Fatalf("expected ai-agent on builtin tool, got %q", tag["ai-agent"])
+	}
+}
+
 func TestEventToIngestRecordToolResult(t *testing.T) {
 	e := model.OtelIngestEvent{
 		AccountID: 1000000,
@@ -380,6 +565,26 @@ func TestNormalizeOsType(t *testing.T) {
 	}
 }
 
+func TestDeriveDevicePrefixPrefersAccountUUID(t *testing.T) {
+	attrs := map[string]string{
+		"user.account_uuid": "19bc4c9a-880a-4294-908d-522e9bb54b8f",
+		"user.id":           "54e30b67fb50d9c98a5ebb2632c9d0ed8a99e2afb1d040cf64ab9bb6bbf63e8c",
+	}
+	if got := deriveDevicePrefix(attrs); got != "19bc4c9a" {
+		t.Fatalf("expected account_uuid prefix 19bc4c9a, got %q", got)
+	}
+}
+
+func TestDeriveDevicePrefixFallsBackToAccountID(t *testing.T) {
+	attrs := map[string]string{
+		"user.account_id": "user_014BKaC2ydJtNyAAGm38eWLv",
+		"user.id":         "54e30b67fb50",
+	}
+	if got := deriveDevicePrefix(attrs); got != "014BKaC2ydJt" {
+		t.Fatalf("expected account_id prefix 014BKaC2ydJt, got %q", got)
+	}
+}
+
 func TestDeriveDevicePrefixFallsBackToSession(t *testing.T) {
 	prefix := deriveDevicePrefix(map[string]string{"session.id": "529ccd89-30b4-4f2a"})
 	if prefix != "529ccd89" {
@@ -390,6 +595,25 @@ func TestDeriveDevicePrefixFallsBackToSession(t *testing.T) {
 func TestDeriveDevicePrefixFallbackCowork(t *testing.T) {
 	if deriveDevicePrefix(map[string]string{}) != "cowork" {
 		t.Fatal("expected cowork fallback")
+	}
+}
+
+func TestResolveCoworkToolRouting(t *testing.T) {
+	_, server, mcpTool, mcp := resolveCoworkToolRouting(map[string]string{
+		"tool_parameters": `{"mcp_server_name":"workspace","mcp_tool_name":"bash"}`,
+	}, "Bash")
+	if !mcp || server != "workspace" || mcpTool != "bash" {
+		t.Fatalf("workspace bash should route MCP, got mcp=%v server=%q tool=%q", mcp, server, mcpTool)
+	}
+
+	_, server2, mcpTool2, mcp2 := resolveCoworkToolRouting(nil, "mcp__github__search_repos")
+	if !mcp2 || server2 != "github" || mcpTool2 != "search_repos" {
+		t.Fatalf("mcp__ prefix should route MCP, got mcp=%v server=%q tool=%q", mcp2, server2, mcpTool2)
+	}
+
+	_, server3, mcpTool3, mcp3 := resolveCoworkToolRouting(map[string]string{}, "Read")
+	if mcp3 || server3 != "" || mcpTool3 != "" {
+		t.Fatalf("Read without MCP params should be builtin, got mcp=%v server=%q tool=%q", mcp3, server3, mcpTool3)
 	}
 }
 

@@ -4,7 +4,7 @@ import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AgenticFlyoutShell from "./AgenticFlyoutShell";
 import AiChatSection from "./AiChatSection";
-import { getAgentLinkedComponents, buildAgentInlineTopologyComponents, buildAgentBuiltinToolsFromStis } from "./agenticPageBuilders";
+import { buildAgentInlineTopologyComponents, buildAgentBuiltinToolsFromStis, countAgentComponentsTab } from "./agenticPageBuilders";
 import { RiskScoreCellRenderer } from "./AgenticCellRenderers";
 import agenticObserveApi, { buildAgenticObserveChatMetadata, selectConfigViolationRows, summarizeViolations } from "./agenticObserveApi";
 import OverviewTab from "./OverviewTab";
@@ -187,8 +187,10 @@ export default function AgenticAssetFlyout({
         const devCount = (assetDevices[asset.id] || []).length;
         let componentCount = 0;
         if (asset.type === "AI Agent") {
-            const children = getAgentLinkedComponents(asset, agenticTreeData, agenticFlatData);
-            componentCount = children.length + (asset.skillCount || 0) + (configViolations ? 1 : 0);
+            componentCount = countAgentComponentsTab(asset, {
+                inlineComponents: inlineTopology,
+                configViolations,
+            });
         } else if (asset.type === "MCP Server") {
             componentCount = mcpComponentCount;
         }
@@ -198,7 +200,7 @@ export default function AgenticAssetFlyout({
             { id: "violations", content: `Violations (${totalV})` },
             { id: "devices",    content: `Devices (${devCount})` },
         ];
-    }, [asset, assetDevices, agenticTreeData, agenticFlatData, mcpComponentCount, configViolations]);
+    }, [asset, assetDevices, inlineTopology, mcpComponentCount, configViolations]);
 
     if (!asset) return null;
 

@@ -69,6 +69,16 @@ export function getAgentLinkedComponents(asset, agenticTreeData = [], agenticFla
     return linked;
 }
 
+// Tab badge count for AI Agent components — mirrors AgentComponentsView rows:
+// config row + builtin tools + connected MCP servers + skills.
+export function countAgentComponentsTab(asset, { inlineComponents = [], configViolations = null, skillCount } = {}) {
+    const mcpCount = new Set((asset?.mcpServers || []).map((s) => String(s).toLowerCase())).size;
+    const toolCount = (inlineComponents || []).filter((c) => c.type === "Tool").length;
+    const skills = skillCount ?? asset?.skillCount ?? 0;
+    const config = configViolations ? 1 : 0;
+    return mcpCount + toolCount + skills + config;
+}
+
 // LLM traffic on the agent host (/v1/messages) — Cowork, Claude CLI, etc.
 export function isAgentLlmMessagesUrl(url) {
     const u = String(url || "");
