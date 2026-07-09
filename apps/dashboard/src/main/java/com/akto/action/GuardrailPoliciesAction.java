@@ -262,6 +262,9 @@ public class GuardrailPoliciesAction extends UserAction {
         if (p.getTokenLimitDetection() != null) {
             updates.add(Updates.set("tokenLimitDetection", p.getTokenLimitDetection()));
         }
+        if (p.getAnomalyDetection() != null) {
+            updates.add(Updates.set("anomalyDetection", p.getAnomalyDetection()));
+        }
         if (p.getSelectedMcpServers() != null) {
             updates.add(Updates.set("selectedMcpServers", p.getSelectedMcpServers()));
         }

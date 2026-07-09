@@ -30,14 +30,25 @@ type policyRefreshResult struct {
 }
 
 // policyCache holds cached policies and their metadata
+// anomalyCfg is a cached per-policy anomaly configuration used at validate time.
+type anomalyCfg struct {
+	ToolCallLimit int
+	ErrorLimit    int
+	PolicyName    string
+	Behaviour     string // "block", "warn", "alert"
+}
+
 type policyCache struct {
 	policies      []types.Policy
 	auditPolicies map[string]*types.AuditPolicy
 	compiledRules map[string]*regexp.Regexp
 	hasAuditRules bool
 	blockedHosts  []mcp.BlockedHostRule
-	lastFetched   time.Time
-	mu            sync.RWMutex
+	// anomalyByPolicy maps policy ID (== policy name) to its anomaly config.
+	// Only policies with anomaly detection enabled appear here.
+	anomalyByPolicy map[string]*anomalyCfg
+	lastFetched     time.Time
+	mu              sync.RWMutex
 }
 
 // collectionTag represents a single key-value tag on a collection
@@ -69,6 +80,7 @@ type Service struct {
 	mcpListCache          *mcpListCache
 	collectionTagsCache   *collectionTagsCache
 	sessionMgr            *session.SessionManager // Our session manager implementation for session tracking
+	anomalyDetector       *session.AnomalyDetector
 	schemaFetcher         *SchemaFetcher
 	policyRefreshGroup    singleflight.Group
 	allowlistRefreshGroup singleflight.Group
@@ -128,6 +140,10 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 
 	schemaFetcher := NewSchemaFetcher(dbClient, time.Duration(cfg.PolicyRefreshIntervalMin)*time.Minute, logger)
 
+	// Initialize anomaly detector (stateless Redis client; per-policy config is
+	// resolved at validate time from the policy cache).
+	anomalyDetector := session.NewAnomalyDetector(logger)
+
 	LogFieldMappingStartup()
 
 	svc := &Service{
@@ -139,6 +155,7 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		mcpListCache:        &mcpListCache{},
 		collectionTagsCache: &collectionTagsCache{byHostName: make(map[string]map[string]string)},
 		sessionMgr:          sessionManager,
+		anomalyDetector:     anomalyDetector,
 		schemaFetcher:       schemaFetcher,
 	}
 	bp := mcp.GetScanBackpressureSnapshot()
@@ -426,7 +443,7 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 
 	s.logger.Info("Refreshing policies cache - fetching ALL policies")
 
-	policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, err := s.fetchAndParsePolicies()
+	policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, anomalyMap, err := s.fetchAndParsePolicies()
 	if err != nil {
 		return nil, nil, nil, false, err
 	}
@@ -437,6 +454,7 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	s.cache.compiledRules = compiledRules
 	s.cache.hasAuditRules = hasAuditRules
 	s.cache.blockedHosts = blockedHostRules
+	s.cache.anomalyByPolicy = anomalyMap
 	s.cache.lastFetched = time.Now()
 
 	s.logger.Info("Policy cache refreshed with ALL policies",
@@ -714,6 +732,23 @@ func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCt
 }
 
 // extractHostHeader extracts the host header value from request headers
+// isToolCallPath returns true if the path corresponds to a tool call
+// rather than a user prompt or other request type.
+// MCP tools: /mcp, non-MCP tools: /tool/<name>, GitHub Copilot: /copilot/tool/<name>
+func isToolCallPath(path string) bool {
+	return strings.HasPrefix(path, "/mcp") ||
+		strings.HasPrefix(path, "/tool") ||
+		strings.Contains(path, "/tool/")
+}
+
+// isErrorStatusCode returns true if the status code string represents an HTTP error (4xx/5xx).
+func isErrorStatusCode(statusCode string) bool {
+	if len(statusCode) == 3 && (statusCode[0] == '4' || statusCode[0] == '5') {
+		return true
+	}
+	return false
+}
+
 func extractHostHeader(headers map[string]string) string {
 	if host, ok := headers["Host"]; ok {
 		return host
@@ -724,8 +759,116 @@ func extractHostHeader(headers map[string]string) string {
 	return ""
 }
 
+// checkToolCallAnomaly records a tool call for each filtered policy that has
+// anomaly detection enabled. Only fires for agentic tool-call paths.
+// Returns a block result if any policy with behaviour "block" triggers an anomaly.
+func (s *Service) checkToolCallAnomaly(ctx context.Context, params *models.ValidateRequestParams, sessionID string, policies []types.Policy, contextSource string) *mcp.ValidationResult {
+	if contextSource != string(types.ContextSourceAgentic) {
+		return nil
+	}
+	if !isToolCallPath(params.Path) {
+		return nil
+	}
+	s.cache.mu.RLock()
+	anomalyMap := s.cache.anomalyByPolicy
+	s.cache.mu.RUnlock()
+	if len(anomalyMap) == 0 {
+		return nil
+	}
+	for _, p := range policies {
+		cfg, ok := anomalyMap[p.Info.Name]
+		s.logger.Info("checkToolCallAnomaly policies loop call - ",
+			zap.String("policyName", p.Info.Name),
+			zap.Bool("isFound", ok))
+
+		if !ok {
+			continue
+		}
+		event, breached := s.anomalyDetector.RecordToolCall(ctx, sessionID, cfg.PolicyName, cfg.ToolCallLimit)
+		if breached {
+			details := fmt.Sprintf("Tool call limit exceeded: %d calls per session (policy: %s)", cfg.ToolCallLimit, cfg.PolicyName)
+			s.logger.Warn("Anomaly detected: tool call limit exceeded",
+				zap.String("sessionID", sessionID),
+				zap.String("policy", cfg.PolicyName),
+				zap.String("behaviour", cfg.Behaviour),
+				zap.Bool("firstFire", event != nil),
+				zap.String("path", params.Path))
+			if event != nil {
+				go session.ReportAnomaly(event, params, cfg.PolicyName, cfg.Behaviour, s.logger)
+			}
+			if cfg.Behaviour == "block" {
+				return &mcp.ValidationResult{
+					Allowed:   false,
+					Reason:    details,
+					Behaviour: "block",
+					Metadata: types.ThreatMetadata{
+						PolicyName:   cfg.PolicyName,
+						RuleViolated: session.AnomalyTypeToolCallRate,
+						Severity:     "MEDIUM",
+						Reason:       details,
+					},
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// checkErrorAnomaly records an error for each filtered policy that
+// has anomaly detection enabled. Only fires for agentic tool-call paths with 4xx/5xx.
+// Returns a block result if any policy with behaviour "block" triggers an anomaly.
+func (s *Service) checkErrorAnomaly(ctx context.Context, params *models.ValidateRequestParams, sessionID string, policies []types.Policy, contextSource string) *mcp.ValidationResult {
+	if contextSource != string(types.ContextSourceAgentic) {
+		return nil
+	}
+	if !isToolCallPath(params.Path) || !isErrorStatusCode(params.StatusCode) {
+		return nil
+	}
+	s.cache.mu.RLock()
+	anomalyMap := s.cache.anomalyByPolicy
+	s.cache.mu.RUnlock()
+	s.cache.mu.RUnlock()
+	if len(anomalyMap) == 0 {
+		return nil
+	}
+	for _, p := range policies {
+		cfg, ok := anomalyMap[p.Info.Name]
+		if !ok {
+			continue
+		}
+		event, breached := s.anomalyDetector.RecordError(ctx, sessionID, cfg.PolicyName, cfg.ErrorLimit)
+		if breached {
+			details := fmt.Sprintf("Error limit exceeded: %d errors per session (policy: %s)", cfg.ErrorLimit, cfg.PolicyName)
+			s.logger.Warn("Anomaly detected: error limit exceeded",
+				zap.String("sessionID", sessionID),
+				zap.String("policy", cfg.PolicyName),
+				zap.String("behaviour", cfg.Behaviour),
+				zap.Bool("firstFire", event != nil),
+				zap.String("path", params.Path),
+				zap.String("statusCode", params.StatusCode))
+			if event != nil {
+				go session.ReportAnomaly(event, params, cfg.PolicyName, cfg.Behaviour, s.logger)
+			}
+			if cfg.Behaviour == "block" {
+				return &mcp.ValidationResult{
+					Allowed:   false,
+					Reason:    details,
+					Behaviour: "block",
+					Metadata: types.ThreatMetadata{
+						PolicyName:   cfg.PolicyName,
+						RuleViolated: session.AnomalyTypeErrorRate,
+						Severity:     "HIGH",
+						Reason:       details,
+					},
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // fetchAndParsePolicies fetches policies from database abstractor and parses them
-func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, []mcp.BlockedHostRule, error) {
+func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, []mcp.BlockedHostRule, map[string]*anomalyCfg, error) {
 	var rawGuardrailPolicies, rawAuditPolicies []byte
 
 	g := new(errgroup.Group)
@@ -747,7 +890,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		return nil
 	})
 	if err := g.Wait(); err != nil {
-		return nil, nil, nil, false, nil, err
+		return nil, nil, nil, false, nil, nil, err
 	}
 
 	s.logger.Debug("Raw guardrail policies response",
@@ -762,7 +905,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		s.logger.Error("Failed to parse guardrail policies",
 			zap.Error(err),
 			zap.String("rawResponse", string(rawGuardrailPolicies)))
-		return nil, nil, nil, false, nil, fmt.Errorf("failed to parse guardrail policies: %w", err)
+		return nil, nil, nil, false, nil, nil, fmt.Errorf("failed to parse guardrail policies: %w", err)
 	}
 
 	s.logger.Info("Parsed guardrail policies",
@@ -774,6 +917,22 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		if gp.Active { // Only include active policies
 			policy := mcp.ConvertGuardrailsToPolicy(gp)
 			policies = append(policies, policy)
+		}
+	}
+
+	// Build per-policy anomaly config map so validate-time checks respect scoping.
+	anomalyMap := make(map[string]*anomalyCfg)
+	for _, gp := range response.GuardrailPolicies {
+		s.logger.Info("checking anomaly config in policy",
+			zap.String("policyName", gp.Name))
+		if gp.Active && gp.AnomalyDetection != nil && gp.AnomalyDetection.Enabled {
+			ad := gp.AnomalyDetection
+			anomalyMap[gp.Name] = &anomalyCfg{
+				ToolCallLimit: ad.ToolCallLimit,
+				ErrorLimit:    ad.ErrorLimit,
+				PolicyName:    gp.Name,
+				Behaviour:     gp.Behaviour,
+			}
 		}
 	}
 
@@ -848,7 +1007,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		zap.Int("auditPolicies", len(auditPolicies)),
 		zap.Int("compiledRules", len(compiledRules)))
 
-	return policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, nil
+	return policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, anomalyMap, nil
 }
 
 // validationContextFromParams builds mcp.ValidationContext from traffic params and explicit payload strings for the context.
@@ -1106,6 +1265,12 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		return blockResult, nil
 	}
 
+	// Anomaly detection: check each filtered policy's anomaly config.
+	// Tool calls and errors are recorded per-policy so scoped limits are respected.
+	if blockResult := s.checkToolCallAnomaly(ctx, params, sessionID, policies, contextSource); blockResult != nil {
+		return blockResult, nil
+	}
+
 	s.logger.Info("ValidateRequest - calling ProcessRequest",
 		zap.String("contextSource", contextSource),
 		zap.String("path", params.Path),
@@ -1312,6 +1477,12 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	// Track response and generate summary
 	isMalicious := processResult.IsBlocked
 	session.TrackResponseAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, responseBody, isMalicious)
+
+	// Anomaly detection: record error if tool call returned error status (4xx/5xx).
+	// Uses the same filtered policies from the request path.
+	if blockResult := s.checkErrorAnomaly(ctx, params, sessionID, policies, contextSource); blockResult != nil {
+		return blockResult, nil
+	}
 
 	// Convert ProcessResult to ValidationResult for backward compatibility
 	result := &mcp.ValidationResult{
