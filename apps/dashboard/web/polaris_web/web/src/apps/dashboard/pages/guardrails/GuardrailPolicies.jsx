@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList, Scrollable, Avatar, Box } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
+import SpinnerCentered from "../../components/progress/SpinnerCentered";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func";
 import { getDashboardCategory, mapLabel, isEndpointSecurityCategory } from "../../../main/labelHelper";
@@ -152,6 +153,7 @@ function GuardrailPolicies() {
     const [createInitialStep, setCreateInitialStep] = useState(1);
     const [presetsPopoverActive, setPresetsPopoverActive] = useState(false);
     const [pendingPolicyName, setPendingPolicyName] = useState(null);
+    const [openedViaDeepLink, setOpenedViaDeepLink] = useState(false);
 
     const allCollections = PersistStore(state => state.allCollections);
 
@@ -186,6 +188,7 @@ function GuardrailPolicies() {
         setIsPreset(true);
         setCreateInitialStep(2);
         setShowCreateModal(true);
+        setOpenedViaDeepLink(true);
         // Clear router state, keep existing query params (e.g. filters) intact.
         navigate(location.pathname + location.search, { replace: true, state: {} });
     }, [location.state, location.pathname, location.search, navigate]);
@@ -207,6 +210,7 @@ function GuardrailPolicies() {
         const match = policyData.find((row) => row.originalData?.name === pendingPolicyName);
         if (match) {
             handleEditPolicy(match);
+            setOpenedViaDeepLink(true);
         }
         setPendingPolicyName(null);
     }, [pendingPolicyName, policyData, loading]);
@@ -638,11 +642,12 @@ function GuardrailPolicies() {
                 false,
                 wasEdit ? "Guardrail updated successfully" : "Guardrail created successfully"
             );
-            setShowCreateModal(false);
-            setEditingPolicy(null);
-            setIsEditMode(false);
-            setIsPreset(false);
-            await fetchGuardrailPolicies();
+            // Closing/navigation is handled once by onClose, which CreateGuardrailPage
+            // always calls right after this (see handleSave). Skip the refetch when
+            // we're about to navigate away entirely.
+            if (!openedViaDeepLink) {
+                await fetchGuardrailPolicies();
+            }
         } catch (error) {
             func.setToast(true, true, isEditMode ? "Failed to update guardrail" : "Failed to create guardrail");
         } finally {
@@ -656,6 +661,12 @@ function GuardrailPolicies() {
         return (
             <CreateGuardrailPage
                 onClose={() => {
+                    // Leaving the page entirely — don't reveal the table (and let its
+                    // own filter->URL sync effect fire and race with this navigation).
+                    if (openedViaDeepLink) {
+                        navigate(-1);
+                        return;
+                    }
                     setShowCreateModal(false);
                     setEditingPolicy(null);
                     setIsEditMode(false);
@@ -670,6 +681,15 @@ function GuardrailPolicies() {
                 initialStep={createInitialStep}
             />
         );
+    }
+
+    // Don't mount the table (and its own filter->URL sync effect) while a ?policy=
+    // deep link or a topicGuardrailPrefill (Create) is still resolving — that extra
+    // mount was pushing an extra history entry, breaking the Close button's
+    // navigate(-1). Only spin while actively resolving; if a ?policy= name never
+    // matches a policy, fall through to the table instead of spinning forever.
+    if ((policyName && (loading || pendingPolicyName)) || location.state?.topicGuardrailPrefill) {
+        return <SpinnerCentered />;
     }
 
     const components = [
