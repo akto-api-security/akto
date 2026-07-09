@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 
 import com.akto.action.DbAction;
 import com.akto.dao.context.Context;
+import com.akto.dto.McpAuditInfo;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
@@ -196,6 +197,25 @@ public class KafkaUtils {
     }
 
 
+    private static final Set<String> LOG_TRIGGER_METHODS = new HashSet<>(Arrays.asList(
+            "insertRuntimeLog",
+            "insertEndpointShieldLog",
+            "insertAnalyserLog",
+            "insertTestingLog",
+            "insertAgenticTestingLog",
+            "insertProtectionLog",
+            "insertDataIngestionLog",
+            "insertMCPAuditDataLog",
+            "insertPuppeteerLog",
+            "insertDastLog",
+            "insertAwsApiGatewayLog",
+            "insertGuardrailsServiceLog"
+    ));
+
+    public static boolean isLogTriggerMethod(String triggerMethod) {
+        return LOG_TRIGGER_METHODS.contains(triggerMethod);
+    }
+
     public static void parseAndTriggerWrites(String message) throws Exception {
         DbAction dbAction = new DbAction();
         Map<String, Object> json = gson.fromJson(message, Map.class);
@@ -204,6 +224,12 @@ public class KafkaUtils {
         Double accIdDouble = (Double) json.get("accountId");
         int accountId = accIdDouble.intValue();
         Context.accountId.set(accountId);
+
+        if (isLogTriggerMethod(triggerMethod)) {
+            parseAndTriggerLogWrites(dbAction, triggerMethod, payload);
+            return;
+        }
+
         List<BulkUpdates> bulkWrites = mapper.readValue(payload, new TypeReference<List<BulkUpdates>>(){});
 
         // logger.info("Account id: " + accountId + " trigger method: " + triggerMethod);
@@ -261,6 +287,62 @@ public class KafkaUtils {
                 dbAction.bulkWriteApiInfo();
                 break;
 
+            default:
+                break;
+        }
+    }
+
+    private static void parseAndTriggerLogWrites(DbAction dbAction, String triggerMethod, String payload) throws Exception {
+        switch (triggerMethod) {
+            case "insertMCPAuditDataLog":
+                McpAuditInfo auditInfo = mapper.readValue(payload, McpAuditInfo.class);
+                dbAction.setAuditInfo(auditInfo);
+                dbAction.insertMCPAuditDataLog();
+                break;
+            case "insertRuntimeLog":
+                dbAction.setLog(BasicDBObject.parse(payload));
+                dbAction.insertRuntimeLog();
+                break;
+            case "insertEndpointShieldLog":
+                dbAction.setLog(BasicDBObject.parse(payload));
+                dbAction.insertEndpointShieldLog();
+                break;
+            case "insertAnalyserLog":
+                dbAction.setLog(BasicDBObject.parse(payload));
+                dbAction.insertAnalyserLog();
+                break;
+            case "insertTestingLog":
+                dbAction.setLog(BasicDBObject.parse(payload));
+                dbAction.insertTestingLog();
+                break;
+            case "insertAgenticTestingLog":
+                dbAction.setLog(BasicDBObject.parse(payload));
+                dbAction.insertAgenticTestingLog();
+                break;
+            case "insertProtectionLog":
+                dbAction.setLog(BasicDBObject.parse(payload));
+                dbAction.insertProtectionLog();
+                break;
+            case "insertDataIngestionLog":
+                dbAction.setLog(BasicDBObject.parse(payload));
+                dbAction.insertDataIngestionLog();
+                break;
+            case "insertPuppeteerLog":
+                dbAction.setLog(BasicDBObject.parse(payload));
+                dbAction.insertPuppeteerLog();
+                break;
+            case "insertDastLog":
+                dbAction.setLog(BasicDBObject.parse(payload));
+                dbAction.insertDastLog();
+                break;
+            case "insertAwsApiGatewayLog":
+                dbAction.setLog(BasicDBObject.parse(payload));
+                dbAction.insertAwsApiGatewayLog();
+                break;
+            case "insertGuardrailsServiceLog":
+                dbAction.setLog(BasicDBObject.parse(payload));
+                dbAction.insertGuardrailsServiceLog();
+                break;
             default:
                 break;
         }
@@ -432,6 +514,10 @@ public class KafkaUtils {
     public static String getTopicNameForAccount(String defaultTopicEnvVar, int accountId) {
         String defaultTopic = getCachedEnv(defaultTopicEnvVar);
         return defaultTopic + "_" + accountId;
+    }
+
+    public void insertLogData(Object payload, String triggerMethod, int accountId) {
+        insertDataCore(payload, triggerMethod, accountId, "AKTO_KAFKA_TOPIC_NAME", null, "kafka insertLogData");
     }
 
     public void insertData(List<BulkUpdates> writes, String triggerMethod, int accountId) {

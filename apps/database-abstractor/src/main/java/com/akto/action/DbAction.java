@@ -1988,6 +1988,14 @@ public class DbAction extends ActionSupport {
     private static String ignoreDaemonLog = "Kafka write successful";
     private static String ignoreMiniRuntimeLog = "lastExecutedBatch sample";
 
+    private String publishLogToKafkaIfEnabled(Object payload, String triggerMethod) {
+        if (kafkaUtils.isWriteEnabled()) {
+            kafkaUtils.insertLogData(payload, triggerMethod, Context.accountId.get());
+            return Action.SUCCESS.toUpperCase();
+        }
+        return null;
+    }
+
     public String insertRuntimeLog() {
         try {
             int accId = Context.accountId.get();
@@ -2000,6 +2008,11 @@ public class DbAction extends ActionSupport {
                 if (message.contains(ignoreDaemonLog) || message.contains(ignoreMiniRuntimeLog)) {
                     return Action.SUCCESS.toUpperCase();
                 }
+            }
+
+            String kafkaResult = publishLogToKafkaIfEnabled(log, "insertRuntimeLog");
+            if (kafkaResult != null) {
+                return kafkaResult;
             }
 
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
@@ -2018,6 +2031,11 @@ public class DbAction extends ActionSupport {
 
     public String insertEndpointShieldLog() {
         try {
+            String kafkaResult = publishLogToKafkaIfEnabled(log, "insertEndpointShieldLog");
+            if (kafkaResult != null) {
+                return kafkaResult;
+            }
+
             LogsEndpointShield dbLog = new LogsEndpointShield(
                 log.getString("agentId"),
                 log.getString("deviceId"),
@@ -2066,6 +2084,12 @@ public class DbAction extends ActionSupport {
             if (accId == 1733164172) {
                 return Action.SUCCESS.toUpperCase();
             }
+
+            String kafkaResult = publishLogToKafkaIfEnabled(log, "insertAnalyserLog");
+            if (kafkaResult != null) {
+                return kafkaResult;
+            }
+
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             DbLayer.insertAnalyserLog(dbLog);
         } catch (Exception e) {
@@ -2992,6 +3016,17 @@ public class DbAction extends ActionSupport {
             if (accId == 1733164172) {
                 return Action.SUCCESS.toUpperCase();
             }
+
+            String logMessage = log.getString("log");
+            if (logMessage != null && logMessage.contains("ApiExecutor") && logMessage.contains("cyborg")) {
+                return Action.SUCCESS.toUpperCase();
+            }
+
+            String kafkaResult = publishLogToKafkaIfEnabled(log, "insertTestingLog");
+            if (kafkaResult != null) {
+                return kafkaResult;
+            }
+
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             dbLog.setActivityId(log.getString("activityId"));
             String activityTypeStr = log.getString("activityType");
@@ -3001,12 +3036,6 @@ public class DbAction extends ActionSupport {
                 } catch (IllegalArgumentException e) {
                     loggerMaker.errorAndAddToDb("Unknown activityType in insertTestingLog: " + activityTypeStr);
                 }
-            }
-
-            // Skip writing cyborg call logs.
-            if (dbLog.getLog().contains("ApiExecutor") &&
-                    dbLog.getLog().contains("cyborg")) {
-                return Action.SUCCESS.toUpperCase();
             }
 
             DbLayer.insertTestingLog(dbLog);
@@ -3019,6 +3048,11 @@ public class DbAction extends ActionSupport {
 
     public String insertAgenticTestingLog() {
         try {
+            String kafkaResult = publishLogToKafkaIfEnabled(log, "insertAgenticTestingLog");
+            if (kafkaResult != null) {
+                return kafkaResult;
+            }
+
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             DbLayer.insertAgenticTestingLog(dbLog);
         } catch (Exception e) {
@@ -3031,6 +3065,11 @@ public class DbAction extends ActionSupport {
 
     public String insertProtectionLog() {
         try {
+            String kafkaResult = publishLogToKafkaIfEnabled(log, "insertProtectionLog");
+            if (kafkaResult != null) {
+                return kafkaResult;
+            }
+
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             DbLayer.insertProtectionLog(dbLog);
         } catch (Exception e) {
@@ -3769,6 +3808,11 @@ public class DbAction extends ActionSupport {
 
     public String insertDataIngestionLog() {
         try {
+            String kafkaResult = publishLogToKafkaIfEnabled(log, "insertDataIngestionLog");
+            if (kafkaResult != null) {
+                return kafkaResult;
+            }
+
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             DbLayer.insertDataIngestionLog(dbLog);
         } catch (Exception e) {
@@ -3783,6 +3827,11 @@ public class DbAction extends ActionSupport {
 
     public String insertMCPAuditDataLog() {
         try {
+            String kafkaResult = publishLogToKafkaIfEnabled(auditInfo, "insertMCPAuditDataLog");
+            if (kafkaResult != null) {
+                return kafkaResult;
+            }
+
             DbLayer.insertMCPAuditDataLog(auditInfo);
         } catch (Exception e) {
             e.printStackTrace();
@@ -3859,6 +3908,11 @@ public class DbAction extends ActionSupport {
 
     public String insertPuppeteerLog() {
         try {
+            String kafkaResult = publishLogToKafkaIfEnabled(log, "insertPuppeteerLog");
+            if (kafkaResult != null) {
+                return kafkaResult;
+            }
+
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             PupeteerLogsDao.instance.insertOne(dbLog);
         } catch (Exception e) {
@@ -3870,6 +3924,11 @@ public class DbAction extends ActionSupport {
 
     public String insertDastLog() {
         try {
+            String kafkaResult = publishLogToKafkaIfEnabled(log, "insertDastLog");
+            if (kafkaResult != null) {
+                return kafkaResult;
+            }
+
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             PupeteerLogsDao.instance.insertOne(dbLog);
         } catch (Exception e) {
@@ -3881,6 +3940,11 @@ public class DbAction extends ActionSupport {
 
     public String insertAwsApiGatewayLog() {
         try {
+            String kafkaResult = publishLogToKafkaIfEnabled(log, "insertAwsApiGatewayLog");
+            if (kafkaResult != null) {
+                return kafkaResult;
+            }
+
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             AwsApiGatewayLogsDao.instance.insertOne(dbLog);
         } catch (Exception e) {
@@ -3892,6 +3956,11 @@ public class DbAction extends ActionSupport {
 
     public String insertGuardrailsServiceLog() {
         try {
+            String kafkaResult = publishLogToKafkaIfEnabled(log, "insertGuardrailsServiceLog");
+            if (kafkaResult != null) {
+                return kafkaResult;
+            }
+
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             GuardrailsServiceLogsDao.instance.insertOne(dbLog);
         } catch (Exception e) {
