@@ -4,11 +4,20 @@ FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
+RUN apk add --no-cache git
+
 WORKDIR /app
+
+ENV GOPRIVATE=github.com/akto-api-security/*
+ENV GONOSUMDB=github.com/akto-api-security/*
+
+COPY --chmod=600 .netrc /root/.netrc
 
 COPY src/go.mod src/go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
+
+RUN rm -f /root/.netrc
 
 COPY src/ .
 RUN --mount=type=cache,target=/go/pkg/mod \

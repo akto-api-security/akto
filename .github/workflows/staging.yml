@@ -342,6 +342,8 @@ jobs:
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
           cd apps/otel-ingestion-service/container
+          chmod +x ../../guardrails-service/container/setup-netrc.sh
+          GITHUB_TOKEN=${{ secrets.AKTO_GITHUB_TOKEN }} ../../guardrails-service/container/setup-netrc.sh
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/otel-ingestion-service:$IMAGE_TAG . --push
 
   build-agent-guard:
