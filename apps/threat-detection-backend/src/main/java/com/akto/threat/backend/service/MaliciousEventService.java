@@ -470,7 +470,11 @@ public class MaliciousEventService {
 
 
     if (!filter.getLatestAttackList().isEmpty()) {
-      query.append("filterId", new Document("$in", filter.getLatestAttackList()));
+      Document inFilter = new Document("$in", filter.getLatestAttackList());
+      query.append("$or", Arrays.asList(
+          new Document("filterId", inFilter),
+          new Document("subCategory", inFilter)
+      ));
     }
 
     if (!filter.getSeverityList().isEmpty()) {
@@ -751,10 +755,14 @@ public class MaliciousEventService {
       query.append("type", new Document("$in", types));
     }
 
-    // Handle latestAttack filter
+    // Handle latestAttack filter — match against both filterId and subCategory
     List<String> latestAttack = (List<String>) filter.get("latestAttack");
     if (latestAttack != null && !latestAttack.isEmpty()) {
-      query.append("filterId", new Document("$in", latestAttack));
+      Document inFilter = new Document("$in", latestAttack);
+      query.append("$or", Arrays.asList(
+          new Document("filterId", inFilter),
+          new Document("subCategory", inFilter)
+      ));
     }
 
     // Handle time range
