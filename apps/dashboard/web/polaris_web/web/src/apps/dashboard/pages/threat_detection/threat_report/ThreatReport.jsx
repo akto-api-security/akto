@@ -5,7 +5,7 @@ import api from '../api'
 import func from '@/util/func'
 import { isApiSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, shortNameToCategory, getReportCategoryShortName } from '@/apps/main/labelHelper'
 import PersistStore from '@/apps/main/PersistStore'
-import { resolveComplianceClauseMap, mergePolicyComplianceMap } from '../utils/formatUtils'
+import { resolveComplianceClauseMap, mergePolicyComplianceMap, extractRuleViolated } from '../utils/formatUtils'
 import guardrailApi from '../../guardrails/api'
 import ThreatReportHeader from './ThreatReportHeader'
 import ThreatReportTOC from './ThreatReportTOC'
@@ -184,6 +184,7 @@ const ThreatReport = () => {
                 return {
                     id: threat.id || threat._id,
                     refId: threat.refId || '',
+                    eventType: threat.eventType || 'SINGLE',
                     actor: threat.actor || 'Unknown',
                     time: threat.timestamp ? new Date(threat.timestamp * 1000).toLocaleString() : '-',
                     timestamp: threat.timestamp || 0,
@@ -193,6 +194,7 @@ const ThreatReport = () => {
                     method: threat.method || '',
                     severity: normalizedSeverity,
                     filterId: threat.filterId || '',
+                    ruleViolated: extractRuleViolated(threat?.metadata),
                     compliance: Object.keys(complianceMap),
                     complianceWithClauses: complianceMap,
                 }

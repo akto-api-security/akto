@@ -13,7 +13,7 @@ import values from "@/util/values";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import threatDetectionApi from "../../threat_detection/api.js"
 import SessionStore from "../../../../main/SessionStore"
-import { resolveComplianceClauseMap, mergePolicyComplianceMap } from "../../threat_detection/utils/formatUtils"
+import { resolveComplianceClauseMap, mergePolicyComplianceMap, extractRuleViolated } from "../../threat_detection/utils/formatUtils"
 import guardrailApi from "../../guardrails/api"
 import ShowListInBadge from "../../../components/shared/ShowListInBadge";
 import { CellType } from "../../../components/tables/rows/GithubRow.js";
@@ -286,7 +286,12 @@ function ThreatCompliancePage() {
                     method: threatData.method || '',
                     apiCollectionId: threatData.apiCollectionId,
                     templateId: threatData.filterId,
-                    sessionContext: threatData.sessionContext || ''
+                    sessionContext: threatData.sessionContext || '',
+                    severity: threatData.severity || '',
+                    sessionId: threatData.sessionId || '',
+                    ruleViolated: threatData.ruleViolated || '-',
+                    complianceMap: threatData.complianceMapData || {},
+                    metadata: threatData.metadata || ''
                 },
                 currentEventId: threatData.eventId || '',
                 currentEventStatus: threatData.status || '',
@@ -305,7 +310,7 @@ function ThreatCompliancePage() {
         setEventState(prev => ({ ...prev, currentEventStatus: newStatus }));
     };
 
-    const createThreatDataObject = (item) => ({
+    const createThreatDataObject = (item, complianceMapData) => ({
         refId: item?.refId,
         eventType: item?.eventType,
         actor: item?.actor,
@@ -316,7 +321,12 @@ function ThreatCompliancePage() {
         status: item?.status,
         eventId: item?.id,
         jiraTicketUrl: item?.jiraTicketUrl,
-        sessionContext: item?.sessionContext || ''
+        sessionContext: item?.sessionContext || '',
+        severity: item?.severity || '',
+        sessionId: item?.sessionId || '',
+        ruleViolated: extractRuleViolated(item?.metadata),
+        metadata: item?.metadata || '',
+        complianceMapData: complianceMapData || {}
     });
 
 
@@ -542,7 +552,7 @@ function ThreatCompliancePage() {
                         urls: [{
                             method: item?.method,
                             url: item?.url,
-                            threatData: createThreatDataObject(item)
+                            threatData: createThreatDataObject(item, complianceData)
                         }],
                         isThreat: true,
                         sessionContext: sessionData,
@@ -557,7 +567,7 @@ function ThreatCompliancePage() {
                     existingThreat.urls.push({
                         method: item?.method,
                         url: item?.url,
-                        threatData: createThreatDataObject(item)
+                        threatData: createThreatDataObject(item, complianceData)
                     });
                     existingThreat.numberOfEndpoints += 1;
                     if (item?.timestamp && item.timestamp > existingThreat.creationTime) {
@@ -724,12 +734,12 @@ function ThreatCompliancePage() {
 
     const infoItems = [
         {
-            title: "Threat Detection",
-            description: "View all detected threats mapped to compliance standards.",
+            title: mapLabel("Threat Detection", dashboardCategory),
+            description: `View all detected ${mapLabel("Threat", dashboardCategory).toLowerCase()}s mapped to compliance standards.`,
         },
         {
             title: "Compliance Mapping",
-            description: "See which threats are mapped to specific compliance requirements.",
+            description: `See which ${mapLabel("Threat", dashboardCategory).toLowerCase()}s are mapped to specific compliance requirements.`,
         }
     ];
 
@@ -873,8 +883,8 @@ function ThreatCompliancePage() {
             title={
                 <HorizontalStack gap={4}>
                     <TitleWithInfo
-                        titleText={"Threat"}
-                        tooltipContent={"View detected threats mapped to compliance standards such as OWASP, PCI-DSS, SOC 2, and more."}
+                        titleText={needsGuardrailCompliance ? "Guardrail Violations Detected" : "Threat"}
+                        tooltipContent={`View detected ${mapLabel("Threat", dashboardCategory).toLowerCase()}s mapped to compliance standards such as OWASP, PCI-DSS, SOC 2, and more.`}
                     />
                     <Popover
                         active={moreActions}
@@ -915,10 +925,12 @@ function ThreatCompliancePage() {
                     <EmptyScreensLayout
                         key="emptyScreen"
                         iconSrc={"/public/alert_hexagon.svg"}
-                        headingText={"No threats yet!"}
-                        description={"There are currently no threats detected in your APIs."}
+                        headingText={needsGuardrailCompliance ? "No guardrail violations yet!" : "No threats yet!"}
+                        description={needsGuardrailCompliance
+                            ? `There are currently no guardrail violations detected in your ${mapLabel("API endpoints", dashboardCategory)}.`
+                            : "There are currently no threats detected in your APIs."}
                         infoItems={infoItems}
-                        infoTitle={"Threat Compliance"}
+                        infoTitle={needsGuardrailCompliance ? "Guardrail Violations Compliance" : "Threat Compliance"}
                     />
                 ] : [
                     <GithubServerTable

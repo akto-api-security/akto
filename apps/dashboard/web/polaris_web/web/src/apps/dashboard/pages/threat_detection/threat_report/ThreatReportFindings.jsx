@@ -39,10 +39,14 @@ const ThreatReportFindings = ({ threatsTableData, severityCount, organizationNam
     const handleThreatClick = (threat) => {
         const params = new URLSearchParams({
             refId: threat.refId,
-            eventType: 'SINGLE',
+            eventType: threat.eventType || 'SINGLE',
             actor: threat.actor,
             filterId: threat.filterId || '',
-            eventStatus: 'ACTIVE'
+            eventStatus: 'ACTIVE',
+            url: threat.endpoint || '',
+            method: threat.method || '',
+            severity: threat.severity || '',
+            ruleViolated: threat.ruleViolated || '-'
         });
 
         const navigateUrl = `${window.location.origin}/dashboard/protection/threat-activity?${params.toString()}#active`;

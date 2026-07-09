@@ -62,7 +62,7 @@ const ThreatReportSummary = ({
             visible: true
         },
         {
-            title: 'Unique Threat Actors',
+            title: `Unique ${mapLabel("Threat", getDashboardCategory())} Actors`,
             data: threatsByActor.length,
             visible: true
         },
