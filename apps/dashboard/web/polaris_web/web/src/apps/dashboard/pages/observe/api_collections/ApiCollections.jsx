@@ -2122,12 +2122,7 @@ function ApiCollections(props) {
 
     // Hide summary card for tree view types (AI Agent, MCP Server, LLM)
     const showSummaryCard = !useTreeView;
-    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [
-        (showSummaryCard ? <SummaryCardInfo summaryItems={summaryItems} key="summary"/> : null),
-        (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null),
-        modalComponent ? <div key="modal">{modalComponent}</div> : null,
-        <div key="table">{tableComponent}</div>
-    ].filter(Boolean)
+    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [(showSummaryCard ? <SummaryCardInfo summaryItems={summaryItems} key="summary"/> : null), (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
 
     if(onlyShowCollectionsTable){
         sendData(data)
