@@ -78,8 +78,14 @@ public class GuardrailPoliciesAction extends UserAction {
     private BasicDBObject playgroundResult;
 
 
+    private static final int DEFAULT_FETCH_LIMIT = 20;
+    private static final int MAX_FETCH_LIMIT = 100;
+
     public String fetchGuardrailPolicies() {
         try {
+            // Mongo treats limit <= 0 as "unlimited", so clamp instead of passing it through as-is.
+            skip = Math.max(skip, 0);
+            limit = limit <= 0 ? DEFAULT_FETCH_LIMIT : Math.min(limit, MAX_FETCH_LIMIT);
             this.guardrailPolicies = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(skip, limit);
             this.total = GuardrailPoliciesDao.instance.getTotalCount();
 

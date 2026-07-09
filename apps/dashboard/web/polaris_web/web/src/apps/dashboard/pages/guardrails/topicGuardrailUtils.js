@@ -76,21 +76,11 @@ export function buildTopicGuardrailPrefillForTopic(topic, topicHierarchy) {
     };
 }
 
-const POLICY_FETCH_PAGE_SIZE = 50;
-const MAX_POLICY_FETCH_PAGES = 40;
 const POLICY_NAMES_CACHE_TTL_MS = 2 * 60 * 1000;
 
 async function fetchGuardrailPolicyNames() {
-    let skip = 0;
-    let names = [];
-    for (let page = 0; page < MAX_POLICY_FETCH_PAGES; page++) {
-        const resp = await guardrailApi.fetchGuardrailPolicies({ skip, limit: POLICY_FETCH_PAGE_SIZE });
-        const batch = resp?.guardrailPolicies || [];
-        names = names.concat(batch.filter(p => p.active).map(p => p.name));
-        if (batch.length < POLICY_FETCH_PAGE_SIZE) break;
-        skip += POLICY_FETCH_PAGE_SIZE;
-    }
-    return names;
+    const policies = await guardrailApi.fetchAllGuardrailPolicies();
+    return policies.filter(p => p.active).map(p => p.name);
 }
 
 export async function fetchGuardrailPolicyNamesCached() {
