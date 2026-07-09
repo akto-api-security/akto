@@ -57,6 +57,7 @@ export const openThreatActivityPage = (filters = {}) => {
     }
     if (filters.actor) filterParts.push(`actor__${filters.actor}`);
     if (filters.url) filterParts.push(`url__${filters.url}`);
+    if (filters.severity) filterParts.push(`severity__${filters.severity}`);
     if (filterParts.length > 0) params.set("filters", filterParts.join("&"));
     if (filters.eventStatus) params.set("eventStatus", filters.eventStatus);
     if (filters.startTimestamp) params.set("startTimestamp", filters.startTimestamp);
