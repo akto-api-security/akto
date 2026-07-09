@@ -276,9 +276,7 @@ public class DbLayer {
         if (additionalData == null || additionalData.isEmpty()) {
             return updates;
         }
-        for (Map.Entry<String, Object> entry : additionalData.entrySet()) {
-            updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + "." + entry.getKey(), entry.getValue()));
-        }
+        updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA, additionalData));
         return updates;
     }
 
