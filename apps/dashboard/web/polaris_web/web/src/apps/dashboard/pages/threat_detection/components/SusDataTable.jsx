@@ -13,7 +13,7 @@ import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
-import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import { isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory } from "../../../../main/labelHelper";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "../../observe/api_collections/endpointShieldHelper";
 import IpReputationScore from "./IpReputationScore";
 import guardrailApi from "../../guardrails/api";
@@ -82,13 +82,24 @@ const getHeaders = () => {
       maxWidth: "120px",
     });
   }
+  baseHeaders.push({
+    text: "Compliance",
+    value: "compliance",
+    title: "Compliance",
+    maxWidth: "200px",
+  });
+
+  // Successful Exploit column is only relevant for API Security (not Argus/Agentic or Atlas/Endpoint)
+  if (isApiSecurityCategory()) {
+    baseHeaders.push({
+      text: "successfulExploit",
+      value: "successfulComp",
+      title: "Successful Exploit",
+      maxWidth: "90px",
+    });
+  }
+
   baseHeaders.push(
-    {
-      text: "Compliance",
-      value: "compliance",
-      title: "Compliance",
-      maxWidth: "200px",
-    },
     {
       text: "Collection",
       value: "apiCollectionName",
@@ -541,6 +552,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     });
     
     const sort = { [sortKey]: sortOrder };
+    // Successful Exploit filter is only relevant for API Security (not Argus/Agentic or Atlas/Endpoint)
+    let successfulBool = undefined;
+    if (isApiSecurityCategory()) {
+      const successfulFilterValue = Array.isArray(filters?.successfulExploit) ? filters?.successfulExploit?.[0] : filters?.successfulExploit;
+      successfulBool = (successfulFilterValue === true || successfulFilterValue === 'true') ? true
+                        : (successfulFilterValue === false || successfulFilterValue === 'false') ? false
+                        : undefined;
+    }
     const res = await api.fetchSuspectSampleData(
       skip,
       sourceIpsFilter,
@@ -553,7 +572,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       latestAttack,
       limit,
       currentTab.toUpperCase(),
-      undefined,
+      successfulBool,
       label, // Use the label prop (THREAT or GUARDRAIL)
       hostFilter,
       latestApiOrigRegex
@@ -612,6 +631,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
         ),
+        // Successful Exploit is only shown for API Security (not Argus/Agentic or Atlas/Endpoint)
+        ...(isApiSecurityCategory() && {
+          successfulComp: (
+            <Badge size="small">{x?.successfulExploit ? "True" : "False"}</Badge>
+          ),
+        }),
         detectionType: (
           <Badge status={isSessionBased ? 'info' : 'default'}>
             {isSessionBased ? 'Session' : 'Single Prompt'}
@@ -729,6 +754,20 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         multiple: true
       },
     ];
+
+    // Successful Exploit filter is only relevant for API Security (not Argus/Agentic or Atlas/Endpoint)
+    if (isApiSecurityCategory()) {
+      filters.push({
+        key: 'successfulExploit',
+        label: 'Successful Exploit',
+        title: 'Successful Exploit',
+        choices: [
+          { label: 'True', value: 'true' },
+          { label: 'False', value: 'false' }
+        ],
+        singleSelect: true
+      });
+    }
   }
 
   useEffect(() => {
