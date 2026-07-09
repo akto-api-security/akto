@@ -42,6 +42,11 @@ func ReportAnomaly(event *AnomalyEvent, params *models.ValidateRequestParams, po
 
 	severity := anomalySeverity(event.AnomalyType)
 
+	contextSource := types.ContextSource(params.ContextSource)
+	if contextSource == "" {
+		contextSource = types.ContextSourceAgentic
+	}
+
 	if err := mcp.ReportThreat(
 		ctx,
 		params.RequestPayload,
@@ -58,7 +63,7 @@ func ReportAnomaly(event *AnomalyEvent, params *models.ValidateRequestParams, po
 		reqHeaders,
 		nil,
 		0,
-		"AGENTIC",
+		contextSource,
 		host,
 		event.SessionID,
 		behaviour,
