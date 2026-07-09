@@ -71,11 +71,7 @@ const LanguageSafetyStep = ({
                                     <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
                                     <ControlInfoIcon
                                         description="Higher values are more permissive (fewer prompts blocked); lower values are stricter."
-                                        examples={[
-                                            { label: "Low (e.g. 0.2)", text: "asdf can u pls hlp me wiht tihs kthing." },
-                                            { label: "High (e.g. 0.8)", text: "xkq93 !!zpqo alkj3 9!! qexlm." },
-                                            { label: "Encoding artifacts (mojibake)", text: "â€œItâ€™s a beautiful day,â€ she said." }
-                                        ]}
+                                        examples={[]}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>
@@ -118,10 +114,7 @@ const LanguageSafetyStep = ({
                                     <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
                                     <ControlInfoIcon
                                         description="Higher values are more permissive (fewer prompts blocked); lower values are stricter."
-                                        examples={[
-                                            { label: "Low (e.g. 0.2)", text: "This is frustrating and unhelpful." },
-                                            { label: "High (e.g. 0.8)", text: "I hate this and everyone involved should suffer." }
-                                        ]}
+                                        examples={[]}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>

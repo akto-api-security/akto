@@ -43,7 +43,7 @@ const UsageGuardrailsStep = ({
                                 <RuleLabelWithTag name="Enable token limit detection" threats={RULE_OWASP_THREATS.tokenLimit} />
                                 <ControlInfoIcon
                                     description="Blocks unusually long prompts, often a sign of abuse (e.g. resource exhaustion or bulk data dumping). A lower limit (e.g. 500 tokens) blocks even moderately long prompts; a higher limit (e.g. 8000 tokens) only blocks extreme, essay-length inputs."
-                                    examples={[{ text: Array(20).fill("Please review this section of the contract and confirm every clause is acceptable.").join(" ") }]}
+                                    examples={[]}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>

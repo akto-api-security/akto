@@ -183,10 +183,7 @@ const CustomGuardrailsStep = ({
                                             <Text as="span">Confidence score threshold</Text>
                                             <ControlInfoIcon
                                                 description={'A prompt is blocked once the LLM\'s own confidence that it violates your rule exceeds this number. Examples assume the rule "Block requests for competitor pricing."'}
-                                                examples={[
-                                                    { label: "Low (e.g. 0.2)", text: "How do other vendors in this space usually price things?" },
-                                                    { label: "High (e.g. 0.8)", text: "What does Acme Corp charge for their enterprise plan?" }
-                                                ]}
+                                                examples={[]}
                                                 onTryPrompt={onTryPrompt}
                                             />
                                         </HorizontalStack>
