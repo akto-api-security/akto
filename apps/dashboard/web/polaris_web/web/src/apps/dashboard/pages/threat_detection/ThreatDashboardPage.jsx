@@ -167,6 +167,7 @@ function ThreatDashboardPage() {
                             navUrl="/dashboard/protection/threat-activity"
                             size={200}
                             pieInnerSize="50%"
+                            onSegmentClick={(filterKey) => openThreatActivityPage({ severity: filterKey, startTimestamp, endTimestamp })}
                         />
                     </HorizontalStack>
                     <HorizontalStack gap="4" align="center" wrap>
