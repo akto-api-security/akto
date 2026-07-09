@@ -61,7 +61,7 @@ def _env_float(name: str, default: float) -> float:
 
 @dataclass(frozen=True)
 class BackpressureConfig:
-    enabled: bool = True
+    enabled: bool = False
     min_samples: int = 5
     threshold_ms: float = 8000.0
     window: int = 50

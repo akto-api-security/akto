@@ -208,11 +208,11 @@ const api = {
         })
     },
 
-    importFromUrl(url, testRoleId, requestBody, customHeaders) {
+    importFromUrl(url, testRoleId, requestBody, customHeaders, collectionName) {
         return request({
             url: '/api/importFromUrl',
             method: 'post',
-            data: {url, testRoleId, requestBody, customHeaders}
+            data: {url, testRoleId, requestBody, customHeaders, collectionName}
         })
     },
 

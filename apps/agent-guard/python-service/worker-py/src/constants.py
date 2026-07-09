@@ -58,13 +58,20 @@ def get_default_config(raw_json: str = "") -> Dict[str, Any]:
 # Routing tables — the single source of truth for which backend handles a scan.
 # BanCode is LLM-judged (code detection via the Gemma arbiter), not the old
 # heuristic — see GEMMA_ONLY_SCANNERS for why it skips the Qwen tier.
-CASCADE_SCANNERS = {"PromptInjection", "BanTopics", "Toxicity", "Gibberish", "BanCode"}
+CASCADE_SCANNERS = {"PromptInjection", "BanTopics", "Toxicity", "Gibberish", "BanCode", "Password"}
 LOCAL_SCANNERS = {"BanSubstrings", "TokenLimit", "Secrets"}
 # Scanners the Qwen3Guard tier cannot judge (it emits a safety verdict, not a
 # code/quality verdict). For these, the Qwen FAST_THREAT_FILTER tier is stripped
 # from modelConfigs so only the arbiter LLM (Gemma) decides — otherwise Qwen
 # would fast-pass benign-but-flaggable input as "safe".
-GEMMA_ONLY_SCANNERS = {"BanCode"}
+GEMMA_ONLY_SCANNERS = {"BanCode", "Password"}
+# Password never uses a second-opinion arbiter (cost/latency) — enforced here so
+# it holds regardless of caller (policy modelConfigs, DEFAULT_MODEL_CONFIG_JSON,
+# or a direct /scan hit with no config at all), not just the Go gateway's own hardcode.
+FORCE_GEMMA_ONLY_SCANNERS = {"Password"}
+_HARDCODED_GEMMA_ONLY_CONFIG = [
+    {"provider": "gemma_vertexai", "modelRole": "FINAL_ARBITER", "timeoutMs": 30000}
+]
 
 
 def strip_qwen_tier(model_configs):
@@ -77,6 +84,11 @@ def strip_qwen_tier(model_configs):
         if not str(m.get("provider", "")).lower().startswith("qwen")
     ]
     return filtered or list(model_configs or [])
+
+
+def force_gemma_only(_model_configs):
+    """Replace whatever modelConfigs was supplied with the fixed Gemma-only map."""
+    return list(_HARDCODED_GEMMA_ONLY_CONFIG)
 # Scanners that proxy to a sibling Worker which in turn owns a Cloudflare
 # Container. Used for any scanner that needs a real Python runtime (spaCy,
 # torch, etc.) which Pyodide can't host.

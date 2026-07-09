@@ -49,7 +49,7 @@ const statusBadge = (s) => <Badge status={STATUS_COLOR[s] || ""}>{s}</Badge>;
 // ── Transform API policy to table format ───────────────────────────────────────
 const STATUS_MAP = { ACTIVE: "Active", INACTIVE: "Inactive", DRAFT: "Draft" };
 
-function transformApiPolicy(apiPolicy, idx, violCountByPolicy = {}) {
+function transformApiPolicy(apiPolicy, violCountByPolicy = {}) {
     const agents  = apiPolicy.scope?.agents  || [];
     const nhiIds  = apiPolicy.scope?.nhiIds  || [];
     const scope = agents.length === 0
@@ -63,7 +63,7 @@ function transformApiPolicy(apiPolicy, idx, violCountByPolicy = {}) {
     return {
         ...apiPolicy,
         hexId: policyId,
-        id: idx + 1,
+        id: policyId,
         policyName: apiPolicy.policyName,
         agents,
         nhiIds,
@@ -126,6 +126,8 @@ export default function PoliciesPage() {
         func.getTableTabIndexById(0, definedTableTabs, initialSelectedTab)
     );
     const [showDeleteModal, setShowDeleteModal]   = useState(false);
+    const [selectedPolicyIds, setSelectedPolicyIds] = useState([]);
+    const [deleting, setDeleting]                 = useState(false);
     const [showCreateModal, setShowCreateModal]   = useState(false);
     const [isEditMode, setIsEditMode]             = useState(false);
     const [editingPolicy, setEditingPolicy]       = useState(null);
@@ -167,7 +169,7 @@ export default function PoliciesPage() {
     }, [rawViolations]);
 
     const tableData = useMemo(
-        () => rawPolicies.map((p, i) => transformApiPolicy(p, i, violCountByPolicy)),
+        () => rawPolicies.map((p) => transformApiPolicy(p, violCountByPolicy)),
         [rawPolicies, violCountByPolicy]
     );
 
@@ -208,9 +210,10 @@ export default function PoliciesPage() {
     const handleSavePolicy = async (payload, policyId) => {
         try {
             await observeRequests.saveNhiPolicy(payload, policyId);
+            func.setToast(true, false, `Policy ${policyId ? "updated" : "created"} successfully`);
             await fetchPolicies();
         } catch (err) {
-            console.error("Error saving NHI policy:", err);
+            func.setToast(true, true, "Failed to save policy");
         }
     };
 
@@ -219,9 +222,24 @@ export default function PoliciesPage() {
         if (!policyId) return;
         try {
             await observeRequests.saveNhiPolicy({ status: "INACTIVE" }, policyId);
+            func.setToast(true, false, "Policy disabled successfully");
             await fetchPolicies();
         } catch (err) {
-            console.error("Error disabling NHI policy:", err);
+            func.setToast(true, true, "Failed to disable policy");
+        }
+    };
+
+    const handleDeletePolicies = async () => {
+        try {
+            setDeleting(true);
+            await observeRequests.deleteNhiPolicies(selectedPolicyIds);
+            func.setToast(true, false, `${selectedPolicyIds.length} polic${selectedPolicyIds.length > 1 ? "ies" : "y"} deleted successfully`);
+            setShowDeleteModal(false);
+            await fetchPolicies();
+        } catch (err) {
+            func.setToast(true, true, "Failed to delete policies");
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -311,8 +329,15 @@ export default function PoliciesPage() {
                     onRowClick={(r) => openEditModal(r)}
                     rowClickable={true}
                     getActions={getActionsList}
-                    promotedBulkActions={() => [
-                        { content: "Delete policy", destructive: true, onAction: () => setShowDeleteModal(true) },
+                    promotedBulkActions={(selectedResources) => [
+                        {
+                            content: "Delete policy",
+                            destructive: true,
+                            onAction: () => {
+                                setSelectedPolicyIds(selectedResources);
+                                setShowDeleteModal(true);
+                            },
+                        },
                     ]}
                 />,
             ]}
@@ -324,7 +349,8 @@ export default function PoliciesPage() {
             primaryAction={{
                 content: "Delete policy",
                 destructive: true,
-                onAction: () => setShowDeleteModal(false),
+                loading: deleting,
+                onAction: handleDeletePolicies,
             }}
             secondaryActions={[{ content: "Cancel", onAction: () => setShowDeleteModal(false) }]}
         >

@@ -266,8 +266,11 @@ public class LLMObservabilityAction extends UserAction {
             if (!es.isConfigured()) return Action.SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
+            // Sessions view always reports Atlas (endpoint) traffic, independent of the
+            // ambient request context.
             Map<String, List<String>> extraFilters = buildMultiFilters(true);
-            JSONObject baseQ = es.buildBaseQueryMulti(accountId, startMs(), endMs(), extraFilters.isEmpty() ? null : extraFilters, null);
+            extraFilters.put(AgentQueryRecord.F_IS_ATLAS_TRAFFIC, java.util.Collections.singletonList("true"));
+            JSONObject baseQ = es.buildBaseQueryMulti(accountId, startMs(), endMs(), extraFilters, null);
             JSONArray mustArr = baseQ.getJSONObject("bool").getJSONArray("must");
             mustArr.put(new JSONObject().put("exists", new JSONObject().put("field", AgentQueryRecord.F_SESSION_IDENTIFIER)));
             JSONObject filteredQuery = new JSONObject().put("bool", new JSONObject().put("must", mustArr));
@@ -369,15 +372,12 @@ public class LLMObservabilityAction extends UserAction {
             if (!es.isConfigured()) return Action.SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
-            // Base time-range + account query, then exclude Atlas traffic so the
-            // total here matches what the Argus paginated table reports.
-            JSONObject baseQ = es.buildBaseQuery(accountId, startMs(), endMs(), null, null);
-            JSONArray mustArr = baseQ.getJSONObject("bool").getJSONArray("must");
-            JSONObject filteredQuery = new JSONObject().put("bool", new JSONObject()
-                .put("must", mustArr)
-                .put("must_not", new JSONArray()
-                    .put(new JSONObject().put("term", new JSONObject()
-                        .put(AgentQueryRecord.F_IS_ATLAS_TRAFFIC, true)))));
+            // Argus view always reports non-Atlas (agent) traffic so the total here matches
+            // what the Argus paginated table reports; "false" also covers docs that predate
+            // this field and were never Atlas-tagged.
+            Map<String, List<String>> argusFilters = new HashMap<>();
+            argusFilters.put(AgentQueryRecord.F_IS_ATLAS_TRAFFIC, java.util.Collections.singletonList("false"));
+            JSONObject filteredQuery = es.buildBaseQueryMulti(accountId, startMs(), endMs(), argusFilters, null);
 
             long argusSparkEndMs = Math.min(endMs(), System.currentTimeMillis());
 
@@ -838,8 +838,12 @@ public class LLMObservabilityAction extends UserAction {
         List<String> subTopics = nonEmpty(subTopicFilters);
         if (!subTopics.isEmpty()) f.put(AgentQueryRecord.F_SUB_TOPIC_KW, subTopics);
         // Atlas traffic filter: ENDPOINT context only shows Atlas-sourced records
-        if (CONTEXT_SOURCE.ENDPOINT.equals(Context.contextSource.get()))
+        if (CONTEXT_SOURCE.ENDPOINT.equals(Context.contextSource.get())){
             f.put(AgentQueryRecord.F_IS_ATLAS_TRAFFIC, java.util.Collections.singletonList("true"));
+        }else{
+            f.put(AgentQueryRecord.F_IS_ATLAS_TRAFFIC, java.util.Collections.singletonList("false"));
+        }
+            
         return f;
     }
 

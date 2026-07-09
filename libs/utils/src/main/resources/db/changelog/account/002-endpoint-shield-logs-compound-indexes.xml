@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Compound indexes for the paginated endpoint-shield log query (getAgentLogs).
+        Mirrors EndpointShieldLogsDao.createIndicesIfAbsent. The paged find filters by
+        (agentId, key) equality and sorts/ranges on _id (Sorts.descending("_id") +
+        Filters.lt("_id", afterId)); per the ESR rule _id trails the equality fields so one
+        index serves both the cursor range and the sort. Without it the planner falls back to
+        the plain _id index and scans the whole collection for sparse keys (proxy/installation
+        logs), timing out on getMore. The second index backs the countDocuments total.
+
+        Index names/keys match MCollection.generateIndexName (all descending) so that if
+        DaoInit's createIndexIfAbsent already built them, these createIndex calls are no-ops.
+    -->
+
+    <changeSet id="002-account-endpoint-shield-logs-agentid-key-id-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="logs_endpoint_shield"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="logs_endpoint_shield">
+            <mongodb:keys>{ "agentId": -1, "key": -1, "_id": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "agentId-key-_id_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="logs_endpoint_shield">
+                <mongodb:keys>{ "agentId": -1, "key": -1, "_id": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="002-account-endpoint-shield-logs-agentid-key-timestamp-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="logs_endpoint_shield"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="logs_endpoint_shield">
+            <mongodb:keys>{ "agentId": -1, "key": -1, "timestamp": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "agentId-key-timestamp_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="logs_endpoint_shield">
+                <mongodb:keys>{ "agentId": -1, "key": -1, "timestamp": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

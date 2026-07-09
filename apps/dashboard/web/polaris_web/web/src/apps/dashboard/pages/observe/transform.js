@@ -764,7 +764,7 @@ const transform = {
                 auth_type: url.auth_type,
                 displayMethod: func.getEndpointMethodForDisplay({ method: url.method, url: url.endpoint, apiType: url.apiType }),
                 methodComp: <MethodBox method={url.method} url={url.endpoint} apiType={url.apiType} methodBoxWidth="48px" />,
-                endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} apiType={url.apiType} isNew={this.isNewEndpoint(url.lastSeenTs)} guardrailEnabled={guardrailEnabled} isMalicious={url.isMalicious || false} isMisconfigured={url.isMisconfigured || false} />,
+                endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} apiType={url.apiType} isNew={this.isNewEndpoint(url.lastSeenTs)} guardrailEnabled={guardrailEnabled} isMalicious={url.isMalicious || false} isMisconfigured={url.isMisconfigured || false} skillTags={url.skillTags || []} />,
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
                 riskScoreComp: <Badge status={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
                 isNew: this.isNewEndpoint(url.lastSeenTs),

@@ -1,0 +1,22 @@
+{
+  "comment": "Example kiro-cli agent config showing the Akto guardrail hooks block. The installer merges this `hooks` object into the target agent config (e.g. ~/.kiro/agents/<name>.json or the default agent). userPromptSubmit and preToolUse are fail-closed: a non-zero exit from the wrapper rejects the action.",
+  "hooks": {
+    "userPromptSubmit": [
+      {
+        "command": "bash ~/.kiro/hooks/akto/akto-validate-prompt-wrapper.sh"
+      }
+    ],
+    "preToolUse": [
+      {
+        "matcher": "*",
+        "command": "bash ~/.kiro/hooks/akto/akto-validate-pre-tool-wrapper.sh"
+      }
+    ],
+    "postToolUse": [
+      {
+        "matcher": "*",
+        "command": "bash ~/.kiro/hooks/akto/akto-validate-post-tool-wrapper.sh"
+      }
+    ]
+  }
+}

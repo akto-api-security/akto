@@ -12,6 +12,7 @@ import lombok.Setter;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class NhiGovernanceIdentitiesAction extends UserAction {
@@ -26,6 +27,9 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
 
     @Setter
     private String identityId;
+
+    @Setter
+    private List<String> identityIds;
 
     @Setter
     private int startTimestamp;
@@ -72,6 +76,34 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error disabling NHI identity: " + e.getMessage());
+            addActionError(e.getMessage());
+            success = false;
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public String deleteNhiIdentities() {
+        try {
+            if (identityIds == null || identityIds.isEmpty()) {
+                addActionError("Identity IDs are required");
+                success = false;
+                return Action.ERROR.toUpperCase();
+            }
+
+            List<ObjectId> objectIds = new ArrayList<>();
+            for (String id : identityIds) {
+                objectIds.add(new ObjectId(id));
+            }
+
+            Bson filter = Filters.in(NhiIdentity.ID, objectIds);
+            NhiIdentityDao.instance.deleteAll(filter);
+
+            loggerMaker.infoAndAddToDb("Deleted " + identityIds.size() + " NHI identities by user: " + getSUser().getLogin());
+
+            success = true;
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error deleting NHI identities: " + e.getMessage());
             addActionError(e.getMessage());
             success = false;
             return Action.ERROR.toUpperCase();

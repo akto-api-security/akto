@@ -14,6 +14,8 @@ message Metadata {
   string reason = 6;
   string dest_country_code = 7;
   string behaviour = 8;
+  string remediation = 9; 
+  string overview = 10;
 }
 
 message SchemaConformanceError {

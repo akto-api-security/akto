@@ -120,9 +120,15 @@ class ModelMapScanner:
             logger.info(f"[ModelMap] {_ROLE_TIER2}=UNSAFE → arbiter")
             return await self._run_arbiters(arbiters, arb)
 
+        completed_pool = res2["completed"] or res1["completed"]
+        if not completed_pool:
+            # Both tiers empty (no models assigned) means no real judgment was made — escalate, don't fabricate "safe".
+            logger.error(f"[ModelMap] {self.scanner_name}: {_ROLE_TIER1}/{_ROLE_TIER2} both empty, escalating to arbiter")
+            return await self._run_arbiters(arbiters, arb)
+
         logger.info(f"[ModelMap] {_ROLE_TIER2}={res2['majority']} → SAFE")
         self._cancel(arb)  # eager arbiters spawned but not needed
-        winner = max(res2["completed"] or res1["completed"], key=lambda r: r["risk_score"])
+        winner = max(completed_pool, key=lambda r: r["risk_score"])
         winner["is_valid"] = True
         return winner
 
@@ -194,12 +200,10 @@ class ModelMapScanner:
         if not completed:
             return self._error_result("all arbiters failed")
 
-        # Convict only on an affirmative flag. safeDecisionThreshold is an
-        # escalation gate for the fast tiers; at the final stage there is no one
-        # left to escalate to, and applying it here would turn a low-confidence
-        # acquittal ("not banned, 85% sure") into a block.
+        # Convict only on an affirmative flag; safeDecisionThreshold only gates the fast tiers, not the final call.
         unsafe = [r for r in completed if not r.get("is_valid", True)]
-        winner = max(unsafe or completed, key=lambda r: r["risk_score"])
+        pool = unsafe or completed
+        winner = pool[0]  # first-listed arbiter in modelConfigs wins ties/disagreement
         winner["is_valid"] = not unsafe
         return winner
 
@@ -235,6 +239,8 @@ class ModelMapScanner:
         }
         if "error" in winner_details:
             details["error"] = winner_details["error"]
+        if winner_details.get("values"):  # Password: exact secret substrings to redact
+            details["values"] = winner_details["values"]
         completed_by_stem = self._index_completed_by_stem()
         for entry in self.config.get("modelConfigs", []):
             stem = self._stem(entry.get("provider", ""))

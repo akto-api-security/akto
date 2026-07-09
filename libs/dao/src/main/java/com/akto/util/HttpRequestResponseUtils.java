@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
+import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -582,4 +583,12 @@ public class HttpRequestResponseUtils {
         }
     }
 
+    public static String extractHostFromUrl(String url) throws Exception {
+        URL parsedUrl = new URL(url);
+        String host = parsedUrl.getHost();
+        if (host == null || host.trim().isEmpty()) {
+            throw new IllegalArgumentException("Invalid URL: no host found");
+        }
+        return host.toLowerCase().trim();
+    }
 }

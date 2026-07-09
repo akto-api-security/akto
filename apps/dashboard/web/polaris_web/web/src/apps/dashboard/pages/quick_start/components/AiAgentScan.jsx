@@ -11,6 +11,7 @@ const MAX_HEADERS = 5
 const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.", defaultRequestBody = { "model": "llama3.2", "prompt": "Why is the sky blue?" }, docsLink = "https://docs.akto.io/ai-security" }) => {
     const [loading, setLoading] = useState(false)
     const [url, setUrl] = useState('')
+    const [collectionName, setCollectionName] = useState('')
     const [useCustomRequestBody, setUseCustomRequestBody] = useState(false)
     const [customRequestBody, setCustomRequestBody] = useState('')
     const [useTestRole, setUseTestRole] = useState(false)
@@ -81,9 +82,11 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
         try {
             const testRoleToSend = useTestRole ? testRole : null
             const customHeaders = headersArrayToObject()
-            await api.importFromUrl(url, testRoleToSend, requestBodyToSend || null, customHeaders)
+            const collectionNameToSend = collectionName.trim() || null
+            await api.importFromUrl(url, testRoleToSend, requestBodyToSend || null, customHeaders, collectionNameToSend)
             func.setToast(true, false, "AI agent imported successfully.")
             setUrl('')
+            setCollectionName('')
             setCustomRequestBody('')
             setUseCustomRequestBody(false)
             setUseTestRole(false)
@@ -107,13 +110,21 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
             <Box paddingBlockStart={3}><Divider /></Box>
 
             <VerticalStack gap="4">
-                <TextField 
-                    label="AI Endpoint URL" 
-                    value={url} 
-                    onChange={setUrl} 
+                <TextField
+                    label="AI Endpoint URL"
+                    value={url}
+                    onChange={setUrl}
                     placeholder="https://api.example.com/ai-agent"
                     type="url"
                     helpText="Enter the AI endpoint URL"
+                />
+
+                <TextField
+                    label="AI Agent name (optional)"
+                    value={collectionName}
+                    onChange={setCollectionName}
+                    placeholder="my-ai-agent"
+                    helpText="If not provided, the hostname from the URL will be used"
                 />
 
                 <Checkbox

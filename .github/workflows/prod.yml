@@ -485,29 +485,6 @@ jobs:
           cache-from: type=gha,scope=agent-guard-embedder
           cache-to: type=gha,mode=max,scope=agent-guard-embedder
 
-      - name: Azure login
-        if: github.event.inputs.agent_guard_deploy_azure == 'true'
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Install Azure Container Apps CLI extension
-        if: github.event.inputs.agent_guard_deploy_azure == 'true'
-        run: az extension add --name containerapp --upgrade
-
-      - name: Deploy to Azure Container Apps
-        if: github.event.inputs.agent_guard_deploy_azure == 'true'
-        env:
-          RG: ${{ secrets.AGENT_GUARD_AZURE_RESOURCE_GROUP }}
-          WORKER_APPS: ${{ secrets.AGENT_GUARD_AZURE_WORKER_APPS }}
-          ANONYMIZER_APP: ${{ secrets.AGENT_GUARD_AZURE_ANONYMIZER_APP }}
-          AGENT_GUARD_AZURE_IMAGE_TAG: ${{ secrets.AGENT_GUARD_AZURE_IMAGE_TAG }}
-          RELEASE_VERSION: ${{ github.event.inputs.release_version_agent_guard }}
-        run: |
-          chmod +x apps/agent-guard/deploy/azure-deploy.sh
-          export IMAGE_TAG="${AGENT_GUARD_AZURE_IMAGE_TAG:-${RELEASE_VERSION:-latest}}"
-          apps/agent-guard/deploy/azure-deploy.sh
-
       - name: Push git tag
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.1

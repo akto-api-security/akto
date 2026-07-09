@@ -17,6 +17,8 @@ See [README.md](../README.md), [ENV.md](../ENV.md). No Cloudflare DNS cutover �
 > The semantic cache (embedder + Redis) has moved to guardrails-service, which
 > now caches in front of agent-guard's `/scan`. agent-guard no longer deploys an
 > embedder or Redis, and workers no longer read `CACHE_*` / `EMBEDDER_URL` / `REDIS_URL`.
+> To deploy guardrails-service + the embedder + Redis/RediSearch on Azure, see
+> [`apps/guardrails-service/deploy/azure.md`](../../guardrails-service/deploy/azure.md).
 
 Deploy order: **anonymizer → executor-v2 → executor**.
 
