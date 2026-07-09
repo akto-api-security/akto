@@ -473,6 +473,10 @@ public class MaliciousEventService {
       query.append("filterId", new Document("$in", filter.getLatestAttackList()));
     }
 
+    if (!filter.getSeverityList().isEmpty()) {
+      query.append("severity", new Document("$in", filter.getSeverityList()));
+    }
+
     // Handle status filter
     if (filter.hasStatusFilter()) {
       applyStatusFilter(query, filter.getStatusFilter());

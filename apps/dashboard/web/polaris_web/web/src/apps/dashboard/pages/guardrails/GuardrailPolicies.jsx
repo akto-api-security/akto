@@ -214,10 +214,10 @@ function GuardrailPolicies() {
     const fetchGuardrailPolicies = async () => {
         setLoading(true);
         try {
-            const response = await api.fetchGuardrailPolicies();
-            if (response && response.guardrailPolicies) {
+            const policies = await api.fetchAllGuardrailPolicies();
+            if (policies) {
                 const showSystemTag = func.isDemoAccount();
-                let formattedPolicies = response.guardrailPolicies.map(policy => ({
+                let formattedPolicies = policies.map(policy => ({
                         id: policy.hexId,
                         policy: showSystemTag && (policy.createdBy || "").toLowerCase().includes("system")
                             ? (
@@ -683,7 +683,7 @@ function GuardrailPolicies() {
             filterStateUrl="/dashboard/guardrails/policies/"
             disambiguateLabel={disambiguateLabel}
             hideQueryField={true}
-            hidePagination={true}
+            pageLimit={20}
             showFooter={false}
             sortOptions={sortOptions}
             emptyStateMarkup={emptyStateMarkup}

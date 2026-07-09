@@ -25,6 +25,7 @@ public class NhiGovernancePoliciesAction extends UserAction {
     @Getter private boolean success = false;
 
     @Setter private String policyId;
+    @Setter private List<String> policyIds;
 
     public String fetchNhiPolicies() {
         try {
@@ -91,6 +92,32 @@ public class NhiGovernancePoliciesAction extends UserAction {
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error saving NHI policy: " + e.getMessage());
+            addActionError(e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public String deleteNhiPolicies() {
+        try {
+            if (policyIds == null || policyIds.isEmpty()) {
+                addActionError("Policy IDs are required");
+                return Action.ERROR.toUpperCase();
+            }
+
+            List<ObjectId> objectIds = new ArrayList<>();
+            for (String id : policyIds) {
+                objectIds.add(new ObjectId(id));
+            }
+
+            Bson filter = Filters.in(NhiPolicy.ID, objectIds);
+            NhiPolicyDao.instance.deleteAll(filter);
+
+            loggerMaker.infoAndAddToDb("Deleted " + policyIds.size() + " NHI policies by user: " + getSUser().getLogin());
+
+            success = true;
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error deleting NHI policies: " + e.getMessage());
             addActionError(e.getMessage());
             return Action.ERROR.toUpperCase();
         }

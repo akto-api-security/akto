@@ -10,7 +10,7 @@ import JiraTicketCreationModal from "../../components/shared/JiraTicketCreationM
 import issuesFunctions from "@/apps/dashboard/pages/issues/module";
 import settingFunctions from "@/apps/dashboard/pages/settings/module";
 
-export default function ViolationDetailsPanel({ row, show, setShow }) {
+export default function ViolationDetailsPanel({ row, show, setShow, onUpdated }) {
     const [actionActive, setActionActive] = useState(false);
     const [marking, setMarking] = useState(false);
     const [jiraModalActive, setJiraModalActive] = useState(false);
@@ -22,14 +22,14 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
         try {
             setMarking(true);
             await observeRequests.markViolationAsFixed(row.id);
-            setMarking(false);
+            func.setToast(true, false, "Violation marked as fixed");
             setActionActive(false);
             setShow(false);
-            window.location.reload();
+            await onUpdated?.();
         } catch (err) {
-            console.error("Error marking violation as fixed:", err);
+            func.setToast(true, true, "Failed to mark violation as fixed");
+        } finally {
             setMarking(false);
-            setActionActive(false);
         }
     };
 
@@ -37,14 +37,14 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
         try {
             setMarking(true);
             await observeRequests.reopenViolation(row.id);
-            setMarking(false);
+            func.setToast(true, false, "Violation reopened");
             setActionActive(false);
             setShow(false);
-            window.location.reload();
+            await onUpdated?.();
         } catch (err) {
-            console.error("Error reopening violation:", err);
+            func.setToast(true, true, "Failed to reopen violation");
+        } finally {
             setMarking(false);
-            setActionActive(false);
         }
     };
 
@@ -77,12 +77,17 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
         }
 
         setJiraModalActive(false);
-        observeRequests.createJiraTicketFromViolation(row.id, window.location.origin, projId, issueType, jiraMetaData).then((res) => {
+        observeRequests.createJiraTicketFromViolation(row.id, window.location.origin, projId, issueType, jiraMetaData).then(async (res) => {
             if (!res?.errorMessage) {
+                func.setToast(true, false, "Jira ticket created successfully");
                 setShow(false);
-                window.location.reload();
+                await onUpdated?.();
+            } else {
+                func.setToast(true, true, res.errorMessage);
             }
-        }).catch(() => {});
+        }).catch(() => {
+            func.setToast(true, true, "Failed to create Jira ticket");
+        });
     };
 
     // ── TitleComponent ────────────────────────────────────────────────────────
