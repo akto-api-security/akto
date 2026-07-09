@@ -3,10 +3,9 @@ module github.com/akto-api-security/guardrails-service
 go 1.24.11
 
 require (
-	github.com/akto-api-security/akto-endpoint-shield v0.0.0-20260708064202-0b3adafd0c42
+	github.com/akto-api-security/akto-endpoint-shield v0.0.0-20260708154917-3cd6594a8fac
 	github.com/gin-gonic/gin v1.11.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
-	github.com/redis/go-redis/v9 v9.20.0
 	github.com/segmentio/kafka-go v0.4.49
 	github.com/tsawler/tabula v1.6.6
 	go.uber.org/zap v1.27.1
@@ -87,6 +86,7 @@ require (
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.57.1 // indirect
+	github.com/redis/go-redis/v9 v9.20.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rs/zerolog v1.33.0 // indirect
@@ -133,6 +133,6 @@ require (
 )
 
 replace (
-	github.com/akto-api-security/akto-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260708064202-0b3adafd0c42
+	github.com/akto-api-security/akto-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260708154917-3cd6594a8fac
 	github.com/shoenig/go-m1cpu => ./internal/stub/go-m1cpu
 )
