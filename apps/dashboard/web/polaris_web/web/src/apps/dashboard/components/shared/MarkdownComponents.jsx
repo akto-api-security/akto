@@ -1,6 +1,4 @@
-import React, { useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { Box, Text } from '@shopify/polaris'
 import ChartRenderer from './ChartRenderer'
 
 // Shared markdown components for consistent styling across AIMessage and MarkdownViewer
@@ -84,22 +82,15 @@ export const markdownStyles = `
         line-height: 1.6;
     }
     
-    .markdown-content .markdown-ul {
-        margin: 0.5em 0;
-        padding-left: 1.5em;
-        list-style-type: disc;
-    }
-
+    .markdown-content .markdown-ul,
     .markdown-content .markdown-ol {
         margin: 0.5em 0;
         padding-left: 1.5em;
-        list-style-type: decimal;
     }
-
+    
     .markdown-content .markdown-li {
         margin: 0.2em 0;
         line-height: 1.5;
-        display: list-item;
     }
     
     .markdown-content .markdown-inline-code {
@@ -220,43 +211,5 @@ export const MarkdownRenderer = ({ children }) => {
             {children}
         </ReactMarkdown>
     )
-}
-
-// ─── Inline phrase highlighting ──────────────────────────────────────────────
-// Splits `text` so any phrase in `highlights` is wrapped in a pink highlight
-// span (.violation-evidence-highlight). Sequential first-match scan.
-
-export function splitHighlights(text, highlights = []) {
-    const phrases = (highlights || []).filter(Boolean);
-    if (!phrases.length) return [text];
-    const parts = [];
-    let remaining = text;
-    let guard = 0;
-    while (remaining.length && guard < 2000) {
-        guard++;
-        let best = null;
-        for (const h of phrases) {
-            const i = remaining.indexOf(h);
-            if (i >= 0 && (best === null || i < best.i)) best = { i, h };
-        }
-        if (!best) { parts.push(remaining); break; }
-        if (best.i > 0) parts.push(remaining.slice(0, best.i));
-        parts.push({ hl: best.h });
-        remaining = remaining.slice(best.i + best.h.length);
-    }
-    return parts;
-}
-
-export function HighlightedText({ text, highlights, mono }) {
-    const parts = useMemo(() => splitHighlights(text || '', highlights), [text, highlights]);
-    const nodes = parts.map((p, i) =>
-        typeof p === 'string'
-            ? <React.Fragment key={i}>{p}</React.Fragment>
-            : <Box as="span" key={i} className="violation-evidence-highlight">{p.hl}</Box>
-    );
-    if (mono) {
-        return <Box className="violation-evidence-pre">{nodes}</Box>;
-    }
-    return <Text variant="bodyMd" as="span">{nodes}</Text>;
 }
 

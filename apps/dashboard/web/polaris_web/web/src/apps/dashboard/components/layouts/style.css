@@ -27,10 +27,6 @@
 .agentic-type-MCP .Polaris-Badge     { background-color: #ECFDF5; color: #0D9488; }
 .agentic-type-LLM .Polaris-Badge     { background-color: #FEFCE8; color: #CA8A04; }
 .agentic-type-SKILL .Polaris-Badge   { background-color: #F9FAFB; color: #6B7280; }
-.agentic-type-PROMPT .Polaris-Badge  { background-color: #E0F7FA; color: #0E7490; }
-.agentic-type-CONFIG .Polaris-Badge  { background-color: #FEFCE8; color: #CA8A04; }
-.agentic-type-TOOL .Polaris-Badge    { background-color: #ECFDF5; color: #0D9488; }
-.agentic-type-LLMS .Polaris-Badge    { background-color: #FEE2E2; color: #DC2626; }
 .agentic-type-DEFAULT .Polaris-Badge { background-color: #F3F4F6; color: #374151; }
 
 
@@ -91,34 +87,7 @@
     align-items: center;
 }
 
-/* Name cell in top-list card: fill remaining flex space so text truncates correctly.
-   flex:1 cannot be expressed via Polaris Box — no flexGrow prop exists. */
-.agentic-name-fill {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-}
-
-/* Hidden measurement layer for BreakdownLegend (AgenticStatsCard ResizeObserver pattern).
-   position/visibility/pointer-events cannot be expressed via Polaris Box. */
-.breakdown-legend-measure {
-    position: absolute;
-    visibility: hidden;
-    pointer-events: none;
-    display: flex;
-    gap: 4px;
-    top: 0;
-    left: 0;
-}
-
 /* Cursor + hover — DataTable owns all spacing/borders */
-.agentic-list-table table {
-    table-layout: fixed;
-    width: 100%;
-}
-.agentic-list-table .Polaris-DataTable__Cell:first-child {
-    width: 60%;
-}
 .agentic-list-table .Polaris-DataTable__Cell {
     cursor: pointer;
 }
@@ -130,10 +99,6 @@
 }
 .agentic-list-table .Polaris-DataTable__TableRow:hover .Polaris-DataTable__Cell {
     background-color: var(--p-color-bg-hover, #f6f6f7);
-}
-/* Selected row — applied via data-active="true" on the inner cell div. */
-.agentic-list-table .Polaris-DataTable__TableRow:has([data-active="true"]) .Polaris-DataTable__Cell {
-    background-color: var(--p-color-bg-surface-selected, #f3f0ff);
 }
 .agentic-list-table .Polaris-DataTable__Cell--header {
     color: var(--p-color-text-subdued, #6D7175);
@@ -152,82 +117,6 @@
     min-width: 2px;
 }
 
-
-/* Violation flyout evidence block — pink-tinted card (Blocked Prompt /
-   Suspicious Skill / Suspicious Config). No Polaris token for this tint. */
-/* The message/code body inside the evidence block — quote-style left accent bar. */
-.violation-evidence-quote {
-    border-left: 2px solid #E0431F;
-    padding-left: 12px;
-}
-/* Avatar + quote row — force top-alignment regardless of content height.
-   HorizontalStack blockAlign="start" relies on a CSS custom property pipeline that
-   can fail in some Polaris builds; an explicit class is the reliable fallback. */
-.violation-evidence-author-row {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--p-space-3);
-    width: 100%;
-}
-/* Author/file name in the evidence header — subtle underline like the design. */
-.violation-evidence-name {
-    text-decoration: underline;
-    text-underline-offset: 2px;
-}
-/* Inline highlight for risky phrases inside the evidence/chat body. */
-.violation-evidence-highlight {
-    background-color: #FCE4E2;
-    color: #B42318;
-    border-radius: 2px;
-    padding: 0 2px;
-}
-/* Monospace preformatted evidence excerpt — preserve whitespace/newlines. */
-.violation-evidence-pre {
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 12px;
-    line-height: 1.6;
-    white-space: pre-wrap;
-    word-break: break-word;
-    color: #202223;
-}
-
-/* Violations table wrapper — flex column so AG Grid can autoHeight inside it. */
-.violations-table-wrap {
-    display: flex;
-    flex-direction: column;
-    min-height: 480px;
-}
-
-.violations-row-selected.ag-row {
-    background-color: var(--p-color-bg-surface-selected, #f3f0ff) !important;
-    border-left: 3px solid var(--p-color-border-interactive, #6d52c9) !important;
-}
-
-/* Chat message outer row — icon | divider | content, top-aligned.
-   Same reliable-CSS-class pattern as violation-evidence-author-row. */
-.chat-message-row {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--p-space-3);
-}
-
-/* Chat message icon container — fixed 20×20 centred wrapper for avatar/logo img. */
-.chat-message-icon-wrap {
-    flex-shrink: 0;
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* Chat message left divider bar — colour set via --chat-divider-color custom prop. */
-.chat-message-divider {
-    width: 2px;
-    flex-shrink: 0;
-    align-self: stretch;
-    background-color: var(--chat-divider-color, #E1E3E5);
-}
 
 /* flex: 1 + flexDirection: column + minHeight: 0 — required for AG Grid fill-height
    inside flyout panels. No Polaris prop equivalent for flex/flexDirection. */
