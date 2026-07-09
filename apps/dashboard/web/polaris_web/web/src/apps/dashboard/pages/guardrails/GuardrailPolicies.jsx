@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList, Scrollable, Avatar, Box } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
@@ -169,13 +169,14 @@ function GuardrailPolicies() {
 
     const location = useLocation();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
 
     // Agent filter is Argus-only; hide on Atlas.
     const tableHeaders = isEndpointSecurityCategory()
         ? headings
         : [...headings, agentFilterHeader];
 
-    const policyName = new URLSearchParams(window.location.search).get("policy");
+    const policyName = searchParams.get("policy");
 
     useEffect(() => {
         const prefill = location.state?.topicGuardrailPrefill;
@@ -185,9 +186,9 @@ function GuardrailPolicies() {
         setIsPreset(true);
         setCreateInitialStep(2);
         setShowCreateModal(true);
-        // Clear router state so this doesn't re-trigger on re-render / back-nav.
-        navigate(location.pathname, { replace: true, state: {} });
-    }, [location.state, location.pathname, navigate]);
+        // Clear router state, keep existing query params (e.g. filters) intact.
+        navigate(location.pathname + location.search, { replace: true, state: {} });
+    }, [location.state, location.pathname, location.search, navigate]);
 
     // Load guardrail policies on component mount
     useEffect(() => {
@@ -660,6 +661,7 @@ function GuardrailPolicies() {
                     setIsEditMode(false);
                     setIsPreset(false);
                     setCreateInitialStep(1);
+                    func.updateQueryParams(searchParams, setSearchParams, "policy", "");
                 }}
                 onSave={handleCreateGuardrail}
                 editingPolicy={editingPolicy}
