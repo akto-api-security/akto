@@ -1359,7 +1359,8 @@ public class DbLayer {
     }
 
     public static void insertEndpointShieldLog(LogsEndpointShield log) {
-        LogsEndpointShieldDao.instance.insertOne(log);
+        // todo: temp disable endpoint shield logs to avoid collection size issues, will re-enable after fixing the issue
+        // LogsEndpointShieldDao.instance.insertOne(log);
     }
 
     public static void modifyHybridSaasSetting(boolean isHybridSaas) {
