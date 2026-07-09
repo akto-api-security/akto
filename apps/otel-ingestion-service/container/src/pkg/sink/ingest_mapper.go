@@ -9,7 +9,10 @@ import (
 	"strings"
 	"time"
 
+	shieldmcp "github.com/akto-api-security/akto-endpoint-shield/mcp"
+	"github.com/akto-api-security/akto-endpoint-shield/utils"
 	"github.com/akto-api-security/otel-ingestion-service/pkg/model"
+	"github.com/akto-api-security/otel-ingestion-service/pkg/strutil"
 )
 
 var slugSanitizer = regexp.MustCompile(`[^a-z0-9._~-]+`)
@@ -17,9 +20,7 @@ var slugSanitizer = regexp.MustCompile(`[^a-z0-9._~-]+`)
 const (
 	connectorClaudeCowork = "claude_cowork"
 	guardrailModeObserve  = "observe"
-	ingestSourceMirroring = "MIRRORING"
-	atlasSourceEndpoint   = "ENDPOINT"
-	aiAgentTagKey         = "ai-agent"
+	genAITagValue         = "Gen AI"
 	coworkHookHeader      = "x-claude_cowork-hook"
 	installerHeaderPrefix = "x-akto-installer-"
 	maxDevicePrefixLen    = 12
@@ -28,30 +29,11 @@ const (
 	mcpIngestPath         = "/mcp"
 )
 
+// ingestDataRecord extends shield ingest batch rows with guardrails routing fields.
 type ingestDataRecord struct {
-	Path                string `json:"path"`
-	RequestHeaders      string `json:"requestHeaders"`
-	ResponseHeaders     string `json:"responseHeaders"`
-	Method              string `json:"method"`
-	RequestPayload      string `json:"requestPayload"`
-	ResponsePayload     string `json:"responsePayload"`
-	IP                  string `json:"ip"`
-	DestIP              string `json:"destIp"`
-	Time                string `json:"time"`
-	StatusCode          string `json:"statusCode"`
-	Type                string `json:"type"`
-	Status              string `json:"status"`
-	AktoAccountID       string `json:"akto_account_id"`
-	AktoVXLANID         string `json:"akto_vxlan_id"`
-	IsPending           string `json:"is_pending"`
-	Source              string `json:"source"`
-	Direction           string `json:"direction,omitempty"`
-	ProcessID           string `json:"process_id,omitempty"`
-	SocketID            string `json:"socket_id,omitempty"`
-	DaemonsetID         string `json:"daemonset_id,omitempty"`
-	EnabledGraph        string `json:"enabled_graph,omitempty"`
-	Tag                 string `json:"tag"`
+	shieldmcp.IngestDataBatch
 	PublishToGuardrails bool   `json:"publishToGuardrails"`
+	ContextSource       string `json:"contextSource,omitempty"`
 }
 
 type ingestDataRequest struct {
@@ -127,7 +109,7 @@ func mergePromptTurnEvents(events []model.OtelIngestEvent) []model.OtelIngestEve
 			continue
 		}
 
-		promptID := firstNonEmptyAttr(e.Attributes, "prompt.id", "prompt_id")
+		promptID := strutil.FirstNonEmpty(e.Attributes, "prompt.id", "prompt_id")
 		if promptID == "" {
 			promptID = e.CorrelationID
 		}
@@ -147,24 +129,24 @@ func mergePromptTurnEvents(events []model.OtelIngestEvent) []model.OtelIngestEve
 		switch hook {
 		case "user_prompt":
 			turn.hasUserPrompt = true
-			if v := firstNonEmptyAttr(e.Attributes, "prompt"); v != "" {
+			if v := strutil.FirstNonEmpty(e.Attributes, "prompt"); v != "" {
 				turn.prompt = v
 			}
 			if turn.base.Timestamp.IsZero() || e.Timestamp.Before(turn.base.Timestamp) {
 				turn.base = e
 			}
 		case "assistant_response":
-			if v := firstNonEmptyAttr(e.Attributes, "response"); v != "" {
+			if v := strutil.FirstNonEmpty(e.Attributes, "response"); v != "" {
 				turn.response = v
 			}
-			if v := firstNonEmptyAttr(e.Attributes, "model"); v != "" {
+			if v := strutil.FirstNonEmpty(e.Attributes, "model"); v != "" {
 				turn.model = v
 			}
 			if !e.Timestamp.IsZero() {
 				turn.base = e
 			}
 		case "api_request":
-			if v := firstNonEmptyAttr(e.Attributes, "model"); v != "" {
+			if v := strutil.FirstNonEmpty(e.Attributes, "model"); v != "" {
 				turn.model = v
 			}
 			if v := intAttr(e.Attributes, "input_tokens"); v > 0 {
@@ -227,9 +209,9 @@ func mergePromptTurnEvents(events []model.OtelIngestEvent) []model.OtelIngestEve
 func eventToIngestRecord(e model.OtelIngestEvent) (ingestDataRecord, error) {
 	devicePrefix := deriveDevicePrefix(e.Attributes)
 	hookName := hookNameFromEvent(e.EventName)
-	promptID := firstNonEmptyAttr(e.Attributes, "prompt.id", "prompt_id")
+	promptID := strutil.FirstNonEmpty(e.Attributes, "prompt.id", "prompt_id")
 	sessionID := e.Attributes["session.id"]
-	userEmail := firstNonEmptyAttr(e.Attributes, "user.email", "user_email")
+	userEmail := strutil.FirstNonEmpty(e.Attributes, "user.email", "user_email")
 
 	toolName := toolNameFromEvent(e.EventName, e.Attributes)
 	mcpServer, mcpTool := parseMCPToolName(toolName)
@@ -243,8 +225,8 @@ func eventToIngestRecord(e model.OtelIngestEvent) (ingestDataRecord, error) {
 	}
 
 	tagObj := map[string]string{
-		"gen-ai":         "Gen AI",
-		"source":         atlasSourceEndpoint,
+		"gen-ai":         genAITagValue,
+		utils.SourceTag:  utils.EndpointSource,
 		"hook":           hookName,
 		"akto_connector": connectorClaudeCowork,
 		"mode":           guardrailModeObserve,
@@ -253,7 +235,7 @@ func eventToIngestRecord(e model.OtelIngestEvent) (ingestDataRecord, error) {
 		tagObj["mcp-server"] = "MCP Server"
 		tagObj["mcp-client"] = connectorClaudeCowork
 	} else {
-		tagObj[aiAgentTagKey] = connectorClaudeCowork
+		tagObj[utils.AgentSource] = connectorClaudeCowork
 	}
 	if promptID != "" {
 		tagObj["prompt_id"] = promptID
@@ -261,11 +243,11 @@ func eventToIngestRecord(e model.OtelIngestEvent) (ingestDataRecord, error) {
 	if sessionID != "" {
 		tagObj["session_id"] = sessionID
 	}
-	// Username for Agentic UI: also registered as collection envType tags via register_cowork_collections.py
+	// Username for Agentic UI: registered as collection envType tags via module heartbeat.
 	if userEmail != "" {
 		tagObj["username"] = userEmail
 	}
-	if osName := normalizeOsType(firstNonEmptyAttr(e.Attributes, "os.type", "os_type")); osName != "" {
+	if osName := normalizeOsType(strutil.FirstNonEmpty(e.Attributes, "os.type", "os_type")); osName != "" {
 		tagObj["os"] = osName
 	}
 	if toolName != "" {
@@ -298,24 +280,26 @@ func eventToIngestRecord(e model.OtelIngestEvent) (ingestDataRecord, error) {
 	}
 
 	return ingestDataRecord{
-		Path:                path,
-		RequestHeaders:      string(reqHeaders),
-		ResponseHeaders:     "{}",
-		Method:              "POST",
-		RequestPayload:      reqPayload,
-		ResponsePayload:     respPayload,
-		IP:                  ip,
-		DestIP:              "",
-		Time:                strconv.FormatInt(ts.Unix(), 10),
-		StatusCode:          "200",
-		Type:                "HTTP/1.1",
-		Status:              "OK",
-		AktoAccountID:       strconv.Itoa(e.AccountID),
-		AktoVXLANID:         devicePrefix,
-		IsPending:           "false",
-		Source:              ingestSourceMirroring,
-		Tag:                 string(tagJSON),
+		IngestDataBatch: shieldmcp.IngestDataBatch{
+			Path:            path,
+			RequestHeaders:  string(reqHeaders),
+			ResponseHeaders: "{}",
+			Method:          "POST",
+			RequestPayload:  reqPayload,
+			ResponsePayload: respPayload,
+			IP:              ip,
+			Time:            strconv.FormatInt(ts.Unix(), 10),
+			StatusCode:      "200",
+			Type:            "HTTP/1.1",
+			Status:          "OK",
+			AktoAccountID:   strconv.Itoa(e.AccountID),
+			AktoVxlanID:     devicePrefix,
+			IsPending:       "false",
+			Source:          "MIRRORING",
+			Tag:             string(tagJSON),
+		},
 		PublishToGuardrails: true,
+		ContextSource:       utils.EndpointSource,
 	}, nil
 }
 
@@ -335,15 +319,15 @@ func buildPathAndPayloads(
 	case "user_prompt", "assistant_response":
 		// Shield parity for LLM Observability — /v1/messages with Anthropic-shaped payloads.
 		path = llmMessagesPath
-		promptText := firstNonEmptyAttr(e.Attributes, "prompt")
-		responseText := firstNonEmptyAttr(e.Attributes, "response")
-		model := firstNonEmptyAttr(e.Attributes, "model")
+		promptText := strutil.FirstNonEmpty(e.Attributes, "prompt")
+		responseText := strutil.FirstNonEmpty(e.Attributes, "response")
+		modelName := strutil.FirstNonEmpty(e.Attributes, "model")
 		inputTok := intAttr(e.Attributes, "input_tokens")
 		outputTok := intAttr(e.Attributes, "output_tokens")
 
 		reqBody := promptText
 		if reqBody == "" && hookName == "user_prompt" {
-			reqBody = firstNonEmptyAttr(e.Attributes, "prompt_length")
+			reqBody = strutil.FirstNonEmpty(e.Attributes, "prompt_length")
 		}
 		reqBytes, err := json.Marshal(map[string]string{"body": reqBody})
 		if err != nil {
@@ -351,13 +335,13 @@ func buildPathAndPayloads(
 		}
 		reqPayload = string(reqBytes)
 
-		if hookName == "assistant_response" || responseText != "" || model != "" || inputTok > 0 || outputTok > 0 {
-			respPayload, err = anthropicMessagesResponse(model, responseText, inputTok, outputTok)
+		if hookName == "assistant_response" || responseText != "" || modelName != "" || inputTok > 0 || outputTok > 0 {
+			respPayload, err = anthropicMessagesResponse(modelName, responseText, inputTok, outputTok)
 			if err != nil {
 				return "", "", "", err
 			}
 		}
-		return path, string(reqPayload), respPayload, nil
+		return path, reqPayload, respPayload, nil
 
 	case "tool_decision", "tool_result":
 		// Shield: non-MCP → /tool/{name}; MCP → /mcp + JSON-RPC tools/call.
@@ -419,16 +403,16 @@ func buildAtlasRequestHeaders(
 		installerHeaderPrefix + "session_id":      sessionID, // AgentQueryDataDao alias
 		installerHeaderPrefix + "akto_message_id": promptID,
 	}
-	if email := firstNonEmptyAttr(attrs, "user.email", "user_email"); email != "" {
+	if email := strutil.FirstNonEmpty(attrs, "user.email", "user_email"); email != "" {
 		headers[installerHeaderPrefix+"user_email"] = email
 	}
-	if osName := normalizeOsType(firstNonEmptyAttr(attrs, "os.type", "os_type")); osName != "" {
+	if osName := normalizeOsType(strutil.FirstNonEmpty(attrs, "os.type", "os_type")); osName != "" {
 		headers[installerHeaderPrefix+"os"] = osName
 	}
-	if osVer := firstNonEmptyAttr(attrs, "os.version", "os_version"); osVer != "" {
+	if osVer := strutil.FirstNonEmpty(attrs, "os.version", "os_version"); osVer != "" {
 		headers[installerHeaderPrefix+"os_version"] = osVer
 	}
-	if arch := firstNonEmptyAttr(attrs, "host.arch", "host_arch"); arch != "" {
+	if arch := strutil.FirstNonEmpty(attrs, "host.arch", "host_arch"); arch != "" {
 		headers[installerHeaderPrefix+"arch"] = arch
 	}
 	if toolName != "" {
@@ -445,12 +429,12 @@ func toolNameFromEvent(eventName string, attrs map[string]string) string {
 	if hook != "tool_decision" && hook != "tool_result" {
 		return ""
 	}
-	return firstNonEmptyAttr(attrs, "tool_name", "tool.name")
+	return strutil.FirstNonEmpty(attrs, "tool_name", "tool.name")
 }
 
 // builtinToolPayloadBody mirrors shield pre-tool shape: {"body": <input>, "toolName": ...}.
 func builtinToolPayloadBody(attrs map[string]string) interface{} {
-	if raw := firstNonEmptyAttr(attrs, "tool_input", "tool.input", "tool_args"); raw != "" {
+	if raw := strutil.FirstNonEmpty(attrs, "tool_input", "tool.input", "tool_args"); raw != "" {
 		return jsonRawOrString(raw)
 	}
 	return attrs
@@ -458,7 +442,7 @@ func builtinToolPayloadBody(attrs map[string]string) interface{} {
 
 // builtinToolResponseBody mirrors shield post-tool shape: {"body": {"result": <output>}}.
 func builtinToolResponseBody(attrs map[string]string) interface{} {
-	if raw := firstNonEmptyAttr(attrs, "tool_response", "tool.response", "tool_output"); raw != "" {
+	if raw := strutil.FirstNonEmpty(attrs, "tool_response", "tool.response", "tool_output"); raw != "" {
 		return jsonRawOrString(raw)
 	}
 	return attrs
@@ -542,15 +526,6 @@ func truncateDevicePrefix(id string) string {
 		return id[:maxDevicePrefixLen]
 	}
 	return id
-}
-
-func firstNonEmptyAttr(attrs map[string]string, keys ...string) string {
-	for _, k := range keys {
-		if v := attrs[k]; v != "" {
-			return v
-		}
-	}
-	return ""
 }
 
 func intAttr(attrs map[string]string, key string) int {

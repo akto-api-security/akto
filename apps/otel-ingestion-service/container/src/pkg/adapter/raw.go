@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"github.com/akto-api-security/otel-ingestion-service/pkg/model"
+	"github.com/akto-api-security/otel-ingestion-service/pkg/strutil"
 	"go.opentelemetry.io/collector/pdata/plog"
 )
 
@@ -29,6 +30,6 @@ func (a *RawPassthroughAdapter) Adapt(record plog.LogRecord, resourceAttrs map[s
 		Timestamp:     recordTimestamp(record),
 		ResourceAttrs: copyMap(resourceAttrs),
 		Attributes:    attrs,
-		CorrelationID: firstNonEmpty(attrs, "prompt.id", "trace_id", "session.id"),
+		CorrelationID: strutil.FirstNonEmpty(attrs, "prompt.id", "trace_id", "session.id"),
 	}}
 }

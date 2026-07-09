@@ -1,6 +1,7 @@
 import {
     extractEndpointId,
     extractServiceName,
+    deviceServiceKey,
 } from "./constants";
 import {
     formatDisplayName,
@@ -38,13 +39,6 @@ export function getRiskStatus(score) {
     if (score >= 2.5) return "warning";
     if (score > 0) return "info";
     return undefined;
-}
-
-function deviceServiceKey(hostName) {
-    if (!hostName) return null;
-    const parts = hostName.split(".");
-    if (parts.length < 2) return null;
-    return parts[0] + "\0" + parts[parts.length - 1];
 }
 
 // Human label derived from the bucket — no duplicated thresholds.

@@ -50,8 +50,8 @@ go run .
 
 ```bash
 cd apps/otel-ingestion-service
-chmod +x scripts/*.sh
-./scripts/generate_dev_token.sh          # writes .dev-keys/env.snippet
+chmod +x scripts/dev/*.sh
+./scripts/dev/generate_dev_token.sh          # writes .dev-keys/env.snippet
 source .dev-keys/env.snippet
 cd container/src && go run .
 ```
@@ -60,7 +60,7 @@ cd container/src && go run .
 
 ```bash
 cd apps/otel-ingestion-service/container
-# Edit docker.env — set AKTO_OTLP_AUTHENTICATE=false for quick start, or RSA_PUBLIC_KEY from dev-keys
+cp docker.env.example docker.env   # docker.env is gitignored
 docker compose up --build
 # OTLP → http://localhost:4318/v1/logs
 ```
@@ -80,7 +80,7 @@ chmod +x scripts/*.sh
 BASE_URL=http://localhost:4318 ./scripts/functional-test.sh
 
 # with auth
-./scripts/generate_dev_token.sh
+./scripts/dev/generate_dev_token.sh
 source .dev-keys/env.snippet
 ./scripts/functional-test.sh
 ```
@@ -161,4 +161,11 @@ After local functional + benchmark tests pass:
 3. Set secrets: `RSA_PUBLIC_KEY` (recommended over Mongo on ACA), `AKTO_OTLP_AUTHENTICATE=true`
 4. Scale: 1 CPU / 2 Gi, min 2 replicas, HTTP concurrency rule
 
-See [plan](.cursor/plans/cowork_otlp_ingestion_service_32cb3865.plan.md) for sizing.
+## Local Cowork E2E replay (dev only)
+
+Scripts under `scripts/dev/` are **local-only** (gitignored). They replay ACA log dumps from `data-adhoc/` through otel-ingestion → data-ingestion → guardrails.
+
+```bash
+export DATABASE_ABSTRACTOR_SERVICE_TOKEN=<jwt>
+./scripts/dev/local-sync.sh ../../data-adhoc/logs-otel-good.txt
+```

@@ -18,7 +18,7 @@ run-local:
 	cd $(SRC) && go run .
 
 dev-keys:
-	./scripts/generate_dev_token.sh
+	./scripts/dev/generate_dev_token.sh
 
 functional:
 	./scripts/functional-test.sh

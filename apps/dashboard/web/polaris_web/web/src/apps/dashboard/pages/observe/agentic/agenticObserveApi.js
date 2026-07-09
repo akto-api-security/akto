@@ -1,6 +1,9 @@
 import request from "@/util/request";
 import observeApi from "../api";
 import { buildMcpComponentsFromStis, buildAgentBuiltinToolsFromStis, buildSkillsFlyoutData, normalizeSeverity } from "./agenticPageBuilders";
+import { deviceServiceKey } from "./constants";
+
+export { deviceServiceKey };
 
 function extractRuleViolated(metadata) {
     if (!metadata) return "-";
@@ -48,14 +51,6 @@ export async function fetchAgenticViolations({ startTimestamp, endTimestamp, hos
 // 3. Claude-config: host is 2-segment ending in `.claude-settings` or `.claude` — these are
 //                   config scanner events with no collection. Attributed to any claude collection
 //                   on the same device. Old ingest = `claude-settings`, new ingest = `claude`.
-
-// device+service key from a hostname (first + last segment), ignoring the middle source.
-export function deviceServiceKey(hostName) {
-    if (!hostName) return null;
-    const parts = hostName.split(".");
-    if (parts.length < 2) return null;
-    return parts[0] + " " + parts[parts.length - 1];
-}
 
 // Returns true for 2-segment claude config event hosts (no matching collection exists for these).
 export function isClaudeConfigHost(hostName) {

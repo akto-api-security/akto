@@ -180,6 +180,14 @@ export const extractServiceName = (hostName) => {
     return parts.slice(2).join('.');
 };
 
+// device+service key from a hostname (first + last segment), ignoring the middle source.
+export const deviceServiceKey = (hostName) => {
+    if (!hostName) return null;
+    const parts = hostName.split(".");
+    if (parts.length < 2) return null;
+    return parts[0] + " " + parts[parts.length - 1];
+};
+
 // Aliases: normalize variant agent tag values to a canonical key for grouping.
 // All Claude CLI variants collapse into claude2 (Claude CLI), Desktop into claude1 (Claude Desktop).
 const AGENT_KEY_ALIASES = {

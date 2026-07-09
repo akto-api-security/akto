@@ -4,7 +4,7 @@ import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AgenticFlyoutShell from "./AgenticFlyoutShell";
 import AiChatSection from "./AiChatSection";
-import { getAgentLinkedComponents, buildAgentInlineTopologyComponents } from "./agenticPageBuilders";
+import { getAgentLinkedComponents, buildAgentInlineTopologyComponents, buildAgentBuiltinToolsFromStis } from "./agenticPageBuilders";
 import { RiskScoreCellRenderer } from "./AgenticCellRenderers";
 import agenticObserveApi, { buildAgenticObserveChatMetadata, selectConfigViolationRows, summarizeViolations } from "./agenticObserveApi";
 import OverviewTab from "./OverviewTab";
@@ -105,9 +105,10 @@ export default function AgenticAssetFlyout({
         (async () => {
             try {
                 const bundles = await Promise.all(collectionIds.map(id => agenticObserveApi.fetchCollectionStiBundle(id)));
-                const toolBundles = await Promise.all(collectionIds.map(id => agenticObserveApi.fetchAgentBuiltinToolsData(id)));
                 const sti = bundles.flatMap(b => b.stiEndpoints || []);
-                const builtinTools = toolBundles.flat();
+                const builtinTools = bundles.flatMap(b =>
+                    buildAgentBuiltinToolsFromStis(b.stiEndpoints, b.apiInfoList, b.id, b.auditRows)
+                );
                 if (!cancelled) setInlineTopology(buildAgentInlineTopologyComponents(sti, builtinTools, asset));
             } catch {
                 if (!cancelled) setInlineTopology([]);

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/akto-api-security/otel-ingestion-service/pkg/model"
+	"github.com/akto-api-security/otel-ingestion-service/pkg/strutil"
 	"go.opentelemetry.io/collector/pdata/plog"
 )
 
@@ -57,7 +58,7 @@ func (a *ClaudeCodeAdapter) Adapt(record plog.LogRecord, resourceAttrs map[strin
 		eventName = "claude_code." + eventName
 	}
 
-	correlationID := firstNonEmpty(attrs, "prompt.id", "prompt_id")
+	correlationID := strutil.FirstNonEmpty(attrs, "prompt.id", "prompt_id")
 	if correlationID == "" {
 		correlationID = attrs["session.id"]
 	}
@@ -80,15 +81,6 @@ func recordTimestamp(record plog.LogRecord) time.Time {
 		return time.Now().UTC()
 	}
 	return ts.UTC()
-}
-
-func firstNonEmpty(attrs map[string]string, keys ...string) string {
-	for _, k := range keys {
-		if v := attrs[k]; v != "" {
-			return v
-		}
-	}
-	return ""
 }
 
 func copyMap(in map[string]string) map[string]string {

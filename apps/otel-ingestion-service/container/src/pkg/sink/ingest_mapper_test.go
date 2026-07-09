@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	shieldmcp "github.com/akto-api-security/akto-endpoint-shield/mcp"
+	"github.com/akto-api-security/akto-endpoint-shield/utils"
 	"github.com/akto-api-security/otel-ingestion-service/pkg/model"
 )
 
@@ -40,8 +42,8 @@ func TestEventToIngestRecord(t *testing.T) {
 	if rec.AktoAccountID != "1726615470" {
 		t.Fatalf("unexpected account id %q", rec.AktoAccountID)
 	}
-	if rec.AktoVXLANID != "0571cbc5" {
-		t.Fatalf("unexpected vxlan id %q", rec.AktoVXLANID)
+	if rec.AktoVxlanID != "0571cbc5" {
+		t.Fatalf("unexpected vxlan id %q", rec.AktoVxlanID)
 	}
 	if rec.IP != "user@example.com" {
 		t.Fatalf("unexpected ip %q", rec.IP)
@@ -60,8 +62,11 @@ func TestEventToIngestRecord(t *testing.T) {
 	if tag["ai-agent"] != "claude_cowork" {
 		t.Fatalf("unexpected ai-agent %q", tag["ai-agent"])
 	}
-	if tag["source"] != "ENDPOINT" {
+	if tag["source"] != utils.EndpointSource {
 		t.Fatalf("expected ENDPOINT source, got %q", tag["source"])
+	}
+	if rec.ContextSource != utils.EndpointSource {
+		t.Fatalf("expected contextSource ENDPOINT, got %q", rec.ContextSource)
 	}
 	if tag["hook"] != "user_prompt" {
 		t.Fatalf("unexpected hook %q", tag["hook"])
@@ -404,5 +409,24 @@ func TestNormalizeToolPathName(t *testing.T) {
 	}
 	if !strings.Contains(normalizeToolPathName("Read File"), "read") {
 		t.Fatal("expected sanitized tool path")
+	}
+}
+
+func TestCoworkTagPassesIsEndpointOrMcpRequest(t *testing.T) {
+	rec, err := eventToIngestRecord(model.OtelIngestEvent{
+		AccountID: 1000000,
+		EventName: "claude_code.user_prompt",
+		Timestamp: time.Unix(1700000000, 0).UTC(),
+		Attributes: map[string]string{
+			"prompt":     "hello",
+			"user.id":    "0571cbc5",
+			"user.email": "user@example.com",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !shieldmcp.IsEndpointOrMcpRequest(rec.Tag, "") {
+		t.Fatalf("Cowork tag should resolve as ENDPOINT traffic: %s", rec.Tag)
 	}
 }

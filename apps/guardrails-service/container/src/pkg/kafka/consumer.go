@@ -261,7 +261,6 @@ func (c *Consumer) Start(ctx context.Context) error {
 				}
 				// Timeout is expected when no messages available, continue silently
 				if errors.Is(err, context.DeadlineExceeded) {
-					// Timeout is expected when no messages available, continue silently
 					continue
 				}
 				if errors.Is(err, context.Canceled) {
