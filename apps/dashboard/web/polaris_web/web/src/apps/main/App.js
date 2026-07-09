@@ -121,7 +121,6 @@ import EndpointShieldMetadata from "../dashboard/pages/observe/atlas/EndpointShi
 import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
 import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetectionDemo";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
-import GuardrailViolations from "../dashboard/pages/guardrails/violations/ViolationsPage";
 import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashboardPage";
 import ThreatProtectedLayout from "../dashboard/pages/threat_detection/ThreatProtectedLayout";
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
@@ -386,10 +385,6 @@ const router = createBrowserRouter([
                             {
                                 path: "policies",
                                 element: <GuardrailPolicies/>
-                            },
-                            {
-                                path: "violations",
-                                element: <GuardrailViolations/>
                             }
                         ]
                     },
