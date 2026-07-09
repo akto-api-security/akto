@@ -6,6 +6,9 @@ import com.akto.dto.billing.Organization;
 import com.akto.usage.OrgUtils;
 import com.akto.util.Constants;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -106,10 +109,19 @@ public class AgentQueryRecord {
             if(serviceId.equals("ai-agent") && parts.length >=3){
                 serviceId = parts[2];
             }
-            if (deviceId == null || deviceUserMap == null || !deviceUserMap.containsKey(deviceId)) {
+            if (deviceId == null) {
                 return null;
             }
-            userName = deviceUserMap.get(deviceId);
+            if (deviceUserMap != null && deviceUserMap.containsKey(deviceId)) {
+                userName = deviceUserMap.get(deviceId);
+            } else {
+                // Atlas endpoint agents without MCP_ENDPOINT_SHIELD registration (e.g. Claude Cowork OTLP)
+                // still carry user identity via installer headers from otel-ingestion-service.
+                userName = getFirstHeader(headers, HEADER_PREFIX + HEADER_USER_EMAIL);
+                if (userName == null || userName.isEmpty()) {
+                    return null;
+                }
+            }
 
         } else if (tagsMap != null && tagsMap.containsKey(Constants.AKTO_GEN_AI_TAG)) {
             deviceId  = null;
@@ -128,8 +140,8 @@ public class AgentQueryRecord {
 
         String requestPayload  = p.getRequestParams().getPayload();
         String responsePayload = p.getPayload() != null ? p.getPayload() : "";
-        int inputTokens  = requestPayload  != null ? requestPayload.length()  : 0;
-        int outputTokens = responsePayload.length();
+        int inputTokens  = resolveTokenCount(responsePayload, requestPayload, true);
+        int outputTokens = resolveTokenCount(responsePayload, responsePayload, false);
 
         return new AgentQueryRecord(
                 null,
@@ -165,6 +177,45 @@ public class AgentQueryRecord {
         if (headers == null) return null;
         List<String> values = headers.get(name);
         return (values != null && !values.isEmpty()) ? values.get(0) : null;
+    }
+
+    /** Prefer usage block from LLM response JSON; fall back to payload string length. */
+    static int resolveTokenCount(String responsePayload, String fallbackPayload, boolean input) {
+        int fromUsage = parseUsageTokens(responsePayload, input);
+        if (fromUsage >= 0) {
+            return fromUsage;
+        }
+        return fallbackPayload != null ? fallbackPayload.length() : 0;
+    }
+
+    static int parseUsageTokens(String json, boolean input) {
+        if (json == null || json.isEmpty()) {
+            return -1;
+        }
+        try {
+            JSONObject obj = new JSONObject(json);
+            if (obj.has("usage")) {
+                JSONObject usage = obj.getJSONObject("usage");
+                int fromUsage = readTokenField(usage, input);
+                if (fromUsage >= 0) {
+                    return fromUsage;
+                }
+            }
+            return readTokenField(obj, input);
+        } catch (Exception ignored) {
+            return -1;
+        }
+    }
+
+    private static int readTokenField(JSONObject obj, boolean input) throws JSONException{
+        if (input) {
+            if (obj.has("input_tokens")) return obj.getInt("input_tokens");
+            if (obj.has("prompt_tokens")) return obj.getInt("prompt_tokens");
+        } else {
+            if (obj.has("output_tokens")) return obj.getInt("output_tokens");
+            if (obj.has("completion_tokens")) return obj.getInt("completion_tokens");
+        }
+        return -1;
     }
     
     @Override
