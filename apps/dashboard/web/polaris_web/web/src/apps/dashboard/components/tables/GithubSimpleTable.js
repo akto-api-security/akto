@@ -19,10 +19,10 @@ function GithubSimpleTable(props) {
         key={tableKey}
         pageLimit={props.pageLimit}
         fetchData={fetchFunction}
-        sortOptions={props.sortOptions} 
-        resourceName={props.resourceName} 
+        sortOptions={props.sortOptions}
+        resourceName={props.resourceName}
         filters={filters}
-        disambiguateLabel={props.disambiguateLabel} 
+        disambiguateLabel={props.disambiguateLabel}
         headers={props.headers}
         getStatus={props.getStatus}
         getActions = {props.getActions}
@@ -51,6 +51,7 @@ function GithubSimpleTable(props) {
         csvFileName={props?.csvFileName}
         treeView={props?.treeView}
         customFilters={props?.customFilters}
+        customFilterContent={props?.customFilterContent}
         showFooter={props?.showFooter}
         setSelectedResourcesForPrimaryAction={props?.setSelectedResourcesForPrimaryAction}
         lastColumnSticky = {props?.lastColumnSticky}

@@ -751,6 +751,11 @@ function GithubServerTable(props) {
                 exportPortalTarget
               )}
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
+              {props?.customFilterContent && mode === IndexFiltersMode.Filtering && (
+                <div style={{ paddingTop: '8px', paddingBottom: '4px' }}>
+                  {props.customFilterContent}
+                </div>
+              )}
               <div className={tableHeightClass}>
               {props.loading && props.loadingText ? (
                 <SpinnerCentered text={props.loadingText}/>
