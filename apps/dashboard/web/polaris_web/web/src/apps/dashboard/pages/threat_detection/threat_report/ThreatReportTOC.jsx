@@ -9,7 +9,7 @@ const ThreatReportTOC = ({ organizationName, severityCount }) => {
     func.getAktoSeverities().forEach((severity) => {
         if (severityCount && severityCount[severity] > 0) {
             severityChildren.push({
-                text: `${func.toSentenceCase(severity)} Severity Threats`,
+                text: `${func.toSentenceCase(severity)} Severity ${mapLabel("Threat", dashboardCategory)}s`,
                 link: `threat-severity-${severity.toLowerCase()}`
             })
         }
