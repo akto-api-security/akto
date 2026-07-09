@@ -65,11 +65,17 @@ export default {
         return resp
     },
 
-    async suggestGuardrailCompliance(inputType, payload) {
+    async fetchViolations(startTimestamp, endTimestamp, skip = 0, limit = 1000) {
         const resp = await request({
-            url: '/api/ask_ai',
+            url: '/api/fetchSuspectSampleData',
             method: 'post',
-            data: { type: 'suggest_guardrail_compliance', meta: { inputType, ...payload } }
+            data: {
+                skip,
+                limit,
+                latestAttack: [],
+                ...(startTimestamp != null ? { startTimestamp } : {}),
+                ...(endTimestamp != null ? { endTimestamp } : {}),
+            }
         })
         return resp
     },

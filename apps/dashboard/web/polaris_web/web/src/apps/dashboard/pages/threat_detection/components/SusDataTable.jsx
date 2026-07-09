@@ -563,7 +563,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     setTotalFilteredCount(res.total || 0);
 //    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
-    let ret = res?.maliciousEvents.map((x) => {
+    let ret = (res?.maliciousEvents || []).map((x) => {
       const severity = (isAgenticSecurityCategory() || isEndpointSecurityCategory())
         ? (x?.severity || "HIGH")
         : (x?.severity || threatFiltersMap[x?.filterId]?.severity || "HIGH")
@@ -662,12 +662,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   async function fillFilters() {
     const res = await api.fetchFiltersThreatTable(startTimestamp, endTimestamp);
-    let urlChoices = res?.urls
+    let urlChoices = (res?.urls || [])
       .map((x) => {
         const url = x || "/"
         return { label: url, value: x };
       });
-    let ipChoices = res?.ips.map((x) => {
+    let ipChoices = (res?.ips || []).map((x) => {
       return { label: x, value: x };
     });
 
