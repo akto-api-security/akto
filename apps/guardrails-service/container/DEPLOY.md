@@ -7,6 +7,8 @@ docker buildx build --platform linux/amd64 -t guardrails-service:1.0.0_local .
 
 The image links **Vectorscan** (`libvectorscan5`) for Hyperscan-accelerated PII redaction. Runtime is `debian:bookworm-slim` (not distroless static) because CGO requires glibc + native libs.
 
+Unit tests run in CI before `docker build` (not inside the image) so each platform only compiles the Hyperscan binary once. BuildKit cache mounts (`go mod`, `go-build`) speed up rebuilds.
+
 # Local PII redaction smoke test (no go.mod bump)
 ```bash
 cd apps/guardrails-service/container

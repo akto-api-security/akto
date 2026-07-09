@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Build stage — TARGETPLATFORM required for CGO + native Vectorscan per arch.
 FROM --platform=$TARGETPLATFORM golang:1.24-bookworm AS builder
 
@@ -20,15 +21,18 @@ COPY src/go.mod src/go.sum ./
 
 COPY src/internal/stub/ ./internal/stub/
 
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 RUN rm -f /root/.netrc
 
 COPY src/ .
 
-RUN go test ./...
-
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+# Unit tests run in CI (see staging.yml). In-image tests doubled compile time because
+# they ran without -tags hyperscan while the binary build requires CGO + hyperscan.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -tags hyperscan -ldflags="-w -s" -o guardrails-service .
 
 FROM debian:bookworm-slim
