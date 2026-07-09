@@ -597,7 +597,13 @@ export function buildDeviceEndpointsPageData(
         agentChildCount += Object.keys(d.children).length;
     });
 
-    const totalViolations = Object.values(violationsBySeverity).reduce((a, b) => a + b, 0);
+    // Compute totals from raw events so the count matches ViolationsPage (all events, not just device-attributed ones)
+    const rawViolationsBySeverity = emptyViolations();
+    violationRows.forEach((r) => {
+        const key = (r.severity || "").toLowerCase();
+        if (key in rawViolationsBySeverity) rawViolationsBySeverity[key] += 1;
+    });
+    const totalViolations = Object.values(rawViolationsBySeverity).reduce((a, b) => a + b, 0);
 
     // ── Real time-series bucketing ────────────────────────────────────────────
     // Endpoints & OS: bucket agenticCollections by startTs (when each collection was first seen)
@@ -694,10 +700,10 @@ export function buildDeviceEndpointsPageData(
         deltaUsers:      Math.max(0, windowDelta(userBucket.counts)),
         deltaViolations: windowDelta(violCounts),
         violationsBySeverity: [
-            { name: "Critical", y: violationsBySeverity.critical, color: "#DC2626" },
-            { name: "High", y: violationsBySeverity.high, color: "#F97316" },
-            { name: "Medium", y: violationsBySeverity.medium, color: "#EAB308" },
-            { name: "Low", y: violationsBySeverity.low, color: "#D1D5DB" },
+            { name: "Critical", y: rawViolationsBySeverity.critical, color: "#DC2626" },
+            { name: "High", y: rawViolationsBySeverity.high, color: "#F97316" },
+            { name: "Medium", y: rawViolationsBySeverity.medium, color: "#EAB308" },
+            { name: "Low", y: rawViolationsBySeverity.low, color: "#D1D5DB" },
         ],
         osTrend: {
             mac:     macCounts,

@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Box, VerticalStack, HorizontalStack, Text, Badge, Button, Tooltip } from '@shopify/polaris';
+import { Avatar, Box, VerticalStack, HorizontalStack, Text, Badge, Button, Tooltip } from '@shopify/polaris';
 import { InfoMinor, MagicMinor } from '@shopify/polaris-icons';
 import MarkdownViewer from '../../../../components/shared/MarkdownViewer';
+import { HighlightedText } from '../../../../components/shared/MarkdownComponents';
 import SampleDataComponent from '../../../../components/shared/SampleDataComponent';
-import { CHAT_ASSETS, MESSAGE_LABELS, MESSAGE_TYPES, VULNERABILITY_BADGE } from './chatConstants';
+import { CHAT_ASSETS, MESSAGE_LABELS, MESSAGE_TYPES } from './chatConstants';
 import ChatInfoModal from './ChatInfoModal';
 import func from "@/util/func";
+import { getDomainForFavicon } from '@/apps/dashboard/pages/observe/agentic/mcpClientHelper';
 
 // This is done for Hybrid messages -> Markdown + JSON 
 function extractPrettyJson(content) {
@@ -133,23 +135,32 @@ StaticCodeBlock.propTypes = {
     children: PropTypes.node,
 };
 
-function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt, toolsMetadata, isExternalAgentRequest = false, staticMode = false }) {
+function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt, toolsMetadata, highlights = [], isExternalAgentRequest = false, staticMode = false }) {
 
     const isRequest = type === MESSAGE_TYPES.REQUEST;
-    // Icon
-    let iconSrc = isRequest ? CHAT_ASSETS.AKTO_LOGO : CHAT_ASSETS.BOT_LOGO;
-    if(isExternalAgentRequest) {
-        iconSrc = CHAT_ASSETS.MAGIC_ICON;
-    }
-    let iconAlt = isRequest ? 'Akto Logo' : 'Agent Logo';
-    if(isExternalAgentRequest) {
-        iconAlt = 'Magic Icon';
-    }
 
     // Label
     const label = customLabel || (isRequest ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE);
     const isAiAgentLabel = label === MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE;
     const isTestedInteraction = label === MESSAGE_LABELS.TESTED_INTERACTION;
+
+    // Icon element — user avatar for human senders, agent favicon for agent responses
+    let iconEl;
+    if (isExternalAgentRequest) {
+        iconEl = <img src={CHAT_ASSETS.MAGIC_ICON} alt="Magic Icon" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />;
+    } else if (isRequest) {
+        if (customLabel && !isTestedInteraction) {
+            // Human user in a conversation (e.g. violations chat) — show initials avatar
+            iconEl = <Avatar size="extraSmall" initials={func.initials(customLabel)} name={customLabel} />;
+        } else {
+            iconEl = <img src={CHAT_ASSETS.AKTO_LOGO} alt="Akto Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />;
+        }
+    } else {
+        // Response — try to resolve an agent-specific favicon from the label
+        const domain = customLabel && !isAiAgentLabel ? getDomainForFavicon(customLabel) : null;
+        const agentSrc = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : CHAT_ASSETS.BOT_LOGO;
+        iconEl = <img src={agentSrc} alt={customLabel || 'Agent'} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />;
+    }
     const hasModifiedPrompt = isTestedInteraction && originalPrompt && originalPrompt !== content;
     const hasHttpAttempt = isAiAgentLabel && onOpenAttempt;
 
@@ -214,19 +225,15 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
     }, [content, shouldRenderAsCode, prettyJson]);
 
     return (
-        <Box padding="3">
-            <Box style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+        <Box padding="3" background={isVulnerable ? "bg-critical-subdued" : undefined}>
+            <Box className="chat-message-row">
                 {/* Icon */}
-                <Box style={{ flexShrink: 0, width: '20px', height: '20px' }}>
-                    <img
-                        src={iconSrc}
-                        alt={iconAlt}
-                        style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-                    />
+                <Box className="chat-message-icon-wrap">
+                    {iconEl}
                 </Box>
 
                 {/* Divider */}
-                <Box style={{ width: '2px', flexShrink: 0, alignSelf: 'stretch', backgroundColor: isVulnerable ? '#D72C0D' : '#E1E3E5' }} />
+                <Box className="chat-message-divider" style={{ "--chat-divider-color": isVulnerable ? '#D72C0D' : '#E1E3E5' }} />
 
                 {/* Content - Takes remaining space */}
                 <Box style={{ flex: 1, minWidth: 0 }}>
@@ -237,6 +244,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                 <Text variant="bodyMd" fontWeight="semibold" color="subdued">
                                     {label}
                                 </Text>
+                                {isVulnerable && <Badge status="critical" size="small">Blocked</Badge>}
                                 {infoActions.map((action, idx) => (
                                     <Tooltip key={idx} content={action.tooltip} dismissOnMouseOut>
                                         <Button
@@ -288,7 +296,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                             </Box>
                         ) : prettyJson ? (
                             <VerticalStack gap="2">
-                                {beforeText && <MarkdownViewer markdown={beforeText} />}
+                                {beforeText && <MarkdownViewer markdown={beforeText} noPadding />}
                                 {staticMode ? (
                                     <StaticCodeBlock>{prettyJson}</StaticCodeBlock>
                                 ) : (
@@ -300,7 +308,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                         simpleJson={true}
                                     />
                                 )}
-                                {afterText && <MarkdownViewer markdown={afterText} />}
+                                {afterText && <MarkdownViewer markdown={afterText} noPadding />}
                             </VerticalStack>
                         ) : decodedRawContent ? (
                             staticMode ? (
@@ -315,15 +323,18 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                 />
                             )
                         ) : (
-                            <MarkdownViewer markdown={content} />
+                            isVulnerable && highlights.length > 0
+                                ? <HighlightedText text={content} highlights={highlights} />
+                                : <MarkdownViewer markdown={content} noPadding />
                         )}
 
                         {/* Vulnerability Badge */}
-                        {isVulnerable && !isRequest && (
+                        {/* {isVulnerable && !isRequest && (
                             <Box paddingBlockStart="2">
                                 <Badge status="critical">{VULNERABILITY_BADGE.SYSTEM_PROMPT_LEAK}</Badge>
                             </Box>
-                        )}
+                        )} */}
+
                     </VerticalStack>
                 </Box>
             </Box>

@@ -2,10 +2,10 @@ import {Box} from '@shopify/polaris'
 import { MarkdownRenderer, markdownStyles } from './MarkdownComponents'
 
 
-const MarkdownViewer = ({markdown}) => {
+const MarkdownViewer = ({markdown, noPadding}) => {
 
     return (
-        <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
+        <Box paddingBlockStart={noPadding ? undefined : 3} paddingInlineEnd={noPadding ? undefined : 4} paddingInlineStart={noPadding ? undefined : 4}>
             <div className="markdown-content">
                 <MarkdownRenderer>
                     {markdown}
