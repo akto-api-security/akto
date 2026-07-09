@@ -28,7 +28,6 @@ func (a *RawPassthroughAdapter) Adapt(record plog.LogRecord, resourceAttrs map[s
 		SignalType:    "logs",
 		EventName:     eventName,
 		Timestamp:     recordTimestamp(record),
-		ResourceAttrs: copyMap(resourceAttrs),
 		Attributes:    attrs,
 		CorrelationID: strutil.FirstNonEmpty(attrs, "prompt.id", "trace_id", "session.id"),
 	}}

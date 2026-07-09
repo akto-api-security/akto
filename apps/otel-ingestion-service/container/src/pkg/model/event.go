@@ -8,7 +8,6 @@ type OtelIngestEvent struct {
 	SignalType    string
 	EventName     string
 	Timestamp     time.Time
-	ResourceAttrs map[string]string
 	Attributes    map[string]string
 	CorrelationID string
 }

@@ -69,7 +69,6 @@ func (a *ClaudeCodeAdapter) Adapt(record plog.LogRecord, resourceAttrs map[strin
 		SignalType:    "logs",
 		EventName:     eventName,
 		Timestamp:     recordTimestamp(record),
-		ResourceAttrs: copyMap(resourceAttrs),
 		Attributes:    attrs,
 		CorrelationID: correlationID,
 	}}
@@ -81,12 +80,4 @@ func recordTimestamp(record plog.LogRecord) time.Time {
 		return time.Now().UTC()
 	}
 	return ts.UTC()
-}
-
-func copyMap(in map[string]string) map[string]string {
-	out := make(map[string]string, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
-	return out
 }

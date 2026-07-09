@@ -12,11 +12,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func TestNormalizeAuthHeader(t *testing.T) {
-	if got := normalizeAuthHeader("Bearer token123"); got != "token123" {
+func TestTokenFromHeader(t *testing.T) {
+	if got := TokenFromHeader("Bearer token123"); got != "token123" {
 		t.Fatalf("expected token123, got %q", got)
 	}
-	if got := normalizeAuthHeader("raw-token"); got != "raw-token" {
+	if got := TokenFromHeader("raw-token"); got != "raw-token" {
 		t.Fatalf("expected raw-token, got %q", got)
 	}
 }

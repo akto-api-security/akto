@@ -66,10 +66,6 @@ func TokenFromHeader(header string) string {
 	return header
 }
 
-func normalizeAuthHeader(header string) string {
-	return TokenFromHeader(header)
-}
-
 func verifyToken(tokenString string, publicKey *rsa.PublicKey) (int, time.Time, error) {
 	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
