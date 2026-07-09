@@ -3,11 +3,13 @@ import Highcharts from "highcharts"
 import { useEffect, useRef, useState } from "react";
 import func from "../../../../util/func";
 import SpinnerCentered from "../progress/SpinnerCentered";
+import useChartDataTableModal from "./useChartDataTableModal";
 
 function StackedChart(props) {
 
     const { type, height, backgroundColor, data, graphPointClick, tooltipFormatter, yAxisTitle, title, text, defaultChartOptions, areaFillHex, color, width, noGap, showGridLines, customXaxis, exportingDisabled} = props;
     const chartComponentRef = useRef(null)
+    const { menuItemDefinitions, modal } = useChartDataTableModal(title);
 
     const fillColor = {
         linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
@@ -41,7 +43,8 @@ function StackedChart(props) {
             enabled: false,
         },
         exporting: {
-            enabled: !exportingDisabled
+            enabled: !exportingDisabled,
+            menuItemDefinitions
         },
         title: {
             text: title,
@@ -118,12 +121,15 @@ function StackedChart(props) {
     }, [data])
 
     return (
-        data.length > 0 ? <HighchartsReact
-        key={"chart"}
-        highcharts={Highcharts}
-        options={chartOptions}
-        ref={chartComponentRef}
-    /> : <SpinnerCentered/>
+        data.length > 0 ? <>
+            <HighchartsReact
+                key={"chart"}
+                highcharts={Highcharts}
+                options={chartOptions}
+                ref={chartComponentRef}
+            />
+            {modal}
+        </> : <SpinnerCentered/>
     )
 }
 

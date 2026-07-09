@@ -3,6 +3,7 @@ import Highcharts from "highcharts";
 import HighchartsSankey from "highcharts/modules/sankey";
 import { useEffect, useRef, useState } from "react";
 import func from "../../../../util/func";
+import useChartDataTableModal from "./useChartDataTableModal";
 
 // Initialize Sankey module
 if (typeof Highcharts === 'object') {
@@ -10,12 +11,12 @@ if (typeof Highcharts === 'object') {
 }
 
 function SankeyChart(props) {
-  const { 
-    height, 
-    backgroundColor, 
-    data, 
-    title, 
-    tooltipFormatter, 
+  const {
+    height,
+    backgroundColor,
+    data,
+    title,
+    tooltipFormatter,
     defaultChartOptions,
     color,
     exportingDisabled,
@@ -23,8 +24,9 @@ function SankeyChart(props) {
     nodePadding,
     linkOpacity
   } = props;
-  
+
   const chartComponentRef = useRef(null);
+  const { menuItemDefinitions, modal } = useChartDataTableModal(title);
 
   const coreChartOptions = {
     chart: {
@@ -37,7 +39,8 @@ function SankeyChart(props) {
       enabled: false,
     },
     exporting: {
-      enabled: !exportingDisabled
+      enabled: !exportingDisabled,
+      menuItemDefinitions
     },
     title: {
       text: title,
@@ -118,12 +121,15 @@ function SankeyChart(props) {
   }, [data, tooltipFormatter, color]);
 
   return (
-    data.length > 0 ? <HighchartsReact
-      key={"sankey-chart"}
-      highcharts={Highcharts}
-      options={chartOptions}
-      ref={chartComponentRef}
-    /> : <></>
+    data.length > 0 ? <>
+      <HighchartsReact
+        key={"sankey-chart"}
+        highcharts={Highcharts}
+        options={chartOptions}
+        ref={chartComponentRef}
+      />
+      {modal}
+    </> : <></>
   );
 }
 

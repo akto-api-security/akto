@@ -1,6 +1,7 @@
 import HighchartsReact from "highcharts-react-official"
 import Highcharts from "highcharts"
 import { useRef } from "react";
+import useChartDataTableModal from "./charts/useChartDataTableModal";
 require("highcharts/modules/exporting")(Highcharts);
 require("highcharts/modules/export-data.src")(Highcharts);
 require("highcharts/modules/accessibility")(Highcharts);
@@ -12,6 +13,7 @@ function GraphMetric(props) {
 
     const { height, backgroundColor, data, inputMetrics, title, text, defaultChartOptions, subtitle, timezoneOffsetMinutes } = props;
     const chartComponentRef = useRef(null)
+    const { menuItemDefinitions, modal } = useChartDataTableModal(title);
 
     const fillColor = {
         linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
@@ -79,6 +81,9 @@ function GraphMetric(props) {
         credits:{
             enabled: false,
         },
+        exporting: {
+            menuItemDefinitions
+        },
         title: {
             text: title,
             align: 'left',
@@ -134,6 +139,7 @@ function GraphMetric(props) {
                 options={chartOptions}
                 ref={chartComponentRef}
             />
+            {modal}
         </div>
     )
 }
