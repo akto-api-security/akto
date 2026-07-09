@@ -549,8 +549,15 @@ function ApiCollections(props) {
     const [popover,setPopover] = useState(false)
     const [teamData, setTeamData] = useState([])
     const [usersCollection, setUsersCollection] = useState([])
-    // Tag filter state - stores selected values for each tag key
-    const [tagFiltersApplied, setTagFiltersApplied] = useState({})
+
+    // Get filtersMap from PersistStore first (needed for tag filter initialization)
+    const filtersMap = PersistStore(state => state.filtersMap)
+    const setFiltersMap = PersistStore(state => state.setFiltersMap)
+    const pageKey = "/dashboard/observe/inventory/"
+
+    // Tag filter state - initialize from persisted state
+    const pageFiltersMap = filtersMap[pageKey];
+    const [tagFiltersApplied, setTagFiltersApplied] = useState(pageFiltersMap?.tagFilters || {})
     const [selectedItems, setSelectedItems] = useState([])
     const [normalData, setNormalData] = useState([])
     const [centerView, setCenterView] = useState(CenterViewType.Table);
@@ -1121,7 +1128,19 @@ function ApiCollections(props) {
     // Use custom hook for Agentic filter detection and summary calculation
     const { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections, activeFilterPlainTitle } = useAgenticFilter(normalData);
 
-    const filtersMap = PersistStore(state => state.filtersMap);
+    // Persist tag filters whenever they change (same pattern as existing filters)
+    useEffect(() => {
+        const currentState = PersistStore.getState();
+        const currentFiltersMap = currentState.filtersMap;
+        const currentFilters = currentFiltersMap[pageKey] || {};
+        currentState.setFiltersMap({
+            ...currentFiltersMap,
+            [pageKey]: {
+                ...currentFilters,
+                tagFilters: tagFiltersApplied
+            }
+        });
+    }, [tagFiltersApplied, pageKey]);
 
     useEffect(() => {
         if (activeFilterType !== FILTER_TYPES.SKILL) return;
