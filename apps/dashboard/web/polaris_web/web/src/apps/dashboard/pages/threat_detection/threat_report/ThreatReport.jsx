@@ -139,7 +139,7 @@ const ThreatReport = () => {
                 startTs,
                 endTs,
                 [],
-                200,
+                100000,
                 undefined,
                 isGuardrail ? undefined : true,
                 'THREAT',

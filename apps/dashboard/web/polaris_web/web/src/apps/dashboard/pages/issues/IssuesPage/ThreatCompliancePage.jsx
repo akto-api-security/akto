@@ -25,6 +25,7 @@ import ComplianceMenu, { getCompliances } from "./ComplianceMenu.jsx";
 import useThreatReportDownload from "../../../hooks/useThreatReportDownload";
 import { updateThreatFiltersStore } from "../../threat_detection/utils/threatFilters";
 import { redactSampleDataByKeywords } from "../../threat_detection/utils/redactSampleData";
+import { LABELS } from "../../threat_detection/constants";
 
 const getSortOptions = (category) => [
     { label: mapLabel('Number of endpoints', category), value: 'numberOfEndpoints asc', directionLabel: 'More', sortKey: 'numberOfEndpoints', columnIndex: 3 },
@@ -247,12 +248,6 @@ function ThreatCompliancePage() {
         }, 200);
     };
 
-    function calcFilteredThreatFilterIds(complianceView) {
-        return Object.entries(threatFiltersMap || {})
-            .filter(([_, v]) => transform.subcategoryMatchesComplianceFramework(v.compliance, complianceView))
-            .map(([k]) => k);
-    }
-
     const handleDetailsVisibility = useCallback((visible) => {
         setShowDetails(visible);
         if (!visible) {
@@ -447,6 +442,7 @@ function ThreatCompliancePage() {
             const sort = sortKey && sortOrder ? { [sortKey]: sortOrder === -1 ? 1 : -1 } : {};
             
             const successfulBool = needsGuardrailCompliance ? undefined : true;
+            const eventLabel = needsGuardrailCompliance ? LABELS.GUARDRAIL : LABELS.THREAT;
 
             const res = await threatDetectionApi.fetchSuspectSampleData(
                 skip,
@@ -458,10 +454,10 @@ function ThreatCompliancePage() {
                 startTimestamp,
                 endTimestamp,
                 latestAttack,
-                200,
+                100000,
                 currentTab.toUpperCase(),
                 successfulBool,
-                'THREAT',
+                eventLabel,
                 hostFilter,
                 latestApiOrigRegex,
                 [],
@@ -474,10 +470,12 @@ function ThreatCompliancePage() {
                 const threatPolicy = threatFiltersMap[item?.filterId];
 
                 // Guardrail (Agentic/Endpoint): compliance keyed by capability derived from
-                // metadata.rule_violated. API Security: compliance on the threat filter template.
-                if (!needsGuardrailCompliance && !threatPolicy) return;
+                // metadata.rule_violated. API Security: compliance on the threat filter template,
+                // or on event.owaspCategories (independent of threatFiltersMap) — resolve first and
+                // only skip if there's genuinely no compliance data, not just a missing filter template.
                 const complianceData = resolveComplianceClauseMap(item, needsGuardrailCompliance, threatFiltersMap, guardrailComplianceMap);
                 const availableCompliances = Object.keys(complianceData);
+                if (!needsGuardrailCompliance && !threatPolicy && availableCompliances.length === 0) return;
 
                 // If filter-bar compliance selections are active, use them (multi-select OR match).
                 // Otherwise fall back to the header dropdown (complianceView).
