@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
     Badge,
     Box,
@@ -31,11 +31,101 @@ function SegmentBar({ segments }) {
 }
 
 function LegendDot({ color }) {
+    return <Box className="agentic-dot" style={{ "--dot-color": color }} />;
+}
+
+// Renders breakdown legend dots; shows all that fit, "+N" only when items actually overflow.
+const CHIP_GAP = 4;
+const OVERFLOW_BADGE_W = 48;
+
+function BreakdownLegend({ breakdown, onFilterClick, activeFilter }) {
+    const wrapRef = useRef(null);
+    const measureRef = useRef(null);
+    const [visibleCount, setVisibleCount] = useState(breakdown.length);
+
+    useEffect(() => {
+        const wrap = wrapRef.current;
+        const measure = measureRef.current;
+        if (!wrap || !measure) return;
+
+        function recalc() {
+            const availW = wrap.offsetWidth;
+            const chips = measure.children;
+            let used = 0;
+            let count = 0;
+            for (let i = 0; i < chips.length; i++) {
+                const chipW = chips[i].offsetWidth;
+                const isLast = i === chips.length - 1;
+                const needed = used + (i > 0 ? CHIP_GAP : 0) + chipW + (!isLast ? CHIP_GAP + OVERFLOW_BADGE_W : 0);
+                if (needed > availW && count > 0) break;
+                used += (i > 0 ? CHIP_GAP : 0) + chipW;
+                count = i + 1;
+            }
+            setVisibleCount(Math.max(1, count));
+        }
+
+        const ro = new ResizeObserver(recalc);
+        ro.observe(wrap);
+        recalc();
+        return () => ro.disconnect();
+    }, [breakdown]);
+
+    const overflow = breakdown.length - visibleCount;
+
     return (
-        <span
-            className="agentic-dot"
-            style={{ "--dot-color": color }}
-        />
+        <Box ref={wrapRef} position="relative">
+            {/* Hidden full-set layer for measuring natural chip widths */}
+            <Box ref={measureRef} aria-hidden="true" className="breakdown-legend-measure">
+                {breakdown.map((b) => (
+                    <Box key={b.label} className="agentic-chip">
+                        <LegendDot color={b.color} />
+                        <Text variant="bodySm" truncate>
+                            {b.label} ({typeof b.count === "number" ? b.count.toLocaleString("en-US") : b.count})
+                        </Text>
+                    </Box>
+                ))}
+            </Box>
+            {/* Visible row */}
+            <HorizontalStack gap="1" wrap={false}>
+                {breakdown.slice(0, visibleCount).map((b) => {
+                    const active = activeFilter?.has(b.key ?? b.label);
+                    return (
+                        <Box
+                            key={b.label}
+                            onClick={() => onFilterClick?.(b.key ?? b.label)}
+                            className={active ? "agentic-chip agentic-chip--active" : "agentic-chip"}
+                        >
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <LegendDot color={b.color} />
+                                <Text variant="bodySm" color="subdued">
+                                    {b.label} ({typeof b.count === "number" ? b.count.toLocaleString("en-US") : b.count})
+                                </Text>
+                            </HorizontalStack>
+                        </Box>
+                    );
+                })}
+                {overflow > 0 && (
+                    <Tooltip
+                        content={
+                            <VerticalStack gap="1">
+                                {breakdown.slice(visibleCount).map((b) => (
+                                    <HorizontalStack key={b.label} gap="1" blockAlign="center">
+                                        <LegendDot color={b.color} />
+                                        <Text variant="bodySm">
+                                            {b.label} ({typeof b.count === "number" ? b.count.toLocaleString("en-US") : b.count})
+                                        </Text>
+                                    </HorizontalStack>
+                                ))}
+                            </VerticalStack>
+                        }
+                    >
+                        <Box className="cursor-pointer">
+                            <Badge size="small">+{overflow}</Badge>
+                        </Box>
+                    </Tooltip>
+                )}
+            </HorizontalStack>
+        </Box>
     );
 }
 
@@ -89,45 +179,11 @@ export default function AgenticStatsCard({
                 <VerticalStack gap="2">
                     {breakdown.length > 0 && <SegmentBar segments={breakdown} />}
                     {breakdown.length > 0 && (
-                        <HorizontalStack gap="1" wrap={false}>
-                            {breakdown.slice(0, 2).map((b) => {
-                                const active = activeFilter?.has(b.key ?? b.label);
-                                return (
-                                    <Box
-                                        key={b.label}
-                                        onClick={() => onFilterClick?.(b.key ?? b.label)}
-                                        className={active ? "agentic-chip agentic-chip--active" : "agentic-chip"}
-                                    >
-                                        <HorizontalStack gap="1" blockAlign="center">
-                                            <LegendDot color={b.color} />
-                                            <Text variant="bodySm" color="subdued">
-                                                {b.label} ({typeof b.count === "number" ? b.count.toLocaleString("en-US") : b.count})
-                                            </Text>
-                                        </HorizontalStack>
-                                    </Box>
-                                );
-                            })}
-                            {breakdown.length > 2 && (
-                                <Tooltip
-                                    content={
-                                        <VerticalStack gap="1">
-                                            {breakdown.slice(2).map(b => (
-                                                <HorizontalStack key={b.label} gap="1" blockAlign="center">
-                                                    <LegendDot color={b.color} />
-                                                    <Text variant="bodySm">
-                                                        {b.label} ({typeof b.count === "number" ? b.count.toLocaleString("en-US") : b.count})
-                                                    </Text>
-                                                </HorizontalStack>
-                                            ))}
-                                        </VerticalStack>
-                                    }
-                                >
-                                    <Box className="cursor-pointer">
-                                        <Badge size="small">+{breakdown.length - 2}</Badge>
-                                    </Box>
-                                </Tooltip>
-                            )}
-                        </HorizontalStack>
+                        <BreakdownLegend
+                            breakdown={breakdown}
+                            onFilterClick={onFilterClick}
+                            activeFilter={activeFilter}
+                        />
                     )}
                 </VerticalStack>
                 {children}

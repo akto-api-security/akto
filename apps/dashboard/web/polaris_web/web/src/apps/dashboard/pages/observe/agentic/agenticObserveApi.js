@@ -118,10 +118,10 @@ export function aggregateViolationsByCollectionId(violationRows = [], collection
     return byCollection;
 }
 
-// Open the threat-activity page deep-linked to a single violation event.
-// Mirrors the URL shape the page expects: filters= first, then the event keys, #active hash.
+// Open the guardrail activity page deep-linked to a single violation event.
+// Mirrors the URL shape the page expects: event keys as query params, #active hash.
 export function openViolationInThreatActivity(row = {}) {
-    const base = "/dashboard/protection/threat-activity";
+    const base = "/dashboard/guardrails/activity";
     const { refId, eventType, actor, filterId, status } = row;
     if (refId && eventType && actor && filterId) {
         const params = new URLSearchParams();
@@ -141,16 +141,12 @@ export function openViolationInThreatActivity(row = {}) {
     }
 }
 
-// ── Claude config violation scoping ──────────────────────────────────────────
-// The authoritative signal for a config violation (matching ConfigRiskSyncCron on the backend)
-// is the event URL prefix `/claude/config/` — NOT the host. These events DO have a real host
-// equal to a collection's hostName. We scope to an asset by matching the event host against the
-// asset's own collection hosts (exact) and their loose device+service key, mirroring how the
-// Violations tab attributes rows. Config violations are thus a subset of the asset's violations.
-const CONFIG_URL_PREFIX = "/claude/config/";
+// ── Config violation scoping (Claude, Codex, Copilot) ────────────────────────
+
+const CONFIG_URL_PATTERN = /^\/[a-zA-Z0-9_-]+\/config\//;
 
 export function isConfigViolationRow(row) {
-    return !!row?.url && row.url.startsWith(CONFIG_URL_PREFIX);
+    return !!row?.url && CONFIG_URL_PATTERN.test(row.url);
 }
 
 function assetHostSets(asset, collections = []) {
@@ -166,7 +162,7 @@ function assetHostSets(asset, collections = []) {
     return { hosts, looseKeys };
 }
 
-// Config violation rows (url starts with /claude/config/) attributed to this asset's hosts.
+// Config violation rows (url contains /config/) attributed to this asset's hosts.
 export function selectConfigViolationRows(violationRows = [], asset, collections = []) {
     const { hosts, looseKeys } = assetHostSets(asset, collections);
     if (!hosts.size && !looseKeys.size) return [];

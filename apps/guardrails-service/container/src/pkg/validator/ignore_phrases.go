@@ -38,7 +38,17 @@ func compileIgnorePhraseMatcher(phrases []types.IgnorePhrase) *ignorePhraseMatch
 			// "Acme") doesn't also strip a substring out of an unrelated larger word
 			// (e.g. "AcmeCorp2024"). Regex phrases are used as-is — the author controls
 			// their own boundaries.
-			pattern = `\b` + regexp.QuoteMeta(phrase.Phrase) + `\b`
+			//
+			// Treat a literal escape-sequence pair as an additional valid
+			// boundary alongside \b so this common case (test payloads/logs with escaped
+			// newlines pasted verbatim) doesn't silently defeat redaction.
+			boundary := `(?:\\[nrtbf"\\/]|\b)`
+			pattern = boundary + regexp.QuoteMeta(phrase.Phrase) + boundary
+		}
+		if phrase.IsRegex {
+			if _, err := regexp.Compile(pattern); err != nil {
+				continue
+			}
 		}
 		if phrase.CaseSensitive {
 			caseSensitiveParts = append(caseSensitiveParts, pattern)
@@ -93,7 +103,13 @@ func (m *ignorePhraseMatcher) redact(payload string, startPlaceholderIndex int) 
 	}
 	placeholderIndex := startPlaceholderIndex
 	redacted = m.re.ReplaceAllStringFunc(payload, func(match string) string {
-		placeholder := "\x00IGNP" + strconv.Itoa(placeholderIndex) + "\x00"
+		// Payloads are JSON, and control characters (0x00-0x1F) are only valid inside a
+		// JSON string when escaped (as a \u00XX sequence) — a raw NUL byte spliced into the text
+		// makes the surrounding JSON invalid. json.Unmarshal then fails, and the caller's
+		// fail-open path (processRequest) forwards the request with every detector
+		// skipped entirely, not just the redacted phrase. Plain alphanumerics/underscore
+		// never need escaping in JSON and can't be misread as structural JSON syntax.
+		placeholder := "AktoIgnorePhrasePlaceholder" + strconv.Itoa(placeholderIndex) + "End"
 		restore = append(restore, replacement{placeholder: placeholder, original: match})
 		placeholderIndex++
 		return placeholder

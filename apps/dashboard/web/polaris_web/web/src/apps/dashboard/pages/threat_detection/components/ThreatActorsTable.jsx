@@ -400,6 +400,10 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   };
 
   const promotedBulkActions = (selectedIps) => {
+    if (isEndpointSecurityCategory()) {
+      return [];
+    }
+
     return [
       {
         content: `Block ${selectedIps.length} IP${selectedIps.length > 1 ? 's' : ''}`,

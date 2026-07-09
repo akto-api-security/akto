@@ -14,6 +14,7 @@ const initialState = {
     defaultIgnoreSummaryTime: 2 * 60 * 60,
     lastEndpointEpoch: 0,
     agenticNewLayout: false,
+    guardrailViolationsNewLayout: false,
 };
 
 let localStore = (set) => ({
@@ -64,6 +65,14 @@ let localStore = (set) => ({
             set({ agenticNewLayout });
         } catch (error) {
             console.error("Error setting agenticNewLayout:", error);
+        }
+    },
+
+    setGuardrailViolationsNewLayout: (guardrailViolationsNewLayout) => {
+        try {
+            set({ guardrailViolationsNewLayout });
+        } catch (error) {
+            console.error("Error setting guardrailViolationsNewLayout:", error);
         }
     },
 
