@@ -74,6 +74,7 @@ export default function LeftNav() {
     }));
 
     const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
+    const guardrailViolationsNewLayout = LocalStore((state) => state.guardrailViolationsNewLayout);
 
     let reportsSubNavigationItems = [
         {
@@ -422,7 +423,7 @@ export default function LeftNav() {
                 ],
                 key: "5",
             }] : []),
-            ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && isAllowedNhiUser  ? [{
+            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.NHI_GOVERNANCE?.isGranted && (dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
                         NHI Governance
@@ -533,13 +534,8 @@ export default function LeftNav() {
                     ),
                     icon: DiamondAlertMinor,
                     onClick: () => {
-                        if (dashboardCategory === CATEGORY_ENDPOINT_SECURITY) {
-                            handleSelect("dashboard_guardrails_violations");
-                            navigate("/dashboard/guardrails/violations");
-                        } else {
-                            handleSelect("dashboard_threat_actor");
-                            navigate("/dashboard/protection/threat-actor");
-                        }
+                        handleSelect("dashboard_threat_actor");
+                        navigate("/dashboard/protection/threat-actor");
                         setActive("normal");
                     },
                     selected: (leftNavSelected.includes("_threat") && !leftNavSelected.includes("_reports")) || leftNavSelected.includes("_guardrails"),
@@ -555,7 +551,7 @@ export default function LeftNav() {
                             },
                             selected: leftNavSelected === "dashboard_threat_dashboard",
                         }] : []),
-                        ...(dashboardCategory !== CATEGORY_ENDPOINT_SECURITY ? [{
+                        {
                             label: `${mapLabel("Threat", dashboardCategory)} Actors`,
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-actor");
@@ -563,8 +559,8 @@ export default function LeftNav() {
                                 setActive("active");
                             },
                             selected: leftNavSelected === "dashboard_threat_actor",
-                        }] : []),
-                        ...(dashboardCategory !== CATEGORY_ENDPOINT_SECURITY ? [{
+                        },
+                        {
                             label: `${mapLabel("Threat", dashboardCategory)} Activity`,
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-activity");
@@ -573,8 +569,19 @@ export default function LeftNav() {
                             },
                             selected:
                                 leftNavSelected === "dashboard_threat_activity",
+                        },
+                        ...((window?.STIGG_FEATURE_WISE_ALLOWED?.GUARDRAIL_VIOLATIONS_NEW_UI?.isGranted &&
+                            dashboardCategory === CATEGORY_ENDPOINT_SECURITY &&
+                            guardrailViolationsNewLayout) ? [{
+                            label: "Violations",
+                            onClick: () => {
+                                navigate("/dashboard/guardrails/violations");
+                                handleSelect("dashboard_guardrails_violations");
+                                setActive("active");
+                            },
+                            selected: leftNavSelected === "dashboard_guardrails_violations",
                         }] : []),
-                        ...(dashboardCategory !== CATEGORY_ENDPOINT_SECURITY ? [{
+                        {
                             label: `${mapLabel("APIs", dashboardCategory)} Under ${mapLabel("Threat", dashboardCategory)}`,
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-api");
@@ -583,34 +590,16 @@ export default function LeftNav() {
                             },
                             selected:
                                 leftNavSelected === "dashboard_threat_api",
-                        }] : []),
-                        ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
-                            label: "Violations",
-                            onClick: () => {
-                                navigate("/dashboard/guardrails/violations");
-                                handleSelect("dashboard_guardrails_violations");
-                                setActive("active");
-                            },
-                            selected: leftNavSelected === "dashboard_guardrails_violations" || leftNavSelected === "dashboard_guardrails_activity",
-                        }] : []),
-                        ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
-                            label: "Actors",
-                            onClick: () => {
-                                navigate("/dashboard/protection/threat-actor");
-                                handleSelect("dashboard_threat_actor");
-                                setActive("active");
-                            },
-                            selected: leftNavSelected === "dashboard_threat_actor",
-                        }] : []),
-                        ...((dashboardCategory === CATEGORY_AGENTIC_SECURITY || dashboardCategory === CATEGORY_ENDPOINT_SECURITY) ? [{
-                            label: "Policies",
+                        },
+                        ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") ? [{
+                            label: "Guardrail Policies",
                             onClick: () => {
                                 navigate("/dashboard/guardrails/policies");
                                 handleSelect("dashboard_guardrails_policies");
                                 setActive("active");
                             },
                             selected: leftNavSelected === "dashboard_guardrails_policies",
-                        }] : []),
+                            }] : []),
                         ...(dashboardCategory === CATEGORY_API_SECURITY || dashboardCategory === CATEGORY_DAST ? [{
                             label: "Threat Policies",
                             onClick: () => {
@@ -701,15 +690,6 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_guardrails_activity",
-                    },
-                    {
-                        label: "Violations",
-                        onClick: () => {
-                            navigate("/dashboard/guardrails/violations");
-                            handleSelect("dashboard_guardrails_violations");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_guardrails_violations" || leftNavSelected === "dashboard_guardrails_activity",
                     },
                     {
                         label: "Guardrails Policies",
