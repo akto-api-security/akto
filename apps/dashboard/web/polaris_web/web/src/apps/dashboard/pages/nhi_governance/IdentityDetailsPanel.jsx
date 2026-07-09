@@ -8,10 +8,11 @@ import { IdentityIcon, violationsHeaders, violationsSortOptions, transformApiVio
 import IdentityGraph from "./IdentityGraph";
 import observeRequests from "../observe/api";
 import { violationIncludesIdentity } from "./identityHelper";
+import func from "@/util/func";
 
 const NHI_VIOLATIONS_PATH = "/dashboard/nhi/violations";
 
-export default function IdentityDetailsPanel({ row, show, setShow }) {
+export default function IdentityDetailsPanel({ row, show, setShow, onUpdated }) {
     const [actionActive, setActionActive] = useState(false);
     const [allViolations, setAllViolations] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -64,16 +65,14 @@ export default function IdentityDetailsPanel({ row, show, setShow }) {
 
             await observeRequests.disableNhiIdentity(row.hexId);
 
-            setDisabling(false);
+            func.setToast(true, false, "Identity disabled successfully");
             setActionActive(false);
             setShow(false);
-
-            // Refresh the identities list
-            window.location.reload();
+            await onUpdated?.();
         } catch (err) {
-            console.error("Error disabling identity:", err);
+            func.setToast(true, true, "Failed to disable identity");
+        } finally {
             setDisabling(false);
-            setActionActive(false);
         }
     };
 

@@ -43,9 +43,9 @@ const buildTableData = (rawRows, violationIndex = {}) =>
             if (b.violCrit !== a.violCrit) return b.violCrit - a.violCrit;
             return (b.violCrit + b.violHigh + b.violMed) - (a.violCrit + a.violHigh + a.violMed);
         })
-        .map((r, i) => ({
+        .map((r) => ({
             ...r,
-            id:             i + 1,
+            id:             r.hexId,
             totalViolations: r.violCrit + r.violHigh + r.violMed,
             priorityScore:  r.violCrit * 1000 + (r.violCrit + r.violHigh + r.violMed),
             identityComp:  <HorizontalStack gap="2" blockAlign="center" wrap={false}><IdentityIcon name={r.identityName} /><Text variant="bodyMd" fontWeight="medium">{r.identityName}</Text></HorizontalStack>,
@@ -148,6 +148,8 @@ export default function IdentitiesPage() {
         func.getTableTabIndexById(0, definedTableTabs, initialSelectedTab)
     );
     const [showDeleteModal, setShowDeleteModal]     = useState(false);
+    const [selectedIdentityIds, setSelectedIdentityIds] = useState([]);
+    const [deleting, setDeleting]                   = useState(false);
     const [selectedRow, setSelectedRow]             = useState(null);
     const [showDetailsPanel, setShowDetailsPanel]   = useState(false);
     const [currDateRange, dispatchCurrDateRange] = useReducer(
@@ -158,31 +160,31 @@ export default function IdentitiesPage() {
     const startTimestamp = parseInt(currDateRange.period.since.getTime() / 1000);
     const endTimestamp = parseInt(currDateRange.period.until.getTime() / 1000);
 
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+
+            const identitiesResponse = await observeRequests.fetchNhiIdentities(startTimestamp, endTimestamp);
+            setRawIdentities(Array.isArray(identitiesResponse) ? identitiesResponse.map(transformIdentityForUI) : []);
+            setLoading(false);
+
+            try {
+                const violationsResponse = await observeRequests.fetchViolationCountsByIdentity();
+                setRawViolations(Array.isArray(violationsResponse) ? violationsResponse : []);
+            } catch (violErr) {
+                console.error("Error fetching violations for counts:", violErr);
+                setRawViolations([]);
+            }
+        } catch (err) {
+            console.error("Error fetching identities:", err);
+            setRawIdentities([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // Fetch identities and violations from API
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setLoading(true);
-
-                const identitiesResponse = await observeRequests.fetchNhiIdentities(startTimestamp, endTimestamp);
-                setRawIdentities(Array.isArray(identitiesResponse) ? identitiesResponse.map(transformIdentityForUI) : []);
-                setLoading(false);
-
-                try {
-                    const violationsResponse = await observeRequests.fetchViolationCountsByIdentity();
-                    setRawViolations(Array.isArray(violationsResponse) ? violationsResponse : []);
-                } catch (violErr) {
-                    console.error("Error fetching violations for counts:", violErr);
-                    setRawViolations([]);
-                }
-            } catch (err) {
-                console.error("Error fetching identities:", err);
-                setRawIdentities([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchData();
     }, [startTimestamp, endTimestamp]);
 
@@ -224,6 +226,20 @@ export default function IdentitiesPage() {
 
     const summaryItems = makeSummaryItems(tableData);
 
+    const handleDeleteIdentities = async () => {
+        try {
+            setDeleting(true);
+            await observeRequests.deleteNhiIdentities(selectedIdentityIds);
+            func.setToast(true, false, `${selectedIdentityIds.length} identit${selectedIdentityIds.length > 1 ? "ies" : "y"} deleted successfully`);
+            setShowDeleteModal(false);
+            await fetchData();
+        } catch (err) {
+            func.setToast(true, true, "Failed to delete identities");
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     if (loading) {
         return <SpinnerCentered />;
     }
@@ -258,8 +274,15 @@ export default function IdentitiesPage() {
                     tableTabs={tableTabs}
                     onSelect={(i) => setSelected(i)}
                     selected={selected}
-                    promotedBulkActions={() => [
-                        { content: "Delete identity", destructive: true, onAction: () => setShowDeleteModal(true) },
+                    promotedBulkActions={(selectedResources) => [
+                        {
+                            content: "Delete identity",
+                            destructive: true,
+                            onAction: () => {
+                                setSelectedIdentityIds(selectedResources);
+                                setShowDeleteModal(true);
+                            },
+                        },
                     ]}
                     onRowClick={(row) => { setSelectedRow(row); setShowDetailsPanel(true); }}
                     rowClickable={true}
@@ -271,6 +294,7 @@ export default function IdentitiesPage() {
                 row={selectedRow}
                 show={showDetailsPanel}
                 setShow={setShowDetailsPanel}
+                onUpdated={fetchData}
             />
         )}
         <Modal
@@ -280,7 +304,8 @@ export default function IdentitiesPage() {
             primaryAction={{
                 content: "Delete identity",
                 destructive: true,
-                onAction: () => setShowDeleteModal(false),
+                loading: deleting,
+                onAction: handleDeleteIdentities,
             }}
             secondaryActions={[{ content: "Cancel", onAction: () => setShowDeleteModal(false) }]}
         >
