@@ -261,12 +261,12 @@ public class DbActor extends DataActor {
         return DbLayer.fetchAllCollections();
     }
 
-    public void createCollectionSimple(int vxlanId) {
-        DbLayer.createCollectionSimple(vxlanId);
+    public void createCollectionSimple(int vxlanId, boolean hasLatestRagDetection) {
+        DbLayer.createCollectionSimple(vxlanId, hasLatestRagDetection);
     }
 
-    public void createCollectionForHost(String host, int colId) {
-        DbLayer.createCollectionForHost(host, colId);
+    public void createCollectionForHost(String host, int colId, boolean hasLatestRagDetection) {
+        DbLayer.createCollectionForHost(host, colId, hasLatestRagDetection);
     }
 
     public AccountSettings fetchAccountSettingsForAccount(int accountId) {

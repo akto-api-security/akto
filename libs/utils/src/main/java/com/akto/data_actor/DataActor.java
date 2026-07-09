@@ -115,9 +115,9 @@ public abstract class DataActor {
     public abstract List<ApiCollection> fetchApiCollectionsByIds(List<Integer> apiCollectionIds, LogDb logDb);
     public abstract List<ApiCollection> fetchAllCollections();
 
-    public abstract void createCollectionSimple(int vxlanId);
+    public abstract void createCollectionSimple(int vxlanId, boolean hasLatestRagDetection);
 
-    public abstract void createCollectionForHost(String host, int colId);
+    public abstract void createCollectionForHost(String host, int colId, boolean hasLatestRagDetection);
 
     public abstract AccountSettings fetchAccountSettingsForAccount(int accountId);
 
