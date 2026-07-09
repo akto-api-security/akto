@@ -569,15 +569,6 @@ export default function LeftNav() {
                             selected:
                                 leftNavSelected === "dashboard_threat_activity",
                         },
-                        ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
-                            label: "Violations",
-                            onClick: () => {
-                                navigate("/dashboard/guardrails/violations");
-                                handleSelect("dashboard_guardrails_violations");
-                                setActive("active");
-                            },
-                            selected: leftNavSelected === "dashboard_guardrails_violations",
-                        }] : []),
                         {
                             label: `${mapLabel("APIs", dashboardCategory)} Under ${mapLabel("Threat", dashboardCategory)}`,
                             onClick: () => {
