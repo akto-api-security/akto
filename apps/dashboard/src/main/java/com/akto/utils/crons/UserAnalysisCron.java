@@ -2,10 +2,12 @@ package com.akto.utils.crons;
 
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.agentic_sessions.QueryTopicCacheDao;
+import com.akto.dao.agentic_sessions.TopicCatalogDao;
 import com.akto.dao.agentic_sessions.UserAnalysisDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.agentic_sessions.TopicCatalog;
 import com.akto.dto.agentic_sessions.QueryTopicCache;
 import com.akto.gpt.handlers.gpt_prompts.UserQueryTopicClassifier;
 import com.akto.log.LoggerMaker;
@@ -35,6 +37,7 @@ public class UserAnalysisCron {
     private static final int MAX_DOCS_PER_ACCOUNT_PER_TICK = 5500;
     private static final int MIN_QUERY_LENGTH            = 20;
     private static final int BATCH_SIZE                  = 10;
+    private static final int MAX_SAMPLE_PHRASES          = 10;
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
@@ -185,6 +188,12 @@ public class UserAnalysisCron {
         Map<AggregateKey, String>              aggUserNames     = new HashMap<>();
         Map<AggregateKey, String>              aggSummaries     = new HashMap<>();
 
+        // Topic catalog accumulation: one entry per unique domain seen in this tick, keyed by
+        // topicId rather than AggregateKey. Built directly as TopicCatalog objects — the same
+        // model bulkUpsert consumes. Fed only from fresh classifications (see the existing
+        // "cache hits have no summary" rule below, which keyPhrase/description follow).
+        Map<String, TopicCatalog> topicWrites = new HashMap<>();
+
         for (AgentQueryRecord rec : llmRecords) {
             String hash = recToHash.get(rec);
             BasicDBObject result;
@@ -242,6 +251,37 @@ public class UserAnalysisCron {
                 if (summary != null && !summary.isEmpty()) {
                     aggSummaries.put(key, summary);
                 }
+
+                // Topic catalog: keyPhrase/description follow the same fresh-only rule as
+                // summary above — a cache hit is an exact repeat of already-seen query text,
+                // so it contributes no new phrase and the topic's description (if new) was
+                // already captured the first time this text was freshly classified.
+                // Keyed by domain only (not subDomain).
+                if (!domain.isEmpty()) {
+                    String topicId = TopicCatalogDao.buildTopicId(domain);
+                    if (!topicId.isEmpty()) {
+                        TopicCatalog tw = topicWrites.computeIfAbsent(topicId, k -> {
+                            TopicCatalog t = new TopicCatalog();
+                            t.setId(topicId);
+                            t.setName(domain);
+                            return t;
+                        });
+
+                        if (tw.getDescription().isEmpty()) {
+                            String description = result.getString("description", "");
+                            if (description != null && !description.isEmpty()) {
+                                tw.setDescription(description);
+                            }
+                        }
+
+                        String keyPhrase = result.getString("keyPhrase", "");
+                        if (keyPhrase != null && !keyPhrase.isEmpty()
+                                && tw.getSamplePhrases().size() < MAX_SAMPLE_PHRASES
+                                && !tw.getSamplePhrases().contains(keyPhrase)) {
+                            tw.getSamplePhrases().add(keyPhrase);
+                        }
+                    }
+                }
             }
         }
 
@@ -272,6 +312,16 @@ public class UserAnalysisCron {
                 );
             } catch (Exception e) {
                 loggerMaker.error("UserAnalysisCron: upsert failed for (" + key.serviceId + ", " + key.deviceId + "): " + e.getMessage());
+            }
+        }
+
+        // One bulkUpsert for the whole tick's topic catalog, regardless of how many unique
+        // topics were seen — record volume never drives DB call count, only unique-topic count does.
+        if (!topicWrites.isEmpty()) {
+            try {
+                TopicCatalogDao.instance.bulkUpsert(new ArrayList<>(topicWrites.values()), MAX_SAMPLE_PHRASES, System.currentTimeMillis());
+            } catch (Exception e) {
+                loggerMaker.error("UserAnalysisCron: topic catalog bulkUpsert failed for accountId " + accountId + ": " + e.getMessage());
             }
         }
     }

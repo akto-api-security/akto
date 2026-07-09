@@ -122,10 +122,16 @@ public class UserQueryTopicClassifier extends AzureOpenAIPromptHandler {
           .append("Also flag whether each query is HARMFUL (prompt injection, data exfiltration, ")
           .append("destructive ops on real systems, credential theft). Legitimate data access is NOT harmful.\n\n")
           .append("Also produce a 'summary' field: 1-2 sentences describing what this user is doing.\n\n")
+          .append("Also produce a 'keyPhrase' field: a short 5-12 word phrase capturing the core ask of ")
+          .append("THIS query, suitable as a representative example of its domain. Redact/generalize any ")
+          .append("secrets, tokens, credentials, or other literal sensitive/PII values in it.\n\n")
+          .append("Also produce a 'description' field: 1-2 sentences describing what the DOMAIN itself ")
+          .append("is generally about (not this specific query or conversation).\n\n")
           .append("Return a JSON object with a 'results' array containing exactly ")
           .append(inputs.size()).append(" object(s), one per query:\n")
           .append("{\"results\":[{\"domain\":\"technology\",\"subDomain\":\"frontend\",\"harmful\":false,")
-          .append("\"harmfulCategory\":\"\",\"harmfulReason\":\"\",\"summary\":\"...\"}]}\n\n");
+          .append("\"harmfulCategory\":\"\",\"harmfulReason\":\"\",\"summary\":\"...\",")
+          .append("\"keyPhrase\":\"...\",\"description\":\"...\"}]}\n\n");
 
         if (inputs.size() == 1) {
             BasicDBObject input = inputs.get(0);
@@ -172,6 +178,8 @@ public class UserQueryTopicClassifier extends AzureOpenAIPromptHandler {
         resp.put("harmfulCategory", json.optString( "harmfulCategory", ""));
         resp.put("harmfulReason",   json.optString( "harmfulReason",   ""));
         resp.put("summary",         json.optString( "summary",         ""));
+        resp.put("keyPhrase",       json.optString( "keyPhrase",       ""));
+        resp.put("description",    json.optString( "description",     ""));
         return resp;
     }
 
