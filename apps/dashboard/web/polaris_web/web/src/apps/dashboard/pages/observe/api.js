@@ -1173,6 +1173,15 @@ export default {
         return resp?.success || false
     },
 
+    async deleteNhiIdentities(identityIds) {
+        const resp = await request({
+            url: '/api/deleteNhiIdentities',
+            method: 'post',
+            data: { identityIds }
+        })
+        return resp?.success || false
+    },
+
     async markViolationAsFixed(violationId) {
         const resp = await request({
             url: '/api/markViolationAsFixed',
@@ -1216,6 +1225,15 @@ export default {
             data: { policy, policyId }
         })
         return resp
+    },
+
+    async deleteNhiPolicies(policyIds) {
+        const resp = await request({
+            url: '/api/deleteNhiPolicies',
+            method: 'post',
+            data: { policyIds }
+        })
+        return resp?.success || false
     },
 
     async fetchSuspectSampleData({ skip = 0, startTimestamp, endTimestamp, hosts = [], limit = 100000 } = {}) {
