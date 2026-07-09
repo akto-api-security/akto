@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, Modal, VerticalStack, Tooltip} from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, Modal, VerticalStack, Tooltip, Filters, ChoiceList} from "@shopify/polaris"
 import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import RegistryBadge from "../../../components/shared/RegistryBadge";
 import RunTest from "./RunTest";
@@ -364,7 +364,25 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
     const discovered = func.prettifyEpoch(rawCollection.startTs || 0);
     const testedEndpoints = rawCollection.urlsCount === 0 ? 0 : (coverageMap[rawCollection.id] || 0);
     const riskScore = rawCollection.urlsCount === 0 ? 0 : (riskScoreMap[rawCollection.id] || 0);
+    const rawEnvType = rawCollection?.envType || null;
+
     const envType = Array.isArray(rawCollection?.envType) ? rawCollection.envType.map(func.formatCollectionType) : [];
+
+    // Extract individual tag key-value pairs from raw envType for filtering
+    const tagKeyValues = {};
+    if (Array.isArray(rawEnvType)) {
+        rawEnvType.forEach(tagObj => {
+            if (tagObj?.keyName && tagObj?.value) {
+                const key = `tagKey_${tagObj.keyName}`;
+                // For each tag key, store the value
+                if (tagKeyValues[key]) {
+                    tagKeyValues[key] = `${tagKeyValues[key]}, ${tagObj.value}`;
+                } else {
+                    tagKeyValues[key] = tagObj.value;
+                }
+            }
+        });
+    }
 
     let calcCoverage = '0%';
     if(!rawCollection.isOutOfTestingScope && rawCollection.urlsCount > 0){
@@ -429,7 +447,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         isOutOfTestingScope: rawCollection.isOutOfTestingScope,
         accessType: rawCollection.accessType ? rawCollection.accessType : "No Access Type",
         envType,
-        envTypeOriginal: rawCollection?.envType,
+        envTypeOriginal: rawEnvType,
         testedEndpoints,
         sensitiveInRespTypes: sensitiveTypes,
         sensitiveSubTypesVal: sensitiveTypes.join(' ') || '-',
@@ -449,6 +467,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         deactivatedRiskScore: rawCollection.deactivated ? (riskScore - 10) : riskScore,
         activatedRiskScore: -1 * (rawCollection.deactivated ? riskScore : (riskScore - 10)),
         username: getUsernameForCollection(rawCollection, usernameMap),
+        ...tagKeyValues  // Add individual tag key-value pairs for filtering
     };
 };
 
@@ -530,6 +549,15 @@ function ApiCollections(props) {
     const [popover,setPopover] = useState(false)
     const [teamData, setTeamData] = useState([])
     const [usersCollection, setUsersCollection] = useState([])
+
+    // Get filtersMap from PersistStore first (needed for tag filter initialization)
+    const filtersMap = PersistStore(state => state.filtersMap)
+    const setFiltersMap = PersistStore(state => state.setFiltersMap)
+    const pageKey = "/dashboard/observe/inventory/"
+
+    // Tag filter state - initialize from persisted state
+    const pageFiltersMap = filtersMap[pageKey];
+    const [tagFiltersApplied, setTagFiltersApplied] = useState(pageFiltersMap?.tagFilters || {})
     const [selectedItems, setSelectedItems] = useState([])
     const [normalData, setNormalData] = useState([])
     const [centerView, setCenterView] = useState(CenterViewType.Table);
@@ -1100,7 +1128,19 @@ function ApiCollections(props) {
     // Use custom hook for Agentic filter detection and summary calculation
     const { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections, activeFilterPlainTitle } = useAgenticFilter(normalData);
 
-    const filtersMap = PersistStore(state => state.filtersMap);
+    // Persist tag filters whenever they change (same pattern as existing filters)
+    useEffect(() => {
+        const currentState = PersistStore.getState();
+        const currentFiltersMap = currentState.filtersMap;
+        const currentFilters = currentFiltersMap[pageKey] || {};
+        currentState.setFiltersMap({
+            ...currentFiltersMap,
+            [pageKey]: {
+                ...currentFilters,
+                tagFilters: tagFiltersApplied
+            }
+        });
+    }, [tagFiltersApplied, pageKey]);
 
     useEffect(() => {
         if (activeFilterType !== FILTER_TYPES.SKILL) return;
@@ -1903,6 +1943,77 @@ function ApiCollections(props) {
     };
     const dynamicSortOptions = getModifiedSortOptions();
 
+    // Extract available tag keys from collections in envTypeMap
+    const availableTagKeys = new Set();
+    const tagKeyValues = {}; // Store unique values for each tag key
+
+    Object.values(envTypeMap || {}).forEach((envTypeArray) => {
+        if (Array.isArray(envTypeArray)) {
+            envTypeArray.forEach(tagObj => {
+                if (tagObj?.keyName && tagObj.keyName !== 'envType') {
+                    availableTagKeys.add(tagObj.keyName);
+
+                    // Collect unique values for each tag key
+                    if (!tagKeyValues[tagObj.keyName]) {
+                        tagKeyValues[tagObj.keyName] = new Set();
+                    }
+                    if (tagObj.value) {
+                        tagKeyValues[tagObj.keyName].add(tagObj.value);
+                    }
+                }
+            });
+        }
+    });
+
+    // Sort tag keys alphabetically
+    const sortedTagKeys = Array.from(availableTagKeys).sort();
+
+    // Create tag filter definitions for the Filters component
+    const tagFilterDefinitions = sortedTagKeys.map(tagKeyName => ({
+        key: `tag_${tagKeyName}`,
+        label: tagKeyName,
+        filter: (
+            <ChoiceList
+                title={tagKeyName}
+                titleHidden
+                choices={Array.from(tagKeyValues[tagKeyName] || []).map(val => ({
+                    label: val,
+                    value: val
+                }))}
+                selected={tagFiltersApplied[tagKeyName] || []}
+                onChange={(value) => {
+                    setTagFiltersApplied({
+                        ...tagFiltersApplied,
+                        [tagKeyName]: value
+                    });
+                }}
+                allowMultiple
+            />
+        ),
+    }));
+
+    // Build applied tag filters list for display as chips
+    const appliedTagFilterChips = [];
+    Object.entries(tagFiltersApplied).forEach(([tagKey, selectedValues]) => {
+        if (selectedValues && selectedValues.length > 0) {
+            appliedTagFilterChips.push({
+                key: `tag_${tagKey}`,
+                label: `${tagKey}: ${selectedValues.join(', ')}`,
+                onRemove: () => {
+                    setTagFiltersApplied({
+                        ...tagFiltersApplied,
+                        [tagKey]: []
+                    });
+                }
+            });
+        }
+    });
+
+    // Handle clear all tag filters
+    const handleClearAllTagFilters = () => {
+        setTagFiltersApplied({});
+    };
+
     // Ensure all headers have unique IDs for IndexTable headings to avoid duplicate key warnings
     const headingsWithIds = dynamicHeaders.map((header, index) => ({
         ...header,
@@ -1962,13 +2073,47 @@ function ApiCollections(props) {
             );
         }
         
+        // Filter data based on applied tag filters
+        const filteredDataByTags = (data[selectedTab] || []).filter(item => {
+            // Check if item matches ALL applied tag filters
+            return Object.entries(tagFiltersApplied).every(([tagKey, selectedValues]) => {
+                // If no values selected for this filter, show all items
+                if (!selectedValues || selectedValues.length === 0) {
+                    return true;
+                }
+
+                // Check if item's tags contain any of the selected values for this tag key
+                const itemTags = envTypeMap[item.id] || [];
+                return itemTags.some(tag =>
+                    tag.keyName === tagKey && selectedValues.includes(tag.value)
+                );
+            });
+        });
+
+            // Custom filter UI using Polaris Filters component
+        const customFilterUI = sortedTagKeys.length > 0 && (
+            <div>
+                <div style={{ marginBottom: '8px', marginLeft: '16px' }}>
+                    <Text variant="bodySm" as="span" style={{ fontWeight: '500', color: '#626262' }}>
+                        Tags filter
+                    </Text>
+                </div>
+                <Filters
+                    filters={tagFilterDefinitions}
+                    appliedFilters={appliedTagFilterChips}
+                    onClearAll={handleClearAllTagFilters}
+                    hideQueryField={true}
+                />
+            </div>
+        );
+
         // Default table view
         return (
             <GithubSimpleTable
                 key={refreshData}
                 filterStateUrl={"/dashboard/observe/inventory/"}
                 pageLimit={100}
-                data={data[selectedTab]}
+                data={filteredDataByTags}
                 sortOptions={dynamicSortOptions}
                 resourceName={resourceName}
                 filters={[]}
@@ -1987,6 +2132,7 @@ function ApiCollections(props) {
                 prettifyPageData={(pageData) => selectedTab === 'untracked' ? transform.prettifyUntrackedCollectionsData(pageData) : transform.prettifyCollectionsData(pageData, false, selectedTab, activeFilterType)}
                 transformRawData={transformRawCollectionData}
                 onExportCsv={() => exportCsv()}
+                customFilterContent={customFilterUI}
             />
         );
     };
