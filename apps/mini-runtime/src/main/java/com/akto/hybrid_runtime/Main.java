@@ -71,6 +71,10 @@ public class Main {
     public static final String ACCOUNT_ID = "account_id";
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.RUNTIME);
 
+    static {
+        DataActorFactory.setModuleType("MINI_RUNTIME");
+    }
+
     public static final DataActor dataActor = DataActorFactory.fetchInstance();
     private static final ClientLayer clientLayer = new ClientLayer();
 
