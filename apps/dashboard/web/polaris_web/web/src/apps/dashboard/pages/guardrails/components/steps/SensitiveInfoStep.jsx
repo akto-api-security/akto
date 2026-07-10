@@ -21,9 +21,9 @@ import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import ControlInfoIcon from "../ControlInfoIcon";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
+import { SENSITIVE_INFO_DESCRIPTIONS } from "../../guardrailDescriptions";
 
-const MIN_COUNT_TOOLTIP =
-    "The guardrail applies only when the prompt has at least this many matches of this PII type. Example: 20 means 20 or more occurrences of that type.";
+const MIN_COUNT_TOOLTIP = SENSITIVE_INFO_DESCRIPTIONS.minCountTooltip;
 
 function clampMinMatchCount(raw) {
     const trimmed = String(raw ?? "").trim();
@@ -202,8 +202,8 @@ const SensitiveInfoStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Personally Identifiable Information (PII) types" threats={RULE_OWASP_THREATS.pii} />
                                 <ControlInfoIcon
-                                    description='Blocks or masks selected PII types (email, phone, SSN, etc.) wherever they appear. Example: with "Email" selected.'
-                                    examples={[{ text: "Contact me at jane@example.com to discuss the contract." }]}
+                                    description={SENSITIVE_INFO_DESCRIPTIONS.piiTypes.description}
+                                    examples={SENSITIVE_INFO_DESCRIPTIONS.piiTypes.examples}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -342,8 +342,8 @@ const SensitiveInfoStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Regex patterns" threats={RULE_OWASP_THREATS.regex} />
                                 <ControlInfoIcon
-                                    description='Blocks any text matching a custom regex pattern you define. Example: pattern "\d{3}-\d{2}-\d{4}".'
-                                    examples={[{ text: "My SSN is 123-45-6789, can you help me fill out this form?" }]}
+                                    description={SENSITIVE_INFO_DESCRIPTIONS.regexPatterns.description}
+                                    examples={SENSITIVE_INFO_DESCRIPTIONS.regexPatterns.examples}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -420,8 +420,8 @@ const SensitiveInfoStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Enable secrets detection" threats={RULE_OWASP_THREATS.secrets} />
                                 <ControlInfoIcon
-                                    description="Blocks API keys, passwords, and tokens accidentally pasted into a prompt. See the Confidence Threshold examples below."
-                                    examples={[]}
+                                    description={SENSITIVE_INFO_DESCRIPTIONS.secretsDetection.description}
+                                    examples={SENSITIVE_INFO_DESCRIPTIONS.secretsDetection.examples}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -436,10 +436,8 @@ const SensitiveInfoStep = ({
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
                                     <ControlInfoIcon
-                                        description="Higher values are more permissive (fewer prompts blocked); lower values are stricter."
-                                        examples={[
-                                            { label: "High (e.g. 0.8)", text: "Here's my AWS key: AKIAIOSFODNN7EXAMPLE, can you debug this?" }
-                                        ]}
+                                        description={SENSITIVE_INFO_DESCRIPTIONS.secretsConfidenceThreshold.description}
+                                        examples={SENSITIVE_INFO_DESCRIPTIONS.secretsConfidenceThreshold.examples}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>
@@ -465,8 +463,8 @@ const SensitiveInfoStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Enable sensitive data anonymization" threats={RULE_OWASP_THREATS.anonymize} />
                                 <ControlInfoIcon
-                                    description='Instead of blocking, replaces sensitive data with a placeholder so the rest of the prompt still goes through. Example: "Email me at jane@example.com" becomes "Email me at [REDACTED_EMAIL_1]." See the Confidence Threshold examples below.'
-                                    examples={[]}
+                                    description={SENSITIVE_INFO_DESCRIPTIONS.anonymize.description}
+                                    examples={SENSITIVE_INFO_DESCRIPTIONS.anonymize.examples}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -481,10 +479,8 @@ const SensitiveInfoStep = ({
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
                                     <ControlInfoIcon
-                                        description="Higher values are more permissive (fewer values anonymized); lower values are stricter."
-                                        examples={[
-                                            { label: "High (e.g. 0.8)", text: "My SSN is 123-45-6789, please update my file." }
-                                        ]}
+                                        description={SENSITIVE_INFO_DESCRIPTIONS.anonymizeConfidenceThreshold.description}
+                                        examples={SENSITIVE_INFO_DESCRIPTIONS.anonymizeConfidenceThreshold.examples}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>

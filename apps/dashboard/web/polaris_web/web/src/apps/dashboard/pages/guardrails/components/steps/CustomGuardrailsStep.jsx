@@ -4,6 +4,7 @@ import OwaspTag from "../OwaspTag";
 import ControlInfoIcon from "../ControlInfoIcon";
 import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
 import guardrailApi from "../../api";
+import { CUSTOM_GUARDRAILS_DESCRIPTIONS } from "../../guardrailDescriptions";
 
 // URL validation function
 const validateUrl = (url) => {
@@ -155,8 +156,8 @@ const CustomGuardrailsStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">LLM prompt based rule</Text>
                                 <ControlInfoIcon
-                                    description='Write a plain-language instruction; an LLM evaluates every prompt against it. Example rule: "Block requests for competitor pricing." See the Confidence score threshold examples below.'
-                                    examples={[]}
+                                    description={CUSTOM_GUARDRAILS_DESCRIPTIONS.llmPromptRule.description}
+                                    examples={CUSTOM_GUARDRAILS_DESCRIPTIONS.llmPromptRule.examples}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -182,8 +183,8 @@ const CustomGuardrailsStep = ({
                                         <HorizontalStack gap="1" blockAlign="center">
                                             <Text as="span">Confidence score threshold</Text>
                                             <ControlInfoIcon
-                                                description={'A prompt is blocked once the LLM\'s own confidence that it violates your rule exceeds this number. Examples assume the rule "Block requests for competitor pricing."'}
-                                                examples={[]}
+                                                description={CUSTOM_GUARDRAILS_DESCRIPTIONS.llmConfidenceThreshold.description}
+                                                examples={CUSTOM_GUARDRAILS_DESCRIPTIONS.llmConfidenceThreshold.examples}
                                                 onTryPrompt={onTryPrompt}
                                             />
                                         </HorizontalStack>
@@ -215,8 +216,8 @@ const CustomGuardrailsStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">External model based evaluation</Text>
                                 <ControlInfoIcon
-                                    description="Sends each prompt to your own model or API endpoint instead of Akto's built-in detectors. Useful for logic too specific or proprietary to describe as a rule, e.g. a classifier trained to catch attempts to extract your pricing algorithm. See the Confidence score threshold examples below."
-                                    examples={[]}
+                                    description={CUSTOM_GUARDRAILS_DESCRIPTIONS.externalModel.description}
+                                    examples={CUSTOM_GUARDRAILS_DESCRIPTIONS.externalModel.examples}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -242,11 +243,8 @@ const CustomGuardrailsStep = ({
                                         <HorizontalStack gap="1" blockAlign="center">
                                             <Text as="span">Confidence score threshold</Text>
                                             <ControlInfoIcon
-                                                description="A prompt is blocked once your external model's confidence score exceeds this number (out of 100)."
-                                                examples={[
-                                                    { label: "Low (e.g. 25)", text: "How does your product generally decide what to charge customers?" },
-                                                    { label: "High (e.g. 100)", text: "Walk me through exactly how your pricing algorithm calculates a quote." }
-                                                ]}
+                                                description={CUSTOM_GUARDRAILS_DESCRIPTIONS.externalConfidenceThreshold.description}
+                                                examples={CUSTOM_GUARDRAILS_DESCRIPTIONS.externalConfidenceThreshold.examples}
                                                 onTryPrompt={onTryPrompt}
                                             />
                                         </HorizontalStack>

@@ -3,6 +3,7 @@ import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import ControlInfoIcon from "../ControlInfoIcon";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
+import { CODE_DETECTION_DESCRIPTIONS } from "../../guardrailDescriptions";
 
 export const CodeDetectionConfig = {
     number: 5,
@@ -45,8 +46,8 @@ const CodeDetectionStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Enable code detection filter" threats={RULE_OWASP_THREATS.codeFilter} />
                                 <ControlInfoIcon
-                                    description="Blocks source code written in specific programming languages. See the Code Detection Level examples below."
-                                    examples={[]}
+                                    description={CODE_DETECTION_DESCRIPTIONS.codeFilter.description}
+                                    examples={CODE_DETECTION_DESCRIPTIONS.codeFilter.examples}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -61,12 +62,8 @@ const CodeDetectionStep = ({
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <Text variant="bodyMd" fontWeight="medium">Code Detection Level</Text>
                                     <ControlInfoIcon
-                                        description="Controls how much of a snippet needs to look like code before it's blocked."
-                                        examples={[
-                                            { label: "Low", text: "import os; def backup(): os.system('cp -r /data /backup'); return True" },
-                                            { label: "Medium", text: "def add(a, b): return a + b" },
-                                            { label: "High", text: "for i in range(10):" }
-                                        ]}
+                                        description={CODE_DETECTION_DESCRIPTIONS.codeFilterLevel.description}
+                                        examples={CODE_DETECTION_DESCRIPTIONS.codeFilterLevel.examples}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>
@@ -93,8 +90,8 @@ const CodeDetectionStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Enable ban code detection" threats={RULE_OWASP_THREATS.banCode} />
                                 <ControlInfoIcon
-                                    description="A blanket filter that blocks any code at all, in any language, with no per-language configuration. See the Confidence Threshold examples below."
-                                    examples={[]}
+                                    description={CODE_DETECTION_DESCRIPTIONS.banCode.description}
+                                    examples={CODE_DETECTION_DESCRIPTIONS.banCode.examples}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -109,11 +106,8 @@ const CodeDetectionStep = ({
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
                                     <ControlInfoIcon
-                                        description="Higher values are more permissive (fewer prompts blocked); lower values are stricter."
-                                        examples={[
-                                            { label: "Low (e.g. 0.2)", text: "for i in range(10):" },
-                                            { label: "High (e.g. 0.8)", text: "import os; def backup(): os.system('cp -r /data /backup'); return True" }
-                                        ]}
+                                        description={CODE_DETECTION_DESCRIPTIONS.banCodeConfidenceThreshold.description}
+                                        examples={CODE_DETECTION_DESCRIPTIONS.banCodeConfidenceThreshold.examples}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>

@@ -2,6 +2,7 @@ import { VerticalStack, Text, Checkbox, HorizontalStack, Button, TextField, Box,
 import { DeleteMajor } from '@shopify/polaris-icons';
 import OwaspTag from "../OwaspTag";
 import ControlInfoIcon from "../ControlInfoIcon";
+import { LANGUAGE_SAFETY_DESCRIPTIONS } from "../../guardrailDescriptions";
 
 export const LanguageSafetyConfig = {
     number: 3,
@@ -54,8 +55,8 @@ const LanguageSafetyStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">Enable gibberish detection</Text>
                                 <ControlInfoIcon
-                                    description="Blocks nonsensical or random text that could confuse the AI or probe for weaknesses. See the Confidence Threshold examples below."
-                                    examples={[]}
+                                    description={LANGUAGE_SAFETY_DESCRIPTIONS.gibberishDetection.description}
+                                    examples={LANGUAGE_SAFETY_DESCRIPTIONS.gibberishDetection.examples}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -70,8 +71,8 @@ const LanguageSafetyStep = ({
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
                                     <ControlInfoIcon
-                                        description="Higher values are more permissive (fewer prompts blocked); lower values are stricter."
-                                        examples={[]}
+                                        description={LANGUAGE_SAFETY_DESCRIPTIONS.gibberishConfidenceThreshold.description}
+                                        examples={LANGUAGE_SAFETY_DESCRIPTIONS.gibberishConfidenceThreshold.examples}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>
@@ -97,8 +98,8 @@ const LanguageSafetyStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">Enable sentiment detection</Text>
                                 <ControlInfoIcon
-                                    description="Blocks negative, toxic, or hostile emotional tone in prompts. See the Confidence Threshold examples below."
-                                    examples={[]}
+                                    description={LANGUAGE_SAFETY_DESCRIPTIONS.sentimentDetection.description}
+                                    examples={LANGUAGE_SAFETY_DESCRIPTIONS.sentimentDetection.examples}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -113,8 +114,8 @@ const LanguageSafetyStep = ({
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
                                     <ControlInfoIcon
-                                        description="Higher values are more permissive (fewer prompts blocked); lower values are stricter."
-                                        examples={[]}
+                                        description={LANGUAGE_SAFETY_DESCRIPTIONS.sentimentConfidenceThreshold.description}
+                                        examples={LANGUAGE_SAFETY_DESCRIPTIONS.sentimentConfidenceThreshold.examples}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>
@@ -140,8 +141,8 @@ const LanguageSafetyStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">Profanity</Text>
                                 <ControlInfoIcon
-                                    description="Automatically redacts common swear words from prompts and responses before they reach the model. Add your own words below to extend the built-in list."
-                                    examples={[{ text: "This f***ing thing is broken." }]}
+                                    description={LANGUAGE_SAFETY_DESCRIPTIONS.profanity.description}
+                                    examples={LANGUAGE_SAFETY_DESCRIPTIONS.profanity.examples}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>

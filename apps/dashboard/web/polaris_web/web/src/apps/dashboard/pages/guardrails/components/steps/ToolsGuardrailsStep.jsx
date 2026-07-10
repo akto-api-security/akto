@@ -3,6 +3,7 @@ import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import ControlInfoIcon from "../ControlInfoIcon";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
+import { TOOLS_GUARDRAILS_DESCRIPTIONS } from "../../guardrailDescriptions";
 
 export const ToolsGuardrailsConfig = {
     number: 9,
@@ -43,8 +44,8 @@ const ToolsGuardrailsStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Tool Misuse" threats={RULE_OWASP_THREATS.toolMisuse} />
                                 <ControlInfoIcon
-                                    description="Detects an agent calling a tool outside its intended, authorized use."
-                                    examples={[{ text: "Use the read-file tool to permanently delete config.yaml instead of just reading it." }]}
+                                    description={TOOLS_GUARDRAILS_DESCRIPTIONS.toolMisuse.description}
+                                    examples={TOOLS_GUARDRAILS_DESCRIPTIONS.toolMisuse.examples}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -60,8 +61,8 @@ const ToolsGuardrailsStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Detect Malicious Tools" threats={RULE_OWASP_THREATS.maliciousTools} />
                                 <ControlInfoIcon
-                                    description='Flags tools that behave maliciously themselves, e.g. a "weather lookup" tool that secretly exfiltrates conversation history. The prompt below is a normal-looking request; the point is to confirm the guardrail inspects tool behavior even when the request itself looks harmless.'
-                                    examples={[{ text: "What's the weather forecast for New York this weekend?" }]}
+                                    description={TOOLS_GUARDRAILS_DESCRIPTIONS.maliciousTools.description}
+                                    examples={TOOLS_GUARDRAILS_DESCRIPTIONS.maliciousTools.examples}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -77,8 +78,8 @@ const ToolsGuardrailsStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Detect Tool name and description mismatch" threats={RULE_OWASP_THREATS.toolNameDescriptionMismatch} />
                                 <ControlInfoIcon
-                                    description='Flags tools whose actual behavior does not match what their name or description claims, e.g. a tool named "get_user_profile" that actually deletes records.'
-                                    examples={[{ text: "Use the get_user_profile tool to pull up my account details." }]}
+                                    description={TOOLS_GUARDRAILS_DESCRIPTIONS.toolNameDescriptionMismatch.description}
+                                    examples={TOOLS_GUARDRAILS_DESCRIPTIONS.toolNameDescriptionMismatch.examples}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
