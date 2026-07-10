@@ -142,7 +142,9 @@ const ContentPolicyStep = ({
     const startEditing = (index) => {
         editStartRef.current = { topic: deniedTopics[index]?.topic || '', description: deniedTopics[index]?.description || '' };
         setEditingIndex(index);
-        setEditFormData({ ...deniedTopics[index] });
+        // Default any missing fields so topics from other sources (e.g. conversation-derived
+        // denied topics, which omit description) don't crash the edit form on .trim().
+        setEditFormData({ topic: "", description: "", samplePhrases: [], ...deniedTopics[index] });
         setNewPhraseInput("");
     };
 
