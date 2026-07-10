@@ -4,6 +4,7 @@ import com.akto.MongoBasedTest;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.types.CappedSet;
 import com.mongodb.BasicDBObject;
@@ -129,5 +130,35 @@ public class TestApiCollectionsAction extends MongoBasedTest {
         assertEquals(3, apiCollectionMap.get(2000).getUrlsCount()); // because burp collection we use count from urls stored in set
         assertEquals(4, apiCollectionMap.get(3000).getUrlsCount()); // because burp collection we use count from urls stored in set
 
+    }
+
+    @Test
+    public void testTagsForCollections(){
+        ApiCollectionsDao.instance.getMCollection().drop();
+        ApiCollection collection1 = new ApiCollection();
+        collection1.setId(1);
+        collection1.setHostName("akto.demo.io");
+
+        ApiCollection collection2 = new ApiCollection();
+        collection2.setId(2);
+        collection2.setHostName("akto.svc.local");
+
+        ApiCollection collection3 = new ApiCollection();
+        collection3.setId(3);
+        collection3.setHostName("locahost:3000");
+
+        ApiCollection collection4 = new ApiCollection();
+        collection4.setId(4);
+        collection4.setHostName("akto.localnet");
+
+        ApiCollection collection5 = new ApiCollection();
+        collection5.setId(5);
+        collection5.setHostName("kubernetes-121212-akto.io");
+
+        assertTrue(collection1.getEnvType() != null && collection1.getEnvType().stream().map(CollectionTags::getValue).anyMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
+        assertTrue(collection2.getEnvType() != null && collection2.getEnvType().stream().map(CollectionTags::getValue).anyMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
+        assertTrue(collection3.getEnvType() == null || collection3.getEnvType().stream().map(CollectionTags::getValue).noneMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
+        assertTrue(collection4.getEnvType() != null && collection4.getEnvType().stream().map(CollectionTags::getValue).anyMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
+        assertTrue(collection5.getEnvType() != null && collection5.getEnvType().stream().map(CollectionTags::getValue).anyMatch(value -> value.equals(ApiCollection.ENV_TYPE.INTERNAL.name())));
     }
 }
