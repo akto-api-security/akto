@@ -829,7 +829,6 @@ func (s *Service) checkErrorAnomaly(ctx context.Context, params *models.Validate
 	s.cache.mu.RLock()
 	anomalyMap := s.cache.anomalyByPolicy
 	s.cache.mu.RUnlock()
-	s.cache.mu.RUnlock()
 	if len(anomalyMap) == 0 {
 		return nil
 	}
