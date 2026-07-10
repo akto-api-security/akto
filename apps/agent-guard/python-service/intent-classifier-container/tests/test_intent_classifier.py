@@ -149,3 +149,46 @@ def test_train_mismatched_lengths_fails_without_touching_existing_model():
 
     after = ic.predict("agentA", [(_basis(16, 0)).tolist()])[0]
     assert before["intent"] == after["intent"]  # previous model untouched
+
+
+# --------------------------------------------------------------------------- #
+# serialize_model / load_model — the Redis L2 round trip. mcp-endpoint-shield
+# persists what serialize_model() returns and hands it back via load_model()
+# on another replica's L1 miss; this must reproduce identical predictions.
+# --------------------------------------------------------------------------- #
+def test_serialize_before_train_returns_none():
+    assert ic.serialize_model("never_trained") is None
+
+
+def test_serialize_and_load_model_round_trip_reproduces_predictions():
+    rng = np.random.default_rng(0)
+    c_flight, c_hotel = _basis(16, 0), _basis(16, 1)
+    vectors = _cluster(rng, c_flight) + _cluster(rng, c_hotel)
+    labels = ["flight_booking"] * 6 + ["hotel_booking"] * 6
+    ic.train("agentA", vectors, labels, {"flight_booking": "create"})
+
+    blob = ic.serialize_model("agentA")
+    assert isinstance(blob, bytes)
+
+    query = (c_flight + rng.normal(scale=0.02, size=16)).tolist()
+    expected = ic.predict("agentA", [query])[0]
+
+    # Simulate a different replica: no local model yet, load from the blob.
+    ic._models.clear()
+    assert ic.has_model("agentA") is False
+    assert ic.load_model("agentA", blob) is True
+    assert ic.has_model("agentA") is True
+
+    actual = ic.predict("agentA", [query])[0]
+    assert actual == expected
+
+
+def test_load_model_with_corrupt_blob_fails_open():
+    assert ic.load_model("agentA", b"not a valid pickle") is False
+    assert ic.has_model("agentA") is False
+
+
+def test_load_model_rejects_non_agent_model_payload():
+    import pickle
+    assert ic.load_model("agentA", pickle.dumps({"not": "an _AgentModel"})) is False
+    assert ic.has_model("agentA") is False

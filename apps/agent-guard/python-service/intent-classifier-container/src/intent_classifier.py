@@ -1,33 +1,7 @@
-"""Per-agent instruction-intent classifier (multi-class LogisticRegression on
-MiniLM embeddings).
-
-Lives in the embedder container because that is where numpy / scikit-learn (the
-sentence-transformers stack) already are; the Pyodide worker can't host them.
-
-One multi-class model per agent: each class is a fine-grained intent the agent's
-offline LLM-labeling service has assigned (e.g. "flight_booking",
-"resource_delete_order"), plus two reject classes — "__other__" (a
-recognizable-but-unmodeled ask, long-tail good intents folded in rather than
-discarded) and "__background__" (data/context that leaked past the upstream
-instruction/data segmenter). There is no "malicious" class here: this
-classifier only ever sees examples derived from GOOD (is_valid=True) verdicts;
-telling a genuinely novel malicious ask apart from a benign one remains the
-LLM cascade's job.
-
-predict() returns, per vector: {intent, confidence, margin, centroid_similarity,
-risk_category}, or None when the agent has no usable model yet (cold start) —
-the caller then ESCALATEs to the cascade, so the system is safe before any
-model exists. confidence/margin come from the calibrated classifier;
-centroid_similarity is an independent corroborating signal (cosine similarity
-to the predicted class's mean training vector) that catches a confidently-wrong
-prediction the classifier itself is extrapolating into.
-
-Models are swapped atomically (a single dict reassignment under the GIL), so a
-concurrent /classify always sees a fully-built model, never a half-trained one.
-"""
 
 import logging
 import os
+import pickle
 import threading
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -100,7 +74,7 @@ class _AgentModel:
 
 def _filter_min_class(X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray, List[str]]:
     """Drop rows belonging to any class with fewer than _MIN_PER_CLASS samples,
-    so one singleton/rare intent doesn't sink training for every other class
+    so one singleton/rare intent doesn't sink training for every other intent
     the agent already has enough examples for. Returns (X, y, dropped_classes)
     — dropped classes just won't be predicted, so those requests ESCALATE
     (safe) instead of the agent staying cold entirely."""
@@ -174,6 +148,10 @@ def train(agent_host: str, vectors: List[List[float]], labels: List[str],
     return {"trained": True, "n_samples": int(len(y)), "classes": classes, "dropped_classes": dropped}
 
 
+def has_model(agent_host: str) -> bool:
+    return agent_host in _models
+
+
 def predict(agent_host: str, vectors: List[List[float]]) -> List[Optional[Dict[str, Any]]]:
     """Return {intent, confidence, margin, centroid_similarity, risk_category}
     per vector, or None per vector when no model exists (cold start)."""
@@ -186,6 +164,33 @@ def predict(agent_host: str, vectors: List[List[float]]) -> List[Optional[Dict[s
     except Exception as exc:
         logger.warning(f"[intent_clf] predict failed agent={agent_host}: {exc}")
         return [None] * len(vectors)
+
+
+def serialize_model(agent_host: str) -> Optional[bytes]:
+    """Pickle the agent's fitted model for the Redis L2 cache. None if the
+    agent has no model (nothing to persist)."""
+    model = _models.get(agent_host)
+    if model is None:
+        return None
+    return pickle.dumps(model)
+
+
+def load_model(agent_host: str, blob: bytes) -> bool:
+    """Unpickle a model blob (fetched from Redis by the caller on an L1 miss)
+    and install it atomically. Fail-open: a corrupt/incompatible blob (e.g.
+    pickled by a different container version) just leaves the agent cold —
+    never raises."""
+    try:
+        model = pickle.loads(blob)
+    except Exception as exc:
+        logger.warning(f"[intent_clf] failed to load model blob agent={agent_host}: {exc}")
+        return False
+    if not isinstance(model, _AgentModel):
+        logger.warning(f"[intent_clf] model blob agent={agent_host} is not an _AgentModel")
+        return False
+    with _lock:
+        _models[agent_host] = model
+    return True
 
 
 def stats() -> Dict[str, int]:

@@ -18,10 +18,6 @@ from constants import (
     get_default_config,
     strip_qwen_tier,
 )
-from intent import audit_log as intent_audit
-from intent import corpus as intent_corpus
-from intent import decision as intent_decision
-from intent import prefilter
 from llm_scanner import scan_with_model_map
 from remote_scanner import scan_anonymize
 from scanners import scan_local
@@ -70,7 +66,6 @@ async def scan_payload(
     scanner_type = payload.get("scanner_type", "prompt")
     text = payload.get("text", "")
     config = payload.get("config") or {}
-    agent_host = payload.get("agent_host") or (config.get("agent_host") if isinstance(config, dict) else "") or ""
 
     def _elapsed_ms() -> float:
         return (time.perf_counter() - started) * 1000.0
@@ -105,68 +100,8 @@ async def scan_payload(
         if config.get("storeAllResults"):
             store_fn = lambda completed, name: schedule(alerts.store_results(completed, name))
 
-        intent_on = prefilter.enabled()
-        timer = scan_diag.StageTimer() if intent_on else None
-        fast = None
-        if intent_on:
-            fast = await prefilter.decide_fast(agent_host, text, timer=timer)
-            decided = fast["decision"]
-            log_extra = {
-                "reason": fast["reason"],
-                "risk_category": fast["intent"].get("risk_category"),
-                "units": len(fast["unit_texts"]),
-                "extraction_method": fast["extraction_method"],
-                "extraction_confidence": fast["extraction_confidence"],
-                "classifier_warm": fast["classifier_warm"],
-            }
-            _audit_kwargs = dict(
-                agent=agent_host,
-                scanner=scanner_name,
-                prompt=text,
-                reason=fast["reason"],
-                extraction_method=fast["extraction_method"],
-                extraction_confidence=fast["extraction_confidence"],
-                risk_category=fast["intent"].get("risk_category"),
-                units=fast["units"],
-                unit_texts=fast["unit_texts"],
-                timer=timer,
-            )
-            if decided == intent_decision.ALLOW:
-                if prefilter.act():
-                    scan_diag.log_intent_decision(
-                        "allow", agent_host, scanner_name, decided,
-                        timer, extra=log_extra, always=True,
-                    )
-                    intent_audit.append("intent_allow", **_audit_kwargs)
-                    return shape_response(scanner_name, True, 0.0, text, {
-                        "scanner_type": scanner_type,
-                        "prefilter": "allow",
-                        "reason": fast["reason"],
-                        "task_intent": ",".join(fast["intent"].get("units") or []),
-                        "risk_category": fast["intent"].get("risk_category"),
-                        "extraction_method": fast["extraction_method"],
-                    })
-                # Shadow mode: log what would have been decided, then fall through.
-                scan_diag.log_intent_decision(
-                    "allow_shadow", agent_host, scanner_name, decided,
-                    timer, extra=log_extra, always=True,
-                )
-                intent_audit.append("intent_allow_shadow", **_audit_kwargs)
-            # ESCALATE (or shadow): log the intent timings/result, then fall through to the cascade.
-            scan_diag.log_intent_decision(
-                "escalate", agent_host, scanner_name, decided, timer, extra=log_extra,
-            )
-            intent_audit.append("intent_escalate", **_audit_kwargs)
-            # An unmatched unit means either a never-seen agent (cold — no
-            # structure profile yet) or a warm agent that hit something its
-            # current model doesn't recognize (stale). Either way, try a
-            # warmup(); it fails open and its own cooldown keeps a busy cold
-            # agent from re-triggering a db-abstractor pull on every request.
-            if any(u is None for u in (fast.get("units") or [None])):
-                schedule(intent_corpus.warmup(agent_host))
-
-        # Cache miss (or cache not serving): only now does backpressure fail-open
-        # to avoid paying for the slow cascade while Vertex latency is elevated.
+        # Backpressure fail-open to avoid paying for the slow cascade while
+        # Vertex latency is elevated.
         if cascade_backpressure.should_skip_cascade():
             scan_diag.log_backpressure_skip(scanner_name)
             return shape_response(
@@ -185,15 +120,6 @@ async def scan_payload(
             if isinstance(elapsed, (int, float)) and elapsed > 0:
                 cascade_backpressure.record_cascade_latency(float(elapsed))
             schedule(alerts.post_slack(scanner_name, scanner_type, text, result))
-            if intent_on:
-                prefilter.enrich_result(result)
-                is_valid_bool = bool(result.get("is_valid", True))
-                if is_valid_bool and fast is not None and fast.get("unit_texts"):
-                    units_for_queue = [{"text": t} for t in fast["unit_texts"]]
-                    if intent_corpus.queue(agent_host, units_for_queue):
-                        schedule(intent_corpus.flush())
-                    if intent_corpus.record_good(agent_host):
-                        schedule(intent_corpus.warmup(agent_host))
             scan_diag.log_scan_outcome(
                 "cascade_run",
                 scanner_name,
@@ -201,7 +127,6 @@ async def scan_payload(
                 extra={
                     "is_valid": result.get("is_valid"),
                     "cascade_ms": elapsed,
-                    "intent": result.get("details", {}).get("task_intent") if intent_on else None,
                 },
             )
             return shape_response(
