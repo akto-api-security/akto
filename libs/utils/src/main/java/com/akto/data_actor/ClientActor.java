@@ -43,6 +43,7 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.Constants;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -4800,8 +4801,9 @@ public class ClientActor extends DataActor {
             BasicDBObject obj = new BasicDBObject();
             obj.put("agentQueryRecords", batch);
             String jsonBody = gson.toJson(obj);
+            String urlFinal = Constants.AGENT_QUERY_LOGS_SERVICE_URL.length() > 0 ? Constants.AGENT_QUERY_LOGS_SERVICE_URL + "/api": url;
             OriginalHttpRequest request = new OriginalHttpRequest(
-                    url + "/storeAgentQueryData", "", "POST", jsonBody, headers, "");
+                urlFinal + "/storeAgentQueryData", "", "POST", jsonBody, headers, "");
             ApiExecutor.sendRequestBackOff(request, true, null, false, null);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in flushAgentQueryRecords: " + e, LoggerMaker.LogDb.RUNTIME);
