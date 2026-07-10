@@ -3,19 +3,19 @@ repos:
     hooks:
       - id: ruff-check
         name: ruff check (agent-guard worker-py)
-        entry: bash -c 'cd apps/agent-guard/python-service/worker-py && uv run ruff check .'
+        entry: bash -c 'cd apps/agent-guard/python-service/worker-py && uv run --locked ruff check .'
         language: system
         files: ^apps/agent-guard/python-service/worker-py/.*\.py$
         pass_filenames: false
       - id: ruff-format
         name: ruff format (agent-guard worker-py)
-        entry: bash -c 'cd apps/agent-guard/python-service/worker-py && uv run ruff format .'
+        entry: bash -c 'cd apps/agent-guard/python-service/worker-py && uv run --locked ruff format .'
         language: system
         files: ^apps/agent-guard/python-service/worker-py/.*\.py$
         pass_filenames: false
       - id: mypy
         name: mypy (agent-guard worker-py)
-        entry: bash -c 'cd apps/agent-guard/python-service/worker-py && uv run mypy src'
+        entry: bash -c 'cd apps/agent-guard/python-service/worker-py && uv run --locked mypy src'
         language: system
         files: ^apps/agent-guard/python-service/worker-py/.*\.py$
         pass_filenames: false

@@ -23,6 +23,8 @@ dev = [
     "ruff",
     "mypy",
     "pytest",
+    "pytest-asyncio",
+    "cryptography",
     "pre-commit",
 ]
 

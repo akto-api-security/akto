@@ -55,13 +55,13 @@ test-worker:
 	cd python-service/worker-py && ./tests/run.sh
 
 lint:
-	cd python-service/worker-py && uv run ruff check . && uv run ruff format --check .
+	cd python-service/worker-py && uv run --locked ruff check . && uv run --locked ruff format --check .
 
 typecheck:
-	cd python-service/worker-py && uv run mypy src
+	cd python-service/worker-py && uv run --locked mypy src
 
 setup:
-	cd python-service/worker-py && uv sync && uv run pre-commit install -c "$$(pwd)/.pre-commit-config.yaml"
+	cd python-service/worker-py && uv sync --locked && uv run pre-commit install -c "$$(pwd)/.pre-commit-config.yaml"
 
 build-legacy:
 	docker compose -f docker-compose.legacy.yml build

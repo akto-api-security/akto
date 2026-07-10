@@ -27,7 +27,7 @@ jobs:
           cache-dependency-glob: "apps/agent-guard/python-service/worker-py/pyproject.toml"
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --locked
 
       - name: ruff check
         run: uv run ruff check .
