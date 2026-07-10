@@ -135,7 +135,8 @@ StaticCodeBlock.propTypes = {
     children: PropTypes.node,
 };
 
-function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt, toolsMetadata, highlights = [], isExternalAgentRequest = false, staticMode = false }) {
+function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt, toolsMetadata, highlights = [], isExternalAgentRequest = false, staticMode = false, enableBlockedStyling = false }) {
+    const showBlockedStyling = isVulnerable && enableBlockedStyling;
 
     const isRequest = type === MESSAGE_TYPES.REQUEST;
 
@@ -225,7 +226,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
     }, [content, shouldRenderAsCode, prettyJson]);
 
     return (
-        <Box padding="3" background={isVulnerable ? "bg-critical-subdued" : undefined}>
+        <Box padding="3" background={showBlockedStyling ? "bg-critical-subdued" : undefined}>
             <Box className="chat-message-row">
                 {/* Icon */}
                 <Box className="chat-message-icon-wrap">
@@ -233,7 +234,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                 </Box>
 
                 {/* Divider */}
-                <Box className="chat-message-divider" style={{ "--chat-divider-color": isVulnerable ? '#D72C0D' : '#E1E3E5' }} />
+                <Box className="chat-message-divider" style={{ "--chat-divider-color": showBlockedStyling ? '#D72C0D' : '#E1E3E5' }} />
 
                 {/* Content - Takes remaining space */}
                 <Box style={{ flex: 1, minWidth: 0 }}>
@@ -244,7 +245,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                 <Text variant="bodyMd" fontWeight="semibold" color="subdued">
                                     {label}
                                 </Text>
-                                {isVulnerable && <Badge status="critical" size="small">Blocked</Badge>}
+                                {showBlockedStyling && <Badge status="critical" size="small">Blocked</Badge>}
                                 {infoActions.map((action, idx) => (
                                     <Tooltip key={idx} content={action.tooltip} dismissOnMouseOut>
                                         <Button
@@ -363,6 +364,7 @@ ChatMessage.propTypes = {
     originalPrompt: PropTypes.string,
     toolsMetadata: PropTypes.object,
     staticMode: PropTypes.bool,
+    enableBlockedStyling: PropTypes.bool,
 };
 
 ChatMessage.defaultProps = {
@@ -373,6 +375,7 @@ ChatMessage.defaultProps = {
     onOpenAttempt: null,
     originalPrompt: null,
     toolsMetadata: {},
+    enableBlockedStyling: false,
 };
 
 export default ChatMessage;
