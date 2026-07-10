@@ -5,7 +5,7 @@ import ChatMessage from './ChatMessage';
 import { MESSAGE_LABELS } from './chatConstants';
 import ChatInfoModal from './ChatInfoModal';
 
-function ConversationHistory({ conversations, isInventory = false, testResults = [], highlights = [], staticMode = false }) {
+function ConversationHistory({ conversations, isInventory = false, testResults = [], highlights = [], staticMode = false, enableBlockedStyling = false }) {
     const label = isInventory ? MESSAGE_LABELS.INVENTORY_ANALYSIS : MESSAGE_LABELS.TESTED_INTERACTION;
 
     const [httpModalOpen, setHttpModalOpen] = useState(false);
@@ -51,6 +51,7 @@ function ConversationHistory({ conversations, isInventory = false, testResults =
                             toolsMetadata={isUser ? {} : (msg?.toolsMetadata || {})}
                             highlights={msg.validation ? highlights : []}
                             staticMode={staticMode}
+                            enableBlockedStyling={enableBlockedStyling}
                         />
                     )
                 })}
@@ -80,6 +81,7 @@ ConversationHistory.propTypes = {
     isInventory: PropTypes.bool,
     testResults: PropTypes.array,
     highlights: PropTypes.arrayOf(PropTypes.string),
+    enableBlockedStyling: PropTypes.bool,
 };
 
 ConversationHistory.defaultProps = {
@@ -87,6 +89,7 @@ ConversationHistory.defaultProps = {
     isInventory: false,
     testResults: [],
     highlights: [],
+    enableBlockedStyling: false,
 };
 
 export default ConversationHistory;
