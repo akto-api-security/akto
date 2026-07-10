@@ -60,6 +60,13 @@ const transform = {
                     existing.timestamp = item.timestamp
                     existing.time = new Date(item.timestamp * 1000).toLocaleString()
                 }
+                Object.entries(complianceMap).forEach(([framework, clauses]) => {
+                    existing.complianceWithClauses[framework] = [...new Set([
+                        ...(existing.complianceWithClauses[framework] || []),
+                        ...(clauses || [])
+                    ])]
+                })
+                existing.compliance = Object.keys(existing.complianceWithClauses)
             }
         })
 

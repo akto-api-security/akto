@@ -133,6 +133,7 @@ require (
 	modernc.org/sqlite v1.40.1 // indirect
 )
 
-replace github.com/shoenig/go-m1cpu => ./internal/stub/go-m1cpu
-
-replace github.com/akto-api-security/akto-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260707092900-d8661326e85b
+replace (
+	github.com/akto-api-security/akto-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260706104013-0b42feae400c
+	github.com/shoenig/go-m1cpu => ./internal/stub/go-m1cpu
+)

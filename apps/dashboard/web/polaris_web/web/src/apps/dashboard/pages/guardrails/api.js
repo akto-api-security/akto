@@ -1,12 +1,28 @@
 import request from "../../../../util/request"
 
 export default {
-    async fetchGuardrailPolicies() {
+    async fetchGuardrailPolicies({ skip = 0, limit = 50 } = {}) {
         const resp = await request({
             url: '/api/fetchGuardrailPolicies',
-            method: 'post'
+            method: 'post',
+            data: { skip, limit }
         })
         return resp
+    },
+
+    async fetchAllGuardrailPolicies() {
+        const PAGE_SIZE = 50;
+        const MAX_PAGES = 40; // cap: 2000 policies
+        let skip = 0;
+        let policies = [];
+        for (let page = 0; page < MAX_PAGES; page++) {
+            const resp = await this.fetchGuardrailPolicies({ skip, limit: PAGE_SIZE });
+            const batch = resp?.guardrailPolicies || [];
+            policies = policies.concat(batch);
+            if (batch.length < PAGE_SIZE) break;
+            skip += PAGE_SIZE;
+        }
+        return policies;
     },
 
     async createGuardrailPolicy(policyData) {
@@ -65,11 +81,17 @@ export default {
         return resp
     },
 
-    async suggestGuardrailCompliance(inputType, payload) {
+    async fetchViolations(startTimestamp, endTimestamp, skip = 0, limit = 1000) {
         const resp = await request({
-            url: '/api/ask_ai',
+            url: '/api/fetchSuspectSampleData',
             method: 'post',
-            data: { type: 'suggest_guardrail_compliance', meta: { inputType, ...payload } }
+            data: {
+                skip,
+                limit,
+                latestAttack: [],
+                ...(startTimestamp != null ? { startTimestamp } : {}),
+                ...(endTimestamp != null ? { endTimestamp } : {}),
+            }
         })
         return resp
     },

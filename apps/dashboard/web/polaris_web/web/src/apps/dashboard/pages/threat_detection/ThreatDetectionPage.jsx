@@ -28,6 +28,8 @@ import WebhookIntegrationModal from "./components/WebhookIntegrationModal";
 import { updateThreatFiltersStore } from "./utils/threatFilters";
 import { redactSampleDataByKeywords } from "./utils/redactSampleData";
 import { resolveComplianceClauseMap } from "./utils/formatUtils";
+import LocalStore from "@/apps/main/LocalStorageStore";
+import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
 const convertToGraphData = (severityMap) => {
     let dataArr = []
     Object.keys(severityMap).forEach((x) => {
@@ -316,6 +318,20 @@ function ThreatDetectionPage() {
     const [pendingRowContext, setPendingRowContext] = useState(null);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
+    const showNewLayoutToggle = func.isDemoAccount() && isEndpointSecurityCategory();
+    const newLayout = LocalStore((state) => state.guardrailViolationsNewLayout);
+    const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
+
+    useEffect(() => {
+        if (showNewLayoutToggle && newLayout) {
+            navigate("/dashboard/guardrails/violations", { replace: true });
+        }
+    }, [navigate, showNewLayoutToggle, newLayout]);
+
+    const handleLayoutToggle = useCallback(() => {
+        setGuardrailViolationsNewLayout(true);
+        navigate("/dashboard/guardrails/violations");
+    }, [navigate, setGuardrailViolationsNewLayout]);
 
     useEffect(() => {
         let cancelled = false;
@@ -400,7 +416,8 @@ function ThreatDetectionPage() {
             severity: data.severity || '',
             sessionId: data.sessionId || '',
             ruleViolated: data.ruleViolated || '-',
-            complianceMapData: data.complianceMapData || {}
+            complianceMapData: data.complianceMapData || {},
+            metadata: data.metadata || ''
         });
 
         setShowDetails(true);
@@ -417,7 +434,8 @@ function ThreatDetectionPage() {
                 severity: data.severity || '',
                 sessionId: data.sessionId || '',
                 ruleViolated: data.ruleViolated || '-',
-                complianceMap: data.complianceMapData || {}
+                complianceMap: data.complianceMapData || {},
+                metadata: data.metadata || ''
             },
             currentEventId: data.id || '',
             currentEventStatus: data.status || '',
@@ -604,6 +622,7 @@ function ThreatDetectionPage() {
               severity: rowContext?.severity || queryParams.severity || '',
               sessionId: rowContext?.sessionId || '',
               ruleViolated: rowContext?.ruleViolated || queryParams.ruleViolated || '-',
+              metadata: rowContext?.metadata || '',
               complianceMap: rowContext?.complianceMapData || (() => {
                 if (!queryParams.filterId) return {};
                 const { threatFiltersMap, guardrailComplianceMap } = SessionStore.getState();
@@ -903,7 +922,12 @@ function ThreatDetectionPage() {
                 isFirstPage={true}
                 primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
                 components={components}
-                secondaryActions={secondaryActionsComp}
+                secondaryActions={
+                    <HorizontalStack gap={2}>
+                        {showNewLayoutToggle && <NewLayoutTooltip checked={false} onChange={handleLayoutToggle} />}
+                        {secondaryActionsComp}
+                    </HorizontalStack>
+                }
             />
         </>
     );

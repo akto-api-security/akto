@@ -178,8 +178,11 @@ def call_guardrails(tool_name: str, tool_input: Any, tool_server_name: str) -> T
 
     try:
         request_body = build_validation_request(tool_name, tool_input, tool_server_name)
+        # Ingest the tool request in the same guardrails round-trip so ALLOWED
+        # tool calls still land in Akto's audit trail (matches the prompt
+        # validator). Blocked calls are additionally ingested with a 403 marker.
         result = post_payload_json(
-            build_http_proxy_url(guardrails=True, ingest_data=False),
+            build_http_proxy_url(guardrails=True, ingest_data=True),
             request_body,
         )
 

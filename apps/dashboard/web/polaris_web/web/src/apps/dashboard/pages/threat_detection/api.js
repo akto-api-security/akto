@@ -25,7 +25,7 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label, hosts, latestApiOrigRegex, method = [], sortBySeverity = false) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label, hosts, latestApiOrigRegex, method = [], sortBySeverity = false, severity = []) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -42,11 +42,14 @@ const threatDetectionRequests = {
                 limit: limit || 50,
                 statusFilter: statusFilter,
                 ...(typeof successfulExploit === 'boolean' ? { successfulExploit } : {}),
-                ...(label ? { label } : {}),
+                // 'guardrail' events are scoped by x-context-source: AGENTIC header; they are not tagged
+                // with label="guardrail" in the DB, so sending the label filter returns zero results.
+                ...(label && label !== 'guardrail' ? { label } : {}),
                 ...(hosts && hosts.length > 0 ? { hosts } : {}),
                 ...(latestApiOrigRegex ? { latestApiOrigRegex } : {}),
                 method: method,
-                ...(typeof sortBySeverity === 'boolean' ? { sortBySeverity } : {})
+                ...(typeof sortBySeverity === 'boolean' ? { sortBySeverity } : {}),
+                ...(severity && severity.length > 0 ? { severity } : {})
             },
             suppress403Toast: true
         })

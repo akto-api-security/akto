@@ -2,9 +2,16 @@
 # WAR is still compiled as Java 8 bytecode by the root Maven build; only the runtime changes here.
 FROM jetty:12.1.10-jdk21-eclipse-temurin
 USER root
-RUN apt-get update -y \
-    && apt-get install -y --no-install-recommends libpcap-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Retry apt-get update: arm64 cross-builds can hit transient Ubuntu mirror sync errors.
+RUN set -eux; \
+    echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries; \
+    for i in 1 2 3 4 5; do \
+      apt-get update -y && break; \
+      if [ "$i" -eq 5 ]; then exit 1; fi; \
+      sleep 15; \
+    done; \
+    apt-get install -y --no-install-recommends libpcap-dev; \
+    rm -rf /var/lib/apt/lists/*
 
 # EE8 deploys javax.servlet WARs; ee8-jsp satisfies Struts JspTemplateEngine classpath (Jetty 9 had this built-in).
 RUN rm -f /var/lib/jetty/start.d/threadpool.ini \

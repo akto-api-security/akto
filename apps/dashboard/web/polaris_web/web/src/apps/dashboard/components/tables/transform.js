@@ -61,7 +61,7 @@ const tableFunc = {
         // Check if data has an override for actual total (used when data is limited for memory optimization)
         const actualTotal = props.data._actualTotal;
 
-        let localFilters = func.prepareFilters(tempData,props.filters);
+        let localFilters = func.prepareFilters(tempData, props.filters);
 
         // Create cache key based on data identity, headers, and filter properties.
         // Including a row-id fingerprint prevents collisions across different scopes
@@ -107,6 +107,7 @@ const tableFunc = {
               label: label,
               title: label,
               choices: choices,
+              ...(header.singleSelect ? { singleSelect: true } : {}),
             };
           })
 

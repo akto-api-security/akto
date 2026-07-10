@@ -141,7 +141,9 @@ function GithubServerTable(props) {
     }else{
       queryFilters = tableFunc.getFiltersMapFromUrl(decodeURIComponent(searchParams.get("filters") || ""), props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey)
     }
-    const currentFilters = tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)
+    const queryFilterKeys = new Set(queryFilters.map((f) => f.key));
+    const nonOverlappingInitialFilters = initialStateFilters.filter((f) => !queryFilterKeys.has(f.key));
+    const currentFilters = tableFunc.mergeFilters(queryFilters,nonOverlappingInitialFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)
     setAppliedFilters((prev) => {
       if(func.deepComparison(prev, currentFilters)){
         return prev
@@ -751,7 +753,8 @@ function GithubServerTable(props) {
                 exportPortalTarget
               )}
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
-              <div className={tableHeightClass}>
+              {props?.customFilterContent && mode === IndexFiltersMode.Filtering && props.customFilterContent}
+              <div className={tableHeightClass} style={{ paddingTop: '8px' }}>
               {props.loading && props.loadingText ? (
                 <SpinnerCentered text={props.loadingText}/>
               ) : (

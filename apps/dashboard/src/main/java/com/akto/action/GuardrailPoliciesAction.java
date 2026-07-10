@@ -66,6 +66,11 @@ public class GuardrailPoliciesAction extends UserAction {
     @Setter
     private List<String> policyIds;
 
+    @Setter
+    private int skip;
+    @Setter
+    private int limit;
+
     // For playground testing
     @Setter
     private String testInput;
@@ -75,7 +80,7 @@ public class GuardrailPoliciesAction extends UserAction {
 
     public String fetchGuardrailPolicies() {
         try {
-            this.guardrailPolicies = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(0, 20);
+            this.guardrailPolicies = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(skip, limit);
             this.total = GuardrailPoliciesDao.instance.getTotalCount();
 
             // Resolve targetTeams/targetRoles → device IDs fresh on every fetch.
@@ -384,6 +389,11 @@ public class GuardrailPoliciesAction extends UserAction {
 
             int accountId = Context.accountId.get();
             String guardrailServiceUrl = "https://" + accountId + "-guardrails.akto.io";
+            
+            if (accountId == 1768175789) {
+                guardrailServiceUrl = "https://ingest.akto.io";
+            }
+
             String validateUrl = guardrailServiceUrl + "/api/validate/requestWithPolicy";
 
             // Prepare request payload - wrap testInput in JSON with "prompt" key

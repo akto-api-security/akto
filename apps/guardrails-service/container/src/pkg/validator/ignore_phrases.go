@@ -2,30 +2,19 @@ package validator
 
 import (
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"go.uber.org/zap"
 )
 
-// replacement is a single placeholder -> original-text substitution made during a
-// redact pass. It's kept only for the duration of one request so the real text can be
-// restored before anything is forwarded downstream — never persisted, never encoded
-// into the payload itself.
-type replacement struct {
-	placeholder string
-	original    string
-}
-
-// ignorePhraseMatcher redacts a fixed set of phrases (literal or regex) from text using
-// a single compiled, linear-time (RE2) regex.
+// ignorePhraseMatcher redacts a set of phrases (literal or regex) via one compiled RE2 regex.
 type ignorePhraseMatcher struct {
 	re *regexp.Regexp
 }
 
-// compileIgnorePhraseMatcher builds one compiled matcher for a single policy's ignore
-// phrases. Returns nil if there's nothing to match (empty list, or every phrase is blank).
+// compileIgnorePhraseMatcher compiles one matcher for a policy's ignore phrases.
+// Returns nil if there's nothing to match.
 func compileIgnorePhraseMatcher(phrases []types.IgnorePhrase) *ignorePhraseMatcher {
 	var caseSensitiveParts, caseInsensitiveParts []string
 	for _, phrase := range phrases {
@@ -34,11 +23,18 @@ func compileIgnorePhraseMatcher(phrases []types.IgnorePhrase) *ignorePhraseMatch
 		}
 		pattern := phrase.Phrase
 		if !phrase.IsRegex {
-			// Literal phrases match whole words only, so a short/common phrase (e.g.
-			// "Acme") doesn't also strip a substring out of an unrelated larger word
-			// (e.g. "AcmeCorp2024"). Regex phrases are used as-is — the author controls
-			// their own boundaries.
-			pattern = `\b` + regexp.QuoteMeta(phrase.Phrase) + `\b`
+			// Whole-word match so "Acme" doesn't also strip "AcmeCorp2024". \b alone
+			// misses a phrase glued to a literal "\n" in escaped text, so also accept
+			// a JSON escape-sequence pair as a boundary.
+			boundary := `(?:\\[nrtbf"\\/]|\b)`
+			pattern = boundary + regexp.QuoteMeta(phrase.Phrase) + boundary
+		}
+		if phrase.IsRegex {
+			// Java's regex engine (save-time validation) accepts things RE2 doesn't
+			// (backreferences, lookaround) — skip just this phrase, not the whole policy.
+			if _, err := regexp.Compile(pattern); err != nil {
+				continue
+			}
 		}
 		if phrase.CaseSensitive {
 			caseSensitiveParts = append(caseSensitiveParts, pattern)
@@ -65,11 +61,8 @@ func compileIgnorePhraseMatcher(phrases []types.IgnorePhrase) *ignorePhraseMatch
 	return &ignorePhraseMatcher{re: compiled}
 }
 
-// compileIgnorePhraseMatchersByPolicy builds one compiled matcher per policy name, once,
-// straight off each policy's own IgnorePhrases (populated natively by
-// mcp.ConvertGuardrailsToPolicy). Called from fetchAndParsePolicies at cache refresh
-// time, not per request — steady-state request handling is a map lookup, never a regex
-// compile. Mirrors how compiledRules is already derived from policies in this file.
+// compileIgnorePhraseMatchersByPolicy compiles one matcher per policy, once, at cache
+// refresh time — steady-state requests only do a map lookup.
 func compileIgnorePhraseMatchersByPolicy(policies []types.Policy) map[string]*ignorePhraseMatcher {
 	matchersByPolicy := make(map[string]*ignorePhraseMatcher)
 	for _, policy := range policies {
@@ -83,105 +76,74 @@ func compileIgnorePhraseMatchersByPolicy(policies []types.Policy) map[string]*ig
 	return matchersByPolicy
 }
 
-// redact replaces every match with a plain sequential placeholder, starting from
-// startPlaceholderIndex so placeholders stay unique when multiple matchers run against
-// the same payload in one request. It returns the substitutions made so the real text
-// can be restored later, and the next free index for a subsequent matcher to continue from.
-func (m *ignorePhraseMatcher) redact(payload string, startPlaceholderIndex int) (redacted string, restore []replacement, nextPlaceholderIndex int) {
+// redact deletes every match outright. A marker/placeholder would itself be
+// unusual-looking text a prompt-injection scanner can flag — deletion leaves no
+// artifact. No restore mapping needed: deletion always shortens the payload, so
+// "did anything change" is just a != check against the original.
+func (m *ignorePhraseMatcher) redact(payload string) string {
 	if m == nil || m.re == nil {
-		return payload, nil, startPlaceholderIndex
+		return payload
 	}
-	placeholderIndex := startPlaceholderIndex
-	redacted = m.re.ReplaceAllStringFunc(payload, func(match string) string {
-		placeholder := "\x00IGNP" + strconv.Itoa(placeholderIndex) + "\x00"
-		restore = append(restore, replacement{placeholder: placeholder, original: match})
-		placeholderIndex++
-		return placeholder
-	})
-	return redacted, restore, placeholderIndex
+	return m.re.ReplaceAllString(payload, "")
 }
 
-// redactIgnorePhrasesForPolicies applies every applicable policy's own ignore-phrase
-// matcher to the same shared payload, in sequence, since the enforcement library takes
-// exactly one payload string for the whole policies batch handed to it in a single call
-// — there's no per-policy channel to keep one policy's redaction from being visible to
-// another's detectors in that same call. A phrase ignored by Policy A is therefore
-// invisible to every other policy evaluated alongside it in this request, not just
-// Policy A itself; this is a deliberate simplicity trade-off (see plan doc).
-func redactIgnorePhrasesForPolicies(payload string, policies []types.Policy, matchersByPolicy map[string]*ignorePhraseMatcher) (redacted string, restore []replacement, changed bool) {
+// redactIgnorePhrasesForPolicies redacts every applicable policy's phrases from one
+// shared payload, since the enforcement library evaluates all policies against a single
+// string per call. A phrase ignored by Policy A is therefore hidden from every policy in
+// this request, not just Policy A (deliberate simplicity trade-off — see plan doc).
+func redactIgnorePhrasesForPolicies(payload string, policies []types.Policy, matchersByPolicy map[string]*ignorePhraseMatcher) string {
 	if len(matchersByPolicy) == 0 {
-		return payload, nil, false
+		return payload
 	}
-	redacted = payload
-	placeholderIndex := 0
+	redacted := payload
 	for _, policy := range policies {
 		matcher, ok := matchersByPolicy[policy.Info.Name]
 		if !ok {
 			continue
 		}
-		var policyRestore []replacement
-		redacted, policyRestore, placeholderIndex = matcher.redact(redacted, placeholderIndex)
-		restore = append(restore, policyRestore...)
+		redacted = matcher.redact(redacted)
 	}
-	return redacted, restore, len(restore) > 0
+	return redacted
 }
 
-// restoreIgnorePhrases puts the real text back wherever a placeholder survived into
-// the (possibly further masked) result the enforcement library returned. Plain
-// strings.ReplaceAll, same primitive already used elsewhere in this service — no
-// encoding/decoding involved.
-func restoreIgnorePhrases(payload string, restore []replacement) string {
-	for _, r := range restore {
-		payload = strings.ReplaceAll(payload, r.placeholder, r.original)
-	}
-	return payload
-}
-
-// redactIgnorePhrasesForEvaluation is the shared "before the enforcement-library call"
-// half of ignore-phrase handling for ValidateRequest and ValidateResponse: look up the
-// cached per-policy matchers (refreshed alongside the rest of the policy cache) and
-// delegate to redactIgnorePhrasesForEvaluationWithMatchers.
-func (s *Service) redactIgnorePhrasesForEvaluation(originalPayload string, policies []types.Policy, logPrefix, sessionID string) (payloadForEvaluation, preRedactionPayload string, restore []replacement) {
+// redactIgnorePhrasesForEvaluation looks up cached matchers and delegates to
+// redactIgnorePhrasesForEvaluationWithMatchers, for ValidateRequest/ValidateResponse.
+func (s *Service) redactIgnorePhrasesForEvaluation(originalPayload string, policies []types.Policy, logPrefix, sessionID string) (payloadForEvaluation, preRedactionPayload string) {
 	s.cache.mu.RLock()
 	matchersByPolicy := s.cache.ignorePhraseMatchersByPolicy
 	s.cache.mu.RUnlock()
 	return s.redactIgnorePhrasesForEvaluationWithMatchers(originalPayload, policies, matchersByPolicy, logPrefix, sessionID)
 }
 
-// redactIgnorePhrasesForEvaluationWithMatchers is the cache-independent core: given
-// matchers the caller already has in hand, redact the payload before it's evaluated if
-// any of the given policies has one. Returns the payload to send for evaluation, the
-// untouched pre-redaction payload, and the substitutions made (nil if nothing changed)
-// — pass all three to reconcileIgnorePhraseRedaction afterward. Used directly by
-// ValidateRequestWithPolicy (the guardrail playground), which evaluates a single
-// one-off provided policy that never goes through the policy cache at all.
-func (s *Service) redactIgnorePhrasesForEvaluationWithMatchers(originalPayload string, policies []types.Policy, matchersByPolicy map[string]*ignorePhraseMatcher, logPrefix, sessionID string) (payloadForEvaluation, preRedactionPayload string, restore []replacement) {
+// redactIgnorePhrasesForEvaluationWithMatchers is the cache-independent core, used
+// directly by ValidateRequestWithPolicy (playground), which never goes through the
+// policy cache. Returns the payload to evaluate and the untouched original — pass both
+// to reconcileIgnorePhraseRedaction afterward.
+func (s *Service) redactIgnorePhrasesForEvaluationWithMatchers(originalPayload string, policies []types.Policy, matchersByPolicy map[string]*ignorePhraseMatcher, logPrefix, sessionID string) (payloadForEvaluation, preRedactionPayload string) {
 	if len(matchersByPolicy) == 0 {
-		return originalPayload, originalPayload, nil
+		return originalPayload, originalPayload
 	}
-	redacted, restore, changed := redactIgnorePhrasesForPolicies(originalPayload, policies, matchersByPolicy)
-	if !changed {
-		return originalPayload, originalPayload, nil
+	redacted := redactIgnorePhrasesForPolicies(originalPayload, policies, matchersByPolicy)
+	if redacted == originalPayload {
+		return originalPayload, originalPayload
 	}
 	s.logger.Info(logPrefix+" - ignore-phrase redaction applied for evaluation",
-		zap.String("sessionID", sessionID),
-		zap.Int("matchCount", len(restore)))
-	return redacted, originalPayload, restore
+		zap.String("sessionID", sessionID))
+	return redacted, originalPayload
 }
 
-// reconcileIgnorePhraseRedaction is the shared "after the enforcement-library call" half:
-// the real origin must never see an ignore-phrase placeholder. If the library modified
-// the payload on top of what was sent for evaluation, the real phrases are restored into
-// that modified result; otherwise the untouched pre-redaction payload is returned instead
-// of the eval-only redacted copy.
-func (s *Service) reconcileIgnorePhraseRedaction(modifiedPayload, payloadForEvaluation, preRedactionPayload string, restore []replacement, logPrefix, sessionID string) string {
-	if len(restore) == 0 {
+// reconcileIgnorePhraseRedaction ensures the real origin gets the real text. If nothing
+// was redacted, modifiedPayload passes through untouched. Otherwise the untouched
+// original is returned, unless another detector's own masking also changed the payload
+// — then that modified copy is forwarded as-is (no marker left to restore just our span).
+func (s *Service) reconcileIgnorePhraseRedaction(modifiedPayload, payloadForEvaluation, preRedactionPayload, logPrefix, sessionID string) string {
+	if payloadForEvaluation == preRedactionPayload {
 		return modifiedPayload
 	}
 	if modifiedPayload != "" && modifiedPayload != payloadForEvaluation {
-		s.logger.Info(logPrefix+" - restored ignore-phrase placeholders after masking",
+		s.logger.Info(logPrefix+" - another detector modified the payload on top of ignore-phrase redaction; forwarding that modified copy as-is",
 			zap.String("sessionID", sessionID))
-		return restoreIgnorePhrases(modifiedPayload, restore)
+		return modifiedPayload
 	}
 	return preRedactionPayload
 }

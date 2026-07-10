@@ -1,9 +1,11 @@
 import {
     extractEndpointId,
     extractServiceName,
+    deviceServiceKey,
 } from "./constants";
 import {
     formatDisplayName,
+    getFriendlyLlmName,
     getTypeFromTags,
     hasPersonalAccountTag,
     hasMisconfiguredConfigTag,
@@ -39,13 +41,6 @@ export function getRiskStatus(score) {
     return undefined;
 }
 
-function deviceServiceKey(hostName) {
-    if (!hostName) return null;
-    const parts = hostName.split(".");
-    if (parts.length < 2) return null;
-    return parts[0] + "\0" + parts[parts.length - 1];
-}
-
 // Human label derived from the bucket — no duplicated thresholds.
 export function getRiskLabel(score) {
     return `${func.toSentenceCase(getRiskLevel(score))} Risk`;
@@ -72,6 +67,46 @@ export function getAgentLinkedComponents(asset, agenticTreeData = [], agenticFla
         linked.push({ name: flat?.name || name, type: flat?.type || "MCP Server" });
     });
     return linked;
+}
+
+// Tab badge count for AI Agent components — mirrors AgentComponentsView rows:
+// config row + builtin tools + connected MCP servers + skills.
+export function countAgentComponentsTab(asset, { inlineComponents = [], configViolations = null, skillCount } = {}) {
+    const mcpCount = new Set((asset?.mcpServers || []).map((s) => String(s).toLowerCase())).size;
+    const toolCount = (inlineComponents || []).filter((c) => c.type === "Tool").length;
+    const skills = skillCount ?? asset?.skillCount ?? 0;
+    const config = configViolations ? 1 : 0;
+    return mcpCount + toolCount + skills + config;
+}
+
+// LLM traffic on the agent host (/v1/messages) — Cowork, Claude CLI, etc.
+export function isAgentLlmMessagesUrl(url) {
+    const u = String(url || "");
+    return u === "/v1/messages" || u.startsWith("/v1/messages/");
+}
+
+// Observed tools + inline LLM on the agent collection for topology graphs.
+export function buildAgentInlineTopologyComponents(stiEndpoints = [], builtinTools = [], asset = {}) {
+    const items = [];
+    const hasLlm = (stiEndpoints || []).some((ep) => {
+        const url = ep?.url || ep?._id?.url;
+        return isAgentLlmMessagesUrl(url);
+    });
+    if (hasLlm) {
+        const tag = asset?.assetTagValue || asset?.name || "claude";
+        const label = tag.toLowerCase().includes("claude")
+            ? getFriendlyLlmName("claude.ai")
+            : formatDisplayName(tag);
+        items.push({ id: "inline-llm", cat: "ai-model", type: "LLM", label, edgeColor: "#ec4899" });
+    }
+    const seenTools = new Set();
+    (builtinTools || []).forEach((tool, i) => {
+        const name = tool?.name;
+        if (!name || seenTools.has(name)) return;
+        seenTools.add(name);
+        items.push({ id: `inline-tool-${i}`, cat: "mcp", type: "Tool", label: name, edgeColor: "#4cbebb" });
+    });
+    return items;
 }
 
 export function inferOsFromDeviceId(deviceId) {
@@ -180,6 +215,21 @@ function bucketFromUrl(url) {
     // MCP protocol paths (initialize, tools/list, ping) are server infrastructure, not user tools
     if (/^\/mcp\b/.test(u) || u === "initialize" || u === "ping") return "Server";
     return "Tool";
+}
+
+// Claude Cowork / shield built-in tools are ingested on the agent host as /tool/{name}.
+export function isAgentBuiltinToolUrl(url) {
+    const u = String(url || "");
+    return u.startsWith("/tool/") && u.length > "/tool/".length;
+}
+
+// Built-in agent tools from agent-host STI (/tool/*). MCP tools stay on MCP collections.
+export function buildAgentBuiltinToolsFromStis(stiEndpoints = [], apiInfoList = [], apiCollectionId, auditRows = []) {
+    const toolEndpoints = (stiEndpoints || []).filter((ep) => {
+        const url = ep?.url || ep?._id?.url;
+        return isAgentBuiltinToolUrl(url);
+    });
+    return buildMcpComponentsFromStis(toolEndpoints, apiInfoList, apiCollectionId, auditRows).tools;
 }
 
 // Build flyout component rows from the collection's STI endpoints (real url+method, used to fetch sample
@@ -597,7 +647,13 @@ export function buildDeviceEndpointsPageData(
         agentChildCount += Object.keys(d.children).length;
     });
 
-    const totalViolations = Object.values(violationsBySeverity).reduce((a, b) => a + b, 0);
+    // Compute totals from raw events so the count matches ViolationsPage (all events, not just device-attributed ones)
+    const rawViolationsBySeverity = emptyViolations();
+    violationRows.forEach((r) => {
+        const key = (r.severity || "").toLowerCase();
+        if (key in rawViolationsBySeverity) rawViolationsBySeverity[key] += 1;
+    });
+    const totalViolations = Object.values(rawViolationsBySeverity).reduce((a, b) => a + b, 0);
 
     // ── Real time-series bucketing ────────────────────────────────────────────
     // Endpoints & OS: bucket agenticCollections by startTs (when each collection was first seen)
@@ -694,10 +750,10 @@ export function buildDeviceEndpointsPageData(
         deltaUsers:      Math.max(0, windowDelta(userBucket.counts)),
         deltaViolations: windowDelta(violCounts),
         violationsBySeverity: [
-            { name: "Critical", y: violationsBySeverity.critical, color: "#DC2626" },
-            { name: "High", y: violationsBySeverity.high, color: "#F97316" },
-            { name: "Medium", y: violationsBySeverity.medium, color: "#EAB308" },
-            { name: "Low", y: violationsBySeverity.low, color: "#D1D5DB" },
+            { name: "Critical", y: rawViolationsBySeverity.critical, color: "#DC2626" },
+            { name: "High", y: rawViolationsBySeverity.high, color: "#F97316" },
+            { name: "Medium", y: rawViolationsBySeverity.medium, color: "#EAB308" },
+            { name: "Low", y: rawViolationsBySeverity.low, color: "#D1D5DB" },
         ],
         osTrend: {
             mac:     macCounts,

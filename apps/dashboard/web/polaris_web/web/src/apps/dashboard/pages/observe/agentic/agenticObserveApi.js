@@ -1,6 +1,9 @@
 import request from "@/util/request";
 import observeApi from "../api";
-import { buildMcpComponentsFromStis, buildSkillsFlyoutData, normalizeSeverity } from "./agenticPageBuilders";
+import { buildMcpComponentsFromStis, buildAgentBuiltinToolsFromStis, buildSkillsFlyoutData, normalizeSeverity } from "./agenticPageBuilders";
+import { deviceServiceKey } from "./constants";
+
+export { deviceServiceKey };
 
 function extractRuleViolated(metadata) {
     if (!metadata) return "-";
@@ -48,14 +51,6 @@ export async function fetchAgenticViolations({ startTimestamp, endTimestamp, hos
 // 3. Claude-config: host is 2-segment ending in `.claude-settings` or `.claude` — these are
 //                   config scanner events with no collection. Attributed to any claude collection
 //                   on the same device. Old ingest = `claude-settings`, new ingest = `claude`.
-
-// device+service key from a hostname (first + last segment), ignoring the middle source.
-export function deviceServiceKey(hostName) {
-    if (!hostName) return null;
-    const parts = hostName.split(".");
-    if (parts.length < 2) return null;
-    return parts[0] + " " + parts[parts.length - 1];
-}
 
 // Returns true for 2-segment claude config event hosts (no matching collection exists for these).
 export function isClaudeConfigHost(hostName) {
@@ -118,10 +113,10 @@ export function aggregateViolationsByCollectionId(violationRows = [], collection
     return byCollection;
 }
 
-// Open the threat-activity page deep-linked to a single violation event.
-// Mirrors the URL shape the page expects: filters= first, then the event keys, #active hash.
+// Open the guardrail activity page deep-linked to a single violation event.
+// Mirrors the URL shape the page expects: event keys as query params, #active hash.
 export function openViolationInThreatActivity(row = {}) {
-    const base = "/dashboard/protection/threat-activity";
+    const base = "/dashboard/guardrails/activity";
     const { refId, eventType, actor, filterId, status } = row;
     if (refId && eventType && actor && filterId) {
         const params = new URLSearchParams();
@@ -141,16 +136,12 @@ export function openViolationInThreatActivity(row = {}) {
     }
 }
 
-// ── Claude config violation scoping ──────────────────────────────────────────
-// The authoritative signal for a config violation (matching ConfigRiskSyncCron on the backend)
-// is the event URL prefix `/claude/config/` — NOT the host. These events DO have a real host
-// equal to a collection's hostName. We scope to an asset by matching the event host against the
-// asset's own collection hosts (exact) and their loose device+service key, mirroring how the
-// Violations tab attributes rows. Config violations are thus a subset of the asset's violations.
-const CONFIG_URL_PREFIX = "/claude/config/";
+// ── Config violation scoping (Claude, Codex, Copilot) ────────────────────────
+
+const CONFIG_URL_PATTERN = /^\/[a-zA-Z0-9_-]+\/config\//;
 
 export function isConfigViolationRow(row) {
-    return !!row?.url && row.url.startsWith(CONFIG_URL_PREFIX);
+    return !!row?.url && CONFIG_URL_PATTERN.test(row.url);
 }
 
 function assetHostSets(asset, collections = []) {
@@ -166,7 +157,7 @@ function assetHostSets(asset, collections = []) {
     return { hosts, looseKeys };
 }
 
-// Config violation rows (url starts with /claude/config/) attributed to this asset's hosts.
+// Config violation rows (url contains /config/) attributed to this asset's hosts.
 export function selectConfigViolationRows(violationRows = [], asset, collections = []) {
     const { hosts, looseKeys } = assetHostSets(asset, collections);
     if (!hosts.size && !looseKeys.size) return [];
@@ -209,10 +200,7 @@ const agenticObserveApi = {
         return [];
     },
 
-    // Tools/resources/prompts sourced from the collection's STI endpoints (for real url+method, used
-    // to fetch sample traffic) classified by the MCP audit `type` field (the authoritative source for
-    // tool/resource/prompt/server — same as the legacy Audit Data page), joined with apiInfoList for risk.
-    async fetchMcpComponentsData(apiCollectionId) {
+    async fetchCollectionStiBundle(apiCollectionId) {
         const id = typeof apiCollectionId === "string" ? parseInt(apiCollectionId, 10) : apiCollectionId;
         const [stiResp, apiResp, auditRows] = await Promise.all([
             observeApi.fetchApisFromStis(id),
@@ -223,7 +211,26 @@ const agenticObserveApi = {
             method: x?._id?.method,
             url: x?._id?.url,
         }));
-        return buildMcpComponentsFromStis(stiEndpoints, apiResp?.apiInfoList || [], id, auditRows || []);
+        return {
+            id,
+            stiEndpoints,
+            apiInfoList: apiResp?.apiInfoList || [],
+            auditRows: auditRows || [],
+        };
+    },
+
+    // Tools/resources/prompts sourced from the collection's STI endpoints (for real url+method, used
+    // to fetch sample traffic) classified by the MCP audit `type` field (the authoritative source for
+    // tool/resource/prompt/server — same as the legacy Audit Data page), joined with apiInfoList for risk.
+    async fetchMcpComponentsData(apiCollectionId) {
+        const { id, stiEndpoints, apiInfoList, auditRows } = await this.fetchCollectionStiBundle(apiCollectionId);
+        return buildMcpComponentsFromStis(stiEndpoints, apiInfoList, id, auditRows);
+    },
+
+    // Built-in tools on the agent host (/tool/*) — Claude Cowork, Claude CLI, etc.
+    async fetchAgentBuiltinToolsData(apiCollectionId) {
+        const { id, stiEndpoints, apiInfoList, auditRows } = await this.fetchCollectionStiBundle(apiCollectionId);
+        return buildAgentBuiltinToolsFromStis(stiEndpoints, apiInfoList, id, auditRows);
     },
 
     async fetchSkillsFlyoutData(apiCollectionId, collection = null) {

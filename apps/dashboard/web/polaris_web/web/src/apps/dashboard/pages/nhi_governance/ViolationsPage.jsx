@@ -17,6 +17,9 @@ import { violationsHeaders, violationsSortOptions, transformApiViolations } from
 import ViolationDetailsPanel from "./ViolationDetailsPanel";
 import observeRequests from "../observe/api";
 import SpinnerCentered from "../../components/progress/SpinnerCentered";
+import JiraTicketCreationModal from "../../components/shared/JiraTicketCreationModal.jsx";
+import issuesFunctions from "@/apps/dashboard/pages/issues/module";
+import settingFunctions from "@/apps/dashboard/pages/settings/module";
 
 const definedTableTabs = ["All", "Open", "Fixed"];
 const resourceName = { singular: "violation", plural: "violations" };
@@ -124,6 +127,14 @@ export default function ViolationsPage() {
     const [selectedViolation, setSelectedViolation] = useState(null);
     const [showViolationPanel, setShowViolationPanel] = useState(false);
 
+    // Bulk action state
+    const [jiraModalActive, setJiraModalActive] = useState(false);
+    const [bulkViolationIds, setBulkViolationIds] = useState([]);
+    const [projId, setProjId] = useState("");
+    const [issueType, setIssueType] = useState("");
+    const [labelsText, setLabelsText] = useState("");
+    const [jiraProjectMap, setJiraProjectMap] = useState({});
+
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
         values.ranges[2]
@@ -132,22 +143,22 @@ export default function ViolationsPage() {
     const startTimestamp = parseInt(currDateRange.period.since.getTime() / 1000);
     const endTimestamp = parseInt(currDateRange.period.until.getTime() / 1000);
 
+    const fetchViolations = async () => {
+        try {
+            setLoading(true);
+            const response = await observeRequests.fetchAllNhiViolations(startTimestamp, endTimestamp);
+            setRawViolations(Array.isArray(response) ? response : []);
+            setLoading(false);
+        } catch (err) {
+            console.error("Error fetching violations:", err);
+            setRawViolations([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // Fetch violations from API
     useEffect(() => {
-        const fetchViolations = async () => {
-            try {
-                setLoading(true);
-                const response = await observeRequests.fetchAllNhiViolations(startTimestamp, endTimestamp);
-                setRawViolations(Array.isArray(response) ? response : []);
-                setLoading(false);
-            } catch (err) {
-                console.error("Error fetching violations:", err);
-                setRawViolations([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchViolations();
     }, [startTimestamp, endTimestamp]);
 
@@ -202,6 +213,53 @@ export default function ViolationsPage() {
         },
         selectedTab, tabsInfo
     );
+
+    const handleBulkMarkAsFixed = async (selectedResources) => {
+        try {
+            await Promise.all(selectedResources.map((id) => observeRequests.markViolationAsFixed(id)));
+            func.setToast(true, false, `${selectedResources.length} violation${selectedResources.length > 1 ? "s" : ""} marked as fixed`);
+            await fetchViolations();
+        } catch (err) {
+            func.setToast(true, true, "Failed to mark violations as fixed");
+        }
+    };
+
+    const handleOpenBulkJiraModal = (selectedResources) => {
+        setBulkViolationIds(selectedResources);
+        settingFunctions.fetchJiraIntegration().then((jiraIntegration) => {
+            if (jiraIntegration.projectIdsMap !== null && Object.keys(jiraIntegration.projectIdsMap).length > 0) {
+                setJiraProjectMap(jiraIntegration.projectIdsMap);
+                setProjId(Object.keys(jiraIntegration.projectIdsMap)[0]);
+            } else {
+                setProjId(jiraIntegration.projId);
+                setIssueType(jiraIntegration.issueType);
+            }
+            setJiraModalActive(true);
+        });
+    };
+
+    const handleSaveBulkJira = async (issueId, labels) => {
+        let jiraMetaData;
+        try {
+            jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData(projId, issueType);
+            if (labels !== undefined && labels && labels.trim()) {
+                jiraMetaData.labels = labels.trim();
+            }
+        } catch (error) {
+            return;
+        }
+
+        setJiraModalActive(false);
+        try {
+            await Promise.all(bulkViolationIds.map((id) =>
+                observeRequests.createJiraTicketFromViolation(id, window.location.origin, projId, issueType, jiraMetaData)
+            ));
+            func.setToast(true, false, `Jira ticket${bulkViolationIds.length > 1 ? "s" : ""} created successfully`);
+            await fetchViolations();
+        } catch (err) {
+            func.setToast(true, true, "Failed to create Jira ticket");
+        }
+    };
 
     if (loading) {
         return <SpinnerCentered />;
@@ -267,9 +325,9 @@ export default function ViolationsPage() {
                     tableTabs={tableTabs}
                     onSelect={(i) => setSelected(i)}
                     selected={selected}
-                    promotedBulkActions={() => [
-                        { content: "Mark as fixed", onAction: () => {} },
-                        { content: "Open Jira ticket", onAction: () => {} },
+                    promotedBulkActions={(selectedResources) => [
+                        { content: "Mark as fixed", onAction: () => handleBulkMarkAsFixed(selectedResources) },
+                        { content: "Open Jira ticket", onAction: () => handleOpenBulkJiraModal(selectedResources) },
                     ]}
                     onRowClick={(r) => { setSelectedViolation(r); setShowViolationPanel(true); }}
                     rowClickable={true}
@@ -281,8 +339,22 @@ export default function ViolationsPage() {
                 row={selectedViolation}
                 show={showViolationPanel}
                 setShow={setShowViolationPanel}
+                onUpdated={fetchViolations}
             />
         )}
+        <JiraTicketCreationModal
+            activator={<div />}
+            modalActive={jiraModalActive}
+            setModalActive={setJiraModalActive}
+            handleSaveAction={handleSaveBulkJira}
+            jiraProjectMaps={jiraProjectMap}
+            setProjId={setProjId}
+            setIssueType={setIssueType}
+            projId={projId}
+            issueType={issueType}
+            labelsText={labelsText}
+            setLabelsText={setLabelsText}
+        />
         </>
     );
 }

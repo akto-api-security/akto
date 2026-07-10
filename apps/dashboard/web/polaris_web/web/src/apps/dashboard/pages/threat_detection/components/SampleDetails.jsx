@@ -15,7 +15,8 @@ import settingFunctions from "../../settings/module";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal";
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
-import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN, CLAUDE_SETTINGS_RISK_MAP } from "../constants/guardrailDescriptions";
+import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN, SETTINGS_RISK_CONFIGS } from "../constants/guardrailDescriptions";
+import { extractOverviewAndRemediation } from "../utils/formatUtils";
 import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
@@ -29,7 +30,12 @@ function SampleDetails(props) {
     // Determine if we should use hardcoded guardrail descriptions
     const useGuardrailDescription = isAgenticSecurityCategory() || isEndpointSecurityCategory();
 
-    const isClaudeSettingsRisk = moreInfoData?.templateId === 'claude_settings_risk';
+    // Settings-risk findings (Claude/Codex/Copilot config scanners) are keyed by policy_name,
+    // which arrives here as moreInfoData.templateId. Some tools also have a static JSON
+    // fallback (riskMap + urlPrefix) for events without live metadata — see SETTINGS_RISK_CONFIGS.
+    const settingsRiskTemplateIds = Object.keys(SETTINGS_RISK_CONFIGS);
+    const isSettingsRisk = settingsRiskTemplateIds.includes(moreInfoData?.templateId);
+    const settingsRiskConfig = SETTINGS_RISK_CONFIGS[moreInfoData?.templateId];
 
     // For guardrail events, look up the specific rule info based on ruleViolated / templateId
     const guardrailRuleInfo = useGuardrailDescription
@@ -41,40 +47,48 @@ function SampleDetails(props) {
         ? [{ heading: guardrailRuleInfo.heading, description: null, subSections: guardrailRuleInfo.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
         : GUARDRAIL_SECTIONS;
 
-    // Resolve the specific claude_settings_risk entry (used for both overview and remediation tabs)
-    const getClaudeSettingsKey = () => {
+    // Resolve the specific settings-risk entry (used for both overview and remediation tabs)
+    const getSettingsRiskKey = (urlPrefix) => {
         const stripArrayIndices = (key) => key?.replace(/\[\d+\]/g, '');
         if (moreInfoData?.ruleViolated && moreInfoData.ruleViolated !== '-') {
             return stripArrayIndices(moreInfoData.ruleViolated);
         }
-        const prefix = '/claude/settings/';
-        const idx = moreInfoData?.url?.indexOf(prefix) ?? -1;
-        return idx !== -1 ? stripArrayIndices(moreInfoData.url.slice(idx + prefix.length)) : null;
+        const idx = moreInfoData?.url?.indexOf(urlPrefix) ?? -1;
+        return idx !== -1 ? stripArrayIndices(moreInfoData.url.slice(idx + urlPrefix.length)) : null;
     };
-    const resolveClaudeSettingsEntry = (key) => {
+
+    // Exact match first, else longest key that `key` starts with (handles nested paths like
+    // "mcp_servers.foo.command" falling back to a generic "mcp_servers.command" entry).
+    const resolveSettingsRiskEntry = (riskMap, key) => {
         if (!key) return undefined;
-        if (CLAUDE_SETTINGS_RISK_MAP[key]) return CLAUDE_SETTINGS_RISK_MAP[key];
-        const bestMatch = Object.keys(CLAUDE_SETTINGS_RISK_MAP)
+        if (riskMap[key]) return riskMap[key];
+        const bestPrefixMatch = Object.keys(riskMap)
             .filter(k => key.startsWith(k))
             .sort((a, b) => b.length - a.length)[0];
-        return bestMatch ? CLAUDE_SETTINGS_RISK_MAP[bestMatch] : undefined;
+        return bestPrefixMatch ? riskMap[bestPrefixMatch] : undefined;
     };
-    const claudeSettingsEntry = isClaudeSettingsRisk
-        ? resolveClaudeSettingsEntry(getClaudeSettingsKey())
+    const settingsRiskEntry = settingsRiskConfig
+        ? resolveSettingsRiskEntry(settingsRiskConfig.riskMap, getSettingsRiskKey(settingsRiskConfig.urlPrefix))
         : undefined;
 
-    const claudeSettingsSectionsToShow = claudeSettingsEntry?.overview
-        ? [{ heading: claudeSettingsEntry.title, description: null, subSections: claudeSettingsEntry.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
+    // Settings-scanner events now carry their own LLM-generated overview/remediation markdown
+    // directly on metadata (per-event, more specific than the static per-field JSON). Prefer it
+    // when present; the static SETTINGS_RISK_CONFIGS JSON remains the fallback for older events.
+    const liveMetadata = isSettingsRisk ? extractOverviewAndRemediation(moreInfoData?.metadata) : { overview: null, remediation: null };
+    const hasLiveOverview = !!liveMetadata.overview;
+
+    const settingsRiskSectionsToShow = settingsRiskEntry?.overview
+        ? [{ heading: settingsRiskEntry.title, description: null, subSections: settingsRiskEntry.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
         : [];
 
     // Get template object - either from hardcoded data or YAML templates
     let currentTemplateObj;
-    if (isClaudeSettingsRisk) {
-        // Claude settings risk takes priority — use per-field overview sections
+    if (isSettingsRisk) {
+        // Settings risk takes priority — use per-field overview sections
         currentTemplateObj = {
-            guardrailSections: claudeSettingsSectionsToShow,
-            testName: moreInfoData?.templateId || "Claude Settings Risk",
-            name: moreInfoData?.templateId || "Claude Settings Risk"
+            guardrailSections: settingsRiskSectionsToShow,
+            testName: moreInfoData?.templateId || "Settings Risk",
+            name: moreInfoData?.templateId || "Settings Risk"
         };
     } else if (useGuardrailDescription) {
         // For Argus/Atlas guardrails, use structured content
@@ -125,7 +139,12 @@ function SampleDetails(props) {
         ? getOwaspThreatsForRule(moreInfoData?.ruleViolated)
         : [];
 
-    const overviewComp = (useGuardrailDescription || isClaudeSettingsRisk) ? (
+    const overviewComp = hasLiveOverview ? (
+        // Per-event LLM-generated overview markdown (settings-scanners) takes priority over the static JSON
+        <Box padding={"4"}>
+            <MarkdownViewer markdown={liveMetadata.overview} />
+        </Box>
+    ) : (useGuardrailDescription || isSettingsRisk) ? (
         // Structured view for Argus/Atlas guardrails - show all 7 sections with hierarchy
         <Box padding={"4"}>
             <VerticalStack gap={"5"}>
@@ -282,11 +301,12 @@ function SampleDetails(props) {
     }
 
     const remediationTab = (() => {
-        if (isClaudeSettingsRisk) {
+        if (isSettingsRisk) {
+            const remediationMarkdown = liveMetadata.remediation || settingsRiskEntry?.remediation || GUARDRAIL_REMEDIATION_MARKDOWN;
             return {
                 id: "remediation",
                 content: "Remediation",
-                component: (<MarkdownViewer markdown={claudeSettingsEntry ? claudeSettingsEntry.remediation : GUARDRAIL_REMEDIATION_MARKDOWN} />)
+                component: (<MarkdownViewer markdown={remediationMarkdown} />)
             };
         }
         if (useGuardrailDescription) {
@@ -959,20 +979,22 @@ Reference URL: ${window.location.href}`.trim();
                                 ].filter(item => item)}
                             />
                         </Popover>
-                        <Modal
-                            activator={<Button destructive size="slim" onClick={() => setShowModal(!showModal)}>Block IPs</Button>}
-                            open={showModal}
-                            onClose={() => setShowModal(false)}
-                            primaryAction={{content: 'Save', onAction: () => setShowModal(false)}}
-                            title={"Block IP ranges"}
-                        >
-                            <Modal.Section>
-                                <Text variant="bodyMd" color="subdued">
-                                    By blocking these IP ranges, no user will be able to access your application
-                                    Are you sure you want to block these IPs
-                                </Text>
-                            </Modal.Section>
-                        </Modal>
+                        {!isEndpointSecurityCategory() && (
+                            <Modal
+                                activator={<Button destructive size="slim" onClick={() => setShowModal(!showModal)}>Block IPs</Button>}
+                                open={showModal}
+                                onClose={() => setShowModal(false)}
+                                primaryAction={{content: 'Save', onAction: () => setShowModal(false)}}
+                                title={"Block IP ranges"}
+                            >
+                                <Modal.Section>
+                                    <Text variant="bodyMd" color="subdued">
+                                        By blocking these IP ranges, no user will be able to access your application
+                                        Are you sure you want to block these IPs
+                                    </Text>
+                                </Modal.Section>
+                            </Modal>
+                        )}
                         {jiraTicketUrl ? (
                             transform.getJiraComponent(jiraTicketUrl)
                         ) : (
