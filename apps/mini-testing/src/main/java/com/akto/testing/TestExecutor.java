@@ -42,6 +42,7 @@ import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.JSONUtils;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
 import com.akto.mcp.McpToolDescriptionsRegistry;
@@ -317,6 +318,7 @@ public class TestExecutor {
 
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size());
+
         boolean collectionWise = testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE);
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
@@ -345,6 +347,8 @@ public class TestExecutor {
         YamlTemplate commonTemplate = dataActor.fetchCommonWordList();
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates, commonTemplate);
+
+        testingRunSubCategories = filterSubCategoriesByCollectionType(testingRun, testingRunSubCategories, testConfigMap);
 
         List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
         TestingUtil testingUtil = new TestingUtil(sampleMessageStore, testRoles, testingRun.getUserEmail(), customAuthTypes);
@@ -508,7 +512,8 @@ public class TestExecutor {
                     }
                 } else {
                     try {
-                        Future<Void> future = threadPool.submit(() -> startWithLatch(testingRunSubCategories, accountId,
+                        List<String> finalTestingRunSubCategories = testingRunSubCategories;
+                        Future<Void> future = threadPool.submit(() -> startWithLatch(finalTestingRunSubCategories, accountId,
                                 apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap,
                                 testConfigMap, testLogs, testingRun, latch, finalApiInfoKeySubcategoryMap));
                         testingRecords.add(future);
@@ -1645,6 +1650,66 @@ public class TestExecutor {
         }
         
         return false;
+    }
+
+    private static boolean isCategoryMcp(String name) {
+        if (name == null) return false;
+        return name.toUpperCase().startsWith("MCP");
+    }
+
+    private static boolean isCategoryAgentic(String name) {
+        if (name == null) return false;
+        // covers both AGENT_ (e.g. AGENT_GOAL_HIJACK) and AGENTIC_ (e.g. AGENTIC_SUPPLY_CHAIN)
+        return name.toUpperCase().startsWith("AGENT");
+    }
+
+    private List<String> filterSubCategoriesByCollectionType(TestingRun testingRun, List<String> subCategories, Map<String, TestConfig> testConfigMap) {
+        if (subCategories == null || subCategories.isEmpty()) {
+            return subCategories;
+        }
+
+        GlobalEnums.CONTEXT_SOURCE contextSource = testingRun.getContextSource();
+        if (contextSource == null) {
+            // contextSource not set — no filtering, run all tests
+            return subCategories;
+        }
+
+        boolean isMcpRun = contextSource == GlobalEnums.CONTEXT_SOURCE.MCP;
+        boolean isGenAiRun = contextSource == GlobalEnums.CONTEXT_SOURCE.GEN_AI || contextSource == GlobalEnums.CONTEXT_SOURCE.AGENTIC;
+
+        loggerMaker.infoAndAddToDb("Category filter - contextSource: " + contextSource + ", MCP run: " + isMcpRun + ", GenAI run: " + isGenAiRun);
+
+        List<String> filtered = new ArrayList<>();
+        for (String subCat : subCategories) {
+            TestConfig config = testConfigMap.get(subCat);
+            if (config == null || config.getInfo() == null || config.getInfo().getCategory() == null) {
+                // no config loaded — fall back to test ID prefix
+                String upper = subCat.toUpperCase();
+                if (upper.startsWith("MCP") && !isMcpRun) continue;
+                if (upper.startsWith("AGENT") && !isGenAiRun) continue;
+                filtered.add(subCat);
+                continue;
+            }
+
+            // check both name and shortName: category name can be AGENT_GOAL_HIJACK or AGENTIC_SUPPLY_CHAIN
+            String categoryName = config.getInfo().getCategory().getName();
+            String shortName = config.getInfo().getCategory().getShortName();
+            boolean isMcpTest = isCategoryMcp(categoryName) || isCategoryMcp(shortName);
+            boolean isAgenticTest = isCategoryAgentic(categoryName) || isCategoryAgentic(shortName);
+
+            if (isMcpTest && !isMcpRun) {
+                loggerMaker.debugInfoAddToDb("Skipping MCP test " + subCat + " (category: " + categoryName + "): contextSource is " + contextSource);
+                continue;
+            }
+            if (isAgenticTest && !isGenAiRun) {
+                loggerMaker.debugInfoAddToDb("Skipping Agentic test " + subCat + " (category: " + categoryName + "): contextSource is " + contextSource);
+                continue;
+            }
+            filtered.add(subCat);
+        }
+
+        loggerMaker.infoAndAddToDb("Category filter: " + subCategories.size() + " -> " + filtered.size() + " subcategories after contextSource check");
+        return filtered;
     }
 
     public boolean filterGraphQlPayload(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) throws Exception {
