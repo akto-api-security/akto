@@ -3,7 +3,7 @@ module github.com/akto-api-security/guardrails-service
 go 1.24.11
 
 require (
-	github.com/akto-api-security/akto-endpoint-shield v0.0.0-20260707092900-d8661326e85b
+	github.com/akto-api-security/akto-endpoint-shield v0.0.0-20260710085344-f0d691e8f9d3
 	github.com/gin-gonic/gin v1.11.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/redis/go-redis/v9 v9.20.0
@@ -134,6 +134,6 @@ require (
 )
 
 replace (
-	github.com/akto-api-security/akto-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260706104013-0b42feae400c
+	github.com/akto-api-security/akto-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260710085344-f0d691e8f9d3
 	github.com/shoenig/go-m1cpu => ./internal/stub/go-m1cpu
 )
