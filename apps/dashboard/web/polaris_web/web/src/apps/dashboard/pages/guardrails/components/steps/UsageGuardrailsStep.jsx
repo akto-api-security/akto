@@ -1,7 +1,9 @@
-import { VerticalStack, Text, Checkbox, Box, TextField } from "@shopify/polaris";
+import { VerticalStack, Text, Checkbox, Box, TextField, HorizontalStack } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
+import ControlInfoIcon from "../ControlInfoIcon";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
+import { USAGE_GUARDRAILS_DESCRIPTIONS } from "../../guardrailDescriptions";
 
 export const UsageGuardrailsConfig = {
     number: 7,
@@ -21,6 +23,7 @@ export const UsageGuardrailsConfig = {
 };
 
 const UsageGuardrailsStep = ({
+    onTryPrompt,
     enableTokenLimit,
     setEnableTokenLimit,
     tokenLimitThreshold,
@@ -36,7 +39,15 @@ const UsageGuardrailsStep = ({
             <VerticalStack gap="4">
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Enable token limit detection" threats={RULE_OWASP_THREATS.tokenLimit} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Enable token limit detection" threats={RULE_OWASP_THREATS.tokenLimit} />
+                                <ControlInfoIcon
+                                    {...USAGE_GUARDRAILS_DESCRIPTIONS.tokenLimit}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableTokenLimit}
                         onChange={setEnableTokenLimit}
                         helpText="Block or alert when a prompt exceeds the specified token count per message."
