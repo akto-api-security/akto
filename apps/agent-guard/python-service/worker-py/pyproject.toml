@@ -31,6 +31,9 @@ dev = [
     "pre-commit",
 ]
 
+[tool.uv]
+default-groups = ["dev"]
+
 [tool.ruff]
 line-length = 120
 target-version = "py312"

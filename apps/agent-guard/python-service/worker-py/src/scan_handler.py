@@ -7,7 +7,6 @@ from typing import Any
 import alerts
 import cascade_backpressure
 import scan_diag
-from metrics import BACKPRESSURE_TRIPS, SCAN_DURATION, SCANS_TOTAL
 from constants import (
     CASCADE_SCANNERS,
     FORCE_GEMMA_ONLY_SCANNERS,
@@ -21,6 +20,7 @@ from constants import (
     strip_qwen_tier,
 )
 from llm_scanner import scan_with_model_map
+from metrics import BACKPRESSURE_TRIPS, SCAN_DURATION, SCANS_TOTAL
 from remote_scanner import scan_anonymize
 from scanners import scan_local
 from settings import settings
