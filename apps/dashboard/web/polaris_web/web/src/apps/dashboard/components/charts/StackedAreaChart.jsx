@@ -3,14 +3,15 @@ import Highcharts from "highcharts";
 import { useEffect, useRef, useState } from "react";
 import func from "../../../../util/func";
 import SpinnerCentered from "../progress/SpinnerCentered";
+import useChartDataTableModal from "./useChartDataTableModal";
 
 function StackedAreaChart(props) {
-  const { 
-    height, 
-    backgroundColor, 
-    data, 
-    title, 
-    tooltipFormatter, 
+  const {
+    height,
+    backgroundColor,
+    data,
+    title,
+    tooltipFormatter,
     yAxisTitle,
     defaultChartOptions,
     exportingDisabled,
@@ -21,8 +22,9 @@ function StackedAreaChart(props) {
 
   const onPointClickRef = useRef(onPointClick);
   useEffect(() => { onPointClickRef.current = onPointClick; }, [onPointClick]);
-  
+
   const chartComponentRef = useRef(null);
+  const { menuItemDefinitions, modal } = useChartDataTableModal(title);
 
   const coreChartOptions = {
     chart: {
@@ -35,7 +37,8 @@ function StackedAreaChart(props) {
       enabled: false,
     },
     exporting: {
-      enabled: !exportingDisabled
+      enabled: !exportingDisabled,
+      menuItemDefinitions
     },
     title: {
       text: title,
@@ -119,12 +122,15 @@ function StackedAreaChart(props) {
   }, [data, tooltipFormatter]);
 
   return (
-    data.length > 0 ? <HighchartsReact
-      key={"stacked-area-chart"}
-      highcharts={Highcharts}
-      options={chartOptions}
-      ref={chartComponentRef}
-    /> : <SpinnerCentered/>
+    data.length > 0 ? <>
+      <HighchartsReact
+        key={"stacked-area-chart"}
+        highcharts={Highcharts}
+        options={chartOptions}
+        ref={chartComponentRef}
+      />
+      {modal}
+    </> : <SpinnerCentered/>
   );
 }
 

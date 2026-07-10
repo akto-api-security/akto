@@ -42,7 +42,9 @@ const threatDetectionRequests = {
                 limit: limit || 50,
                 statusFilter: statusFilter,
                 ...(typeof successfulExploit === 'boolean' ? { successfulExploit } : {}),
-                ...(label ? { label } : {}),
+                // 'guardrail' events are scoped by x-context-source: AGENTIC header; they are not tagged
+                // with label="guardrail" in the DB, so sending the label filter returns zero results.
+                ...(label && label !== 'guardrail' ? { label } : {}),
                 ...(hosts && hosts.length > 0 ? { hosts } : {}),
                 ...(latestApiOrigRegex ? { latestApiOrigRegex } : {}),
                 method: method,

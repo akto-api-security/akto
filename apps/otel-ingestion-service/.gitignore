@@ -1,0 +1,6 @@
+.dev-keys/
+bin/
+*.test
+scripts/dev/*
+!scripts/dev/README.md
+container/docker.env

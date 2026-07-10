@@ -1674,6 +1674,21 @@ const learnMoreObject = {
             }
         ]
     },
+    dashboard_guardrails_violations: {
+        api_security: {
+            docsLink: []
+        },
+        docsLink: [
+            {
+                content: "Guardrail Activity Monitoring",
+                value: "https://ai-security-docs.akto.io/agentic-guardrails/concepts/guardrail-activity"
+            },
+            {
+                content: "Detailed Activity View",
+                value: "https://ai-security-docs.akto.io/agentic-guardrails/how-to/guardrail-activity-detailed-view"
+            }
+        ]
+    },
     dashboard_guardrails_policies: {
         docsLink: [
             {

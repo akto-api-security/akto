@@ -1,0 +1,17 @@
+version: '2.1'
+
+services:
+  otel-ingestion-service:
+    build: .
+    image: aktosecurity/otel-ingestion-service:local
+    restart: unless-stopped
+    ports:
+      - "4318:8080"
+    env_file:
+      - docker.env
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"

@@ -62,7 +62,7 @@ const ThreatReportSummary = ({
             visible: true
         },
         {
-            title: 'Unique Threat Actors',
+            title: `Unique ${mapLabel("Threat", getDashboardCategory())} Actors`,
             data: threatsByActor.length,
             visible: true
         },
@@ -104,11 +104,11 @@ const ThreatReportSummary = ({
                             const complianceName = activeComplianceFilters?.length > 0 ? activeComplianceFilters[0] : null
                             const reportLabel = isGuardrail && complianceName
                                 ? `${complianceName} guardrail violations report`
-                                : `${mapLabel("threat", getDashboardCategory()).toLowerCase()} detection report`
+                                : `${mapLabel("Threat", getDashboardCategory()).toLowerCase()} detection report`
                             const periodText = isAllTime
                                 ? 'covers all available data and'
                                 : `covers the period from ${formatDate(dateRange.start)} to ${formatDate(dateRange.end)} and`
-                            return <>This {reportLabel} {periodText} identifies malicious activities targeting <span id='organization-name'>{organizationName}</span>'s {mapLabel("API endpoints", getDashboardCategory())}. The findings highlight {mapLabel("threat", getDashboardCategory()).toLowerCase()} actor patterns and attack categories to support informed security decisions.</>
+                            return <>This {reportLabel} {periodText} identifies malicious activities targeting <span id='organization-name'>{organizationName}</span>'s {mapLabel("API endpoints", getDashboardCategory())}. The findings highlight {mapLabel("Threat", getDashboardCategory()).toLowerCase()} actor patterns and attack categories to support informed security decisions.</>
                         })()}
                     </Text>
                     <ThreatReportSummaryInfoCard summaryItems={summaryItems} />
@@ -117,7 +117,7 @@ const ThreatReportSummary = ({
 
                     <Box width='100%' paddingBlockStart={4} paddingBlockEnd={2}>
                         <VerticalStack gap={3}>
-                            <Text variant="headingSm">Threats by Severity</Text>
+                            <Text variant="headingSm">{mapLabel("Threat", getDashboardCategory())}s by Severity</Text>
 
                             <ChartypeComponent
                                 data={severityMap}

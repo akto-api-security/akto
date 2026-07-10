@@ -167,11 +167,11 @@ function TopSection({ summary }) {
 }
 
 // ─── OS icon helpers ──────────────────────────────────────────────────────────
-export function OsIcon({ os }) {
-    if (os === "mac")     return <img src="/public/os-mac.svg"     width={15} height={15} alt="macOS" />;
-    if (os === "windows") return <img src="/public/os-windows.svg" width={15} height={15} alt="Windows" />;
-    if (os === "linux")   return <img src="/public/os-linux.svg"   width={15} height={15} alt="Linux" />;
-    return                       <img src={LaptopIcon}             width={15} height={15} alt="Device" />;
+export function OsIcon({ os, size = 16 }) {
+    if (os === "mac")     return <img src="/public/os-mac.svg"     width={size} height={size} alt="macOS"   style={{ flexShrink: 0 }} />;
+    if (os === "windows") return <img src="/public/os-windows.svg" width={size} height={size} alt="Windows" style={{ flexShrink: 0 }} />;
+    if (os === "linux")   return <img src="/public/os-linux.svg"   width={size} height={size} alt="Linux"   style={{ flexShrink: 0 }} />;
+    return                       <img src={LaptopIcon}             width={size} height={size} alt="Device"  style={{ flexShrink: 0 }} />;
 }
 
 // Marker icon shown next to a row label (matches the personal-account marker pattern in AgenticCellRenderers).
@@ -209,14 +209,16 @@ function ViolationsCellRenderer({ value }) {
 // ─── Endpoint cell — uses AgGridRow as shared inner renderer ──────────────────
 
 // Username cell renderer — used as innerRenderer of the auto-group (expand) column.
-const TYPE_CLASS_MAP = {
+export const TYPE_CLASS_MAP = {
     "AI Agent": "agentic-type-AGENT",
     "MCP Server": "agentic-type-MCP",
     "LLM": "agentic-type-LLM",
     "Skill": "agentic-type-SKILL",
     "Tool": "agentic-type-TOOL",
+    "Tool Call": "agentic-type-TOOL",
     "Resource": "agentic-type-RESOURCE",
     "Prompt": "agentic-type-PROMPT",
+    "Config": "agentic-type-CONFIG",
 };
 
 function UsernameCellInner({ data, node }) {
