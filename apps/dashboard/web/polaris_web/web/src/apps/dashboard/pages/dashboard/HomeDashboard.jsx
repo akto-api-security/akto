@@ -1217,7 +1217,7 @@ function HomeDashboard() {
                         <Text variant='headingMd'>-</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
-                        <Box style={{ minHeight: '36px' }}><Text color="subdued">MCP security</Text></Box>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">MCP protection</Text></Box>
                         <Text variant='headingMd'>-</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
