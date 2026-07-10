@@ -1,6 +1,8 @@
 import { VerticalStack, Text, Checkbox, HorizontalStack, Button, TextField, Box, DataTable, RangeSlider } from "@shopify/polaris";
 import { DeleteMajor } from '@shopify/polaris-icons';
 import OwaspTag from "../OwaspTag";
+import ControlInfoIcon from "../ControlInfoIcon";
+import { LANGUAGE_SAFETY_DESCRIPTIONS } from "../../guardrailDescriptions";
 
 export const LanguageSafetyConfig = {
     number: 3,
@@ -21,6 +23,7 @@ export const LanguageSafetyConfig = {
 };
 
 const LanguageSafetyStep = ({
+    onTryPrompt,
     // Gibberish detection
     enableGibberishDetection,
     setEnableGibberishDetection,
@@ -48,7 +51,15 @@ const LanguageSafetyStep = ({
                 {/* Gibberish Detection */}
                 <Box>
                     <Checkbox
-                        label="Enable gibberish detection"
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text as="span">Enable gibberish detection</Text>
+                                <ControlInfoIcon
+                                    {...LANGUAGE_SAFETY_DESCRIPTIONS.gibberishDetection}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableGibberishDetection}
                         onChange={setEnableGibberishDetection}
                         helpText="Detect and block gibberish or nonsensical text in user inputs. This helps prevent meaningless prompts that could confuse the AI or be used as attack vectors."
@@ -56,7 +67,13 @@ const LanguageSafetyStep = ({
                     {enableGibberishDetection && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                    <ControlInfoIcon
+                                        {...LANGUAGE_SAFETY_DESCRIPTIONS.gibberishConfidenceThreshold}
+                                        onTryPrompt={onTryPrompt}
+                                    />
+                                </HorizontalStack>
                                 <RangeSlider
                                     label=""
                                     value={gibberishConfidenceScore}
@@ -75,7 +92,15 @@ const LanguageSafetyStep = ({
                 {/* Sentiment Detection */}
                 <Box>
                     <Checkbox
-                        label="Enable sentiment detection"
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text as="span">Enable sentiment detection</Text>
+                                <ControlInfoIcon
+                                    {...LANGUAGE_SAFETY_DESCRIPTIONS.sentimentDetection}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableSentiment}
                         onChange={setEnableSentiment}
                         helpText="Analyze sentiment in user inputs to detect negative, toxic, or inappropriate emotional content."
@@ -83,7 +108,13 @@ const LanguageSafetyStep = ({
                     {enableSentiment && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                    <ControlInfoIcon
+                                        {...LANGUAGE_SAFETY_DESCRIPTIONS.sentimentConfidenceThreshold}
+                                        onTryPrompt={onTryPrompt}
+                                    />
+                                </HorizontalStack>
                                 <RangeSlider
                                     label=""
                                     value={sentimentConfidenceScore}
@@ -102,7 +133,15 @@ const LanguageSafetyStep = ({
                 {/* Profanity */}
                 <Box>
                     <Checkbox
-                        label="Profanity"
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text as="span">Profanity</Text>
+                                <ControlInfoIcon
+                                    {...LANGUAGE_SAFETY_DESCRIPTIONS.profanity}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={wordFilters.profanity}
                         onChange={(checked) => setWordFilters({ ...wordFilters, profanity: checked })}
                         helpText="Redacts profanity words that are considered offensive."

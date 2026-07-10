@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Divider, HorizontalGrid, HorizontalStack, Scrollable, Tabs, Text, VerticalStack } from "@shopify/polaris";
+import TopicsGuardrailList from "../../guardrails/components/TopicsGuardrailList";
 import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
 import AgenticFlyoutShell from "../agentic/AgenticFlyoutShell";
 import FlyoutBreadcrumb from "../agentic/FlyoutBreadcrumb";
@@ -14,7 +15,6 @@ import api from "./api";
 import { enrichRow } from "./utils";
 import { getTraceColumnDefs } from "./columns";
 import { formatCompact, formatDurationMs, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
-import func from "@/util/func";
 
 const TAB_OVERVIEW = 0;
 const TAB_TRACES   = 1;
@@ -40,6 +40,18 @@ function SessionFlowGraph({ session }) {
     return <AssetTopologyGraph nodes={nodes} edges={edges} />;
 }
 
+function SessionTopicsSection({ topicHierarchy }) {
+    if (Object.keys(topicHierarchy || {}).length === 0) return null;
+
+    return (
+        <VerticalStack gap="2" inlineAlign="start">
+            <Divider />
+            <Text variant="headingXs" color="subdued">Topics queried</Text>
+            <TopicsGuardrailList topicHierarchy={topicHierarchy} />
+        </VerticalStack>
+    );
+}
+
 // ─── Overview ─────────────────────────────────────────────────────────────────
 
 function OverviewContent({ session, traceCount }) {
@@ -57,7 +69,6 @@ function OverviewContent({ session, traceCount }) {
         { label: "Session ID",  value: truncate(session.sessionIdentifier, 36) },
         { label: "Models",      value: session._models?.length ? session._models.join(", ") : undefined },
         { label: "Endpoint ID", value: session.deviceId, href: session.deviceId ? `/dashboard/observe/inventory/${session.deviceId}` : undefined },
-        { label: "Topics queried",value: session.topicHierarchy ? Object.keys(session.topicHierarchy).map((x) => func.toSentenceCase(x)).join(", ") : undefined },
     ];
 
     return (
@@ -89,6 +100,8 @@ function OverviewContent({ session, traceCount }) {
                     items={detailItems}
                     columns={3}
                 />
+
+                <SessionTopicsSection topicHierarchy={session.topicHierarchy} />
             </VerticalStack>
         </Box>
     );

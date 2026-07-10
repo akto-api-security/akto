@@ -1,7 +1,9 @@
-import { VerticalStack, Text, Checkbox, Box } from "@shopify/polaris";
+import { VerticalStack, Text, Checkbox, Box, HorizontalStack } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
+import ControlInfoIcon from "../ControlInfoIcon";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
+import { TOOLS_GUARDRAILS_DESCRIPTIONS } from "../../guardrailDescriptions";
 
 export const ToolsGuardrailsConfig = {
     number: 9,
@@ -21,6 +23,7 @@ export const ToolsGuardrailsConfig = {
 };
 
 const ToolsGuardrailsStep = ({
+    onTryPrompt,
     enableToolMisuse,
     setEnableToolMisuse,
     enableMaliciousTools,
@@ -37,7 +40,15 @@ const ToolsGuardrailsStep = ({
             <VerticalStack gap="4">
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Tool Misuse" threats={RULE_OWASP_THREATS.toolMisuse} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Tool Misuse" threats={RULE_OWASP_THREATS.toolMisuse} />
+                                <ControlInfoIcon
+                                    {...TOOLS_GUARDRAILS_DESCRIPTIONS.toolMisuse}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableToolMisuse}
                         onChange={setEnableToolMisuse}
                         helpText="Detect and block unauthorized or malicious use of tools by agents."
@@ -45,7 +56,15 @@ const ToolsGuardrailsStep = ({
                 </Box>
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Detect Malicious Tools" threats={RULE_OWASP_THREATS.maliciousTools} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Detect Malicious Tools" threats={RULE_OWASP_THREATS.maliciousTools} />
+                                <ControlInfoIcon
+                                    {...TOOLS_GUARDRAILS_DESCRIPTIONS.maliciousTools}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableMaliciousTools}
                         onChange={setEnableMaliciousTools}
                         helpText="Detect and block tools that exhibit malicious behavior or intent."
@@ -53,7 +72,15 @@ const ToolsGuardrailsStep = ({
                 </Box>
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Detect Tool name and description mismatch" threats={RULE_OWASP_THREATS.toolNameDescriptionMismatch} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Detect Tool name and description mismatch" threats={RULE_OWASP_THREATS.toolNameDescriptionMismatch} />
+                                <ControlInfoIcon
+                                    {...TOOLS_GUARDRAILS_DESCRIPTIONS.toolNameDescriptionMismatch}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableToolNameDescriptionMismatch}
                         onChange={setEnableToolNameDescriptionMismatch}
                         helpText="Detect when tool usage does not match the declared name or description."
