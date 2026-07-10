@@ -5,7 +5,7 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
-from typing import Any, List
+from typing import Any
 
 from fastapi import FastAPI, Request
 from pydantic import BaseModel, Field
@@ -119,7 +119,5 @@ async def scan(body: ScanRequest):
 
 
 @app.post("/scan/batch")
-async def scan_batch(body: List[ScanRequest]):
-    return [
-        await scan_payload(item.model_dump(), schedule_fn=_schedule_background) for item in body
-    ]
+async def scan_batch(body: list[ScanRequest]):
+    return [await scan_payload(item.model_dump(), schedule_fn=_schedule_background) for item in body]

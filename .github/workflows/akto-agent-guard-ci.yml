@@ -1,0 +1,42 @@
+name: Agent Guard Worker CI
+
+on:
+  pull_request:
+    paths:
+      - "apps/agent-guard/python-service/worker-py/**"
+      - ".github/workflows/akto-agent-guard-ci.yml"
+  push:
+    branches: ["master"]
+    paths:
+      - "apps/agent-guard/python-service/worker-py/**"
+      - ".github/workflows/akto-agent-guard-ci.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: apps/agent-guard/python-service/worker-py
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: "apps/agent-guard/python-service/worker-py/pyproject.toml"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: ruff check
+        run: uv run ruff check .
+
+      - name: ruff format --check
+        run: uv run ruff format --check .
+
+      - name: mypy
+        run: uv run mypy src
+
+      - name: pytest
+        run: ./tests/run.sh

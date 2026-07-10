@@ -10,7 +10,7 @@ Mirrors llm_guard's BanSubstrings behaviour for the options Akto uses:
 """
 
 import re
-from typing import Any, Dict, List
+from typing import Any
 
 REDACTED = "[REDACTED]"
 
@@ -23,7 +23,7 @@ def _matches(text: str, sub: str, match_type: str, case_sensitive: bool) -> bool
     return needle in hay
 
 
-def _redact(text: str, subs: List[str], case_sensitive: bool) -> str:
+def _redact(text: str, subs: list[str], case_sensitive: bool) -> str:
     flags = 0 if case_sensitive else re.IGNORECASE
     out = text
     for sub in subs:
@@ -31,8 +31,8 @@ def _redact(text: str, subs: List[str], case_sensitive: bool) -> str:
     return out
 
 
-def scan(scanner_type: str, text: str, config: Dict[str, Any]) -> Dict[str, Any]:
-    substrings: List[str] = list(config.get("substrings") or [])
+def scan(scanner_type: str, text: str, config: dict[str, Any]) -> dict[str, Any]:
+    substrings: list[str] = list(config.get("substrings") or [])
     match_type = config.get("match_type", "str")
     case_sensitive = bool(config.get("case_sensitive", False))
     contains_all = bool(config.get("contains_all", False))

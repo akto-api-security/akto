@@ -10,7 +10,9 @@ python_modules/
 .wrangler/
 uv.lock
 
-# test artifacts
+# lint/type/test caches
+.ruff_cache/
+.mypy_cache/
 .pytest_cache/
 __pycache__/
 *.pyc

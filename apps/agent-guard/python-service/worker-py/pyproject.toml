@@ -20,4 +20,21 @@ dependencies = [
 [dependency-groups]
 dev = [
     "workers-py",
+    "ruff",
+    "mypy",
+    "pytest",
+    "pre-commit",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["src/vocab_blob.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+exclude = ["src/vocab_blob.py"]

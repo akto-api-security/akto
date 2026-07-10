@@ -1,6 +1,6 @@
 """Banned-topic detection prompts."""
 
-from typing import Any, Dict
+from typing import Any
 
 DEFAULT = """You are a security system that detects whether a message discusses or relates to specific banned topics.
 
@@ -69,18 +69,18 @@ Text to analyze:
 %s"""
 
 
-def _format_topic_entry(topic: str, descriptions: Dict[str, str], sample_phrases: Dict[str, list]) -> str:
+def _format_topic_entry(topic: str, descriptions: dict[str, str], sample_phrases: dict[str, list]) -> str:
     lines = [f"- {topic}"]
     desc = descriptions.get(topic, "")
     if desc:
         lines.append(f"  Flag when: {desc}")
     phrases = sample_phrases.get(topic, [])
     if phrases:
-        lines.append(f"  Examples that MUST be flagged: {', '.join(f'\"{p}\"' for p in phrases)}")
+        lines.append(f"  Examples that MUST be flagged: {', '.join(f'"{p}"' for p in phrases)}")
     return "\n".join(lines)
 
 
-def _format_topics(topics: Any, descriptions: Dict[str, str] = None, sample_phrases: Dict[str, list] = None) -> str:
+def _format_topics(topics: Any, descriptions: dict[str, str] = None, sample_phrases: dict[str, list] = None) -> str:
     if isinstance(topics, str):
         return topics
     if not isinstance(topics, list):
@@ -93,7 +93,7 @@ def _format_topics(topics: Any, descriptions: Dict[str, str] = None, sample_phra
     return ", ".join(str(t) for t in topics if t)
 
 
-def build(config: Dict[str, Any], provider_name: str, text: str) -> str:
+def build(config: dict[str, Any], provider_name: str, text: str) -> str:
     topics_str = _format_topics(
         config.get("topics", []),
         config.get("topicDescriptions", {}),

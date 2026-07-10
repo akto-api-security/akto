@@ -28,6 +28,7 @@ def _schedule(coro) -> None:
     itself once the coroutine settles. waitUntil keeps the isolate alive until
     then (up to 30s after the response).
     """
+
     async def _run_and_cleanup(c, proxy_box):
         try:
             await c
