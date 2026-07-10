@@ -43,8 +43,7 @@ const UsageGuardrailsStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Enable token limit detection" threats={RULE_OWASP_THREATS.tokenLimit} />
                                 <ControlInfoIcon
-                                    description={USAGE_GUARDRAILS_DESCRIPTIONS.tokenLimit.description}
-                                    examples={USAGE_GUARDRAILS_DESCRIPTIONS.tokenLimit.examples}
+                                    {...USAGE_GUARDRAILS_DESCRIPTIONS.tokenLimit}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>

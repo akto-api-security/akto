@@ -491,8 +491,7 @@ const ContentPolicyStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Enable prompt injection attacks filter" threats={RULE_OWASP_THREATS.promptInjection} />
                                 <ControlInfoIcon
-                                    description={CONTENT_POLICY_DESCRIPTIONS.promptAttacks.description}
-                                    examples={CONTENT_POLICY_DESCRIPTIONS.promptAttacks.examples}
+                                    {...CONTENT_POLICY_DESCRIPTIONS.promptAttacks}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -507,8 +506,7 @@ const ContentPolicyStep = ({
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <Text variant="bodyMd" fontWeight="medium">Prompt Attack Level</Text>
                                     <ControlInfoIcon
-                                        description={CONTENT_POLICY_DESCRIPTIONS.promptAttackLevel.description}
-                                        examples={CONTENT_POLICY_DESCRIPTIONS.promptAttackLevel.examples}
+                                        {...CONTENT_POLICY_DESCRIPTIONS.promptAttackLevel}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>
@@ -537,8 +535,7 @@ const ContentPolicyStep = ({
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <RuleLabelWithTag name="Enable context poisoning attacks" threats={RULE_OWASP_THREATS.contextPoisoning} />
                                     <ControlInfoIcon
-                                        description={CONTENT_POLICY_DESCRIPTIONS.contextPoisoning.description}
-                                        examples={CONTENT_POLICY_DESCRIPTIONS.contextPoisoning.examples}
+                                        {...CONTENT_POLICY_DESCRIPTIONS.contextPoisoning}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>
@@ -557,8 +554,7 @@ const ContentPolicyStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">Add denied topics</Text>
                                 <ControlInfoIcon
-                                    description={CONTENT_POLICY_DESCRIPTIONS.deniedTopics.description}
-                                    examples={CONTENT_POLICY_DESCRIPTIONS.deniedTopics.examples}
+                                    {...CONTENT_POLICY_DESCRIPTIONS.deniedTopics}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -644,8 +640,7 @@ const ContentPolicyStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">Enable harmful categories filters</Text>
                                 <ControlInfoIcon
-                                    description={CONTENT_POLICY_DESCRIPTIONS.harmfulCategories.description}
-                                    examples={CONTENT_POLICY_DESCRIPTIONS.harmfulCategories.examples}
+                                    {...CONTENT_POLICY_DESCRIPTIONS.harmfulCategories}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -675,8 +670,7 @@ const ContentPolicyStep = ({
                                                 <Text variant="bodyMd" fontWeight="medium" textTransform="capitalize">{category}</Text>
                                                 {HARMFUL_CATEGORY_INFO[category] && (
                                                     <ControlInfoIcon
-                                                        description={HARMFUL_CATEGORY_INFO[category]?.description}
-                                                        examples={HARMFUL_CATEGORY_INFO[category]?.examples}
+                                                        {...HARMFUL_CATEGORY_INFO[category]}
                                                         onTryPrompt={onTryPrompt}
                                                     />
                                                 )}
@@ -715,8 +709,7 @@ const ContentPolicyStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Enable agent intent verification" threats={RULE_OWASP_THREATS.intentVerification} />
                                 <ControlInfoIcon
-                                    description={CONTENT_POLICY_DESCRIPTIONS.intentVerification.description}
-                                    examples={CONTENT_POLICY_DESCRIPTIONS.intentVerification.examples}
+                                    {...CONTENT_POLICY_DESCRIPTIONS.intentVerification}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -733,8 +726,7 @@ const ContentPolicyStep = ({
                                         <HorizontalStack gap="1" blockAlign="center">
                                             <Text as="span">Confidence Threshold</Text>
                                             <ControlInfoIcon
-                                                description={CONTENT_POLICY_DESCRIPTIONS.intentConfidenceThreshold.description}
-                                                examples={CONTENT_POLICY_DESCRIPTIONS.intentConfidenceThreshold.examples}
+                                                {...CONTENT_POLICY_DESCRIPTIONS.intentConfidenceThreshold}
                                                 onTryPrompt={onTryPrompt}
                                             />
                                         </HorizontalStack>

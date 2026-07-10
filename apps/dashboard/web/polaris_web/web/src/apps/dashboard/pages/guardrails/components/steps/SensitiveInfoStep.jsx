@@ -202,8 +202,7 @@ const SensitiveInfoStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Personally Identifiable Information (PII) types" threats={RULE_OWASP_THREATS.pii} />
                                 <ControlInfoIcon
-                                    description={SENSITIVE_INFO_DESCRIPTIONS.piiTypes.description}
-                                    examples={SENSITIVE_INFO_DESCRIPTIONS.piiTypes.examples}
+                                    {...SENSITIVE_INFO_DESCRIPTIONS.piiTypes}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -342,8 +341,7 @@ const SensitiveInfoStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Regex patterns" threats={RULE_OWASP_THREATS.regex} />
                                 <ControlInfoIcon
-                                    description={SENSITIVE_INFO_DESCRIPTIONS.regexPatterns.description}
-                                    examples={SENSITIVE_INFO_DESCRIPTIONS.regexPatterns.examples}
+                                    {...SENSITIVE_INFO_DESCRIPTIONS.regexPatterns}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -420,8 +418,7 @@ const SensitiveInfoStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Enable secrets detection" threats={RULE_OWASP_THREATS.secrets} />
                                 <ControlInfoIcon
-                                    description={SENSITIVE_INFO_DESCRIPTIONS.secretsDetection.description}
-                                    examples={SENSITIVE_INFO_DESCRIPTIONS.secretsDetection.examples}
+                                    {...SENSITIVE_INFO_DESCRIPTIONS.secretsDetection}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -436,8 +433,7 @@ const SensitiveInfoStep = ({
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
                                     <ControlInfoIcon
-                                        description={SENSITIVE_INFO_DESCRIPTIONS.secretsConfidenceThreshold.description}
-                                        examples={SENSITIVE_INFO_DESCRIPTIONS.secretsConfidenceThreshold.examples}
+                                        {...SENSITIVE_INFO_DESCRIPTIONS.secretsConfidenceThreshold}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>
@@ -463,8 +459,7 @@ const SensitiveInfoStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Enable sensitive data anonymization" threats={RULE_OWASP_THREATS.anonymize} />
                                 <ControlInfoIcon
-                                    description={SENSITIVE_INFO_DESCRIPTIONS.anonymize.description}
-                                    examples={SENSITIVE_INFO_DESCRIPTIONS.anonymize.examples}
+                                    {...SENSITIVE_INFO_DESCRIPTIONS.anonymize}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -479,8 +474,7 @@ const SensitiveInfoStep = ({
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
                                     <ControlInfoIcon
-                                        description={SENSITIVE_INFO_DESCRIPTIONS.anonymizeConfidenceThreshold.description}
-                                        examples={SENSITIVE_INFO_DESCRIPTIONS.anonymizeConfidenceThreshold.examples}
+                                        {...SENSITIVE_INFO_DESCRIPTIONS.anonymizeConfidenceThreshold}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>

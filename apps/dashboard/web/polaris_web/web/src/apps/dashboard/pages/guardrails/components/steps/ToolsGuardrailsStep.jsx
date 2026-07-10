@@ -44,8 +44,7 @@ const ToolsGuardrailsStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Tool Misuse" threats={RULE_OWASP_THREATS.toolMisuse} />
                                 <ControlInfoIcon
-                                    description={TOOLS_GUARDRAILS_DESCRIPTIONS.toolMisuse.description}
-                                    examples={TOOLS_GUARDRAILS_DESCRIPTIONS.toolMisuse.examples}
+                                    {...TOOLS_GUARDRAILS_DESCRIPTIONS.toolMisuse}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -61,8 +60,7 @@ const ToolsGuardrailsStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Detect Malicious Tools" threats={RULE_OWASP_THREATS.maliciousTools} />
                                 <ControlInfoIcon
-                                    description={TOOLS_GUARDRAILS_DESCRIPTIONS.maliciousTools.description}
-                                    examples={TOOLS_GUARDRAILS_DESCRIPTIONS.maliciousTools.examples}
+                                    {...TOOLS_GUARDRAILS_DESCRIPTIONS.maliciousTools}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -78,8 +76,7 @@ const ToolsGuardrailsStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Detect Tool name and description mismatch" threats={RULE_OWASP_THREATS.toolNameDescriptionMismatch} />
                                 <ControlInfoIcon
-                                    description={TOOLS_GUARDRAILS_DESCRIPTIONS.toolNameDescriptionMismatch.description}
-                                    examples={TOOLS_GUARDRAILS_DESCRIPTIONS.toolNameDescriptionMismatch.examples}
+                                    {...TOOLS_GUARDRAILS_DESCRIPTIONS.toolNameDescriptionMismatch}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>

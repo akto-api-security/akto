@@ -156,8 +156,7 @@ const CustomGuardrailsStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">LLM prompt based rule</Text>
                                 <ControlInfoIcon
-                                    description={CUSTOM_GUARDRAILS_DESCRIPTIONS.llmPromptRule.description}
-                                    examples={CUSTOM_GUARDRAILS_DESCRIPTIONS.llmPromptRule.examples}
+                                    {...CUSTOM_GUARDRAILS_DESCRIPTIONS.llmPromptRule}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -183,8 +182,7 @@ const CustomGuardrailsStep = ({
                                         <HorizontalStack gap="1" blockAlign="center">
                                             <Text as="span">Confidence score threshold</Text>
                                             <ControlInfoIcon
-                                                description={CUSTOM_GUARDRAILS_DESCRIPTIONS.llmConfidenceThreshold.description}
-                                                examples={CUSTOM_GUARDRAILS_DESCRIPTIONS.llmConfidenceThreshold.examples}
+                                                {...CUSTOM_GUARDRAILS_DESCRIPTIONS.llmConfidenceThreshold}
                                                 onTryPrompt={onTryPrompt}
                                             />
                                         </HorizontalStack>
@@ -216,8 +214,7 @@ const CustomGuardrailsStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">External model based evaluation</Text>
                                 <ControlInfoIcon
-                                    description={CUSTOM_GUARDRAILS_DESCRIPTIONS.externalModel.description}
-                                    examples={CUSTOM_GUARDRAILS_DESCRIPTIONS.externalModel.examples}
+                                    {...CUSTOM_GUARDRAILS_DESCRIPTIONS.externalModel}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -243,8 +240,7 @@ const CustomGuardrailsStep = ({
                                         <HorizontalStack gap="1" blockAlign="center">
                                             <Text as="span">Confidence score threshold</Text>
                                             <ControlInfoIcon
-                                                description={CUSTOM_GUARDRAILS_DESCRIPTIONS.externalConfidenceThreshold.description}
-                                                examples={CUSTOM_GUARDRAILS_DESCRIPTIONS.externalConfidenceThreshold.examples}
+                                                {...CUSTOM_GUARDRAILS_DESCRIPTIONS.externalConfidenceThreshold}
                                                 onTryPrompt={onTryPrompt}
                                             />
                                         </HorizontalStack>

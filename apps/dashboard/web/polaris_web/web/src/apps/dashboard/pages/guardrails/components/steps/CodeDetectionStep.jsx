@@ -46,8 +46,7 @@ const CodeDetectionStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Enable code detection filter" threats={RULE_OWASP_THREATS.codeFilter} />
                                 <ControlInfoIcon
-                                    description={CODE_DETECTION_DESCRIPTIONS.codeFilter.description}
-                                    examples={CODE_DETECTION_DESCRIPTIONS.codeFilter.examples}
+                                    {...CODE_DETECTION_DESCRIPTIONS.codeFilter}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -62,8 +61,7 @@ const CodeDetectionStep = ({
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <Text variant="bodyMd" fontWeight="medium">Code Detection Level</Text>
                                     <ControlInfoIcon
-                                        description={CODE_DETECTION_DESCRIPTIONS.codeFilterLevel.description}
-                                        examples={CODE_DETECTION_DESCRIPTIONS.codeFilterLevel.examples}
+                                        {...CODE_DETECTION_DESCRIPTIONS.codeFilterLevel}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>
@@ -90,8 +88,7 @@ const CodeDetectionStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <RuleLabelWithTag name="Enable ban code detection" threats={RULE_OWASP_THREATS.banCode} />
                                 <ControlInfoIcon
-                                    description={CODE_DETECTION_DESCRIPTIONS.banCode.description}
-                                    examples={CODE_DETECTION_DESCRIPTIONS.banCode.examples}
+                                    {...CODE_DETECTION_DESCRIPTIONS.banCode}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -106,8 +103,7 @@ const CodeDetectionStep = ({
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
                                     <ControlInfoIcon
-                                        description={CODE_DETECTION_DESCRIPTIONS.banCodeConfidenceThreshold.description}
-                                        examples={CODE_DETECTION_DESCRIPTIONS.banCodeConfidenceThreshold.examples}
+                                        {...CODE_DETECTION_DESCRIPTIONS.banCodeConfidenceThreshold}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>

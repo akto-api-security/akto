@@ -55,8 +55,7 @@ const LanguageSafetyStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">Enable gibberish detection</Text>
                                 <ControlInfoIcon
-                                    description={LANGUAGE_SAFETY_DESCRIPTIONS.gibberishDetection.description}
-                                    examples={LANGUAGE_SAFETY_DESCRIPTIONS.gibberishDetection.examples}
+                                    {...LANGUAGE_SAFETY_DESCRIPTIONS.gibberishDetection}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -71,8 +70,7 @@ const LanguageSafetyStep = ({
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
                                     <ControlInfoIcon
-                                        description={LANGUAGE_SAFETY_DESCRIPTIONS.gibberishConfidenceThreshold.description}
-                                        examples={LANGUAGE_SAFETY_DESCRIPTIONS.gibberishConfidenceThreshold.examples}
+                                        {...LANGUAGE_SAFETY_DESCRIPTIONS.gibberishConfidenceThreshold}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>
@@ -98,8 +96,7 @@ const LanguageSafetyStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">Enable sentiment detection</Text>
                                 <ControlInfoIcon
-                                    description={LANGUAGE_SAFETY_DESCRIPTIONS.sentimentDetection.description}
-                                    examples={LANGUAGE_SAFETY_DESCRIPTIONS.sentimentDetection.examples}
+                                    {...LANGUAGE_SAFETY_DESCRIPTIONS.sentimentDetection}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
@@ -114,8 +111,7 @@ const LanguageSafetyStep = ({
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
                                     <ControlInfoIcon
-                                        description={LANGUAGE_SAFETY_DESCRIPTIONS.sentimentConfidenceThreshold.description}
-                                        examples={LANGUAGE_SAFETY_DESCRIPTIONS.sentimentConfidenceThreshold.examples}
+                                        {...LANGUAGE_SAFETY_DESCRIPTIONS.sentimentConfidenceThreshold}
                                         onTryPrompt={onTryPrompt}
                                     />
                                 </HorizontalStack>
@@ -141,8 +137,7 @@ const LanguageSafetyStep = ({
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text as="span">Profanity</Text>
                                 <ControlInfoIcon
-                                    description={LANGUAGE_SAFETY_DESCRIPTIONS.profanity.description}
-                                    examples={LANGUAGE_SAFETY_DESCRIPTIONS.profanity.examples}
+                                    {...LANGUAGE_SAFETY_DESCRIPTIONS.profanity}
                                     onTryPrompt={onTryPrompt}
                                 />
                             </HorizontalStack>
