@@ -615,6 +615,7 @@ function GuardrailPolicies() {
                 ...(guardrailData.secretsDetection ? { secretsDetection: guardrailData.secretsDetection } : {}),
                 ...(guardrailData.sentimentDetection ? { sentimentDetection: guardrailData.sentimentDetection } : {}),
                 ...(guardrailData.tokenLimitDetection ? { tokenLimitDetection: guardrailData.tokenLimitDetection } : {}),
+                ...(guardrailData.anomalyDetection ? { anomalyDetection: guardrailData.anomalyDetection } : {}),
                 applyToAllServers: guardrailData.applyToAllServers ?? true,
                 targetTeams: guardrailData.targetTeams || [],
                 targetRoles: guardrailData.targetRoles || [],

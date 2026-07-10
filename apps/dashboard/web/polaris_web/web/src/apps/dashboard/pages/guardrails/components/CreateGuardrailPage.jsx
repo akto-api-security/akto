@@ -181,6 +181,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableTokenLimit, setEnableTokenLimit] = useState(false);
     const [tokenLimitThreshold, setTokenLimitThreshold] = useState(4096);
 
+    // Step 8: Anomaly Detection
+    const [enableAnomalyDetection, setEnableAnomalyDetection] = useState(false);
+    const [anomalyToolCallLimit, setAnomalyToolCallLimit] = useState(null);
+    const [anomalyErrorLimit, setAnomalyErrorLimit] = useState(null);
+
     // Step 9: Tools Guardrails
     const [enableToolMisuse, setEnableToolMisuse] = useState(true);
     const [enableMaliciousTools, setEnableMaliciousTools] = useState(true);
@@ -282,6 +287,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         // Step 7
         enableTokenLimit,
         tokenLimitThreshold,
+        // Step 8
+        enableAnomalyDetection,
+        anomalyToolCallLimit,
+        anomalyErrorLimit,
         // Step 9
         enableToolMisuse,
         enableMaliciousTools,
@@ -595,6 +604,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setConfidenceScore(25);
         setEnableTokenLimit(false);
         setTokenLimitThreshold(4096);
+        setEnableAnomalyDetection(false);
+        setAnomalyToolCallLimit(null);
+        setAnomalyErrorLimit(null);
         setEnableToolMisuse(true);
         setEnableMaliciousTools(true);
         setEnableToolNameDescriptionMismatch(true);
@@ -719,6 +731,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setScannerState(policy.sentimentDetection, setEnableSentiment, setSentimentConfidenceScore);
         setEnableTokenLimit(policy.tokenLimitDetection?.enabled || false);
         setTokenLimitThreshold(policy.tokenLimitDetection?.threshold || 4096);
+
+        // Anomaly detection
+        const ad = policy.anomalyDetection;
+        setEnableAnomalyDetection(ad?.enabled || false);
+        setAnomalyToolCallLimit(ad?.toolCallLimit || ad?.toolCallBucketCap || null);
+        setAnomalyErrorLimit(ad?.errorLimit || ad?.errorThreshold || null);
 
         // External model based evaluation
         setEnableExternalModel(!!policy.url);
@@ -893,6 +911,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     enabled: enableTokenLimit,
                     threshold: tokenLimitThreshold
                 },
+                anomalyDetection: {
+                    enabled: enableAnomalyDetection,
+                    toolCallLimit: anomalyToolCallLimit,
+                    errorLimit: anomalyErrorLimit,
+                },
                 url: enableExternalModel ? (url || null) : null,
                 confidenceScore: enableExternalModel ? confidenceScore : null,
                 applyToAllServers,
@@ -1051,7 +1074,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 );
             case 8:
                 return (
-                    <AnomalyDetectionStep />
+                    <AnomalyDetectionStep
+                        enableAnomalyDetection={enableAnomalyDetection}
+                        setEnableAnomalyDetection={setEnableAnomalyDetection}
+                        anomalyToolCallLimit={anomalyToolCallLimit}
+                        setAnomalyToolCallLimit={setAnomalyToolCallLimit}
+                        anomalyErrorLimit={anomalyErrorLimit}
+                        setAnomalyErrorLimit={setAnomalyErrorLimit}
+                    />
                 );
             case 9:
                 return (
@@ -1204,6 +1234,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             secretsDetection: buildDetectionConfig(enableSecrets, secretsConfidenceScore),
             sentimentDetection: buildDetectionConfig(enableSentiment, sentimentConfidenceScore),
             tokenLimitDetection: { enabled: enableTokenLimit, threshold: tokenLimitThreshold },
+            anomalyDetection: {
+                enabled: enableAnomalyDetection,
+                toolCallLimit: anomalyToolCallLimit,
+                errorLimit: anomalyErrorLimit,
+            },
             url: enableExternalModel ? (url || null) : null,
             confidenceScore: enableExternalModel ? confidenceScore : null,
             applyToAllServers: applyToAllServers,
