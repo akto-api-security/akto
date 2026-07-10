@@ -56,6 +56,8 @@ import com.akto.dao.context.Context;
 import com.akto.dao.file.FilesDao;
 import com.akto.dao.nhi_governance.NhiIdentityDao;
 import com.akto.dto.nhi_governance.NhiIdentity;
+import com.akto.dao.config_field_policy.ConfigFieldPolicyDao;
+import com.akto.dto.config_field_policy.ConfigFieldPolicy;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
@@ -3088,6 +3090,20 @@ public class DbLayer {
             return AgentUsersDao.instance.findDeviceIdsByTeamsAndRoles(teams, roles);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in findDeviceIdsByTeamsAndRoles: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    // --- Config Field Policy (Misconfigurations) ---
+
+    public static List<ConfigFieldPolicy> fetchActiveConfigFieldPolicies(String toolName) {
+        try {
+            Bson filter = Filters.and(
+                    Filters.eq(ConfigFieldPolicy.STATUS, "ACTIVE"),
+                    Filters.eq(ConfigFieldPolicy.TOOL_NAME, toolName));
+            return ConfigFieldPolicyDao.instance.findAll(filter);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchActiveConfigFieldPolicies: " + e.getMessage());
             return new ArrayList<>();
         }
     }
