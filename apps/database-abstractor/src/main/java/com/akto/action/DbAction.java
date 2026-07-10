@@ -4055,11 +4055,16 @@ public class DbAction extends ActionSupport {
     private List<com.akto.utils.elasticsearch.AgentQueryRecord> agentQueryRecords;
 
     public String storeAgentQueryRecords() {
-        try {
-            com.akto.utils.elasticsearch.ElasticSearchClient.instance().bulkIndexAgentQueryRecords(agentQueryRecords);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in storeAgentQueryRecords " + e.toString());
-            return Action.ERROR.toUpperCase();
+        int accId = Context.accountId.get();
+        if (kafkaUtils.isWriteEnabled()) {
+            kafkaUtils.insertDataSecondary(agentQueryRecords, "storeAgentQueryRecords", accId);
+        } else {
+            try {
+                com.akto.utils.elasticsearch.ElasticSearchClient.instance().bulkIndexAgentQueryRecords(agentQueryRecords);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error in storeAgentQueryRecords " + e.toString());
+                return Action.ERROR.toUpperCase();
+            }
         }
         return Action.SUCCESS.toUpperCase();
     }
