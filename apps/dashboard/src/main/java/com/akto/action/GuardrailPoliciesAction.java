@@ -66,6 +66,11 @@ public class GuardrailPoliciesAction extends UserAction {
     @Setter
     private List<String> policyIds;
 
+    @Setter
+    private int skip;
+    @Setter
+    private int limit;
+
     // For playground testing
     @Setter
     private String testInput;
@@ -75,7 +80,7 @@ public class GuardrailPoliciesAction extends UserAction {
 
     public String fetchGuardrailPolicies() {
         try {
-            this.guardrailPolicies = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(0, 20);
+            this.guardrailPolicies = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(skip, limit);
             this.total = GuardrailPoliciesDao.instance.getTotalCount();
 
             // Resolve targetTeams/targetRoles → device IDs fresh on every fetch.

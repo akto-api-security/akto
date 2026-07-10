@@ -1300,7 +1300,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Redact any configured ignore-phrases before the enforcement library ever sees the
 	// text — see ValidateRequest's plan-doc note on the shared-payload trade-off. Shared
 	// with ValidateResponse via redactIgnorePhrasesForEvaluation/reconcileIgnorePhraseRedaction.
-	payloadForEvaluation, preRedactionPayload, restore := s.redactIgnorePhrasesForEvaluation(payloadToValidate, policies, "ValidateRequest", sessionID)
+	payloadForEvaluation, preRedactionPayload := s.redactIgnorePhrasesForEvaluation(payloadToValidate, policies, "ValidateRequest", sessionID)
 	payloadToValidate = payloadForEvaluation
 
 	// Use the default processor - skipThreat is passed via ValidationContext
@@ -1320,7 +1320,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	}
 
 	// Reconcile ignore-phrase redaction: the real origin must never see a placeholder.
-	finalPayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, payloadToValidate, preRedactionPayload, restore, "ValidateRequest", sessionID)
+	finalPayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, payloadToValidate, preRedactionPayload, "ValidateRequest", sessionID)
 
 	s.logger.Info("ValidateRequest - ProcessRequestParallel result",
 		zap.String("path", params.Path),
@@ -1473,7 +1473,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	// boundary, so only the agent-guard /scan call is shed when degraded.
 	// Redact any configured ignore-phrases before the enforcement library ever sees the
 	// text — see ValidateRequest for the full rationale and the shared-payload trade-off.
-	payloadForEvaluation, preRedactionPayload, restore := s.redactIgnorePhrasesForEvaluation(responseBodyForValidation, policies, "ValidateResponse", sessionID)
+	payloadForEvaluation, preRedactionPayload := s.redactIgnorePhrasesForEvaluation(responseBodyForValidation, policies, "ValidateResponse", sessionID)
 	responseBodyForValidation = payloadForEvaluation
 
 	// Use processor's ProcessResponse method with external policies
@@ -1493,7 +1493,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	}
 
 	// Reconcile ignore-phrase redaction: the real origin must never see a placeholder.
-	finalResponsePayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, responseBodyForValidation, preRedactionPayload, restore, "ValidateResponse", sessionID)
+	finalResponsePayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, responseBodyForValidation, preRedactionPayload, "ValidateResponse", sessionID)
 
 	s.logger.Info("ValidateResponse - ProcessResponseParallel result",
 		zap.String("path", params.Path),
@@ -1646,7 +1646,7 @@ func (s *Service) ValidateRequestWithPolicy(
 	// one-off provided policy that never goes through the policy cache, so matchers are
 	// compiled fresh for just this one policy rather than looked up from it.
 	matchersByPolicy := compileIgnorePhraseMatchersByPolicy(policies)
-	payloadForEvaluation, preRedactionPayload, restore := s.redactIgnorePhrasesForEvaluationWithMatchers(payloadToValidate, policies, matchersByPolicy, "ValidateRequestWithPolicy", sessionID)
+	payloadForEvaluation, preRedactionPayload := s.redactIgnorePhrasesForEvaluationWithMatchers(payloadToValidate, policies, matchersByPolicy, "ValidateRequestWithPolicy", sessionID)
 	payloadToValidate = payloadForEvaluation
 
 	// Use the default processor - skipThreat is passed via ValidationContext
@@ -1667,7 +1667,7 @@ func (s *Service) ValidateRequestWithPolicy(
 		zap.String("fullProcessResultJSON", string(processResultJSON)))
 
 	// Reconcile ignore-phrase redaction: the real origin must never see a placeholder.
-	finalPayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, payloadToValidate, preRedactionPayload, restore, "ValidateRequestWithPolicy", sessionID)
+	finalPayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, payloadToValidate, preRedactionPayload, "ValidateRequestWithPolicy", sessionID)
 
 	// Convert ProcessResult to ValidationResult
 	result := &mcp.ValidationResult{
@@ -1701,23 +1701,44 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 	s.schemaFetcher.RefreshIfNeeded()
 
-	policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies(string(contextSource))
-	if err != nil {
-		s.logger.Error("ValidateBatch - failed to load policies",
-			zap.String("contextSource", contextSource),
-			zap.Error(err))
-		return nil, fmt.Errorf("failed to load policies: %w", err)
+	type batchPolicyBundle struct {
+		policies        []types.Policy
+		auditPolicies   map[string]*types.AuditPolicy
+		compiledRules   map[string]*regexp.Regexp
+		hasAuditRules   bool
 	}
-
-	s.logger.Debug("ValidateBatch - loaded policies for contextSource",
-		zap.String("contextSource", contextSource),
-		zap.Int("policiesCount", len(policies)),
-		zap.Int("auditPoliciesCount", len(auditPolicies)),
-		zap.Strings("policyNames", policyNames(policies)))
+	policyByContext := make(map[string]batchPolicyBundle)
 
 	results := make([]ValidationBatchResult, 0, len(batchData))
 
 	for i, data := range batchData {
+		itemContextSource := ResolveIngestContextSource(data, contextSource)
+		bundle, ok := policyByContext[itemContextSource]
+		if !ok {
+			policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies(itemContextSource)
+			if err != nil {
+				s.logger.Error("ValidateBatch - failed to load policies",
+					zap.String("contextSource", itemContextSource),
+					zap.Error(err))
+				return nil, fmt.Errorf("failed to load policies: %w", err)
+			}
+			bundle = batchPolicyBundle{
+				policies:      policies,
+				auditPolicies: auditPolicies,
+				compiledRules: compiledRules,
+				hasAuditRules: hasAuditRules,
+			}
+			policyByContext[itemContextSource] = bundle
+			s.logger.Debug("ValidateBatch - loaded policies for contextSource",
+				zap.String("contextSource", itemContextSource),
+				zap.Int("policiesCount", len(policies)),
+				zap.Int("auditPoliciesCount", len(auditPolicies)),
+				zap.Strings("policyNames", policyNames(policies)))
+		}
+		policies := bundle.policies
+		auditPolicies := bundle.auditPolicies
+		compiledRules := bundle.compiledRules
+		hasAuditRules := bundle.hasAuditRules
 		result := ValidationBatchResult{
 			Index:  i,
 			Method: data.Method,
@@ -1759,7 +1780,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			StatusCode:         statusCode,
 			RequestPayload:     data.RequestPayload,
 			ResponsePayload:    data.ResponsePayload,
-			ContextSource:      types.ContextSource(contextSource),
+			ContextSource:      types.ContextSource(itemContextSource),
+			Tag:                data.Tag,
 			McpServerName:      mcpServerName,
 			AktoAccountID:      auth.AccountIDFromServiceToken(),
 			SkipThreat:         skipThreat, // Set skipThreat directly in context

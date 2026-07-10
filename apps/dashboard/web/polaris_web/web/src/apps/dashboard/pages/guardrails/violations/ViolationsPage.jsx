@@ -27,6 +27,7 @@ import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter
 import PersistStore from "@/apps/main/PersistStore";
 import LocalStore from "@/apps/main/LocalStorageStore";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
+import { isEndpointSecurityCategory } from "@/apps/main/labelHelper";
 
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "@/apps/dashboard/pages/observe/api_collections/endpointShieldHelper";
 import { formatDisplayName } from "@/apps/dashboard/pages/observe/agentic/mcpClientHelper";
@@ -604,17 +605,19 @@ function Violations() {
     const newLayout = LocalStore((state) => state.guardrailViolationsNewLayout);
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
+    const legacyPath = isEndpointSecurityCategory() ? "/dashboard/protection/threat-activity" : "/dashboard/guardrails/activity";
+
     useEffect(() => {
         // New layout is only available to demo accounts; everyone else stays on the legacy page.
         if (!func.isDemoAccount() || !newLayout) {
-            navigate("/dashboard/guardrails/activity", { replace: true });
+            navigate(legacyPath, { replace: true });
         }
-    }, [navigate]);
+    }, [navigate, legacyPath]);
 
     const handleLayoutToggle = useCallback((checked) => {
         setGuardrailViolationsNewLayout(checked);
-        if (!checked) navigate("/dashboard/guardrails/activity");
-    }, [navigate, setGuardrailViolationsNewLayout]);
+        if (!checked) navigate(legacyPath);
+    }, [navigate, setGuardrailViolationsNewLayout, legacyPath]);
 
     const [rows, setRows] = useState([]);
     const [summary, setSummary] = useState(null);

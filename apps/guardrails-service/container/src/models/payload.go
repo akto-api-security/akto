@@ -25,6 +25,7 @@ type IngestDataBatch struct {
 	DaemonsetID        string   `json:"daemonset_id"`
 	EnabledGraph       string   `json:"enabled_graph"`
 	Tag                string   `json:"tag"`
+	ContextSource      string   `json:"contextSource,omitempty"`
 	ParentMcpToolNames []string `json:"parentMcpToolNames"`
 }
 

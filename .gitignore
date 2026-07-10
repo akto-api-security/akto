@@ -41,6 +41,8 @@ run-guardrails-service.sh
 .github/hooks
 **/CLAUDE.md
 scripts/**
+apps/guardrails-service/container/scripts/**
+**.log
 **.log
 apps/guardrails-service/container/scripts/**
 run-agent-guard.sh
@@ -49,3 +51,4 @@ run-embedder.sh
 .venv
 .python-version
 *logs.txt
+data-adhoc/**

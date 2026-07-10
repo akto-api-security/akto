@@ -518,7 +518,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       matchingUrlFilter = [],
       typeFilter = [],
       latestAttack = [],
-      hostFilter = [];
+      hostFilter = [],
+      severityFilter = [];
     let latestApiOrigRegex = queryValue.length > 3 ? queryValue : "";
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
@@ -538,7 +539,10 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     if(filters?.host){
       hostFilter = filters?.host
     }
-    
+    if(filters?.severity){
+      severityFilter = filters?.severity
+    }
+
     // Store current filters for bulk operations
     setCurrentFilters({
       actor: sourceIpsFilter,
@@ -547,6 +551,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       type: typeFilter,
       latestAttack: latestAttack,
       host: hostFilter,
+      severity: severityFilter,
       sortKey: sortKey,
       sortOrder: sortOrder
     });
@@ -575,7 +580,10 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       successfulBool,
       label, // Use the label prop (THREAT or GUARDRAIL)
       hostFilter,
-      latestApiOrigRegex
+      latestApiOrigRegex,
+      undefined,
+      undefined,
+      severityFilter
     );
 
     // Store the total count for filtered results
@@ -751,6 +759,18 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         label: labelMap[PersistStore.getState().dashboardCategory]["Latest attack sub-category"],
         type: 'select',
         choices: attackTypeChoices,
+        multiple: true
+      },
+      {
+        key: 'severity',
+        label: "Severity",
+        title: "Severity",
+        choices: [
+          { label: 'Critical', value: 'CRITICAL' },
+          { label: 'High', value: 'HIGH' },
+          { label: 'Medium', value: 'MEDIUM' },
+          { label: 'Low', value: 'LOW' },
+        ],
         multiple: true
       },
     ];

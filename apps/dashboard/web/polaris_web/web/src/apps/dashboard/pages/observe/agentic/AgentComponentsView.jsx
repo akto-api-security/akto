@@ -88,7 +88,7 @@ const COMBINED_AGENT_COL_DEFS = [
         suppressHeaderMenuButton: true,
         suppressHeaderFilterButton: true,
         cellRenderer: AgentComponentTypeCellRenderer,
-        cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL" })[p.value] || "agentic-type-DEFAULT",
+        cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL", "Tool": "agentic-type-TOOL" })[p.value] || "agentic-type-DEFAULT",
         cellStyle: { display: "flex", alignItems: "center" },
     },
     {
@@ -241,6 +241,7 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
     const [selectedTool,  setSelectedTool]  = useState(null);
     const [selectedSkill, setSelectedSkill] = useState(null);
     const [skills,        setSkills]        = useState([]);
+    const [builtinTools,  setBuiltinTools]  = useState([]);
 
     const connectedMcps = useMemo(() => {
         if (!asset.mcpServers?.length) return [];
@@ -278,6 +279,27 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
         return () => { cancelled = true; };
     }, [asset?.id, asset?.collectionIds]);
 
+    useEffect(() => {
+        const collectionIds = asset?.collectionIds;
+        if (!collectionIds?.length) { setBuiltinTools([]); return; }
+        let cancelled = false;
+        (async () => {
+            try {
+                const results = await Promise.all(collectionIds.map(id => agenticObserveApi.fetchAgentBuiltinToolsData(id)));
+                if (cancelled) return;
+                const seen = new Set();
+                const merged = [];
+                results.flat().forEach((tool) => {
+                    if (!seen.has(tool.name)) { seen.add(tool.name); merged.push(tool); }
+                });
+                setBuiltinTools(merged);
+            } catch {
+                if (!cancelled) setBuiltinTools([]);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [asset?.id, asset?.collectionIds]);
+
     const goToList = useCallback(() => {
         setView("list"); setSelectedMcp(null); setSelectedTool(null); setSelectedSkill(null);
         onNavChange?.(null);
@@ -299,9 +321,10 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
 
     const allComponents = useMemo(() => [
         ...(configRow ? [configRow] : []),
+        ...builtinTools.map(t => ({ ...t, _type: "Tool" })),
         ...connectedMcps.map(m => ({ ...m, _type: "MCP Server" })),
         ...skills.map(s => ({ ...s, _type: "Skill" })),
-    ], [configRow, connectedMcps, skills]);
+    ], [configRow, builtinTools, connectedMcps, skills]);
 
     const handleListRowClick = useCallback((e) => {
         if (!e.data || e.data._nonClickable) return;
@@ -320,6 +343,13 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
                 { label: asset.name, onClick: goToList },
                 { label: e.data.name },
             ]);
+        } else if (e.data._type === "Tool") {
+            setSelectedTool(e.data);
+            setView("tool-detail");
+            onNavChange?.([
+                { label: asset.name, onClick: goToList },
+                { label: e.data.name },
+            ]);
         } else if (e.data._type === "Skill") {
             // Show the skill's captured traffic inline (same as the MCP-server skill drill-down)
             setSelectedSkill(e.data);
@@ -333,11 +363,16 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
 
     if (view === "tool-detail" && selectedTool) {
         return <ToolDetailPanel tool={selectedTool} onBack={() => {
-            setView("mcp-tools"); setSelectedTool(null);
-            onNavChange?.([
-                { label: asset.name, onClick: goToList },
-                { label: selectedMcp?.name },
-            ]);
+            setSelectedTool(null);
+            if (selectedMcp) {
+                setView("mcp-tools");
+                onNavChange?.([
+                    { label: asset.name, onClick: goToList },
+                    { label: selectedMcp?.name },
+                ]);
+            } else {
+                goToList();
+            }
         }} />;
     }
 
