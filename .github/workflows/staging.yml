@@ -12,19 +12,58 @@ on:
     types: [ submitted ]
   workflow_dispatch:
     inputs:
-      target:
-        description: 'Build target (PR review always runs all)'
-        required: true
-        default: all
-        type: choice
-        options:
-          - all
-          - main
-          - guardrails-service
-          - agent-guard
-          - agent-guard-worker
-          - agent-guard-anonymizer
-          - agent-guard-embedder
+      dashboard:
+        type: boolean
+        default: false
+        description: Dashboard
+      testing:
+        type: boolean
+        default: false
+        description: Testing
+      billing:
+        type: boolean
+        default: false
+        description: Billing
+      internal:
+        type: boolean
+        default: false
+        description: Internal
+      threat_detection:
+        type: boolean
+        default: false
+        description: Threat Detection
+      threat_detection_backend:
+        type: boolean
+        default: false
+        description: Threat Detection Backend
+      account_job_executor:
+        type: boolean
+        default: false
+        description: Account Job Executor
+      data_ingestion:
+        type: boolean
+        default: false
+        description: Data Ingestion Service
+      guardrails_service:
+        type: boolean
+        default: false
+        description: Guardrails Service
+      otel_ingestion_service:
+        type: boolean
+        default: false
+        description: OTel Ingestion Service
+      agent_guard_worker:
+        type: boolean
+        default: false
+        description: Agent Guard Worker
+      agent_guard_anonymizer:
+        type: boolean
+        default: false
+        description: Agent Guard Anonymizer
+      agent_guard_embedder:
+        type: boolean
+        default: false
+        description: Agent Guard Embedder
       skipTests:
         description: 'Skip unit tests'
         type: boolean
@@ -39,7 +78,7 @@ jobs:
     if: (github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') || (github.event_name == 'workflow_dispatch') || (github.event_name == 'push')
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -87,22 +126,171 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
-  build:
+  resolve-modules:
     needs: check-dao-migration
     if: |
       (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') ||
-      (github.event_name == 'workflow_dispatch' && (github.event.inputs.target == 'all' || github.event.inputs.target == 'main'))
+      (github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-22.04
+    outputs:
+      dashboard: ${{ steps.resolve.outputs.dashboard }}
+      testing: ${{ steps.resolve.outputs.testing }}
+      billing: ${{ steps.resolve.outputs.billing }}
+      internal: ${{ steps.resolve.outputs.internal }}
+      threat_detection: ${{ steps.resolve.outputs.threat_detection }}
+      threat_detection_backend: ${{ steps.resolve.outputs.threat_detection_backend }}
+      account_job_executor: ${{ steps.resolve.outputs.account_job_executor }}
+      data_ingestion: ${{ steps.resolve.outputs.data_ingestion }}
+      guardrails_service: ${{ steps.resolve.outputs.guardrails_service }}
+      otel_ingestion_service: ${{ steps.resolve.outputs.otel_ingestion_service }}
+      agent_guard_worker: ${{ steps.resolve.outputs.agent_guard_worker }}
+      agent_guard_anonymizer: ${{ steps.resolve.outputs.agent_guard_anonymizer }}
+      agent_guard_embedder: ${{ steps.resolve.outputs.agent_guard_embedder }}
+      any_main: ${{ steps.resolve.outputs.any_main }}
+      any_agent_guard: ${{ steps.resolve.outputs.any_agent_guard }}
+    steps:
+      - uses: actions/checkout@v6
+        if: github.event_name == 'pull_request_review'
+        with:
+          fetch-depth: 0
+
+      - name: Resolve modules to build
+        id: resolve
+        run: |
+          set -euo pipefail
+
+          set_out() {
+            echo "$1=$2" >> "$GITHUB_OUTPUT"
+          }
+
+          dashboard=false
+          testing=false
+          billing=false
+          internal=false
+          threat_detection=false
+          threat_detection_backend=false
+          account_job_executor=false
+          data_ingestion=false
+          guardrails_service=false
+          otel_ingestion_service=false
+          agent_guard_worker=false
+          agent_guard_anonymizer=false
+          agent_guard_embedder=false
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            dashboard="${{ github.event.inputs.dashboard }}"
+            testing="${{ github.event.inputs.testing }}"
+            billing="${{ github.event.inputs.billing }}"
+            internal="${{ github.event.inputs.internal }}"
+            threat_detection="${{ github.event.inputs.threat_detection }}"
+            threat_detection_backend="${{ github.event.inputs.threat_detection_backend }}"
+            account_job_executor="${{ github.event.inputs.account_job_executor }}"
+            data_ingestion="${{ github.event.inputs.data_ingestion }}"
+            guardrails_service="${{ github.event.inputs.guardrails_service }}"
+            otel_ingestion_service="${{ github.event.inputs.otel_ingestion_service }}"
+            agent_guard_worker="${{ github.event.inputs.agent_guard_worker }}"
+            agent_guard_anonymizer="${{ github.event.inputs.agent_guard_anonymizer }}"
+            agent_guard_embedder="${{ github.event.inputs.agent_guard_embedder }}"
+          else
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+            CHANGED=$(git diff --name-only "$BASE"..."$HEAD")
+            echo "Changed files:"
+            echo "$CHANGED"
+
+            path_hit() {
+              echo "$CHANGED" | grep -qE "$1"
+            }
+
+            SHARED=false
+            if path_hit '^(libs/|pom\.xml$|apps/pom\.xml$)'; then
+              SHARED=true
+            fi
+
+            bool_or_shared() {
+              if [ "$SHARED" = "true" ] || path_hit "$1"; then
+                echo true
+              else
+                echo false
+              fi
+            }
+
+            dashboard="$(bool_or_shared '^apps/dashboard/')"
+            testing="$(bool_or_shared '^apps/testing/')"
+            billing="$(bool_or_shared '^apps/billing/')"
+            internal="$(bool_or_shared '^apps/internal/')"
+            threat_detection="$(bool_or_shared '^apps/threat-detection/')"
+            threat_detection_backend="$(bool_or_shared '^apps/threat-detection-backend/')"
+            account_job_executor="$(bool_or_shared '^apps/account-job-executor/')"
+            data_ingestion="$(bool_or_shared '^apps/data-ingestion-service/')"
+
+            if path_hit '^apps/guardrails-service/'; then
+              guardrails_service=true
+            fi
+            if path_hit '^apps/otel-ingestion-service/'; then
+              otel_ingestion_service=true
+            fi
+
+            if path_hit '^apps/agent-guard/python-service/worker-py/'; then
+              agent_guard_worker=true
+            fi
+            if path_hit '^apps/agent-guard/python-service/anonymizer-container/'; then
+              agent_guard_anonymizer=true
+            fi
+            if path_hit '^apps/agent-guard/python-service/embedder-container/'; then
+              agent_guard_embedder=true
+            fi
+            # Shared agent-guard paths (deploy/, anonymizer-worker/, top-level files, etc.)
+            OTHER_AG=$(echo "$CHANGED" | grep '^apps/agent-guard/' | grep -vE '^apps/agent-guard/python-service/(worker-py|anonymizer-container|embedder-container)/' || true)
+            if [ -n "$OTHER_AG" ]; then
+              agent_guard_worker=true
+              agent_guard_anonymizer=true
+              agent_guard_embedder=true
+            fi
+          fi
+
+          any_main=false
+          if [ "$dashboard" = "true" ] || [ "$testing" = "true" ] || [ "$billing" = "true" ] || [ "$internal" = "true" ] || \
+             [ "$threat_detection" = "true" ] || [ "$threat_detection_backend" = "true" ] || \
+             [ "$account_job_executor" = "true" ] || [ "$data_ingestion" = "true" ]; then
+            any_main=true
+          fi
+          any_agent_guard=false
+          if [ "$agent_guard_worker" = "true" ] || [ "$agent_guard_anonymizer" = "true" ] || [ "$agent_guard_embedder" = "true" ]; then
+            any_agent_guard=true
+          fi
+
+          set_out dashboard "$dashboard"
+          set_out testing "$testing"
+          set_out billing "$billing"
+          set_out internal "$internal"
+          set_out threat_detection "$threat_detection"
+          set_out threat_detection_backend "$threat_detection_backend"
+          set_out account_job_executor "$account_job_executor"
+          set_out data_ingestion "$data_ingestion"
+          set_out guardrails_service "$guardrails_service"
+          set_out otel_ingestion_service "$otel_ingestion_service"
+          set_out agent_guard_worker "$agent_guard_worker"
+          set_out agent_guard_anonymizer "$agent_guard_anonymizer"
+          set_out agent_guard_embedder "$agent_guard_embedder"
+          set_out any_main "$any_main"
+          set_out any_agent_guard "$any_agent_guard"
+          echo "Resolved modules: dashboard=$dashboard testing=$testing billing=$billing internal=$internal threat_detection=$threat_detection threat_detection_backend=$threat_detection_backend account_job_executor=$account_job_executor data_ingestion=$data_ingestion guardrails=$guardrails_service otel=$otel_ingestion_service agent_guard_worker=$agent_guard_worker agent_guard_anonymizer=$agent_guard_anonymizer agent_guard_embedder=$agent_guard_embedder any_main=$any_main any_agent_guard=$any_agent_guard"
+
+  build:
+    needs: [check-dao-migration, resolve-modules]
+    if: needs.resolve-modules.outputs.any_main == 'true'
     runs-on: ubuntu-22.04
     outputs:
       IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-java@v2
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
         with:
           distribution: "adopt"
           java-version: "8"
           architecture: x64
-      - uses: actions/setup-node@v2
+      - uses: actions/setup-node@v6
         with:
           node-version: "17"
       - name: Setup Protoc
@@ -117,38 +305,45 @@ jobs:
         id: docker_tag
         run: echo "IMAGE_TAG=a-$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
       - name: Download Akto templates zip and PII files
+        if: needs.resolve-modules.outputs.dashboard == 'true'
         working-directory: ./apps/dashboard/src/main/resources
         run: |
           wget -O tests-library-master.zip https://github.com/akto-api-security/tests-library/archive/refs/heads/master.zip
           wget -O general.json https://raw.githubusercontent.com/akto-api-security/pii-types/master/general.json
           wget -O fintech.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json
           wget -O filetypes.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json
-      - name: Create maxmind directory
+      - name: Create maxmind directory (threat-detection-backend)
+        if: needs.resolve-modules.outputs.threat_detection_backend == 'true'
         run: mkdir -p ./apps/threat-detection-backend/src/main/resources/maxmind
-      - name: Download Maxmind Country database
+      - name: Download Maxmind Country database (threat-detection-backend)
+        if: needs.resolve-modules.outputs.threat_detection_backend == 'true'
         working-directory: ./apps/threat-detection-backend/src/main/resources/maxmind
         run: |
           wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
-      
-      - name: Create maxmind directory
+
+      - name: Create maxmind directory (utils)
+        if: needs.resolve-modules.outputs.threat_detection == 'true' || needs.resolve-modules.outputs.threat_detection_backend == 'true' || needs.resolve-modules.outputs.dashboard == 'true'
         run: mkdir -p ./libs/utils/src/main/resources/maxmind
-      - name: Download Maxmind Country database
+      - name: Download Maxmind Country database (utils)
+        if: needs.resolve-modules.outputs.threat_detection == 'true' || needs.resolve-modules.outputs.threat_detection_backend == 'true' || needs.resolve-modules.outputs.dashboard == 'true'
         working-directory: ./libs/utils/src/main/resources/maxmind
         run: |
           wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
 
       - name: Configure AWS Credentials (dashboard only)
-        uses: aws-actions/configure-aws-credentials@v1
+        if: needs.resolve-modules.outputs.dashboard == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
           aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
           aws-region: ap-south-1
 
       - name: Download dashboard static assets
+        if: needs.resolve-modules.outputs.dashboard == 'true'
         run: bash apps/dashboard/scripts/download-dashboard-vendor-assets.sh
 
       - name: Build Dashboard polaris UI
-        if: github.event_name != 'workflow_dispatch' || github.event.inputs.skipFrontendBuild != 'true'
+        if: needs.resolve-modules.outputs.dashboard == 'true' && (github.event_name != 'workflow_dispatch' || github.event.inputs.skipFrontendBuild != 'true')
         working-directory: ./apps/dashboard/web/polaris_web
         run: |
           npm install
@@ -185,6 +380,15 @@ jobs:
           ECR_REPOSITORY: akto-api-security
           IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
           GAR_ENABLED: ${{ vars.GCP_PROJECT_ID != '' }}
+          BUILD_DASHBOARD: ${{ needs.resolve-modules.outputs.dashboard }}
+          BUILD_TESTING: ${{ needs.resolve-modules.outputs.testing }}
+          BUILD_BILLING: ${{ needs.resolve-modules.outputs.billing }}
+          BUILD_INTERNAL: ${{ needs.resolve-modules.outputs.internal }}
+          BUILD_THREAT: ${{ needs.resolve-modules.outputs.threat_detection }}
+          BUILD_THREAT_BACKEND: ${{ needs.resolve-modules.outputs.threat_detection_backend }}
+          BUILD_ACCOUNT_EXECUTOR: ${{ needs.resolve-modules.outputs.account_job_executor }}
+          BUILD_DATA_INGESTION: ${{ needs.resolve-modules.outputs.data_ingestion }}
+          SKIP_FRONTEND: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.skipFrontendBuild == 'true' }}
         run: |
           set -euo pipefail
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
@@ -194,91 +398,109 @@ jobs:
               echo "-t $GAR_REGISTRY/$1:$IMAGE_TAG"
             fi
           }
-          # Build non-dashboard images in parallel.
-          (
-            cd apps/testing
-            docker buildx build --platform linux/arm64/v8,linux/amd64 \
-              -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG \
-              $(gar_tag akto-api-testing) \
-              . --push
-          ) &
-          PID_TESTING=$!
-          (
-            cd apps/billing
-            docker buildx build --platform linux/arm64/v8,linux/amd64 \
-              -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG \
-              $(gar_tag akto-billing) \
-              . --push
-          ) &
-          PID_BILLING=$!
-          (
-            cd apps/internal
-            docker buildx build --platform linux/arm64/v8,linux/amd64 \
-              -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG \
-              $(gar_tag akto-internal) \
-              . --push
-          ) &
-          PID_INTERNAL=$!
-          (
-            cd apps/threat-detection
-            docker buildx build --platform linux/arm64/v8,linux/amd64 \
-              -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG \
-              $(gar_tag akto-threat-detection) \
-              . --push
-          ) &
-          PID_THREAT=$!
-          (
-            cd apps/threat-detection-backend
-            docker buildx build --platform linux/arm64/v8,linux/amd64 \
-              -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG \
-              $(gar_tag akto-threat-detection-backend) \
-              . --push
-          ) &
-          PID_THREAT_BACKEND=$!
-          (
-            cd apps/account-job-executor
-            docker buildx build --platform linux/arm64/v8,linux/amd64 \
-              -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_TAG \
-              $(gar_tag akto-account-job-executor) \
-              . --push
-          ) &
-          PID_ACCOUNT_EXECUTOR=$!
-          (
-            cd apps/data-ingestion-service
-            docker buildx build --platform linux/arm64/v8,linux/amd64 \
-              -t $ECR_REGISTRY/data-ingestion-service:$IMAGE_TAG \
-              $(gar_tag data-ingestion-service) \
-              . --push
-          ) &
-          PID_DATA_INGESTION=$!
+          PIDS=()
 
-          if [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ "${{ github.event.inputs.skipFrontendBuild }}" != "true" ]; then
-            aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/$IMAGE_TAG/dist --delete
+          if [ "$BUILD_TESTING" = "true" ]; then
+            (
+              cd apps/testing
+              docker buildx build --platform linux/arm64/v8,linux/amd64 \
+                -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG \
+                $(gar_tag akto-api-testing) \
+                . --push
+            ) &
+            PIDS+=($!)
           fi
-          (
-            cd apps/dashboard
-            docker buildx build --platform linux/arm64/v8,linux/amd64 \
-              -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG \
-              $(gar_tag $ECR_REPOSITORY-dashboard) \
-              . --push
-          )
+          if [ "$BUILD_BILLING" = "true" ]; then
+            (
+              cd apps/billing
+              docker buildx build --platform linux/arm64/v8,linux/amd64 \
+                -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG \
+                $(gar_tag akto-billing) \
+                . --push
+            ) &
+            PIDS+=($!)
+          fi
+          if [ "$BUILD_INTERNAL" = "true" ]; then
+            (
+              cd apps/internal
+              docker buildx build --platform linux/arm64/v8,linux/amd64 \
+                -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG \
+                $(gar_tag akto-internal) \
+                . --push
+            ) &
+            PIDS+=($!)
+          fi
+          if [ "$BUILD_THREAT" = "true" ]; then
+            (
+              cd apps/threat-detection
+              docker buildx build --platform linux/arm64/v8,linux/amd64 \
+                -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG \
+                $(gar_tag akto-threat-detection) \
+                . --push
+            ) &
+            PIDS+=($!)
+          fi
+          if [ "$BUILD_THREAT_BACKEND" = "true" ]; then
+            (
+              cd apps/threat-detection-backend
+              docker buildx build --platform linux/arm64/v8,linux/amd64 \
+                -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG \
+                $(gar_tag akto-threat-detection-backend) \
+                . --push
+            ) &
+            PIDS+=($!)
+          fi
+          if [ "$BUILD_ACCOUNT_EXECUTOR" = "true" ]; then
+            (
+              cd apps/account-job-executor
+              docker buildx build --platform linux/arm64/v8,linux/amd64 \
+                -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_TAG \
+                $(gar_tag akto-account-job-executor) \
+                . --push
+            ) &
+            PIDS+=($!)
+          fi
+          if [ "$BUILD_DATA_INGESTION" = "true" ]; then
+            (
+              cd apps/data-ingestion-service
+              docker buildx build --platform linux/arm64/v8,linux/amd64 \
+                -t $ECR_REGISTRY/data-ingestion-service:$IMAGE_TAG \
+                $(gar_tag data-ingestion-service) \
+                . --push
+            ) &
+            PIDS+=($!)
+          fi
 
-          wait $PID_TESTING $PID_BILLING $PID_INTERNAL $PID_THREAT $PID_THREAT_BACKEND $PID_ACCOUNT_EXECUTOR $PID_DATA_INGESTION
+          if [ "$BUILD_DASHBOARD" = "true" ]; then
+            if [ "$SKIP_FRONTEND" != "true" ]; then
+              aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/$IMAGE_TAG/dist --delete
+            fi
+            (
+              cd apps/dashboard
+              docker buildx build --platform linux/arm64/v8,linux/amd64 \
+                -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG \
+                $(gar_tag $ECR_REPOSITORY-dashboard) \
+                . --push
+            )
+          fi
+
+          if [ ${#PIDS[@]} -gt 0 ]; then
+            wait "${PIDS[@]}"
+          fi
 
       - name: Cache Maven packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
   build-guardrails-service:
-    if: |
-      (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') ||
-      (github.event_name == 'workflow_dispatch' && (github.event.inputs.target == 'all' || github.event.inputs.target == 'guardrails-service'))
+    needs: [check-dao-migration, resolve-modules]
+    if: needs.resolve-modules.outputs.guardrails_service == 'true'
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
         id: docker_tag
         run: echo "IMAGE_TAG=a-$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
@@ -321,10 +543,11 @@ jobs:
             . --push
 
   build-otel-ingestion-service:
-    if: (github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') || (github.event_name == 'workflow_dispatch')
+    needs: [check-dao-migration, resolve-modules]
+    if: needs.resolve-modules.outputs.otel_ingestion_service == 'true'
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
         id: docker_tag
         run: echo "IMAGE_TAG=a-$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
@@ -347,12 +570,11 @@ jobs:
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/otel-ingestion-service:$IMAGE_TAG . --push
 
   build-agent-guard:
-    if: |
-      (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') ||
-      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["all","agent-guard","agent-guard-worker","agent-guard-anonymizer","agent-guard-embedder"]'), github.event.inputs.target))
+    needs: [check-dao-migration, resolve-modules]
+    if: needs.resolve-modules.outputs.any_agent_guard == 'true'
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
         id: docker_tag
         run: echo "IMAGE_TAG=a-$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
@@ -378,9 +600,9 @@ jobs:
           ECR_REGISTRY: aktosecurity
           IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
           GAR_ENABLED: ${{ vars.GCP_PROJECT_ID != '' }}
-          BUILD_WORKER: ${{ github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-worker"]'), github.event.inputs.target) }}
-          BUILD_ANONYMIZER: ${{ github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-anonymizer"]'), github.event.inputs.target) }}
-          BUILD_EMBEDDER: ${{ github.event_name == 'pull_request_review' || contains(fromJSON('["all","agent-guard","agent-guard-embedder"]'), github.event.inputs.target) }}
+          BUILD_WORKER: ${{ needs.resolve-modules.outputs.agent_guard_worker }}
+          BUILD_ANONYMIZER: ${{ needs.resolve-modules.outputs.agent_guard_anonymizer }}
+          BUILD_EMBEDDER: ${{ needs.resolve-modules.outputs.agent_guard_embedder }}
         run: |
           set -euo pipefail
           echo "$IMAGE_TAG" >> $GITHUB_STEP_SUMMARY

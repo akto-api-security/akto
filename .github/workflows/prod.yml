@@ -89,7 +89,7 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -129,12 +129,12 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
-      - uses: actions/setup-java@v2
+      - uses: actions/setup-java@v5
         with:
           distribution: "adopt"
           java-version: "8"
           architecture: x64
-      - uses: actions/setup-node@v2
+      - uses: actions/setup-node@v6
         with:
           node-version: '17'
       - name: Setup Protoc
@@ -266,17 +266,18 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
       - name: Set up JDK 11
-        uses: actions/setup-java@v1
+        uses: actions/setup-java@v5
         with:
+          distribution: "adopt"
           java-version: 11
       - name: Cache SonarCloud packages
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
       - name: Cache Maven packages
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
@@ -290,7 +291,7 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
       
       - name: DockerHub login
         env:
@@ -353,7 +354,7 @@ jobs:
     if: ${{ github.event.inputs.guardrails_service == 'true' }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
 
       - name: DockerHub login
         env:
@@ -422,7 +423,7 @@ jobs:
     if: ${{ github.event.inputs.otel_ingestion_service == 'true' }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
 
       - name: DockerHub login
         env:
@@ -490,7 +491,7 @@ jobs:
     if: ${{ github.event.inputs.agent_guard == 'true' }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -600,9 +601,9 @@ jobs:
     if: ${{ github.event.inputs.account_jobs_executor == 'true' }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-java@v2
+      - uses: actions/setup-java@v5
         with:
           distribution: "adopt"
           java-version: "8"
@@ -691,13 +692,13 @@ jobs:
     if: ${{ github.event.inputs.data_ingestion == 'true' }}
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-java@v2
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
         with:
           distribution: "adopt"
           java-version: "8"
           architecture: x64
-      - uses: actions/setup-node@v2
+      - uses: actions/setup-node@v6
         with:
           node-version: "17"
       - name: Setup Protoc
@@ -768,17 +769,18 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
       - name: Set up JDK 11
-        uses: actions/setup-java@v1
+        uses: actions/setup-java@v5
         with:
+          distribution: "adopt"
           java-version: 11
       - name: Cache SonarCloud packages
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
       - name: Cache Maven packages
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
@@ -793,8 +795,8 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
-      - uses: actions/setup-java@v2
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
         with:
           distribution: "adopt"
           java-version: "8"
@@ -923,17 +925,18 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
       - name: Set up JDK 11
-        uses: actions/setup-java@v1
+        uses: actions/setup-java@v5
         with:
+          distribution: "adopt"
           java-version: 11
       - name: Cache SonarCloud packages
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
       - name: Cache Maven packages
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
