@@ -65,69 +65,21 @@ on:
         default: false
         description: Agent Guard Embedder
       skipTests:
-        description: 'Skip unit tests'
         type: boolean
         default: false
+        description: >-
+          [Options] Skip unit tests — Java modules only
+          (Dashboard, Testing, Billing, Internal, Threat Detection,
+          Threat Detection Backend, Account Job Executor, Data Ingestion).
+          Does not apply to Guardrails, OTel, or Agent Guard.
       skipFrontendBuild:
-        description: 'Skip dashboard frontend build and S3 sync'
         type: boolean
         default: false
+        description: >-
+          [Options] Skip dashboard frontend build and S3 sync — Dashboard only
 
 jobs:
-  check-dao-migration:
-    if: (github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') || (github.event_name == 'workflow_dispatch') || (github.event_name == 'push')
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Check DAO migration
-        if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-dao-migration-check') }}
-        run: |
-          if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
-            BASE=${{ github.event.pull_request.base.sha }}
-            HEAD=${{ github.event.pull_request.head.sha }}
-          else
-            # push / workflow_dispatch have no PR context - diff against the
-            # previous commit on this ref instead.
-            BASE=$(git rev-parse HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
-            HEAD=${{ github.sha }}
-          fi
-
-          # Only schema-affecting additions count, not any edit to a DAO file
-          # (e.g. business-logic-only changes like an upsert-vs-update branch).
-          SCHEMA_TOUCHED=$(git diff -U0 "$BASE"..."$HEAD" \
-              -- 'libs/dao/src/main/java/com/akto/dao/*.java' 'libs/dao/src/main/java/com/akto/DaoInit.java' \
-            | grep -E '^\+' \
-            | grep -E 'createIndex|createIndicesIfAbsent|createUniqueIndex|createCollection|dropIndex|dropCollection|renameCollection|convertToCappedCollection|compactCollection' || true)
-          if [ -z "$SCHEMA_TOUCHED" ]; then
-            exit 0
-          fi
-
-          MIGRATION_ADDED=$(git diff --name-only --diff-filter=A "$BASE"..."$HEAD" \
-            | grep -E "^libs/utils/src/main/resources/db/changelog/(common|billing|account)/.*\.xml$" || true)
-          if [ -z "$MIGRATION_ADDED" ]; then
-            echo "This change adds/changes an index or collection but no migration file was added under db/changelog/common|billing|account/. See libs/utils/src/main/resources/db/changelog/README.md."
-            exit 1
-          fi
-
-          echo "Migration check passed: $MIGRATION_ADDED"
-
-      - name: Send failure notification to Slack
-        if: failure()
-        uses: slackapi/slack-github-action@v1.23.0
-        with:
-          payload: |
-            {
-              "text": "❌ DAO migration check failed on Staging (${{ github.event_name }}, ${{ github.sha }}). Build blocked."
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-
   resolve-modules:
-    needs: check-dao-migration
     if: |
       (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'master' && github.event.review.state == 'approved') ||
       (github.event_name == 'workflow_dispatch')
@@ -147,7 +99,6 @@ jobs:
       agent_guard_anonymizer: ${{ steps.resolve.outputs.agent_guard_anonymizer }}
       agent_guard_embedder: ${{ steps.resolve.outputs.agent_guard_embedder }}
       any_main: ${{ steps.resolve.outputs.any_main }}
-      any_agent_guard: ${{ steps.resolve.outputs.any_agent_guard }}
     steps:
       - uses: actions/checkout@v6
         if: github.event_name == 'pull_request_review'
@@ -255,10 +206,6 @@ jobs:
              [ "$account_job_executor" = "true" ] || [ "$data_ingestion" = "true" ]; then
             any_main=true
           fi
-          any_agent_guard=false
-          if [ "$agent_guard_worker" = "true" ] || [ "$agent_guard_anonymizer" = "true" ] || [ "$agent_guard_embedder" = "true" ]; then
-            any_agent_guard=true
-          fi
 
           set_out dashboard "$dashboard"
           set_out testing "$testing"
@@ -274,12 +221,73 @@ jobs:
           set_out agent_guard_anonymizer "$agent_guard_anonymizer"
           set_out agent_guard_embedder "$agent_guard_embedder"
           set_out any_main "$any_main"
-          set_out any_agent_guard "$any_agent_guard"
-          echo "Resolved modules: dashboard=$dashboard testing=$testing billing=$billing internal=$internal threat_detection=$threat_detection threat_detection_backend=$threat_detection_backend account_job_executor=$account_job_executor data_ingestion=$data_ingestion guardrails=$guardrails_service otel=$otel_ingestion_service agent_guard_worker=$agent_guard_worker agent_guard_anonymizer=$agent_guard_anonymizer agent_guard_embedder=$agent_guard_embedder any_main=$any_main any_agent_guard=$any_agent_guard"
+          echo "Resolved modules: dashboard=$dashboard testing=$testing billing=$billing internal=$internal threat_detection=$threat_detection threat_detection_backend=$threat_detection_backend account_job_executor=$account_job_executor data_ingestion=$data_ingestion guardrails=$guardrails_service otel=$otel_ingestion_service agent_guard_worker=$agent_guard_worker agent_guard_anonymizer=$agent_guard_anonymizer agent_guard_embedder=$agent_guard_embedder any_main=$any_main"
 
-  build:
-    needs: [check-dao-migration, resolve-modules]
-    if: needs.resolve-modules.outputs.any_main == 'true'
+  # Java modules only — skip for guardrails / otel / agent-guard
+  check-dao-migration:
+    needs: resolve-modules
+    if: |
+      always() && !cancelled() && (
+        github.event_name == 'push' ||
+        (needs.resolve-modules.result == 'success' && needs.resolve-modules.outputs.any_main == 'true')
+      )
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check DAO migration
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-dao-migration-check') }}
+        run: |
+          if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
+            BASE=${{ github.event.pull_request.base.sha }}
+            HEAD=${{ github.event.pull_request.head.sha }}
+          else
+            # push / workflow_dispatch have no PR context - diff against the
+            # previous commit on this ref instead.
+            BASE=$(git rev-parse HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
+            HEAD=${{ github.sha }}
+          fi
+
+          # Only schema-affecting additions count, not any edit to a DAO file
+          # (e.g. business-logic-only changes like an upsert-vs-update branch).
+          SCHEMA_TOUCHED=$(git diff -U0 "$BASE"..."$HEAD" \
+              -- 'libs/dao/src/main/java/com/akto/dao/*.java' 'libs/dao/src/main/java/com/akto/DaoInit.java' \
+            | grep -E '^\+' \
+            | grep -E 'createIndex|createIndicesIfAbsent|createUniqueIndex|createCollection|dropIndex|dropCollection|renameCollection|convertToCappedCollection|compactCollection' || true)
+          if [ -z "$SCHEMA_TOUCHED" ]; then
+            exit 0
+          fi
+
+          MIGRATION_ADDED=$(git diff --name-only --diff-filter=A "$BASE"..."$HEAD" \
+            | grep -E "^libs/utils/src/main/resources/db/changelog/(common|billing|account)/.*\.xml$" || true)
+          if [ -z "$MIGRATION_ADDED" ]; then
+            echo "This change adds/changes an index or collection but no migration file was added under db/changelog/common|billing|account/. See libs/utils/src/main/resources/db/changelog/README.md."
+            exit 1
+          fi
+
+          echo "Migration check passed: $MIGRATION_ADDED"
+
+      - name: Send failure notification to Slack
+        if: failure()
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "❌ DAO migration check failed on Staging (${{ github.event_name }}, ${{ github.sha }}). Build blocked."
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # One Maven package for all selected Java modules, then parallel docker pushes
+  package-java:
+    needs: [resolve-modules, check-dao-migration]
+    if: |
+      always() && !cancelled() &&
+      needs.resolve-modules.outputs.any_main == 'true' &&
+      needs.check-dao-migration.result == 'success'
     runs-on: ubuntu-22.04
     outputs:
       IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
@@ -293,6 +301,12 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "17"
+      - name: Cache Maven packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
       - name: Setup Protoc
         uses: arduino/setup-protoc@v3
         with:
@@ -320,7 +334,6 @@ jobs:
         working-directory: ./apps/threat-detection-backend/src/main/resources/maxmind
         run: |
           wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
-
       - name: Create maxmind directory (utils)
         if: needs.resolve-modules.outputs.threat_detection == 'true' || needs.resolve-modules.outputs.threat_detection_backend == 'true' || needs.resolve-modules.outputs.dashboard == 'true'
         run: mkdir -p ./libs/utils/src/main/resources/maxmind
@@ -329,7 +342,6 @@ jobs:
         working-directory: ./libs/utils/src/main/resources/maxmind
         run: |
           wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
-
       - name: Configure AWS Credentials (dashboard only)
         if: needs.resolve-modules.outputs.dashboard == 'true'
         uses: aws-actions/configure-aws-credentials@v4
@@ -337,49 +349,26 @@ jobs:
           aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
           aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
           aws-region: ap-south-1
-
       - name: Download dashboard static assets
         if: needs.resolve-modules.outputs.dashboard == 'true'
         run: bash apps/dashboard/scripts/download-dashboard-vendor-assets.sh
-
       - name: Build Dashboard polaris UI
         if: needs.resolve-modules.outputs.dashboard == 'true' && (github.event_name != 'workflow_dispatch' || github.event.inputs.skipFrontendBuild != 'true')
         working-directory: ./apps/dashboard/web/polaris_web
         run: |
           npm install
           RELEASE_VERSION=${{ steps.docker_tag.outputs.IMAGE_TAG }} npm run build
-
+      - name: Sync dashboard frontend to S3
+        if: needs.resolve-modules.outputs.dashboard == 'true' && (github.event_name != 'workflow_dispatch' || github.event.inputs.skipFrontendBuild != 'true')
+        run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/${{ steps.docker_tag.outputs.IMAGE_TAG }}/dist --delete
       - name: Run mvn package
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.skipTests != 'true'
         run: mvn package -Dakto-image-tag=${{ steps.docker_tag.outputs.IMAGE_TAG }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
       - name: Run mvn package (skip tests)
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.skipTests == 'true'
         run: mvn package -Dakto-image-tag=${{ steps.docker_tag.outputs.IMAGE_TAG }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}} -DskipTests
-
-      - name: DockerHub login
+      - name: Pack Java docker contexts
         env:
-          DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
-          DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
-        run: |
-          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-      - name: Authenticate to Google Cloud
-        if: vars.GCP_PROJECT_ID != ''
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-      - name: Set up Cloud SDK
-        if: vars.GCP_PROJECT_ID != ''
-        uses: google-github-actions/setup-gcloud@v2
-      - name: Configure Docker for Artifact Registry
-        if: vars.GCP_PROJECT_ID != ''
-        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
-      - name: Build, tag, and push the image to DockerHub and Artifact Registry
-        id: build-image-dockerhub
-        env:
-          ECR_REGISTRY: aktosecurity
-          ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
-          GAR_ENABLED: ${{ vars.GCP_PROJECT_ID != '' }}
           BUILD_DASHBOARD: ${{ needs.resolve-modules.outputs.dashboard }}
           BUILD_TESTING: ${{ needs.resolve-modules.outputs.testing }}
           BUILD_BILLING: ${{ needs.resolve-modules.outputs.billing }}
@@ -388,115 +377,136 @@ jobs:
           BUILD_THREAT_BACKEND: ${{ needs.resolve-modules.outputs.threat_detection_backend }}
           BUILD_ACCOUNT_EXECUTOR: ${{ needs.resolve-modules.outputs.account_job_executor }}
           BUILD_DATA_INGESTION: ${{ needs.resolve-modules.outputs.data_ingestion }}
-          SKIP_FRONTEND: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.skipFrontendBuild == 'true' }}
         run: |
           set -euo pipefail
-          echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
-          docker buildx create --use
-          gar_tag() {
-            if [ "$GAR_ENABLED" = "true" ]; then
-              echo "-t $GAR_REGISTRY/$1:$IMAGE_TAG"
-            fi
+          paths=()
+          add_files() {
+            local dir="$1"
+            shift
+            paths+=("$dir/Dockerfile")
+            for f in "$@"; do
+              if [ ! -e "$dir/$f" ]; then
+                echo "Missing required file: $dir/$f"
+                exit 1
+              fi
+              paths+=("$dir/$f")
+            done
           }
-          PIDS=()
-
-          if [ "$BUILD_TESTING" = "true" ]; then
-            (
-              cd apps/testing
-              docker buildx build --platform linux/arm64/v8,linux/amd64 \
-                -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG \
-                $(gar_tag akto-api-testing) \
-                . --push
-            ) &
-            PIDS+=($!)
-          fi
-          if [ "$BUILD_BILLING" = "true" ]; then
-            (
-              cd apps/billing
-              docker buildx build --platform linux/arm64/v8,linux/amd64 \
-                -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG \
-                $(gar_tag akto-billing) \
-                . --push
-            ) &
-            PIDS+=($!)
-          fi
-          if [ "$BUILD_INTERNAL" = "true" ]; then
-            (
-              cd apps/internal
-              docker buildx build --platform linux/arm64/v8,linux/amd64 \
-                -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG \
-                $(gar_tag akto-internal) \
-                . --push
-            ) &
-            PIDS+=($!)
-          fi
-          if [ "$BUILD_THREAT" = "true" ]; then
-            (
-              cd apps/threat-detection
-              docker buildx build --platform linux/arm64/v8,linux/amd64 \
-                -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG \
-                $(gar_tag akto-threat-detection) \
-                . --push
-            ) &
-            PIDS+=($!)
-          fi
-          if [ "$BUILD_THREAT_BACKEND" = "true" ]; then
-            (
-              cd apps/threat-detection-backend
-              docker buildx build --platform linux/arm64/v8,linux/amd64 \
-                -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG \
-                $(gar_tag akto-threat-detection-backend) \
-                . --push
-            ) &
-            PIDS+=($!)
-          fi
-          if [ "$BUILD_ACCOUNT_EXECUTOR" = "true" ]; then
-            (
-              cd apps/account-job-executor
-              docker buildx build --platform linux/arm64/v8,linux/amd64 \
-                -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_TAG \
-                $(gar_tag akto-account-job-executor) \
-                . --push
-            ) &
-            PIDS+=($!)
-          fi
-          if [ "$BUILD_DATA_INGESTION" = "true" ]; then
-            (
-              cd apps/data-ingestion-service
-              docker buildx build --platform linux/arm64/v8,linux/amd64 \
-                -t $ECR_REGISTRY/data-ingestion-service:$IMAGE_TAG \
-                $(gar_tag data-ingestion-service) \
-                . --push
-            ) &
-            PIDS+=($!)
-          fi
-
-          if [ "$BUILD_DASHBOARD" = "true" ]; then
-            if [ "$SKIP_FRONTEND" != "true" ]; then
-              aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/$IMAGE_TAG/dist --delete
-            fi
-            (
-              cd apps/dashboard
-              docker buildx build --platform linux/arm64/v8,linux/amd64 \
-                -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG \
-                $(gar_tag $ECR_REPOSITORY-dashboard) \
-                . --push
-            )
-          fi
-
-          if [ ${#PIDS[@]} -gt 0 ]; then
-            wait "${PIDS[@]}"
-          fi
-
-      - name: Cache Maven packages
-        uses: actions/cache@v5
+          [ "$BUILD_DASHBOARD" = "true" ] && add_files apps/dashboard target/dashboard.war entrypoint.sh set_xmx.sh
+          [ "$BUILD_TESTING" = "true" ] && add_files apps/testing target/testing-1.0-SNAPSHOT-jar-with-dependencies.jar start.sh
+          [ "$BUILD_BILLING" = "true" ] && add_files apps/billing target/billing.war
+          [ "$BUILD_INTERNAL" = "true" ] && add_files apps/internal target/internal.war
+          [ "$BUILD_THREAT" = "true" ] && add_files apps/threat-detection target/threat-detection-1.0-SNAPSHOT-jar-with-dependencies.jar start.sh
+          [ "$BUILD_THREAT_BACKEND" = "true" ] && add_files apps/threat-detection-backend target/threat-detection-backend-1.0-SNAPSHOT-jar-with-dependencies.jar
+          [ "$BUILD_ACCOUNT_EXECUTOR" = "true" ] && add_files apps/account-job-executor target/account-job-executor-1.0-SNAPSHOT-jar-with-dependencies.jar start.sh
+          [ "$BUILD_DATA_INGESTION" = "true" ] && add_files apps/data-ingestion-service target/data-ingestion-service.war docker
+          tar czf java-docker-contexts.tar.gz "${paths[@]}"
+          ls -lh java-docker-contexts.tar.gz
+          tar tzf java-docker-contexts.tar.gz | head -50
+      - uses: actions/upload-artifact@v4
         with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
+          name: java-docker-contexts
+          path: java-docker-contexts.tar.gz
+          retention-days: 1
+
+  build-java:
+    needs: [resolve-modules, package-java]
+    if: needs.resolve-modules.outputs.any_main == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flag: dashboard
+            context: apps/dashboard
+            image: akto-api-security-dashboard
+          - flag: testing
+            context: apps/testing
+            image: akto-api-testing
+          - flag: billing
+            context: apps/billing
+            image: akto-billing
+          - flag: internal
+            context: apps/internal
+            image: akto-internal
+          - flag: threat_detection
+            context: apps/threat-detection
+            image: akto-threat-detection
+          - flag: threat_detection_backend
+            context: apps/threat-detection-backend
+            image: akto-threat-detection-backend
+          - flag: account_job_executor
+            context: apps/account-job-executor
+            image: akto-account-job-executor
+          - flag: data_ingestion
+            context: apps/data-ingestion-service
+            image: data-ingestion-service
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Skip if module not selected
+        id: should_build
+        run: |
+          case "${{ matrix.flag }}" in
+            dashboard) FLAG="${{ needs.resolve-modules.outputs.dashboard }}" ;;
+            testing) FLAG="${{ needs.resolve-modules.outputs.testing }}" ;;
+            billing) FLAG="${{ needs.resolve-modules.outputs.billing }}" ;;
+            internal) FLAG="${{ needs.resolve-modules.outputs.internal }}" ;;
+            threat_detection) FLAG="${{ needs.resolve-modules.outputs.threat_detection }}" ;;
+            threat_detection_backend) FLAG="${{ needs.resolve-modules.outputs.threat_detection_backend }}" ;;
+            account_job_executor) FLAG="${{ needs.resolve-modules.outputs.account_job_executor }}" ;;
+            data_ingestion) FLAG="${{ needs.resolve-modules.outputs.data_ingestion }}" ;;
+          esac
+          echo "run=$FLAG" >> "$GITHUB_OUTPUT"
+          if [ "$FLAG" != "true" ]; then
+            echo "Skipping ${{ matrix.image }} (not selected)"
+          fi
+      - uses: actions/download-artifact@v4
+        if: steps.should_build.outputs.run == 'true'
+        with:
+          name: java-docker-contexts
+      - name: Extract docker context
+        if: steps.should_build.outputs.run == 'true'
+        run: tar xzf java-docker-contexts.tar.gz
+      - name: DockerHub login
+        if: steps.should_build.outputs.run == 'true'
+        env:
+          DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
+          DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+        run: |
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+      - name: Authenticate to Google Cloud
+        if: steps.should_build.outputs.run == 'true' && vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - name: Set up Cloud SDK
+        if: steps.should_build.outputs.run == 'true' && vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Configure Docker for Artifact Registry
+        if: steps.should_build.outputs.run == 'true' && vars.GCP_PROJECT_ID != ''
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+      - name: Build and push ${{ matrix.image }}
+        if: steps.should_build.outputs.run == 'true'
+        env:
+          ECR_REGISTRY: aktosecurity
+          IMAGE_TAG: ${{ needs.package-java.outputs.IMAGE_TAG }}
+          GAR_ENABLED: ${{ vars.GCP_PROJECT_ID != '' }}
+          IMAGE_NAME: ${{ matrix.image }}
+          CONTEXT: ${{ matrix.context }}
+        run: |
+          set -euo pipefail
+          echo "$IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
+          docker buildx create --use
+          GAR_TAG=""
+          if [ "$GAR_ENABLED" = "true" ]; then
+            GAR_TAG="-t $GAR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
+          fi
+          docker buildx build --platform linux/arm64/v8,linux/amd64 \
+            -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+            $GAR_TAG \
+            "$CONTEXT" --push
 
   build-guardrails-service:
-    needs: [check-dao-migration, resolve-modules]
+    needs: resolve-modules
     if: needs.resolve-modules.outputs.guardrails_service == 'true'
     runs-on: ubuntu-22.04
     steps:
@@ -543,7 +553,7 @@ jobs:
             . --push
 
   build-otel-ingestion-service:
-    needs: [check-dao-migration, resolve-modules]
+    needs: resolve-modules
     if: needs.resolve-modules.outputs.otel_ingestion_service == 'true'
     runs-on: ubuntu-22.04
     steps:
@@ -570,76 +580,82 @@ jobs:
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/otel-ingestion-service:$IMAGE_TAG . --push
 
   build-agent-guard:
-    needs: [check-dao-migration, resolve-modules]
-    if: needs.resolve-modules.outputs.any_agent_guard == 'true'
+    needs: resolve-modules
+    if: |
+      needs.resolve-modules.outputs.agent_guard_worker == 'true' ||
+      needs.resolve-modules.outputs.agent_guard_anonymizer == 'true' ||
+      needs.resolve-modules.outputs.agent_guard_embedder == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: worker
+            flag: agent_guard_worker
+            context: apps/agent-guard/python-service/worker-py
+            image: akto-agent-guard-worker
+          - name: anonymizer
+            flag: agent_guard_anonymizer
+            context: apps/agent-guard/python-service/anonymizer-container
+            image: akto-agent-guard-anonymizer
+          - name: embedder
+            flag: agent_guard_embedder
+            context: apps/agent-guard/python-service/embedder-container
+            image: akto-agent-guard-embedder
     runs-on: ubuntu-22.04
     steps:
+      - name: Skip if module not selected
+        id: should_build
+        run: |
+          case "${{ matrix.flag }}" in
+            agent_guard_worker) FLAG="${{ needs.resolve-modules.outputs.agent_guard_worker }}" ;;
+            agent_guard_anonymizer) FLAG="${{ needs.resolve-modules.outputs.agent_guard_anonymizer }}" ;;
+            agent_guard_embedder) FLAG="${{ needs.resolve-modules.outputs.agent_guard_embedder }}" ;;
+          esac
+          echo "run=$FLAG" >> "$GITHUB_OUTPUT"
+          if [ "$FLAG" != "true" ]; then
+            echo "Skipping ${{ matrix.name }} (not selected)"
+          fi
       - uses: actions/checkout@v6
+        if: steps.should_build.outputs.run == 'true'
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
+        if: steps.should_build.outputs.run == 'true'
         id: docker_tag
         run: echo "IMAGE_TAG=a-$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
       - name: DockerHub login
+        if: steps.should_build.outputs.run == 'true'
         env:
           DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
       - name: Authenticate to Google Cloud
-        if: vars.GCP_PROJECT_ID != ''
+        if: steps.should_build.outputs.run == 'true' && vars.GCP_PROJECT_ID != ''
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
       - name: Set up Cloud SDK
-        if: vars.GCP_PROJECT_ID != ''
+        if: steps.should_build.outputs.run == 'true' && vars.GCP_PROJECT_ID != ''
         uses: google-github-actions/setup-gcloud@v2
       - name: Configure Docker for Artifact Registry
-        if: vars.GCP_PROJECT_ID != ''
+        if: steps.should_build.outputs.run == 'true' && vars.GCP_PROJECT_ID != ''
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
-      - name: Build and push agent-guard images
+      - name: Build and push ${{ matrix.image }}
+        if: steps.should_build.outputs.run == 'true'
         env:
           ECR_REGISTRY: aktosecurity
           IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
           GAR_ENABLED: ${{ vars.GCP_PROJECT_ID != '' }}
-          BUILD_WORKER: ${{ needs.resolve-modules.outputs.agent_guard_worker }}
-          BUILD_ANONYMIZER: ${{ needs.resolve-modules.outputs.agent_guard_anonymizer }}
-          BUILD_EMBEDDER: ${{ needs.resolve-modules.outputs.agent_guard_embedder }}
+          IMAGE_NAME: ${{ matrix.image }}
+          CONTEXT: ${{ matrix.context }}
         run: |
           set -euo pipefail
           echo "$IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
-          gar_tag() {
-            if [ "$GAR_ENABLED" = "true" ]; then
-              echo "-t $GAR_REGISTRY/$1:$IMAGE_TAG"
-            fi
-          }
-          PIDS=()
-          if [ "$BUILD_WORKER" = "true" ]; then
-            (
-              docker buildx build --platform linux/arm64/v8,linux/amd64 \
-                -t $ECR_REGISTRY/akto-agent-guard-worker:$IMAGE_TAG \
-                $(gar_tag akto-agent-guard-worker) \
-                apps/agent-guard/python-service/worker-py --push
-            ) &
-            PIDS+=($!)
+          GAR_TAG=""
+          if [ "$GAR_ENABLED" = "true" ]; then
+            GAR_TAG="-t $GAR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
           fi
-          if [ "$BUILD_ANONYMIZER" = "true" ]; then
-            (
-              docker buildx build --platform linux/arm64/v8,linux/amd64 \
-                -t $ECR_REGISTRY/akto-agent-guard-anonymizer:$IMAGE_TAG \
-                $(gar_tag akto-agent-guard-anonymizer) \
-                apps/agent-guard/python-service/anonymizer-container --push
-            ) &
-            PIDS+=($!)
-          fi
-          if [ "$BUILD_EMBEDDER" = "true" ]; then
-            (
-              docker buildx build --platform linux/arm64/v8,linux/amd64 \
-                -t $ECR_REGISTRY/akto-agent-guard-embedder:$IMAGE_TAG \
-                $(gar_tag akto-agent-guard-embedder) \
-                apps/agent-guard/python-service/embedder-container --push
-            ) &
-            PIDS+=($!)
-          fi
-          if [ ${#PIDS[@]} -gt 0 ]; then
-            wait "${PIDS[@]}"
-          fi
+          docker buildx build --platform linux/arm64/v8,linux/amd64 \
+            -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+            $GAR_TAG \
+            "$CONTEXT" --push
