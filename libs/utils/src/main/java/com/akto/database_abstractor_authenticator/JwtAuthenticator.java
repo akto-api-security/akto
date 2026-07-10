@@ -48,6 +48,23 @@ public class JwtAuthenticator {
                 .compact();
     }
 
+    public static String createJWT(Map<String, Object> claims, String issuer, String subject, java.util.Date expiry)
+            throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
+
+        PrivateKey privateKey = getPrivateKey();
+
+        java.util.Date issueTime = Calendar.getInstance().getTime();
+
+        return Jwts.builder()
+                .setIssuer(issuer)
+                .setSubject(subject)
+                .addClaims(claims)
+                .setIssuedAt(issueTime)
+                .setExpiration(expiry)
+                .signWith(privateKey)
+                .compact();
+    }
+
     private static PrivateKey getPrivateKey() throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
         HybridSaasConfig config = (Config.HybridSaasConfig) ConfigsDao.instance.findOne(Filters.eq("_id", "HYBRID_SAAS"));
         String rsaPrivateKey = config.getPrivateKey();
