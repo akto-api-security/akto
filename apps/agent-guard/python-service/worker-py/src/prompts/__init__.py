@@ -1,6 +1,6 @@
 """Per-scanner prompt templates and the unified build_scan_prompt dispatcher."""
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from . import ban_topics, code, gibberish, password, prompt_injection, toxicity
 

@@ -43,6 +43,32 @@ _FIELDS = (
 
 
 class Settings:
+    # Declared for mypy only — __init__ below is the actual runtime source of
+    # truth, setting these (and only these, per _FIELDS) via setattr.
+    OPENAI_API_KEY: str
+    OPENAI_MODEL: str
+    OPENAI_COMPATIBLE_BASE_URL: str
+    ANTHROPIC_API_KEY: str
+    ANTHROPIC_MODEL: str
+    VERTEX_AI_SA_KEY_JSON: str
+    VERTEX_AI_PROJECT: str
+    VERTEX_AI_LOCATION: str
+    VERTEX_AI_ENDPOINT_ID: str
+    GEMMA_VERTEX_SA_KEY_JSON: str
+    GEMMA_VERTEX_PROJECT: str
+    GEMMA_VERTEX_LOCATION: str
+    GEMMA_VERTEX_ENDPOINT_ID: str
+    GEMMA_VERTEX_DEDICATED_DNS: str
+    QWEN3GUARD_SA_KEY_JSON: str
+    QWEN3GUARD_PROJECT: str
+    QWEN3GUARD_LOCATION: str
+    QWEN3GUARD_ENDPOINT_ID: str
+    QWEN3GUARD_DEDICATED_DNS: str
+    SLACK_WEBHOOK_URL: str
+    DATABASE_ABSTRACTOR_SERVICE_URL: str
+    DEFAULT_MODEL_CONFIG_JSON: str
+    ANONYMIZER_URL: str
+
     def __init__(self):
         for f in _FIELDS:
             setattr(self, f, "")

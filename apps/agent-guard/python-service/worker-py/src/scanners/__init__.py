@@ -4,7 +4,7 @@ Each scanner exposes `scan(scanner_type, text, config) -> dict` returning the
 ScanResponse-shaped fields: is_valid, risk_score, sanitized_text, details.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from . import ban_code, ban_substrings, secrets, token_limit
 

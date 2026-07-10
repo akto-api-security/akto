@@ -80,7 +80,9 @@ def _format_topic_entry(topic: str, descriptions: dict[str, str], sample_phrases
     return "\n".join(lines)
 
 
-def _format_topics(topics: Any, descriptions: dict[str, str] = None, sample_phrases: dict[str, list] = None) -> str:
+def _format_topics(
+    topics: Any, descriptions: dict[str, str] | None = None, sample_phrases: dict[str, list] | None = None
+) -> str:
     if isinstance(topics, str):
         return topics
     if not isinstance(topics, list):

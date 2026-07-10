@@ -70,10 +70,8 @@ _SIGNALS: list[tuple[str, "re.Pattern", float]] = [
     ("call", re.compile(r"\b[A-Za-z_]\w*\s*\([^)]*\)"), 0.15),
     ("assignment", re.compile(r"\b[A-Za-z_]\w*\s*(?:[-+*/|&]|<<|>>)?=\s*\S"), 0.15),
     ("indexing", re.compile(r"\b[A-Za-z_]\w*\[[^\]]+\]"), 0.15),
-    ("comment", re.compile(r"(?m)//|/\*|\*/|^\s*#\s|--\s")),  # weight set below
+    ("comment", re.compile(r"(?m)//|/\*|\*/|^\s*#\s|--\s"), 0.15),
 ]
-# `comment` carries a weak weight; declared inline to keep the tuple readable.
-_SIGNALS[-1] = ("comment", _SIGNALS[-1][1], 0.15)
 
 
 def scan(scanner_type: str, text: str, config: dict[str, Any]) -> dict[str, Any]:

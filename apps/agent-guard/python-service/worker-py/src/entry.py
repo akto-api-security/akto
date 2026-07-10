@@ -4,14 +4,13 @@ import json
 import logging
 from urllib.parse import urlparse
 
-logging.basicConfig(level=logging.INFO)
-
 from pyodide.ffi import create_proxy
 from workers import Response, waitUntil
 
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
