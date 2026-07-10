@@ -2,6 +2,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon, TextField } from "@shopify/polaris"
 import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import api from "../api"
+import collectionApi from "./api"
 import { useEffect, useMemo, useState, isValidElement } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
@@ -1679,7 +1680,7 @@ function ApiEndpoints(props) {
         try {
             await Promise.all(selectedSkillEndpoints.map(endpoint => {
                 const skillName = endpoint.endpoint.replace('/skills/', '')
-                return api.updateSkillBlockStatus([Number(apiCollectionId)], skillName, block)
+                return collectionApi.updateSkillBlockStatus([Number(apiCollectionId)], skillName, block)
             }))
             const skillUrls = new Set(selectedSkillEndpoints.map(e => e.endpoint))
             setApiInfoList(prev => prev.map(info =>
