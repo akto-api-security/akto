@@ -304,13 +304,20 @@ jobs:
           ECR_REGISTRY: aktosecurity
           IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
           GAR_ENABLED: ${{ vars.GCP_PROJECT_ID != '' }}
+          GOPRIVATE: github.com/akto-api-security/*
+          GONOSUMDB: github.com/akto-api-security/*
         run: |
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
-          docker buildx create --use
           cd apps/guardrails-service/container
           chmod +x setup-netrc.sh
           # token expires in 1 year [2026-12-17]
           GITHUB_TOKEN=${{ secrets.AKTO_GITHUB_TOKEN }} ./setup-netrc.sh
+          cp .netrc ~/.netrc
+          chmod 600 ~/.netrc
+          cd src
+          go test ./...
+          cd ..
+          docker buildx create --use
           GAR_TAG=""
           if [ "$GAR_ENABLED" = "true" ]; then
             GAR_TAG="-t $GAR_REGISTRY/guardrails-service:$IMAGE_TAG"

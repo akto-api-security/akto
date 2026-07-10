@@ -43,6 +43,16 @@ jobs:
           chmod +x setup-netrc.sh
           GITHUB_TOKEN=${{ secrets.AKTO_GITHUB_TOKEN }} ./setup-netrc.sh
 
+      - name: Unit tests
+        env:
+          GOPRIVATE: github.com/akto-api-security/*
+          GONOSUMDB: github.com/akto-api-security/*
+        run: |
+          cp apps/guardrails-service/container/.netrc ~/.netrc
+          chmod 600 ~/.netrc
+          cd apps/guardrails-service/container/src
+          go test ./...
+
       - name: Build and push to DockerHub and ECR
         uses: docker/build-push-action@v4
         with:
