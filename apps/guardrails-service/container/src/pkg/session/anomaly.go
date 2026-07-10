@@ -3,11 +3,9 @@ package session
 import (
 	"context"
 	"fmt"
-	"os"
-	"strings"
-	"sync"
 	"time"
 
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/guardcache"
 	redis "github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
@@ -21,25 +19,10 @@ const (
 	counterTTL       = 14400 // 4h — auto-cleanup for inactive sessions
 )
 
-// Package-level Redis singleton (one connection pool per process).
-var (
-	redisClient     *redis.Client
-	redisClientOnce sync.Once
-)
-
+// getRedisClient reuses the shared Redis connection pool from guardcache
+// (akto-gateway). Returns nil when REDIS_URL is unset (fail-open).
 func getRedisClient() *redis.Client {
-	redisClientOnce.Do(func() {
-		url := strings.TrimSpace(os.Getenv("REDIS_URL"))
-		if url == "" {
-			return
-		}
-		opts, err := redis.ParseURL(url)
-		if err != nil {
-			return
-		}
-		redisClient = redis.NewClient(opts)
-	})
-	return redisClient
+	return guardcache.GetRedisClient()
 }
 
 type AnomalyEvent struct {
