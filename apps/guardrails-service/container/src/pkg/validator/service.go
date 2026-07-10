@@ -796,7 +796,7 @@ func (s *Service) checkToolCallAnomaly(ctx context.Context, params *models.Valid
 				zap.Bool("firstFire", event != nil),
 				zap.String("path", params.Path))
 			if event != nil {
-				go session.ReportAnomaly(event, params, cfg.PolicyName, cfg.Behaviour, s.logger)
+				go session.ReportAnomaly(event, params, cfg.PolicyName, cfg.Behaviour, p.Severity, s.logger)
 			}
 			if cfg.Behaviour == "block" {
 				return &mcp.ValidationResult{
@@ -806,7 +806,7 @@ func (s *Service) checkToolCallAnomaly(ctx context.Context, params *models.Valid
 					Metadata: types.ThreatMetadata{
 						PolicyName:   cfg.PolicyName,
 						RuleViolated: session.AnomalyTypeToolCallRate,
-						Severity:     "MEDIUM",
+						Severity:     p.Severity,
 						Reason:       details,
 					},
 				}
@@ -848,7 +848,7 @@ func (s *Service) checkErrorAnomaly(ctx context.Context, params *models.Validate
 				zap.String("path", params.Path),
 				zap.String("statusCode", params.StatusCode))
 			if event != nil {
-				go session.ReportAnomaly(event, params, cfg.PolicyName, cfg.Behaviour, s.logger)
+				go session.ReportAnomaly(event, params, cfg.PolicyName, cfg.Behaviour, p.Severity, s.logger)
 			}
 			if cfg.Behaviour == "block" {
 				return &mcp.ValidationResult{
@@ -858,7 +858,7 @@ func (s *Service) checkErrorAnomaly(ctx context.Context, params *models.Validate
 					Metadata: types.ThreatMetadata{
 						PolicyName:   cfg.PolicyName,
 						RuleViolated: session.AnomalyTypeErrorRate,
-						Severity:     "HIGH",
+						Severity:     p.Severity,
 						Reason:       details,
 					},
 				}

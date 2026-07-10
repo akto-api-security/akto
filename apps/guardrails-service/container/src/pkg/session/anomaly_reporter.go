@@ -11,18 +11,9 @@ import (
 	"go.uber.org/zap"
 )
 
-func anomalySeverity(anomalyType string) string {
-	switch anomalyType {
-	case AnomalyTypeErrorRate:
-		return "HIGH"
-	default:
-		return "MEDIUM"
-	}
-}
-
 // ReportAnomaly reports an anomaly event to guardrail activity via ReportThreat.
 // Designed to be called in a goroutine (fire-and-forget).
-func ReportAnomaly(event *AnomalyEvent, params *models.ValidateRequestParams, policyName string, behaviour string, logger *zap.Logger) {
+func ReportAnomaly(event *AnomalyEvent, params *models.ValidateRequestParams, policyName string, behaviour string, severity string, logger *zap.Logger) {
 	if event == nil || params == nil {
 		return
 	}
@@ -39,8 +30,6 @@ func ReportAnomaly(event *AnomalyEvent, params *models.ValidateRequestParams, po
 	if host == "" {
 		host = reqHeaders["host"]
 	}
-
-	severity := anomalySeverity(event.AnomalyType)
 
 	contextSource := types.ContextSource(params.ContextSource)
 	if contextSource == "" {
