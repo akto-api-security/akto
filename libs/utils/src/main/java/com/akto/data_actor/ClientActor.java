@@ -4801,7 +4801,7 @@ public class ClientActor extends DataActor {
             BasicDBObject obj = new BasicDBObject();
             obj.put("agentQueryRecords", batch);
             String jsonBody = gson.toJson(obj);
-            String urlFinal = Constants.AGENT_QUERY_LOGS_SERVICE_URL.length() > 0 ? Constants.AGENT_QUERY_LOGS_SERVICE_URL: url;
+            String urlFinal = Constants.AGENT_QUERY_LOGS_SERVICE_URL.length() > 0 ? Constants.AGENT_QUERY_LOGS_SERVICE_URL + "/api": url;
             OriginalHttpRequest request = new OriginalHttpRequest(
                 urlFinal + "/storeAgentQueryData", "", "POST", jsonBody, headers, "");
             ApiExecutor.sendRequestBackOff(request, true, null, false, null);
