@@ -14,11 +14,23 @@ function HybridSaasSource() {
     const copyCommandUtil = (data)=>{func.copyToClipboard(data, ref, null)}
 
     const [selectedExpiryDuration, setSelectedExpiryDuration] = useState(6);
+    const [selectedScope, setSelectedScope] = useState([]);
+    const [scopeOptions, setScopeOptions] = useState([]);
 
-    const fetchRuntimeHelmCommand = async(selectedExpiryDuration) => {
-        await api.fetchRuntimeHelmCommand(selectedExpiryDuration).then((resp) => {
+    const fetchRuntimeHelmCommand = async(selectedExpiryDuration, selectedScope) => {
+        await api.fetchRuntimeHelmCommand(selectedExpiryDuration, selectedScope).then((resp) => {
             if (!resp) return
             setApiToken(resp?.apiToken)
+        })
+    }
+
+    const fetchModuleTypes = async() => {
+        await api.fetchModuleTypes().then((resp) => {
+            const moduleTypes = resp?.moduleTypes || []
+            setScopeOptions(moduleTypes.map(value => ({
+                label: value.split('_').map(func.toSentenceCase).join(' '),
+                value
+            })))
         })
     }
 
@@ -53,11 +65,23 @@ function HybridSaasSource() {
                 menuItems={expiryDurationOptions}
                 value={getLabelFromValue(selectedExpiryDuration)}
                 initial={selectedExpiryDuration}
-                selected={(type) => {setSelectedExpiryDuration(type); fetchRuntimeHelmCommand(type)}}
+                selected={(type) => {setSelectedExpiryDuration(type); fetchRuntimeHelmCommand(type, selectedScope)}}
+            />
+          </Box>
+
+          <span>3. (Optional) Select the scope(s) this token should be restricted to. Leave empty to generate a legacy (unscoped) token. </span>
+          <Box maxWidth="280px" paddingInlineStart={"4"}>
+            <Dropdown
+                id={`select-scope`}
+                allowMultiple
+                placeHolder="Select scope(s)"
+                menuItems={scopeOptions}
+                preSelected={selectedScope}
+                selected={(scope) => {setSelectedScope(scope); fetchRuntimeHelmCommand(selectedExpiryDuration, scope)}}
             />
             </Box>
 
-          <span>3. Run the below command to setup Akto Runtime service. Change the namespace according to your requirements. </span>
+          <span>4. Run the below command to setup Akto Runtime service. Change the namespace according to your requirements. </span>
 
           <VerticalStack gap="1">
             <JsonComponent title="Runtime Service Command" toolTipContent="Copy command" onClickFunc={()=> rcopyCommand()} dataString={runtimeSvcCommand} language="text" minHeight="450px" />
@@ -67,7 +91,8 @@ function HybridSaasSource() {
       )
 
     useEffect(()=> {
-        fetchRuntimeHelmCommand(selectedExpiryDuration)
+        fetchRuntimeHelmCommand(selectedExpiryDuration, selectedScope)
+        fetchModuleTypes()
     },[])
 
     return (

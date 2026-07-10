@@ -1,18 +1,101 @@
 package auth
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"io"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
+
+	"go.uber.org/zap"
 )
 
-// GetDatabaseAbstractorServiceToken returns the JWT token from environment variable
-// This token is used for authenticating with database-abstractor service
+var (
+	exchangedTokenMu   sync.RWMutex
+	exchangedAuthToken string
+)
+
+// GetDatabaseAbstractorServiceToken returns the exchanged (scoped) token if InitModuleType
+// obtained one, otherwise falls back to the raw DATABASE_ABSTRACTOR_SERVICE_TOKEN env
+// variable — a legacy/unscoped token keeps working exactly as before.
 func GetDatabaseAbstractorServiceToken() string {
+	exchangedTokenMu.RLock()
+	token := exchangedAuthToken
+	exchangedTokenMu.RUnlock()
+	if token != "" {
+		return token
+	}
 	return os.Getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN")
+}
+
+// InitModuleType trades the raw DATABASE_ABSTRACTOR_SERVICE_TOKEN for one scoped to
+// moduleType, if the raw token supports it. Any failure (legacy/unscoped token, network
+// error, non-200 response) is logged and swallowed — the raw token keeps being used as-is.
+// Single attempt, no retries: a legacy token's rejection is deterministic, so retrying
+// would only add startup latency for no benefit.
+func InitModuleType(logger *zap.Logger, moduleType string) {
+	rawToken := os.Getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN")
+	if rawToken == "" {
+		return
+	}
+
+	baseURL := os.Getenv("DATABASE_ABSTRACTOR_SERVICE_URL")
+	if baseURL == "" {
+		baseURL = "https://ultron.akto.io"
+	}
+	baseURL = strings.TrimSuffix(baseURL, "/") + "/api"
+
+	body, err := json.Marshal(map[string]string{"moduleType": moduleType})
+	if err != nil {
+		logger.Warn("Failed to marshal exchangeToken request", zap.Error(err))
+		return
+	}
+
+	req, err := http.NewRequest("POST", baseURL+"/exchangeToken", bytes.NewBuffer(body))
+	if err != nil {
+		logger.Warn("Failed to build exchangeToken request", zap.Error(err))
+		return
+	}
+	req.Header.Set("Authorization", rawToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		logger.Warn("Token exchange request failed; continuing with raw token", zap.Error(err))
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Warn("Failed to read exchangeToken response; continuing with raw token", zap.Error(err))
+		return
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		logger.Info("Token exchange not applied (likely a legacy/unscoped token); continuing with raw token",
+			zap.Int("status", resp.StatusCode), zap.String("moduleType", moduleType))
+		return
+	}
+
+	var parsed struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(respBody, &parsed); err != nil || parsed.Token == "" {
+		logger.Warn("Failed to parse exchangeToken response; continuing with raw token", zap.Error(err))
+		return
+	}
+
+	exchangedTokenMu.Lock()
+	exchangedAuthToken = parsed.Token
+	exchangedTokenMu.Unlock()
+	logger.Info("Database-abstractor token exchanged for scoped token", zap.String("moduleType", moduleType))
 }
 
 var (

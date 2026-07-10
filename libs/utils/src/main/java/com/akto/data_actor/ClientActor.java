@@ -1357,14 +1357,123 @@ public class ClientActor extends DataActor {
         return codeAnalysisRepos;
     }
 
+    private static volatile String exchangedAuthToken;
+    private static volatile String pendingModuleType;
+    private static volatile boolean exchangeAttempted = false;
+    private static final Object EXCHANGE_LOCK = new Object();
+
     public Map<String, List<String>> buildHeaders() {
         Map<String, List<String>> headers = new HashMap<>();
-        if(System.getProperty("DATABASE_ABSTRACTOR_SERVICE_TOKEN") != null){
-            headers.put("Authorization", Collections.singletonList(System.getProperty("DATABASE_ABSTRACTOR_SERVICE_TOKEN")));
-        }else{
-            headers.put("Authorization", Collections.singletonList(System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN")));
-        }
+        headers.put("Authorization", Collections.singletonList(getAuthToken()));
         return headers;
+    }
+
+    private static String getRawAuthToken() {
+        if (System.getProperty("DATABASE_ABSTRACTOR_SERVICE_TOKEN") != null) {
+            return System.getProperty("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+        }
+        return System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+    }
+
+    // Called from Main's static init to record which scope this service should exchange for.
+    // Deliberately NOT triggering the actual exchange here: fetchInstance()/ClientActor construction
+    // can be forced arbitrarily early by unrelated static initializers (e.g. LoggerMaker itself calls
+    // DataActorFactory.fetchInstance()), so anything hooked into construction time can run before
+    // this is even set. Triggering lazily from getAuthToken() instead guarantees this has already
+    // been set, since real API calls can't happen before Main's own static init completes.
+    public static void setPendingModuleType(String moduleType) {
+        pendingModuleType = moduleType;
+    }
+
+    private static String getAuthToken() {
+        ensureModuleTypeExchanged();
+        if (exchangedAuthToken != null) {
+            return exchangedAuthToken;
+        }
+        return getRawAuthToken();
+    }
+
+    private static void ensureModuleTypeExchanged() {
+        if (pendingModuleType == null) {
+            return;
+        }
+        // Deliberately no unsynchronized fast-path check on exchangeAttempted here: that would let a
+        // second thread read exchangeAttempted=true (set the instant the first thread enters this
+        // block, before its network call even finishes) and race ahead using the still-unexchanged
+        // token. Every caller must actually acquire this lock, so a concurrent caller blocks until
+        // the in-flight exchange attempt has fully finished (success or failure) before proceeding.
+        synchronized (EXCHANGE_LOCK) {
+            if (exchangeAttempted) {
+                return;
+            }
+            exchangeAttempted = true;
+            initModuleType(pendingModuleType);
+        }
+    }
+
+    // Trades the raw provisioned token for one scoped to moduleType, if the raw token supports it.
+    // Any failure (legacy/unscoped token, network error, etc.) is swallowed and the raw token keeps being used as-is.
+    //
+    // Deliberately uses a plain HttpURLConnection instead of ApiExecutor/OriginalHttpRequest: ApiExecutor
+    // unconditionally persists a "Final url is..." diagnostic log via LoggerMaker, which itself needs a
+    // token via this very same getAuthToken() path. That reentrant call would see exchangeAttempted
+    // already true and fall back to the still-unexchanged raw token, guaranteeing an extra 403 + several
+    // seconds of futile backoff retries on every single startup. This bootstrap call shouldn't depend on
+    // any machinery (logging, retry policy) that itself depends on the token this call is establishing.
+    public static void initModuleType(String moduleType) {
+        java.net.HttpURLConnection connection = null;
+        try {
+            loggerMaker.warn("Attempting database abstractor token exchange for moduleType " + moduleType);
+            String rawToken = getRawAuthToken();
+            if (rawToken == null) {
+                return;
+            }
+
+            BasicDBObject obj = new BasicDBObject();
+            obj.put("moduleType", moduleType);
+            byte[] payload = obj.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+            connection = (java.net.HttpURLConnection) new java.net.URL(url + "/exchangeToken").openConnection();
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Authorization", rawToken);
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setConnectTimeout(10000);
+            connection.setReadTimeout(10000);
+            connection.setDoOutput(true);
+            try (java.io.OutputStream os = connection.getOutputStream()) {
+                os.write(payload);
+            }
+
+            int status = connection.getResponseCode();
+            if (status != 200) {
+                loggerMaker.warn("Token exchange for moduleType " + moduleType + " not applied (status " + status + "); continuing with raw token");
+                return;
+            }
+
+            String body = readStream(connection.getInputStream());
+            String newToken = BasicDBObject.parse(body).getString("token");
+            if (newToken != null && !newToken.isEmpty()) {
+                exchangedAuthToken = newToken;
+                loggerMaker.warn("Database abstractor token exchanged successfully for moduleType " + moduleType);
+            }
+        } catch (Exception e) {
+            loggerMaker.error("error exchanging database abstractor token for moduleType " + moduleType + ": " + e);
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    private static String readStream(java.io.InputStream in) throws java.io.IOException {
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8))) {
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+            return sb.toString();
+        }
     }
 
     public void bulkWriteSuspectSampleData(List<Object> writesForSuspectSampleData) {

@@ -39,6 +39,8 @@ func main() {
 
 	utils.SetLogger(logger)
 
+	auth.InitModuleType(logger, "GUARDRAIL")
+
 	logger.Info("Starting guardrails-service",
 		zap.Int("port", cfg.ServerPort),
 		zap.String("database_abstractor_url", cfg.DatabaseAbstractorURL),
