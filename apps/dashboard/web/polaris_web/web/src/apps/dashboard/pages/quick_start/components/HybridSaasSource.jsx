@@ -14,7 +14,9 @@ function HybridSaasSource() {
     const copyCommandUtil = (data)=>{func.copyToClipboard(data, ref, null)}
 
     const [selectedExpiryDuration, setSelectedExpiryDuration] = useState(6);
-    const [selectedScope, setSelectedScope] = useState([]);
+    // This page is specifically for the hybrid SaaS runtime helm chart, so default the
+    // generated token's scope to the runtime module rather than leaving it unscoped.
+    const [selectedScope, setSelectedScope] = useState(['MINI_RUNTIME']);
     const [scopeOptions, setScopeOptions] = useState([]);
 
     const fetchRuntimeHelmCommand = async(selectedExpiryDuration, selectedScope) => {
