@@ -8,10 +8,12 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, Request
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 
 import cascade_backpressure
 import scan_diag
+from metrics import QUEUE_SIZE
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
 
@@ -37,6 +39,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Akto Agent Guard Executor", version="1.0.0", lifespan=lifespan)
+Instrumentator().instrument(app).expose(app)
 
 
 @app.middleware("http")
@@ -49,6 +52,7 @@ async def scan_inflight_middleware(request: Request, call_next):
     wall_start = time.perf_counter()
     _scan_inflight += 1
     inflight = _scan_inflight
+    QUEUE_SIZE.set(inflight)
     scan_diag.log_inflight(inflight, entering=True)
     try:
         response = await call_next(request)
@@ -64,6 +68,7 @@ async def scan_inflight_middleware(request: Request, call_next):
         return response
     finally:
         _scan_inflight -= 1
+        QUEUE_SIZE.set(_scan_inflight)
         scan_diag.log_inflight(_scan_inflight, entering=False)
 
 
