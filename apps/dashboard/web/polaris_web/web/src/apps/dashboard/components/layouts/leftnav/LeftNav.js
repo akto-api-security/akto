@@ -588,6 +588,16 @@ export default function LeftNav() {
                             },
                             selected: leftNavSelected === "dashboard_guardrails_policies",
                             }] : []),
+                        ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") ? [{
+                            label: "Misconfigurations",
+                            badge: <Badge status="info">Beta</Badge>,
+                            onClick: () => {
+                                navigate("/dashboard/guardrails/misconfigurations");
+                                handleSelect("dashboard_guardrails_misconfigurations");
+                                setActive("active");
+                            },
+                            selected: leftNavSelected === "dashboard_guardrails_misconfigurations",
+                            }] : []),
                         ...(dashboardCategory === CATEGORY_API_SECURITY || dashboardCategory === CATEGORY_DAST ? [{
                             label: "Threat Policies",
                             onClick: () => {
@@ -650,6 +660,17 @@ export default function LeftNav() {
                         },
                         selected:
                             leftNavSelected === "dashboard_guardrails_policies",
+                    },
+                    {
+                        label: "Misconfigurations",
+                        badge: <Badge status="info">Beta</Badge>,
+                        onClick: () => {
+                            navigate("/dashboard/guardrails/misconfigurations");
+                            handleSelect("dashboard_guardrails_misconfigurations");
+                            setActive("active");
+                        },
+                        selected:
+                            leftNavSelected === "dashboard_guardrails_misconfigurations",
                     }
                 ]
 
@@ -688,6 +709,17 @@ export default function LeftNav() {
                         },
                         selected:
                             leftNavSelected === "dashboard_guardrails_policies",
+                    },
+                    {
+                        label: "Misconfigurations",
+                        badge: <Badge status="info">Beta</Badge>,
+                        onClick: () => {
+                            navigate("/dashboard/guardrails/misconfigurations");
+                            handleSelect("dashboard_guardrails_misconfigurations");
+                            setActive("active");
+                        },
+                        selected:
+                            leftNavSelected === "dashboard_guardrails_misconfigurations",
                     }
                 ]
             }] : [])

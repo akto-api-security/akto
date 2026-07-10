@@ -96,4 +96,31 @@ export default {
         return resp
     },
 
+    async fetchConfigFieldPolicies({ skip = 0, limit = 50 } = {}) {
+        const resp = await request({
+            url: '/api/fetchConfigFieldPolicies',
+            method: 'post',
+            data: { skip, limit }
+        })
+        return resp
+    },
+
+    async createConfigFieldPolicy(policyData, hexId) {
+        const resp = await request({
+            url: '/api/createConfigFieldPolicy',
+            method: 'post',
+            data: { policy: policyData, hexId }
+        })
+        return resp
+    },
+
+    async deleteConfigFieldPolicies(policyIds) {
+        const resp = await request({
+            url: '/api/deleteConfigFieldPolicies',
+            method: 'post',
+            data: { policyIds }
+        })
+        return resp
+    },
+
 }
