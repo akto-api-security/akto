@@ -44,7 +44,7 @@ public class Constants {
     public static final String AGENT_BASE_URL = StringUtils.hasLength(System.getenv("AGENT_BASE_URL")) ? System.getenv("AGENT_BASE_URL") : "http://localhost:5500";
     public static final String AUTOMATED_AGENT_BASE_URL = StringUtils.hasLength(System.getenv("AUTOMATED_AGENT_BASE_URL")) ? System.getenv("AUTOMATED_AGENT_BASE_URL") : "http://localhost:8000";
 
-    public static final String AGENT_QUERY_LOGS_SERVICE_URL = StringUtils.hasLength(System.getenv("AGENT_QUERY_LOGS_SERVICE_URL")) ? System.getenv("AGENT_QUERY_LOGS_SERVICE_URL") : "";
+    public static final String AGENT_QUERY_LOGS_SERVICE_URL = StringUtils.hasLength(System.getenv("AGENT_QUERY_LOGS_SERVICE_URL")) ? System.getenv("AGENT_QUERY_LOGS_SERVICE_URL") : "https://observer.akto.io";
 
 
     public final static String _AKTO = "AKTO";
