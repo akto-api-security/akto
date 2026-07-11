@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
+import { Badge, Box, Button, ChoiceList, Divider, HorizontalStack, Modal, Text, TextField, Tooltip, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -16,7 +16,7 @@ import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreati
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
 import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN, SETTINGS_RISK_CONFIGS } from "../constants/guardrailDescriptions";
-import { extractOverviewAndRemediation } from "../utils/formatUtils";
+import { extractOverviewAndRemediation, extractBehaviour } from "../utils/formatUtils";
 import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
@@ -105,9 +105,15 @@ function SampleDetails(props) {
     let severity = moreInfoData?.severity || currentTemplateObj?.severity || "HIGH"
     const [remediationText, setRemediationText] = useState("")
     const [latestActivity, setLatestActivity] = useState([])
-    const [showModal, setShowModal] = useState(false);  
+    const [showModal, setShowModal] = useState(false);
     const [triageLoading, setTriageLoading] = useState(false);
     const [actionPopoverActive, setActionPopoverActive] = useState(false);
+
+    // Approve-server states (for "approval" behaviour guardrail events)
+    const [approveModalActive, setApproveModalActive] = useState(false);
+    const [approveMode, setApproveMode] = useState("ALWAYS"); // ALWAYS | DURATION
+    const [approveDays, setApproveDays] = useState("7");
+    const [approveLoading, setApproveLoading] = useState(false);
 
     // Jira ticket states
     const [jiraTicketUrl, setJiraTicketUrl] = useState(props.jiraTicketUrl || "");
@@ -670,6 +676,42 @@ function SampleDetails(props) {
         }
     }
 
+    // ── Approve server (bypass an "approval" behaviour guardrail) ──────────────
+    const rawBehaviour = moreInfoData?.behaviour || extractBehaviour(moreInfoData?.metadata) || "";
+    const isApprovalEvent = String(rawBehaviour).toLowerCase() === "approval";
+    const approveServerId = moreInfoData?.host || null;      // request Host = serverId
+    const approvePolicyName = moreInfoData?.templateId || null;
+
+    const openApproveModal = () => { setApproveMode("ALWAYS"); setApproveDays("7"); setApproveModalActive(true); };
+
+    const handleApproveServer = async () => {
+        if (!approvePolicyName) { func.setToast(true, true, "Could not resolve the policy for this event"); return; }
+        if (!approveServerId)   { func.setToast(true, true, "Could not resolve the server for this event"); return; }
+        let value = 0;
+        if (approveMode === "DURATION") {
+            value = parseInt(approveDays, 10);
+            if (!Number.isInteger(value) || value <= 0) { func.setToast(true, true, "Enter a valid number of days"); return; }
+        }
+        setApproveLoading(true);
+        try {
+            // request util rejects (and toasts the backend error) on non-2xx, so reaching here = success.
+            await guardrailApi.approveServerForPolicy({
+                policyName: approvePolicyName,
+                approvedServerId: approveServerId,
+                approvedServerName: approveServerId,
+                approvalMode: approveMode,
+                approvalValue: value,
+            });
+            const scope = approveMode === "DURATION" ? `for ${value} day(s)` : "always";
+            func.setToast(true, false, `Approved ${approveServerId} ${scope}`);
+            setApproveModalActive(false);
+        } catch {
+            // Error toast already surfaced by the request interceptor; keep the modal open.
+        } finally {
+            setApproveLoading(false);
+        }
+    };
+
     const handleJiraClick = async () => {
         if (!modalActive) {
             try {
@@ -979,6 +1021,44 @@ Reference URL: ${window.location.href}`.trim();
                                 ].filter(item => item)}
                             />
                         </Popover>
+                        {isApprovalEvent && (
+                            <Modal
+                                activator={<Button size="slim" onClick={openApproveModal}>Approve server</Button>}
+                                open={approveModalActive}
+                                onClose={() => setApproveModalActive(false)}
+                                primaryAction={{ content: "Approve", loading: approveLoading, onAction: handleApproveServer }}
+                                secondaryActions={[{ content: "Cancel", onAction: () => setApproveModalActive(false) }]}
+                                title={"Approve server"}
+                            >
+                                <Modal.Section>
+                                    <VerticalStack gap="4">
+                                        <Text variant="bodyMd">
+                                            Allow <Text as="span" fontWeight="semibold">{approveServerId || "this server"}</Text> to
+                                            bypass the <Text as="span" fontWeight="semibold">{approvePolicyName || "policy"}</Text> guardrail.
+                                        </Text>
+                                        <ChoiceList
+                                            title="Approve for"
+                                            choices={[
+                                                { label: "Always", value: "ALWAYS" },
+                                                { label: "A number of days", value: "DURATION" },
+                                            ]}
+                                            selected={[approveMode]}
+                                            onChange={(v) => setApproveMode(v[0])}
+                                        />
+                                        {approveMode === "DURATION" && (
+                                            <TextField
+                                                label="Number of days"
+                                                type="number"
+                                                min={1}
+                                                value={approveDays}
+                                                onChange={setApproveDays}
+                                                autoComplete="off"
+                                            />
+                                        )}
+                                    </VerticalStack>
+                                </Modal.Section>
+                            </Modal>
+                        )}
                         {!isEndpointSecurityCategory() && (
                             <Modal
                                 activator={<Button destructive size="slim" onClick={() => setShowModal(!showModal)}>Block IPs</Button>}
