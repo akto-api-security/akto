@@ -588,7 +588,7 @@ export default function LeftNav() {
                             },
                             selected: leftNavSelected === "dashboard_guardrails_policies",
                             }] : []),
-                        ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") ? [{
+                        ...((dashboardCategory === "Endpoint Security") ? [{
                             label: "Misconfigurations",
                             badge: <Badge status="info">Beta</Badge>,
                             onClick: () => {
