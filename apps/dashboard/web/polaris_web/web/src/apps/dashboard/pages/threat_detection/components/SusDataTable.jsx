@@ -6,7 +6,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
-import { Badge, IndexFiltersMode, Avatar, Box, HorizontalStack, Text } from "@shopify/polaris";
+import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, VerticalStack } from "@shopify/polaris";
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
@@ -152,7 +152,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const guardrailComplianceMap = SessionStore((state) => state.guardrailComplianceMap);
   const setGuardrailComplianceMap = SessionStore((state) => state.setGuardrailComplianceMap);
   const needsGuardrailCompliance = label === LABELS.GUARDRAIL || isAgenticSecurityCategory() || isEndpointSecurityCategory();
-  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, training: 3 };
+  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, needs_approval: 3, training: 4 };
   const resolvedInitialTab = initialTab || 'active';
   const [currentTab, setCurrentTab] = useState(resolvedInitialTab);
   const [selected, setSelected] = useState(tabIndexMap[resolvedInitialTab] || 0)
@@ -160,6 +160,48 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const [totalFilteredCount, setTotalFilteredCount] = useState(0)
   const [usernameMap, setUsernameMap] = useState({});
   const [usernameMapLoaded, setUsernameMapLoaded] = useState(!isEndpointSecurityCategory());
+
+  // Inline "Approve server" (Needs Approval tab). approveRow holds the raw event being approved.
+  const [approveRow, setApproveRow] = useState(null);
+  const [approveMode, setApproveMode] = useState("ALWAYS"); // ALWAYS | DURATION
+  const [approveDays, setApproveDays] = useState("7");
+  const [approveLoading, setApproveLoading] = useState(false);
+
+  const openInlineApprove = (x) => {
+    setApproveMode("ALWAYS");
+    setApproveDays("7");
+    setApproveRow(x);
+  };
+
+  const submitInlineApprove = async () => {
+    const policyName = approveRow?.filterId;
+    const serverId = approveRow?.host;
+    if (!policyName) { func.setToast(true, true, "Could not resolve the policy for this event"); return; }
+    if (!serverId || serverId === '-') { func.setToast(true, true, "Could not resolve the server for this event"); return; }
+    let value = 0;
+    if (approveMode === "DURATION") {
+      value = parseInt(approveDays, 10);
+      if (!Number.isInteger(value) || value <= 0) { func.setToast(true, true, "Enter a valid number of days"); return; }
+    }
+    setApproveLoading(true);
+    try {
+      // request util rejects (and toasts the backend error) on non-2xx, so reaching here = success.
+      await guardrailApi.approveServerForPolicy({
+        policyName,
+        approvedServerId: serverId,
+        approvedServerName: serverId,
+        approvalMode: approveMode,
+        approvalValue: value,
+      });
+      const scope = approveMode === "DURATION" ? `for ${value} day(s)` : "always";
+      func.setToast(true, false, `Approved ${serverId} ${scope}`);
+      setApproveRow(null);
+    } catch {
+      // Error toast already surfaced by the request interceptor; keep the modal open.
+    } finally {
+      setApproveLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (isEndpointSecurityCategory()) {
@@ -215,14 +257,28 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   // Check if AGENT_TRAFFIC_LOGS feature is enabled
   const hasAgentTrafficLogsAccess = func.checkForFeatureSaas('AGENT_TRAFFIC_LOGS');
   // Add Training Data tab only for guardrail events and if feature is enabled
-  const tableTabs = label === LABELS.GUARDRAIL && hasAgentTrafficLogsAccess
-    ? [...baseTabs, {
-        content: 'Training Data',
-        onAction: () => { setCurrentTab('training'); },
-        id: 'training',
-        index: 3
-      }]
-    : baseTabs
+  const guardrailExtraTabs = [];
+  // "Needs Approval" is relevant wherever approval-behaviour guardrail events appear — i.e. the
+  // same Agentic (Argus) / Endpoint (Atlas) categories that show the Behaviour column. This is
+  // gated on category (not the label prop) because those pages pass label=THREAT.
+  if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+    guardrailExtraTabs.push({
+      content: 'Needs Approval',
+      badge: 'Beta',
+      onAction: () => { setCurrentTab('needs_approval'); },
+      id: 'needs_approval',
+      index: 3
+    });
+  }
+  if (label === LABELS.GUARDRAIL && hasAgentTrafficLogsAccess) {
+    guardrailExtraTabs.push({
+      content: 'Training Data',
+      onAction: () => { setCurrentTab('training'); },
+      id: 'training',
+      index: 4
+    });
+  }
+  const tableTabs = [...baseTabs, ...guardrailExtraTabs]
 
   const handleSelectedTab = (selectedIndex) => {
     setLoading(true)
@@ -513,6 +569,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     queryValue
   ) {
     setLoading(true);
+    // "Needs Approval" is a client-side view over ACTIVE events filtered to behaviour==="approval".
+    // Fetch active events with a high limit (single page) and filter after mapping.
+    const isNeedsApproval = currentTab === 'needs_approval';
+    const effectiveStatus = isNeedsApproval ? 'ACTIVE' : currentTab.toUpperCase();
+    const effectiveSkip = isNeedsApproval ? 0 : skip;
+    const effectiveLimit = isNeedsApproval ? 200 : limit;
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
       matchingUrlFilter = [],
@@ -566,7 +628,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
                         : undefined;
     }
     const res = await api.fetchSuspectSampleData(
-      skip,
+      effectiveSkip,
       sourceIpsFilter,
       apiCollectionIdsFilter,
       matchingUrlFilter,
@@ -575,8 +637,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       startTimestamp,
       endTimestamp,
       latestAttack,
-      limit,
-      currentTab.toUpperCase(),
+      effectiveLimit,
+      effectiveStatus,
       successfulBool,
       label, // Use the label prop (THREAT or GUARDRAIL)
       hostFilter,
@@ -657,6 +719,10 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
             </Badge>
           ),
           ruleViolated: extractRuleViolated(x?.metadata),
+          // Raw behaviour string kept as an explicit field so it survives onRowClick
+          // (the raw `metadata` passthrough is dropped by the table); used by the flyout's
+          // "Approve server" action for "approval" behaviour policies.
+          behaviourRaw: extractBehaviour(x?.metadata),
           behaviour: (() => {
             const b = extractBehaviour(x?.metadata);
             return b ? <Badge tone={getBehaviourTone(b)}>{func.toSentenceCase(b)}</Badge> : '-';
@@ -680,7 +746,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           </HorizontalStack>
         ) : <Text color="subdued">-</Text>,
         nextUrl: nextUrl,
-        complianceMapData: complianceMapData
+        complianceMapData: complianceMapData,
+        // Inline Approve button for the "Needs Approval" tab. stopPropagation so it doesn't
+        // also open the row flyout.
+        approveAction: (
+          <div onClick={(e) => e.stopPropagation()}>
+            <Button size="slim" onClick={() => openInlineApprove(x)}>Approve</Button>
+          </div>
+        )
       };
 
       if (func.shouldShowIpReputation()) {
@@ -689,6 +762,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
       return rowData;
     });
+    // Needs Approval tab: keep only approval-behaviour rows (client-side Option A).
+    if (isNeedsApproval) {
+      ret = ret.filter(r => String(r.behaviourRaw || '').toLowerCase() === 'approval');
+      total = ret.length;
+    }
     setLoading(false);
     return { value: ret, total: total };
   }
@@ -815,29 +893,70 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const guardrailComplianceLoaded = !needsGuardrailCompliance || Object.keys(guardrailComplianceMap).length > 0;
   const key = startTimestamp + endTimestamp + (usernameMapLoaded ? '_u' : '') + (guardrailComplianceLoaded ? '_gc' : '');
   const headers = getHeaders();
+  if (currentTab === 'needs_approval') {
+    headers.push({ text: "Action", value: "approveAction", title: "Action" });
+  }
 
   return (
-    <GithubServerTable
-      key={key}
-      onRowClick={(data) => rowClicked(data)}
-      pageLimit={limit}
-      headers={headers}
-      resourceName={resourceName}
-      sortOptions={sortOptions}
-      disambiguateLabel={disambiguateLabel}
-      loading={loading}
-      fetchData={fetchData}
-      filters={filters}
-      selectable={true}
-      promotedBulkActions={promotedBulkActions}
-      headings={headers}
-      useNewRow={true}
-      condensedHeight={true}
-      tableTabs={tableTabs}
-      selected={selected}
-      onSelect={handleSelectedTab}
-      mode={IndexFiltersMode.Default}
-    />
+    <>
+      <GithubServerTable
+        key={key}
+        onRowClick={(data) => rowClicked(data)}
+        pageLimit={limit}
+        headers={headers}
+        resourceName={resourceName}
+        sortOptions={sortOptions}
+        disambiguateLabel={disambiguateLabel}
+        loading={loading}
+        fetchData={fetchData}
+        filters={filters}
+        selectable={true}
+        promotedBulkActions={promotedBulkActions}
+        headings={headers}
+        useNewRow={true}
+        condensedHeight={true}
+        tableTabs={tableTabs}
+        selected={selected}
+        onSelect={handleSelectedTab}
+        mode={IndexFiltersMode.Default}
+      />
+
+      <Modal
+        open={approveRow !== null}
+        onClose={() => setApproveRow(null)}
+        title="Approve server"
+        primaryAction={{ content: "Approve", loading: approveLoading, onAction: submitInlineApprove }}
+        secondaryActions={[{ content: "Cancel", onAction: () => setApproveRow(null) }]}
+      >
+        <Modal.Section>
+          <VerticalStack gap="4">
+            <Text variant="bodyMd">
+              Allow <Text as="span" fontWeight="semibold">{approveRow?.host || "this server"}</Text> to
+              bypass the <Text as="span" fontWeight="semibold">{approveRow?.filterId || "policy"}</Text> guardrail.
+            </Text>
+            <ChoiceList
+              title="Approve for"
+              choices={[
+                { label: "Always", value: "ALWAYS" },
+                { label: "A number of days", value: "DURATION" },
+              ]}
+              selected={[approveMode]}
+              onChange={(v) => setApproveMode(v[0])}
+            />
+            {approveMode === "DURATION" && (
+              <TextField
+                label="Number of days"
+                type="number"
+                min={1}
+                value={approveDays}
+                onChange={setApproveDays}
+                autoComplete="off"
+              />
+            )}
+          </VerticalStack>
+        </Modal.Section>
+      </Modal>
+    </>
   );
 }
 

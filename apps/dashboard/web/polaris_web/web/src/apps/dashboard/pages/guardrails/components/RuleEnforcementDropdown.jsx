@@ -12,7 +12,9 @@ export default function RuleEnforcementDropdown({
 }) {
     const initial = normalizeBehaviourValue(value);
     const showLabelRow = typeof label === "string" && label.trim().length > 0;
-    const showEndpointOnlyNote = initial === GUARDRAIL_BEHAVIOUR.WARN || initial === GUARDRAIL_BEHAVIOUR.ALERT;
+    const showEndpointOnlyNote = initial === GUARDRAIL_BEHAVIOUR.WARN
+        || initial === GUARDRAIL_BEHAVIOUR.ALERT
+        || initial === GUARDRAIL_BEHAVIOUR.APPROVAL;
 
     return (
         <VerticalStack gap="2">
@@ -36,7 +38,7 @@ export default function RuleEnforcementDropdown({
             {showEndpointOnlyNote && (
                 <Banner tone="info">
                     <Text variant="bodyMd">
-                        In the browser extension, <Text as="span" fontWeight="bold">Warn</Text> and <Text as="span" fontWeight="bold">Alert</Text> behave the same as <Text as="span" fontWeight="bold">Block</Text>.
+                        In the browser extension, <Text as="span" fontWeight="bold">Warn</Text>, <Text as="span" fontWeight="bold">Alert</Text> and <Text as="span" fontWeight="bold">Approval</Text> behave the same as <Text as="span" fontWeight="bold">Block</Text>.
                     </Text>
                 </Banner>
             )}

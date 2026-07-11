@@ -7,23 +7,26 @@ export const SEVERITY = {
 
 export const SEVERITY_OPTIONS = Object.values(SEVERITY);
 
-/** Rule behaviour (block / warn / alert); stored as policy-wide `behaviour`. */
+/** Rule behaviour (block / warn / alert / approval); stored as policy-wide `behaviour`. */
 export const GUARDRAIL_BEHAVIOUR = {
     BLOCK: "block",
     WARN: "warn",
     ALERT: "alert",
+    APPROVAL: "approval",
 };
 
 export const GUARDRAIL_BEHAVIOUR_OPTIONS = [
     { label: "Block", value: GUARDRAIL_BEHAVIOUR.BLOCK },
     { label: "Warn", value: GUARDRAIL_BEHAVIOUR.WARN },
     { label: "Alert", value: GUARDRAIL_BEHAVIOUR.ALERT },
+    { label: "Approval", value: GUARDRAIL_BEHAVIOUR.APPROVAL },
 ];
 
 export const GUARDRAIL_BEHAVIOUR_TOOLTIP_LINES = [
     "Block: Stop the content when this rule matches.",
     "Warn: Warn the user. User can then bypass the guardrail after this nudge.",
     "Alert: Raise an alert for review without blocking.",
+    "Approval: Hold the content until a reviewer approves or rejects it.",
 ];
 
 export const normalizeBehaviourValue = (raw) => {
@@ -33,6 +36,9 @@ export const normalizeBehaviourValue = (raw) => {
     }
     if (v === GUARDRAIL_BEHAVIOUR.ALERT) {
         return GUARDRAIL_BEHAVIOUR.ALERT;
+    }
+    if (v === GUARDRAIL_BEHAVIOUR.APPROVAL) {
+        return GUARDRAIL_BEHAVIOUR.APPROVAL;
     }
     if (v === GUARDRAIL_BEHAVIOUR.BLOCK) {
         return GUARDRAIL_BEHAVIOUR.BLOCK;
