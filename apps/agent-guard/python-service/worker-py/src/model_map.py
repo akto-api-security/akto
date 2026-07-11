@@ -17,6 +17,7 @@ import logging
 import time
 from typing import Any
 
+from metrics import PROVIDER_ERRORS, PROVIDER_LATENCY
 from providers import build_provider_from_config
 
 logger = logging.getLogger(__name__)
@@ -165,10 +166,16 @@ class ModelMapScanner:
         completed: list[dict[str, Any]] = []
         safe = unsafe = 0
         for result, entry in await self._await_map(task_map):
+            provider_name = entry.get("provider") or "unknown"
             if isinstance(result, Exception):
+                reason = "timeout" if isinstance(result, TimeoutError) else type(result).__name__
+                PROVIDER_ERRORS.labels(provider=provider_name, reason=reason).inc()
                 logger.error(f"[ModelMap] {label} '{entry.get('provider')}' failed: {result!r}")
                 unsafe += 1  # conservative: failures count as unsafe
                 continue
+            exec_ms = result.get("execution_time_ms")
+            if isinstance(exec_ms, (int, float)):
+                PROVIDER_LATENCY.labels(provider=provider_name).observe(exec_ms / 1000.0)
             completed.append(result)
             if _classify(result, entry):
                 unsafe += 1
@@ -189,9 +196,15 @@ class ModelMapScanner:
         task_map = pre_submitted if pre_submitted is not None else self._submit(arbiters, _DEFAULT_ARBITER_TIMEOUT_MS)
         completed: list[dict[str, Any]] = []
         for result, entry in await self._await_map(task_map):
+            provider_name = entry.get("provider") or "unknown"
             if isinstance(result, Exception):
+                reason = "timeout" if isinstance(result, TimeoutError) else type(result).__name__
+                PROVIDER_ERRORS.labels(provider=provider_name, reason=reason).inc()
                 logger.error(f"[ModelMap] {_ROLE_ARBITER} '{entry.get('provider')}' failed: {result!r}")
                 continue
+            exec_ms = result.get("execution_time_ms")
+            if isinstance(exec_ms, (int, float)):
+                PROVIDER_LATENCY.labels(provider=provider_name).observe(exec_ms / 1000.0)
             completed.append(result)
 
         self.completed_all.extend(completed)

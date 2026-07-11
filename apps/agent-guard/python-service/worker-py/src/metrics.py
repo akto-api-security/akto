@@ -36,3 +36,14 @@ QUEUE_SIZE = Gauge(
     "scan_queue_size",
     "Current number of in-flight /scan requests",
 )
+
+ANONYMIZER_LATENCY = Histogram(
+    "anonymizer_latency_seconds",
+    "Latency of calls to the anonymizer service",
+)
+
+ANONYMIZER_ERRORS = Counter(
+    "anonymizer_errors_total",
+    "Anonymizer call failures",
+    ["reason"],
+)
