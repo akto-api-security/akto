@@ -22,7 +22,6 @@ import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
 import 'monaco-editor/esm/vs/editor/contrib/bracketMatching/browser/bracketMatching';
 import 'monaco-editor/esm/vs/editor/contrib/format/browser/formatActions';
 import "monaco-editor/esm/vs/language/json/monaco.contribution";
-import "./misconfigurations.css";
 
 const truncate = (value, maxLen = 60) => {
     if (!value) return "-";
@@ -67,7 +66,17 @@ function JsonValueEditor({ value, onChange }) {
         }
     }, [value]);
 
-    return <div className="misconfig-json-editor" ref={containerRef} />;
+    return (
+        <Box
+            ref={containerRef}
+            minHeight="160px"
+            borderColor="border"
+            borderWidth="1"
+            borderRadius="1"
+            overflowY="hidden"
+            overflowX="hidden"
+        />
+    );
 }
 
 const DEFAULT_SNIPPET = `{
