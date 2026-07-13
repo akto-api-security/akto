@@ -111,7 +111,8 @@ public class ModuleInfo {
         TRAFFIC_COLLECTOR,
         AKTO_AGENT_GATEWAY,
         DAST,
-        AGENTIC_TESTING
+        AGENTIC_TESTING,
+        GUARDRAIL // guardrails-service
     }
 
 }
