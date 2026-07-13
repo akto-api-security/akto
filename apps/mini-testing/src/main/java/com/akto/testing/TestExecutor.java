@@ -1226,6 +1226,7 @@ public class TestExecutor {
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
         Boolean agenticTestingAllowed = testConfig.getInfo().getAgenticTestingAllowed();
+        Boolean onlySmartTestingAllowed = testConfig.getInfo().getOnlySmartTestingAllowed();
 
         // Copilot Studio bots expose a /copilot/conversation endpoint that is a duplicate of the
         // actual bot endpoint we already test. Skip it to avoid redundant test results.
@@ -1312,6 +1313,9 @@ public class TestExecutor {
         }
         if(agenticTestingAllowed != null) {
             varMap.put("agenticTestingAllowed", agenticTestingAllowed);
+        }
+        if(onlySmartTestingAllowed != null){
+            varMap.put("onlySmartTestingAllowed", onlySmartTestingAllowed);
         }
         if (testConfig.getContent() != null) {
             varMap.put("yaml_template_content", testConfig.getContent());

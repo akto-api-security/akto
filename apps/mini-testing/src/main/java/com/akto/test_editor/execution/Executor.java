@@ -59,6 +59,7 @@ import static com.akto.test_editor.utils.Utils.headerValuesUnchanged;
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.common.protocol.types.Field.Bool;
 
 public class Executor {
 
@@ -149,12 +150,13 @@ public class Executor {
         origRawApi = sampleRawApi.copy();
 
         boolean requestSent = false;
-         // boolean templateAllowsAutomated = varMap.containsKey("agenticTestingAllowed") && Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
-         boolean runAutomatedPentest = TestingConfigurations.getInstance().isRunAutomatedTests();
+        boolean templateAllowsAutomated = varMap.containsKey("agenticTestingAllowed") && Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
+        boolean runAutomatedPentest = TestingConfigurations.getInstance().isRunAutomatedTests() && templateAllowsAutomated;
+        boolean onlySmartTestingAllowed = varMap.containsKey("onlySmartTestingAllowed") && Boolean.TRUE.equals(varMap.get("onlySmartTestingAllowed"));
 
         String executionType = node.getChildNodes().get(0).getValues().toString();
         boolean isParallelExecution = executionType.equalsIgnoreCase("parallel");
-        if (!runAutomatedPentest && (executionType.equals("multiple") || executionType.equals("graph") || isParallelExecution)) {
+        if (!runAutomatedPentest && (executionType.equals("multiple") || executionType.equals("graph") || isParallelExecution) && !onlySmartTestingAllowed) {
             if (executionType.equals("graph")) {
                 List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
                 apiInfoKeys.add(apiInfoKey);
@@ -167,7 +169,7 @@ public class Executor {
             return yamlTestResult;
         }
 
-        if (!runAutomatedPentest && executionType.equals("passive")) {
+        if (!runAutomatedPentest && executionType.equals("passive") && !onlySmartTestingAllowed) {
             ExecutionResult attempt = new ExecutionResult(true, "", rawApi.getRequest(), rawApi.getResponse());
             TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
             if (res != null) {
@@ -219,6 +221,9 @@ public class Executor {
             } else {
                 loggerMaker.infoAndAddToDb("AutomatedAgenticTest: no results returned for testSubType=" + testSubType);
             }
+        } else if (onlySmartTestingAllowed) {
+            // do not execute normal testing
+            loggerMaker.infoAndAddToDb("Skipping normal testing as only smart testing is allowed", LogDb.TESTING);
         } else {
             for (RawApi testReq: testRawApis) {
                 if (executorNodes.size() > 0 && testReq.equals(origRawApi)) {
