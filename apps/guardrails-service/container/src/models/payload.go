@@ -115,3 +115,25 @@ type ValidationResponse struct {
 	Result  string   `json:"result"`
 	Errors  []string `json:"errors,omitempty"`
 }
+
+// DatabricksMessage represents a single message in an OpenAI chat completion response
+type DatabricksMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+// DatabricksChoice represents a single choice in an OpenAI chat completion response
+type DatabricksChoice struct {
+	Index        int               `json:"index"`
+	Message      DatabricksMessage `json:"message"`
+	FinishReason string            `json:"finish_reason"`
+}
+
+// DatabricksValidateResponse represents an OpenAI chat completion-compatible validation response
+type DatabricksValidateResponse struct {
+	ID      string             `json:"id"`
+	Object  string             `json:"object"`
+	Created int64              `json:"created"`
+	Model   string             `json:"model"`
+	Choices []DatabricksChoice `json:"choices"`
+}

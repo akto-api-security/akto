@@ -415,6 +415,42 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// ValidateDatabricksRequest accepts a Databricks/OpenAI chat completion-shaped
+// request, logs it, and returns a stubbed OpenAI-compatible chat completion response.
+func (h *ValidationHandler) ValidateDatabricksRequest(c *gin.Context) {
+	var req map[string]interface{}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Error("ValidateDatabricksRequest - invalid request format", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid request format",
+		})
+		return
+	}
+
+	h.logger.Info("ValidateDatabricksRequest - received request", zap.Any("request", req))
+	h.logger.Info("ValidateDatabricksRequest - received headers", zap.Any("headers", c.Request.Header))
+
+	model, _ := req["model"].(string)
+
+	c.JSON(http.StatusOK, models.DatabricksValidateResponse{
+		ID:      "chatcmpl-stub",
+		Object:  "chat.completion",
+		Created: time.Now().Unix(),
+		Model:   model,
+		Choices: []models.DatabricksChoice{
+			{
+				Index: 0,
+				Message: models.DatabricksMessage{
+					Role:    "assistant",
+					Content: `{"flagged": false, "confidence": 0.1}`,
+				},
+				FinishReason: "stop",
+			},
+		},
+	})
+}
+
 // HealthCheck handles health check requests
 func (h *ValidationHandler) HealthCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{

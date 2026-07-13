@@ -206,6 +206,7 @@ func setupRouter(validationHandler *handlers.ValidationHandler, authMiddleware g
 		api.POST("/validate/requestWithPolicy", validationHandler.ValidateRequestWithPolicy)
 		api.POST("/validate/response", validationHandler.ValidateResponse)
 		api.POST("/validate/file", validationHandler.ValidateFile)
+		api.POST("/chat/completions", validationHandler.ValidateDatabricksRequest)
 	}
 
 	return router
