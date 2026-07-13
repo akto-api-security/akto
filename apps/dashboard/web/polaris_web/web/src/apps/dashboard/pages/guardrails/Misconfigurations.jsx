@@ -8,6 +8,7 @@ import {
     Badge,
     Modal,
     TextField,
+    Select,
     EmptySearchResult,
 } from "@shopify/polaris";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
@@ -30,7 +31,13 @@ const truncate = (value, maxLen = 60) => {
 
 const policyResourceName = { singular: "policy", plural: "policies" };
 
+// Only "claude" is enabled server-side today (ConfigFieldPolicyAction.SUPPORTED_TOOL_NAMES) — extend both when adding a tool.
+const TOOL_NAME_OPTIONS = [
+    { label: "Claude", value: "claude" },
+];
+
 const policyHeaders = [
+    { text: "Tool", value: "toolNameDisplay", title: "Tool", type: CellType.TEXT },
     { text: "Field Path", value: "fieldPath", title: "Field Path", type: CellType.TEXT },
     { text: "Enforced Value", value: "enforcedValuePreview", title: "Enforced Value", type: CellType.TEXT },
     { text: "Status", value: "statusComp", title: "Status" },
@@ -107,6 +114,7 @@ function deriveFieldFromSnippet(snippetText) {
 
 function PolicyFormModal({ open, onClose, editingPolicy, onSaved }) {
     const [policyName, setPolicyName] = useState("");
+    const [toolName, setToolName] = useState(TOOL_NAME_OPTIONS[0].value);
     const [snippet, setSnippet] = useState(DEFAULT_SNIPPET);
     const [jsonError, setJsonError] = useState("");
     const [saving, setSaving] = useState(false);
@@ -115,6 +123,7 @@ function PolicyFormModal({ open, onClose, editingPolicy, onSaved }) {
         if (!open) return;
         if (editingPolicy) {
             setPolicyName(editingPolicy.policyName || "");
+            setToolName(editingPolicy.toolName || TOOL_NAME_OPTIONS[0].value);
             let value = editingPolicy.enforcedValueJson || "null";
             try {
                 value = JSON.parse(editingPolicy.enforcedValueJson);
@@ -124,6 +133,7 @@ function PolicyFormModal({ open, onClose, editingPolicy, onSaved }) {
             setSnippet(JSON.stringify({ [editingPolicy.fieldPath]: value }, null, 2));
         } else {
             setPolicyName("");
+            setToolName(TOOL_NAME_OPTIONS[0].value);
             setSnippet(DEFAULT_SNIPPET);
         }
         setJsonError("");
@@ -152,7 +162,7 @@ function PolicyFormModal({ open, onClose, editingPolicy, onSaved }) {
             policyName: effectiveName,
             description: "",
             status: editingPolicy?.status || "ACTIVE",
-            toolName: "claude",
+            toolName,
             fieldPath: derived.fieldPath,
             enforcedValueJson: derived.enforcedValueJson,
             devices: [],
@@ -170,11 +180,13 @@ function PolicyFormModal({ open, onClose, editingPolicy, onSaved }) {
         }
     };
 
+    const toolLabel = TOOL_NAME_OPTIONS.find((t) => t.value === toolName)?.label || toolName;
+
     return (
         <Modal
             open={open}
             onClose={onClose}
-            title={editingPolicy ? "Edit Claude Config Policy" : "New Claude Config Policy"}
+            title={editingPolicy ? `Edit ${toolLabel} Config Policy` : `New ${toolLabel} Config Policy`}
             primaryAction={{ content: "Save", onAction: handleSave, loading: saving }}
             secondaryActions={[{ content: "Cancel", onAction: onClose }]}
         >
@@ -187,10 +199,16 @@ function PolicyFormModal({ open, onClose, editingPolicy, onSaved }) {
                         placeholder="Optional — auto-generated from the field below"
                         autoComplete="off"
                     />
+                    <Select
+                        label="Tool"
+                        options={TOOL_NAME_OPTIONS}
+                        value={toolName}
+                        onChange={setToolName}
+                    />
                     <VerticalStack gap="1">
-                        <Text variant="bodyMd" as="p">Claude config field to pin</Text>
+                        <Text variant="bodyMd" as="p">{toolLabel} config field to pin</Text>
                         <Text variant="bodySm" color="subdued">
-                            Paste a single field exactly as it should appear in Claude Code's settings.json. It's created automatically on the device if missing, and any local edit gets reverted back to this value.
+                            Paste a single field exactly as it should appear in {toolLabel}'s settings.json. It's created automatically on the device if missing, and any local edit gets reverted back to this value.
                         </Text>
                         <JsonValueEditor value={snippet} onChange={(v) => { setSnippet(v); if (jsonError) validateSnippet(v); }} />
                         {jsonError && <Text variant="bodySm" color="critical">{jsonError}</Text>}
@@ -230,6 +248,7 @@ function Misconfigurations() {
 
     const tablePolicies = useMemo(() => policies.map((p) => ({
         id: p.hexId,
+        toolNameDisplay: TOOL_NAME_OPTIONS.find((t) => t.value === p.toolName)?.label || p.toolName || "-",
         fieldPath: p.fieldPath,
         enforcedValuePreview: truncate(p.enforcedValueJson),
         statusComp: (
@@ -306,8 +325,8 @@ function Misconfigurations() {
 
     const emptyPoliciesMarkup = (
         <EmptySearchResult
-            title="No Claude config policies found"
-            description="Pin a field in Claude Code's settings.json so local edits get auto-reverted"
+            title="No config field policies found"
+            description="Pin a field in a tool's settings.json so local edits get auto-reverted"
             withIllustration
         />
     );
@@ -315,7 +334,7 @@ function Misconfigurations() {
     const components = [
         <Box key="policies-header" paddingBlockEnd="4">
             <HorizontalStack align="space-between" blockAlign="center">
-                <Text variant="headingMd">Claude Config</Text>
+                <Text variant="headingMd">Config Field Policies</Text>
                 <Button primary onClick={() => { setEditingPolicy(null); setShowCreateModal(true); }}>
                     New Policy
                 </Button>
