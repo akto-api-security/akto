@@ -19,7 +19,8 @@ import InfoCard from "../dashboard/new_components/InfoCard";
 import BarGraph from "../../components/charts/BarGraph";
 import SessionStore from "../../../main/SessionStore";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
-import { getDashboardCategory, isApiSecurityCategory, isDastCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel } from "../../../main/labelHelper";
+import { getDashboardCategory, isApiSecurityCategory, isDastCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel, getReportCategoryShortName, shortNameToCategory } from "../../../main/labelHelper";
+import PersistStore from "../../../main/PersistStore";
 import LineChart from "../../components/charts/LineChart";
 import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
 import { LABELS } from "./constants";
@@ -30,6 +31,13 @@ import { redactSampleDataByKeywords } from "./utils/redactSampleData";
 import { resolveComplianceClauseMap } from "./utils/formatUtils";
 import LocalStore from "@/apps/main/LocalStorageStore";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
+
+// Opened in a fresh tab (e.g. "View All"), so apply ?category= before first render, same as ThreatReport.jsx.
+const categoryOverride = shortNameToCategory[getReportCategoryShortName()]
+if (categoryOverride) {
+    PersistStore.getState().setDashboardCategory(categoryOverride)
+}
+
 const convertToGraphData = (severityMap) => {
     let dataArr = []
     Object.keys(severityMap).forEach((x) => {
