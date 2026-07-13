@@ -44,6 +44,12 @@ public class YamlTestTemplate extends SecurityTestTemplate {
                 return false;
             }
         }
+        // no filteration when template allowed for smart testing
+        boolean templateAllowsAutomated = varMap.containsKey("agenticTestingAllowed") && Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
+        if(templateAllowsAutomated){
+            return true;
+        }
+
         boolean isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap, this.logId);
         // loggerMaker.infoAndAddToDb("filter status " + isValid + " " + logId, LogDb.TESTING);
         return isValid;
