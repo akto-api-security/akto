@@ -57,6 +57,10 @@ import java.util.concurrent.TimeUnit;
 public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.TESTING);
 
+    static {
+        DataActorFactory.setModuleType("MINI_TESTING");
+    }
+
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
