@@ -91,7 +91,7 @@ public class Main {
             int metricsAccountId = ClientActor.getAccountId();
             Context.accountId.set(metricsAccountId);
             String instanceId = ModuleInfoWorker.getModuleName(ModuleInfo.ModuleType.ACCOUNT_JOB_EXECUTOR);
-            AllMetrics.instance.init(LogDb.ACCOUNTS_JOB_EXECUTOR, false, dataActor, metricsAccountId, instanceId,
+            AllMetrics.instance.init(LogDb.ACCOUNT_JOB_EXECUTOR, false, dataActor, metricsAccountId, instanceId,
                     ModuleInfo.ModuleType.ACCOUNT_JOB_EXECUTOR.name());
 
             logger.info("===========================================");
