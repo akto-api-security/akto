@@ -848,10 +848,10 @@ const hybridSaasObj = {
     component : <HybridSaasSource/>
 }
 
-const databaseAbstractorTokenObj = {
+const authenticationTokenObj = {
     icon: '/public/favicon.svg',
     label: "Generate Authentication Token",
-    text: "Generate a database-abstractor token, optionally scoped to a specific module (guardrails, threat detection, etc.)",
+    text: "Generate an authentication token, optionally scoped to a specific module (guardrails, threat detection, etc.)",
     key: "Generate Authentication Token",
     component : <RuntimeTokenField/>
 }
@@ -2142,7 +2142,7 @@ const quickStartFunc = {
 
         // Hybrid Saas
         const hybridSaas = [
-            hybridSaasObj, databaseAbstractorTokenObj
+            hybridSaasObj, authenticationTokenObj
         ];
 
         // Kubernetes
@@ -2325,7 +2325,7 @@ const quickStartFunc = {
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
             openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, neovimHookObj, openCodeHookObj,hermesHookObj,
-            harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, databaseAbstractorTokenObj, apiInventoryFromSourceCodeObj,
+            harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, authenticationTokenObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
             cloudflareWarpObj, zscalerObj, snowflakeObj,

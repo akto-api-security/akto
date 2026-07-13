@@ -8,7 +8,7 @@ import InformationBannerComponent from './shared/InformationBannerComponent'
 
 // This page is specifically for the hybrid SaaS runtime helm chart, so the token it
 // generates is always scoped to the runtime module. Token generation for other scopes
-// (guardrails, threat-detection, etc.) has its own separate card - see databaseAbstractorTokenObj
+// (guardrails, threat-detection, etc.) has its own separate entry - see authenticationTokenObj
 // in transform.js.
 const RUNTIME_SCOPE = ['MINI_RUNTIME']
 
@@ -83,7 +83,7 @@ function HybridSaasSource() {
                 Seamlessly deploy Akto with our hybrid setup and start viewing your API traffic in few minutes.
             </Text>
             <InformationBannerComponent
-                content='The token generated below is scoped to the runtime module only. To generate a token for another module (guardrails, threat detection, etc.), use the "Generate Authentication Token" card instead.'
+                content='The token generated below is scoped to the runtime module only. To generate a token for another module (guardrails, threat detection, etc.), select "Generate Authentication Token" from the quick start list instead.'
                 docsUrl=''
             />
             {hybridSaasComponent}
