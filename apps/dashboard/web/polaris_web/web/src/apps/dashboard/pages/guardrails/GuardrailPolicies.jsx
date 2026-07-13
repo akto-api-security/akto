@@ -4,7 +4,7 @@ import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func";
-import { getDashboardCategory, mapLabel, isEndpointSecurityCategory } from "../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isEndpointSecurityCategory, getReportCategoryShortName, shortNameToCategory } from "../../../main/labelHelper";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
@@ -19,6 +19,17 @@ import {
     applyAgentFilterToRows,
     splitAgentServersV2,
 } from "./serverTargetingUtils";
+
+// Apply ?category= override synchronously before first render — mirrors ThreatReport.jsx/
+// VulnerabilityReport.jsx. A deep-link opened in a fresh tab (e.g. from a violation's
+// "Triggered by the <policy>" link) has no PersistStore session, so dashboardCategory
+// defaults to API_SECURITY and every request here (fetchGuardrailPolicies etc.) goes out
+// with the wrong x-context-source header, leaving the page stuck on "Loading...".
+const categoryShortName = getReportCategoryShortName();
+const categoryOverride = shortNameToCategory[categoryShortName];
+if (categoryOverride) {
+    PersistStore.getState().setDashboardCategory(categoryOverride);
+}
 
 const resourceName = {
   singular: "policy",

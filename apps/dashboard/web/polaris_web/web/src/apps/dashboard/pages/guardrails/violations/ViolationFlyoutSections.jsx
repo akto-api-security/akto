@@ -18,6 +18,7 @@ import MarkdownViewer from "@/apps/dashboard/components/shared/MarkdownViewer";
 import { HighlightedText } from "@/apps/dashboard/components/shared/MarkdownComponents";
 import ConversationHistory from "@/apps/dashboard/pages/testing/TestRunResultPage/components/ConversationHistory";
 import func from "@/util/func";
+import { getDashboardCategory, categoryToShortName } from "@/apps/main/labelHelper";
 import { GUARDRAIL_SECTIONS } from "@/apps/dashboard/pages/threat_detection/constants/guardrailDescriptions";
 import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "@/apps/dashboard/pages/guardrails/components/owaspConfig";
@@ -61,10 +62,16 @@ function TriggerReason({ reason, policyName }) {
     if (!reason) return null;
     if (policyName && reason.includes(policyName)) {
         const [before, after] = reason.split(policyName);
+        // Include the current category (AGENTIC/ENDPOINT) so a fresh tab — which has no
+        // PersistStore session and would otherwise default to API_SECURITY — lands in the
+        // right module instead of hanging on "Loading guardrail policies...".
+        const categoryShort = categoryToShortName[getDashboardCategory()];
+        const policyUrl = `/dashboard/guardrails/policies?policy=${encodeURIComponent(policyName)}`
+            + (categoryShort ? `&category=${categoryShort}` : "");
         return (
             <Text variant="bodyMd" as="span">
                 {before}
-                <Link url="#" onClick={(e) => e.preventDefault()}>{policyName}</Link>
+                <Link url={policyUrl} external>{policyName}</Link>
                 {after}
             </Text>
         );
@@ -154,8 +161,8 @@ export function OverviewSection({ row, detail }) {
 
     const gridItems = [
         { label: "Detected", value: func.epochToDateTime(row.detected) },
-        { label: "Device ID", value: detail?.deviceId || "—" },
-        { label: "Session ID", value: detail?.sessionId || "—", tooltip: detail?.sessionId || undefined },
+        { label: "Device ID", value: detail?.deviceId || "N/A" },
+        { label: "Session ID", value: detail?.sessionId || "N/A" },
     ];
 
     const hasCompliance = row.complianceMap && Object.keys(row.complianceMap).length > 0;

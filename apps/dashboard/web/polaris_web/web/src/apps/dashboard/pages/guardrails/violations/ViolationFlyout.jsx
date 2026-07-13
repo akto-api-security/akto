@@ -6,7 +6,6 @@ import {
     Button,
     Divider,
     HorizontalStack,
-    Modal,
     Popover,
     Tabs,
     Text,
@@ -15,9 +14,11 @@ import { MobileCancelMajor } from "@shopify/polaris-icons";
 
 import AgenticFlyoutShell from "@/apps/dashboard/pages/observe/agentic/AgenticFlyoutShell";
 import AiChatSection from "@/apps/dashboard/pages/observe/agentic/AiChatSection";
+import SkillComponentsView from "@/apps/dashboard/pages/observe/agentic/SkillComponentsView";
 import { SeverityBadge } from "@/apps/dashboard/pages/observe/agentic/AgenticCellRenderers";
 import ActivityTracker from "@/apps/dashboard/pages/dashboard/components/ActivityTracker";
 import JiraTicketCreationModal from "@/apps/dashboard/components/shared/JiraTicketCreationModal";
+import SampleDataList from "@/apps/dashboard/components/shared/SampleDataList";
 import func from "@/util/func";
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import issuesApi from "@/apps/dashboard/pages/issues/api";
@@ -107,15 +108,15 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
             const description = [
                 "Guardrail Violation Alert",
                 "",
-                `Policy: ${row?.policyName || "—"}`,
-                `Severity: ${row?.severity || "—"}`,
-                `Type: ${row?.type || "—"}`,
-                `Agentic Asset: ${row?.agenticAsset || "—"}`,
-                `User: ${row?.user || "—"}`,
-                `Detected: ${row?.detected ? func.epochToDateTime(row.detected) : "—"}`,
+                `Policy: ${row?.policyName || "N/A"}`,
+                `Severity: ${row?.severity || "N/A"}`,
+                `Type: ${row?.type || "N/A"}`,
+                `Agentic Asset: ${row?.agenticAsset || "N/A"}`,
+                `User: ${row?.user || "N/A"}`,
+                `Detected: ${row?.detected ? func.epochToDateTime(row.detected) : "N/A"}`,
                 "",
                 "Evidence:",
-                row?.evidenceText || "—",
+                row?.evidenceText || "N/A",
                 "",
                 `Reference URL: ${window.location.href}`,
             ].join("\n");
@@ -164,15 +165,15 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
             const description = [
                 "Guardrail Violation Alert",
                 "",
-                `Policy: ${row?.policyName || "—"}`,
-                `Severity: ${row?.severity || "—"}`,
-                `Type: ${row?.type || "—"}`,
-                `Agentic Asset: ${row?.agenticAsset || "—"}`,
-                `User: ${row?.user || "—"}`,
-                `Detected: ${row?.detected ? func.epochToDateTime(row.detected) : "—"}`,
+                `Policy: ${row?.policyName || "N/A"}`,
+                `Severity: ${row?.severity || "N/A"}`,
+                `Type: ${row?.type || "N/A"}`,
+                `Agentic Asset: ${row?.agenticAsset || "N/A"}`,
+                `User: ${row?.user || "N/A"}`,
+                `Detected: ${row?.detected ? func.epochToDateTime(row.detected) : "N/A"}`,
                 "",
                 "Evidence:",
-                row?.evidenceText || "—",
+                row?.evidenceText || "N/A",
                 "",
                 `Reference URL: ${window.location.href}`,
             ].join("\n");
@@ -257,32 +258,6 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
     );
 }
 
-// ─── Block IPs button ─────────────────────────────────────────────────────────
-
-function BlockIpsButton({ ip }) {
-    const [showModal, setShowModal] = useState(false);
-
-    return (
-        <>
-            <Button destructive size="slim" onClick={() => setShowModal(true)}>Block IPs</Button>
-            <Modal
-                open={showModal}
-                onClose={() => setShowModal(false)}
-                title="Block IP ranges"
-                primaryAction={{ content: "Block", destructive: true, onAction: () => { setShowModal(false); func.setToast(true, false, "IP block coming soon"); } }}
-                secondaryActions={[{ content: "Cancel", onAction: () => setShowModal(false) }]}
-            >
-                <Modal.Section>
-                    <Text variant="bodyMd" color="subdued">
-                        By blocking these IP ranges, no user will be able to access your application from {ip || "this source"}.
-                        Are you sure you want to block these IPs?
-                    </Text>
-                </Modal.Section>
-            </Modal>
-        </>
-    );
-}
-
 // ─── Header ─────────────────────────────────────────────────────────────────────
 
 function FlyoutHeader({ row, onClose, onStatusUpdate }) {
@@ -306,7 +281,6 @@ function FlyoutHeader({ row, onClose, onStatusUpdate }) {
                             onStatusUpdate={onStatusUpdate}
                             row={row}
                         />
-                        <BlockIpsButton ip={row.ip || row.user} />
                         <Button plain icon={MobileCancelMajor} onClick={onClose} accessibilityLabel="Close" />
                     </HorizontalStack>
                 </HorizontalStack>
@@ -338,7 +312,8 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
             r => r.user === violation.user && r.violation === violation.violation
         );
         const source = sameRuleRows.length > 0 ? sameRuleRows : [violation];
-        const sorted = [...source].sort((a, b) => a.detected - b.detected);
+        // Most-recent-first, matching the main table's default "Detected" order.
+        const sorted = [...source].sort((a, b) => b.detected - a.detected);
 
         const uniqueEvidence = new Set(sorted.map(r => r.evidenceText || ""));
 
@@ -350,9 +325,9 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
             : sorted;
 
         return relevantRows
-            .slice(-50)
+            .slice(0, 50)
             .map(r => ({
-                description: r.violation || "Violation detected",
+                description: (r.violation || "Violation detected") + (r.id === violation.id ? " (this event)" : ""),
                 timestamp: r.detected,
             }));
     }, [violation, allRows]);
@@ -380,7 +355,24 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
         switch (id) {
             case "overview":    return <OverviewSection row={violation} detail={detail} />;
             case "chat":        return <ChatSessionSection messages={detail?.chatSession} highlights={detail?.evidence?.highlights || []} />;
-            case "file":        return <FileSection detail={detail} />;
+            case "file":
+                if (violation.type === "Skill") {
+                    return <SkillComponentsView asset={{ collectionIds: violation.apiCollectionId != null ? [violation.apiCollectionId] : [], name: detail?.skillName }} />;
+                }
+                if (violation.type === "Tool") {
+                    // Same request/response viewer as the Guardrail Activity page's "Values" tab.
+                    return (
+                        <Box paddingBlockStart="3" paddingInlineEnd="4" paddingInlineStart="4">
+                            <SampleDataList
+                                heading="Attempt"
+                                minHeight="30vh"
+                                vertical
+                                sampleData={[{ message: violation.payload, highlightPaths: [], metadata: violation.metadata || null }]}
+                            />
+                        </Box>
+                    );
+                }
+                return <FileSection detail={detail} />;
             case "remediation": return <RemediationSection markdown={detail?.remediation} />;
             case "timeline":    return <ActivityTracker latestActivity={timelineActivity} />;
             default:            return null;

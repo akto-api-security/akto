@@ -92,7 +92,7 @@ function BulkActionBar({ count, bulkActions = [], onClear, noRadius = false }) {
                     {bulkActions.length > 0 && (
                         <HorizontalStack gap="2">
                             {bulkActions.map(action => (
-                                <Button key={action.label} size="slim" onClick={action.onAction}>
+                                <Button key={action.label} size="slim" destructive={action.destructive} onClick={action.onAction}>
                                     {action.label}
                                 </Button>
                             ))}
@@ -310,10 +310,10 @@ export default function AgGridTable({
 
     return (
         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} noRadius />
             {hasSearch && <SearchBar value={searchValue} onChange={(val) => {
                 setSearchValue(val);
             }} placeholder={searchPlaceholder} topRadius={!noOuterBorder} />}
+            <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} noRadius />
             <div style={height ? { height } : { flex: 1, minHeight: 0 }}>
                 {gridNode}
             </div>

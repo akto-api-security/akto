@@ -1,12 +1,14 @@
-import React, { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
 import {
     Badge,
     Box,
+    Button,
     Card,
     HorizontalGrid,
     HorizontalStack,
+    Modal,
     Text,
     VerticalStack,
 } from "@shopify/polaris";
@@ -35,8 +37,9 @@ import { extractServiceName } from "@/apps/dashboard/pages/observe/agentic/const
 
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import guardrailsApi from "../api";
+import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import ViolationFlyout from "./ViolationFlyout";
-import { SPARKLINE_LABELS } from "./violationsData";
+import { SPARKLINE_LABELS, normalizeReasonPunctuation, coerceToText, sanitizeDisplayText } from "./violationsData";
 
 // ─── Method → display type mapping ──────────────────────────────────────────────
 
@@ -166,6 +169,8 @@ const COL_DEFS = [
         headerName: "Detected",
         minWidth: 150,
         filter: false,
+        checkboxSelection: true,
+        headerCheckboxSelection: true,
         valueFormatter: p => p.value != null ? func.epochToDateTime(p.value) : "",
     },
     {
@@ -288,73 +293,6 @@ function parseAktoPayload(payloadStr) {
     } catch { return {}; }
 }
 
-// Extract the user-visible text from a messages array ({role, content} objects).
-// Handles: plain string, JSON-stringified array, Anthropic content-block arrays.
-function extractUserMessageContent(messages) {
-    if (!messages) return null;
-
-    let arr = messages;
-    if (typeof messages === "string") {
-        try { arr = JSON.parse(messages); } catch { return messages.trim() || null; }
-    }
-
-    if (!Array.isArray(arr) || arr.length === 0) return null;
-
-    // Prefer the last user-role message; fall back to the last message of any role
-    const userMsgs = arr.filter(m => !m.role || m.role === "user");
-    const target = userMsgs[userMsgs.length - 1] || arr[arr.length - 1];
-    if (!target) return null;
-
-    const c = target.content;
-    if (typeof c === "string") return c.trim() || null;
-    // Anthropic content-block array: [{type:"text", text:"..."}]
-    if (Array.isArray(c)) {
-        const textBlock = c.find(b => b.type === "text");
-        return textBlock?.text?.trim() || null;
-    }
-    return null;
-}
-
-function extractGuardrailEvidence(payloadStr) {
-    const { req, raw } = parseAktoPayload(payloadStr);
-
-    // 1. Request messages array (LLM API body — OpenAI / Anthropic / direct payload format)
-    // raw?.messages handles direct LLM request bodies not wrapped in requestPayload
-    // req?.body?.messages handles nested body format
-    const messages = req?.messages || req?.body?.messages || raw?.messages;
-    if (messages) {
-        const content = extractUserMessageContent(messages);
-        if (content) return content;
-    }
-
-    // 2. Request prompt (non-chat LLM APIs and skill file chunks).
-    // Skill validation wraps each chunk as {"prompt": content} with no outer requestPayload key,
-    // so req is null and the content lives on raw.
-    if (req?.prompt) return String(req.prompt).trim() || null;
-    if (raw?.prompt) return String(raw.prompt).trim() || null;
-
-    // 3. Request input (tool-call arguments: {"input": {...}} or {"arguments": {...}}).
-    // Tool violations store the tool call body directly, so req is null and input is on raw.
-    if (req?.input) return typeof req.input === "string" ? req.input.trim() || null : JSON.stringify(req.input);
-    if (raw?.input) return typeof raw.input === "string" ? raw.input.trim() || null : JSON.stringify(raw.input);
-    if (raw?.arguments) return typeof raw.arguments === "string" ? raw.arguments.trim() || null : JSON.stringify(raw.arguments);
-
-    // 4. Schema-extracted content ({"text": "extracted field value"})
-    if (raw?.text) return String(raw.text).trim() || null;
-
-    // 5. Skill/Tool metadata payloads ({"skill_description": "...", "skill_name": "..."})
-    if (req?.skill_description) return String(req.skill_description).trim() || null;
-    if (raw?.skill_description) return String(raw.skill_description).trim() || null;
-
-    // 6. Request message / title (config-scan events)
-    if (req?.message) return String(req.message);
-    if (req?.title) return String(req.title);
-
-    // Response error reason is intentionally excluded — it is the block message,
-    // not the user's sent content. It appears as triggerReason instead.
-    return null;
-}
-
 function deriveAgenticType(url, method) {
     const lower = (url || "").toLowerCase();
     // match by URL path segments (no leading slash required)
@@ -376,7 +314,7 @@ function transformEvent(event, policiesMap, collectionsMap, usernameMap) {
     const typeLabel = deriveAgenticType(event.url, event.method);
 
     // Extract behaviour from response payload then metadata; default to "Flagged"
-    const { resp: respPayload } = parseAktoPayload(event.payload);
+    const { req: reqPayload, resp: respPayload } = parseAktoPayload(event.payload);
     const rawBehaviour = respPayload?.error?.data?.behaviour || meta.behaviour || meta.nbehaviour || null;
     const action = rawBehaviour === "block" ? "Blocked"
         : (rawBehaviour === "warn" || rawBehaviour === "flag") ? "Flagged"
@@ -387,34 +325,24 @@ function transformEvent(event, policiesMap, collectionsMap, usernameMap) {
     const resolvedUser = getUsernameForCollection({ displayName: rawHost }, usernameMap || {});
     const userDisplay = (resolvedUser && resolvedUser !== "-") ? resolvedUser : (rawHost ? rawHost.split('.')[0] : "-");
 
-    // Evidence priority: actual request content first, then metadata fields, then the
-    // guardrail trigger reason from the response (mirrors what buildFallbackDetail shows
-    // in the flyout — ensures the table column is never blank when the flyout has content).
-    const rawGuardrailReason = respPayload?.error?.data?.reason
-        || respPayload?.error?.message
-        || respPayload?.message
-        || respPayload?.reason
-        || null;
-    const evidenceText = extractUserMessageContent(meta.messages || meta.nmessages)
-        || extractGuardrailEvidence(event.payload)
-        || meta.evidenceText || meta.evidence
-        || (meta.prompt ? String(meta.prompt) : null)
-        || (meta.nprompt ? String(meta.nprompt) : null)
-        || (meta.phrase ? String(meta.phrase) : null)
-        || (meta.message ? String(meta.message) : null)
-        || rawGuardrailReason
-        || null;
-
     const rawAsset = collectionsMap?.[event.apiCollectionId] || meta.agenticAsset || meta.agentName || event.host || null;
     const agenticAssetTag = rawAsset ? getAssetServiceName(rawAsset) : null;
 
+    // Prompt & Tool -> requestPayload.body; Skill -> responsePayload.evidence; Config
+    // (and anything else) -> requestPayload.evidence — same mapping as the flyout.
+    const isPromptOrTool = typeLabel === "Prompt" || typeLabel === "Tool";
+    const primaryValue = sanitizeDisplayText(coerceToText(isPromptOrTool
+        ? (reqPayload?.body || null)
+        : typeLabel === "Skill" ? (respPayload?.evidence || null) : (reqPayload?.evidence || null)), 300);
+
     return {
         id: event.id,
+        apiCollectionId: event.apiCollectionId,
         detected: event.timestamp,
         type: typeLabel,
         violation: meta.rule_violated || meta.nrule_violated || meta.nruleViolated || event.subCategory || event.filterId || "-",
         severity: (event.severity || "HIGH").toUpperCase(),
-        evidenceText,
+        evidenceText: primaryValue || normalizeReasonPunctuation(meta.reason) || "-",
         user: userDisplay,
         userHost: rawHost,
         agenticAsset: formatAssetDisplayName(rawAsset),
@@ -424,6 +352,7 @@ function transformEvent(event, policiesMap, collectionsMap, usernameMap) {
         policyName: meta.policy_name || meta.npolicy_name || policiesMap[event.filterId] || event.filterId || "-",
         _status: event.status || "ACTIVE",
         payload: event.payload || null,
+        metadata: event.metadata || null,
         sessionId: event.sessionId || null,
         deviceId: rawHost,
     };
@@ -454,13 +383,17 @@ function computeSummary(rows) {
 
     // top users
     const userMap = {};
-    rows.forEach(r => { if (r.user && r.user !== "-") userMap[r.user] = (userMap[r.user] || 0) + 1; });
+    rows.forEach(r => {
+        if (!r.user || r.user === "-") return;
+        if (!userMap[r.user]) userMap[r.user] = { count: 0, host: r.userHost };
+        userMap[r.user].count += 1;
+    });
     const topUsers = Object.entries(userMap)
-        .sort((a, b) => b[1] - a[1])
+        .sort((a, b) => b[1].count - a[1].count)
         .slice(0, 5)
-        .map(([name, count], i) => ({
-            id: `u${i}`, name, count, os: null,
-            sparkline: [0, 0, 0, 0, 0, 0, count],
+        .map(([name, data], i) => ({
+            id: `u${i}`, name, count: data.count, os: detectOs(data.host),
+            sparkline: [0, 0, 0, 0, 0, 0, data.count],
         }));
 
     // top policies
@@ -510,7 +443,7 @@ function buildTopListRows(items) {
 
 // ─── Dashboard summary section ───────────────────────────────────────────────────
 
-function ViolationsDashboard({ totalSummary, openSummary, topUsers, topPolicies, byType, severityFilter, onSeverityFilter, statusFilter, onStatusFilter, policyFilter, onPolicyFilter, userFilter, onUserFilter }) {
+function ViolationsDashboard({ totalSummary, openSummary, topUsers, topPolicies, byType, severityFilter, onSeverityFilter, statusFilter, onStatusFilter, policyFilter, onPolicyFilter, onClearPolicyFilter, userFilter, onUserFilter, onClearUserFilter, typeFilter, onTypeFilter, onClearTypeFilter }) {
     const policyRows = buildTopListRows(topPolicies).map((row) => ({
         ...row,
         onClick: (r) => onPolicyFilter?.(r.name),
@@ -557,6 +490,7 @@ function ViolationsDashboard({ totalSummary, openSummary, topUsers, topPolicies,
                     rows={userRows}
                     renderIcon={(row) => <OsIcon os={row.os} size={20} />}
                     activeRows={userFilter}
+                    onClearSelection={onClearUserFilter}
                 />
                 <AgenticTopListCard
                     title="Top Policies Triggered"
@@ -564,10 +498,16 @@ function ViolationsDashboard({ totalSummary, openSummary, topUsers, topPolicies,
                     rows={policyRows}
                     renderIcon={() => null}
                     activeRows={policyFilter}
+                    onClearSelection={onClearPolicyFilter}
                 />
                 <Card padding="0">
                     <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="4" paddingBlockEnd="3">
-                        <Text variant="headingSm">Violations by Type</Text>
+                        <HorizontalStack align="space-between" blockAlign="center">
+                            <Text variant="headingSm">Violations by Type</Text>
+                            {(typeFilter?.size ?? 0) > 0 && (
+                                <Button plain onClick={onClearTypeFilter}>Clear selection</Button>
+                            )}
+                        </HorizontalStack>
                     </Box>
                     <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockEnd="4">
                         <VerticalStack gap="2">
@@ -581,13 +521,22 @@ function ViolationsDashboard({ totalSummary, openSummary, topUsers, topPolicies,
                                 />
                             </HorizontalStack>
                             {Object.keys(byType).length > 0 && (
-                                <HorizontalStack gap="3" wrap align="center">
-                                    {Object.entries(byType).map(([label, seg]) => (
-                                        <HorizontalStack key={label} gap="1" blockAlign="center">
-                                            <Box className="agentic-dot" style={{ "--dot-color": seg.color }} />
-                                            <Text variant="bodySm" color="subdued">{label} ({seg.text})</Text>
-                                        </HorizontalStack>
-                                    ))}
+                                <HorizontalStack gap="2" wrap align="center">
+                                    {Object.entries(byType).map(([label, seg]) => {
+                                        const active = typeFilter?.has(seg.filterKey ?? label);
+                                        return (
+                                            <Box
+                                                key={label}
+                                                onClick={() => onTypeFilter?.(seg.filterKey ?? label)}
+                                                className={active ? "agentic-chip agentic-chip--active" : "agentic-chip"}
+                                            >
+                                                <HorizontalStack gap="1" blockAlign="center">
+                                                    <Box className="agentic-dot" style={{ "--dot-color": seg.color }} />
+                                                    <Text variant="bodySm" color="subdued">{label} ({seg.text})</Text>
+                                                </HorizontalStack>
+                                            </Box>
+                                        );
+                                    })}
                                 </HorizontalStack>
                             )}
                         </VerticalStack>
@@ -606,13 +555,14 @@ function Violations() {
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
     const legacyPath = isEndpointSecurityCategory() ? "/dashboard/protection/threat-activity" : "/dashboard/guardrails/activity";
+    // New layout is available to demo accounts plus this specific account; everyone else stays on the legacy page.
+    const canUseNewLayout = func.isDemoAccount() || window.ACTIVE_ACCOUNT === 1726615470;
 
     useEffect(() => {
-        // New layout is only available to demo accounts; everyone else stays on the legacy page.
-        if (!func.isDemoAccount() || !newLayout) {
+        if (!canUseNewLayout || !newLayout) {
             navigate(legacyPath, { replace: true });
         }
-    }, [navigate, legacyPath]);
+    }, [navigate, legacyPath, canUseNewLayout, newLayout]);
 
     const handleLayoutToggle = useCallback((checked) => {
         setGuardrailViolationsNewLayout(checked);
@@ -623,12 +573,15 @@ function Violations() {
     const [summary, setSummary] = useState(null);
     const [loading, setLoading] = useState(false);
     const [selectedViolation, setSelectedViolation] = useState(null);
+    const [bulkSelectedCount, setBulkSelectedCount] = useState(0);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const gridRef = useRef(null);
     const prevSelectedIdRef = useRef(null);
     const [severityFilter, setSeverityFilter] = useState(new Set());
     const [statusFilter, setStatusFilter] = useState(new Set());
     const [policyFilter, setPolicyFilter] = useState(new Set());
     const [userFilter, setUserFilter] = useState(new Set());
+    const [typeFilter, setTypeFilter] = useState(new Set());
     const collectionsMap = PersistStore((state) => state.collectionsMap);
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
@@ -717,8 +670,74 @@ function Violations() {
         });
     }, []);
 
+    const handleTypeFilter = useCallback((key) => {
+        setTypeFilter((prev) => {
+            const next = new Set(prev);
+            next.has(key) ? next.delete(key) : next.add(key);
+            return next;
+        });
+    }, []);
+
+    const handleClearUserFilter = useCallback(() => setUserFilter(new Set()), []);
+    const handleClearPolicyFilter = useCallback(() => setPolicyFilter(new Set()), []);
+    const handleClearTypeFilter = useCallback(() => setTypeFilter(new Set()), []);
+
+    // ─── Bulk actions ──────────────────────────────────────────────────────────
+    const getSelectedIds = useCallback(() => (
+        (gridRef.current?.api?.getSelectedRows() || []).map(r => r.id).filter(Boolean)
+    ), []);
+
+    const clearBulkSelection = useCallback(() => {
+        gridRef.current?.api?.deselectAll();
+        setBulkSelectedCount(0);
+    }, []);
+
+    const handleBulkStatusUpdate = useCallback(async (status, pastTenseLabel) => {
+        const ids = getSelectedIds();
+        if (!ids.length) return;
+        try {
+            const response = await threatDetectionApi.updateMaliciousEventStatus({ eventIds: ids, status });
+            if (response?.updateSuccess) {
+                func.setToast(true, false, `${ids.length} event${ids.length === 1 ? "" : "s"} ${pastTenseLabel} successfully`);
+                setRows(prev => prev.map(r => ids.includes(r.id) ? { ...r, _status: status } : r));
+                clearBulkSelection();
+            } else {
+                func.setToast(true, true, "Failed to update selected events");
+            }
+        } catch {
+            func.setToast(true, true, "Failed to update selected events");
+        }
+    }, [getSelectedIds, clearBulkSelection]);
+
+    const handleBulkDelete = useCallback(async () => {
+        const ids = getSelectedIds();
+        setDeleteConfirmOpen(false);
+        if (!ids.length) return;
+        try {
+            const response = await threatDetectionApi.deleteMaliciousEvents({ eventIds: ids });
+            if (response?.deleteSuccess) {
+                func.setToast(true, false, `${ids.length} event${ids.length === 1 ? "" : "s"} deleted successfully`);
+                setRows(prev => prev.filter(r => !ids.includes(r.id)));
+                clearBulkSelection();
+            } else {
+                func.setToast(true, true, "Failed to delete selected events");
+            }
+        } catch {
+            func.setToast(true, true, "Failed to delete selected events");
+        }
+    }, [getSelectedIds, clearBulkSelection]);
+
+    const bulkActions = useMemo(() => [
+        { label: "Mark for Review", onAction: () => handleBulkStatusUpdate("UNDER_REVIEW", "marked for review") },
+        { label: "Ignore", onAction: () => handleBulkStatusUpdate("IGNORED", "ignored") },
+        { label: "Delete", destructive: true, onAction: () => setDeleteConfirmOpen(true) },
+    ], [handleBulkStatusUpdate]);
+
     const STATUS_KEY_TO_ROW = { OPEN: "ACTIVE", FIXED: "FIXED", IGNORED: "IGNORED" };
-    const filteredRows = rows.filter((r) => {
+    // Memoized so selecting a row (which only updates selectedViolation) doesn't produce a
+    // new array reference each render — AG Grid treats a new rowData reference as fresh data
+    // and resets scroll to the top, which is why opening the flyout used to jump the table.
+    const filteredRows = useMemo(() => rows.filter((r) => {
         if (severityFilter.size > 0 && !severityFilter.has(r.severity)) return false;
         if (statusFilter.size > 0) {
             const rowStatus = [...statusFilter].map(k => STATUS_KEY_TO_ROW[k] || k);
@@ -726,8 +745,9 @@ function Violations() {
         }
         if (policyFilter.size > 0 && !policyFilter.has(r.policyName)) return false;
         if (userFilter.size > 0 && !userFilter.has(r.user)) return false;
+        if (typeFilter.size > 0 && !typeFilter.has(r.type)) return false;
         return true;
-    });
+    }), [rows, severityFilter, statusFilter, policyFilter, userFilter, typeFilter]);
 
     const handleRowClick = (e) => {
         if (e?.data) setSelectedViolation(e.data);
@@ -773,8 +793,13 @@ function Violations() {
                     getRowStyle={() => ({ cursor: "pointer" })}
                     getRowClass={getRowClass}
                     gridRef={gridRef}
+                    rowSelection="multiple"
+                    onSelectionChanged={e => setBulkSelectedCount(e.api.getSelectedRows().length)}
+                    bulkActionCount={bulkSelectedCount}
+                    bulkActions={bulkActions}
+                    onClearBulk={clearBulkSelection}
                     pagination
-                    paginationPageSize={20}
+                    paginationPageSize={100}
                     paginationPageSizeSelector={[20, 50, 100]}
                     height={500}
                     domLayout="normal"
@@ -802,8 +827,13 @@ function Violations() {
                 onStatusFilter={handleStatusFilter}
                 policyFilter={policyFilter}
                 onPolicyFilter={handlePolicyFilter}
+                onClearPolicyFilter={handleClearPolicyFilter}
                 userFilter={userFilter}
                 onUserFilter={handleUserFilter}
+                onClearUserFilter={handleClearUserFilter}
+                typeFilter={typeFilter}
+                onTypeFilter={handleTypeFilter}
+                onClearTypeFilter={handleClearTypeFilter}
             />,
             tableComponent,
             <ViolationFlyout
@@ -813,6 +843,20 @@ function Violations() {
                 onClose={() => setSelectedViolation(null)}
                 allRows={rows}
             />,
+            <Modal
+                key="delete-confirm"
+                open={deleteConfirmOpen}
+                onClose={() => setDeleteConfirmOpen(false)}
+                title="Delete selected events"
+                primaryAction={{ content: "Delete", destructive: true, onAction: handleBulkDelete }}
+                secondaryActions={[{ content: "Cancel", onAction: () => setDeleteConfirmOpen(false) }]}
+            >
+                <Modal.Section>
+                    <Text variant="bodyMd" color="subdued">
+                        {`This will permanently delete ${bulkSelectedCount} selected event${bulkSelectedCount === 1 ? "" : "s"}. This action cannot be undone.`}
+                    </Text>
+                </Modal.Section>
+            </Modal>,
         ];
 
     return (
@@ -824,7 +868,7 @@ function Violations() {
                 />
             }
             isFirstPage
-            secondaryActions={func.isDemoAccount() && <NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />}
+            secondaryActions={canUseNewLayout && <NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />}
             primaryAction={
                 <DateRangeFilter
                     initialDispatch={currDateRange}
