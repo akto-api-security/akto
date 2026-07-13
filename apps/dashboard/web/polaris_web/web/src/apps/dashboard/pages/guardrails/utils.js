@@ -15,18 +15,17 @@ export const GUARDRAIL_BEHAVIOUR = {
     APPROVAL: "approval",
 };
 
+// Display label only — the stored `value` stays "approval" (backend + guardrails-service depend on it).
 export const GUARDRAIL_BEHAVIOUR_OPTIONS = [
     { label: "Block", value: GUARDRAIL_BEHAVIOUR.BLOCK },
-    { label: "Warn", value: GUARDRAIL_BEHAVIOUR.WARN },
     { label: "Alert", value: GUARDRAIL_BEHAVIOUR.ALERT },
-    { label: "Approval", value: GUARDRAIL_BEHAVIOUR.APPROVAL },
+    { label: "Human Approval", value: GUARDRAIL_BEHAVIOUR.APPROVAL },
 ];
 
 export const GUARDRAIL_BEHAVIOUR_TOOLTIP_LINES = [
     "Block: Stop the content when this rule matches.",
-    "Warn: Warn the user. User can then bypass the guardrail after this nudge.",
     "Alert: Raise an alert for review without blocking.",
-    "Approval: Hold the content until a reviewer approves or rejects it.",
+    "Human Approval: Hold the content until a reviewer approves or rejects it.",
 ];
 
 export const normalizeBehaviourValue = (raw) => {
@@ -52,6 +51,39 @@ export const resolveStoredPolicyBehaviour = (policy) => {
     }
     return GUARDRAIL_BEHAVIOUR.BLOCK;
 };
+
+/**
+ * Whether a single approvedServers entry is still active (not expired).
+ * ALWAYS -> always; DURATION -> now < expiredAt; COUNT -> expiredAfter > 0.
+ */
+const isApprovedServerActive = (entry, nowSeconds) => {
+    const mode = String(entry?.mode || "").toUpperCase();
+    if (mode === "ALWAYS") return true;
+    if (mode === "DURATION") return Number(entry?.expiredAt || 0) > nowSeconds;
+    if (mode === "COUNT") return Number(entry?.expiredAfter || 0) > 0;
+    return false;
+};
+
+/**
+ * Build { policyName -> [active approved serverId, ...] } from fetched guardrail policies.
+ * Only currently-valid (non-expired) entries are included.
+ */
+export const buildApprovedByPolicy = (policies) => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const map = {};
+    (policies || []).forEach((p) => {
+        if (!p?.name) return;
+        const active = (p.approvedServers || [])
+            .filter((entry) => isApprovedServerActive(entry, nowSeconds))
+            .map((entry) => entry.serverId);
+        if (active.length > 0) map[p.name] = active;
+    });
+    return map;
+};
+
+/** True if serverId is currently approved for policyName (AND of policy + server). */
+export const isServerApproved = (approvedByPolicy, policyName, serverId) =>
+    !!(approvedByPolicy && policyName && serverId && (approvedByPolicy[policyName] || []).includes(serverId));
 
 /**
  * Helper function to transform frontend field names to backend DTO field names

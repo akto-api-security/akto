@@ -17,6 +17,7 @@ import { isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCat
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "../../observe/api_collections/endpointShieldHelper";
 import IpReputationScore from "./IpReputationScore";
 import guardrailApi from "../../guardrails/api";
+import { buildApprovedByPolicy, isServerApproved } from "../../guardrails/utils";
 
 const resourceName = {
   singular: "activity",
@@ -151,6 +152,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
   const guardrailComplianceMap = SessionStore((state) => state.guardrailComplianceMap);
   const setGuardrailComplianceMap = SessionStore((state) => state.setGuardrailComplianceMap);
+  const guardrailApprovedByPolicy = SessionStore((state) => state.guardrailApprovedByPolicy);
+  const setGuardrailApprovedByPolicy = SessionStore((state) => state.setGuardrailApprovedByPolicy);
   const needsGuardrailCompliance = label === LABELS.GUARDRAIL || isAgenticSecurityCategory() || isEndpointSecurityCategory();
   const tabIndexMap = { active: 0, under_review: 1, ignored: 2, needs_approval: 3, training: 4 };
   const resolvedInitialTab = initialTab || 'active';
@@ -196,6 +199,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       const scope = approveMode === "DURATION" ? `for ${value} day(s)` : "always";
       func.setToast(true, false, `Approved ${serverId} ${scope}`);
       setApproveRow(null);
+      // Refresh the approved-servers map + table so the row drops off Needs Approval immediately.
+      await refreshApprovedByPolicy();
+      if (triggerRefresh) triggerRefresh();
     } catch {
       // Error toast already surfaced by the request interceptor; keep the modal open.
     } finally {
@@ -228,10 +234,22 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       mergePolicyComplianceMap(capabilityMap, policiesResp?.guardrailPolicies);
 
       setGuardrailComplianceMap(capabilityMap);
+      setGuardrailApprovedByPolicy(buildApprovedByPolicy(policiesResp?.guardrailPolicies));
     }).catch((error) => {
       console.error('Error loading guardrail compliance:', error);
     });
   }, [label]);
+
+  // Refetch policies and refresh the approved-servers map (e.g. right after an approve),
+  // so the just-approved server drops off the Needs Approval tab immediately.
+  const refreshApprovedByPolicy = async () => {
+    try {
+      const resp = await guardrailApi.fetchGuardrailPolicies();
+      setGuardrailApprovedByPolicy(buildApprovedByPolicy(resp?.guardrailPolicies));
+    } catch (error) {
+      console.error('Error refreshing approved servers:', error);
+    }
+  };
 
   const baseTabs = [
     {
@@ -258,10 +276,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const hasAgentTrafficLogsAccess = func.checkForFeatureSaas('AGENT_TRAFFIC_LOGS');
   // Add Training Data tab only for guardrail events and if feature is enabled
   const guardrailExtraTabs = [];
-  // "Needs Approval" is relevant wherever approval-behaviour guardrail events appear — i.e. the
-  // same Agentic (Argus) / Endpoint (Atlas) categories that show the Behaviour column. This is
-  // gated on category (not the label prop) because those pages pass label=THREAT.
-  if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+  // "Needs Approval" is Endpoint (Atlas) only — approval behaviour is not supported for Agentic
+  // (Argus). Gated on category (not the label prop) because the Atlas page passes label=THREAT.
+  if (isEndpointSecurityCategory()) {
     guardrailExtraTabs.push({
       content: 'Needs Approval',
       badge: 'Beta',
@@ -725,7 +742,10 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           behaviourRaw: extractBehaviour(x?.metadata),
           behaviour: (() => {
             const b = extractBehaviour(x?.metadata);
-            return b ? <Badge tone={getBehaviourTone(b)}>{func.toSentenceCase(b)}</Badge> : '-';
+            if (!b) return '-';
+            // Display "Human Approval" for the "approval" behaviour (value stays "approval").
+            const label = String(b).toLowerCase() === 'approval' ? 'Human Approval' : func.toSentenceCase(b);
+            return <Badge tone={getBehaviourTone(b)}>{label}</Badge>;
           })(),
         }),
         compliance: complianceList.length > 0 ? (
@@ -747,10 +767,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         ) : <Text color="subdued">-</Text>,
         nextUrl: nextUrl,
         complianceMapData: complianceMapData,
-        // Inline Approve button for the "Needs Approval" tab. stopPropagation so it doesn't
-        // also open the row flyout.
+        // Inline Approve button for the "Needs Approval" tab. Each cell is wrapped by GithubRow
+        // in a Polaris <Link url={nextUrl}> (a real <a href>), so we must preventDefault to stop
+        // the row's anchor navigation (the "reload"), plus stopPropagation for the row click.
         approveAction: (
-          <div onClick={(e) => e.stopPropagation()}>
+          <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
             <Button size="slim" onClick={() => openInlineApprove(x)}>Approve</Button>
           </div>
         )
@@ -762,9 +783,13 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
       return rowData;
     });
-    // Needs Approval tab: keep only approval-behaviour rows (client-side Option A).
+    // Needs Approval tab: keep only approval-behaviour rows (client-side Option A), and drop
+    // rows whose (policy, server) is already approved for that policy.
     if (isNeedsApproval) {
-      ret = ret.filter(r => String(r.behaviourRaw || '').toLowerCase() === 'approval');
+      ret = ret.filter(r =>
+        String(r.behaviourRaw || '').toLowerCase() === 'approval' &&
+        !isServerApproved(guardrailApprovedByPolicy, r.filterId, r.host)
+      );
       total = ret.length;
     }
     setLoading(false);

@@ -133,6 +133,8 @@ require (
 )
 
 replace (
-	github.com/akto-api-security/akto-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260710064642-ccde9ac87ed9
+	// LOCAL DEV ONLY — do not commit. Restore the published version before committing:
+	//   github.com/akto-api-security/akto-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260710064642-ccde9ac87ed9
+	github.com/akto-api-security/akto-endpoint-shield => /Users/shubham/akto_code/akto-gateway/mcp-endpoint-shield
 	github.com/shoenig/go-m1cpu => ./internal/stub/go-m1cpu
 )
