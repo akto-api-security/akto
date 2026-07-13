@@ -1,5 +1,5 @@
 # Build stage - use native platform for building (avoids QEMU emulation issues)
-FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 
 # Build arguments for cross-compilation (automatically set by BuildKit)
 ARG TARGETOS
