@@ -128,8 +128,8 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
     const category = getDashboardCategory();
     // "View All" opens a new tab, so pass the category and date range along (see threatDashboardUtils.js).
     const viewAllParams = new URLSearchParams();
-    const categoryShortName = categoryToShortName[category];
-    if (categoryShortName) viewAllParams.set("category", categoryShortName);
+    const categoryParam = categoryToShortName[category];
+    if (categoryParam) viewAllParams.set("category", categoryParam);
     if (startTimestamp) viewAllParams.set("since", startTimestamp);
     if (endTimestamp) viewAllParams.set("until", endTimestamp);
     const viewAllQuery = viewAllParams.toString() ? `?${viewAllParams.toString()}` : "";
