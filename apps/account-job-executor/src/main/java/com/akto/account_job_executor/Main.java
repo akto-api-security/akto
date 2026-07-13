@@ -2,7 +2,10 @@ package com.akto.account_job_executor;
 
 import com.akto.account_job_executor.cron.AccountJobsCron;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.ClientActor;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.log.LoggerMaker;
+import com.akto.metrics.ModuleInfoWorker;
 
 /**
  * Main entry point for the AccountJob Executor service.
@@ -77,6 +80,9 @@ public class Main {
         try {
             logger.info("Starting AccountJobsCron scheduler...");
             AccountJobsCron.instance.startScheduler();
+
+            logger.info("Starting module info heartbeat...");
+            ModuleInfoWorker.init(ModuleInfo.ModuleType.ACCOUNT_JOB_EXECUTOR, new ClientActor());
 
             logger.info("===========================================");
             logger.info("Account Job Executor Service started successfully (API-only mode)");
