@@ -2395,6 +2395,20 @@ public class DbLayer {
                 loggerMaker.errorAndAddToDb(e, "Error submitting OT metrics task: " + e.getMessage(), LogDb.DB_ABS);
             }
         }
+
+        // Forward to Akto's own collector (independent of the customer
+        // OpenTelemetryIntegration). Gated for gradual rollout by the overall
+        // flag + account allowlist (see OpenTelemetryUtils.shouldForwardToAktoInfra).
+        if (OpenTelemetryUtils.shouldForwardToAktoInfra(accountId)) {
+            try {
+                telemetryForwardingExecutorService.submit(() -> {
+                    Context.accountId.set(accountId);
+                    OpenTelemetryUtils.forwardMetricsToAktoInfra(metricData);
+                });
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error submitting Akto infra metrics task: " + e.getMessage(), LogDb.DB_ABS);
+            }
+        }
     }
     public static void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         Integer accountId = Context.accountId.get();

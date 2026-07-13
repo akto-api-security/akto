@@ -34,7 +34,10 @@ import io.opentelemetry.sdk.resources.Resource;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.time.Duration;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -118,10 +121,18 @@ public class OpenTelemetryUtils {
             throw new Exception("No OpenTelemetry integration found.");
         }
 
-        String endpoint = openTelemetryIntegration.getEndpoint();
-        String apiKey = openTelemetryIntegration.getApiKey();
-        String headerName = openTelemetryIntegration.getHeaderName();
+        OpenTelemetryClient newClient = buildClient(
+                openTelemetryIntegration.getEndpoint(),
+                openTelemetryIntegration.getApiKey(),
+                openTelemetryIntegration.getHeaderName());
+        OpenTelemetryClient winner = clientCache.putIfAbsent(accountId, newClient);
+        return winner != null ? winner : newClient;
+    }
 
+    // Builds an OTLP (metrics + logs) client for a given endpoint/auth.
+    // Shared by the customer integration (initClientForAccount) and Akto's
+    // own collector (initAktoInfraClient) so the mapping logic isn't duplicated.
+    private static OpenTelemetryClient buildClient(String endpoint, String apiKey, String headerName) {
         if (apiKey != null && !apiKey.isEmpty()) {
             try {
                 apiKey = URLDecoder.decode(apiKey, "UTF-8");
@@ -162,11 +173,92 @@ public class OpenTelemetryUtils {
                         BatchLogRecordProcessor.builder(logExporterBuilder.build()).build())
                 .build();
 
-        OpenTelemetryClient newClient = new OpenTelemetryClient(meterProvider, loggerProvider);
-        OpenTelemetryClient winner = clientCache.putIfAbsent(accountId, newClient);
-        return winner != null ? winner : newClient;
+        return new OpenTelemetryClient(meterProvider, loggerProvider);
     }
 
+    // Akto's OWN collector — an always-on forward, independent of the
+    // customer-facing OpenTelemetryIntegration. Enabled only when configured
+    // via environment on the deployment:
+    //   AKTO_INFRA_OTEL_ENDPOINT  OTLP/HTTP base URL, e.g. http://10.2.32.15:4318
+    //   AKTO_INFRA_OTEL_TOKEN     bearer token the collector enforces
+    // Returns null (no-op) when not configured. Single global client (one endpoint).
+    private static volatile OpenTelemetryClient aktoInfraClient;
+
+    public static OpenTelemetryClient initAktoInfraClient() {
+        OpenTelemetryClient existing = aktoInfraClient;
+        if (existing != null) return existing;
+
+        String endpoint = System.getenv("AKTO_INFRA_OTEL_ENDPOINT");
+        String token = System.getenv("AKTO_INFRA_OTEL_TOKEN");
+        if (endpoint == null || endpoint.isEmpty() || token == null || token.isEmpty()) {
+            return null;
+        }
+
+        synchronized (OpenTelemetryUtils.class) {
+            if (aktoInfraClient == null) {
+                aktoInfraClient = buildClient(endpoint, "Bearer " + token, "Authorization");
+            }
+            return aktoInfraClient;
+        }
+    }
+
+    // OTEL infra-push config, parsed ONCE from env (env is immutable for the
+    // process's lifetime, so there's nothing to re-read). A change needs a restart.
+    private static volatile boolean otelInfraPushConfigInitialized = false;
+    private static boolean otelInfraPushEnabled = false;      // overall flag AND endpoint present
+    private static boolean otelInfraPushAllAccounts = false;  // "*" / "all"
+    private static Set<Integer> otelInfraPushAccounts = Collections.emptySet();
+
+    private static void initOtelInfraPushConfig() {
+        if (otelInfraPushConfigInitialized) return;
+        synchronized (OpenTelemetryUtils.class) {
+            if (otelInfraPushConfigInitialized) return;
+
+            boolean enabled = "true".equalsIgnoreCase(System.getenv("AKTO_INFRA_OTEL_ENABLED"));
+            String endpoint = System.getenv("AKTO_INFRA_OTEL_ENDPOINT");
+            boolean hasEndpoint = endpoint != null && !endpoint.isEmpty();
+
+            boolean all = false;
+            Set<Integer> set = new HashSet<>();
+            String accounts = System.getenv("AKTO_INFRA_OTEL_ACCOUNTS");
+            if (accounts != null && !accounts.trim().isEmpty()) {
+                accounts = accounts.trim();
+                if (accounts.equals("*") || accounts.equalsIgnoreCase("all")) {
+                    all = true;
+                } else {
+                    for (String a : accounts.split(",")) {
+                        try {
+                            set.add(Integer.parseInt(a.trim()));
+                        } catch (NumberFormatException ignore) {
+                            // skip malformed ids
+                        }
+                    }
+                }
+            }
+
+            otelInfraPushEnabled = enabled && hasEndpoint;
+            otelInfraPushAllAccounts = all;
+            otelInfraPushAccounts = set;
+            otelInfraPushConfigInitialized = true;
+        }
+    }
+
+    // Single decision point for whether to push metrics to Akto's OTEL collector.
+    // Reads pre-parsed cached config (O(1) set lookup) — no getenv/split per call.
+    // Controlled via env (parsed once at first call):
+    //   AKTO_INFRA_OTEL_ENABLED   "true" to arm the feature (kill switch)
+    //   AKTO_INFRA_OTEL_ENDPOINT  must be set (nowhere to send otherwise)
+    //   AKTO_INFRA_OTEL_ACCOUNTS  comma-separated account IDs, or "*"/"all".
+    //                             Empty/unset => no account pushes yet.
+    public static boolean shouldForwardToAktoInfra(int accountId) {
+        initOtelInfraPushConfig();
+        if (!otelInfraPushEnabled) return false;
+        if (otelInfraPushAllAccounts) return true;
+        return otelInfraPushAccounts.contains(accountId);
+    }
+
+    // Customer-facing forward — ships metrics to the customer's own endpoint
+    // (configured via OpenTelemetryIntegration in Mongo).
     public static void forwardMetrics(List<MetricData> mdList) {
         if (mdList == null || mdList.isEmpty()) {
             return;
@@ -179,12 +271,31 @@ public class OpenTelemetryUtils {
             loggerMaker.errorAndAddToDb(e, String.format("Failed to initialize Open Telemetry client for account %d: %s", Context.accountId.get(), e.getMessage()));
             return;
         }
+        forward(client, mdList, "customer OpenTelemetry endpoint");
+    }
 
+    // Akto-infra forward — ships the same metrics to Akto's own collector
+    // (configured via AKTO_INFRA_OTEL_* env). No-op if not configured.
+    public static void forwardMetricsToAktoInfra(List<MetricData> mdList) {
+        if (mdList == null || mdList.isEmpty()) {
+            return;
+        }
+
+        OpenTelemetryClient client = OpenTelemetryUtils.initAktoInfraClient();
+        if (client == null) {
+            return;
+        }
+        forward(client, mdList, "Akto infra collector");
+    }
+
+    // Shared mapping loop: MetricData -> OTLP (SUM->counter, else gauge),
+    // with account/org/module attributes. Used by both forwards above.
+    private static void forward(OpenTelemetryClient client, List<MetricData> mdList, String target) {
         try {
             Meter meter = client.meterProvider.get("akto-telemetry");
             Attributes idAttrs = OpenTelemetryUtils.getIdAttributes();
 
-            loggerMaker.info("Forwarding " + mdList.size() + " metrics to Open Telemetry endpoint for account " + Context.accountId.get());
+            loggerMaker.info("Forwarding " + mdList.size() + " metrics to " + target + " for account " + Context.accountId.get());
             for (MetricData md : mdList) {
                 if (md.getModuleType() != null && md.getModuleType().equals(ModuleType.TRAFFIC_COLLECTOR.toString())) {
                     continue; // todo: handle traffic collector metrics
@@ -211,7 +322,7 @@ public class OpenTelemetryUtils {
 
             client.meterProvider.forceFlush();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, String.format("Failed to forward metrics to Open Telemetry endpoint for account %d: %s", Context.accountId.get(), e.getMessage()));
+            loggerMaker.errorAndAddToDb(e, String.format("Failed to forward metrics to %s for account %d: %s", target, Context.accountId.get(), e.getMessage()));
         }
     }
 
