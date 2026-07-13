@@ -13,7 +13,7 @@ files. The built-in detectors below cover the common, high-impact secret types.
 import os
 import re
 import tempfile
-from typing import Any, Dict, List
+from typing import Any
 
 REDACT_MASK = "******"
 
@@ -49,7 +49,7 @@ _PLUGINS = [
 ]
 
 
-def _redact(text: str, values: List[str]) -> str:
+def _redact(text: str, values: list[str]) -> str:
     """Mask each detected secret.
 
     detect-secrets returns only the captured group for regex detectors with a
@@ -65,13 +65,17 @@ def _redact(text: str, values: List[str]) -> str:
     return out
 
 
-def scan(scanner_type: str, text: str, config: Dict[str, Any]) -> Dict[str, Any]:
+def scan(scanner_type: str, text: str, config: dict[str, Any]) -> dict[str, Any]:
     from detect_secrets.core.secrets_collection import SecretsCollection
     from detect_secrets.settings import transient_settings
 
     if not text.strip():
-        return {"is_valid": True, "risk_score": 0.0, "sanitized_text": text,
-                "details": {"scanner_type": scanner_type, "types": [], "secrets": []}}
+        return {
+            "is_valid": True,
+            "risk_score": 0.0,
+            "sanitized_text": text,
+            "details": {"scanner_type": scanner_type, "types": [], "secrets": []},
+        }
 
     secrets = SecretsCollection()
     tmp = tempfile.NamedTemporaryFile(delete=False)

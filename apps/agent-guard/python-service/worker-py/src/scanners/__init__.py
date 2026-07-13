@@ -4,12 +4,12 @@ Each scanner exposes `scan(scanner_type, text, config) -> dict` returning the
 ScanResponse-shaped fields: is_valid, risk_score, sanitized_text, details.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from . import ban_code, ban_substrings, secrets, token_limit
 
 
-def scan_local(scanner_name: str, scanner_type: str, text: str, config: Dict[str, Any]) -> Dict[str, Any]:
+def scan_local(scanner_name: str, scanner_type: str, text: str, config: dict[str, Any]) -> dict[str, Any]:
     if scanner_name == "BanCode":
         return ban_code.scan(scanner_type, text, config)
     if scanner_name == "BanSubstrings":
