@@ -84,8 +84,7 @@ async def test_get_token_returns_and_signs_verifiable_jwt():
     assert payload["iss"] == sa_info["client_email"]
     assert payload["aud"] == "https://oauth2.googleapis.com/token"
 
-    pub = rsa.PublicKey(key.public_key().public_numbers().n,
-                        key.public_key().public_numbers().e)
+    pub = rsa.PublicKey(key.public_key().public_numbers().n, key.public_key().public_numbers().e)
     signing_input = f"{header_b64}.{payload_b64}".encode()
     # rsa.verify raises on mismatch; returns hash name on success.
     assert rsa.verify(signing_input, _unb64(sig_b64), pub) == "SHA-256"

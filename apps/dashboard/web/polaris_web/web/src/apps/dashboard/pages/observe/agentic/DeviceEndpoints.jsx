@@ -28,6 +28,7 @@ import values from "@/util/values";
 import func from "@/util/func";
 import api from "../api";
 import LocalStore from "../../../../main/LocalStorageStore";
+import { fetchGuardrailPolicyNamesCached } from "../../guardrails/topicGuardrailUtils";
 
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
@@ -504,6 +505,10 @@ export default function DeviceEndpoints() {
             navigate("/dashboard/observe/users-and-devices", { replace: true });
         }
     }, [navigate, newLayout]);
+
+    useEffect(() => {
+        fetchGuardrailPolicyNamesCached();
+    }, []);
 
     const handleLayoutToggle = useCallback((val) => {
         const checked = val === true;

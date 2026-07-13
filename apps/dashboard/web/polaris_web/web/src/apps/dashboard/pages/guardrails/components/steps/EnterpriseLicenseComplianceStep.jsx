@@ -1,5 +1,7 @@
-import { VerticalStack, Text, Checkbox, Box } from "@shopify/polaris";
+import { VerticalStack, Text, Checkbox, Box, HorizontalStack } from "@shopify/polaris";
 import { ENTERPRISE_LICENSE_COMPLIANCE_CATEGORIES, enterpriseLicenseComplianceLabels } from "../enterpriseLicenseComplianceCatalog";
+import ControlInfoIcon from "../ControlInfoIcon";
+import { ENTERPRISE_CATEGORY_EXAMPLES } from "../../guardrailDescriptions";
 
 export const EnterpriseLicenseComplianceConfig = {
     number: 12,
@@ -15,7 +17,7 @@ export const EnterpriseLicenseComplianceConfig = {
     }
 };
 
-const EnterpriseLicenseComplianceStep = ({ enterpriseLicenseComplianceCategories = [], setEnterpriseLicenseComplianceCategories }) => {
+const EnterpriseLicenseComplianceStep = ({ onTryPrompt, enterpriseLicenseComplianceCategories = [], setEnterpriseLicenseComplianceCategories }) => {
     const toggle = (key, checked) => {
         if (checked) {
             setEnterpriseLicenseComplianceCategories([...enterpriseLicenseComplianceCategories, key]);
@@ -34,7 +36,16 @@ const EnterpriseLicenseComplianceStep = ({ enterpriseLicenseComplianceCategories
                 {ENTERPRISE_LICENSE_COMPLIANCE_CATEGORIES.map((c) => (
                     <Box key={c.key}>
                         <Checkbox
-                            label={c.label}
+                            label={
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text as="span">{c.label}</Text>
+                                    <ControlInfoIcon
+                                        description={c.helpText}
+                                        examples={ENTERPRISE_CATEGORY_EXAMPLES[c.key]}
+                                        onTryPrompt={onTryPrompt}
+                                    />
+                                </HorizontalStack>
+                            }
                             checked={enterpriseLicenseComplianceCategories.includes(c.key)}
                             onChange={(checked) => toggle(c.key, checked)}
                             helpText={c.helpText}

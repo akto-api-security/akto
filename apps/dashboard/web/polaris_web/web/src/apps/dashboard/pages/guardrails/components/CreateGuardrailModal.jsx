@@ -115,7 +115,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [enableTokenLimit, setEnableTokenLimit] = useState(false);
     const [tokenLimitThreshold, setTokenLimitThreshold] = useState(4096);
 
-    // Step 8: Anomaly Detection (coming soon)
+    // Step 8: Anomaly Detection
+    const [enableAnomalyDetection, setEnableAnomalyDetection] = useState(false);
+    const [anomalyToolCallLimit, setAnomalyToolCallLimit] = useState(null);
+    const [anomalyErrorLimit, setAnomalyErrorLimit] = useState(null);
 
     // Step 9: Tools Guardrails
     const [enableToolMisuse, setEnableToolMisuse] = useState(true);
@@ -183,6 +186,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         // Step 7
         enableTokenLimit,
         tokenLimitThreshold,
+        // Step 8
+        enableAnomalyDetection,
+        anomalyToolCallLimit,
+        anomalyErrorLimit,
         // Step 9
         enableToolMisuse,
         enableMaliciousTools,
@@ -515,6 +522,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setEnableTokenLimit(policy.tokenLimitDetection?.enabled || false);
         setTokenLimitThreshold(policy.tokenLimitDetection?.threshold || 4096);
 
+        // Anomaly detection
+        const ad = policy.anomalyDetection;
+        setEnableAnomalyDetection(ad?.enabled || false);
+        setAnomalyToolCallLimit(ad?.toolCallLimit || ad?.toolCallBucketCap || null);
+        setAnomalyErrorLimit(ad?.errorLimit || ad?.errorThreshold || null);
+
         // External model based evaluation
         const hasExternalModel = !!policy.url;
         setEnableExternalModel(hasExternalModel);
@@ -646,6 +659,11 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 tokenLimitDetection: {
                     enabled: enableTokenLimit,
                     threshold: tokenLimitThreshold
+                },
+                anomalyDetection: {
+                    enabled: enableAnomalyDetection,
+                    toolCallLimit: anomalyToolCallLimit,
+                    errorLimit: anomalyErrorLimit,
                 },
                 url: enableExternalModel ? (url || null) : null,
                 confidenceScore: enableExternalModel ? confidenceScore : null,
@@ -895,7 +913,14 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 );
             case 8:
                 return (
-                    <AnomalyDetectionStep />
+                    <AnomalyDetectionStep
+                        enableAnomalyDetection={enableAnomalyDetection}
+                        setEnableAnomalyDetection={setEnableAnomalyDetection}
+                        anomalyToolCallLimit={anomalyToolCallLimit}
+                        setAnomalyToolCallLimit={setAnomalyToolCallLimit}
+                        anomalyErrorLimit={anomalyErrorLimit}
+                        setAnomalyErrorLimit={setAnomalyErrorLimit}
+                    />
                 );
             case 9:
                 return (

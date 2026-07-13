@@ -57,6 +57,10 @@ public class Main {
   private static final LoggerMaker logger = new LoggerMaker(Main.class, LogDb.THREAT_DETECTION);
   private static boolean aggregationRulesEnabled = System.getenv().getOrDefault("AGGREGATION_RULES_ENABLED", "true").equals("true");
 
+  static {
+    DataActorFactory.setModuleType("THREAT_DETECTION");
+  }
+
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
   public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);

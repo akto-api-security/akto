@@ -97,9 +97,9 @@ const getLlmServiceKeySet = (allCollections) => {
     return keys;
 };
 
-const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false }) => {
+const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false, initialStep = 1 }) => {
     // Step management
-    const [currentStep, setCurrentStep] = useState(1);
+    const [currentStep, setCurrentStep] = useState(initialStep);
     const [loading, setLoading] = useState(false);
     const [leftSteps, setLeftSteps] = useState(new Set());
     const prevStepRef = useRef(currentStep);
@@ -180,6 +180,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // Step 7: Usage based Guardrails
     const [enableTokenLimit, setEnableTokenLimit] = useState(false);
     const [tokenLimitThreshold, setTokenLimitThreshold] = useState(4096);
+
+    // Step 8: Anomaly Detection
+    const [enableAnomalyDetection, setEnableAnomalyDetection] = useState(false);
+    const [anomalyToolCallLimit, setAnomalyToolCallLimit] = useState(null);
+    const [anomalyErrorLimit, setAnomalyErrorLimit] = useState(null);
 
     // Step 9: Tools Guardrails
     const [enableToolMisuse, setEnableToolMisuse] = useState(true);
@@ -282,6 +287,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         // Step 7
         enableTokenLimit,
         tokenLimitThreshold,
+        // Step 8
+        enableAnomalyDetection,
+        anomalyToolCallLimit,
+        anomalyErrorLimit,
         // Step 9
         enableToolMisuse,
         enableMaliciousTools,
@@ -595,6 +604,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setConfidenceScore(25);
         setEnableTokenLimit(false);
         setTokenLimitThreshold(4096);
+        setEnableAnomalyDetection(false);
+        setAnomalyToolCallLimit(null);
+        setAnomalyErrorLimit(null);
         setEnableToolMisuse(true);
         setEnableMaliciousTools(true);
         setEnableToolNameDescriptionMismatch(true);
@@ -719,6 +731,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setScannerState(policy.sentimentDetection, setEnableSentiment, setSentimentConfidenceScore);
         setEnableTokenLimit(policy.tokenLimitDetection?.enabled || false);
         setTokenLimitThreshold(policy.tokenLimitDetection?.threshold || 4096);
+
+        // Anomaly detection
+        const ad = policy.anomalyDetection;
+        setEnableAnomalyDetection(ad?.enabled || false);
+        setAnomalyToolCallLimit(ad?.toolCallLimit || ad?.toolCallBucketCap || null);
+        setAnomalyErrorLimit(ad?.errorLimit || ad?.errorThreshold || null);
 
         // External model based evaluation
         setEnableExternalModel(!!policy.url);
@@ -893,6 +911,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     enabled: enableTokenLimit,
                     threshold: tokenLimitThreshold
                 },
+                anomalyDetection: {
+                    enabled: enableAnomalyDetection,
+                    toolCallLimit: anomalyToolCallLimit,
+                    errorLimit: anomalyErrorLimit,
+                },
                 url: enableExternalModel ? (url || null) : null,
                 confidenceScore: enableExternalModel ? confidenceScore : null,
                 applyToAllServers,
@@ -945,6 +968,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             case 2:
                 return (
                     <ContentPolicyStep
+                        onTryPrompt={handleSamplePayloadClick}
                         enablePromptAttacks={enablePromptAttacks}
                         setEnablePromptAttacks={setEnablePromptAttacks}
                         promptAttackLevel={promptAttackLevel}
@@ -971,6 +995,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             case 3:
                 return (
                     <LanguageSafetyStep
+                        onTryPrompt={handleSamplePayloadClick}
                         enableGibberishDetection={enableGibberishDetection}
                         setEnableGibberishDetection={setEnableGibberishDetection}
                         gibberishConfidenceScore={gibberishConfidenceScore}
@@ -988,6 +1013,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             case 4:
                 return (
                     <SensitiveInfoStep
+                        onTryPrompt={handleSamplePayloadClick}
                         enablePiiTypes={enablePiiTypes}
                         setEnablePiiTypes={setEnablePiiTypes}
                         piiTypes={piiTypes}
@@ -1011,6 +1037,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             case 5:
                 return (
                     <CodeDetectionStep
+                        onTryPrompt={handleSamplePayloadClick}
                         enableCodeFilter={enableCodeFilter}
                         setEnableCodeFilter={setEnableCodeFilter}
                         codeFilterLevel={codeFilterLevel}
@@ -1024,6 +1051,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             case 6:
                 return (
                     <CustomGuardrailsStep
+                        onTryPrompt={handleSamplePayloadClick}
                         enableLlmPrompt={enableLlmPrompt}
                         setEnableLlmPrompt={setEnableLlmPrompt}
                         llmRule={llmPrompt}
@@ -1043,6 +1071,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             case 7:
                 return (
                     <UsageGuardrailsStep
+                        onTryPrompt={handleSamplePayloadClick}
                         enableTokenLimit={enableTokenLimit}
                         setEnableTokenLimit={setEnableTokenLimit}
                         tokenLimitThreshold={tokenLimitThreshold}
@@ -1051,11 +1080,19 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 );
             case 8:
                 return (
-                    <AnomalyDetectionStep />
+                    <AnomalyDetectionStep
+                        enableAnomalyDetection={enableAnomalyDetection}
+                        setEnableAnomalyDetection={setEnableAnomalyDetection}
+                        anomalyToolCallLimit={anomalyToolCallLimit}
+                        setAnomalyToolCallLimit={setAnomalyToolCallLimit}
+                        anomalyErrorLimit={anomalyErrorLimit}
+                        setAnomalyErrorLimit={setAnomalyErrorLimit}
+                    />
                 );
             case 9:
                 return (
                     <ToolsGuardrailsStep
+                        onTryPrompt={handleSamplePayloadClick}
                         enableToolMisuse={enableToolMisuse}
                         setEnableToolMisuse={setEnableToolMisuse}
                         enableMaliciousTools={enableMaliciousTools}
@@ -1125,6 +1162,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             case 12:
                 return (
                     <EnterpriseLicenseComplianceStep
+                        onTryPrompt={handleSamplePayloadClick}
                         enterpriseLicenseComplianceCategories={enterpriseLicenseComplianceCategories}
                         setEnterpriseLicenseComplianceCategories={setEnterpriseLicenseComplianceCategories}
                         targetTeams={targetTeams}
@@ -1204,6 +1242,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             secretsDetection: buildDetectionConfig(enableSecrets, secretsConfidenceScore),
             sentimentDetection: buildDetectionConfig(enableSentiment, sentimentConfidenceScore),
             tokenLimitDetection: { enabled: enableTokenLimit, threshold: tokenLimitThreshold },
+            anomalyDetection: {
+                enabled: enableAnomalyDetection,
+                toolCallLimit: anomalyToolCallLimit,
+                errorLimit: anomalyErrorLimit,
+            },
             url: enableExternalModel ? (url || null) : null,
             confidenceScore: enableExternalModel ? confidenceScore : null,
             applyToAllServers: applyToAllServers,

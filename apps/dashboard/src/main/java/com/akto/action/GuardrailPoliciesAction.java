@@ -78,8 +78,14 @@ public class GuardrailPoliciesAction extends UserAction {
     private BasicDBObject playgroundResult;
 
 
+    private static final int DEFAULT_FETCH_LIMIT = 20;
+    private static final int MAX_FETCH_LIMIT = 100;
+
     public String fetchGuardrailPolicies() {
         try {
+            // Mongo treats limit <= 0 as "unlimited", so clamp instead of passing it through as-is.
+            skip = Math.max(skip, 0);
+            limit = limit <= 0 ? DEFAULT_FETCH_LIMIT : Math.min(limit, MAX_FETCH_LIMIT);
             this.guardrailPolicies = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(skip, limit);
             this.total = GuardrailPoliciesDao.instance.getTotalCount();
 
@@ -304,6 +310,9 @@ public class GuardrailPoliciesAction extends UserAction {
         }
         if (p.getTokenLimitDetection() != null) {
             updates.add(Updates.set("tokenLimitDetection", p.getTokenLimitDetection()));
+        }
+        if (p.getAnomalyDetection() != null) {
+            updates.add(Updates.set("anomalyDetection", p.getAnomalyDetection()));
         }
         if (p.getSelectedMcpServers() != null) {
             updates.add(Updates.set("selectedMcpServers", p.getSelectedMcpServers()));

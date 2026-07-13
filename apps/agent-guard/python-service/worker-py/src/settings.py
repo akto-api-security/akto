@@ -9,19 +9,32 @@ import os
 
 _FIELDS = (
     # OpenAI / openai-compatible
-    "OPENAI_API_KEY", "OPENAI_MODEL", "OPENAI_COMPATIBLE_BASE_URL",
+    "OPENAI_API_KEY",
+    "OPENAI_MODEL",
+    "OPENAI_COMPATIBLE_BASE_URL",
     # Anthropic
-    "ANTHROPIC_API_KEY", "ANTHROPIC_MODEL",
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_MODEL",
     # Vertex (generic)
-    "VERTEX_AI_SA_KEY_JSON", "VERTEX_AI_PROJECT", "VERTEX_AI_LOCATION", "VERTEX_AI_ENDPOINT_ID",
+    "VERTEX_AI_SA_KEY_JSON",
+    "VERTEX_AI_PROJECT",
+    "VERTEX_AI_LOCATION",
+    "VERTEX_AI_ENDPOINT_ID",
     # Gemma on Vertex
-    "GEMMA_VERTEX_SA_KEY_JSON", "GEMMA_VERTEX_PROJECT", "GEMMA_VERTEX_LOCATION",
-    "GEMMA_VERTEX_ENDPOINT_ID", "GEMMA_VERTEX_DEDICATED_DNS",
+    "GEMMA_VERTEX_SA_KEY_JSON",
+    "GEMMA_VERTEX_PROJECT",
+    "GEMMA_VERTEX_LOCATION",
+    "GEMMA_VERTEX_ENDPOINT_ID",
+    "GEMMA_VERTEX_DEDICATED_DNS",
     # Qwen3Guard on Vertex
-    "QWEN3GUARD_SA_KEY_JSON", "QWEN3GUARD_PROJECT", "QWEN3GUARD_LOCATION",
-    "QWEN3GUARD_ENDPOINT_ID", "QWEN3GUARD_DEDICATED_DNS",
+    "QWEN3GUARD_SA_KEY_JSON",
+    "QWEN3GUARD_PROJECT",
+    "QWEN3GUARD_LOCATION",
+    "QWEN3GUARD_ENDPOINT_ID",
+    "QWEN3GUARD_DEDICATED_DNS",
     # Integrations
-    "SLACK_WEBHOOK_URL", "DATABASE_ABSTRACTOR_SERVICE_URL",
+    "SLACK_WEBHOOK_URL",
+    "DATABASE_ABSTRACTOR_SERVICE_URL",
     # Per-deployment cascade default modelMap (JSON). Empty → built-in default.
     "DEFAULT_MODEL_CONFIG_JSON",
     # Portable anonymizer service URL (e.g. http://anonymizer:8093).
@@ -30,6 +43,32 @@ _FIELDS = (
 
 
 class Settings:
+    # Declared for mypy only — __init__ below is the actual runtime source of
+    # truth, setting these (and only these, per _FIELDS) via setattr.
+    OPENAI_API_KEY: str
+    OPENAI_MODEL: str
+    OPENAI_COMPATIBLE_BASE_URL: str
+    ANTHROPIC_API_KEY: str
+    ANTHROPIC_MODEL: str
+    VERTEX_AI_SA_KEY_JSON: str
+    VERTEX_AI_PROJECT: str
+    VERTEX_AI_LOCATION: str
+    VERTEX_AI_ENDPOINT_ID: str
+    GEMMA_VERTEX_SA_KEY_JSON: str
+    GEMMA_VERTEX_PROJECT: str
+    GEMMA_VERTEX_LOCATION: str
+    GEMMA_VERTEX_ENDPOINT_ID: str
+    GEMMA_VERTEX_DEDICATED_DNS: str
+    QWEN3GUARD_SA_KEY_JSON: str
+    QWEN3GUARD_PROJECT: str
+    QWEN3GUARD_LOCATION: str
+    QWEN3GUARD_ENDPOINT_ID: str
+    QWEN3GUARD_DEDICATED_DNS: str
+    SLACK_WEBHOOK_URL: str
+    DATABASE_ABSTRACTOR_SERVICE_URL: str
+    DEFAULT_MODEL_CONFIG_JSON: str
+    ANONYMIZER_URL: str
+
     def __init__(self):
         for f in _FIELDS:
             setattr(self, f, "")

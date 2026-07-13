@@ -6,6 +6,7 @@ require (
 	github.com/akto-api-security/akto-endpoint-shield v0.0.0-20260713080310-159f6158fffd
 	github.com/gin-gonic/gin v1.12.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/redis/go-redis/v9 v9.20.0
 	github.com/segmentio/kafka-go v0.4.49
 	github.com/tsawler/tabula v1.6.6
 	go.uber.org/zap v1.27.1

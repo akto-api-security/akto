@@ -13,6 +13,7 @@ import (
 // ExtractSessionID extracts session ID from headers with fallback chain
 func ExtractSessionID(headers map[string]string) string {
 	candidates := []string{
+		"X-Akto-Installer-Akto_session_id", "x-akto-installer-akto_session_id", // Akto CLI hooks
 		"x-session-id", "X-Session-Id",
 		"x-conversation-id", "X-Conversation-Id",
 		"authorization", "Authorization",

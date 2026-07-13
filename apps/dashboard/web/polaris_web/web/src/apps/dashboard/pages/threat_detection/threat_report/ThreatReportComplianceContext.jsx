@@ -6,13 +6,17 @@ const ThreatReportComplianceContext = ({ activeComplianceFilters, groupedThreats
     if (!activeComplianceFilters?.length || !groupedThreatsData?.length) return null
 
     const activeUpper = activeComplianceFilters.map(f => f.toUpperCase())
+    const matchesActiveFilter = (framework) => {
+        const frameworkUpper = framework.toUpperCase()
+        return activeUpper.some(f => f === frameworkUpper || f.includes(frameworkUpper) || frameworkUpper.includes(f))
+    }
 
     // Unique article set per framework — from grouped rows (deduplicated)
     const filteredFrameworks = {}
     groupedThreatsData.forEach(row => {
         const clauses = row.complianceWithClauses || {}
         Object.entries(clauses).forEach(([framework, articles]) => {
-            if (!activeUpper.includes(framework.toUpperCase())) return
+            if (!matchesActiveFilter(framework)) return
             if (!filteredFrameworks[framework]) filteredFrameworks[framework] = new Set()
             ;(articles || []).forEach(a => filteredFrameworks[framework].add(a))
         })
@@ -23,7 +27,7 @@ const ThreatReportComplianceContext = ({ activeComplianceFilters, groupedThreats
     ;(threatsTableData || []).forEach(row => {
         const clauses = row.complianceWithClauses || {}
         Object.entries(clauses).forEach(([framework, articles]) => {
-            if (!activeUpper.includes(framework.toUpperCase())) return
+            if (!matchesActiveFilter(framework)) return
             ;(articles || []).forEach(a => {
                 clauseViolationCounts[a] = (clauseViolationCounts[a] || 0) + 1
             })

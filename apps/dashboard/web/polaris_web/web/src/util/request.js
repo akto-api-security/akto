@@ -6,6 +6,8 @@ import LocalStore from '../apps/main/LocalStorageStore';
 import PersistStore from '../apps/main/PersistStore';
 
 const accessTokenUrl = "/dashboard/accessToken"
+// De-dupe concurrent 403s (e.g. a page firing many parallel requests on a fresh tab) into one token refresh.
+let refreshTokenPromise = null
 
 // create axios
 const service = axios.create({
@@ -99,10 +101,11 @@ const err = async (error) => {
         break
       }
 
-      await service({
-        url: accessTokenUrl,
-        method: 'get',
-      })
+      if (!refreshTokenPromise) {
+        refreshTokenPromise = service({ url: accessTokenUrl, method: 'get' })
+          .finally(() => { refreshTokenPromise = null })
+      }
+      await refreshTokenPromise
 
       return service(originalRequest)
     case 500:

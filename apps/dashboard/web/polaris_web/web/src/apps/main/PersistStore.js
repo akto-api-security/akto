@@ -65,6 +65,7 @@ const initialState = {
     tagCollectionsMap: {},// Keep in memory (not persisted)
     hostNameMap: {}, // Keep in memory (not persisted)
     skillRiskScoreCache: { data: {}, ts: 0 }, // skillName -> maxRiskScore, in-memory only
+    guardrailPolicyNames: { data: [], ts: 0 },
     lastFetchedInfo: { lastRiskScoreInfo: 0, lastSensitiveInfo: 0 },
     lastFetchedResp: { criticalUrls: 0, riskScoreMap: {} },
     lastFetchedSeverityResp: {},
@@ -165,6 +166,20 @@ let persistStore = (set, get) => ({
             set({ skillRiskScoreCache });
         } catch (error) {
             console.error("Error setting skillRiskScoreCache:", error);
+        }
+    },
+    setGuardrailPolicyNames: (data) => {
+        try {
+            set({ guardrailPolicyNames: { data, ts: Date.now() } });
+        } catch (error) {
+            console.error("Error setting guardrailPolicyNames:", error);
+        }
+    },
+    clearGuardrailPolicyNames: () => {
+        try {
+            set({ guardrailPolicyNames: { data: [], ts: 0 } });
+        } catch (error) {
+            console.error("Error clearing guardrailPolicyNames:", error);
         }
     },
     setLastFetchedInfo: (lastFetchedInfo) => {

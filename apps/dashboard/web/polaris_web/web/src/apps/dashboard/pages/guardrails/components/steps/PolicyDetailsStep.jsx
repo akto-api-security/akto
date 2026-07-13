@@ -1,4 +1,4 @@
-import { VerticalStack, Text, FormLayout, TextField, Checkbox, Select } from "@shopify/polaris";
+import { VerticalStack, FormLayout, TextField, Checkbox, Select } from "@shopify/polaris";
 import { SEVERITY_OPTIONS } from "../../utils";
 
 // Step metadata

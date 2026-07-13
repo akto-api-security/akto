@@ -464,7 +464,7 @@ function ThreatCompliancePage() {
                 startTimestamp,
                 endTimestamp,
                 latestAttack,
-                100000,
+                500,
                 currentTab.toUpperCase(),
                 successfulBool,
                 eventLabel,

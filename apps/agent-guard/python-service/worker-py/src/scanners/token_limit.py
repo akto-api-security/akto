@@ -10,7 +10,7 @@ Config:
   - encoding_name: str         (default "cl100k_base"; only this is bundled)
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 # cl100k_base pattern + special tokens (from tiktoken_ext/openai_public.py).
 _CL100K_PAT = (
@@ -32,7 +32,9 @@ def _get_encoding():
     global _ENCODING
     if _ENCODING is None:
         import base64
+
         import tiktoken
+
         import vocab_blob
 
         ranks = {}
@@ -51,8 +53,8 @@ def _get_encoding():
     return _ENCODING
 
 
-def scan(scanner_type: str, text: str, config: Dict[str, Any]) -> Dict[str, Any]:
-    limit: Optional[int] = config.get("limit")
+def scan(scanner_type: str, text: str, config: dict[str, Any]) -> dict[str, Any]:
+    limit: int | None = config.get("limit")
     enc = _get_encoding()
     # disallowed_special=() so tiktoken counts special-token text literally
     # instead of raising — matches llm_guard's permissive counting.

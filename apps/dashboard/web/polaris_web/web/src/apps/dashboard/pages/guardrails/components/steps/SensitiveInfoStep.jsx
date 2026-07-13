@@ -19,10 +19,11 @@ import DropdownSearch from "../../../../components/shared/DropdownSearch";
 import observeApi from "../../../observe/api";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
+import ControlInfoIcon from "../ControlInfoIcon";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
+import { SENSITIVE_INFO_DESCRIPTIONS } from "../../guardrailDescriptions";
 
-const MIN_COUNT_TOOLTIP =
-    "The guardrail applies only when the prompt has at least this many matches of this PII type. Example: 20 means 20 or more occurrences of that type.";
+const MIN_COUNT_TOOLTIP = SENSITIVE_INFO_DESCRIPTIONS.minCountTooltip;
 
 function clampMinMatchCount(raw) {
     const trimmed = String(raw ?? "").trim();
@@ -92,6 +93,7 @@ export const SensitiveInfoConfig = {
 };
 
 const SensitiveInfoStep = ({
+    onTryPrompt,
     // PII types
     enablePiiTypes,
     setEnablePiiTypes,
@@ -196,7 +198,15 @@ const SensitiveInfoStep = ({
                 {/* PII Types */}
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Personally Identifiable Information (PII) types" threats={RULE_OWASP_THREATS.pii} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Personally Identifiable Information (PII) types" threats={RULE_OWASP_THREATS.pii} />
+                                <ControlInfoIcon
+                                    {...SENSITIVE_INFO_DESCRIPTIONS.piiTypes}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enablePiiTypes}
                         onChange={setEnablePiiTypes}
                         helpText="Specify the types of PII to be filtered and the desired guardrail behavior."
@@ -327,7 +337,15 @@ const SensitiveInfoStep = ({
                 {/* Regex Patterns */}
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Regex patterns" threats={RULE_OWASP_THREATS.regex} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Regex patterns" threats={RULE_OWASP_THREATS.regex} />
+                                <ControlInfoIcon
+                                    {...SENSITIVE_INFO_DESCRIPTIONS.regexPatterns}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableRegexPatterns}
                         onChange={setEnableRegexPatterns}
                         helpText="Add up to 10 regex patterns to filter custom types of sensitive information for your specific use case."
@@ -396,7 +414,15 @@ const SensitiveInfoStep = ({
                 {/* Secrets Detection */}
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Enable secrets detection" threats={RULE_OWASP_THREATS.secrets} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Enable secrets detection" threats={RULE_OWASP_THREATS.secrets} />
+                                <ControlInfoIcon
+                                    {...SENSITIVE_INFO_DESCRIPTIONS.secretsDetection}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableSecrets}
                         onChange={setEnableSecrets}
                         helpText="Detect and block secrets, API keys, passwords, and other sensitive information in user inputs."
@@ -404,7 +430,13 @@ const SensitiveInfoStep = ({
                     {enableSecrets && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                    <ControlInfoIcon
+                                        {...SENSITIVE_INFO_DESCRIPTIONS.secretsConfidenceThreshold}
+                                        onTryPrompt={onTryPrompt}
+                                    />
+                                </HorizontalStack>
                                 <RangeSlider
                                     label=""
                                     value={secretsConfidenceScore}
@@ -423,7 +455,15 @@ const SensitiveInfoStep = ({
                 {/* Sensitive Data Anonymization */}
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Enable sensitive data anonymization" threats={RULE_OWASP_THREATS.anonymize} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Enable sensitive data anonymization" threats={RULE_OWASP_THREATS.anonymize} />
+                                <ControlInfoIcon
+                                    {...SENSITIVE_INFO_DESCRIPTIONS.anonymize}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableAnonymize}
                         onChange={setEnableAnonymize}
                         helpText="Detect and automatically anonymize sensitive data (emails, credit cards, phone numbers, SSN, etc.) in user inputs by replacing them with placeholders like [REDACTED_EMAIL_1]. Original values are stored securely for later restoration if needed."
@@ -431,7 +471,13 @@ const SensitiveInfoStep = ({
                     {enableAnonymize && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                    <ControlInfoIcon
+                                        {...SENSITIVE_INFO_DESCRIPTIONS.anonymizeConfidenceThreshold}
+                                        onTryPrompt={onTryPrompt}
+                                    />
+                                </HorizontalStack>
                                 <RangeSlider
                                     label=""
                                     value={anonymizeConfidenceScore}

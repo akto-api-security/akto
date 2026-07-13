@@ -9,7 +9,6 @@ import pytest
 
 import model_map
 
-
 # A scripted result per provider name. _classify treats is_valid False OR
 # decision_confidence < safeDecisionThreshold as unsafe.
 SAFE = {"is_valid": True, "risk_score": 0.02, "decision_confidence": 0.99, "details": {}}
@@ -46,10 +45,10 @@ class FakeScanner:
 def patch_providers(monkeypatch):
     FakeScanner.calls = []
     FakeScanner.script = {}
-    monkeypatch.setattr(model_map, "build_provider_from_config",
-                        lambda entry: FakeProvider(entry["provider"]))
+    monkeypatch.setattr(model_map, "build_provider_from_config", lambda entry: FakeProvider(entry["provider"]))
     # run() does `from llm_scanner import LLMScanner`; patch it there.
     import llm_scanner
+
     monkeypatch.setattr(llm_scanner, "LLMScanner", FakeScanner)
     yield
 
@@ -70,16 +69,14 @@ async def _run(model_configs, script, **cfg):
 
 
 async def test_confident_safe_tier1_skips_arbiter():
-    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"),
-           _entry("gemma_vertexai", "FINAL_ARBITER")]
+    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"), _entry("gemma_vertexai", "FINAL_ARBITER")]
     r = await _run(cfg, {"qwen3guard": SAFE, "gemma_vertexai": SAFE})
     assert r["is_valid"] is True
     assert "gemma_vertexai" not in FakeScanner.calls  # no escalation needed
 
 
 async def test_hedged_tier1_escalates_and_arbiter_allows():
-    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"),
-           _entry("gemma_vertexai", "FINAL_ARBITER")]
+    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"), _entry("gemma_vertexai", "FINAL_ARBITER")]
     r = await _run(cfg, {"qwen3guard": HEDGED_SAFE, "gemma_vertexai": SAFE})
     assert r["is_valid"] is True
     assert r["details"]["cascade_decision"] == "gemma_authority"
@@ -87,15 +84,13 @@ async def test_hedged_tier1_escalates_and_arbiter_allows():
 
 
 async def test_default_config_arbiter_blocks():
-    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"),
-           _entry("gemma_vertexai", "FINAL_ARBITER")]
+    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"), _entry("gemma_vertexai", "FINAL_ARBITER")]
     r = await _run(cfg, {"qwen3guard": HEDGED_SAFE, "gemma_vertexai": UNSAFE})
     assert r["is_valid"] is False
 
 
 async def test_tier1_unsafe_escalates_to_arbiter():
-    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"),
-           _entry("gemma_vertexai", "FINAL_ARBITER")]
+    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"), _entry("gemma_vertexai", "FINAL_ARBITER")]
     r = await _run(cfg, {"qwen3guard": UNSAFE, "gemma_vertexai": UNSAFE})
     assert r["is_valid"] is False
     assert "gemma_vertexai" in FakeScanner.calls
@@ -105,9 +100,11 @@ async def test_tier1_unsafe_escalates_to_arbiter():
 
 
 async def test_all_safe_three_tier_skips_arbiter():
-    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"),
-           _entry("openai", "FAST_FALLBACK_SAFE_FILTER"),
-           _entry("gemma_vertexai", "FINAL_ARBITER")]
+    cfg = [
+        _entry("qwen3guard", "FAST_THREAT_FILTER"),
+        _entry("openai", "FAST_FALLBACK_SAFE_FILTER"),
+        _entry("gemma_vertexai", "FINAL_ARBITER"),
+    ]
     r = await _run(cfg, {"qwen3guard": SAFE, "openai": SAFE, "gemma_vertexai": SAFE})
     assert r["is_valid"] is True
     # tier1 SAFE + tier2 SAFE -> arbiter NOT consulted
@@ -115,9 +112,11 @@ async def test_all_safe_three_tier_skips_arbiter():
 
 
 async def test_tier2_unsafe_escalates_to_arbiter():
-    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"),
-           _entry("openai", "FAST_FALLBACK_SAFE_FILTER"),
-           _entry("gemma_vertexai", "FINAL_ARBITER")]
+    cfg = [
+        _entry("qwen3guard", "FAST_THREAT_FILTER"),
+        _entry("openai", "FAST_FALLBACK_SAFE_FILTER"),
+        _entry("gemma_vertexai", "FINAL_ARBITER"),
+    ]
     r = await _run(cfg, {"qwen3guard": SAFE, "openai": UNSAFE, "gemma_vertexai": UNSAFE})
     assert r["is_valid"] is False
     assert "gemma_vertexai" in FakeScanner.calls
@@ -127,16 +126,14 @@ async def test_tier2_unsafe_escalates_to_arbiter():
 
 
 async def test_provider_failure_counts_unsafe():
-    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"),
-           _entry("gemma_vertexai", "FINAL_ARBITER")]
+    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"), _entry("gemma_vertexai", "FINAL_ARBITER")]
     r = await _run(cfg, {"qwen3guard": RuntimeError("boom"), "gemma_vertexai": UNSAFE})
     # tier1 raised -> treated unsafe -> arbiter decides (unsafe)
     assert r["is_valid"] is False
 
 
 async def test_result_shape_has_per_model_summaries():
-    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"),
-           _entry("gemma_vertexai", "FINAL_ARBITER")]
+    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"), _entry("gemma_vertexai", "FINAL_ARBITER")]
     r = await _run(cfg, {"qwen3guard": HEDGED_SAFE, "gemma_vertexai": SAFE})
     d = r["details"]
     assert d["scanner_type"] == "prompt"
@@ -156,8 +153,7 @@ async def test_no_arbiter_configured_fails_open_with_error():
 async def test_all_arbiters_failed_fails_open_with_error():
     # Arbiter timeout/error is an infrastructure failure, not a verdict: allow,
     # and carry details.error so the caller can skip caching the degraded result.
-    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"),
-           _entry("gemma_vertexai", "FINAL_ARBITER")]
+    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"), _entry("gemma_vertexai", "FINAL_ARBITER")]
     r = await _run(cfg, {"qwen3guard": UNSAFE, "gemma_vertexai": TimeoutError()})
     assert r["is_valid"] is True
     assert r["details"]["error"] == "all arbiters failed"
@@ -201,18 +197,20 @@ async def test_both_tiers_empty_two_arbiters_one_fails_other_still_decides():
 
 async def test_arbiter_hedged_acquittal_allows():
     # Arbiter acquittal below safeDecisionThreshold must not be converted into a block.
-    hedged_safe = {"is_valid": True, "risk_score": 0.15,
-                   "decision_confidence": 0.85, "details": {}}
-    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"),
-           _entry("gemma_vertexai", "FINAL_ARBITER")]
+    hedged_safe = {"is_valid": True, "risk_score": 0.15, "decision_confidence": 0.85, "details": {}}
+    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"), _entry("gemma_vertexai", "FINAL_ARBITER")]
     r = await _run(cfg, {"qwen3guard": UNSAFE, "gemma_vertexai": hedged_safe})
     assert r["is_valid"] is True
 
 
 async def test_arbiter_reason_priority_first_listed_wins_despite_lower_score():
     # gemma is listed before qwen in modelConfigs, so gemma wins even with a lower risk_score.
-    gemma_unsafe = {"is_valid": False, "risk_score": 0.8, "decision_confidence": 0.8,
-                     "details": {"reason": "Explicit instructions for making a weapon."}}
+    gemma_unsafe = {
+        "is_valid": False,
+        "risk_score": 0.8,
+        "decision_confidence": 0.8,
+        "details": {"reason": "Explicit instructions for making a weapon."},
+    }
     qwen_unsafe = {"is_valid": False, "risk_score": 1.0, "decision_confidence": 1.0, "details": {}}
     cfg = [_entry("gemma_vertexai", "FINAL_ARBITER"), _entry("qwen3guard", "FINAL_ARBITER")]
     r = await _run(cfg, {"gemma_vertexai": gemma_unsafe, "qwen3guard": qwen_unsafe})
@@ -234,10 +232,18 @@ async def test_arbiter_reason_empty_when_qwen_is_sole_objector():
 
 async def test_arbiter_reason_priority_follows_modelconfigs_order():
     # anthropic is listed first, so it wins over gemma regardless of risk_score.
-    anthropic_unsafe = {"is_valid": False, "risk_score": 0.6, "decision_confidence": 0.6,
-                         "details": {"reason": "anthropic reason"}}
-    gemma_unsafe = {"is_valid": False, "risk_score": 0.99, "decision_confidence": 0.99,
-                     "details": {"reason": "gemma reason"}}
+    anthropic_unsafe = {
+        "is_valid": False,
+        "risk_score": 0.6,
+        "decision_confidence": 0.6,
+        "details": {"reason": "anthropic reason"},
+    }
+    gemma_unsafe = {
+        "is_valid": False,
+        "risk_score": 0.99,
+        "decision_confidence": 0.99,
+        "details": {"reason": "gemma reason"},
+    }
     cfg = [_entry("anthropic", "FINAL_ARBITER"), _entry("gemma_vertexai", "FINAL_ARBITER")]
     r = await _run(cfg, {"anthropic": anthropic_unsafe, "gemma_vertexai": gemma_unsafe})
     assert r["details"]["llm_provider"] == "anthropic"
