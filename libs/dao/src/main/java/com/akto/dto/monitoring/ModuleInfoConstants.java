@@ -86,6 +86,11 @@ public class ModuleInfoConstants {
             put("ENABLE_COPILOT_CLI_SETTINGS_CONFIG_SCAN", "Copilot CLI Settings Config");
             put("ENABLE_SYSTEM_PROXY", "Enable System Proxy");
         }});
+
+        put(ModuleInfo.ModuleType.ACCOUNT_JOB_EXECUTOR, new HashMap<String, String>() {{
+            put("AKTO_ACCOUNT_ID", "Akto Account ID");
+            put("DATABASE_ABSTRACTOR_SERVICE_URL", "Database Abstractor Service URL");
+        }});
     }};
 
     private ModuleInfoConstants() {
