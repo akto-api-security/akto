@@ -1412,16 +1412,8 @@ public class ClientActor extends DataActor {
     }
 
     // Trades the raw provisioned token for one scoped to moduleType, if the raw token supports it.
-    // Any failure (legacy/unscoped token, network error, etc.) is swallowed and the raw token keeps being used as-is.
-    //
-    // Deliberately uses a plain HttpURLConnection instead of ApiExecutor/OriginalHttpRequest: ApiExecutor
-    // unconditionally persists a "Final url is..." diagnostic log via LoggerMaker, which itself needs a
-    // token via this very same getAuthToken() path. That reentrant call would see exchangeAttempted
-    // already true and fall back to the still-unexchanged raw token, guaranteeing an extra 403 + several
-    // seconds of futile backoff retries on every single startup. This bootstrap call shouldn't depend on
-    // any machinery (logging, retry policy) that itself depends on the token this call is establishing.
+    // Uses sendRequestBackOff, same as other ClientActor calls.
     public static void initModuleType(String moduleType) {
-        java.net.HttpURLConnection connection = null;
         try {
             loggerMaker.warn("Attempting database abstractor token exchange for moduleType " + moduleType);
             String rawToken = getRawAuthToken();
@@ -1429,50 +1421,27 @@ public class ClientActor extends DataActor {
                 return;
             }
 
+            Map<String, List<String>> headers = new HashMap<>();
+            headers.put("Authorization", Collections.singletonList(rawToken));
+
             BasicDBObject obj = new BasicDBObject();
             obj.put("moduleType", moduleType);
-            byte[] payload = obj.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
-            connection = (java.net.HttpURLConnection) new java.net.URL(url + "/exchangeToken").openConnection();
-            connection.setRequestMethod("POST");
-            connection.setRequestProperty("Authorization", rawToken);
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setConnectTimeout(10000);
-            connection.setReadTimeout(10000);
-            connection.setDoOutput(true);
-            try (java.io.OutputStream os = connection.getOutputStream()) {
-                os.write(payload);
-            }
-
-            int status = connection.getResponseCode();
-            if (status != 200) {
-                loggerMaker.warn("Token exchange for moduleType " + moduleType + " not applied (status " + status + "); continuing with raw token");
+            OriginalHttpRequest request = new OriginalHttpRequest(url + "/exchangeToken", "", "POST", obj.toString(), headers, "");
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response == null || response.getStatusCode() != 200 || response.getBody() == null) {
+                loggerMaker.warn("Token exchange for moduleType " + moduleType + " not applied (status "
+                        + (response == null ? "null" : response.getStatusCode()) + "); continuing with raw token");
                 return;
             }
 
-            String body = readStream(connection.getInputStream());
-            String newToken = BasicDBObject.parse(body).getString("token");
+            String newToken = BasicDBObject.parse(response.getBody()).getString("token");
             if (newToken != null && !newToken.isEmpty()) {
                 exchangedAuthToken = newToken;
                 loggerMaker.warn("Database abstractor token exchanged successfully for moduleType " + moduleType);
             }
         } catch (Exception e) {
             loggerMaker.error("error exchanging database abstractor token for moduleType " + moduleType + ": " + e);
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
-        }
-    }
-
-    private static String readStream(java.io.InputStream in) throws java.io.IOException {
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8))) {
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
-            return sb.toString();
         }
     }
 

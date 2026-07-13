@@ -33,22 +33,20 @@ func GetDatabaseAbstractorServiceToken() string {
 	return os.Getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN")
 }
 
-// InitModuleType trades the raw DATABASE_ABSTRACTOR_SERVICE_TOKEN for one scoped to
-// moduleType, if the raw token supports it. Any failure (legacy/unscoped token, network
-// error, non-200 response) is logged and swallowed — the raw token keeps being used as-is.
-// Single attempt, no retries: a legacy token's rejection is deterministic, so retrying
-// would only add startup latency for no benefit.
-func InitModuleType(logger *zap.Logger, moduleType string) {
-	rawToken := os.Getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN")
+// InitModuleType trades the raw provisioned token for one scoped to moduleType, if the raw
+// token supports it. rawToken/baseHost are the same DATABASE_ABSTRACTOR_SERVICE_TOKEN /
+// DATABASE_ABSTRACTOR_SERVICE_URL values config.LoadConfig() already resolved (cfg.DatabaseAbstractorToken
+// / cfg.DatabaseAbstractorURL) — passed in rather than re-read here, so there's one place that
+// owns the env var + default. Any failure (legacy/unscoped token, network error, non-200
+// response) is logged and swallowed — the raw token keeps being used as-is. Single attempt, no
+// retries: a legacy token's rejection is deterministic, so retrying would only add startup
+// latency for no benefit.
+func InitModuleType(logger *zap.Logger, moduleType string, rawToken string, baseHost string) {
 	if rawToken == "" {
 		return
 	}
 
-	baseURL := os.Getenv("DATABASE_ABSTRACTOR_SERVICE_URL")
-	if baseURL == "" {
-		baseURL = "https://ultron.akto.io"
-	}
-	baseURL = strings.TrimSuffix(baseURL, "/") + "/api"
+	baseURL := strings.TrimSuffix(baseHost, "/") + "/api"
 
 	body, err := json.Marshal(map[string]string{"moduleType": moduleType})
 	if err != nil {
