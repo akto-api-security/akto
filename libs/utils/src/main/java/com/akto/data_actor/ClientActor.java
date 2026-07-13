@@ -3723,7 +3723,7 @@ public class ClientActor extends DataActor {
             obj.put("moduleType", moduleType);
 
             OriginalHttpRequest request = new OriginalHttpRequest(url + "/exchangeToken", "", "POST", obj.toString(), headers, "");
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             if (response == null || response.getStatusCode() != 200 || response.getBody() == null) {
                 loggerMaker.warn("Token exchange for moduleType " + moduleType + " not applied (status "
                         + (response == null ? "null" : response.getStatusCode()) + "); continuing with raw token");
