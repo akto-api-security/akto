@@ -8,7 +8,7 @@ import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import DonutChart from "../../../components/shared/DonutChart";
 import ThreatWorldMap from "./ThreatWorldMap";
 import { formatCategoryName, getFlagSrc, openThreatActivityPage } from "../utils/threatDashboardUtils";
-import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, categoryToShortName } from "../../../../main/labelHelper";
 
 const TAB_KEYS = {
     TOTAL_THREATS: 0,
@@ -126,6 +126,13 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
     };
 
     const category = getDashboardCategory();
+    // "View All" opens a new tab, so pass the category and date range along (see threatDashboardUtils.js).
+    const viewAllParams = new URLSearchParams();
+    const categoryShortName = categoryToShortName[category];
+    if (categoryShortName) viewAllParams.set("category", categoryShortName);
+    if (startTimestamp) viewAllParams.set("since", startTimestamp);
+    if (endTimestamp) viewAllParams.set("until", endTimestamp);
+    const viewAllQuery = viewAllParams.toString() ? `?${viewAllParams.toString()}` : "";
     const tabs = [
         { label: mapLabel("Total Threats", category), count: totalThreatsCount },
         { label: mapLabel("APIs Under Threat", category), count: apisUnderThreatCount },
@@ -183,8 +190,8 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
                             style={{ cursor: "pointer" }}
                             onClick={() => handleThreatNameClick(item.rawName)}
                         >
-                            <HorizontalStack gap="2" blockAlign="center">
-                                <span style={{ color: "#E45858", fontSize: "var(--p-font-size-75, 0.75rem)", letterSpacing: "-1px" }}>|||</span>
+                            <HorizontalStack gap="2" blockAlign="start" wrap={false}>
+                                <span style={{ color: "#E45858", fontSize: "var(--p-font-size-75, 0.75rem)", letterSpacing: "-1px", flexShrink: 0 }}>|||</span>
                                 <Text variant="bodyMd">{item.name}</Text>
                             </HorizontalStack>
                         </div>,
@@ -195,7 +202,7 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
                 />
                 {threatCategoryData.length > 0 && (
                     <Box paddingBlockStart="2">
-                        <Link url="/dashboard/protection/threat-activity" removeUnderline target="_blank">
+                        <Link url={`/dashboard/protection/threat-activity${viewAllQuery}`} removeUnderline target="_blank">
                             View All ({totalThreatsCount})
                         </Link>
                     </Box>
@@ -235,7 +242,7 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
                 increasedTableDensity
             />
             {apisData.length > 0 && (
-                <Link url="/dashboard/protection/threat-api" removeUnderline target="_blank">
+                <Link url={`/dashboard/protection/threat-api${viewAllQuery}`} removeUnderline target="_blank">
                     View All ({apisUnderThreatCount})
                 </Link>
             )}
@@ -284,7 +291,7 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
                     increasedTableDensity
                 />
                 {actorsData.length > 0 && (
-                    <Link url="/dashboard/protection/threat-actor" removeUnderline target="_blank">
+                    <Link url={`/dashboard/protection/threat-actor${viewAllQuery}`} removeUnderline target="_blank">
                         View All ({threatActorsCount})
                     </Link>
                 )}

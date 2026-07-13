@@ -1,5 +1,9 @@
 import { flags } from "../components/flags/index.mjs";
 import SessionStore from "../../../../main/SessionStore";
+import { getDashboardCategory, categoryToShortName } from "../../../../main/labelHelper";
+
+// New tab starts with a fresh PersistStore, so carry the category via ?category= (see ThreatReport.jsx).
+const getCategoryParam = () => categoryToShortName[getDashboardCategory()];
 
 export const formatCategoryName = (name) => {
     if (!name) return "Unknown";
@@ -62,6 +66,8 @@ export const openThreatActivityPage = (filters = {}) => {
     if (filters.eventStatus) params.set("eventStatus", filters.eventStatus);
     if (filters.startTimestamp) params.set("startTimestamp", filters.startTimestamp);
     if (filters.endTimestamp) params.set("endTimestamp", filters.endTimestamp);
+    const categoryParam = getCategoryParam();
+    if (categoryParam) params.set("category", categoryParam);
     const url = `${window.location.origin}/dashboard/protection/threat-activity?${params.toString()}`;
     window.open(url, "_blank");
 };
@@ -74,6 +80,8 @@ export const openThreatActorsPage = (filters = {}) => {
     if (filterParts.length > 0) params.set("filters", filterParts.join("&"));
     if (filters.startTimestamp) params.set("since", filters.startTimestamp);
     if (filters.endTimestamp) params.set("until", filters.endTimestamp);
+    const categoryParam = getCategoryParam();
+    if (categoryParam) params.set("category", categoryParam);
     const url = `${window.location.origin}/dashboard/protection/threat-actor?${params.toString()}`;
     window.open(url, "_blank");
 };
