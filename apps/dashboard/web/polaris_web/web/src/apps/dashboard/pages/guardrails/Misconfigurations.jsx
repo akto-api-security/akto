@@ -37,7 +37,7 @@ const TOOL_NAME_OPTIONS = [
 ];
 
 const policyHeaders = [
-    { text: "Tool", value: "toolNameDisplay", title: "Tool", type: CellType.TEXT },
+    { text: "Agent", value: "toolNameDisplay", title: "Agent", type: CellType.TEXT },
     { text: "Field Path", value: "fieldPath", title: "Field Path", type: CellType.TEXT },
     { text: "Enforced Value", value: "enforcedValuePreview", title: "Enforced Value", type: CellType.TEXT },
     { text: "Status", value: "statusComp", title: "Status" },
