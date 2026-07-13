@@ -324,6 +324,55 @@ func (s *Service) filterPoliciesByDeviceId(policies []types.Policy, mcpServerNam
 	return filtered
 }
 
+// filterApprovedServers drops "approval"-behaviour policies whose target server already has a
+// valid (non-expired) entry in the policy's ApprovedServers list. Bypassing the policy here
+// means its detectors never run in ProcessRequestParallel — so an approved server is allowed
+// through with no block and no threat report. Only "approval" policies are affected; block/
+// warn/alert policies always pass through unchanged.
+func (s *Service) filterApprovedServers(policies []types.Policy, mcpServerName string) []types.Policy {
+	if mcpServerName == "" {
+		return policies
+	}
+	now := time.Now().Unix()
+	filtered := make([]types.Policy, 0, len(policies))
+	for _, p := range policies {
+		if strings.EqualFold(p.Behaviour, "approval") && isServerApproved(p.ApprovedServers, mcpServerName, now) {
+			s.logger.Info("filterApprovedServers - bypassing policy for approved server",
+				zap.String("policy", p.Info.Name),
+				zap.String("mcpServerName", mcpServerName))
+			continue
+		}
+		filtered = append(filtered, p)
+	}
+	return filtered
+}
+
+// isServerApproved reports whether mcpServerName has a currently-valid approval entry.
+// serverId is matched exactly (case-insensitive) — it is stored as the same device-prefixed
+// host the threat event uses, which is exactly valCtx.McpServerName. Mode ALWAYS is always
+// valid; DURATION is valid while now < expiredAt (epoch seconds); COUNT while expiredAfter > 0
+// (Phase 2: decrement handled elsewhere).
+func isServerApproved(approved []types.ApprovedServer, mcpServerName string, now int64) bool {
+	for _, a := range approved {
+		if !strings.EqualFold(a.ServerId, mcpServerName) {
+			continue
+		}
+		switch strings.ToUpper(a.Mode) {
+		case "ALWAYS":
+			return true
+		case "DURATION":
+			if a.ExpiredAt > now {
+				return true
+			}
+		case "COUNT":
+			if a.ExpiredAfter > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (s *Service) getMcpAllowedHostList() ([]types.McpAllowedList, error) {
 	refreshInterval := time.Duration(s.config.McpAllowedListRefreshIntervalMin) * time.Minute
 
@@ -941,6 +990,15 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		}
 	}
 
+	// [GUARDRAIL_FLOW] 1/3 — fetched & parsed active policies from cyborg.
+	for _, p := range policies {
+		s.logger.Info("[GUARDRAIL_FLOW] fetched policy",
+			zap.String("name", p.Info.Name),
+			zap.String("behaviour", p.Behaviour),
+			zap.Bool("applyToAllServers", p.ApplyToAllServers),
+			zap.Int("approvedServersCount", len(p.ApprovedServers)))
+	}
+
 	// Build per-policy anomaly config map so validate-time checks respect scoping.
 	anomalyMap := make(map[string]*anomalyCfg)
 	for _, gp := range response.GuardrailPolicies {
@@ -1271,6 +1329,15 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// rules that belong to policies applicable to this server.
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
 	policies = s.filterPoliciesByDeviceId(policies, valCtx.McpServerName)
+	// Bypass "approval" policies whose server is already approved (allow, no threat).
+	policies = s.filterApprovedServers(policies, valCtx.McpServerName)
+
+	// [GUARDRAIL_FLOW] 2/3 — policies that APPLY to this request after server/device/approval filtering.
+	s.logger.Info("[GUARDRAIL_FLOW] policies applied to request",
+		zap.String("mcpServerName", valCtx.McpServerName),
+		zap.String("sessionID", sessionID),
+		zap.Int("appliedCount", len(policies)),
+		zap.Strings("appliedPolicies", policyNames(policies)))
 
 	// Check account-type guardrail after server filtering so the policy's server
 	// selection is respected (a personal-account policy scoped to server A should
@@ -1487,6 +1554,8 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	// Filter policies by MCP server name — policies with no server configured are skipped
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
 	policies = s.filterPoliciesByDeviceId(policies, valCtx.McpServerName)
+	// Bypass "approval" policies whose server is already approved (allow, no threat).
+	policies = s.filterApprovedServers(policies, valCtx.McpServerName)
 
 	s.logger.Info("ValidateResponse - calling ProcessResponse",
 		zap.String("path", params.Path),
@@ -1835,6 +1904,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 		// Filter policies by MCP server name for this specific batch item
 		itemPolicies := s.filterPoliciesByMcpServer(policies, mcpServerName)
 		itemPolicies = s.filterPoliciesByDeviceId(itemPolicies, mcpServerName)
+		// Bypass "approval" policies whose server is already approved (allow, no threat).
+		itemPolicies = s.filterApprovedServers(itemPolicies, mcpServerName)
 		s.logger.Debug("ValidateBatch - applicable policies for server",
 			zap.Int("index", i),
 			zap.String("mcpServerName", mcpServerName),

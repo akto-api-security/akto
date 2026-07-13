@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import testingApi from "../../testing/api"
 import threatDetectionApi from "../api"
 import guardrailApi from "../../guardrails/api"
+import SessionStore from "../../../../main/SessionStore";
+import { isServerApproved, buildApprovedByPolicy } from "../../guardrails/utils";
 import issuesApi from "../../issues/api"
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
 import TooltipText from "../../../components/shared/TooltipText";
@@ -22,6 +24,94 @@ import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig"
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import OwaspTag from "../../guardrails/components/OwaspTag";
 import ComplianceTags from "../../guardrails/components/ComplianceTags";
+
+// Self-contained approve button + modal. Kept as its own component so typing the duration
+// re-renders only this small tree, not the whole SampleDetails flyout (which caused a flash).
+function ApproveServerButton({ policyName, serverId, alreadyApproved }) {
+    const setGuardrailApprovedByPolicy = SessionStore((state) => state.setGuardrailApprovedByPolicy);
+    const [modalActive, setModalActive] = useState(false);
+    const [mode, setMode] = useState("ALWAYS"); // ALWAYS | DURATION
+    const [days, setDays] = useState("7");
+    const [loading, setLoading] = useState(false);
+
+    if (alreadyApproved) {
+        return <Badge tone="success">Approved</Badge>;
+    }
+
+    const openModal = () => { setMode("ALWAYS"); setDays("7"); setModalActive(true); };
+
+    const handleApprove = async () => {
+        if (!policyName) { func.setToast(true, true, "Could not resolve the policy for this event"); return; }
+        if (!serverId)   { func.setToast(true, true, "Could not resolve the server for this event"); return; }
+        let value = 0;
+        if (mode === "DURATION") {
+            value = parseInt(days, 10);
+            if (!Number.isInteger(value) || value <= 0) { func.setToast(true, true, "Enter a valid number of days"); return; }
+        }
+        setLoading(true);
+        try {
+            // request util rejects (and toasts the backend error) on non-2xx, so reaching here = success.
+            await guardrailApi.approveServerForPolicy({
+                policyName,
+                approvedServerId: serverId,
+                approvedServerName: serverId,
+                approvalMode: mode,
+                approvalValue: value,
+            });
+            const scope = mode === "DURATION" ? `for ${value} day(s)` : "always";
+            func.setToast(true, false, `Approved ${serverId} ${scope}`);
+            setModalActive(false);
+            // Refresh the approved-servers map so the button flips to the green "Approved" badge.
+            try {
+                const resp = await guardrailApi.fetchGuardrailPolicies();
+                setGuardrailApprovedByPolicy(buildApprovedByPolicy(resp?.guardrailPolicies));
+            } catch { /* keep stale map on refresh failure */ }
+        } catch {
+            // Error toast already surfaced by the request interceptor; keep the modal open.
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Modal
+            activator={<Button size="slim" onClick={openModal}>Approve server</Button>}
+            open={modalActive}
+            onClose={() => setModalActive(false)}
+            primaryAction={{ content: "Approve", loading, onAction: handleApprove }}
+            secondaryActions={[{ content: "Cancel", onAction: () => setModalActive(false) }]}
+            title={"Approve server"}
+        >
+            <Modal.Section>
+                <VerticalStack gap="4">
+                    <Text variant="bodyMd">
+                        Allow <Text as="span" fontWeight="semibold">{serverId || "this server"}</Text> to
+                        bypass the <Text as="span" fontWeight="semibold">{policyName || "policy"}</Text> guardrail.
+                    </Text>
+                    <ChoiceList
+                        title="Approve for"
+                        choices={[
+                            { label: "Always", value: "ALWAYS" },
+                            { label: "A number of days", value: "DURATION" },
+                        ]}
+                        selected={[mode]}
+                        onChange={(v) => setMode(v[0])}
+                    />
+                    {mode === "DURATION" && (
+                        <TextField
+                            label="Number of days"
+                            type="number"
+                            min={1}
+                            value={days}
+                            onChange={setDays}
+                            autoComplete="off"
+                        />
+                    )}
+                </VerticalStack>
+            </Modal.Section>
+        </Modal>
+    );
+}
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
@@ -109,11 +199,9 @@ function SampleDetails(props) {
     const [triageLoading, setTriageLoading] = useState(false);
     const [actionPopoverActive, setActionPopoverActive] = useState(false);
 
-    // Approve-server states (for "approval" behaviour guardrail events)
-    const [approveModalActive, setApproveModalActive] = useState(false);
-    const [approveMode, setApproveMode] = useState("ALWAYS"); // ALWAYS | DURATION
-    const [approveDays, setApproveDays] = useState("7");
-    const [approveLoading, setApproveLoading] = useState(false);
+    // Approve-server: modal/mode/days state lives in the small ApproveServerButton component
+    // (not here) so typing the duration re-renders only that button, not the whole flyout.
+    const guardrailApprovedByPolicy = SessionStore((state) => state.guardrailApprovedByPolicy);
 
     // Jira ticket states
     const [jiraTicketUrl, setJiraTicketUrl] = useState(props.jiraTicketUrl || "");
@@ -677,40 +765,13 @@ function SampleDetails(props) {
     }
 
     // ── Approve server (bypass an "approval" behaviour guardrail) ──────────────
+    // Endpoint (Atlas) only — approval behaviour is not supported for Agentic (Argus).
     const rawBehaviour = moreInfoData?.behaviour || extractBehaviour(moreInfoData?.metadata) || "";
-    const isApprovalEvent = String(rawBehaviour).toLowerCase() === "approval";
+    const isApprovalEvent = String(rawBehaviour).toLowerCase() === "approval" && isEndpointSecurityCategory();
     const approveServerId = moreInfoData?.host || null;      // request Host = serverId
     const approvePolicyName = moreInfoData?.templateId || null;
-
-    const openApproveModal = () => { setApproveMode("ALWAYS"); setApproveDays("7"); setApproveModalActive(true); };
-
-    const handleApproveServer = async () => {
-        if (!approvePolicyName) { func.setToast(true, true, "Could not resolve the policy for this event"); return; }
-        if (!approveServerId)   { func.setToast(true, true, "Could not resolve the server for this event"); return; }
-        let value = 0;
-        if (approveMode === "DURATION") {
-            value = parseInt(approveDays, 10);
-            if (!Number.isInteger(value) || value <= 0) { func.setToast(true, true, "Enter a valid number of days"); return; }
-        }
-        setApproveLoading(true);
-        try {
-            // request util rejects (and toasts the backend error) on non-2xx, so reaching here = success.
-            await guardrailApi.approveServerForPolicy({
-                policyName: approvePolicyName,
-                approvedServerId: approveServerId,
-                approvedServerName: approveServerId,
-                approvalMode: approveMode,
-                approvalValue: value,
-            });
-            const scope = approveMode === "DURATION" ? `for ${value} day(s)` : "always";
-            func.setToast(true, false, `Approved ${approveServerId} ${scope}`);
-            setApproveModalActive(false);
-        } catch {
-            // Error toast already surfaced by the request interceptor; keep the modal open.
-        } finally {
-            setApproveLoading(false);
-        }
-    };
+    // Already approved for this (policy, server)? -> ApproveServerButton shows a green badge.
+    const alreadyApproved = isServerApproved(guardrailApprovedByPolicy, approvePolicyName, approveServerId);
 
     const handleJiraClick = async () => {
         if (!modalActive) {
@@ -1022,42 +1083,11 @@ Reference URL: ${window.location.href}`.trim();
                             />
                         </Popover>
                         {isApprovalEvent && (
-                            <Modal
-                                activator={<Button size="slim" onClick={openApproveModal}>Approve server</Button>}
-                                open={approveModalActive}
-                                onClose={() => setApproveModalActive(false)}
-                                primaryAction={{ content: "Approve", loading: approveLoading, onAction: handleApproveServer }}
-                                secondaryActions={[{ content: "Cancel", onAction: () => setApproveModalActive(false) }]}
-                                title={"Approve server"}
-                            >
-                                <Modal.Section>
-                                    <VerticalStack gap="4">
-                                        <Text variant="bodyMd">
-                                            Allow <Text as="span" fontWeight="semibold">{approveServerId || "this server"}</Text> to
-                                            bypass the <Text as="span" fontWeight="semibold">{approvePolicyName || "policy"}</Text> guardrail.
-                                        </Text>
-                                        <ChoiceList
-                                            title="Approve for"
-                                            choices={[
-                                                { label: "Always", value: "ALWAYS" },
-                                                { label: "A number of days", value: "DURATION" },
-                                            ]}
-                                            selected={[approveMode]}
-                                            onChange={(v) => setApproveMode(v[0])}
-                                        />
-                                        {approveMode === "DURATION" && (
-                                            <TextField
-                                                label="Number of days"
-                                                type="number"
-                                                min={1}
-                                                value={approveDays}
-                                                onChange={setApproveDays}
-                                                autoComplete="off"
-                                            />
-                                        )}
-                                    </VerticalStack>
-                                </Modal.Section>
-                            </Modal>
+                            <ApproveServerButton
+                                policyName={approvePolicyName}
+                                serverId={approveServerId}
+                                alreadyApproved={alreadyApproved}
+                            />
                         )}
                         {!isEndpointSecurityCategory() && (
                             <Modal
