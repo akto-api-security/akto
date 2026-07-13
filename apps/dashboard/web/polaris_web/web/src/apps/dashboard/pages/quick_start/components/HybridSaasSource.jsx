@@ -4,11 +4,12 @@ import api from '../api'
 import JsonComponent from './shared/JsonComponent'
 import func from "@/util/func"
 import Dropdown from '../../../components/layouts/Dropdown'
+import InformationBannerComponent from './shared/InformationBannerComponent'
 
 // This page is specifically for the hybrid SaaS runtime helm chart, so the token it
-// generates is always scoped to the runtime module - letting the user pick a different
-// scope here (e.g. guardrails) while the page still shows mini-runtime deploy instructions
-// would be confusing. Pick any other scope from its own settings page instead.
+// generates is always scoped to the runtime module. Token generation for other scopes
+// (guardrails, threat-detection, etc.) has its own separate card - see databaseAbstractorTokenObj
+// in transform.js.
 const RUNTIME_SCOPE = ['MINI_RUNTIME']
 
 function HybridSaasSource() {
@@ -81,6 +82,10 @@ function HybridSaasSource() {
             <Text variant='bodyMd'>
                 Seamlessly deploy Akto with our hybrid setup and start viewing your API traffic in few minutes.
             </Text>
+            <InformationBannerComponent
+                content='The token generated below is scoped to the runtime module only. To generate a token for another module (guardrails, threat detection, etc.), use the "Generate Authentication Token" card instead.'
+                docsUrl=''
+            />
             {hybridSaasComponent}
 
         </div>

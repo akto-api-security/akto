@@ -2,6 +2,7 @@ import {Avatar, Badge} from "@shopify/polaris"
 import PostmanSource from "./components/PostmanSource"
 import BurpSource from "./components/BurpSource"
 import HybridSaasSource from "./components/HybridSaasSource"
+import RuntimeTokenField from "./components/RuntimeTokenField"
 import DifyConnector from "./components/DifyConnector"
 import AgenticShield from "./components/AgenticShield"
 import AwsSource from "./components/AwsSource"
@@ -845,6 +846,14 @@ const hybridSaasObj = {
     docsUrl: 'https://docs.akto.io/getting-started/traffic-processor/hybrid-saas',
     key: "Hybrid Saas",
     component : <HybridSaasSource/>
+}
+
+const databaseAbstractorTokenObj = {
+    icon: '/public/favicon.svg',
+    label: "Generate Authentication Token",
+    text: "Generate a database-abstractor token, optionally scoped to a specific module (guardrails, threat detection, etc.)",
+    key: "Generate Authentication Token",
+    component : <RuntimeTokenField/>
 }
 
 const apiInventoryFromSourceCodeObj = {
@@ -2133,7 +2142,7 @@ const quickStartFunc = {
 
         // Hybrid Saas
         const hybridSaas = [
-            hybridSaasObj
+            hybridSaasObj, databaseAbstractorTokenObj
         ];
 
         // Kubernetes
@@ -2316,7 +2325,7 @@ const quickStartFunc = {
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
             openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, neovimHookObj, openCodeHookObj,hermesHookObj,
-            harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
+            harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, databaseAbstractorTokenObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
             cloudflareWarpObj, zscalerObj, snowflakeObj,
