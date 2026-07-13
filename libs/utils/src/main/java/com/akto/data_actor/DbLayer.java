@@ -261,7 +261,7 @@ public class DbLayer {
         updateList.add(Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()));
         updateList.add(Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS)));
         updateList.add(Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()));
-        updateList.addAll(buildAdditionalDataUpdates(moduleInfo.getAdditionalData()));
+        updateList.addAll(buildAdditionalDataUpdates(moduleInfo.getModuleType(), moduleInfo.getAdditionalData()));
 
         ModuleInfo result = ModuleInfoDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
@@ -273,12 +273,18 @@ public class DbLayer {
         return result;
     }
 
-    private static List<Bson> buildAdditionalDataUpdates(Map<String, Object> additionalData) {
+    private static List<Bson> buildAdditionalDataUpdates(ModuleInfo.ModuleType moduleType, Map<String, Object> additionalData) {
         List<Bson> updates = new ArrayList<>();
         if (additionalData == null || additionalData.isEmpty()) {
             return updates;
         }
-        updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA, additionalData));
+        if (moduleType == ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD) {
+            for (Map.Entry<String, Object> entry : additionalData.entrySet()) {
+                updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + "." + entry.getKey(), entry.getValue()));
+            }
+        } else {
+            updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA, additionalData));
+        }
         return updates;
     }
 
