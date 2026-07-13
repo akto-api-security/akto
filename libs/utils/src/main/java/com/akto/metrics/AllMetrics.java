@@ -28,7 +28,7 @@ public class AllMetrics {
         this.dataActor = dataActor;
         this.instance_id = instanceId;
 
-        Organization organization = OrgUtils.getOrganizationCached(accountId);
+        Organization organization = OrgUtils.getOrganizationCached(accountId, dataActor);
         String orgId = organization.getId();
 
         if(moduleType.equals(ModuleInfo.ModuleType.MINI_RUNTIME.name()) || moduleType.equals(ModuleInfo.ModuleType.THREAT_DETECTION.name())){
