@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Indexes for config_field_policies (ConfigFieldPolicyDao). Not created by
+        DaoInit/ConfigFieldPolicyDao today (no createIndicesIfAbsent override), so this
+        migration is the first index setup for the collection.
+
+        - createdAt index backs the paginated fetch (fetchConfigFieldPolicies →
+          findAll(Filters.empty(), skip, limit, Sorts.descending(CREATED_AT))).
+        - policyName index backs the create/update dedupe lookup
+          (Filters.eq(ConfigFieldPolicy.POLICY_NAME, ...) in ConfigFieldPolicyAction).
+    -->
+
+    <changeSet id="004-account-create-config-field-policies" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="config_field_policies"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="config_field_policies"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="config_field_policies"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="004-account-config-field-policies-createdat-index" author="akto">
+        <mongodb:createIndex collectionName="config_field_policies">
+            <mongodb:keys>{ "createdAt": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "createdAt_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="config_field_policies">
+                <mongodb:keys>{ "createdAt": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="004-account-config-field-policies-policyname-index" author="akto">
+        <mongodb:createIndex collectionName="config_field_policies">
+            <mongodb:keys>{ "policyName": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "policyName_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="config_field_policies">
+                <mongodb:keys>{ "policyName": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
