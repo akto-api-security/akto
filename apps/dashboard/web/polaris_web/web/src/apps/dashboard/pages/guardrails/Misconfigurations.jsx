@@ -200,7 +200,7 @@ function PolicyFormModal({ open, onClose, editingPolicy, onSaved }) {
                         autoComplete="off"
                     />
                     <Select
-                        label="Tool"
+                        label="Agent"
                         options={TOOL_NAME_OPTIONS}
                         value={toolName}
                         onChange={setToolName}
