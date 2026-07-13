@@ -1390,6 +1390,42 @@ const codexHookObj = {
     />
 }
 
+const kiroCliHookObj = {
+    icon: '/public/kiro.svg',
+    label: "Kiro CLI Hook",
+    text: "Monitor and secure Kiro CLI (Amazon Q Developer CLI lineage) interactions with Akto guardrails.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/kiro-cli-hooks',
+    key: "KIRO_CLI_HOOK",
+    component: <BannerComponent
+        content="Monitor and secure Kiro CLI (Amazon Q Developer CLI lineage) interactions with Akto guardrails."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/kiro-cli-hooks'
+    />
+}
+
+const kiroIdeHookObj = {
+    icon: '/public/kiro.svg',
+    label: "Kiro IDE Hook",
+    text: "IDE-level protection monitoring AI-powered code completions in the Kiro IDE.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/kiro-cli-hooks',
+    key: "KIRO_IDE_HOOK",
+    component: <BannerComponent
+        content="IDE-level protection monitoring AI-powered code completions in the Kiro IDE."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/kiro-cli-hooks'
+    />
+}
+
+const gleanHookObj = {
+    icon: '/public/glean.svg',
+    label: "Glean",
+    text: "Discover and secure Glean AI assistant interactions with Akto guardrails.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/glean',
+    key: "GLEAN_HOOK",
+    component: <BannerComponent
+        content="Discover and secure Glean AI assistant interactions with Akto guardrails."
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/glean'
+    />
+}
+
 const intellijHookObj = {
     icon: '/public/intellij.svg',
     label: "IntelliJ/JetBrains Hook (Coming Soon)",
@@ -2229,7 +2265,7 @@ const quickStartFunc = {
 
         // Endpoint Agents
         const endpointAgents = [
-            cursorHookObj, claudeCodeCliHookObj, claudeCoworkObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, neovimHookObj, openCodeHookObj, ampHookObj, hermesHookObj,intellijHookObj, antigravityObj,
+            cursorHookObj, claudeCodeCliHookObj, claudeCoworkObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, kiroCliHookObj, kiroIdeHookObj, gleanHookObj, neovimHookObj, openCodeHookObj, ampHookObj, hermesHookObj,intellijHookObj, antigravityObj,
         ]
 
         const localHostedModels = [
@@ -2318,13 +2354,13 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal() || func.isLimitedAccount()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, neovimHookObj, openCodeHookObj, hermesHookObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, kiroCliHookObj, kiroIdeHookObj, gleanHookObj, intellijHookObj, antigravityObj, databricksImportObj, neovimHookObj, openCodeHookObj, hermesHookObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, neovimHookObj, openCodeHookObj,hermesHookObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, kiroCliHookObj, kiroIdeHookObj, gleanHookObj, intellijHookObj, antigravityObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, neovimHookObj, openCodeHookObj,hermesHookObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, authenticationTokenObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
@@ -2338,7 +2374,7 @@ const quickStartFunc = {
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj,
                 awsBedrockObj, amazonQuickObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
-                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, anthropicImportObj, openaiImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj, neovimHookObj, openCodeHookObj,hermesHookObj,
+                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, kiroCliHookObj, kiroIdeHookObj, gleanHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, anthropicImportObj, openaiImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj, neovimHookObj, openCodeHookObj,hermesHookObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj,
                 intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
                 jamfEndpointObj, kandjiEndpointObj, customEndpointObj,

@@ -72,15 +72,18 @@ public class ModuleInfoConstants {
             put("ENABLE_MCP_WRAP_CODEX", "Enable MCP Wrap for Codex");
             put("ENABLE_MCP_WRAP_GITHUB_CLI", "Enable MCP Wrap for GitHub CLI");
             put("ENABLE_MCP_WRAP_ANTIGRAVITY", "Enable MCP Wrap for Antigravity");
+            put("ENABLE_MCP_WRAP_KIRO", "Enable MCP Wrap for Kiro");
             put("ENABLE_MCP_HOOKS_CLAUDE", "MCP Hooks path for Claude");
             put("ENABLE_MCP_HOOKS_CURSOR", "MCP Hooks path for Cursor");
             put("ENABLE_MCP_HOOKS_CODEX", "MCP Hooks path for Codex");
             put("ENABLE_MCP_HOOKS_GITHUB_CLI", "MCP Hooks path for GitHub CLI");
+            put("ENABLE_MCP_HOOKS_KIRO_CLI", "MCP Hooks path for Kiro CLI");
             put("ENABLE_PROMPT_HOOKS_CLAUDE", "Prompt Hooks path for Claude");
             put("ENABLE_PROMPT_HOOKS_CURSOR", "Prompt Hooks path for Cursor");
             put("ENABLE_PROMPT_HOOKS_GEMINI", "Prompt Hooks path for Gemini");
             put("ENABLE_PROMPT_HOOKS_CODEX", "Prompt Hooks path for Codex");
             put("ENABLE_PROMPT_HOOKS_GITHUB_CLI", "Prompt Hooks path for GitHub CLI");
+            put("ENABLE_PROMPT_HOOKS_KIRO_CLI", "Prompt Hooks path for Kiro CLI");
             put("ENABLE_CLAUDE_SETTINGS_CONFIG_SCAN", "Claude Settings Config");
             put("ENABLE_CODEX_SETTINGS_CONFIG_SCAN", "Codex Settings Config");
             put("ENABLE_COPILOT_CLI_SETTINGS_CONFIG_SCAN", "Copilot CLI Settings Config");
