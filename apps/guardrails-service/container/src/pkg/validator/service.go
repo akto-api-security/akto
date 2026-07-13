@@ -83,6 +83,7 @@ type Service struct {
 	sessionMgr            *session.SessionManager // Our session manager implementation for session tracking
 	anomalyDetector       *session.AnomalyDetector
 	schemaFetcher         *SchemaFetcher
+	skipPaths             *pathSkipper
 	policyRefreshGroup    singleflight.Group
 	allowlistRefreshGroup singleflight.Group
 }
@@ -141,6 +142,11 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 
 	schemaFetcher := NewSchemaFetcher(dbClient, time.Duration(cfg.PolicyRefreshIntervalMin)*time.Minute, logger)
 
+	skipPaths := newPathSkipper(cfg.SkipPaths, logger)
+	if skipPaths.enabled() {
+		logger.Info("Guardrails path skip enabled", zap.String("GUARDRAILS_SKIP_PATHS", skipPaths.rawConfig))
+	}
+
 	// Initialize anomaly detector (stateless Redis client; per-policy config is
 	// resolved at validate time from the policy cache).
 	anomalyDetector := session.NewAnomalyDetector(logger)
@@ -158,6 +164,7 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		sessionMgr:          sessionManager,
 		anomalyDetector:     anomalyDetector,
 		schemaFetcher:       schemaFetcher,
+		skipPaths:           skipPaths,
 	}
 	bp := mcp.GetScanBackpressureSnapshot()
 	logger.Info("Scan backpressure breaker active (mcp processor, remote-scanner boundary)",
@@ -761,6 +768,19 @@ func extractHostHeader(headers map[string]string) string {
 	return ""
 }
 
+// hostFromRequestHeaders parses the raw request-headers JSON and returns the
+// Host header value (empty if absent or unparseable).
+func hostFromRequestHeaders(rawHeaders string) string {
+	if rawHeaders == "" {
+		return ""
+	}
+	headers := make(map[string]string)
+	if err := json.Unmarshal([]byte(rawHeaders), &headers); err != nil {
+		return ""
+	}
+	return extractHostHeader(headers)
+}
+
 // checkToolCallAnomaly records a tool call for each filtered policy that has
 // anomaly detection enabled. Only fires for agentic tool-call paths.
 // Returns a block result if any policy with behaviour "block" triggers an anomaly.
@@ -1175,6 +1195,15 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.String("aktoVxlanId", params.AktoVxlanID),
 		zap.Bool("skipThreat", params.EffectiveSkipThreat()))
 
+	if s.skipPaths.enabled() {
+		host := hostFromRequestHeaders(params.RequestHeaders)
+		if s.skipPaths.shouldSkip(host, params.Path) {
+			s.logger.Info("ValidateRequest - host+path in GUARDRAILS_SKIP_PATHS, skipping guardrails",
+				zap.String("host", host), zap.String("path", params.Path), zap.String("method", params.Method))
+			return &mcp.ValidationResult{Allowed: true, ModifiedPayload: payload}, nil
+		}
+	}
+
 	if result, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, requestID, payload); isMalicious {
 		s.logger.Info("ValidateRequest - session already malicious, blocking request",
 			zap.String("path", params.Path),
@@ -1407,6 +1436,15 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("tag", params.Tag),
 		zap.String("aktoVxlanId", params.AktoVxlanID),
 		zap.Bool("skipThreat", params.EffectiveSkipThreat()))
+
+	if s.skipPaths.enabled() {
+		host := hostFromRequestHeaders(params.RequestHeaders)
+		if s.skipPaths.shouldSkip(host, params.Path) {
+			s.logger.Info("ValidateResponse - host+path in GUARDRAILS_SKIP_PATHS, skipping guardrails",
+				zap.String("host", host), zap.String("path", params.Path), zap.String("method", params.Method))
+			return &mcp.ValidationResult{Allowed: true, ModifiedPayload: responseBody}, nil
+		}
+	}
 
 	s.schemaFetcher.RefreshIfNeeded()
 
