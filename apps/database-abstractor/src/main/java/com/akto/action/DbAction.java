@@ -90,6 +90,7 @@ import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.CustomAuthUtil;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.GcpVertexAuthUtil;
+import com.akto.utils.GemmaVertexStructuredCallUtil;
 import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
 import com.akto.utils.StiCountAlert;
@@ -235,6 +236,20 @@ public class DbAction extends ActionSupport {
 
     @Getter @Setter
     private String gemmaVertexDedicatedDns;
+
+    // Request-bound fields for structured Vertex/Gemma calls.
+    @Getter @Setter
+    private String gemmaVertexSystem;
+
+    @Getter @Setter
+    private String gemmaVertexUser;
+
+    @Getter @Setter
+    private Map<String, Object> gemmaVertexSchema;
+
+    // Raw Vertex/Gemma predict payload binding (top-level `instances`).
+    @Getter @Setter
+    private List<Map<String, Object>> instances;
 
     @Getter @Setter
     private Map<String, Object> response;
@@ -6553,32 +6568,23 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String getGemmaVertexConfig() {
+    public String getGemmaResponse() {
         try {
-            this.gemmaVertexSaKeyJson = System.getenv().getOrDefault("GEMMA_VERTEX_SA_KEY_JSON", "");
-            this.gemmaVertexProject = System.getenv().getOrDefault("GEMMA_VERTEX_PROJECT", "");
-            this.gemmaVertexLocation = System.getenv().getOrDefault("GEMMA_VERTEX_LOCATION", "");
-            this.gemmaVertexEndpointId = System.getenv().getOrDefault("GEMMA_VERTEX_ENDPOINT_ID", "");
-            this.gemmaVertexDedicatedDns = System.getenv().getOrDefault("GEMMA_VERTEX_DEDICATED_DNS", "");
-            String accessToken = GcpVertexAuthUtil.getAccessToken(this.gemmaVertexSaKeyJson);
-            if (this.token == null) {
-                this.token = new Tokens();
+            String saKeyJson = System.getenv().getOrDefault("GEMMA_VERTEX_SA_KEY_JSON", "");
+            Map<String, Object> parsedJson;
+            if (this.instances != null && !this.instances.isEmpty()) {
+                Map<String, Object> vertexPayload = new HashMap<>();
+                vertexPayload.put("instances", this.instances);
+                parsedJson = GemmaVertexStructuredCallUtil.predictAndParseVertexPayload(saKeyJson, vertexPayload);
             }
-            // Existing `token` field is a `Tokens` DTO; populate its `token` string.
-            this.token.setToken(accessToken);
-
-            Map<String, Object> data = new HashMap<>();
-            data.put("GEMMA_VERTEX_SA_KEY_JSON", this.gemmaVertexSaKeyJson);
-            data.put("GEMMA_VERTEX_PROJECT", this.gemmaVertexProject);
-            data.put("GEMMA_VERTEX_LOCATION", this.gemmaVertexLocation);
-            data.put("GEMMA_VERTEX_ENDPOINT_ID", this.gemmaVertexEndpointId);
-            data.put("GEMMA_VERTEX_DEDICATED_DNS", this.gemmaVertexDedicatedDns);
-            data.put("token", accessToken);
+            else {
+                throw new IllegalArgumentException("Request field `instances` is required and cannot be empty");
+            }
 
             this.response = new HashMap<>();
-            this.response.put("data", data);
+            this.response.put("data", parsedJson);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in getGemmaVertexConfig " + e.toString());
+            loggerMaker.errorAndAddToDb(e, "Error in getGemmaResponse " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();

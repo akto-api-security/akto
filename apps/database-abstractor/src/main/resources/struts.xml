@@ -2858,7 +2858,7 @@
             </result>
         </action>
 
-        <action name="api/getGemmaVertexConfig" class="com.akto.action.DbAction" method="getGemmaVertexConfig">
+        <action name="api/getGemmaResponse" class="com.akto.action.DbAction" method="getGemmaResponse">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">

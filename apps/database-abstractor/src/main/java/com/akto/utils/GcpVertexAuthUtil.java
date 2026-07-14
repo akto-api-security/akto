@@ -118,6 +118,20 @@ public class GcpVertexAuthUtil {
         }
     }
 
+static void invalidateCachedToken(String serviceAccountKeyJson) {
+        if (serviceAccountKeyJson == null || serviceAccountKeyJson.isEmpty()) {
+            return;
+        }
+        try {
+            JSONObject saInfo = parseServiceAccountJson(serviceAccountKeyJson);
+            String clientEmail = saInfo.getString("client_email");
+            TOKEN_CACHE.remove(clientEmail);
+        } catch (Exception e) {
+            // Swallow: invalidate is best-effort and should not mask the original 401.
+            loggerMaker.errorAndAddToDb(e, "Error in invalidateCachedToken " + e.toString());
+        }
+    }
+
     private static JSONObject parseServiceAccountJson(String raw) {
         String candidate = raw.trim();
         try {
