@@ -75,6 +75,16 @@
     border-color: #8c9196;
 }
 
+/* Vertically centers card content against a taller sibling in the same HorizontalGrid row —
+   Card stretches its own background to the row height internally, but that fill behavior
+   isn't exposed to children via any Box/VerticalStack prop, so this needs raw flex. */
+.agentic-fill-center {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
 /* Legend dot — colour via --dot-color custom property. */
 .agentic-dot {
     width: 7px;
