@@ -56,7 +56,7 @@ function ThreatApiPage() {
   const ChartComponent = () => {
     return (
       <HorizontalGrid gap={4} columns={2}>
-        <TopThreatTypeChart key={"top-threat-types"} data={subCategoryCount} />
+        <TopThreatTypeChart key={"top-threat-types"} data={categoryCount} />
         <ThreatApiSubcategoryCount
           key={"threat-categories"}
           data={categoryCount}

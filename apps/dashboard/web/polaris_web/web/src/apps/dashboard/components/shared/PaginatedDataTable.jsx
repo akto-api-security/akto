@@ -11,24 +11,23 @@ const PaginatedDataTable = ({ columnContentTypes, headings, rows, rowsPerPage = 
   const paged = rows.slice(currentPage * rowsPerPage, (currentPage + 1) * rowsPerPage);
 
   return (
-    <VerticalStack gap="2">
+    <VerticalStack gap="2" align="space-between">
       <DataTable
         columnContentTypes={columnContentTypes}
         headings={headings}
         rows={paged}
       />
-      {totalPages > 1 && (
-        <Box paddingBlockStart="2">
-          <HorizontalStack align="center">
-            <Pagination
-              hasNext={currentPage < totalPages - 1}
-              hasPrevious={currentPage > 0}
-              onNext={() => setPage(currentPage + 1)}
-              onPrevious={() => setPage(currentPage - 1)}
-            />
-          </HorizontalStack>
-        </Box>
-      )}
+      {/* Pinned to the bottom via align="space-between", not conditional on totalPages, so the card doesn't jump when row count drops below a page. */}
+      <Box paddingBlockStart="2">
+        <HorizontalStack align="center">
+          <Pagination
+            hasNext={currentPage < totalPages - 1}
+            hasPrevious={currentPage > 0}
+            onNext={() => setPage(currentPage + 1)}
+            onPrevious={() => setPage(currentPage - 1)}
+          />
+        </HorizontalStack>
+      </Box>
     </VerticalStack>
   );
 };

@@ -9,7 +9,7 @@ const ROWS_PER_PAGE = 4;
 const ThreatApiSubcategoryCount = ({ data }) => {
   const sorted = [...data]
     .filter((x) => x && x.text != null)
-    .sort((a, b) => String(b.text).localeCompare(String(a.text)));
+    .sort((a, b) => b.value - a.value);
 
   return (
     <InfoCard
