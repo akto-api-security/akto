@@ -131,7 +131,7 @@ function TopSection({ summary }) {
                         <TitleWithInfo
                             titleText="Endpoints Over Time by OS Type"
                             textProps={{ variant: "headingMd", fontWeight: "semibold" }}
-                            tooltipContent="Undiscovered endpoints are devices whose operating system could not be determined, typically browser-extension-based detections or devices running an older installer version."
+                            tooltipContent="Unknown endpoints are devices whose operating system could not be determined, typically browser-extension-based detections or devices running an older installer version."
                         />
                         <HighchartsReact highcharts={Highcharts} options={osTrendOpts} />
                     </VerticalStack>
