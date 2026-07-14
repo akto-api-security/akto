@@ -107,7 +107,7 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
     const assetDetails = useMemo(() => [
         { label: "AI Interactions",   value: asset.aiInteractions != null ? Number(asset.aiInteractions).toLocaleString("en-US") : "-" },
         { label: "Last Traffic Seen", value: asset.lastSeen || "-" },
-        { label: "Group",             value: asset.groups?.[0]?.name || "-" },
+        { label: "Group",             value: asset.groups?.length ? asset.groups.map(g => g.name).join(", ") : "-" },
     ], [asset]);
 
     return (
