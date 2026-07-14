@@ -1,10 +1,9 @@
 import { Box, Card, HorizontalStack, Link, VerticalStack } from '@shopify/polaris';
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 
-function InfoCard({component, title, titleToolTip, linkText, linkUrl, minHeight, onLinkClick}) {
-    return (
+function InfoCard({component, title, titleToolTip, linkText, linkUrl, minHeight, onLinkClick, fillHeight}) {
+    const card = (
         <Card padding={5} key="info">
-            
             <Box minHeight={minHeight ? minHeight : "100%"}>
                 <VerticalStack gap={"2"}>
                     <VerticalStack gap={5} align='center'>
@@ -28,6 +27,9 @@ function InfoCard({component, title, titleToolTip, linkText, linkUrl, minHeight,
             </Box>
         </Card>
     );
+
+    // Card ignores style/height props; grid stretch makes it fill the wrapper.
+    return fillHeight ? <div style={{ height: "100%", display: "grid" }}>{card}</div> : card;
 }
 
 export default InfoCard;
