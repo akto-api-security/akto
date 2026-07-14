@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
+import { Badge, Box, Button, ChoiceList, Divider, HorizontalStack, Modal, Text, TextField, Tooltip, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import testingApi from "../../testing/api"
 import threatDetectionApi from "../api"
 import guardrailApi from "../../guardrails/api"
+import SessionStore from "../../../../main/SessionStore";
+import { isServerApproved, buildApprovedByPolicy } from "../../guardrails/utils";
 import issuesApi from "../../issues/api"
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
 import TooltipText from "../../../components/shared/TooltipText";
@@ -16,12 +18,100 @@ import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreati
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
 import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN, SETTINGS_RISK_CONFIGS } from "../constants/guardrailDescriptions";
-import { extractOverviewAndRemediation } from "../utils/formatUtils";
+import { extractOverviewAndRemediation, extractBehaviour } from "../utils/formatUtils";
 import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import OwaspTag from "../../guardrails/components/OwaspTag";
 import ComplianceTags from "../../guardrails/components/ComplianceTags";
+
+// Self-contained approve button + modal. Kept as its own component so typing the duration
+// re-renders only this small tree, not the whole SampleDetails flyout (which caused a flash).
+function ApproveServerButton({ policyName, serverId, alreadyApproved }) {
+    const setGuardrailApprovedByPolicy = SessionStore((state) => state.setGuardrailApprovedByPolicy);
+    const [modalActive, setModalActive] = useState(false);
+    const [mode, setMode] = useState("ALWAYS"); // ALWAYS | DURATION
+    const [days, setDays] = useState("7");
+    const [loading, setLoading] = useState(false);
+
+    if (alreadyApproved) {
+        return <Badge tone="success">Approved</Badge>;
+    }
+
+    const openModal = () => { setMode("ALWAYS"); setDays("7"); setModalActive(true); };
+
+    const handleApprove = async () => {
+        if (!policyName) { func.setToast(true, true, "Could not resolve the policy for this event"); return; }
+        if (!serverId)   { func.setToast(true, true, "Could not resolve the server for this event"); return; }
+        let value = 0;
+        if (mode === "DURATION") {
+            value = parseInt(days, 10);
+            if (!Number.isInteger(value) || value <= 0) { func.setToast(true, true, "Enter a valid number of days"); return; }
+        }
+        setLoading(true);
+        try {
+            // request util rejects (and toasts the backend error) on non-2xx, so reaching here = success.
+            await guardrailApi.approveServerForPolicy({
+                policyName,
+                approvedServerId: serverId,
+                approvedServerName: serverId,
+                approvalMode: mode,
+                approvalValue: value,
+            });
+            const scope = mode === "DURATION" ? `for ${value} day(s)` : "always";
+            func.setToast(true, false, `Approved ${serverId} ${scope}`);
+            setModalActive(false);
+            // Refresh the approved-servers map so the button flips to the green "Approved" badge.
+            try {
+                const resp = await guardrailApi.fetchGuardrailPolicies();
+                setGuardrailApprovedByPolicy(buildApprovedByPolicy(resp?.guardrailPolicies));
+            } catch { /* keep stale map on refresh failure */ }
+        } catch {
+            // Error toast already surfaced by the request interceptor; keep the modal open.
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Modal
+            activator={<Button size="slim" onClick={openModal}>Approve server</Button>}
+            open={modalActive}
+            onClose={() => setModalActive(false)}
+            primaryAction={{ content: "Approve", loading, onAction: handleApprove }}
+            secondaryActions={[{ content: "Cancel", onAction: () => setModalActive(false) }]}
+            title={"Approve server"}
+        >
+            <Modal.Section>
+                <VerticalStack gap="4">
+                    <Text variant="bodyMd">
+                        Allow <Text as="span" fontWeight="semibold">{serverId || "this server"}</Text> to
+                        bypass the <Text as="span" fontWeight="semibold">{policyName || "policy"}</Text> guardrail.
+                    </Text>
+                    <ChoiceList
+                        title="Approve for"
+                        choices={[
+                            { label: "Always", value: "ALWAYS" },
+                            { label: "A number of days", value: "DURATION" },
+                        ]}
+                        selected={[mode]}
+                        onChange={(v) => setMode(v[0])}
+                    />
+                    {mode === "DURATION" && (
+                        <TextField
+                            label="Number of days"
+                            type="number"
+                            min={1}
+                            value={days}
+                            onChange={setDays}
+                            autoComplete="off"
+                        />
+                    )}
+                </VerticalStack>
+            </Modal.Section>
+        </Modal>
+    );
+}
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
@@ -105,9 +195,13 @@ function SampleDetails(props) {
     let severity = moreInfoData?.severity || currentTemplateObj?.severity || "HIGH"
     const [remediationText, setRemediationText] = useState("")
     const [latestActivity, setLatestActivity] = useState([])
-    const [showModal, setShowModal] = useState(false);  
+    const [showModal, setShowModal] = useState(false);
     const [triageLoading, setTriageLoading] = useState(false);
     const [actionPopoverActive, setActionPopoverActive] = useState(false);
+
+    // Approve-server: modal/mode/days state lives in the small ApproveServerButton component
+    // (not here) so typing the duration re-renders only that button, not the whole flyout.
+    const guardrailApprovedByPolicy = SessionStore((state) => state.guardrailApprovedByPolicy);
 
     // Jira ticket states
     const [jiraTicketUrl, setJiraTicketUrl] = useState(props.jiraTicketUrl || "");
@@ -670,6 +764,15 @@ function SampleDetails(props) {
         }
     }
 
+    // ── Approve server (bypass an "approval" behaviour guardrail) ──────────────
+    // Endpoint (Atlas) only — approval behaviour is not supported for Agentic (Argus).
+    const rawBehaviour = moreInfoData?.behaviour || extractBehaviour(moreInfoData?.metadata) || "";
+    const isApprovalEvent = String(rawBehaviour).toLowerCase() === "approval" && isEndpointSecurityCategory();
+    const approveServerId = moreInfoData?.host || null;      // request Host = serverId
+    const approvePolicyName = moreInfoData?.templateId || null;
+    // Already approved for this (policy, server)? -> ApproveServerButton shows a green badge.
+    const alreadyApproved = isServerApproved(guardrailApprovedByPolicy, approvePolicyName, approveServerId);
+
     const handleJiraClick = async () => {
         if (!modalActive) {
             try {
@@ -979,6 +1082,13 @@ Reference URL: ${window.location.href}`.trim();
                                 ].filter(item => item)}
                             />
                         </Popover>
+                        {isApprovalEvent && (
+                            <ApproveServerButton
+                                policyName={approvePolicyName}
+                                serverId={approveServerId}
+                                alreadyApproved={alreadyApproved}
+                            />
+                        )}
                         {!isEndpointSecurityCategory() && (
                             <Modal
                                 activator={<Button destructive size="slim" onClick={() => setShowModal(!showModal)}>Block IPs</Button>}

@@ -14,6 +14,7 @@ import SampleDetails from "../threat_detection/components/SampleDetails";
 import { LABELS } from "../threat_detection/constants";
 import SusDataTable from "../threat_detection/components/SusDataTable";
 import NormalSampleDetails from "../threat_detection/components/NormalSampleDetails";
+import { extractBehaviour } from "../threat_detection/utils/formatUtils";
 
 
 function GuardrailDetection() {
@@ -57,7 +58,11 @@ function GuardrailDetection() {
                 sessionId: data.sessionId,
                 severity: data.severity,
                 ruleViolated: data.ruleViolated,
-                complianceMap: data.complianceMapData || {}
+                complianceMap: data.complianceMapData || {},
+                // For the "Approve server" action on approval-behaviour guardrail events.
+                // Prefer the precomputed row field (data.metadata passthrough is dropped by the table).
+                behaviour: data.behaviourRaw || extractBehaviour(data.metadata),
+                host: data.host,
             })
         } else {
             setShowDetails(!showDetails)
