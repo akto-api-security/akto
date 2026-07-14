@@ -75,6 +75,10 @@ public class AllMetrics {
             multipleSampleDataFetchLatency = new LatencyMetric("MULTIPLE_SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId, moduleType);
         }
 
+        if(moduleType.equals(ModuleInfo.ModuleType.ACCOUNT_JOB_EXECUTOR.name())){
+            accountJobsRunFailed = new SumMetric("ACCOUNT_JOBS_RUN_FAILED", 60, accountId, orgId, moduleType);
+        }
+
         // sampleDataFetchCount = new SumMetric("SAMPLE_DATA_FETCH_COUNT", 60, accountId, orgId); // tODO: Do we need this?
         // kafkaOffset = new SumMetric("KAFKA_OFFSET", 60, accountId, orgId);
         if (!moduleType.equals(ModuleInfo.ModuleType.THREAT_DETECTION.name())) {
@@ -102,7 +106,7 @@ public class AllMetrics {
                 cyborgApiPayloadSize, multipleSampleDataFetchLatency, runtimeApiReceivedCount,
                 tdKafkaRecordCount, tdKafkaRecordSize, tdKafkaProcessLatency,
                 cpuUsagePercent, heapMemoryUsedMb, heapMemoryMaxMb, nonHeapMemoryUsedMb, threadCount,
-                availableProcessors, totalPhysicalMemoryMb);
+                availableProcessors, totalPhysicalMemoryMb, accountJobsRunFailed);
 
         AllMetrics _this = this;
         executorService.scheduleWithFixedDelay(() -> {
@@ -211,6 +215,7 @@ public class AllMetrics {
     private Metric cyborgApiPayloadSize = null;
     private Metric multipleSampleDataFetchLatency = null;
     private Metric runtimeApiReceivedCount = null;
+    private Metric accountJobsRunFailed = null;
 
     // Infrastructure metrics (CPU, Memory, Threads)
     private Metric cpuUsagePercent = null;
@@ -393,6 +398,10 @@ public class AllMetrics {
             multipleSampleDataFetchLatency.record(val);
     }
 
+    public void setAccountJobsRunFailed(float val){
+        if(accountJobsRunFailed != null)
+            accountJobsRunFailed.record(val);
+    }
 
     private static final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
 
