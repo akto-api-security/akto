@@ -14,7 +14,8 @@ import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
-import com.akto.utils.elasticsearch.ElasticSearchClient;
+import com.akto.utils.search.SearchClient;
+import com.akto.utils.search.SearchClientFactory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -41,8 +42,8 @@ public class UserAnalysisCron {
     public void setUpUserAnalysisCronScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                if (!ElasticSearchClient.instance().isConfigured()) {
-                    loggerMaker.error("UserAnalysisCron: ES not configured, skipping tick.");
+                if (!SearchClientFactory.instance().isConfigured()) {
+                    loggerMaker.error("UserAnalysisCron: search backend not configured, skipping tick.");
                     return;
                 }
                 AccountTask.instance.executeTask(new Consumer<Account>() {
@@ -72,10 +73,10 @@ public class UserAnalysisCron {
 
         // Collect unprocessed records (scrollQueryData already filters topicProcessed=true)
         List<AgentQueryRecord> records = new ArrayList<>();
-        ElasticSearchClient.instance().scrollQueryData(accountId, startTs, endTs, PAGE_SIZE,
+        SearchClientFactory.instance().scrollQueryData(accountId, startTs, endTs, PAGE_SIZE,
             MAX_DOCS_PER_ACCOUNT_PER_TICK, records::add);
 
-        loggerMaker.info("Fetch query records from ES with count: " + records.size());
+        loggerMaker.info("Fetch query records count: " + records.size());
 
         // Filter: drop tool-use spans and short/empty records
         List<AgentQueryRecord> llmRecords = new ArrayList<>();
@@ -85,7 +86,7 @@ public class UserAnalysisCron {
             if (rec.getQueryPayload() == null || rec.getQueryPayload().length() < MIN_QUERY_LENGTH) continue;
             if (!isToolUseRecord(rec)) llmRecords.add(rec);
         }
-        loggerMaker.info("Filtered query records from ES, count left: " + llmRecords.size());
+        loggerMaker.info("Filtered query records count left: " + llmRecords.size());
 
         if (!llmRecords.isEmpty()) {
             classifyAndPersist(llmRecords, accountId, classifier);
@@ -177,7 +178,7 @@ public class UserAnalysisCron {
         }
 
         // Step 4: Accumulate per-record results into per-AggregateKey structures
-        List<ElasticSearchClient.TopicUpdate> topicUpdates = new ArrayList<>();
+        List<SearchClient.TopicUpdate> topicUpdates = new ArrayList<>();
         // domain → (subDomain → count) per aggregate key — mirrors topicHierarchy in MongoDB
         Map<AggregateKey, Map<String, Map<String, Integer>>> aggTopicHierarchy = new HashMap<>();
         Map<AggregateKey, Map<String, Object>> aggHarmfulMerge = new HashMap<>();
@@ -203,11 +204,11 @@ public class UserAnalysisCron {
 
             AggregateKey key = new AggregateKey(rec.getServiceId(), rec.getDeviceId());
 
-            // ES write-back: domain + subDomain for this record
+            // Topic write-back: domain + subDomain for this record
             String domain    = getDomain(result);
             String subDomain = getSubDomain(result);
             if (!domain.isEmpty() && rec.getDocId() != null && !rec.getDocId().isEmpty()) {
-                topicUpdates.add(new ElasticSearchClient.TopicUpdate(rec.getDocId(), domain, subDomain));
+                topicUpdates.add(new SearchClient.TopicUpdate(rec.getDocId(), domain, subDomain, rec.getTimeStampMs()));
             }
 
             // Build topic hierarchy: domain → subDomain → count
@@ -245,11 +246,11 @@ public class UserAnalysisCron {
             }
         }
 
-        // Step 5: Bulk write topics back to ES
+        // Step 5: Bulk write topics back
         if (!topicUpdates.isEmpty()) {
             loggerMaker.infoAndAddToDb("Bulk updates for topics: " + topicUpdates.size());
             try {
-                ElasticSearchClient.instance().bulkUpdateTopics(topicUpdates);
+                SearchClientFactory.instance().bulkUpdateTopics(topicUpdates);
             } catch (Exception e) {
                 loggerMaker.error("UserAnalysisCron: bulkUpdateTopics failed for accountId " + accountId + ": " + e.getMessage());
             }
