@@ -16,10 +16,7 @@ type MetricData struct {
 	MetricType string  `json:"metricType"`
 	ModuleType string  `json:"moduleType"`
 	AccountId  int64   `json:"accountId,omitempty"`
-	// InstanceId distinguishes replicas of the same account for instance-level
-	// gauges (CPU/memory). Empty for the per-account latency metrics, which are
-	// aggregated across the instance anyway.
-	InstanceId string `json:"instanceId,omitempty"`
+	InstanceId string  `json:"instanceId,omitempty"`
 }
 
 type accountAccumulator struct {
