@@ -10,6 +10,7 @@ import (
 
 	"time"
 
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/guardcache"
 	"github.com/akto-api-security/akto-endpoint-shield/utils"
 	"github.com/akto-api-security/guardrails-service/handlers"
 	"github.com/akto-api-security/guardrails-service/pkg/auth"
@@ -75,12 +76,13 @@ func main() {
 
 // metricsFlushLoop periodically drains guardrail metrics and pushes them to the
 // db-abstractor every 60s: per-account latency plus instance-level
-// CPU/memory/goroutine gauges. It blocks forever, so start it with `go`.
+// CPU/memory/goroutine gauges and full-text semantic-cache hit/miss counts.
+// It blocks forever, so start it with `go`.
 func metricsFlushLoop(dbClient *dbabstractor.Client, logger *zap.Logger, acc *metrics.Accumulator) {
 	sysSampler, err := metrics.NewSystemSampler()
 	if err != nil {
 		// Non-fatal: the service still validates without instance metrics.
-		logger.Warn("System metrics sampler unavailable; CPU/memory gauges disabled", zap.Error(err))
+		logger.Warn("System metrics sampler unavailable; CPU/memory/cache gauges disabled", zap.Error(err))
 	}
 
 	ticker := time.NewTicker(60 * time.Second)
@@ -89,10 +91,14 @@ func metricsFlushLoop(dbClient *dbabstractor.Client, logger *zap.Logger, acc *me
 		for accountId, batch := range acc.DrainAll() {
 			flushMetrics(dbClient, logger, accountId, batch)
 		}
-		// Instance-level CPU/memory/goroutine gauges, attributed to the
-		// service token's account (see metrics.SystemSampler).
+		// Instance-level CPU/memory/goroutine gauges plus cache hit/miss
+		// counts, attributed to the service token's account (see
+		// metrics.SystemSampler).
 		if sysSampler != nil {
-			if sysBatch := sysSampler.Sample(); len(sysBatch) > 0 {
+			sysBatch := sysSampler.Sample()
+			cacheStats := guardcache.DrainStats()
+			sysBatch = append(sysBatch, sysSampler.CacheStats(cacheStats.HitsExact, cacheStats.HitsFuzzy, cacheStats.Misses)...)
+			if len(sysBatch) > 0 {
 				flushMetrics(dbClient, logger, strconv.FormatInt(sysBatch[0].AccountId, 10), sysBatch)
 			}
 		}

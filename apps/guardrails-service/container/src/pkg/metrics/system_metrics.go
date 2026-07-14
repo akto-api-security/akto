@@ -41,17 +41,25 @@ func NewSystemSampler() (*SystemSampler, error) {
 	return &SystemSampler{proc: p, accountId: accID, instanceId: host}, nil
 }
 
-// gauge builds a MetricData for one instance-level reading.
-func (s *SystemSampler) gauge(metricId string, value float64, now int64) MetricData {
+// metric builds a MetricData for one instance-level reading of the given type.
+func (s *SystemSampler) metric(metricId, metricType string, value float64, now int64) MetricData {
 	return MetricData{
 		MetricId:   metricId,
 		Value:      value,
 		Timestamp:  now,
-		MetricType: "GAUGE",
+		MetricType: metricType,
 		ModuleType: moduleTypeAgentGateway,
 		AccountId:  s.accountId,
 		InstanceId: s.instanceId,
 	}
+}
+
+func (s *SystemSampler) gauge(metricId string, value float64, now int64) MetricData {
+	return s.metric(metricId, "GAUGE", value, now)
+}
+
+func (s *SystemSampler) sum(metricId string, value float64, now int64) MetricData {
+	return s.metric(metricId, "SUM", value, now)
 }
 
 // Sample reads current CPU%, resident memory and goroutine count. It is meant to
@@ -74,4 +82,18 @@ func (s *SystemSampler) Sample() []MetricData {
 	out = append(out, s.gauge("GUARDRAIL_GOROUTINES", float64(runtime.NumGoroutine()), now))
 
 	return out
+}
+
+// CacheStats builds SUM metrics for the full-text semantic-cache hit/miss
+// counts accumulated since the last call — a delta (e.g. from
+// guardcache.DrainStats), not a running total, matching MetricType SUM.
+// Hits are split by match type: exact (literal repeat) vs fuzzy (embedding
+// similarity match), since they represent different cache behavior.
+func (s *SystemSampler) CacheStats(hitsExact, hitsFuzzy, misses uint64) []MetricData {
+	now := time.Now().Unix()
+	return []MetricData{
+		s.sum("GUARDRAIL_CACHE_HIT_EXACT", float64(hitsExact), now),
+		s.sum("GUARDRAIL_CACHE_HIT_FUZZY", float64(hitsFuzzy), now),
+		s.sum("GUARDRAIL_CACHE_MISS", float64(misses), now),
+	}
 }

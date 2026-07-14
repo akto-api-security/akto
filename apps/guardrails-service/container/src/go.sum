@@ -29,8 +29,8 @@ github.com/Masterminds/sprig/v3 v3.3.0 h1:mQh0Yrg1XPo6vjYXgtf5OtijNAKJRNcTdOOGZe
 github.com/Masterminds/sprig/v3 v3.3.0/go.mod h1:Zy1iXRYNqNLUolqCpL4uhk6SHUMAOSCzdgBfDb35Lz0=
 github.com/STARRY-S/zip v0.2.1 h1:pWBd4tuSGm3wtpoqRZZ2EAwOmcHK6XFf7bU9qcJXyFg=
 github.com/STARRY-S/zip v0.2.1/go.mod h1:xNvshLODWtC4EJ702g7cTYn13G53o1+X9BWnPFpcWV4=
-github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260713165715-0741a43011a6 h1:FlVQxBopt3lJhPXw19h2cTHvMG5jCx2VAIxMwt2Fd5A=
-github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260713165715-0741a43011a6/go.mod h1:xygh4yYStZhELBqnSAgC/eflshcDFacvKQz2ZF5bFwY=
+github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260714114404-dadbd4118ccb h1:nEDsZm5EnOJvHPJnEplYS93E+O1R8N5k69lhUwgiOCg=
+github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260714114404-dadbd4118ccb/go.mod h1:xygh4yYStZhELBqnSAgC/eflshcDFacvKQz2ZF5bFwY=
 github.com/andybalholm/brotli v1.2.0 h1:ukwgCxwYrmACq68yiUqwIWnGY0cTPox/M94sVwToPjQ=
 github.com/andybalholm/brotli v1.2.0/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
 github.com/aymanbagabas/go-osc52/v2 v2.0.1 h1:HwpRHbFMcZLEVr42D4p7XBqjyuxQH5SMiErDT4WkJ2k=
