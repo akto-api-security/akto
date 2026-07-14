@@ -249,7 +249,7 @@ public class DbAction extends ActionSupport {
 
     // Raw Vertex/Gemma predict payload binding (top-level `instances`).
     @Getter @Setter
-    private List<Map<String, Object>> instances;
+    private List<Object> instances;
 
     @Getter @Setter
     private Map<String, Object> response;
@@ -6572,13 +6572,12 @@ public class DbAction extends ActionSupport {
         try {
             String saKeyJson = System.getenv().getOrDefault("GEMMA_VERTEX_SA_KEY_JSON", "");
             Map<String, Object> parsedJson;
-            if (this.instances != null && !this.instances.isEmpty()) {
+            if (this.instances != null) {
                 Map<String, Object> vertexPayload = new HashMap<>();
                 vertexPayload.put("instances", this.instances);
                 parsedJson = GemmaVertexStructuredCallUtil.predictAndParseVertexPayload(saKeyJson, vertexPayload);
-            }
-            else {
-                throw new IllegalArgumentException("Request field `instances` is required and cannot be empty");
+            } else {
+                throw new IllegalArgumentException("Request field `instances` is required");
             }
 
             this.response = new HashMap<>();
