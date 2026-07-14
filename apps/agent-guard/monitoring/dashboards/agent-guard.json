@@ -1,0 +1,86 @@
+{
+  "title": "Agent Guard",
+  "uid": "agent-guard",
+  "timezone": "browser",
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "15s",
+  "panels": [
+    { "type": "row", "title": "HTTP", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "id": 100 },
+    {
+      "id": 1, "type": "timeseries", "title": "Request rate by endpoint",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "targets": [{ "expr": "sum by (handler, status) (rate(http_requests_total[1m]))", "legendFormat": "{{handler}} {{status}}" }]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "Request latency p95 by endpoint",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (handler, le) (rate(http_request_duration_seconds_bucket[5m])))", "legendFormat": "{{handler}}" }]
+    },
+
+    { "type": "row", "title": "Scans", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }, "id": 101 },
+    {
+      "id": 3, "type": "timeseries", "title": "Scan requests by scanner & status",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "targets": [{ "expr": "sum by (scanner, status) (rate(scanner_requests_total[1m]))", "legendFormat": "{{scanner}} {{status}}" }]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "Scan duration p50/p95 by scanner",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (scanner, le) (rate(scanner_duration_seconds_bucket[5m])))", "legendFormat": "p50 {{scanner}}" },
+        { "expr": "histogram_quantile(0.95, sum by (scanner, le) (rate(scanner_duration_seconds_bucket[5m])))", "legendFormat": "p95 {{scanner}}" }
+      ]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "In-flight scan requests",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "targets": [{ "expr": "scan_queue_size", "legendFormat": "in-flight" }]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Cascade backpressure trips",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "targets": [{ "expr": "rate(cascade_backpressure_trips_total[5m])", "legendFormat": "trips/sec" }]
+    },
+
+    { "type": "row", "title": "Dependencies", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 }, "id": 102 },
+    {
+      "id": 7, "type": "timeseries", "title": "LLM provider latency p95",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 27 },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (provider, le) (rate(provider_latency_seconds_bucket[5m])))", "legendFormat": "{{provider}}" }]
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "LLM provider errors by reason",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 27 },
+      "targets": [{ "expr": "sum by (provider, reason) (rate(provider_errors_total[5m]))", "legendFormat": "{{provider}} {{reason}}" }]
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Anonymizer latency p95",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le) (rate(anonymizer_latency_seconds_bucket[5m])))", "legendFormat": "p95" }]
+    },
+    {
+      "id": 10, "type": "timeseries", "title": "Anonymizer errors by reason",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 },
+      "targets": [{ "expr": "sum by (reason) (rate(anonymizer_errors_total[5m]))", "legendFormat": "{{reason}}" }]
+    },
+
+    { "type": "row", "title": "Containers (cAdvisor)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 43 }, "id": 103 },
+    {
+      "id": 11, "type": "timeseries", "title": "CPU usage (cores)",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 44 },
+      "targets": [{ "expr": "sum by (id) (rate(container_cpu_usage_seconds_total{id=~\"/docker/.+\"}[1m]))", "legendFormat": "{{id}}" }]
+    },
+    {
+      "id": 12, "type": "timeseries", "title": "Memory usage (incl. cache)",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 44 },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [{ "expr": "container_memory_usage_bytes{id=~\"/docker/.+\"}", "legendFormat": "{{id}}" }]
+    },
+    {
+      "id": 13, "type": "timeseries", "title": "Memory working set (OOM-risk)",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 44 },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [{ "expr": "container_memory_working_set_bytes{id=~\"/docker/.+\"}", "legendFormat": "{{id}}" }]
+    }
+  ]
+}

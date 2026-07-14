@@ -75,6 +75,8 @@ services:
     container_name: agent-guard-grafana
     volumes:
       - ./monitoring/grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+      - ./monitoring/grafana-dashboards-provider.yml:/etc/grafana/provisioning/dashboards/provider.yml:ro
+      - ./monitoring/dashboards:/etc/grafana/provisioning/dashboards/files:ro
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
