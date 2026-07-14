@@ -43,6 +43,7 @@ function makeOsTrendConfig(osTrend, monthLabels) {
         {name:"Mac",     data:osTrend.mac     || new Array(n).fill(0), color:"#7C3AED"},
         {name:"Windows", data:osTrend.windows || new Array(n).fill(0), color:"#10B981"},
         {name:"Linux",   data:osTrend.linux   || new Array(n).fill(0), color:"#F59E0B"},
+        {name:"Unknown", data:osTrend.unknown || new Array(n).fill(0), color:"#8C9196"},
     ];
     return {
         chart:{
@@ -127,7 +128,11 @@ function TopSection({ summary }) {
             <Card padding="0">
                 <Box padding="4">
                     <VerticalStack gap="2">
-                        <Text variant="headingMd" fontWeight="semibold">Endpoints Over Time by OS Type</Text>
+                        <TitleWithInfo
+                            titleText="Endpoints Over Time by OS Type"
+                            textProps={{ variant: "headingMd", fontWeight: "semibold" }}
+                            tooltipContent="Unknown endpoints are devices whose operating system could not be determined, typically browser-extension-based detections or devices running an older installer version."
+                        />
                         <HighchartsReact highcharts={Highcharts} options={osTrendOpts} />
                     </VerticalStack>
                 </Box>

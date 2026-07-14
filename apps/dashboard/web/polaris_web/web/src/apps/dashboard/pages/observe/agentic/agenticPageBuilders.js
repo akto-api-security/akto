@@ -109,15 +109,6 @@ export function buildAgentInlineTopologyComponents(stiEndpoints = [], builtinToo
     return items;
 }
 
-export function inferOsFromDeviceId(deviceId) {
-    if (!deviceId) return null;
-    const upper = String(deviceId).toUpperCase();
-    if (upper.includes("WIN")) return "windows";
-    if (upper.includes("LIN") || upper.includes("LINUX")) return "linux";
-    if (upper.includes("MAC")) return "mac";
-    return null;
-}
-
 // Collections reaching this UI are already scoped to agentic context-source, so we only
 // guard against deactivated ones and confirm the agentic <endpoint>.<source>.<service>
 // hostname shape — no env-tag re-check needed.
@@ -496,7 +487,7 @@ export function buildDeviceEndpointsPageData(
     riskScoreMap = {},
     { moduleInfos = [], usernameMap = {}, violationsByCollectionId = {}, violationRows = [], startTimestamp = 0, endTimestamp = 0 } = {},
 ) {
-    const agenticCollections = collections.filter(isAgenticCollection);
+    const agenticCollections = collections.filter((c) => !c.deactivated);
     const deviceModules = buildModuleDeviceMap(moduleInfos);
     const deviceMap = {};
     const collectionIdToDevice = {};
@@ -521,7 +512,7 @@ export function buildDeviceEndpointsPageData(
             const username = resolvedUsername !== DEFAULT_VALUE ? resolvedUsername : (mod.username || "-");
             deviceMap[devId] = {
                 deviceId: devId,
-                os: mod.os || inferOsFromDeviceId(devId),
+                os: mod.os || null,
                 username,
                 team: mod.team || "",
                 role: mod.role || "",
@@ -581,7 +572,7 @@ export function buildDeviceEndpointsPageData(
         if (deviceMap[devId]) {
             const mod = deviceModules[devId];
             const device = deviceMap[devId];
-            if (!device.os) device.os = mod.os || inferOsFromDeviceId(devId);
+            if (!device.os) device.os = mod.os || null;
             if (!device.team) device.team = mod.team || "";
             if (!device.role) device.role = mod.role || "";
         }
@@ -639,10 +630,8 @@ export function buildDeviceEndpointsPageData(
     const users = new Set(Object.values(deviceMap).map((d) => d.username).filter((u) => u && u !== "-"));
     let agentChildCount = 0;
     const violationsBySeverity = emptyViolations();
-    const osCounts = { mac: 0, windows: 0, linux: 0 };
 
     Object.values(deviceMap).forEach((d) => {
-        osCounts[d.os] = (osCounts[d.os] || 0) + 1;
         mergeViolations(violationsBySeverity, d.violations);
         agentChildCount += Object.keys(d.children).length;
     });
@@ -666,7 +655,7 @@ export function buildDeviceEndpointsPageData(
         if (!devId) return;
         const ts = c.startTs || 0;
         if (!deviceFirstSeen[devId] || ts < deviceFirstSeen[devId].ts) {
-            deviceFirstSeen[devId] = { ts, os: deviceMap[devId]?.os || inferOsFromDeviceId(devId) };
+            deviceFirstSeen[devId] = { ts, os: deviceMap[devId]?.os || null };
         }
     });
     const deviceFirstSeenItems = Object.values(deviceFirstSeen);
@@ -688,10 +677,13 @@ export function buildDeviceEndpointsPageData(
     const userFirstSeenItems = Object.values(userFirstSeen).map((ts) => ({ ts }));
 
     // OS trend: count of newly-first-seen devices per OS per month.
-    // Use cumulativeSeriesByMonth so all 3 OS series share identical slot boundaries + labels.
+    // Use cumulativeSeriesByMonth so all series share identical slot boundaries + labels.
+    // Devices with no reported os (e.g. pre-update installers that didn't send it) fall into "unknown"
+    // so the trend total always reconciles with deviceCount.
     const macItems     = deviceFirstSeenItems.filter((d) => d.os === "mac");
     const windowsItems = deviceFirstSeenItems.filter((d) => d.os === "windows");
     const linuxItems   = deviceFirstSeenItems.filter((d) => d.os === "linux");
+    const unknownItems = deviceFirstSeenItems.filter((d) => d.os !== "mac" && d.os !== "windows" && d.os !== "linux");
 
     const getTs = (d) => d.ts;
     // OS trend: cumulative new-devices-per-OS over the selected window, shared slots/labels.
@@ -700,11 +692,12 @@ export function buildDeviceEndpointsPageData(
             { items: macItems,     getTs },
             { items: windowsItems, getTs },
             { items: linuxItems,   getTs },
+            { items: unknownItems, getTs },
         ],
         startTimestamp,
         endTimestamp,
     );
-    const [macCounts, windowsCounts, linuxCounts] = osTrendData;
+    const [macCounts, windowsCounts, linuxCounts, unknownCounts] = osTrendData;
 
     // Sparklines — cumulative, same window as the OS trend
     const endpointBucket  = cumulativeByMonth(deviceFirstSeenItems, getTs, startTimestamp, endTimestamp);
@@ -759,6 +752,7 @@ export function buildDeviceEndpointsPageData(
             mac:     macCounts,
             windows: windowsCounts,
             linux:   linuxCounts,
+            unknown: unknownCounts,
         },
         statSparklines: {
             endpoints:  endpointBucket.counts,

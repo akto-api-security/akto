@@ -13,13 +13,13 @@ import {
     hasPersonalAccountTag,
     hasLocalMcpServerTag,
     hasMisconfiguredConfigTag,
+    isNotAttachedHostName,
 } from "./mcpClientHelper";
 import func from "@/util/func";
 import {
     getResolvedUsernameForCollection,
     DEFAULT_VALUE,
 } from "../api_collections/endpointShieldHelper";
-import { inferOsFromDeviceId } from "./agenticPageBuilders";
 
 // Table constants
 export const PAGE_LIMIT = 100;
@@ -213,12 +213,13 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
 
     collections.forEach((c) => {
         if (c.deactivated) return;
+        const hostName = c.hostName || c.displayName || c.name;
+        if (isNotAttachedHostName(hostName)) return; // Orphan skill bucket — not a real agent
         const assetTag = findAssetTag(c.envType);
         if (!assetTag?.value) return; // Skip collections without agent tag
         if (assetTag.keyName === ASSET_TAG_KEYS.BROWSER_LLM_AGENT) return; // Skip browser-llm-agent rows
 
         const key = AGENT_KEY_ALIASES[assetTag.value] ?? assetTag.value;
-        const hostName = c.hostName || c.displayName || c.name;
         const endpointId = extractEndpointId(hostName);
         
         if (!agents[key]) {
@@ -300,7 +301,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
     
     collections.forEach((c) => {
         if (c.deactivated) return;
-        if ((c.hostName || c.displayName || c.name || '').includes('not-attached')) return;
+        if (isNotAttachedHostName(c.hostName || c.displayName || c.name)) return;
         const typeTag = findTypeTag(c.envType);
         if (!typeTag) return; // Skip collections without type tag
         // gen-ai collections that also have an asset tag (ai-agent/mcp-client) or a connector
@@ -695,7 +696,7 @@ function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}) {
                 deviceId,
                 endpoint: deviceId,
                 username,
-                os: inferOsFromDeviceId(deviceId),
+                os: null,
                 riskScore: collRisk,
                 lastSeen: maxTraffic > 0 ? func.prettifyEpoch(maxTraffic) : "-",
                 lastSeenEpoch: maxTraffic,
@@ -889,6 +890,7 @@ export function buildAgenticAssetsPageData(
             hasMisconfiguredConfig: group.hasMisconfiguredConfig || false,
         };
         if (violations) flatRow.violations = violations;
+        if (groups.length) flatRow.groups = groups;
         if (aiInteractions) {
             flatRow.aiInteractions = aiInteractions.total;
             flatRow.aiInteractionsDetail = {
