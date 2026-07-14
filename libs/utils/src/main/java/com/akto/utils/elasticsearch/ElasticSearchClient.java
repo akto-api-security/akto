@@ -58,7 +58,7 @@ public class ElasticSearchClient extends SearchClient {
     private static final String AGG_TOP_TRACES          = "topTraces";
     private static final String AGG_TRACE_SPARK         = "traceSpark";
     private static final String AGG_SESSION_SPARK       = "sessionSpark";
-    private static final int    USER_BREAKDOWN_SIZE      = 5;
+    private static final int    USER_BREAKDOWN_SIZE      = 3;
     // Nested agg: terms on topic.keyword → sub-agg terms on subTopic.keyword.
     // Preserves domain→subDomain link so the frontend can show the hierarchy correctly.
     private static final String AGG_TOPIC_HIERARCHY     = "topicHierarchyAgg";
