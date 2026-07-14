@@ -34,24 +34,17 @@ jobs:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
-          set -euo pipefail
-
-          BASELINE_ARGS=()
+          set -eu
+          JOBS="$(nproc)"
           if [ "${EVENT_NAME}" != "pull_request" ]; then
             git fetch --no-tags origin master:refs/remotes/origin/master
             BASELINE_COMMIT="$(git merge-base HEAD origin/master)"
-            BASELINE_ARGS=(--baseline-commit "${BASELINE_COMMIT}")
             echo "Delta Pro scan vs master (baseline=${BASELINE_COMMIT})"
+            semgrep ci --baseline-commit "${BASELINE_COMMIT}" --jobs "${JOBS}" --json-output=semgrep-results.json
           else
             echo "Delta Pro scan via pull_request event (Semgrep diff-aware mode)"
+            semgrep ci --jobs "${JOBS}" --json-output=semgrep-results.json
           fi
-
-          JOBS="$(nproc)"
-          echo "Using jobs=${JOBS}"
-          semgrep ci \
-            "${BASELINE_ARGS[@]}" \
-            --jobs "${JOBS}" \
-            --json-output=semgrep-results.json
 
       - name: Write Actions job summary
         if: always()
