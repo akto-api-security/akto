@@ -6572,13 +6572,14 @@ public class DbAction extends ActionSupport {
         try {
             String saKeyJson = System.getenv().getOrDefault("GEMMA_VERTEX_SA_KEY_JSON", "");
             Map<String, Object> parsedJson;
-            if (this.instances != null) {
-                Map<String, Object> vertexPayload = new HashMap<>();
-                vertexPayload.put("instances", this.instances);
-                parsedJson = GemmaVertexStructuredCallUtil.predictAndParseVertexPayload(saKeyJson, vertexPayload);
-            } else {
-                throw new IllegalArgumentException("Request field `instances` is required");
+            if (this.instances == null) {
+                addActionError("Request field `instances` is required");
+                return Action.ERROR.toUpperCase();
             }
+
+            Map<String, Object> vertexPayload = new HashMap<>();
+            vertexPayload.put("instances", this.instances);
+            parsedJson = GemmaVertexStructuredCallUtil.predictAndParseVertexPayload(saKeyJson, vertexPayload);
 
             this.response = new HashMap<>();
             this.response.put("data", parsedJson);
