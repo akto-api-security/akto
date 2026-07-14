@@ -89,6 +89,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.CustomAuthUtil;
 import com.akto.utils.KafkaUtils;
+import com.akto.utils.GcpVertexAuthUtil;
 import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
 import com.akto.utils.StiCountAlert;
@@ -218,6 +219,25 @@ public class DbAction extends ActionSupport {
 
     @Getter @Setter
     private AgentQueryData agentQueryData;
+
+    // Gemini/Vertex configuration + minted OAuth access token for internal worker calls.
+    @Getter @Setter
+    private String gemmaVertexSaKeyJson;
+
+    @Getter @Setter
+    private String gemmaVertexProject;
+
+    @Getter @Setter
+    private String gemmaVertexLocation;
+
+    @Getter @Setter
+    private String gemmaVertexEndpointId;
+
+    @Getter @Setter
+    private String gemmaVertexDedicatedDns;
+
+    @Getter @Setter
+    private Map<String, Object> response;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
 
@@ -6529,6 +6549,37 @@ public class DbAction extends ActionSupport {
         nhiUpsertedCount = ok;
         if (failed > 0) {
             loggerMaker.errorAndAddToDb("upsertNhiIdentities: " + failed + "/" + nhiIdentities.size() + " records failed");
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String getGemmaVertexConfig() {
+        try {
+            this.gemmaVertexSaKeyJson = System.getenv().getOrDefault("GEMMA_VERTEX_SA_KEY_JSON", "");
+            this.gemmaVertexProject = System.getenv().getOrDefault("GEMMA_VERTEX_PROJECT", "");
+            this.gemmaVertexLocation = System.getenv().getOrDefault("GEMMA_VERTEX_LOCATION", "");
+            this.gemmaVertexEndpointId = System.getenv().getOrDefault("GEMMA_VERTEX_ENDPOINT_ID", "");
+            this.gemmaVertexDedicatedDns = System.getenv().getOrDefault("GEMMA_VERTEX_DEDICATED_DNS", "");
+            String accessToken = GcpVertexAuthUtil.getAccessToken(this.gemmaVertexSaKeyJson);
+            if (this.token == null) {
+                this.token = new Tokens();
+            }
+            // Existing `token` field is a `Tokens` DTO; populate its `token` string.
+            this.token.setToken(accessToken);
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("GEMMA_VERTEX_SA_KEY_JSON", this.gemmaVertexSaKeyJson);
+            data.put("GEMMA_VERTEX_PROJECT", this.gemmaVertexProject);
+            data.put("GEMMA_VERTEX_LOCATION", this.gemmaVertexLocation);
+            data.put("GEMMA_VERTEX_ENDPOINT_ID", this.gemmaVertexEndpointId);
+            data.put("GEMMA_VERTEX_DEDICATED_DNS", this.gemmaVertexDedicatedDns);
+            data.put("token", accessToken);
+
+            this.response = new HashMap<>();
+            this.response.put("data", data);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in getGemmaVertexConfig " + e.toString());
+            return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
     }
