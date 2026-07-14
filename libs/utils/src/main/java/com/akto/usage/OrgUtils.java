@@ -40,6 +40,10 @@ public class OrgUtils {
     private static final Map<Integer, CachedOrganization> orgCache = new ConcurrentHashMap<>();
 
     public static Organization getOrganizationCached(int accountId) {
+        return getOrganizationCached(accountId, dataActor);
+    }
+
+    public static Organization getOrganizationCached(int accountId, DataActor dataActor) {
         CachedOrganization cached = orgCache.get(accountId);
         int now = Context.now();
         if (cached != null) {
