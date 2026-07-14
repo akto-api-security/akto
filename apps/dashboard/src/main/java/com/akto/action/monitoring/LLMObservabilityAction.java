@@ -46,6 +46,7 @@ public class LLMObservabilityAction extends UserAction {
     private static final String AGG_TOP_TRACES          = "topTraces";
     private static final String AGG_TRACE_SPARK          = "traceSpark";
     private static final String AGG_SESSION_SPARK        = "sessionSpark";
+    private static final int    USER_BREAKDOWN_SIZE       = 3;
     // Nested agg: terms on topic.keyword → sub-agg terms on subTopic.keyword.
     // Preserves domain→subDomain link so the frontend can show the hierarchy correctly.
     private static final String AGG_TOPIC_HIERARCHY      = "topicHierarchyAgg";
@@ -323,7 +324,18 @@ public class LLMObservabilityAction extends UserAction {
                     .put("terms", new JSONObject().put("field", AgentQueryRecord.F_USER_NAME_KW).put("size", 10))
                     .put("aggs", tokenSubAggs()))
                 .put(AGG_USER_BREAKDOWN, new JSONObject()
-                    .put("terms", new JSONObject().put("field", AgentQueryRecord.F_USER_NAME_KW).put("size", 3)))
+                    .put("terms", new JSONObject()
+                        .put("field", AgentQueryRecord.F_USER_NAME_KW)
+                        .put("size", USER_BREAKDOWN_SIZE)
+                        // Rank buckets by the cardinality sub-agg (unique sessions), not the
+                        // default doc_count (messages) — otherwise a chatty low-session user
+                        // could bump a genuinely higher-session user out of the top N.
+                        .put("order", new JSONObject().put(AGG_TOTAL_SESSIONS, "desc")))
+                    // Cardinality sub-agg so the breakdown reflects unique sessions per user,
+                    // not raw message/doc count (which double-counts multi-message sessions).
+                    .put("aggs", new JSONObject()
+                        .put(AGG_TOTAL_SESSIONS, new JSONObject()
+                            .put("cardinality", new JSONObject().put("field", AgentQueryRecord.F_SESSION_IDENTIFIER_KW)))))
                 .put(AGG_SESSION_SPARK, new JSONObject()
                     .put("date_histogram", new JSONObject()
                         .put("field", AgentQueryRecord.F_TIMESTAMP)
@@ -352,7 +364,7 @@ public class LLMObservabilityAction extends UserAction {
                 row.put(KEY_TOTAL_TOKENS, in + out);
                 aggTopUsers.add(row);
             }
-            aggUserBreakdown.addAll(parseBreakdown(aggsResult, AGG_USER_BREAKDOWN, 3));
+            aggUserBreakdown.addAll(parseBreakdown(aggsResult, AGG_USER_BREAKDOWN, USER_BREAKDOWN_SIZE, AGG_TOTAL_SESSIONS));
 
             JSONObject sessionSparkAgg = aggsResult.optJSONObject(AGG_SESSION_SPARK);
             if (sessionSparkAgg != null) {
@@ -686,11 +698,11 @@ public class LLMObservabilityAction extends UserAction {
         return out;
     }
 
-    /**
-     * Extracts up to maxItems {label, count} entries from a plain terms aggregation (no sub-aggs).
-     */
+    // Extracts up to maxItems {label, count} entries from a terms aggregation, reading count
+    // from the named cardinality sub-agg rather than doc_count (which would double-count
+    // entities, e.g. sessions, that span multiple documents).
     private static List<Map<String, Object>> parseBreakdown(
-            JSONObject aggsResult, String aggName, int maxItems) throws JSONException {
+            JSONObject aggsResult, String aggName, int maxItems, String cardinalitySubAggName) throws JSONException {
         List<Map<String, Object>> out = new ArrayList<>();
         if (aggsResult == null) return out;
         JSONObject agg = aggsResult.optJSONObject(aggName);
@@ -704,7 +716,7 @@ public class LLMObservabilityAction extends UserAction {
             if (key.isEmpty()) continue;
             Map<String, Object> entry = new HashMap<>();
             entry.put(KEY_LABEL, key);
-            entry.put(KEY_COUNT, b.optLong("doc_count", 0));
+            entry.put(KEY_COUNT, subAggLong(b, cardinalitySubAggName));
             out.add(entry);
         }
         return out;
