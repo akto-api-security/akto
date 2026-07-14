@@ -698,11 +698,10 @@ export function buildDeviceEndpointsPageData(
     });
     const userFirstSeenItems = Object.values(userFirstSeen).map((ts) => ({ ts }));
 
-    // OS trend: count of newly-first-seen ENDPOINT devices (installed agent/CLI/IDE, not
-    // browser-only) per OS per month. Use cumulativeSeriesByMonth so all series share
-    // identical slot boundaries + labels. Devices with no reported os (e.g. pre-update
-    // installers that didn't send it) fall into "unknown" so the trend total always
-    // reconciles with deviceCount.
+    // OS trend: count of newly-first-seen devices per OS per month.
+    // Use cumulativeSeriesByMonth so all series share identical slot boundaries + labels.
+    // Devices with no reported os (e.g. pre-update installers that didn't send it) fall into "unknown"
+    // so the trend total always reconciles with deviceCount.
     const macItems     = endpointFirstSeenItems.filter((d) => d.os === "mac");
     const windowsItems = endpointFirstSeenItems.filter((d) => d.os === "windows");
     const linuxItems   = endpointFirstSeenItems.filter((d) => d.os === "linux");
