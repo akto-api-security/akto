@@ -1,7 +1,8 @@
 """Cloud-agnostic scan routing shared by the Cloudflare Worker and FastAPI app."""
 
 import time
-from typing import Any, Callable, Coroutine, Dict, Optional
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 import alerts
 import cascade_backpressure
@@ -35,7 +36,7 @@ def shape_response(
     is_valid: bool,
     risk_score: float,
     sanitized_text: str,
-    details: Dict[str, Any],
+    details: dict[str, Any],
 ) -> dict:
     return {
         "scanner_name": scanner_name,
@@ -57,7 +58,7 @@ def scanners_metadata() -> dict:
 async def scan_payload(
     payload: dict,
     env=None,
-    schedule_fn: Optional[ScheduleFn] = None,
+    schedule_fn: ScheduleFn | None = None,
 ) -> dict:
     """Run one scan and return the ScanResponse-shaped dict."""
     started = time.perf_counter()
@@ -77,16 +78,12 @@ async def scan_payload(
             _elapsed_ms(),
             always=True,
         )
-        return shape_response(
-            scanner_name, True, 0.0, text, {"error": f"unsupported scanner: {scanner_name}"}
-        )
+        return shape_response(scanner_name, True, 0.0, text, {"error": f"unsupported scanner: {scanner_name}"})
 
     if scanner_name in REMOTE_SCANNERS:
         if scanner_name == "Anonymize":
             r = await scan_anonymize(text, config, env)
-            return shape_response(
-                scanner_name, r["is_valid"], r["risk_score"], r["sanitized_text"], r["details"]
-            )
+            return shape_response(scanner_name, r["is_valid"], r["risk_score"], r["sanitized_text"], r["details"])
 
     if scanner_name in CASCADE_SCANNERS:
         if not config.get("modelConfigs"):
@@ -113,9 +110,7 @@ async def scan_payload(
             )
         scan_diag.log_backpressure_proceeding(scanner_name)
         try:
-            result = await scan_with_model_map(
-                scanner_name, scanner_type, text, config, store_fn=store_fn
-            )
+            result = await scan_with_model_map(scanner_name, scanner_type, text, config, store_fn=store_fn)
             elapsed = result.get("execution_time_ms")
             if isinstance(elapsed, (int, float)) and elapsed > 0:
                 cascade_backpressure.record_cascade_latency(float(elapsed))
@@ -161,9 +156,7 @@ async def scan_payload(
                 _elapsed_ms(),
                 extra={"is_valid": r["is_valid"]},
             )
-            return shape_response(
-                scanner_name, r["is_valid"], r["risk_score"], r["sanitized_text"], r["details"]
-            )
+            return shape_response(scanner_name, r["is_valid"], r["risk_score"], r["sanitized_text"], r["details"])
         except ValueError:
             return shape_response(
                 scanner_name,

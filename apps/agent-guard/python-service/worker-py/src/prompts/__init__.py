@@ -1,6 +1,6 @@
 """Per-scanner prompt templates and the unified build_scan_prompt dispatcher."""
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from . import ban_topics, code, gibberish, password, prompt_injection, toxicity
 
@@ -8,10 +8,10 @@ from . import ban_topics, code, gibberish, password, prompt_injection, toxicity
 def build_scan_prompt(
     scanner_name: str,
     scanner_type: str,
-    config: Dict[str, Any],
+    config: dict[str, Any],
     text: str,
     provider_name: str = "",
-) -> Optional[str]:
+) -> str | None:
     if scanner_name == "PromptInjection":
         return prompt_injection.build(scanner_type, text)
     if scanner_name == "BanTopics":

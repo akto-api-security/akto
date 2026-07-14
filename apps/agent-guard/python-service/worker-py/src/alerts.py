@@ -10,7 +10,7 @@ response. None ever raises into the caller.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 import httpx
 
@@ -31,8 +31,7 @@ def _fmt_num(v: Any) -> str:
         return "—"
 
 
-def _build_blocks(scanner_name: str, scanner_type: str, text: str,
-                  result: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _build_blocks(scanner_name: str, scanner_type: str, text: str, result: dict[str, Any]) -> list[dict[str, Any]]:
     details = result.get("details") or {}
     is_valid = bool(result.get("is_valid", True))
     verdict = "✅ ALLOWED" if is_valid else "🚫 BLOCKED"
@@ -43,7 +42,7 @@ def _build_blocks(scanner_name: str, scanner_type: str, text: str,
 
     preview = text if len(text) <= _TEXT_PREVIEW_CHARS else text[:_TEXT_PREVIEW_CHARS] + "…"
 
-    model_rows: List[str] = []
+    model_rows: list[str] = []
     for key, val in details.items():
         if not isinstance(val, dict) or "completed" not in val:
             continue
@@ -56,22 +55,29 @@ def _build_blocks(scanner_name: str, scanner_type: str, text: str,
         else:
             model_rows.append(f"• `{key}` — _not consulted_")
 
-    blocks: List[Dict[str, Any]] = [
-        {"type": "section", "text": {"type": "mrkdwn", "text": (
-            f"*{verdict}* — `{scanner_name}` ({scanner_type})\n"
-            f"*winner:* `{provider}`   *cascade:* `{cascade}`   *risk:* `{risk}`")}},
+    blocks: list[dict[str, Any]] = [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": (
+                    f"*{verdict}* — `{scanner_name}` ({scanner_type})\n"
+                    f"*winner:* `{provider}`   *cascade:* `{cascade}`   *risk:* `{risk}`"
+                ),
+            },
+        },
         {"type": "section", "text": {"type": "mrkdwn", "text": f"*Input:*\n```{preview}```"}},
     ]
     if reason:
         blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*Reason:* {reason}"}})
     if model_rows:
-        blocks.append({"type": "section", "text": {"type": "mrkdwn",
-                       "text": "*Per-model decisions:*\n" + "\n".join(model_rows)}})
+        blocks.append(
+            {"type": "section", "text": {"type": "mrkdwn", "text": "*Per-model decisions:*\n" + "\n".join(model_rows)}}
+        )
     return blocks
 
 
-async def post_slack(scanner_name: str, scanner_type: str, text: str,
-                     result: Dict[str, Any]) -> None:
+async def post_slack(scanner_name: str, scanner_type: str, text: str, result: dict[str, Any]) -> None:
     webhook = (settings.SLACK_WEBHOOK_URL or "").strip()
     if not webhook:
         return
@@ -85,15 +91,14 @@ async def post_slack(scanner_name: str, scanner_type: str, text: str,
         logger.warning(f"[Slack] post failed: {exc}")
 
 
-async def store_results(completed: List[Dict[str, Any]], scanner_name: str) -> None:
+async def store_results(completed: list[dict[str, Any]], scanner_name: str) -> None:
     base = (settings.DATABASE_ABSTRACTOR_SERVICE_URL or "").strip().rstrip("/")
     if not base:
         return
     try:
         payload = {"scannerName": scanner_name, "modelResults": completed}
         async with httpx.AsyncClient(timeout=_STORE_TIMEOUT_S) as client:
-            resp = await client.post(f"{base}/api/storeGuardrailModelResults",
-                                     headers=_IDENTITY, json=payload)
+            resp = await client.post(f"{base}/api/storeGuardrailModelResults", headers=_IDENTITY, json=payload)
         if resp.status_code >= 400:
             logger.warning(f"[Store] returned {resp.status_code} for scanner={scanner_name}")
     except Exception as exc:

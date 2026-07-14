@@ -2,7 +2,6 @@
 
 import json
 
-import constants
 from constants import BUILTIN_DEFAULT_CONFIG, get_default_config
 
 
@@ -14,8 +13,7 @@ def test_empty_falls_back_to_builtin():
 def test_valid_json_overrides_builtin():
     custom = {
         "modelConfigs": [
-            {"provider": "anthropic", "modelRole": "FINAL_ARBITER",
-             "safeDecisionThreshold": 0.8, "timeoutMs": 20000},
+            {"provider": "anthropic", "modelRole": "FINAL_ARBITER", "safeDecisionThreshold": 0.8, "timeoutMs": 20000},
         ],
         "parallelExecution": True,
         "storeAllResults": True,

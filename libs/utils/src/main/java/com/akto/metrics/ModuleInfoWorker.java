@@ -73,15 +73,21 @@ public class ModuleInfoWorker {
     public static String getModuleName(ModuleInfo.ModuleType moduleType) {
         switch (moduleType) {
             case THREAT_DETECTION:
-                if (!hostname.isEmpty()) {
-                    return "akto-threat:" + hostname;
-                } else if (!podName.isEmpty() && !nodeName.isEmpty()) {
-                    return "akto-threat:" + podName + ":" + nodeName;
-                } else {
-                    return "akto-threat:" + UUID.randomUUID().toString();
-                }
+                return resolveModuleName("akto-threat");
+            case ACCOUNT_JOB_EXECUTOR:
+                return resolveModuleName("account-job-executor");
             default:
                 return "Default_" + UUID.randomUUID().toString();
+        }
+    }
+
+    private static String resolveModuleName(String prefix) {
+        if (!hostname.isEmpty()) {
+            return prefix + ":" + hostname;
+        } else if (!podName.isEmpty() && !nodeName.isEmpty()) {
+            return prefix + ":" + podName + ":" + nodeName;
+        } else {
+            return prefix + ":" + UUID.randomUUID().toString();
         }
     }
 

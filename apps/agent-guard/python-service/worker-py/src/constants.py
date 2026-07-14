@@ -8,12 +8,12 @@ different model maps; BUILTIN_DEFAULT_CONFIG is the last-resort fallback.
 
 import json
 import logging
-from typing import Any, Dict
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-BUILTIN_DEFAULT_CONFIG: Dict[str, Any] = {
+BUILTIN_DEFAULT_CONFIG: dict[str, Any] = {
     "modelConfigs": [
         {
             "provider": "qwen3guard",
@@ -37,7 +37,7 @@ BUILTIN_DEFAULT_CONFIG: Dict[str, Any] = {
 }
 
 
-def get_default_config(raw_json: str = "") -> Dict[str, Any]:
+def get_default_config(raw_json: str = "") -> dict[str, Any]:
     """Resolve the fallback modelMap for a request with no modelConfigs.
 
     Prefers the per-deployment DEFAULT_MODEL_CONFIG_JSON env value (passed in as
@@ -69,9 +69,7 @@ GEMMA_ONLY_SCANNERS = {"BanCode", "Password"}
 # it holds regardless of caller (policy modelConfigs, DEFAULT_MODEL_CONFIG_JSON,
 # or a direct /scan hit with no config at all), not just the Go gateway's own hardcode.
 FORCE_GEMMA_ONLY_SCANNERS = {"Password"}
-_HARDCODED_GEMMA_ONLY_CONFIG = [
-    {"provider": "gemma_vertexai", "modelRole": "FINAL_ARBITER", "timeoutMs": 30000}
-]
+_HARDCODED_GEMMA_ONLY_CONFIG = [{"provider": "gemma_vertexai", "modelRole": "FINAL_ARBITER", "timeoutMs": 30000}]
 
 
 def strip_qwen_tier(model_configs):
@@ -79,16 +77,15 @@ def strip_qwen_tier(model_configs):
 
     Returns the original list if filtering would leave nothing usable.
     """
-    filtered = [
-        m for m in (model_configs or [])
-        if not str(m.get("provider", "")).lower().startswith("qwen")
-    ]
+    filtered = [m for m in (model_configs or []) if not str(m.get("provider", "")).lower().startswith("qwen")]
     return filtered or list(model_configs or [])
 
 
 def force_gemma_only(_model_configs):
     """Replace whatever modelConfigs was supplied with the fixed Gemma-only map."""
     return list(_HARDCODED_GEMMA_ONLY_CONFIG)
+
+
 # Scanners that proxy to a sibling Worker which in turn owns a Cloudflare
 # Container. Used for any scanner that needs a real Python runtime (spaCy,
 # torch, etc.) which Pyodide can't host.

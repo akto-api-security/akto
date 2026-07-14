@@ -2,7 +2,13 @@ package com.akto.account_job_executor;
 
 import com.akto.account_job_executor.cron.AccountJobsCron;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.ClientActor;
+import com.akto.data_actor.DataActor;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
+import com.akto.metrics.ModuleInfoWorker;
 
 /**
  * Main entry point for the AccountJob Executor service.
@@ -18,6 +24,7 @@ import com.akto.log.LoggerMaker;
 public class Main {
 
     private static final LoggerMaker logger = new LoggerMaker(Main.class);
+    private static final DataActor dataActor = new ClientActor();
 
     public static void main(String[] args) {
         logger.info("===========================================");
@@ -77,6 +84,15 @@ public class Main {
         try {
             logger.info("Starting AccountJobsCron scheduler...");
             AccountJobsCron.instance.startScheduler();
+
+            logger.info("Starting module info heartbeat...");
+            ModuleInfoWorker.init(ModuleInfo.ModuleType.ACCOUNT_JOB_EXECUTOR, dataActor);
+
+            int metricsAccountId = ClientActor.getAccountId();
+            Context.accountId.set(metricsAccountId);
+            String instanceId = ModuleInfoWorker.getModuleName(ModuleInfo.ModuleType.ACCOUNT_JOB_EXECUTOR);
+            AllMetrics.instance.init(LogDb.ACCOUNT_JOB_EXECUTOR, false, dataActor, metricsAccountId, instanceId,
+                    ModuleInfo.ModuleType.ACCOUNT_JOB_EXECUTOR.name());
 
             logger.info("===========================================");
             logger.info("Account Job Executor Service started successfully (API-only mode)");

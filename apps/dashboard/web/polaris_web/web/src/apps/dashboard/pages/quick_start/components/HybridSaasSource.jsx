@@ -4,6 +4,13 @@ import api from '../api'
 import JsonComponent from './shared/JsonComponent'
 import func from "@/util/func"
 import Dropdown from '../../../components/layouts/Dropdown'
+import InformationBannerComponent from './shared/InformationBannerComponent'
+
+// This page is specifically for the hybrid SaaS runtime helm chart, so the token it
+// generates is always scoped to the runtime module. Token generation for other scopes
+// (guardrails, threat-detection, etc.) has its own separate entry - see authenticationTokenObj
+// in transform.js.
+const RUNTIME_SCOPE = ['MINI_RUNTIME']
 
 function HybridSaasSource() {
     const [apiToken, setApiToken] = useState("");
@@ -16,7 +23,7 @@ function HybridSaasSource() {
     const [selectedExpiryDuration, setSelectedExpiryDuration] = useState(6);
 
     const fetchRuntimeHelmCommand = async(selectedExpiryDuration) => {
-        await api.fetchRuntimeHelmCommand(selectedExpiryDuration).then((resp) => {
+        await api.fetchRuntimeHelmCommand(selectedExpiryDuration, RUNTIME_SCOPE).then((resp) => {
             if (!resp) return
             setApiToken(resp?.apiToken)
         })
@@ -55,7 +62,7 @@ function HybridSaasSource() {
                 initial={selectedExpiryDuration}
                 selected={(type) => {setSelectedExpiryDuration(type); fetchRuntimeHelmCommand(type)}}
             />
-            </Box>
+          </Box>
 
           <span>3. Run the below command to setup Akto Runtime service. Change the namespace according to your requirements. </span>
 
@@ -75,6 +82,10 @@ function HybridSaasSource() {
             <Text variant='bodyMd'>
                 Seamlessly deploy Akto with our hybrid setup and start viewing your API traffic in few minutes.
             </Text>
+            <InformationBannerComponent
+                content='The token generated below is scoped to the runtime module only. To generate a token for another module (guardrails, threat detection, etc.), select "Generate Authentication Token" from the quick start list instead.'
+                docsUrl=''
+            />
             {hybridSaasComponent}
 
         </div>
