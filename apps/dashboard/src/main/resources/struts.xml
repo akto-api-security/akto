@@ -9199,6 +9199,9 @@
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User sent message to MCP AI agent with conversation storage</param>
             </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AKTO_GPT_AI</param>
+            </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
