@@ -36,6 +36,25 @@ import "../../../components/layouts/style.css";
 
 // ─── Event Actions dropdown ───────────────────────────────────────────────────
 
+// Shared by the Jira and Azure Boards ticket-creation handlers below — same fields, same order.
+function buildViolationDescription(row) {
+    return [
+        "Guardrail Violation Alert",
+        "",
+        `Policy: ${row?.policyName || "N/A"}`,
+        `Severity: ${row?.severity || "N/A"}`,
+        `Type: ${row?.type || "N/A"}`,
+        `Agentic Asset: ${row?.agenticAsset || "N/A"}`,
+        `User: ${row?.user || "N/A"}`,
+        `Detected: ${row?.detected ? func.epochToDateTime(row.detected) : "N/A"}`,
+        "",
+        "Evidence:",
+        row?.evidenceText || "N/A",
+        "",
+        `Reference URL: ${window.location.href}`,
+    ].join("\n");
+}
+
 function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row }) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -105,21 +124,7 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
         }
         try {
             const title = `${row?.violation || "Guardrail Violation"} - ${row?.agenticAsset || row?.user || "Unknown"}`;
-            const description = [
-                "Guardrail Violation Alert",
-                "",
-                `Policy: ${row?.policyName || "N/A"}`,
-                `Severity: ${row?.severity || "N/A"}`,
-                `Type: ${row?.type || "N/A"}`,
-                `Agentic Asset: ${row?.agenticAsset || "N/A"}`,
-                `User: ${row?.user || "N/A"}`,
-                `Detected: ${row?.detected ? func.epochToDateTime(row.detected) : "N/A"}`,
-                "",
-                "Evidence:",
-                row?.evidenceText || "N/A",
-                "",
-                `Reference URL: ${window.location.href}`,
-            ].join("\n");
+            const description = buildViolationDescription(row);
             func.setToast(true, false, "Creating Jira Ticket");
             const response = await issuesApi.createGeneralJiraTicket({ title, description, projId, issueType, threatEventId: violationId });
             if (response?.errorMessage) { func.setToast(true, true, response.errorMessage); return; }
@@ -162,21 +167,7 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
             catch { func.setToast(true, true, "Please fill all required fields before creating an Azure Boards work item."); return; }
 
             const title = `${row?.violation || "Guardrail Violation"} - ${row?.agenticAsset || row?.user || "Unknown"}`;
-            const description = [
-                "Guardrail Violation Alert",
-                "",
-                `Policy: ${row?.policyName || "N/A"}`,
-                `Severity: ${row?.severity || "N/A"}`,
-                `Type: ${row?.type || "N/A"}`,
-                `Agentic Asset: ${row?.agenticAsset || "N/A"}`,
-                `User: ${row?.user || "N/A"}`,
-                `Detected: ${row?.detected ? func.epochToDateTime(row.detected) : "N/A"}`,
-                "",
-                "Evidence:",
-                row?.evidenceText || "N/A",
-                "",
-                `Reference URL: ${window.location.href}`,
-            ].join("\n");
+            const description = buildViolationDescription(row);
             func.setToast(true, false, "Creating Azure Boards Work Item");
             const response = await issuesApi.createGeneralAzureBoardsWorkItem({
                 title, description,
