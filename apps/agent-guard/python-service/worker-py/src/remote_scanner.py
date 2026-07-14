@@ -16,7 +16,7 @@ from typing import Any
 
 import httpx
 
-from metrics import ANONYMIZER_ERRORS, ANONYMIZER_LATENCY
+import metrics_push
 from settings import settings
 
 logger = logging.getLogger(__name__)
@@ -56,20 +56,20 @@ async def _scan_anonymize_http(text: str, config: dict[str, Any], base_url: str)
         async with httpx.AsyncClient(timeout=_ANONYMIZE_TIMEOUT_S) as client:
             response = await client.post(url, json=payload)
     except Exception as exc:
-        ANONYMIZER_ERRORS.labels(reason=type(exc).__name__).inc()
+        metrics_push.anonymizer_errors.increment(type(exc).__name__)
         logger.warning(f"[remote] anonymizer HTTP fetch failed: {exc}")
         return _fail_open(text, f"fetch_failed: {exc}")
-    ANONYMIZER_LATENCY.observe(time.perf_counter() - started)
+    metrics_push.anonymizer_latency.record("anonymizer", (time.perf_counter() - started) * 1000.0)
 
     if response.status_code < 200 or response.status_code >= 300:
-        ANONYMIZER_ERRORS.labels(reason=f"status_{response.status_code}").inc()
+        metrics_push.anonymizer_errors.increment(f"status_{response.status_code}")
         logger.warning(f"[remote] anonymizer returned {response.status_code}")
         return _fail_open(text, f"status_{response.status_code}")
 
     try:
         return _shape_success(response.json(), text)
     except Exception as exc:
-        ANONYMIZER_ERRORS.labels(reason=type(exc).__name__).inc()
+        metrics_push.anonymizer_errors.increment(type(exc).__name__)
         logger.warning(f"[remote] anonymizer response not JSON: {exc}")
         return _fail_open(text, "bad_response")
 

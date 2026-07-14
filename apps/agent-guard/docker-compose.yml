@@ -45,45 +45,6 @@ services:
     networks:
       - agent-guard-network
 
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
-    container_name: agent-guard-cadvisor
-    privileged: true
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-    ports:
-      - "127.0.0.1:8080:8080"
-    networks:
-      - agent-guard-network
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: agent-guard-prometheus
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    ports:
-      - "127.0.0.1:9090:9090"
-    networks:
-      - agent-guard-network
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: agent-guard-grafana
-    volumes:
-      - ./monitoring/grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
-      - ./monitoring/grafana-dashboards-provider.yml:/etc/grafana/provisioning/dashboards/provider.yml:ro
-      - ./monitoring/dashboards:/etc/grafana/provisioning/dashboards/files:ro
-    ports:
-      - "127.0.0.1:3000:3000"
-    depends_on:
-      - prometheus
-    networks:
-      - agent-guard-network
-
 networks:
   agent-guard-network:
     driver: bridge

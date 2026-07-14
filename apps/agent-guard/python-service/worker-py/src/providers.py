@@ -14,6 +14,7 @@ from typing import Any, Optional
 
 import gcp_auth
 import http_client
+import metrics_push
 from settings import settings
 
 logger = logging.getLogger(__name__)
@@ -32,10 +33,13 @@ def _cached_provider(
 ) -> Optional["LLMProvider"]:
     cached = _PROVIDER_CACHE.get(cache_key)
     if cached is not None:
+        metrics_push.cache_hits.increment("provider_build")
         return cached
+    metrics_push.cache_misses.increment("provider_build")
     built = builder()
     if built is not None:
         _PROVIDER_CACHE[cache_key] = built
+        metrics_push.set_cache_size("provider_build", len(_PROVIDER_CACHE))
     return built
 
 

@@ -15,9 +15,7 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "pydantic",
-    # metrics
-    "prometheus-client",
-    "prometheus-fastapi-instrumentator",
+    "psutil",
 ]
 
 [dependency-groups]

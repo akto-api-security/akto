@@ -17,7 +17,7 @@ import logging
 import time
 from typing import Any
 
-from metrics import PROVIDER_ERRORS, PROVIDER_LATENCY
+import metrics_push
 from providers import build_provider_from_config
 
 logger = logging.getLogger(__name__)
@@ -169,13 +169,13 @@ class ModelMapScanner:
             provider_name = entry.get("provider") or "unknown"
             if isinstance(result, Exception):
                 reason = "timeout" if isinstance(result, TimeoutError) else type(result).__name__
-                PROVIDER_ERRORS.labels(provider=provider_name, reason=reason).inc()
+                metrics_push.provider_errors.increment(f"{provider_name}:{reason}")
                 logger.error(f"[ModelMap] {label} '{entry.get('provider')}' failed: {result!r}")
                 unsafe += 1  # conservative: failures count as unsafe
                 continue
             exec_ms = result.get("execution_time_ms")
             if isinstance(exec_ms, (int, float)):
-                PROVIDER_LATENCY.labels(provider=provider_name).observe(exec_ms / 1000.0)
+                metrics_push.provider_latency.record(provider_name, float(exec_ms))
             completed.append(result)
             if _classify(result, entry):
                 unsafe += 1
@@ -189,7 +189,9 @@ class ModelMapScanner:
         return {"majority": majority, "completed": completed}
 
     async def _run_arbiters(self, arbiters, pre_submitted) -> dict[str, Any]:
+        metrics_push.arbiter_escalations.increment("cascade")
         if not arbiters:
+            metrics_push.arbiter_errors.increment("no_arbiter_configured")
             logger.error(f"[ModelMap] no {_ROLE_ARBITER} configured for {self.scanner_name}")
             return self._error_result("no arbiter configured")
 
@@ -199,16 +201,17 @@ class ModelMapScanner:
             provider_name = entry.get("provider") or "unknown"
             if isinstance(result, Exception):
                 reason = "timeout" if isinstance(result, TimeoutError) else type(result).__name__
-                PROVIDER_ERRORS.labels(provider=provider_name, reason=reason).inc()
+                metrics_push.provider_errors.increment(f"{provider_name}:{reason}")
                 logger.error(f"[ModelMap] {_ROLE_ARBITER} '{entry.get('provider')}' failed: {result!r}")
                 continue
             exec_ms = result.get("execution_time_ms")
             if isinstance(exec_ms, (int, float)):
-                PROVIDER_LATENCY.labels(provider=provider_name).observe(exec_ms / 1000.0)
+                metrics_push.provider_latency.record(provider_name, float(exec_ms))
             completed.append(result)
 
         self.completed_all.extend(completed)
         if not completed:
+            metrics_push.arbiter_errors.increment("all_arbiters_failed")
             return self._error_result("all arbiters failed")
 
         # Convict only on an affirmative flag; safeDecisionThreshold only gates the fast tiers, not the final call.

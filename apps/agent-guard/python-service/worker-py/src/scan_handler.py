@@ -6,6 +6,7 @@ from typing import Any
 
 import alerts
 import cascade_backpressure
+import metrics_push
 import scan_diag
 from constants import (
     CASCADE_SCANNERS,
@@ -20,7 +21,6 @@ from constants import (
     strip_qwen_tier,
 )
 from llm_scanner import scan_with_model_map
-from metrics import BACKPRESSURE_TRIPS, SCAN_DURATION, SCANS_TOTAL
 from remote_scanner import scan_anonymize
 from scanners import scan_local
 from settings import settings
@@ -73,8 +73,9 @@ async def scan_payload(
         return (time.perf_counter() - started) * 1000.0
 
     def _record(status: str) -> None:
-        SCANS_TOTAL.labels(scanner=scanner_name, status=status).inc()
-        SCAN_DURATION.labels(scanner=scanner_name).observe(_elapsed_ms() / 1000.0)
+        elapsed_ms = _elapsed_ms()
+        metrics_push.scan_counts.increment(f"{scanner_name}:{status}")
+        metrics_push.scan_latency.record(scanner_name, elapsed_ms)
 
     if scanner_name not in SUPPORTED_SCANNERS:
         scan_diag.log_scan_outcome(
@@ -108,7 +109,7 @@ async def scan_payload(
         # latency is elevated.
         if cascade_backpressure.should_skip_cascade():
             scan_diag.log_backpressure_skip(scanner_name)
-            BACKPRESSURE_TRIPS.inc()
+            metrics_push.backpressure_trips.increment("cascade")
             _record("skipped")
             return shape_response(
                 scanner_name,
