@@ -20,6 +20,7 @@ A secret VALUE is the actual credential string itself - a literal string someone
 The following are NOT secret values - they are names, references, or descriptions. If EVERY secret-looking candidate in the payload is one of these, the answer is isPassword=false:
   - A NAME in ALL_CAPS_WITH_UNDERSCORES: SLACK_USER_TOKEN, ANTHROPIC_API_KEY, JAMF_PASSWORD, DB_SECRET_KEY, GROWTH_CMS_PASSWORD_TEST, RANDOM_GEN_PASSWORD_TOKEN. These are variable/env-var/secret names, not values - no matter how the sentence around them describes them, and no matter what the WORDS INSIDE the name itself say. A name is judged by its CHARACTER SHAPE (all-caps, underscore-separated, no digits/symbols mixed in) - not by whether it contains words like RANDOM, GENERATED, REAL, or PASSWORD. `RANDOM_GEN_PASSWORD_TOKEN` is not a value just because it spells out "random" and "password"; it is still all-caps-with-underscores, therefore still a name.
   - A reference wrapper: $NAME, ${NAME}, ${{ secrets.NAME }}, env|NAME|, env|NAME, os.getenv("NAME"), process.env.NAME, config.password. The wrapper names a secret; it does not contain one.
+  - A shell command substitution or variable expansion that PRODUCES a secret at runtime: $(gh auth token), $(cat secret.txt), `printenv TOKEN`, $TOKEN, "$TOKEN", ${TOKEN}. These RUN or reference something that yields a credential later - the literal text holds no credential, so flag nothing. Even in shell like password="$TOKEN" or echo "password=$(...)", the value is a reference/command, NOT a real password.
   - A placeholder: changeme, <password>, {{password}}, your_password_here, "example"
   - A mask / redaction: ****, xxxxxxxx, ########, [REDACTED], "********"
   - A bare word or field name, and NOTHING else attached: password, secret, hidden, masked, none, null, "N/A", has_password. This applies ONLY when the candidate is EXACTLY one of these words - the instant anything else is appended (password@123, mypassword1, Password2024), it is no longer bare and must be judged as a value under the CHARACTERS+ROLE test below.
@@ -54,9 +55,18 @@ WORKED EXAMPLES (snippet -> verdict):
   "apiKey": "sk-Abc9XyZ0qP"                         -> isPassword=true,  values=["sk-Abc9XyZ0qP"]  (credential key AND known format)
   region = "AKIA5XYZ12ABCD34EFGH"                   -> isPassword=true,  values=["AKIA5XYZ12ABCD34EFGH"]  (non-credential key, but AWS format is self-identifying)
 
+ASSIGNMENT TRAP - the most common mistake: in `key = "X"` or `"password": "X"`, judge X, NOT the key. If X is a reference (env|NAME, $NAME, ${{ secrets.NAME }}) or an ALL_CAPS name, it is NOT a value even though the key is literally called "password". `password = "env|CHARGE_COLLECTIONS_WDA_PASSWORD"` loads the secret from elsewhere - the text holds no credential.
+
+WORKED EXAMPLES (snippet -> verdict):
+  password = "env|CHARGE_COLLECTIONS_WDA_PASSWORD"  -> isPassword=false, values=[]   (value is an env reference; the ALL_CAPS name is not a value)
+  DB_PASSWORD: ${{ secrets.DB_PASSWORD }}           -> isPassword=false, values=[]   (CI secret reference)
+  TOKEN=$(gh auth token)                            -> isPassword=false, values=[]   (command substitution, produces a token at runtime)
+  export DB_PASS=Hunter2024#                        -> isPassword=true,  values=["Hunter2024#"]   (a literal credential string)
+  "apiKey": "sk-Abc9XyZ0qP"                         -> isPassword=true,  values=["sk-Abc9XyZ0qP"]  (a literal credential string)
+
 When uncertain, output isPassword=false.
 
-"values" = the exact real secret substring(s), copied verbatim; empty when isPassword=false. NEVER put a NAME (ALL_CAPS_WITH_UNDERSCORES) or a reference wrapper into "values".
+"values" = the exact real secret substring(s), copied verbatim; empty when isPassword=false. NEVER put a NAME (ALL_CAPS_WITH_UNDERSCORES), a reference wrapper, or a shell command/variable ($(...), `...`, $VAR, "$VAR") into "values".
 "reason" MUST quote every string from "values" verbatim when isPassword=true - write them out literally, never describe them vaguely as "high-entropy strings" or "credentials in the PoC". Example: "Found 2 exposed password value(s): 55vNfGQ595, 4S3Nce1UL4 - real credential strings used for authentication."
 
 PAYLOAD:
