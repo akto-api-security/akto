@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, DataTable, HorizontalStack, Pagination, VerticalStack } from "@shopify/polaris";
+import { Box, DataTable, HorizontalStack, Pagination } from "@shopify/polaris";
 
 // DataTable has no built-in pagination prop, so this adds one.
 const PaginatedDataTable = ({ columnContentTypes, headings, rows, rowsPerPage = 10 }) => {
@@ -11,14 +11,14 @@ const PaginatedDataTable = ({ columnContentTypes, headings, rows, rowsPerPage = 
   const paged = rows.slice(currentPage * rowsPerPage, (currentPage + 1) * rowsPerPage);
 
   return (
-    <VerticalStack gap="2" align="space-between">
+    <>
       <DataTable
         columnContentTypes={columnContentTypes}
         headings={headings}
         rows={paged}
       />
-      {/* Pinned to the bottom via align="space-between", not conditional on totalPages, so the card doesn't jump when row count drops below a page. */}
-      <Box paddingBlockStart="2">
+      {/* Anchors to the nearest position:relative ancestor (InfoCard's component Box). */}
+      <Box position="absolute" insetInlineStart="0" insetInlineEnd="0" insetBlockEnd="0">
         <HorizontalStack align="center">
           <Pagination
             hasNext={currentPage < totalPages - 1}
@@ -28,7 +28,7 @@ const PaginatedDataTable = ({ columnContentTypes, headings, rows, rowsPerPage = 
           />
         </HorizontalStack>
       </Box>
-    </VerticalStack>
+    </>
   );
 };
 

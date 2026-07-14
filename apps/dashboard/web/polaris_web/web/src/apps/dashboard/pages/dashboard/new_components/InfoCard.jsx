@@ -1,8 +1,9 @@
 import { Box, Card, HorizontalStack, Link, VerticalStack } from '@shopify/polaris';
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 
-// Literal px, not "100%": Box is a plain block, so a % height on its child never resolves.
-const FILL_HEIGHT_PX = "350px";
+// Content is bounded (fixed chart height, capped table rows), so minHeight renders like height.
+const TITLE_AREA_HEIGHT_PX = "52px";
+const COMPONENT_AREA_HEIGHT_PX = "320px";
 
 function InfoCard({component, title, titleToolTip, linkText, linkUrl, minHeight, onLinkClick, fillHeight}) {
     const titleRow = (
@@ -22,14 +23,14 @@ function InfoCard({component, title, titleToolTip, linkText, linkUrl, minHeight,
         </HorizontalStack>
     );
 
-    // fillHeight skips Box (a plain block) and sets height directly on a flex div instead.
+    // fillHeight gives title/component their own fixed-height Box slots.
     if (fillHeight) {
         return (
             <Card padding={5} key="info">
-                <div style={{ height: FILL_HEIGHT_PX, display: "flex", flexDirection: "column", gap: 20 }}>
-                    {titleRow}
-                    <div style={{ flex: 1, minHeight: 0, display: "grid" }}>{component}</div>
-                </div>
+                <Box minHeight={TITLE_AREA_HEIGHT_PX}>{titleRow}</Box>
+                <Box minHeight={COMPONENT_AREA_HEIGHT_PX} position="relative">
+                    {component}
+                </Box>
             </Card>
         );
     }
