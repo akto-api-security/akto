@@ -117,6 +117,9 @@ public class GuardrailPolicies {
     // Block personal / consumer accounts (non-enterprise email-type users).
     private boolean blockPersonalAccounts;
 
+    // Anomaly detection configuration (tool-call rate limiting, error storm detection).
+    private AnomalyDetection anomalyDetection;
+
     // Modal config
     private ArrayList<ModelConfig> modelConfigs;
 
@@ -462,6 +465,16 @@ public class GuardrailPolicies {
         private ModelRole modelRole;
         private String attackType;
         private double safeDecisionThreshold;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AnomalyDetection {
+        private boolean enabled;
+        private int toolCallLimit;        // total tool calls per session before triggering
+        private int errorLimit;           // total errors per session before triggering
     }
 
 }
