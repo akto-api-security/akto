@@ -5,7 +5,8 @@ WORKDIR /app
 # Install deps before copying any source so the (slow) pip layer stays cached and
 # only re-runs when the dependency list itself changes — not on every code edit.
 RUN pip install --no-cache-dir \
-    rsa pyasn1 httpx detect-secrets tiktoken fastapi 'uvicorn[standard]' pydantic psutil
+    rsa==4.9.1 pyasn1==0.6.3 httpx==0.28.1 detect-secrets==1.5.0 tiktoken==0.13.0 \
+    fastapi==0.139.0 'uvicorn[standard]==0.50.2' pydantic==2.13.4 psutil==7.2.2
 
 COPY pyproject.toml .
 COPY src/ ./src/

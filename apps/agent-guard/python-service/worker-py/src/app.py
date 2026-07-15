@@ -45,14 +45,6 @@ app = FastAPI(title="Akto Agent Guard Executor", version="1.0.0", lifespan=lifes
 
 
 @app.middleware("http")
-async def http_status_middleware(request: Request, call_next):
-    """Count every response by status class (2xx/4xx/5xx), across all endpoints."""
-    response = await call_next(request)
-    metrics_push.http_status_counts.increment(f"{response.status_code // 100}xx")
-    return response
-
-
-@app.middleware("http")
 async def scan_inflight_middleware(request: Request, call_next):
     """Track concurrent /scan handlers per uvicorn worker (queue saturation signal)."""
     global _scan_inflight

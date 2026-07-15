@@ -54,9 +54,9 @@ async def get_token(sa_info: dict) -> str:
     now = time.time()
     cached = _TOKEN_CACHE.get(email)
     if cached and cached[1] - 300 > now:
-        metrics_push.cache_hits.increment("gcp_token")
+        metrics_push.COUNTS["cache_hits"].increment("gcp_token")
         return cached[0]
-    metrics_push.cache_misses.increment("gcp_token")
+    metrics_push.COUNTS["cache_misses"].increment("gcp_token")
 
     privkey = _load_private_key(sa_info["private_key"])
     iat = int(now)

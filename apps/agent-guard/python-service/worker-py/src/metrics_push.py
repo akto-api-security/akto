@@ -88,28 +88,26 @@ class CountAccumulator:
         return counts
 
 
-# scanner_name -> latencies; f"{scanner_name}:{status}" -> count
-scan_latency = SampleAccumulator()
-scan_counts = CountAccumulator()
-# provider name -> latencies; f"{provider}:{reason}" -> error count
-provider_latency = SampleAccumulator()
-provider_errors = CountAccumulator()
-# single "anonymizer" key; reason -> error count
-anonymizer_latency = SampleAccumulator()
-anonymizer_errors = CountAccumulator()
-# cache name -> hit/miss count (gcp_auth's token cache, providers' provider-object cache)
-cache_hits = CountAccumulator()
-cache_misses = CountAccumulator()
-# single "cascade" key
-backpressure_trips = CountAccumulator()
-# single "cascade" key -> escalation/error count
-arbiter_escalations = CountAccumulator()
-arbiter_errors = CountAccumulator()
-# single "store_results" key
-alert_latency = SampleAccumulator()
-alert_errors = CountAccumulator()
-# status class ("2xx"/"4xx"/"5xx") -> count, across every HTTP endpoint
-http_status_counts = CountAccumulator()
+# Duration-sample accumulators, keyed by name)
+SAMPLES: dict[str, SampleAccumulator] = {
+    name: SampleAccumulator() for name in ("scan", "provider", "anonymizer", "alert")
+}
+
+# Counter accumulators, keyed by name
+COUNTS: dict[str, CountAccumulator] = {
+    name: CountAccumulator()
+    for name in (
+        "scan",
+        "provider_errors",
+        "anonymizer_errors",
+        "cache_hits",
+        "cache_misses",
+        "backpressure_trips",
+        "arbiter_escalations",
+        "arbiter_errors",
+        "alert_errors",
+    )
+}
 
 _queue_size_lock = threading.Lock()
 _queue_size = 0
@@ -188,11 +186,11 @@ def _collect_batch() -> list[dict]:
 
     # --- overall request latency + RPS + request/error/blocked counts ---
     all_scan_samples: list[float] = []
-    for samples in scan_latency.drain_all().values():
+    for samples in SAMPLES["scan"].drain_all().values():
         all_scan_samples.extend(samples)
     batch.extend(_latency_batch("AGENT_GUARD_REQUEST", all_scan_samples, account_id, now))
 
-    scan_count_by_key = scan_counts.drain_all()
+    scan_count_by_key = COUNTS["scan"].drain_all()
     total_requests = sum(scan_count_by_key.values())
     error_count = sum(v for k, v in scan_count_by_key.items() if k.endswith(":error"))
     blocked_count = sum(v for k, v in scan_count_by_key.items() if k.endswith(":blocked"))
@@ -217,9 +215,9 @@ def _collect_batch() -> list[dict]:
             )
 
     # --- per-provider latency + errors (bounded: known LLM providers) ---
-    for provider, samples in provider_latency.drain_all().items():
+    for provider, samples in SAMPLES["provider"].drain_all().items():
         batch.extend(_latency_batch(f"AGENT_GUARD_PROVIDER_{provider.upper()}", samples, account_id, now))
-    for key, count in provider_errors.drain_all().items():
+    for key, count in COUNTS["provider_errors"].drain_all().items():
         provider, _, reason = key.partition(":")
         batch.append(
             _metric(f"AGENT_GUARD_PROVIDER_{provider.upper()}_ERROR_COUNT", float(count), "SUM", account_id, now)
@@ -227,15 +225,15 @@ def _collect_batch() -> list[dict]:
 
     # --- anonymizer ---
     anon_samples: list[float] = []
-    for samples in anonymizer_latency.drain_all().values():
+    for samples in SAMPLES["anonymizer"].drain_all().values():
         anon_samples.extend(samples)
     batch.extend(_latency_batch("AGENT_GUARD_ANONYMIZER", anon_samples, account_id, now))
-    anon_error_total = sum(anonymizer_errors.drain_all().values())
+    anon_error_total = sum(COUNTS["anonymizer_errors"].drain_all().values())
     if anon_error_total:
         batch.append(_metric("AGENT_GUARD_ANONYMIZER_ERROR_COUNT", float(anon_error_total), "SUM", account_id, now))
 
     # --- backpressure (trip count + live circuit-breaker state) + queue depth ---
-    trips = sum(backpressure_trips.drain_all().values())
+    trips = sum(COUNTS["backpressure_trips"].drain_all().values())
     if trips:
         batch.append(_metric("AGENT_GUARD_BACKPRESSURE_TRIPS", float(trips), "SUM", account_id, now))
     batch.append(
@@ -262,30 +260,22 @@ def _collect_batch() -> list[dict]:
     batch.append(_metric("AGENT_GUARD_QUEUE_SIZE", float(_current_queue_size()), "GAUGE", account_id, now))
 
     # --- arbiter escalation + failure counts (tier1/tier2 disagreement, config errors) ---
-    escalations = sum(arbiter_escalations.drain_all().values())
+    escalations = sum(COUNTS["arbiter_escalations"].drain_all().values())
     if escalations:
         batch.append(_metric("AGENT_GUARD_ARBITER_ESCALATIONS", float(escalations), "SUM", account_id, now))
-    for reason, count in arbiter_errors.drain_all().items():
+    for reason, count in COUNTS["arbiter_errors"].drain_all().items():
         batch.append(_metric(f"AGENT_GUARD_ARBITER_ERROR_{reason.upper()}", float(count), "SUM", account_id, now))
 
     # --- alert sinks (database-abstractor store) ---
-    for key, samples in alert_latency.drain_all().items():
+    for key, samples in SAMPLES["alert"].drain_all().items():
         batch.extend(_latency_batch(f"AGENT_GUARD_ALERT_{key.upper()}", samples, account_id, now))
-    for key, count in alert_errors.drain_all().items():
+    for key, count in COUNTS["alert_errors"].drain_all().items():
         sink, _, reason = key.partition(":")
         batch.append(_metric(f"AGENT_GUARD_ALERT_{sink.upper()}_ERROR_COUNT", float(count), "SUM", account_id, now))
 
-    # --- HTTP-level request rate + status class counts, across every endpoint ---
-    status_by_class = http_status_counts.drain_all()
-    total_http = sum(status_by_class.values())
-    if total_http:
-        batch.append(_metric("AGENT_GUARD_HTTP_RPS", total_http / elapsed_s, "GAUGE", account_id, now))
-    for status_class, count in status_by_class.items():
-        batch.append(_metric(f"AGENT_GUARD_HTTP_{status_class.upper()}_COUNT", float(count), "SUM", account_id, now))
-
     # --- cache hit rate + current size ("load"), per cache name ---
-    hits = cache_hits.drain_all()
-    misses = cache_misses.drain_all()
+    hits = COUNTS["cache_hits"].drain_all()
+    misses = COUNTS["cache_misses"].drain_all()
     for cache_name in set(hits) | set(misses):
         h, m = hits.get(cache_name, 0), misses.get(cache_name, 0)
         if h + m:
@@ -373,6 +363,9 @@ async def run_forever() -> None:
 
     while True:
         await asyncio.sleep(interval)
-        batch = _collect_batch()
-        if batch:
-            await _push(batch)
+        try:
+            batch = _collect_batch()
+            if batch:
+                await _push(batch)
+        except Exception as exc:
+            logger.warning(f"[metrics-push] tick failed, will retry next interval: {exc}")

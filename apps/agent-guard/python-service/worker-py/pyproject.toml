@@ -5,28 +5,28 @@ description = "Akto Agent Guard — LLM cascade + local scanners (Cloudflare Wor
 requires-python = ">=3.12"
 dependencies = [
     # cascade auth + HTTP
-    "rsa",
-    "pyasn1",
-    "httpx",
+    "rsa==4.9.1",
+    "pyasn1==0.6.3",
+    "httpx==0.28.1",
     # local scanners
-    "detect-secrets",
-    "tiktoken",
+    "detect-secrets==1.5.0",
+    "tiktoken==0.13.0",
     # portable HTTP server
-    "fastapi",
-    "uvicorn[standard]",
-    "pydantic",
-    "psutil",
+    "fastapi==0.139.0",
+    "uvicorn[standard]==0.50.2",
+    "pydantic==2.13.4",
+    "psutil==7.2.2",
 ]
 
 [dependency-groups]
 dev = [
-    "workers-py",
-    "ruff",
-    "mypy",
-    "pytest",
-    "pytest-asyncio",
-    "cryptography",
-    "pre-commit",
+    "workers-py==1.14.0",
+    "ruff==0.15.21",
+    "mypy==2.2.0",
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "cryptography==49.0.0",
+    "pre-commit==4.6.0",
 ]
 
 [tool.uv]
