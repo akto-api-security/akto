@@ -39,6 +39,9 @@ _FIELDS = (
     "DEFAULT_MODEL_CONFIG_JSON",
     # Portable anonymizer service URL (e.g. http://anonymizer:8093).
     "ANONYMIZER_URL",
+    "DATABASE_ABSTRACTOR_SERVICE_TOKEN",
+    # Seconds between metric pushes to database-abstractor. Default 60s.
+    "METRICS_PUSH_INTERVAL_SEC",
 )
 
 
@@ -68,6 +71,8 @@ class Settings:
     DATABASE_ABSTRACTOR_SERVICE_URL: str
     DEFAULT_MODEL_CONFIG_JSON: str
     ANONYMIZER_URL: str
+    DATABASE_ABSTRACTOR_SERVICE_TOKEN: str
+    METRICS_PUSH_INTERVAL_SEC: str
 
     def __init__(self):
         for f in _FIELDS:
