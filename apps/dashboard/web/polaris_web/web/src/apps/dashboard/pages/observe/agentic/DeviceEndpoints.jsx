@@ -16,7 +16,7 @@ import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentere
 import { SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import DonutChart from "../../../components/shared/DonutChart";
 import AgenticStatsCard from "./AgenticStatsCard";
-import { OsTrendChart, BrowserTrendChart } from "./TrendCharts";
+import { EndpointBrowserTrendChart } from "./TrendCharts";
 import { aggregateViolationsByCollectionId, fetchAgenticViolations } from "./agenticObserveApi";
 import { buildDeviceEndpointsPageData } from "./agenticPageBuilders";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
@@ -97,41 +97,39 @@ function TopSection({ summary }) {
                 </VerticalStack>
             </Card>
             <Card padding="0">
-                <VerticalStack>
-                    <OsTrendChart osTrend={summary?.osTrend || {}} monthLabels={summary?.monthLabels || []} />
-                    <Divider />
-                    <BrowserTrendChart browserTrend={summary?.browserTrend || {}} monthLabels={summary?.monthLabels || []} />
-                </VerticalStack>
+                <EndpointBrowserTrendChart
+                    osTrend={summary?.osTrend || {}}
+                    browserTrend={summary?.browserTrend || {}}
+                    monthLabels={summary?.monthLabels || []}
+                />
             </Card>
-            <Card padding="0">
-                <Box padding="4" className="agentic-fill-center">
-                    <VerticalStack gap="2" inlineAlign="center">
-                        <Text variant="headingMd" fontWeight="semibold" alignment="center">Violations by Severity</Text>
-                        <HorizontalStack align="center">
-                            <DonutChart
-                                data={violationsChartData}
-                                title={summary?.totalViolations ?? 0}
-                                subtitle="Violations"
-                                size={180}
-                                pieInnerSize="55%"
-                                titleColor={violationsTitleColor}
-                            />
+            <Card padding="4">
+                <VerticalStack gap="2">
+                    <Text variant="headingMd" fontWeight="semibold" alignment="center">Violations by Severity</Text>
+                    <HorizontalStack align="center">
+                        <DonutChart
+                            data={violationsChartData}
+                            title={summary?.totalViolations ?? 0}
+                            subtitle="Violations"
+                            size={180}
+                            pieInnerSize="55%"
+                            titleColor={violationsTitleColor}
+                        />
+                    </HorizontalStack>
+                    {Object.keys(violationsChartData).length > 0 && (
+                        <HorizontalStack gap="3" wrap align="center">
+                            {Object.entries(violationsChartData).map(([key, { text, color }]) => (
+                                <HorizontalStack key={key} gap="1" blockAlign="center">
+                                    <Box
+                                        className="agentic-dot"
+                                        style={{ "--dot-color": color }}
+                                    />
+                                    <Text variant="bodySm" color="subdued">{key} ({text})</Text>
+                                </HorizontalStack>
+                            ))}
                         </HorizontalStack>
-                        {Object.keys(violationsChartData).length > 0 && (
-                            <HorizontalStack gap="3" wrap align="center">
-                                {Object.entries(violationsChartData).map(([key, { text, color }]) => (
-                                    <HorizontalStack key={key} gap="1" blockAlign="center">
-                                        <Box
-                                            className="agentic-dot"
-                                            style={{ "--dot-color": color }}
-                                        />
-                                        <Text variant="bodySm" color="subdued">{key} ({text})</Text>
-                                    </HorizontalStack>
-                                ))}
-                            </HorizontalStack>
-                        )}
-                    </VerticalStack>
-                </Box>
+                    )}
+                </VerticalStack>
             </Card>
         </HorizontalGrid>
     );

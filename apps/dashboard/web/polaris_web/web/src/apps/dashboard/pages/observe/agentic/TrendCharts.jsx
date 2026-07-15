@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Box, VerticalStack, Text } from "@shopify/polaris";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
@@ -16,16 +16,16 @@ const BROWSER_SERIES = [
     { key: "safari",  name: "Safari",  color: "#00B4D8" },
 ];
 
-function makeTrendConfig(trend, monthLabels, seriesDefs) {
+function makeTrendConfig(trends, monthLabels, seriesDefs) {
     const categories = monthLabels || [];
     const n = categories.length;
     const tickInterval = n > 14 ? Math.ceil(n / 12) : 1;
-    const series = seriesDefs.map(({ key, name, color }) => ({
-        name, color, data: trend[key] || new Array(n).fill(0),
+    const series = seriesDefs.map(({ key, name, color, trend }) => ({
+        name, color, data: (trend || trends)[key] || new Array(n).fill(0),
     }));
     return {
         chart:{
-            type:"areaspline", height:176, backgroundColor:"transparent",
+            type:"areaspline", height:340, backgroundColor:"transparent",
             style:{fontFamily:"Inter, -apple-system, sans-serif"},
             margin:[8,8,72,44],
         },
@@ -54,20 +54,16 @@ function TrendChartCard({ title, options }) {
     );
 }
 
-export function OsTrendChart({ osTrend = {}, monthLabels = [] }) {
-    const options = React.useMemo(
-        () => makeTrendConfig(osTrend, monthLabels, OS_SERIES),
-        [osTrend, monthLabels]
+export function EndpointBrowserTrendChart({ osTrend = {}, browserTrend = {}, monthLabels = [] }) {
+    const seriesDefs = useMemo(() => [
+        ...OS_SERIES.map(s => ({ ...s, trend: osTrend })),
+        ...BROWSER_SERIES.map(s => ({ ...s, trend: browserTrend })),
+    ], [osTrend, browserTrend]);
+    const options = useMemo(
+        () => makeTrendConfig(null, monthLabels, seriesDefs),
+        [seriesDefs, monthLabels]
     );
-    return <TrendChartCard title="Endpoints Over Time by OS Type" options={options} />;
-}
-
-export function BrowserTrendChart({ browserTrend = {}, monthLabels = [] }) {
-    const options = React.useMemo(
-        () => makeTrendConfig(browserTrend, monthLabels, BROWSER_SERIES),
-        [browserTrend, monthLabels]
-    );
-    return <TrendChartCard title="Browser Extensions Over Time by Browser Type" options={options} />;
+    return <TrendChartCard title="Endpoints & Browser Extensions Over Time" options={options} />;
 }
 
 export default TrendChartCard;

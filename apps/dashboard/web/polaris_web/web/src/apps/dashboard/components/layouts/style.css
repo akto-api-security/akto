@@ -75,13 +75,6 @@
     border-color: #8c9196;
 }
 
-.agentic-fill-center {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-
 /* Legend dot — colour via --dot-color custom property. */
 .agentic-dot {
     width: 7px;
