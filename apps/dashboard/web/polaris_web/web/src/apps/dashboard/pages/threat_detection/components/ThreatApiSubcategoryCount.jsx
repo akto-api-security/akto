@@ -13,14 +13,14 @@ const ThreatApiSubcategoryCount = ({ data }) => {
 
   return (
     <InfoCard
-      title={`Top ${mapLabel("Threat", getDashboardCategory())} Categories`}
-      titleToolTip={`Most common ${mapLabel("Threat", getDashboardCategory())} categories by volume`}
+      title={mapLabel("Top Threat Categories", getDashboardCategory())}
+      titleToolTip={mapLabel("Threat categories ranked by number of detections.", getDashboardCategory())}
       fillHeight
       component={
         <PaginatedDataTable
           columnContentTypes={["text", "numeric"]}
           headings={[
-            <Text variant="headingSm" key="category">{mapLabel("Threat", getDashboardCategory())} Category</Text>,
+            <Text variant="headingSm" key="category">{mapLabel("Threat Category", getDashboardCategory())}</Text>,
             <Text variant="headingSm" key="count">Count</Text>,
           ]}
           rows={sorted.map((x) => [x.text, x.value])}
