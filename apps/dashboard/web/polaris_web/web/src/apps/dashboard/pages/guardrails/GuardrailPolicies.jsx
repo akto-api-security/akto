@@ -21,6 +21,7 @@ import {
     getApplicableAgentKeys,
     applyAgentFilterToRows,
     splitAgentServersV2,
+    resolveClientKey,
 } from "./serverTargetingUtils";
 
 const resourceName = {
@@ -328,9 +329,14 @@ function GuardrailPolicies() {
             ? policy.selectedAgentServersV2
             : (policy.selectedAgentServers || []).map(id => ({ id, name: id }));
         const { agents, llms } = splitPolicyAgentServers(raw);
+        // Atlas stores every raw wire-level tag value an agent group aliases (e.g. 9 Claude CLI
+        // variants) — collapse back to canonical keys so counts show "1 Agent", not "9 Agents".
+        const dedupedAgents = isEndpointSecurityCategory()
+            ? [...new Set(agents.map(a => resolveClientKey(a.name || a.id)))]
+            : agents;
         return {
             mcp: getEffectiveSelectedMcpServers(policy),
-            agents,
+            agents: dedupedAgents,
             llms
         };
     };
