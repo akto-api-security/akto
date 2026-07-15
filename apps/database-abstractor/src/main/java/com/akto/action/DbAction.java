@@ -2026,7 +2026,14 @@ public class DbAction extends ActionSupport {
                 log.getString("log"),
                 log.getInt("timestamp")
             );
-            DbLayer.insertEndpointShieldLog(dbLog);
+            // Producer mode: hand off to Kafka and return immediately so the API request
+            // isn't blocked on a Mongo insert. The consumer service writes it to Mongo async.
+            // Non-Kafka mode: fall back to a direct (w:1) Mongo write.
+            if (kafkaUtils.isWriteEnabled()) {
+                kafkaUtils.insertEndpointShieldLog(dbLog, Context.accountId.get());
+            } else {
+                DbLayer.insertEndpointShieldLog(dbLog);
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertEndpointShieldLog " + e.toString());
             return Action.ERROR.toUpperCase();
