@@ -19,6 +19,7 @@ import rsa
 from pyasn1.codec.der import decoder as der_decoder
 
 import http_client
+import metrics_push
 
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
 _SCOPE = "https://www.googleapis.com/auth/cloud-platform"
@@ -53,7 +54,9 @@ async def get_token(sa_info: dict) -> str:
     now = time.time()
     cached = _TOKEN_CACHE.get(email)
     if cached and cached[1] - 300 > now:
+        metrics_push.COUNTS["cache_hits"].increment("gcp_token")
         return cached[0]
+    metrics_push.COUNTS["cache_misses"].increment("gcp_token")
 
     privkey = _load_private_key(sa_info["private_key"])
     iat = int(now)
@@ -85,4 +88,5 @@ async def get_token(sa_info: dict) -> str:
     token = body["access_token"]
     ttl = int(body.get("expires_in", 3600))
     _TOKEN_CACHE[email] = (token, now + ttl)
+    metrics_push.set_cache_size("gcp_token", len(_TOKEN_CACHE))
     return token

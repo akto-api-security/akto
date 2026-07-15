@@ -371,7 +371,7 @@ function deriveAgenticType(url, method) {
     return METHOD_TO_TYPE[m] || "Prompt";
 }
 
-function transformEvent(event, policiesMap, collectionsMap, usernameMap) {
+function transformEvent(event, policiesMap, collectionsMap, usernameMap, policyIdByName = {}) {
     const meta = parseMetadata(event.metadata);
     const typeLabel = deriveAgenticType(event.url, event.method);
 
@@ -408,6 +408,14 @@ function transformEvent(event, policiesMap, collectionsMap, usernameMap) {
     const rawAsset = collectionsMap?.[event.apiCollectionId] || meta.agenticAsset || meta.agentName || event.host || null;
     const agenticAssetTag = rawAsset ? getAssetServiceName(rawAsset) : null;
 
+    const resolvedPolicyName = meta.policy_name || meta.policyName || meta.npolicy_name || policiesMap[event.filterId] || event.filterId || "-";
+
+    // Policy's CONFIGURED behaviour (metadata) — distinct from rawBehaviour above, which is the
+    // action actually taken. For an "approval" policy that blocked, metadata.behaviour is
+    // "approval" while the response payload's behaviour is "block". The approve-server action
+    // must key off the configured (metadata) behaviour.
+    const policyBehaviour = meta.behaviour || meta.nbehaviour || rawBehaviour || null;
+
     return {
         id: event.id,
         detected: event.timestamp,
@@ -421,7 +429,9 @@ function transformEvent(event, policiesMap, collectionsMap, usernameMap) {
         agenticAssetRaw: rawAsset,
         agenticAssetTag,
         action,
-        policyName: meta.policy_name || meta.npolicy_name || policiesMap[event.filterId] || event.filterId || "-",
+        behaviour: policyBehaviour,
+        policyName: resolvedPolicyName,
+        policyId: policyIdByName[resolvedPolicyName] || null,
         _status: event.status || "ACTIVE",
         payload: event.payload || null,
         sessionId: event.sessionId || null,
@@ -655,10 +665,12 @@ function Violations() {
                     fetchEndpointShieldUsernameMap(),
                 ]);
 
-                // Build filterId → name map from policies
+                // Build filterId → name map from policies, plus name → hexId (for the approve-server flow)
                 const policiesMap = {};
+                const policyIdByName = {};
                 (policiesResp?.guardrailPolicies || []).forEach(p => {
                     if (p.hexId) policiesMap[p.hexId] = p.name;
+                    if (p.name) policyIdByName[p.name] = p.hexId;
                 });
 
                 let events = firstResp?.maliciousEvents || [];
@@ -672,7 +684,7 @@ function Violations() {
                     );
                     events = [...events, ...rest.flatMap(r => r?.maliciousEvents || [])];
                 }
-                const transformed = events.map(e => transformEvent(e, policiesMap, collectionsMap, usernameMap));
+                const transformed = events.map(e => transformEvent(e, policiesMap, collectionsMap, usernameMap, policyIdByName));
                 setRows(transformed);
                 setSummary(computeSummary(transformed));
             } catch (e) {

@@ -10,6 +10,8 @@ import (
 
 	"time"
 
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/depstats"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/guardcache"
 	"github.com/akto-api-security/akto-endpoint-shield/utils"
 	"github.com/akto-api-security/guardrails-service/handlers"
 	"github.com/akto-api-security/guardrails-service/pkg/auth"
@@ -73,6 +75,65 @@ func main() {
 	}
 }
 
+// metricsFlushLoop periodically drains guardrail metrics and pushes them to the
+// db-abstractor every 60s: per-account latency, instance-level CPU/memory/
+// goroutine gauges, full-text semantic-cache hit/miss counts, and client-observed
+// call health (errors, latency) for the two downstream dependencies — agent-guard
+// (includes the Anonymize scanner) and the embedder (combined across the cache's
+// single-text lookup and intentguard's batched calls). It blocks forever, so
+// start it with `go`.
+func metricsFlushLoop(dbClient *dbabstractor.Client, logger *zap.Logger, acc *metrics.Accumulator) {
+	sysSampler, err := metrics.NewSystemSampler()
+	if err != nil {
+		// Non-fatal: the service still validates without instance metrics.
+		logger.Warn("System metrics sampler unavailable; CPU/memory/cache/dependency gauges disabled", zap.Error(err))
+	}
+
+	ticker := time.NewTicker(60 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		for accountId, batch := range acc.DrainAll() {
+			flushMetrics(dbClient, logger, accountId, batch)
+		}
+		// Instance-level CPU/memory/goroutine gauges, cache hit/miss counts,
+		// and downstream-dependency call health, attributed to the service
+		// token's account (see metrics.SystemSampler).
+		if sysSampler != nil {
+			sysBatch := sysSampler.Sample()
+			cacheStats := guardcache.DrainStats()
+			sysBatch = append(sysBatch, sysSampler.CacheStats(cacheStats.HitsExact, cacheStats.HitsFuzzy, cacheStats.Misses)...)
+			agStats := depstats.AgentGuard.Drain()
+			sysBatch = append(sysBatch, sysSampler.DependencyStats("GUARDRAIL_AGENT_GUARD", agStats.Calls, agStats.Errors, agStats.AvgLatencyMs)...)
+			embStats := depstats.Embedder.Drain()
+			sysBatch = append(sysBatch, sysSampler.DependencyStats("GUARDRAIL_EMBEDDER", embStats.Calls, embStats.Errors, embStats.AvgLatencyMs)...)
+			if len(sysBatch) > 0 {
+				flushMetrics(dbClient, logger, strconv.FormatInt(sysBatch[0].AccountId, 10), sysBatch)
+			}
+		}
+	}
+}
+
+// flushMetrics POSTs one account's metric batch to the db-abstractor and logs
+// each value sent so the emitted metrics are observable in the service logs.
+func flushMetrics(dbClient *dbabstractor.Client, logger *zap.Logger, account string, batch []metrics.MetricData) {
+	payload := make([]interface{}, len(batch))
+	for i, m := range batch {
+		payload[i] = m
+	}
+	if err := dbClient.IngestMetrics(payload); err != nil {
+		logger.Error("Failed to flush guardrail metrics", zap.String("account", account), zap.Error(err))
+		return
+	}
+	for _, m := range batch {
+		logger.Info("Flushed guardrail metric",
+			zap.String("account", account),
+			zap.String("metricId", m.MetricId),
+			zap.Float64("value", m.Value),
+			zap.String("instance", m.InstanceId),
+			zap.Int64("timestamp", m.Timestamp))
+	}
+}
+
 func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logger *zap.Logger) {
 	startPprofIfEnabled(logger)
 
@@ -81,30 +142,7 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 
 	acc := metrics.NewAccumulator()
 	dbClient := dbabstractor.NewClient(logger)
-	go func() {
-		ticker := time.NewTicker(60 * time.Second)
-		defer ticker.Stop()
-		for range ticker.C {
-			for accountId, batch := range acc.DrainAll() {
-				payload := make([]interface{}, len(batch))
-				for i, m := range batch {
-					payload[i] = m
-				}
-				if err := dbClient.IngestMetrics(payload); err != nil {
-					logger.Error("Failed to flush guardrail metrics", zap.String("account", accountId), zap.Error(err))
-					continue
-				}
-				// Log the actual average values sent so the computed metric is observable.
-				for _, m := range batch {
-					logger.Info("Flushed guardrail latency metric",
-						zap.String("account", accountId),
-						zap.String("metricId", m.MetricId),
-						zap.Float64("avgMs", m.Value),
-						zap.Int64("timestamp", m.Timestamp))
-				}
-			}
-		}
-	}()
+	go metricsFlushLoop(dbClient, logger, acc)
 
 	if cfg.NhiEnabled {
 		// One Publisher is shared by every Source. Adding new sources later

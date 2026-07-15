@@ -112,7 +112,8 @@ public class ModuleInfo {
         AKTO_AGENT_GATEWAY,
         DAST,
         AGENTIC_TESTING,
-        GUARDRAIL // guardrails-service
+        GUARDRAIL, // guardrails-service,
+        ACCOUNT_JOB_EXECUTOR
     }
 
 }
