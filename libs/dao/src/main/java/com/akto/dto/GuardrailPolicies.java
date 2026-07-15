@@ -84,8 +84,12 @@ public class GuardrailPolicies {
     private String url;
     private double confidenceScore;
     
-    /** Policy-wide rule behaviour: {@code "block"}, {@code "warn"}, or {@code "alert"}. */
+    /** Policy-wide rule behaviour: {@code "block"}, {@code "warn"}, {@code "alert"}, or {@code "approval"}. */
     private String behaviour;
+
+    // Servers explicitly approved to bypass this policy's "approval" behaviour.
+    // Keyed logically by serverId (the request Host the enforcement layer matches on).
+    private List<ApprovedServer> approvedServers;
 
     // Step 8: Review and Finish
     private boolean active;
@@ -116,6 +120,9 @@ public class GuardrailPolicies {
 
     // Block personal / consumer accounts (non-enterprise email-type users).
     private boolean blockPersonalAccounts;
+
+    // Anomaly detection configuration (tool-call rate limiting, error storm detection).
+    private AnomalyDetection anomalyDetection;
 
     // Modal config
     private ArrayList<ModelConfig> modelConfigs;
@@ -301,6 +308,39 @@ public class GuardrailPolicies {
         }
     }
 
+    /** How long an approved server is allowed to bypass an "approval" behaviour. */
+    public enum ApprovalMode {
+        ALWAYS,   // never expires
+        COUNT,    // allowed for a fixed number of future violations (expiredAfter); Phase 2
+        DURATION  // allowed until a wall-clock time (expiredAt)
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class ApprovedServer {
+        private String serverId;        // the request Host (matches enforcement-layer server matching)
+        private String serverName;      // display only
+        // Stored as the ApprovalMode name ("ALWAYS"/"DURATION"/"COUNT"). Kept as a String, NOT the
+        // enum, because the Mongo driver has no codec for a bare enum value.
+        private String mode;
+        private int expiredAfter;       // COUNT mode: remaining allowed violations
+        private long expiredAt;         // DURATION mode: epoch seconds; valid while now < expiredAt
+        private long approvedAt;
+        private String approvedBy;
+
+        public ApprovedServer(String serverId, String serverName, String mode,
+                              int expiredAfter, long expiredAt, long approvedAt, String approvedBy) {
+            this.serverId = serverId;
+            this.serverName = serverName;
+            this.mode = mode;
+            this.expiredAfter = expiredAfter;
+            this.expiredAt = expiredAt;
+            this.approvedAt = approvedAt;
+            this.approvedBy = approvedBy;
+        }
+    }
+
     /**
      * A single blocked host entry (block-only). {@code pattern} is a glob matched against the
      * request's {@code host + path}, where {@code *} matches any sequence (e.g. "chatgpt.com/*",
@@ -462,6 +502,16 @@ public class GuardrailPolicies {
         private ModelRole modelRole;
         private String attackType;
         private double safeDecisionThreshold;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AnomalyDetection {
+        private boolean enabled;
+        private int toolCallLimit;        // total tool calls per session before triggering
+        private int errorLimit;           // total errors per session before triggering
     }
 
 }

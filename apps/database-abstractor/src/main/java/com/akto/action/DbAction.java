@@ -89,6 +89,8 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.CustomAuthUtil;
 import com.akto.utils.KafkaUtils;
+import com.akto.utils.GcpVertexAuthUtil;
+import com.akto.utils.GemmaVertexStructuredCallUtil;
 import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
 import com.akto.utils.StiCountAlert;
@@ -218,6 +220,39 @@ public class DbAction extends ActionSupport {
 
     @Getter @Setter
     private AgentQueryData agentQueryData;
+
+    // Gemini/Vertex configuration + minted OAuth access token for internal worker calls.
+    @Getter @Setter
+    private String gemmaVertexSaKeyJson;
+
+    @Getter @Setter
+    private String gemmaVertexProject;
+
+    @Getter @Setter
+    private String gemmaVertexLocation;
+
+    @Getter @Setter
+    private String gemmaVertexEndpointId;
+
+    @Getter @Setter
+    private String gemmaVertexDedicatedDns;
+
+    // Request-bound fields for structured Vertex/Gemma calls.
+    @Getter @Setter
+    private String gemmaVertexSystem;
+
+    @Getter @Setter
+    private String gemmaVertexUser;
+
+    @Getter @Setter
+    private Map<String, Object> gemmaVertexSchema;
+
+    // Raw Vertex/Gemma predict payload binding (top-level `instances`).
+    @Getter @Setter
+    private List<Object> instances;
+
+    @Getter @Setter
+    private Map<String, Object> response;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
 
@@ -4062,11 +4097,16 @@ public class DbAction extends ActionSupport {
     private List<com.akto.utils.elasticsearch.AgentQueryRecord> agentQueryRecords;
 
     public String storeAgentQueryRecords() {
-        try {
-            com.akto.utils.elasticsearch.ElasticSearchClient.instance().bulkIndexAgentQueryRecords(agentQueryRecords);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in storeAgentQueryRecords " + e.toString());
-            return Action.ERROR.toUpperCase();
+        int accId = Context.accountId.get();
+        if (kafkaUtils.isWriteEnabled()) {
+            kafkaUtils.insertDataSecondary(agentQueryRecords, "storeAgentQueryRecords", accId);
+        } else {
+            try {
+                com.akto.utils.elasticsearch.ElasticSearchClient.instance().bulkIndexAgentQueryRecords(agentQueryRecords);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error in storeAgentQueryRecords " + e.toString());
+                return Action.ERROR.toUpperCase();
+            }
         }
         return Action.SUCCESS.toUpperCase();
     }
@@ -6531,6 +6571,28 @@ public class DbAction extends ActionSupport {
         nhiUpsertedCount = ok;
         if (failed > 0) {
             loggerMaker.errorAndAddToDb("upsertNhiIdentities: " + failed + "/" + nhiIdentities.size() + " records failed");
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String getGemmaResponse() {
+        try {
+            String saKeyJson = System.getenv().getOrDefault("GEMMA_VERTEX_SA_KEY_JSON", "");
+            Map<String, Object> parsedJson;
+            if (this.instances == null) {
+                addActionError("Request field `instances` is required");
+                return Action.ERROR.toUpperCase();
+            }
+
+            Map<String, Object> vertexPayload = new HashMap<>();
+            vertexPayload.put("instances", this.instances);
+            parsedJson = GemmaVertexStructuredCallUtil.predictAndParseVertexPayload(saKeyJson, vertexPayload);
+
+            this.response = new HashMap<>();
+            this.response.put("data", parsedJson);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in getGemmaResponse " + e.toString());
+            return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
     }

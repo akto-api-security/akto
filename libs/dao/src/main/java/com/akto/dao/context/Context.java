@@ -7,12 +7,16 @@ import com.akto.dto.Log;
 import java.math.BigDecimal;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
+import java.util.Date;
+import java.util.List;
 
 public class Context {
     public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
     public static ThreadLocal<Boolean> tokenExpired = new ThreadLocal<Boolean>();
     public static ThreadLocal<String> activityId = new ThreadLocal<String>();
     public static ThreadLocal<Log.ActivityType> activityType = new ThreadLocal<Log.ActivityType>();
+    public static ThreadLocal<List<String>> tokenScope = new ThreadLocal<List<String>>();
+    public static ThreadLocal<Date> tokenExpiry = new ThreadLocal<Date>();
 
 
     public static void resetContextThreadLocals() {
@@ -20,6 +24,8 @@ public class Context {
         tokenExpired.remove();
         activityId.remove();
         activityType.remove();
+        tokenScope.remove();
+        tokenExpiry.remove();
     }
 
     public static int getId() {

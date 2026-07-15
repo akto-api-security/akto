@@ -30,6 +30,7 @@ import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -232,14 +233,15 @@ public class KafkaUtils {
             return;
         }
 
+        if ("storeAgentQueryRecords".equals(triggerMethod)) {
+            List<AgentQueryRecord> agentQueryRecords = mapper.readValue(payload, new TypeReference<List<AgentQueryRecord>>(){});
+            dbAction.setAgentQueryRecords(agentQueryRecords);
+            dbAction.storeAgentQueryRecords();
+            return;
+        }
+
         List<BulkUpdates> bulkWrites = mapper.readValue(payload, new TypeReference<List<BulkUpdates>>(){});
 
-        // logger.info("Account id: " + accountId + " trigger method: " + triggerMethod);
-        // logger.info(" bulkWrites: \n");
-        // for(BulkUpdates update: bulkWrites){
-        //     logger.info(update.getFilters().toString() + " " + update.getUpdates().toString());
-        // }
-        // logger.info("\n");
 
         switch (triggerMethod) {
             case "bulkWriteSti":
