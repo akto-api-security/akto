@@ -361,6 +361,20 @@ function buildModuleDeviceMap(moduleInfos = []) {
 }
 
 /**
+ * Keep assets whose Last Seen falls in [startTimestamp, endTimestamp].
+ * When startTimestamp <= 0 (all-time), returns rows unchanged.
+ * Rows with missing/zero lastSeenEpoch are excluded when a range is active.
+ */
+export function filterAssetsByLastSeen(rows, startTimestamp, endTimestamp) {
+    if (!rows?.length || startTimestamp <= 0) return rows || [];
+    const end = endTimestamp > 0 ? endTimestamp : Math.floor(Date.now() / 1000);
+    return rows.filter((r) => {
+        const ts = r?.lastSeenEpoch || 0;
+        return ts >= startTimestamp && ts <= end;
+    });
+}
+
+/**
  * Bucket a list of items into 12 monthly slots covering the given time window.
  * Each slot counts how many items fall in that calendar month.
  * If startTimestamp is 0 (all-time), uses the earliest item's month as the window start.
