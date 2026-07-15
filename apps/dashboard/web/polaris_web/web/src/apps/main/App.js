@@ -219,8 +219,7 @@ const router = createBrowserRouter([
                         children: [
                             {
                                 path: "sensitive",
-                                element: <ThreatProtectedLayout probeUrl="/api/fetchDataTypes" featureName="Sensitive Data"/>,
-                                children: [{ index: true, element: <AllSensitiveData/> }]
+                                element: <AllSensitiveData/>
                             },
                             {
                                 path: "inventory",
