@@ -956,14 +956,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         <Modal.Section>
           <VerticalStack gap="4">
             <Text variant="bodyMd">
-              Allow <Text as="span" fontWeight="semibold">{approveRow?.host || "this server"}</Text> to
-              bypass the <Text as="span" fontWeight="semibold">{approveRow?.filterId || "policy"}</Text> guardrail.
+              Approving <Text as="span" fontWeight="semibold">{approveRow?.host || "this server"}</Text> will
+              allow it to bypass the <Text as="span" fontWeight="semibold">{approveRow?.filterId || "policy"}</Text> guardrail policy on future requests.
             </Text>
             <ChoiceList
               title="Approve for"
               choices={[
                 { label: "Always", value: "ALWAYS" },
-                { label: "A number of days", value: "DURATION" },
+                { label: "Number of days", value: "DURATION" },
               ]}
               selected={[approveMode]}
               onChange={(v) => setApproveMode(v[0])}
