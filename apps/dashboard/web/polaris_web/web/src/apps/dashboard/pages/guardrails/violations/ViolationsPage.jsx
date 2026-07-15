@@ -287,7 +287,6 @@ function parseAktoPayload(payloadStr) {
 
 function deriveSkillOrToolName(url) {
     if (!url) return null;
-    const lower = url.toLowerCase();
     const skillMatch = url.match(/\/skills\/([^/?#]+)/i);
     if (skillMatch) return skillMatch[1];
     const toolMatch = url.match(/\/tools\/([^/?#]+)/i);

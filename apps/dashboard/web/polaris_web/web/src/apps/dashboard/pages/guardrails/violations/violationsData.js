@@ -1,11 +1,3 @@
-// Last 7 months ending today — matches the 7-point sparkline arrays on the Violations page.
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const _now = new Date();
-export const SPARKLINE_LABELS = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(_now.getFullYear(), _now.getMonth() - (6 - i), 1);
-    return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
-});
-
 // ─── Flyout detail helpers ───────────────────────────────────────────────────────
 
 function _parseAktoOuter(payloadStr) {
@@ -249,8 +241,8 @@ export function buildFallbackDetail(row) {
             highlights: undefined,
             mono: evidenceIsMono,
             author: row.type === "Prompt" ? (row.user || undefined) : undefined,
-            assetName: row.agenticAsset || undefined,
-            apiCollectionId: row.apiCollectionId || undefined,
+            assetName: row.type === "Skill" ? (row.agenticAsset || undefined) : undefined,
+            apiCollectionId: row.type === "Skill" ? (row.apiCollectionId || undefined) : undefined,
         },
         triggerReason,
         policyName,

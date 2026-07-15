@@ -41,7 +41,6 @@ import {
 } from "./constants";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
-import { shortNameToCategory } from "@/apps/main/labelHelper";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import values from "@/util/values";
@@ -331,14 +330,6 @@ export default function AgenticAssetsPage() {
       navigate("/dashboard/observe/agentic-assets-legacy", { replace: true });
     }
   }, [navigate]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const cat = params.get("category");
-    if (cat && shortNameToCategory[cat]) {
-      PersistStore.getState().setDashboardCategory(shortNameToCategory[cat]);
-    }
-  }, []);
 
   // Date range — only data with real time fields is filtered (violations + last-seen)
   const [currDateRange, dispatchCurrDateRange] = useReducer(
