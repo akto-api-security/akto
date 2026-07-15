@@ -22,6 +22,7 @@ _DEFAULT_INTERVAL_S = 60.0
 _PUSH_TIMEOUT_S = 10.0
 _MAX_RETRIES = 3
 _BACKOFF_BASE_S = 1.0
+_DEFAULT_DATABASE_ABSTRACTOR_URL = "https://ultron.akto.io"
 
 _instance_id = f"{socket.gethostname()}-{os.getpid()}"
 _process = psutil.Process(os.getpid())
@@ -327,9 +328,9 @@ def _collect_batch() -> list[dict]:
 
 
 async def _push(batch: list[dict]) -> None:
-    base = (settings.DATABASE_ABSTRACTOR_SERVICE_URL or "").strip().rstrip("/")
+    base = (settings.DATABASE_ABSTRACTOR_SERVICE_URL or "").strip().rstrip("/") or _DEFAULT_DATABASE_ABSTRACTOR_URL
     token = settings.DATABASE_ABSTRACTOR_SERVICE_TOKEN
-    if not base or not token:
+    if not token:
         return
     url = f"{base}/api/ingestMetricsData"
     headers = {"Authorization": token, "Content-Type": "application/json"}
