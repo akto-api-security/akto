@@ -178,6 +178,43 @@ export function summarizeViolations(rows = []) {
     return t;
 }
 
+// ── Skill-scoped violation attribution ───────────────────────────────────────
+// Skill identity lives on the event URL as /skills/<skillName> (not on host).
+// Host-level aggregation must not be used for Skill assets — it pulls in
+// agent/config findings (e.g. claude_settings_risk) from every parent collection.
+
+export function skillNameFromUrl(url) {
+    if (!url) return null;
+    const idx = url.indexOf("skills/");
+    if (idx < 0) return null;
+    const name = url.substring(idx + "skills/".length).split(/[?#]/)[0];
+    return name || null;
+}
+
+export function eventMatchesSkill(row, skillName) {
+    if (!skillName || !row) return false;
+    return skillNameFromUrl(row.url) === skillName;
+}
+
+export function selectSkillViolationRows(violationRows = [], skillName) {
+    if (!skillName) return [];
+    return violationRows.filter((r) => eventMatchesSkill(r, skillName));
+}
+
+export function aggregateViolationsBySkillName(violationRows = []) {
+    const bySkill = {};
+    violationRows.forEach((row) => {
+        const skillName = skillNameFromUrl(row.url);
+        if (!skillName) return;
+        const sev = normalizeSeverity(row.severity);
+        if (!sev) return;
+        const key = sev.toLowerCase();
+        if (!bySkill[skillName]) bySkill[skillName] = { critical: 0, high: 0, medium: 0, low: 0 };
+        bySkill[skillName][key] += 1;
+    });
+    return bySkill;
+}
+
 export function buildAgenticObserveChatMetadata(scope, data = {}) {
     return {
         type: "agentic_observe",
