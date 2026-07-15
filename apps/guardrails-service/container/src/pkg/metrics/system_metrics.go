@@ -97,3 +97,18 @@ func (s *SystemSampler) CacheStats(hitsExact, hitsFuzzy, misses uint64) []Metric
 		s.sum("GUARDRAIL_CACHE_MISS", float64(misses), now),
 	}
 }
+
+// DependencyStats builds call-health metrics for one downstream dependency
+// (agent-guard or the embedder), as observed by this client — network transit
+// time and connection-level failures included, which the dependency's own
+// server-side metrics can't see. calls/errors are deltas since the last call
+// (e.g. from a depstats.Tracker.Drain), matching MetricType SUM; avgLatencyMs
+// is this window's mean, matching MetricType GAUGE.
+func (s *SystemSampler) DependencyStats(prefix string, calls, errors uint64, avgLatencyMs float64) []MetricData {
+	now := time.Now().Unix()
+	return []MetricData{
+		s.sum(prefix+"_CALLS", float64(calls), now),
+		s.sum(prefix+"_ERRORS", float64(errors), now),
+		s.gauge(prefix+"_LATENCY", avgLatencyMs, now),
+	}
+}
