@@ -83,17 +83,13 @@ async def post_slack(scanner_name: str, scanner_type: str, text: str, result: di
     webhook = (settings.SLACK_WEBHOOK_URL or "").strip()
     if not webhook:
         return
-    started = time.perf_counter()
     try:
         payload = {"blocks": _build_blocks(scanner_name, scanner_type, text, result)}
         async with httpx.AsyncClient(timeout=_SLACK_TIMEOUT_S) as client:
             resp = await client.post(webhook, headers=_IDENTITY, json=payload)
-        metrics_push.alert_latency.record("slack", (time.perf_counter() - started) * 1000.0)
         if resp.status_code >= 400:
-            metrics_push.alert_errors.increment(f"slack:status_{resp.status_code}")
             logger.warning(f"[Slack] webhook returned {resp.status_code}")
     except Exception as exc:
-        metrics_push.alert_errors.increment(f"slack:{type(exc).__name__}")
         logger.warning(f"[Slack] post failed: {exc}")
 
 

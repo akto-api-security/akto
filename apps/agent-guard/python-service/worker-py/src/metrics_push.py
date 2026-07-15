@@ -105,7 +105,7 @@ backpressure_trips = CountAccumulator()
 # single "cascade" key -> escalation/error count
 arbiter_escalations = CountAccumulator()
 arbiter_errors = CountAccumulator()
-# single "slack"/"store_results" key
+# single "store_results" key
 alert_latency = SampleAccumulator()
 alert_errors = CountAccumulator()
 # status class ("2xx"/"4xx"/"5xx") -> count, across every HTTP endpoint
@@ -268,7 +268,7 @@ def _collect_batch() -> list[dict]:
     for reason, count in arbiter_errors.drain_all().items():
         batch.append(_metric(f"AGENT_GUARD_ARBITER_ERROR_{reason.upper()}", float(count), "SUM", account_id, now))
 
-    # --- alert sinks (Slack webhook, database-abstractor store) ---
+    # --- alert sinks (database-abstractor store) ---
     for key, samples in alert_latency.drain_all().items():
         batch.extend(_latency_batch(f"AGENT_GUARD_ALERT_{key.upper()}", samples, account_id, now))
     for key, count in alert_errors.drain_all().items():
