@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request
 from pydantic import BaseModel, Field
 
 import cascade_backpressure
+import metrics_push
 import scan_diag
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
@@ -33,7 +34,11 @@ async def lifespan(_: FastAPI):
     settings.init_from_env()
     cascade_backpressure.configure_from_env()
     scan_diag.log_startup_banner()
-    yield
+    push_task = asyncio.create_task(metrics_push.run_forever())
+    try:
+        yield
+    finally:
+        push_task.cancel()
 
 
 app = FastAPI(title="Akto Agent Guard Executor", version="1.0.0", lifespan=lifespan)
@@ -49,6 +54,7 @@ async def scan_inflight_middleware(request: Request, call_next):
     wall_start = time.perf_counter()
     _scan_inflight += 1
     inflight = _scan_inflight
+    metrics_push.set_queue_size(inflight)
     scan_diag.log_inflight(inflight, entering=True)
     try:
         response = await call_next(request)
@@ -64,6 +70,7 @@ async def scan_inflight_middleware(request: Request, call_next):
         return response
     finally:
         _scan_inflight -= 1
+        metrics_push.set_queue_size(_scan_inflight)
         scan_diag.log_inflight(_scan_inflight, entering=False)
 
 
