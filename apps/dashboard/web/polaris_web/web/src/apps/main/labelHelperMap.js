@@ -371,7 +371,12 @@ export const labelMap = {
     "Attack type": "Policy Triggered",
     "Attack Type": "Policy Triggered",
     "Latest Attack": "Latest Policy Triggered",
-    "Latest attack sub-category": "Policy triggered"
+    "Latest attack sub-category": "Policy triggered",
+    "Top Threat Violation Types": "Top Guardrail Violation Types",
+    "Number of detections for each threat category, from most to least common.": "Number of violations detected, grouped by guardrail trigger.",
+    "Top Threat Categories": "Top Guardrail Triggers",
+    "Threat categories ranked by number of detections.": "Guardrail triggers ranked by number of violations detected.",
+    "Threat Category": "Guardrail Trigger"
   },
   "Endpoint Security": {
     "Quick Start": "Connectors",
@@ -461,6 +466,11 @@ export const labelMap = {
     "Attack type": "Policy Triggered",
     "Attack Type": "Policy Triggered",
     "Latest Attack": "Latest Policy Triggered",
-    "Latest attack sub-category": "Policy triggered"
+    "Latest attack sub-category": "Policy triggered",
+    "Top Threat Violation Types": "Top Guardrail Violation Types",
+    "Number of detections for each threat category, from most to least common.": "Number of violations detected, grouped by guardrail trigger.",
+    "Top Threat Categories": "Top Guardrail Triggers",
+    "Threat categories ranked by number of detections.": "Guardrail triggers ranked by number of violations detected.",
+    "Threat Category": "Guardrail Trigger"
   },
 }
