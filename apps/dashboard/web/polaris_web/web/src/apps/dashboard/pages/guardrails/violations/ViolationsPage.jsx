@@ -16,12 +16,13 @@ import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithM
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import DonutChart from "@/apps/dashboard/components/shared/DonutChart";
+import SmoothAreaChart from "@/apps/dashboard/pages/dashboard/new_components/SmoothChart";
 import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
 import AgenticStatsCard from "@/apps/dashboard/pages/observe/agentic/AgenticStatsCard";
 import AgenticTopListCard from "@/apps/dashboard/pages/observe/agentic/AgenticTopListCard";
 import AssetIcon from "@/apps/dashboard/pages/observe/agentic/AssetIcon";
 import { SeverityBadge } from "@/apps/dashboard/pages/observe/agentic/AgenticCellRenderers";
-import { TYPE_CLASS_MAP } from "@/apps/dashboard/pages/observe/agentic/DeviceEndpoints";
+import { OsIcon, TYPE_CLASS_MAP } from "@/apps/dashboard/pages/observe/agentic/DeviceEndpoints";
 import func from "@/util/func";
 import values from "@/util/values";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
@@ -364,7 +365,7 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
     if (summaryLoading) return <SpinnerCentered />;
     if (!summaryData) return null;
 
-    const { severityDistribution, categoryTotal, statusCounts, topPolicies, byType } = summaryData;
+    const { severityDistribution, categoryTotal, statusCounts, topPolicies, topHosts, byType } = summaryData;
 
     const totalBreakdown = ["CRITICAL", "HIGH", "MEDIUM", "LOW"].map(k => ({
         label: k.charAt(0) + k.slice(1).toLowerCase(),
@@ -386,6 +387,20 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
         renderValue: () => (
             <HorizontalStack gap="3" blockAlign="center" align="end" wrap={false}>
                 <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>
+                <SmoothAreaChart tickPositions={[0, 0, 0, 0, 0, 0, item.count]} color="#EF4444" height={28} width={90} />
+            </HorizontalStack>
+        ),
+    }));
+
+    const hostRows = (topHosts || []).slice(0, 5).map((item, i) => ({
+        id: `h${i}`,
+        name: item.name,
+        count: item.count,
+        os: detectOs(item.host),
+        renderValue: () => (
+            <HorizontalStack gap="3" blockAlign="center" align="end" wrap={false}>
+                <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>
+                <SmoothAreaChart tickPositions={[0, 0, 0, 0, 0, 0, item.count]} color="#EF4444" height={28} width={90} />
             </HorizontalStack>
         ),
     }));
@@ -419,7 +434,16 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
                 </div>
             </HorizontalGrid>
 
-            <HorizontalGrid columns={2} gap="4">
+            <HorizontalGrid columns={3} gap="4">
+                <AgenticTopListCard
+                    title="Violations by Top Users"
+                    titleTooltip="Top 5 users by number of violations. Click a user to filter the table below."
+                    columns={[{ label: "User" }, { label: "Violations" }]}
+                    rows={hostRows}
+                    renderIcon={(row) => <OsIcon os={row.os} size={20} />}
+                    activeRows={new Set()}
+                    onClearSelection={() => {}}
+                />
                 <AgenticTopListCard
                     title="Top Policies Triggered"
                     titleTooltip="Top 5 guardrail policies by number of active violations. Click a policy to filter the table below."
@@ -637,10 +661,11 @@ function Violations() {
         async function loadSummary() {
             setSummaryLoading(true);
             try {
-                const [severityResp, categoryResp, dailyResp] = await Promise.all([
+                const [severityResp, categoryResp, dailyResp, topNResp] = await Promise.all([
                     threatDetectionApi.fetchCountBySeverity(startTimestamp, endTimestamp, "ACTIVE"),
                     threatDetectionApi.fetchThreatCategoryCount(startTimestamp, endTimestamp, activeStatusValue),
                     threatDetectionApi.getDailyThreatActorsCount(startTimestamp, endTimestamp, []),
+                    threatDetectionApi.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5),
                 ]);
 
                 // Severity counts — same parsing as ThreatDashboardPage
@@ -692,7 +717,14 @@ function Violations() {
                 });
                 const categoryTotal = Object.values(byType).reduce((sum, v) => sum + v.text, 0);
 
-                setSummaryData({ severityDistribution, totalCount, categoryTotal, statusCounts, topPolicies, byType, typeToSubCategories });
+                // Top hosts from topN response
+                const topHosts = (topNResp?.topHosts || []).map(h => ({
+                    name: h.host || "-",
+                    count: h.attacks || 0,
+                    host: h.host || "",
+                }));
+
+                setSummaryData({ severityDistribution, totalCount, categoryTotal, statusCounts, topPolicies, topHosts, byType, typeToSubCategories });
             } catch {
                 setSummaryData(null);
             } finally {
