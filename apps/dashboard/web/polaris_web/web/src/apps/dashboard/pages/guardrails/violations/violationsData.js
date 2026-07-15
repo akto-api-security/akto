@@ -156,16 +156,13 @@ export function buildFallbackDetail(row) {
                 fileTabLabel = "Config.json";
             } else if (row.type === "Skill" || row.type === "Tool") {
                 if (row.type === "Skill") skillName = req?.skill_name || null;
-                // When the payload is skill metadata (has skill_name/skill_description but no
-                // actual file body), format it as readable text instead of raw JSON and use
-                // a label that doesn't imply the full file is present.
                 if (req?.skill_name || req?.skill_description) {
                     const lines = [];
                     if (req.skill_name) lines.push(`# ${req.skill_name}`);
-                    if (req.skill_description) lines.push(`\n${req.skill_description}`);
+                    if (req.skill_description) lines.push(`\n**${req.skill_description}**`);
+                    if (req.skill_content) lines.push(`\n${req.skill_content}`);
                     if (req.file_path) lines.push(`\n**Path:** ${req.file_path}`);
                     if (req.agent) lines.push(`**Agent:** ${req.agent}`);
-                    if (req.content_length != null) lines.push(`\n> Full skill file (${req.content_length} bytes) was validated but is not stored in the event payload.`);
                     fileContent = lines.join("\n");
                     fileTabLabel = "Skill Info";
                 } else {
@@ -252,6 +249,8 @@ export function buildFallbackDetail(row) {
             highlights: undefined,
             mono: evidenceIsMono,
             author: row.type === "Prompt" ? (row.user || undefined) : undefined,
+            assetName: row.agenticAsset || undefined,
+            apiCollectionId: row.apiCollectionId || undefined,
         },
         triggerReason,
         policyName,
