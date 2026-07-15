@@ -819,6 +819,7 @@ export function buildAgenticAssetsPageData(
         usernameMap = {},
         userMetadataMap = {},
         violationsByCollectionId = {},
+        maliciousSkillNames = new Set(),
         analysisByKey = new Map(),
         userAnalysisKeysByDeviceId = new Map(),
     } = {},
@@ -837,6 +838,7 @@ export function buildAgenticAssetsPageData(
 
     allGroups.forEach((group) => {
         const collectionIds = (group.collections || []).map((c) => c.id);
+        const isSkill = group.rowType === ROW_TYPES.SKILL || group.clientType === CLIENT_TYPES.SKILL;
         // Skills are capability manifest entries — violations belong to the agent/service collection
         // that declares them, not to the skill itself. Suppress to avoid double-counting.
         const violations = violationsForCollections(collectionIds, violationsByCollectionId);
@@ -846,6 +848,8 @@ export function buildAgenticAssetsPageData(
         const riskScore = group.riskScore ?? group.maxRiskScore ?? null;
         const lastSeen = group.detectedTimestamp || 0;
         const aiInteractions = aggregateAiInteractionsForGroup(group, analysisByKey, userAnalysisKeysByDeviceId);
+        const isMalicious = isSkill
+            && maliciousSkillNames.has(String(group.groupName || "").toLowerCase());
 
         const treeRow = {
             path: [group.id],
@@ -861,6 +865,7 @@ export function buildAgenticAssetsPageData(
             hasLocalMcpServer: group.hasLocalMcpServer || false,
             hasMisconfiguredConfig: group.hasMisconfiguredConfig || false,
         };
+        if (isMalicious) treeRow.isMalicious = true;
         if (aiInteractions) {
             treeRow.aiInteractions = aiInteractions.total;
             treeRow.aiInteractionsDetail = {
@@ -889,6 +894,7 @@ export function buildAgenticAssetsPageData(
             hasLocalMcpServer: group.hasLocalMcpServer || false,
             hasMisconfiguredConfig: group.hasMisconfiguredConfig || false,
         };
+        if (isMalicious) flatRow.isMalicious = true;
         if (violations) flatRow.violations = violations;
         if (groups.length) flatRow.groups = groups;
         if (aiInteractions) {
