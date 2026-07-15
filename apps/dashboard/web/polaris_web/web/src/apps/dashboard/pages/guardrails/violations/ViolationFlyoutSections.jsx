@@ -182,7 +182,14 @@ export function OverviewSection({ row, detail }) {
 
             <Divider />
 
-            {/* 2. Numbered guardrail sections */}
+            {/* 2. Detected / Device ID / Session ID */}
+            <Box padding="4">
+                <DetailGrid items={gridItems} columns={3} />
+            </Box>
+
+            <Divider />
+
+            {/* 3. Numbered guardrail sections */}
             <Box padding="4">
                 <VerticalStack gap="5">
                     {guardrailSections.map((section, sectionIdx) => (
@@ -226,17 +233,18 @@ export function OverviewSection({ row, detail }) {
                 </VerticalStack>
             </Box>
 
-            <Divider />
+            {topo && (
+                <>
+                    <Divider />
 
-            {/* 3. Other details — topology + device/session grid */}
-            <Box padding="4">
-                <VerticalStack gap="4">
-                    {topo && <AssetTopologyGraph nodes={topo.nodes} edges={topo.edges} />}
-                    <DetailGrid items={gridItems} columns={3} />
-                </VerticalStack>
-            </Box>
+                    {/* 4. Asset topology */}
+                    <Box padding="4">
+                        <AssetTopologyGraph nodes={topo.nodes} edges={topo.edges} />
+                    </Box>
+                </>
+            )}
 
-            {/* 4. OWASP + Compliance — only when data exists */}
+            {/* 5. OWASP + Compliance — only when data exists */}
             {hasBottomSection && (
                 <>
                     <Divider />
