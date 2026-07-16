@@ -22,6 +22,7 @@ import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
+import com.mongodb.WriteConcern;
 import com.akto.dao.*;
 import com.akto.dao.agent_classifiers.AgentGuardCorpusDao;
 import com.akto.dao.agent_classifiers.AgentGuardCorpusQueueDao;
@@ -56,6 +57,8 @@ import com.akto.dao.context.Context;
 import com.akto.dao.file.FilesDao;
 import com.akto.dao.nhi_governance.NhiIdentityDao;
 import com.akto.dto.nhi_governance.NhiIdentity;
+import com.akto.dao.config_field_policy.ConfigFieldPolicyDao;
+import com.akto.dto.config_field_policy.ConfigFieldPolicy;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
@@ -259,7 +262,7 @@ public class DbLayer {
         updateList.add(Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()));
         updateList.add(Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS)));
         updateList.add(Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()));
-        updateList.addAll(buildAdditionalDataUpdates(moduleInfo.getAdditionalData()));
+        updateList.addAll(buildAdditionalDataUpdates(moduleInfo.getModuleType(), moduleInfo.getAdditionalData()));
 
         ModuleInfo result = ModuleInfoDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
@@ -271,12 +274,18 @@ public class DbLayer {
         return result;
     }
 
-    private static List<Bson> buildAdditionalDataUpdates(Map<String, Object> additionalData) {
+    private static List<Bson> buildAdditionalDataUpdates(ModuleInfo.ModuleType moduleType, Map<String, Object> additionalData) {
         List<Bson> updates = new ArrayList<>();
         if (additionalData == null || additionalData.isEmpty()) {
             return updates;
         }
-        updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA, additionalData));
+        if (moduleType == ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD) {
+            for (Map.Entry<String, Object> entry : additionalData.entrySet()) {
+                updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + "." + entry.getKey(), entry.getValue()));
+            }
+        } else {
+            updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA, additionalData));
+        }
         return updates;
     }
 
@@ -1359,8 +1368,21 @@ public class DbLayer {
     }
 
     public static void insertEndpointShieldLog(LogsEndpointShield log) {
-        // todo: temp disable endpoint shield logs to avoid collection size issues, will re-enable after fixing the issue
-        // LogsEndpointShieldDao.instance.insertOne(log);
+        // Logs are high-volume and non-critical: use w:1 so inserts return as soon as the
+        // primary has written, instead of blocking on majority acknowledgement from
+        // (possibly lagging) secondaries. Avoids waitForWriteConcern stalls under load.
+        // In the Kafka producer/consumer setup this runs on the consumer side, off the
+        // API request hot path, so Mongo write pressure is decoupled from the caller.
+        LogsEndpointShieldDao.instance.insertOne(log, WriteConcern.W1);
+    }
+
+    public static void insertEndpointShieldLogs(List<LogsEndpointShield> logs) {
+        if (logs == null || logs.isEmpty()) {
+            return;
+        }
+        // Batched, unordered, w:1 insert — one Mongo round trip per Kafka poll instead of
+        // one insertOne per log. ordered(false) so a single bad doc doesn't abort the batch.
+        LogsEndpointShieldDao.instance.insertMany(logs, WriteConcern.W1, new InsertManyOptions().ordered(false));
     }
 
     public static void modifyHybridSaasSetting(boolean isHybridSaas) {
@@ -2393,6 +2415,20 @@ public class DbLayer {
                 loggerMaker.errorAndAddToDb(e, "Error submitting OT metrics task: " + e.getMessage(), LogDb.DB_ABS);
             }
         }
+
+        // Forward to Akto's own collector (independent of the customer
+        // OpenTelemetryIntegration). Gated for gradual rollout by the overall
+        // flag + account allowlist (see OpenTelemetryUtils.shouldForwardToAktoInfra).
+        if (OpenTelemetryUtils.shouldForwardToAktoInfra(accountId)) {
+            try {
+                telemetryForwardingExecutorService.submit(() -> {
+                    Context.accountId.set(accountId);
+                    OpenTelemetryUtils.forwardMetricsToAktoInfra(metricData);
+                });
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error submitting Akto infra metrics task: " + e.getMessage(), LogDb.DB_ABS);
+            }
+        }
     }
     public static void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         Integer accountId = Context.accountId.get();
@@ -3088,6 +3124,20 @@ public class DbLayer {
             return AgentUsersDao.instance.findDeviceIdsByTeamsAndRoles(teams, roles);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in findDeviceIdsByTeamsAndRoles: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    // --- Config Field Policy (Misconfigurations) ---
+
+    public static List<ConfigFieldPolicy> fetchActiveConfigFieldPolicies(String toolName) {
+        try {
+            Bson filter = Filters.and(
+                    Filters.eq(ConfigFieldPolicy.STATUS, "ACTIVE"),
+                    Filters.eq(ConfigFieldPolicy.TOOL_NAME, toolName));
+            return ConfigFieldPolicyDao.instance.findAll(filter);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchActiveConfigFieldPolicies: " + e.getMessage());
             return new ArrayList<>();
         }
     }
