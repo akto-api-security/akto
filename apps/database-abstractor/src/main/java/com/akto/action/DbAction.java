@@ -3945,8 +3945,8 @@ public class DbAction extends ActionSupport {
 
     public String insertGuardrailsServiceLog() {
         try {
-            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            GuardrailsServiceLogsDao.instance.insertOne(dbLog);
+            // Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            // GuardrailsServiceLogsDao.instance.insertOne(dbLog);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertGuardrailsServiceLog " + e.toString());
             return Action.ERROR.toUpperCase();
