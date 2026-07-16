@@ -12,6 +12,7 @@ import com.akto.dto.testing.TestRoles;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
+import com.akto.testing.HostValidator;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.utils.Utils;
@@ -50,6 +51,15 @@ public class AgentImportAction extends UserAction{
 
     @Getter @Setter
     private String collectionName;
+
+    @Getter @Setter
+    private String customResponseBody;
+
+    @Getter @Setter
+    private Integer customResponseStatusCode;
+
+    @Getter @Setter
+    private Map<String, String> customResponseHeaders;
 
     private int apiCollectionId;
     
@@ -156,44 +166,64 @@ public class AgentImportAction extends UserAction{
     }
     
     private void executeApiCall() {
-        try {
-            Map<String, List<String>> headers = new HashMap<>();
-            headers.put("Content-Type", Arrays.asList("application/json"));
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("Content-Type", Arrays.asList("application/json"));
 
-            String method = !StringUtils.isEmpty(requestBody) ? "POST" : "GET";
-            OriginalHttpRequest request = new OriginalHttpRequest(url, "", method, requestBody, headers, "HTTP/1.1");
-            
-            if (!StringUtils.isEmpty(testRoleId)) {
-                TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testRoleId)));
-                if (testRole != null) {
-                    AuthMechanism authMechanism = testRole.findDefaultAuthMechanism();
-                    authMechanism.addAuthToRequest(request, false);
+        String method = !StringUtils.isEmpty(requestBody) ? "POST" : "GET";
+        OriginalHttpRequest request = new OriginalHttpRequest(url, "", method, requestBody, headers, "HTTP/1.1");
+
+        if (customHeaders != null) {
+            for (Map.Entry<String, String> entry : customHeaders.entrySet()) {
+                if (!StringUtils.isEmpty(entry.getKey())) {
+                    headers.put(entry.getKey(), Arrays.asList(entry.getValue()));
                 }
             }
+        }
 
-            if (customHeaders != null) {
-                for (Map.Entry<String, String> entry : customHeaders.entrySet()) {
+        OriginalHttpResponse response;
+        if (!StringUtils.isEmpty(customResponseBody)) {
+            // User supplied the expected response directly (e.g. the target is unreachable from
+            // the dashboard's network) — skip the live call and save that response as-is.
+            loggerMaker.info("Using user-provided custom response for URL: " + url, LoggerMaker.LogDb.DASHBOARD);
+            Map<String, List<String>> customRespHeaders = new HashMap<>();
+            if (customResponseHeaders != null) {
+                for (Map.Entry<String, String> entry : customResponseHeaders.entrySet()) {
                     if (!StringUtils.isEmpty(entry.getKey())) {
-                        headers.put(entry.getKey(), Arrays.asList(entry.getValue()));
+                        customRespHeaders.put(entry.getKey(), Arrays.asList(entry.getValue()));
                     }
                 }
             }
-            
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, false, null, false, new ArrayList<>(), false);
+            int statusCode = customResponseStatusCode != null ? customResponseStatusCode : 200;
+            response = new OriginalHttpResponse(customResponseBody, customRespHeaders, statusCode);
+        } else {
+            try {
+                if (!StringUtils.isEmpty(testRoleId)) {
+                    TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testRoleId)));
+                    if (testRole != null) {
+                        AuthMechanism authMechanism = testRole.findDefaultAuthMechanism();
+                        authMechanism.addAuthToRequest(request, false);
+                    }
+                }
 
-            if (response == null) {
-                loggerMaker.error("Failed to get response from URL: " + url, LoggerMaker.LogDb.DASHBOARD);
-                return;
+                response = ApiExecutor.sendRequest(request, false, null, false, new ArrayList<>(), HostValidator.SKIP_SSRF_CHECK);
+                if (response == null) {
+                    throw new Exception("No response received from URL: " + url);
+                }
+                loggerMaker.info("Successfully received response from URL", LoggerMaker.LogDb.DASHBOARD);
+            } catch (Exception e) {
+                // Request never reached the target (SSRF block, DNS/connection failure, timeout, etc).
+                // Save a placeholder entry so the attempted call still shows up instead of vanishing silently.
+                loggerMaker.error("Error calling URL: " + url + " - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+                response = new OriginalHttpResponse("", new HashMap<>(), 0);
             }
+        }
 
-            loggerMaker.info("Successfully received response from URL", LoggerMaker.LogDb.DASHBOARD);
-            
+        try {
             // Remove x-akto-ignore header before converting to message
             headers.remove(Constants.AKTO_IGNORE_FLAG);
 
             String message = convertToMessage(url, headers, requestBody, response);
             saveToDatabase(Arrays.asList(message));
-
         } catch (Exception e) {
             loggerMaker.error("Error during async API execution: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
@@ -213,14 +243,21 @@ public class AgentImportAction extends UserAction{
         result.put("requestHeaders", mapper.writeValueAsString(requestHeadersFlat));
         result.put("method", requestBody != null ? "POST" : "GET");
         result.put("requestPayload", requestBody != null ? requestBody : "");
-        result.put("responsePayload", response.getBody());
+        result.put("responsePayload", response.getBody() != null ? response.getBody() : "");
         result.put("ip", "null");
         result.put("time", Context.now() + "");
         result.put("statusCode", response.getStatusCode() + "");
         result.put("type", "HTTP/1.1");
-        result.put("status", "OK");
+
+        // statusCode <= 0 means the call never got a real response (SSRF block, DNS/connection
+        // failure, etc). The runtime pipeline's filterHttpResponseParams() drops any non-2xx/302
+        // status code unless source == POSTMAN, which is the existing carve-out for "no response"
+        // imports (e.g. Postman collections without live responses) — reuse it here so the
+        // attempted call still shows up instead of being silently discarded downstream.
+        boolean isNoResponse = response.getStatusCode() <= 0;
+        result.put("status", isNoResponse ? "ERROR" : "OK");
         result.put("contentType", getContentTypeFromHeaders(response.getHeaders()));
-        result.put("source", HttpResponseParams.Source.HAR.name());
+        result.put("source", (isNoResponse ? HttpResponseParams.Source.POSTMAN : HttpResponseParams.Source.HAR).name());
         
         result.put("responseHeaders", mapper.writeValueAsString(responseHeadersFlat));
         
