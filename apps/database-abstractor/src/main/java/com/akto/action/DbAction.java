@@ -3910,6 +3910,17 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String insertSmartTestingLog() {
+        try {
+            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            SmartTestingLogsDao.instance.insertOne(dbLog);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertSmartTestingLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String insertDastLog() {
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
