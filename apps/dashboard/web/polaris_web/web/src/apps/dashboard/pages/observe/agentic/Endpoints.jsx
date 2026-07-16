@@ -23,6 +23,7 @@ import {
     PAGE_LIMIT,
     groupCollectionsByAgent,
     groupCollectionsByService,
+    groupCollectionsByLLM,
     groupCollectionsBySkill,
     extractEndpointId,
     buildAgenticInventoryFilterForRow,
@@ -199,16 +200,18 @@ function Endpoints() {
 
             const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap, riskScoreMap);
             const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);
+            const llmGroups = groupCollectionsByLLM(collections, trafficMap, sensitiveMap, riskScoreMap);
             const skillGroups = groupCollectionsBySkill(collections, trafficMap, sensitiveMap, riskScoreMap);
 
             const prettifiedAgents = prettifyGroupData(agentGroups);
             const prettifiedServices = prettifyGroupData(serviceGroups);
+            const prettifiedLlms = prettifyGroupData(llmGroups);
             const prettifiedSkills = prettifyGroupData(skillGroups);
 
             const agentGroupKeys = new Set(prettifiedAgents.map((a) => a.groupKey));
             const servicesToShow = prettifiedServices.filter((s) => !agentGroupKeys.has(s.groupKey));
 
-            const allData = [...prettifiedAgents, ...servicesToShow, ...prettifiedSkills];
+            const allData = [...prettifiedAgents, ...servicesToShow, ...prettifiedLlms, ...prettifiedSkills];
 
             const uniqueEndpointIds = new Set();
             collections.forEach((c) => {
