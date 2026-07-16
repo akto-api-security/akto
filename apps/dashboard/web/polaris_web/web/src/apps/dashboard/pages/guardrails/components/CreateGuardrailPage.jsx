@@ -562,7 +562,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 setMcpServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'mcp-server')).map(toOption)));
                 setAgentServers(buildAgentFilterOptions(allCollections).map(opt => ({
                     ...opt,
-                    isInline: !genAiCollections.some(c =>
+                    isInline: genAiCollections.some(c =>
                         (c.hostName || c.displayName || c.name || '') === opt.value
                         && !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe')
                     )
