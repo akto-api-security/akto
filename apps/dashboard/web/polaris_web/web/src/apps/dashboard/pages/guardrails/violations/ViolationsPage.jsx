@@ -383,6 +383,7 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
         name: item.name,
         count: item.count,
         onClick: () => onPolicyClick?.(item.name),
+        renderValue: () => <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>,
     }));
 
     const hostRows = (topHosts || []).slice(0, 5).map((item, i) => ({
@@ -390,6 +391,7 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
         name: item.name,
         count: item.count,
         os: detectOs(item.host),
+        renderValue: () => <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>,
     }));
 
     return (
