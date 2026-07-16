@@ -1415,8 +1415,8 @@ public class DbAction extends ActionSupport {
 
     public String bulkWriteTrafficMetrics() {
         if (kafkaUtils.isWriteEnabled()) {
-            int accId = Context.accountId.get();
-            kafkaUtils.insertDataTraffic(writesForTrafficMetrics, "bulkWriteTrafficMetrics", accId);
+            // int accId = Context.accountId.get();
+            // kafkaUtils.insertDataTraffic(writesForTrafficMetrics, "bulkWriteTrafficMetrics", accId);
         } else {
             try {
                 loggerMaker.infoAndAddToDb("bulkWriteTrafficInfo called");
