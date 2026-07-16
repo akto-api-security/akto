@@ -635,7 +635,7 @@ func (s *Service) getLoginUserEmailType(reqHeaders map[string]string) string {
 
 // TODO: move reportAndBlockPersonalAccount to mcp library so threat reporting
 // and validation live in one place alongside other policy enforcement.
-func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID, policyName string) *mcp.ValidationResult {
+func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID, policyName, behaviour string) *mcp.ValidationResult {
 	blockReason := "Blocked: personal accounts are not permitted by guardrail policy"
 
 	if s.sessionMgr != nil && sessionID != "" {
@@ -672,7 +672,7 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 				types.ContextSource(params.ContextSource),
 				extractHostHeader(reqHeaders),
 				sessionID,
-				"block",
+				behaviour,
 			); err != nil {
 				s.logger.Warn("Failed to report threat for personal account block", zap.String("policyName", policyName), zap.Error(err))
 			}
@@ -682,7 +682,7 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 	return &mcp.ValidationResult{
 		Allowed:   false,
 		Reason:    blockReason,
-		Behaviour: "block",
+		Behaviour: behaviour,
 		Metadata: types.ThreatMetadata{
 			PolicyName:   policyName,
 			RuleViolated: "BlockPersonalAccounts",
@@ -739,10 +739,26 @@ func (s *Service) checkBlockedHost(params *models.ValidateRequestParams, valCtx 
 		zap.String("policy", policyName),
 		zap.String("sessionID", sessionID),
 		zap.String("requestID", requestID))
-	return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, policyName, matchedPattern)
+	return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, policyName, matchedPattern, behaviourForPolicy(policies, policyName))
 }
 
-func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID, policyName, matchedPattern string) *mcp.ValidationResult {
+// behaviourForPolicy returns the configured behaviour (lowercased) for the named policy,
+// defaulting to "block" when the policy is missing or has no behaviour set. Mirrors the
+// mcp library's effectiveViolationBehaviour so the guardrails-service's own reporters send
+// the policy's behaviour (e.g. "approval") instead of a hardcoded "block".
+func behaviourForPolicy(policies []types.Policy, policyName string) string {
+	for _, p := range policies {
+		if p.Info.Name == policyName {
+			if b := strings.TrimSpace(p.Behaviour); b != "" {
+				return strings.ToLower(b)
+			}
+			break
+		}
+	}
+	return "block"
+}
+
+func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID, policyName, matchedPattern, behaviour string) *mcp.ValidationResult {
 	reason := "Request blocked by guardrail policy (blocked host pattern: " + matchedPattern + ")"
 	metadata := types.ThreatMetadata{
 		PolicyName:   policyName,
@@ -772,7 +788,7 @@ func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCt
 				types.ContextSource(params.ContextSource),
 				extractHostHeader(valCtx.RequestHeaders),
 				sessionID,
-				"block",
+				behaviour,
 			); err != nil {
 				s.logger.Warn("Failed to report threat for blocked host", zap.Error(err))
 			}
@@ -785,7 +801,7 @@ func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCt
 		ModifiedPayload: payloadToValidate,
 		Reason:          reason,
 		Metadata:        metadata,
-		Behaviour:       "block",
+		Behaviour:       behaviour,
 	}
 }
 
@@ -1357,7 +1373,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 				zap.String("accountType", accountType),
 				zap.String("policyName", policyName),
 				zap.String("sessionID", sessionID))
-			return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName), nil
+			return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName)), nil
 		}
 	}
 

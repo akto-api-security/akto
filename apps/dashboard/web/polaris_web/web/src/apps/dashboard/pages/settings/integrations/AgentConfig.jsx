@@ -11,7 +11,8 @@ const MODEL_TYPES = {
   AZURE_OPENAI: "AZURE_OPENAI",
   OLLAMA: "OLLAMA",
   DATABRICKS: "DATABRICKS",
-  GITHUB_COPILOT: "GITHUB_COPILOT"
+  GITHUB_COPILOT: "GITHUB_COPILOT",
+  GEMINI: "GEMINI"
 }
 
 const OPENAI_MODELS = [
@@ -65,6 +66,16 @@ const GITHUB_COPILOT_MODELS = [
   { label: "Raptor mini (Preview)", value: "raptor-mini-preview" },
 ]
 
+const GEMINI_MODELS = [
+  { label: "Gemini 2.5 Flash", value: "gemini-2.5-flash" },
+  { label: "Gemini 2.5 Flash-Lite", value: "gemini-2.5-flash-lite" },
+  { label: "Gemini 3.5 Flash", value: "gemini-3.5-flash" },
+  { label: "Gemini 3.1 Flash-Lite", value: "gemini-3.1-flash-lite" },
+  { label: "Gemini 2.5 Pro", value: "gemini-2-5-pro" },
+  { label: "Gemini 3.1 Pro (Preview)", value: "gemini-3-1-pro-preview" },
+  { label: "Gemini 3 Flash (Preview)", value: "gemini-3-flash-preview" },
+]
+
 function getModelSections(type, data, setData, isEdit=false) {
   let sections = []
 
@@ -95,6 +106,7 @@ function getModelSections(type, data, setData, isEdit=false) {
   switch (type) {
     case MODEL_TYPES.ANTHROPIC:
     case MODEL_TYPES.OPENAI:
+    case MODEL_TYPES.GEMINI:
       break;
     case MODEL_TYPES.DATABRICKS:
       sections.push({
@@ -176,6 +188,8 @@ function getModelSections(type, data, setData, isEdit=false) {
         items = DATABRICKS_MODELS
       } else if (type === MODEL_TYPES.GITHUB_COPILOT) {
         items = GITHUB_COPILOT_MODELS
+      } else if (type === MODEL_TYPES.GEMINI) {
+        items = GEMINI_MODELS
       }
       section.component = (
         <VerticalStack gap="1">
@@ -320,6 +334,10 @@ function AgentConfig() {
             {
               label: 'GitHub Copilot',
               value: MODEL_TYPES.GITHUB_COPILOT
+            },
+            {
+              label: 'Gemini',
+              value: MODEL_TYPES.GEMINI
             }
             ]}
             initial={modelType}

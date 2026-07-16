@@ -11,10 +11,12 @@ Wire (portable):
 
 import json
 import logging
+import time
 from typing import Any
 
 import httpx
 
+import metrics_push
 from settings import settings
 
 logger = logging.getLogger(__name__)
@@ -49,20 +51,25 @@ def _fail_open(text: str, error: str) -> dict[str, Any]:
 async def _scan_anonymize_http(text: str, config: dict[str, Any], base_url: str) -> dict[str, Any]:
     payload = _build_payload(text, config)
     url = f"{base_url.rstrip('/')}/anonymize"
+    started = time.perf_counter()
     try:
         async with httpx.AsyncClient(timeout=_ANONYMIZE_TIMEOUT_S) as client:
             response = await client.post(url, json=payload)
     except Exception as exc:
+        metrics_push.COUNTS["anonymizer_errors"].increment(type(exc).__name__)
         logger.warning(f"[remote] anonymizer HTTP fetch failed: {exc}")
         return _fail_open(text, f"fetch_failed: {exc}")
+    metrics_push.SAMPLES["anonymizer"].record("anonymizer", (time.perf_counter() - started) * 1000.0)
 
     if response.status_code < 200 or response.status_code >= 300:
+        metrics_push.COUNTS["anonymizer_errors"].increment(f"status_{response.status_code}")
         logger.warning(f"[remote] anonymizer returned {response.status_code}")
         return _fail_open(text, f"status_{response.status_code}")
 
     try:
         return _shape_success(response.json(), text)
     except Exception as exc:
+        metrics_push.COUNTS["anonymizer_errors"].increment(type(exc).__name__)
         logger.warning(f"[remote] anonymizer response not JSON: {exc}")
         return _fail_open(text, "bad_response")
 

@@ -179,6 +179,11 @@ const findTypeTag = (envType) => {
     return null;
 };
 
+// True if the collection carries an explicit browser-llm tag, regardless of what other
+// type/asset tags (gen-ai, ai-agent, browser-llm-agent) are also present or their order.
+const hasBrowserLlmTag = (envType) =>
+    Array.isArray(envType) && envType.some((tag) => tag.keyName === TYPE_TAG_KEYS.BROWSER_LLM);
+
 // Get agent type from tag value using KNOWN_CLIENTS map (for agent rows)
 const getAgentTypeFromValue = (tagValue) => {
     const info = findClientInfo(tagValue);
@@ -242,6 +247,7 @@ export {
     getTypeFromTags,
     findAssetTag,
     findTypeTag,
+    hasBrowserLlmTag,
     getAgentTypeFromValue,
     getAgenticCategoryLabel,
     CLIENT_TAG_ALIASES,

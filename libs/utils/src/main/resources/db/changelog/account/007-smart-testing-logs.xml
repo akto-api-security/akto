@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Collection + timestamp index for SmartTestingLogsDao.createIndicesIfAbsent
+        (collName: logs_smart_testing, index on Log.TIMESTAMP descending).
+
+        Matches other account log collections in baseline-account.xml
+        (e.g. logs_agentic_testing, logs_dashboard): uncapped createCollection +
+        timestamp_-1. Index name matches MCollection.generateIndexName so the DAO's
+        createIndexIfAbsent treats it as present.
+
+        Capping (maxDocuments=100_000, sizeInBytes=100_000_000 from LogsDao) is left
+        to the DAO when DbMode.allowCappedCollections() is true and the collection
+        does not yet exist. We do not convertToCapped here — that command is
+        MongoDB-only and unsupported on DocumentDB/Cosmos (see changeset 006).
+    -->
+
+    <changeSet id="007-account-create-logs-smart-testing" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="logs_smart_testing"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="logs_smart_testing"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="logs_smart_testing"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="007-account-logs-smart-testing-timestamp-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="logs_smart_testing"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="logs_smart_testing">
+            <mongodb:keys>{ "timestamp": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "timestamp_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="logs_smart_testing">
+                <mongodb:keys>{ "timestamp": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

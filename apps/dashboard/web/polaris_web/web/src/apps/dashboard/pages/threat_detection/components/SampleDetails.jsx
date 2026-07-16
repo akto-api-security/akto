@@ -85,14 +85,14 @@ function ApproveServerButton({ policyName, serverId, alreadyApproved }) {
             <Modal.Section>
                 <VerticalStack gap="4">
                     <Text variant="bodyMd">
-                        Allow <Text as="span" fontWeight="semibold">{serverId || "this server"}</Text> to
-                        bypass the <Text as="span" fontWeight="semibold">{policyName || "policy"}</Text> guardrail.
+                        Approving <Text as="span" fontWeight="semibold">{serverId || "this server"}</Text> will
+                        allow it to bypass the <Text as="span" fontWeight="semibold">{policyName || "policy"}</Text> guardrail policy on future requests.
                     </Text>
                     <ChoiceList
                         title="Approve for"
                         choices={[
                             { label: "Always", value: "ALWAYS" },
-                            { label: "A number of days", value: "DURATION" },
+                            { label: "Number of days", value: "DURATION" },
                         ]}
                         selected={[mode]}
                         onChange={(v) => setMode(v[0])}
@@ -344,7 +344,11 @@ function SampleDetails(props) {
         </Box>
     )
 
-    const overviewTab = {
+    // Skill events (url like "/skills/<name>") show their own detail view via the
+    // Values tab reason field - the generic Overview tab adds no extra context there.
+    const isSkillEvent = (moreInfoData?.url || '').includes('skills/');
+
+    const overviewTab = !isSkillEvent && {
         id: "overview",
         content: 'Overview',
         component: currentTemplateObj && overviewComp
@@ -395,6 +399,7 @@ function SampleDetails(props) {
     }
 
     const remediationTab = (() => {
+        if (isSkillEvent) return false;
         if (isSettingsRisk) {
             const remediationMarkdown = liveMetadata.remediation || settingsRiskEntry?.remediation || GUARDRAIL_REMEDIATION_MARKDOWN;
             return {

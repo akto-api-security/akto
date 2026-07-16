@@ -6,6 +6,7 @@ from typing import Any
 
 import alerts
 import cascade_backpressure
+import metrics_push
 import scan_diag
 from constants import (
     CASCADE_SCANNERS,
@@ -71,6 +72,11 @@ async def scan_payload(
     def _elapsed_ms() -> float:
         return (time.perf_counter() - started) * 1000.0
 
+    def _record(status: str) -> None:
+        elapsed_ms = _elapsed_ms()
+        metrics_push.COUNTS["scan"].increment(f"{scanner_name}:{status}")
+        metrics_push.SAMPLES["scan"].record(scanner_name, elapsed_ms)
+
     if scanner_name not in SUPPORTED_SCANNERS:
         scan_diag.log_scan_outcome(
             "unsupported_scanner",
@@ -78,11 +84,13 @@ async def scan_payload(
             _elapsed_ms(),
             always=True,
         )
+        _record("error")
         return shape_response(scanner_name, True, 0.0, text, {"error": f"unsupported scanner: {scanner_name}"})
 
     if scanner_name in REMOTE_SCANNERS:
         if scanner_name == "Anonymize":
             r = await scan_anonymize(text, config, env)
+            _record("success" if r["is_valid"] else "blocked")
             return shape_response(scanner_name, r["is_valid"], r["risk_score"], r["sanitized_text"], r["details"])
 
     if scanner_name in CASCADE_SCANNERS:
@@ -101,6 +109,8 @@ async def scan_payload(
         # latency is elevated.
         if cascade_backpressure.should_skip_cascade():
             scan_diag.log_backpressure_skip(scanner_name)
+            metrics_push.COUNTS["backpressure_trips"].increment("cascade")
+            _record("skipped")
             return shape_response(
                 scanner_name,
                 True,
@@ -124,6 +134,7 @@ async def scan_payload(
                     "cascade_ms": elapsed,
                 },
             )
+            _record("success" if result["is_valid"] else "blocked")
             return shape_response(
                 scanner_name,
                 result["is_valid"],
@@ -139,6 +150,7 @@ async def scan_payload(
                 extra={"error": str(exc)},
                 always=True,
             )
+            _record("error")
             return shape_response(
                 scanner_name,
                 True,
@@ -156,8 +168,10 @@ async def scan_payload(
                 _elapsed_ms(),
                 extra={"is_valid": r["is_valid"]},
             )
+            _record("success" if r["is_valid"] else "blocked")
             return shape_response(scanner_name, r["is_valid"], r["risk_score"], r["sanitized_text"], r["details"])
         except ValueError:
+            _record("not_implemented")
             return shape_response(
                 scanner_name,
                 True,
@@ -170,4 +184,5 @@ async def scan_payload(
                 },
             )
 
+    _record("error")
     return shape_response(scanner_name, True, 0.0, text, {"error": "unroutable"})
