@@ -283,7 +283,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_changes",
                     }] : []),
-                    ...(dashboardCategory !== CATEGORY_AGENTIC_SECURITY ? [{
+                    ...((activeAccount === 1669322524 || (dashboardCategory !== CATEGORY_AGENTIC_SECURITY && dashboardCategory !== CATEGORY_ENDPOINT_SECURITY)) ? [{
                         label: "Sensitive Data",
                         onClick: () => {
                             navigate("/dashboard/observe/sensitive");
