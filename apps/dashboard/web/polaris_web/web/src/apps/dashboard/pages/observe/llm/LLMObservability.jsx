@@ -118,14 +118,18 @@ export default function LLMObservability() {
         [argusStats]
     );
 
-    // Breakdown by top 3 users (by session count) — comes from aggregated backend stats.
+    // Breakdown by top users (by session count)
     const sessionBreakdown = useMemo(() => {
         const breakdown = sessionStats?.userBreakdown || [];
-        return breakdown.map(({ label, count }, i) => ({
+        const entries = breakdown.map(({ label, count }, i) => ({
             label,
             count: Number(count),
             color: SERVICE_COLORS[i] || "#D1D5DB",
         }));
+        const shown = entries.reduce((sum, e) => sum + e.count, 0);
+        const rest  = (sessionStats?.totalSessions || 0) - shown;
+        if (rest > 0) entries.push({ label: "Others", count: rest, color: "#D1D5DB" });
+        return entries;
     }, [sessionStats]);
 
     // Token totals from accurate aggregated stats; fall back to sessions array while loading.

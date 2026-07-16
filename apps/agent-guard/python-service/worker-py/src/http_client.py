@@ -4,7 +4,6 @@ Reuses TCP connections under load instead of opening a new client per request.
 """
 
 import os
-from typing import Optional
 
 import httpx
 
@@ -12,7 +11,7 @@ _DEFAULT_TIMEOUT_S = 120.0
 _MAX_CONNECTIONS = 100
 _MAX_KEEPALIVE = 50
 
-_client: Optional[httpx.AsyncClient] = None
+_client: httpx.AsyncClient | None = None
 
 
 def _limits() -> httpx.Limits:

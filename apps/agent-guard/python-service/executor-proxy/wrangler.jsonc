@@ -1,0 +1,20 @@
+{
+	// Deploying under this EXACT name replaces the old Python executor Worker,
+	// so the live URL akto-agent-guard-executor.billing-53a.workers.dev is
+	// preserved for already-installed devices. Deploy into the account that
+	// owns the billing-53a.workers.dev subdomain.
+	"name": "akto-agent-guard-executor",
+	"main": "src/index.js",
+	"compatibility_date": "2025-06-23",
+	"workers_dev": true,
+	"observability": {
+		"enabled": true
+	},
+	"vars": {
+		// The agent-guard service on Azure, behind your owned DNS. Change this
+		// (then redeploy) to repoint the proxy — no code edit needed. For a
+		// secret instead of a plaintext var, remove this line and run:
+		//   npx wrangler secret put AZURE_ORIGIN
+		"AZURE_ORIGIN": "https://loki.akto.io"
+	}
+}

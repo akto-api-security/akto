@@ -234,17 +234,17 @@ public class EndpointShieldAgentAction extends UserAction {
             Bson sort = Sorts.descending("_id");
             Bson projection = Projections.include("log", "timestamp", "key", "agentId", "deviceId", "level");
 
-            // Force agentId index to avoid collection scans on sparse keys (proxy-logs, installation-logs).
-            // The agentId single-field index narrows the scan to this agent's documents; key/timestamp
-            // filtering is then applied as residual predicates, which is fast enough for per-agent volumes.
-            org.bson.Document hint = new org.bson.Document("agentId", -1);
-
+            // Let the planner pick the index. The compound {agentId, key, _id} index serves this
+            // query (agentId+key equality, _id sort/range) with no in-memory sort. We intentionally
+            // do NOT force a hint: a forced hint hard-fails ("hint does not correspond to an existing
+            // index") whenever that index is momentarily absent — e.g. right after the collection is
+            // converted to capped, which drops all non-_id indexes until they are rebuilt. Without a
+            // hint the query degrades to a slower plan instead of erroring.
             List<EndpointShieldLog> fetched = new ArrayList<>();
             EndpointShieldLogsDao.instance.getMCollection()
                 .find(pagedFilter)
                 .projection(projection)
                 .sort(sort)
-                .hint(hint)
                 .limit(effectivePageSize + 1)
                 .maxTime(30, java.util.concurrent.TimeUnit.SECONDS)
                 .into(fetched);
@@ -256,16 +256,15 @@ public class EndpointShieldAgentAction extends UserAction {
 
             agentLogs = new ArrayList<>(fetched);
             // Only count on the first page — subsequent pages discard the value anyway.
-            // Count with the same agentId hint as the find so it narrows to this agent's
-            // documents (key/timestamp applied as residual) instead of scanning the timestamp
-            // range index across every agent — that scan is why the count previously had to be
-            // skipped for wide (e.g. all-time) ranges. Display-only and non-fatal: on timeout
-            // totalCount = -1, which the UI renders as "unknown" while pagination still works.
+            // Rides on the {agentId, key, _id} index: agentId+key are bounded by equality and the
+            // timestamp range is applied as a residual filter over that (small, capped) partition.
+            // No forced hint (see the find above) so a missing index degrades to a scan rather than
+            // throwing. Display-only and non-fatal: on timeout totalCount = -1, which the UI renders
+            // as "unknown" while pagination still works.
             if (afterId == null || afterId.isEmpty()) {
                 try {
                     totalCount = EndpointShieldLogsDao.instance.getMCollection()
                         .countDocuments(baseFilter, new com.mongodb.client.model.CountOptions()
-                            .hint(hint)
                             .maxTime(10, java.util.concurrent.TimeUnit.SECONDS));
                 } catch (Exception countErr) {
                     loggerMaker.errorAndAddToDb("Error counting endpoint shield logs: " + countErr.getMessage());

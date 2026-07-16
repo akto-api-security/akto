@@ -43,6 +43,18 @@ export default {
         return resp
     },
 
+    // Approve a server to bypass a policy's "approval" behaviour.
+    // Identify the policy by hexId (preferred) or policyName (the threat event's filterId).
+    // mode: 'ALWAYS' | 'DURATION' | 'COUNT'; value: days (DURATION) or times (COUNT), ignored for ALWAYS.
+    async approveServerForPolicy({ hexId, policyName, approvedServerId, approvedServerName, approvalMode, approvalValue = 0 }) {
+        const resp = await request({
+            url: '/api/approveServerForPolicy',
+            method: 'post',
+            data: { hexId, policyName, approvedServerId, approvedServerName, approvalMode, approvalValue }
+        })
+        return resp
+    },
+
     async guardrailPlayground(testInput, policyData) {
         const resp = await request({
             url: '/api/guardrailPlayground',
@@ -92,6 +104,33 @@ export default {
                 ...(startTimestamp != null ? { startTimestamp } : {}),
                 ...(endTimestamp != null ? { endTimestamp } : {}),
             }
+        })
+        return resp
+    },
+
+    async fetchConfigFieldPolicies({ skip = 0, limit = 50 } = {}) {
+        const resp = await request({
+            url: '/api/fetchConfigFieldPolicies',
+            method: 'post',
+            data: { skip, limit }
+        })
+        return resp
+    },
+
+    async createConfigFieldPolicy(policyData, hexId) {
+        const resp = await request({
+            url: '/api/createConfigFieldPolicy',
+            method: 'post',
+            data: { policy: policyData, hexId }
+        })
+        return resp
+    },
+
+    async deleteConfigFieldPolicies(policyIds) {
+        const resp = await request({
+            url: '/api/deleteConfigFieldPolicies',
+            method: 'post',
+            data: { policyIds }
         })
         return resp
     },

@@ -5,16 +5,20 @@ import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiSequences;
 import com.akto.dto.monitoring.EndpointShieldLog;
+import com.akto.util.DbMode;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
 
 import java.util.List;
 
 public class EndpointShieldLogsDao extends AccountsContextDao<EndpointShieldLog> {
-    
+
+    public static final long CAPPED_SIZE_IN_BYTES = 100_000_000L; // 100MB
+
     public static final EndpointShieldLogsDao instance = new EndpointShieldLogsDao();
-    
+
     private EndpointShieldLogsDao() {}
 
     @Override
@@ -39,23 +43,32 @@ public class EndpointShieldLogsDao extends AccountsContextDao<EndpointShieldLog>
         };
 
         if (!exists) {
-            db.createCollection(getCollName());
+            if (DbMode.allowCappedCollections()) {
+                db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).sizeInBytes(CAPPED_SIZE_IN_BYTES));
+            } else {
+                db.createCollection(getCollName());
+            }
+        } else if (DbMode.allowCappedCollections() && !isCapped()) {
+            convertToCappedCollection(CAPPED_SIZE_IN_BYTES);
         }
 
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { EndpointShieldLog.TIMESTAMP }, false);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { EndpointShieldLog.AGENT_ID}, false);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { EndpointShieldLog.DEVICE_ID }, false);
-
-        // The paged log query filters by (agentId, key) equality and sorts+ranges on _id
-        // (Filters.lt("_id", afterId) + Sorts.descending("_id")). Following the ESR rule
-        // (Equality, Sort, Range), _id trails the equality fields so a single index serves
-        // both the cursor range and the sort — no collection scan, no blocking in-memory sort.
-        // Without this, the planner falls back to the plain _id index and scans the whole
-        // collection filtering out other agents'/keys' logs, timing out on getMore for sparse
-        // keys (proxy/installation logs).
+        // Single secondary index. Every real query targets one (agentId, key) partition; the
+        // paged log query then sorts+ranges on _id (Filters.lt("_id", afterId) +
+        // Sorts.descending("_id")). Per the ESR rule (Equality, Sort, Range) _id trails the
+        // equality fields, so this one index serves the cursor range and the sort with no
+        // collection scan and no blocking in-memory sort.
+        //
+        // This is the only index we keep, to minimise write amplification on this high-write log
+        // collection (which is also capped). What was dropped and why:
+        //  - {timestamp}: nothing fetches these logs by timestamp alone — the only such path
+        //    (DbLogsAction/LoggerMaker with LogDb.ENDPOINT_SHIELD) is never invoked; the log viewer
+        //    only queries TESTING/RUNTIME/DASHBOARD.
+        //  - {agentId} / {deviceId}: {agentId} is a prefix of this index; {deviceId} has no caller.
+        //  - {agentId, key, timestamp}: only backed the display-only countDocuments. That count now
+        //    rides on this index (agentId+key equality bound, timestamp applied as a residual filter
+        //    over the small per-partition set) — acceptable since the collection is capped, the count
+        //    runs only on the first page, and it degrades to "unknown" on its 10s maxTime.
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { EndpointShieldLog.AGENT_ID, EndpointShieldLog.KEY, MCollection.ID }, false);
-        // countDocuments filters by (agentId, key) equality + timestamp range.
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { EndpointShieldLog.AGENT_ID, EndpointShieldLog.KEY, EndpointShieldLog.TIMESTAMP }, false);
     }
     public List<EndpointShieldLog> findByAgentId(String agentId) {
         Bson filter = Filters.eq(EndpointShieldLog.AGENT_ID, agentId);

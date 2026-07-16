@@ -5,7 +5,6 @@ import math
 import llm_scanner
 from providers import _confidence_from_logprobs, parse_qwen3guard_result
 
-
 # ── llm_scanner._clean_json ──────────────────────────────────────────────────
 
 
@@ -16,6 +15,7 @@ def test_clean_json_extracts_object_from_chatty_reply():
 
 def test_clean_json_empty_raises():
     import pytest
+
     with pytest.raises(ValueError):
         llm_scanner._clean_json("")
 
@@ -35,9 +35,7 @@ def test_parse_prompt_injection_flagged():
 
 
 def test_parse_prompt_injection_clean_inverts_confidence():
-    r = llm_scanner.parse_llm_result(
-        "PromptInjection", '{"isInjection": false, "confidence": 0.1}'
-    )
+    r = llm_scanner.parse_llm_result("PromptInjection", '{"isInjection": false, "confidence": 0.1}')
     assert r["is_valid"] is True
     # not flagged -> decision_confidence is confidence-in-the-SAFE-call
     assert r["decision_confidence"] == 0.9
@@ -84,6 +82,7 @@ def test_qwen_ban_topics_sets_matched_topic():
 
 def test_qwen_unknown_safety_raises():
     import pytest
+
     with pytest.raises(ValueError):
         parse_qwen3guard_result("Toxicity", "Safety: Maybe")
 

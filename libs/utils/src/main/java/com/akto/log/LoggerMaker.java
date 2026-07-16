@@ -108,7 +108,7 @@ public class LoggerMaker  {
     }
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION, ENDPOINT_SHIELD, AGENTIC_TESTING, AWS_API_GATEWAY, GUARDRAILS_SERVICE, SMART_TESTING
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION, ENDPOINT_SHIELD, AGENTIC_TESTING, AWS_API_GATEWAY, GUARDRAILS_SERVICE, ACCOUNT_JOB_EXECUTOR, SMART_TESTING
     }
 
     private static AccountSettings accountSettings = null;
@@ -451,6 +451,7 @@ public class LoggerMaker  {
                 break;
             case SMART_TESTING:
                 logs = SmartTestingLogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
+                break;
             default:
                 break;
         }

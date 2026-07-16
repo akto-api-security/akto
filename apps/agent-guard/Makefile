@@ -1,8 +1,9 @@
 .PHONY: help build up down restart logs health smoke test-worker clean ps \
-        up-legacy down-legacy health-legacy build-legacy
+        up-legacy down-legacy health-legacy build-legacy lint typecheck setup
 
 help:
 	@echo 'Agent Guard - see README.md, ENV.md, PRODUCTION.md'
+	@echo '  make setup       - One-time: sync worker-py deps + install pre-commit hook'
 	@echo '  make up            - Start worker + anonymizer (:8090)'
 	@echo '  make up-legacy     - Start legacy ONNX executor (:8092)'
 	@echo '  make down        - Stop services'
@@ -11,6 +12,8 @@ help:
 	@echo '  make health      - Check service health'
 	@echo '  make smoke       - Run smoke tests against localhost:8090'
 	@echo '  make test-worker - Run worker-py offline tests'
+	@echo '  make lint        - Run ruff check + format --check on worker-py'
+	@echo '  make typecheck   - Run mypy on worker-py'
 	@echo '  make ps          - Show running containers'
 	@echo '  make clean       - Remove containers and images'
 
@@ -50,6 +53,15 @@ smoke:
 
 test-worker:
 	cd python-service/worker-py && ./tests/run.sh
+
+lint:
+	cd python-service/worker-py && uv run --locked ruff check . && uv run --locked ruff format --check .
+
+typecheck:
+	cd python-service/worker-py && uv run --locked mypy src
+
+setup:
+	cd python-service/worker-py && uv sync --locked && uv run pre-commit install -c "$$(pwd)/.pre-commit-config.yaml"
 
 build-legacy:
 	docker compose -f docker-compose.legacy.yml build

@@ -19,7 +19,8 @@ import InfoCard from "../dashboard/new_components/InfoCard";
 import BarGraph from "../../components/charts/BarGraph";
 import SessionStore from "../../../main/SessionStore";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
-import { getDashboardCategory, isApiSecurityCategory, isDastCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel } from "../../../main/labelHelper";
+import { getDashboardCategory, isApiSecurityCategory, isDastCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel, getReportCategoryShortName, shortNameToCategory } from "../../../main/labelHelper";
+import PersistStore from "../../../main/PersistStore";
 import LineChart from "../../components/charts/LineChart";
 import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
 import { LABELS } from "./constants";
@@ -27,9 +28,16 @@ import useThreatReportDownload from "../../hooks/useThreatReportDownload";
 import WebhookIntegrationModal from "./components/WebhookIntegrationModal";
 import { updateThreatFiltersStore } from "./utils/threatFilters";
 import { redactSampleDataByKeywords } from "./utils/redactSampleData";
-import { resolveComplianceClauseMap } from "./utils/formatUtils";
+import { resolveComplianceClauseMap, extractBehaviour } from "./utils/formatUtils";
 import LocalStore from "@/apps/main/LocalStorageStore";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
+
+// Opened in a fresh tab (e.g. "View All"), so apply ?category= before first render, same as ThreatReport.jsx.
+const categoryOverride = shortNameToCategory[getReportCategoryShortName()]
+if (categoryOverride) {
+    PersistStore.getState().setDashboardCategory(categoryOverride)
+}
+
 const convertToGraphData = (severityMap) => {
     let dataArr = []
     Object.keys(severityMap).forEach((x) => {
@@ -417,7 +425,9 @@ function ThreatDetectionPage() {
             sessionId: data.sessionId || '',
             ruleViolated: data.ruleViolated || '-',
             complianceMapData: data.complianceMapData || {},
-            metadata: data.metadata || ''
+            metadata: data.metadata || '',
+            behaviourRaw: data.behaviourRaw || extractBehaviour(data.metadata) || '',
+            host: data.host || ''
         });
 
         setShowDetails(true);
@@ -435,7 +445,9 @@ function ThreatDetectionPage() {
                 sessionId: data.sessionId || '',
                 ruleViolated: data.ruleViolated || '-',
                 complianceMap: data.complianceMapData || {},
-                metadata: data.metadata || ''
+                metadata: data.metadata || '',
+                behaviour: data.behaviourRaw || extractBehaviour(data.metadata) || '',
+                host: data.host || ''
             },
             currentEventId: data.id || '',
             currentEventStatus: data.status || '',
@@ -623,6 +635,8 @@ function ThreatDetectionPage() {
               sessionId: rowContext?.sessionId || '',
               ruleViolated: rowContext?.ruleViolated || queryParams.ruleViolated || '-',
               metadata: rowContext?.metadata || '',
+              behaviour: rowContext?.behaviourRaw || extractBehaviour(rowContext?.metadata) || '',
+              host: rowContext?.host || '',
               complianceMap: rowContext?.complianceMapData || (() => {
                 if (!queryParams.filterId) return {};
                 const { threatFiltersMap, guardrailComplianceMap } = SessionStore.getState();
