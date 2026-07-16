@@ -101,6 +101,7 @@ import org.bson.codecs.pojo.ClassModel;
 import org.bson.codecs.pojo.PojoCodecProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.akto.dao.context.Context;
 
 import static com.akto.dao.MCollection.clients;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
@@ -434,6 +435,8 @@ public class DaoInit {
     }
 
     public static void createIndices() {
+        logger.info("[initCheck] DaoInit.createIndices() ENTER for account={} dbType={} allowCappedCollections={} setupType={}",
+                Context.accountId.get(), DbMode.dbType, DbMode.allowCappedCollections(), DbMode.setupType);
         try {
             TestingRunResultDao.instance.convertToCappedCollection();
         } catch (Exception e) {
@@ -484,6 +487,7 @@ public class DaoInit {
         McpAuditInfoDao.instance.createIndicesIfAbsent();
         McpReconRequestDao.instance.createIndicesIfAbsent();
         GuardrailPoliciesDao.instance.createIndicesIfAbsent();
+        logger.info("[initCheck] calling EndpointShieldLogsDao.createIndicesIfAbsent() for account={}", Context.accountId.get());
         EndpointShieldLogsDao.instance.createIndicesIfAbsent();
     }
 }
