@@ -117,7 +117,8 @@ public class ModuleInfo {
         DAST,
         AGENTIC_TESTING,
         GUARDRAIL,
-        SMART_TESTING
+        SMART_TESTING,
+        ACCOUNT_JOB_EXECUTOR
     }
 
 }

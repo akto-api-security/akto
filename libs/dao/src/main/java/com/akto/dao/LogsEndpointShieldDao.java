@@ -10,8 +10,9 @@ public class LogsEndpointShieldDao extends AccountsContextDao<LogsEndpointShield
 
     public static final LogsEndpointShieldDao instance = new LogsEndpointShieldDao();
 
-    public static final int maxDocuments = 100_000;
-    public static final int sizeInBytes = 100_000_000;
+    // Capped by size only (no maxDocuments), matching master's EndpointShieldLogsDao — see
+    // commit a104c00 "added capped collection for endpoint logs and removed redundant indexes".
+    public static final long CAPPED_SIZE_IN_BYTES = 100_000_000L; // 100MB
 
     public void createIndicesIfAbsent() {
         boolean exists = false;
@@ -26,20 +27,26 @@ public class LogsEndpointShieldDao extends AccountsContextDao<LogsEndpointShield
 
         if (!exists) {
             if (DbMode.allowCappedCollections()) {
-                db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(maxDocuments).sizeInBytes(sizeInBytes));
+                db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).sizeInBytes(CAPPED_SIZE_IN_BYTES));
             } else {
                 db.createCollection(getCollName());
             }
+        } else if (DbMode.allowCappedCollections() && !isCapped()) {
+            // Collection predates capping (created uncapped): convert the existing collection to
+            // capped so it stays bounded. Equivalent to:
+            //   db.runCommand({convertToCapped: "logs_endpoint_shield", size: 100000000})
+            // convertToCapped drops secondary indexes, so the index creation below re-adds them.
+            convertToCappedCollection(CAPPED_SIZE_IN_BYTES);
         }
 
-        String[] fieldNames = {LogsEndpointShield.TIMESTAMP};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
-        
-        String[] agentFieldNames = {LogsEndpointShield.AGENT_ID};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), agentFieldNames, false);
-
-        String[] deviceIdName = {LogsEndpointShield.DEVICE_ID};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), deviceIdName, false);
+        // Single secondary index, matching master (commit a104c00). Every real query targets one
+        // (agentId, key) partition and paginates/sorts on _id (Sorts.descending("_id") +
+        // Filters.lt("_id", afterId)); per the ESR rule _id trails the equality fields so this one
+        // index serves the range + sort with no collection scan and no in-memory sort. The former
+        // {timestamp}, {agentId} and {deviceId} indexes were dropped: {timestamp} has no query
+        // path, {agentId} is a prefix of this index, and {deviceId} has no caller.
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { LogsEndpointShield.AGENT_ID, LogsEndpointShield.KEY, MCollection.ID }, false);
     }
 
     @Override
