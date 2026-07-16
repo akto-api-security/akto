@@ -14,6 +14,7 @@ import {
     hasLocalMcpServerTag,
     hasMisconfiguredConfigTag,
     isNotAttachedHostName,
+    NOT_ATTACHED_VALUE,
 } from "./mcpClientHelper";
 import func from "@/util/func";
 import {
@@ -205,6 +206,14 @@ const AGENT_KEY_ALIASES = {
     'claude-desktop': 'claude1',
 };
 
+// True if a browser-llm-agent tag exists anywhere in envType, regardless of tag order.
+// findAssetTag only returns the first ASSET_TAG_KEYS match by array position, so a collection
+// carrying both an ai-agent tag and a browser-llm-agent tag could have the ai-agent tag picked
+// first — checking presence directly (not the picked assetTag) keeps the exclusion below
+// order-independent.
+const hasBrowserLlmAgentTag = (envType) =>
+    (envType || []).some(t => t.keyName === ASSET_TAG_KEYS.BROWSER_LLM_AGENT && t.value !== NOT_ATTACHED_VALUE);
+
 // Group collections by agent identification (mcp-client, ai-agent values)
 // These are the sources that discovered the services (cursor, litellm, etc.)
 // Note: browser-llm-agent is excluded from this grouping
@@ -217,7 +226,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
         if (isNotAttachedHostName(hostName)) return; // Orphan skill bucket — not a real agent
         const assetTag = findAssetTag(c.envType);
         if (!assetTag?.value) return; // Skip collections without agent tag
-        if (assetTag.keyName === ASSET_TAG_KEYS.BROWSER_LLM_AGENT) return; // Skip browser-llm-agent rows
+        if (hasBrowserLlmAgentTag(c.envType)) return; // Skip browser-llm-agent rows (order-independent)
 
         const key = AGENT_KEY_ALIASES[assetTag.value] ?? assetTag.value;
         const endpointId = extractEndpointId(hostName);
