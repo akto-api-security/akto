@@ -2668,6 +2668,11 @@ public class InitializerListener implements ServletContextListener {
                 } while (!connectedToMongo);
 
                 int now = Context.now();
+                logger.info("[initCheck] gating decision: runJobFunctions=" + runJobFunctions
+                        + " runJobFunctionsAnyway=" + runJobFunctionsAnyway
+                        + " isSaasDeployment=" + DashboardMode.isSaasDeployment()
+                        + " isOnPremDeployment=" + DashboardMode.isOnPremDeployment()
+                        + " -> willRunInitializerFunctions=" + (runJobFunctions || runJobFunctionsAnyway));
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
@@ -3711,7 +3716,9 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void runInitializerFunctions() {
+        logger.infoAndAddToDb("[initCheck] runInitializerFunctions START for account=" + Context.accountId.get(), LogDb.DASHBOARD);
         DaoInit.createIndices();
+        logger.infoAndAddToDb("[initCheck] DaoInit.createIndices() returned for account=" + Context.accountId.get(), LogDb.DASHBOARD);
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
