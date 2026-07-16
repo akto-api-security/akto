@@ -16,7 +16,6 @@ import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithM
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import DonutChart from "@/apps/dashboard/components/shared/DonutChart";
-import SmoothAreaChart from "@/apps/dashboard/pages/dashboard/new_components/SmoothChart";
 import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
 import AgenticStatsCard from "@/apps/dashboard/pages/observe/agentic/AgenticStatsCard";
 import AgenticTopListCard from "@/apps/dashboard/pages/observe/agentic/AgenticTopListCard";
@@ -384,12 +383,6 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
         name: item.name,
         count: item.count,
         onClick: () => onPolicyClick?.(item.name),
-        renderValue: () => (
-            <HorizontalStack gap="3" blockAlign="center" align="end" wrap={false}>
-                <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>
-                <SmoothAreaChart tickPositions={[0, 0, 0, 0, 0, 0, item.count]} color="#EF4444" height={28} width={90} />
-            </HorizontalStack>
-        ),
     }));
 
     const hostRows = (topHosts || []).slice(0, 5).map((item, i) => ({
@@ -397,12 +390,6 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
         name: item.name,
         count: item.count,
         os: detectOs(item.host),
-        renderValue: () => (
-            <HorizontalStack gap="3" blockAlign="center" align="end" wrap={false}>
-                <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>
-                <SmoothAreaChart tickPositions={[0, 0, 0, 0, 0, 0, item.count]} color="#EF4444" height={28} width={90} />
-            </HorizontalStack>
-        ),
     }));
 
     return (
