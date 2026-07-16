@@ -130,11 +130,19 @@ const api = {
         })
     },
 
-    fetchRuntimeHelmCommand(expiryTimeInMonth) {
+    fetchRuntimeHelmCommand(expiryTimeInMonth, scope) {
         return request({
             url: '/api/fetchRuntimeHelmCommand',
             method: 'post',
-            data: {expiryTimeInMonth}
+            data: {expiryTimeInMonth, scope}
+        })
+    },
+
+    fetchModuleTypes() {
+        return request({
+            url: '/api/fetchModuleTypes',
+            method: 'post',
+            data: {}
         })
     },
 

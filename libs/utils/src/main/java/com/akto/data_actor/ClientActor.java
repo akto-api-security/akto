@@ -1357,14 +1357,92 @@ public class ClientActor extends DataActor {
         return codeAnalysisRepos;
     }
 
+    private static volatile String exchangedAuthToken;
+    private static volatile String pendingModuleType;
+    private static volatile boolean exchangeAttempted = false;
+    private static final Object EXCHANGE_LOCK = new Object();
+
     public Map<String, List<String>> buildHeaders() {
         Map<String, List<String>> headers = new HashMap<>();
-        if(System.getProperty("DATABASE_ABSTRACTOR_SERVICE_TOKEN") != null){
-            headers.put("Authorization", Collections.singletonList(System.getProperty("DATABASE_ABSTRACTOR_SERVICE_TOKEN")));
-        }else{
-            headers.put("Authorization", Collections.singletonList(System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN")));
-        }
+        headers.put("Authorization", Collections.singletonList(getAuthToken()));
         return headers;
+    }
+
+    private static String getRawAuthToken() {
+        if (System.getProperty("DATABASE_ABSTRACTOR_SERVICE_TOKEN") != null) {
+            return System.getProperty("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+        }
+        return System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+    }
+
+    // Called from Main's static init to record which scope this service should exchange for.
+    // Deliberately NOT triggering the actual exchange here: fetchInstance()/ClientActor construction
+    // can be forced arbitrarily early by unrelated static initializers (e.g. LoggerMaker itself calls
+    // DataActorFactory.fetchInstance()), so anything hooked into construction time can run before
+    // this is even set. Triggering lazily from getAuthToken() instead guarantees this has already
+    // been set, since real API calls can't happen before Main's own static init completes.
+    public static void setPendingModuleType(String moduleType) {
+        pendingModuleType = moduleType;
+    }
+
+    private static String getAuthToken() {
+        ensureModuleTypeExchanged();
+        if (exchangedAuthToken != null) {
+            return exchangedAuthToken;
+        }
+        return getRawAuthToken();
+    }
+
+    private static void ensureModuleTypeExchanged() {
+        if (pendingModuleType == null) {
+            return;
+        }
+        // Deliberately no unsynchronized fast-path check on exchangeAttempted here: that would let a
+        // second thread read exchangeAttempted=true (set the instant the first thread enters this
+        // block, before its network call even finishes) and race ahead using the still-unexchanged
+        // token. Every caller must actually acquire this lock, so a concurrent caller blocks until
+        // the in-flight exchange attempt has fully finished (success or failure) before proceeding.
+        synchronized (EXCHANGE_LOCK) {
+            if (exchangeAttempted) {
+                return;
+            }
+            exchangeAttempted = true;
+            initModuleType(pendingModuleType);
+        }
+    }
+
+    // Trades the raw provisioned token for one scoped to moduleType, if the raw token supports it.
+    // Uses sendRequestBackOff, same as other ClientActor calls.
+    public static void initModuleType(String moduleType) {
+        try {
+            loggerMaker.warn("Attempting database abstractor token exchange for moduleType " + moduleType);
+            String rawToken = getRawAuthToken();
+            if (rawToken == null) {
+                return;
+            }
+
+            Map<String, List<String>> headers = new HashMap<>();
+            headers.put("Authorization", Collections.singletonList(rawToken));
+
+            BasicDBObject obj = new BasicDBObject();
+            obj.put("moduleType", moduleType);
+
+            OriginalHttpRequest request = new OriginalHttpRequest(url + "/exchangeToken", "", "POST", obj.toString(), headers, "");
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response == null || response.getStatusCode() != 200 || response.getBody() == null) {
+                loggerMaker.warn("Token exchange for moduleType " + moduleType + " not applied (status "
+                        + (response == null ? "null" : response.getStatusCode()) + "); continuing with raw token");
+                return;
+            }
+
+            String newToken = BasicDBObject.parse(response.getBody()).getString("token");
+            if (newToken != null && !newToken.isEmpty()) {
+                exchangedAuthToken = newToken;
+                loggerMaker.warn("Database abstractor token exchanged successfully for moduleType " + moduleType);
+            }
+        } catch (Exception e) {
+            loggerMaker.error("error exchanging database abstractor token for moduleType " + moduleType + ": " + e);
+        }
     }
 
     public void bulkWriteSuspectSampleData(List<Object> writesForSuspectSampleData) {

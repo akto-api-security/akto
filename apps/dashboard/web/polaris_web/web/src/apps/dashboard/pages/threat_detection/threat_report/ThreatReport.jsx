@@ -6,6 +6,7 @@ import func from '@/util/func'
 import { isApiSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, shortNameToCategory, getReportCategoryShortName } from '@/apps/main/labelHelper'
 import PersistStore from '@/apps/main/PersistStore'
 import { resolveComplianceClauseMap, mergePolicyComplianceMap, extractRuleViolated } from '../utils/formatUtils'
+import { LABELS } from '../constants'
 import guardrailApi from '../../guardrails/api'
 import ThreatReportHeader from './ThreatReportHeader'
 import ThreatReportTOC from './ThreatReportTOC'
@@ -128,6 +129,7 @@ const ThreatReport = () => {
 
             const isApiSecurity = isApiSecurityCategory()
             const isGuardrail = isAgenticSecurityCategory() || isEndpointSecurityCategory()
+            const eventLabel = isGuardrail ? LABELS.GUARDRAIL : LABELS.THREAT
 
             const threatResponse = await api.fetchSuspectSampleData(
                 0,
@@ -139,12 +141,14 @@ const ThreatReport = () => {
                 startTs,
                 endTs,
                 [],
-                100000,
+                500,
                 undefined,
                 isGuardrail ? undefined : true,
-                'THREAT',
+                eventLabel,
                 savedHosts,
-                undefined
+                undefined,
+                [],
+                true
             )
 
             const allThreats = threatResponse.maliciousEvents || []
@@ -159,9 +163,15 @@ const ThreatReport = () => {
             if (savedCompliance.length > 0) {
                 filteredThreats = filteredThreats.filter(threat => {
                     const available = Object.keys(resolveComplianceClauseMap(threat, isGuardrail, localThreatFiltersMap, localGuardrailComplianceMap))
-                    return savedCompliance.some(selected =>
-                        available.some(c => c.toUpperCase() === selected.toUpperCase())
-                    )
+                    return savedCompliance.some(selected => {
+                        const selectedUpper = selected.toUpperCase()
+                        return available.some(c => {
+                            const cUpper = c.toUpperCase()
+                            return cUpper === selectedUpper ||
+                                cUpper.includes(selectedUpper) ||
+                                selectedUpper.includes(cUpper)
+                        })
+                    })
                 })
             }
 

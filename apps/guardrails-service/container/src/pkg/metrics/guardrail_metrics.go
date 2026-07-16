@@ -16,6 +16,7 @@ type MetricData struct {
 	MetricType string  `json:"metricType"`
 	ModuleType string  `json:"moduleType"`
 	AccountId  int64   `json:"accountId,omitempty"`
+	InstanceId string  `json:"instanceId,omitempty"`
 }
 
 type accountAccumulator struct {

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Caps logs_endpoint_shield at 100MB and reduces it to a SINGLE secondary index,
+        mirroring EndpointShieldLogsDao.createIndicesIfAbsent after the index cleanup.
+
+        Every real query targets one (agentId, key) partition and paginates/sorts on _id
+        (Sorts.descending("_id") + Filters.lt("_id", afterId)), so {agentId, key, _id} is the
+        only index we keep. The previously-created indexes are intentionally dropped:
+          - {agentId, key, timestamp} (created by changeset 002) — only backed the display-only
+            count, which now rides on {agentId, key, _id};
+          - {timestamp}, {agentId}, {deviceId} (created by the DAO, never by Liquibase) —
+            {timestamp} has no query path, {agentId} is a prefix of {agentId, key, _id}, and
+            {deviceId} has no caller.
+
+        We do NOT issue explicit dropIndex calls for those: convertToCapped performs a
+        server-side CLONE of the collection and drops EVERY non-_id index as a side effect, so
+        the convert below removes all of them in one step. We then recreate only the one index
+        we keep, AFTER the convert. (Changeset 002 is left untouched — Liquibase checksums
+        forbid editing an already-shipped changeset; its indexes simply get dropped here.)
+
+        CAUTION:
+          - convertToCapped holds a collection lock for the whole clone. On a large collection
+            this blocks reads/writes — run in a maintenance window.
+          - MongoDB only. convertToCapped is unsupported on DocumentDB/Cosmos; do not enable
+            AKTO_RUN_DB_MIGRATIONS against those backends for this changelog.
+          - The mongodb Liquibase extension has no "is capped" precondition, so this cannot be
+            guarded to skip an already-capped collection. It is safe because Liquibase runs each
+            changeset exactly once per account DB; the only cost is a one-time redundant re-clone
+            if the DAO had already capped the collection before migrations ran.
+    -->
+
+    <changeSet id="006-account-endpoint-shield-logs-convert-to-capped" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="logs_endpoint_shield"/>
+        </preConditions>
+        <mongodb:runCommand>
+            <mongodb:command>{ "convertToCapped": "logs_endpoint_shield", "size": 100000000 }</mongodb:command>
+        </mongodb:runCommand>
+        <!-- No automatic inverse: reverting a capped collection to uncapped also requires a
+             full clone, so rollback is intentionally a no-op. -->
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="006-account-endpoint-shield-logs-agentid-key-id-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="logs_endpoint_shield"/>
+        </preConditions>
+        <!-- Recreated after the convert above dropped it. Name matches
+             MCollection.generateIndexName so the DAO's createIndexIfAbsent treats it as present. -->
+        <mongodb:createIndex collectionName="logs_endpoint_shield">
+            <mongodb:keys>{ "agentId": -1, "key": -1, "_id": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "agentId-key-_id_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="logs_endpoint_shield">
+                <mongodb:keys>{ "agentId": -1, "key": -1, "_id": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

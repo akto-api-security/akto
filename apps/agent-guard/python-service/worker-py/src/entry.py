@@ -4,14 +4,13 @@ import json
 import logging
 from urllib.parse import urlparse
 
-logging.basicConfig(level=logging.INFO)
-
 from pyodide.ffi import create_proxy
 from workers import Response, waitUntil
 
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -28,6 +27,7 @@ def _schedule(coro) -> None:
     itself once the coroutine settles. waitUntil keeps the isolate alive until
     then (up to 30s after the response).
     """
+
     async def _run_and_cleanup(c, proxy_box):
         try:
             await c
