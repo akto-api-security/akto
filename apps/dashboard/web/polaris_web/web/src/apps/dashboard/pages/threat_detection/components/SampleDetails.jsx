@@ -344,7 +344,11 @@ function SampleDetails(props) {
         </Box>
     )
 
-    const overviewTab = {
+    // Skill events (url like "/skills/<name>") show their own detail view via the
+    // Values tab reason field - the generic Overview tab adds no extra context there.
+    const isSkillEvent = (moreInfoData?.url || '').includes('skills/');
+
+    const overviewTab = !isSkillEvent && {
         id: "overview",
         content: 'Overview',
         component: currentTemplateObj && overviewComp
@@ -395,6 +399,7 @@ function SampleDetails(props) {
     }
 
     const remediationTab = (() => {
+        if (isSkillEvent) return false;
         if (isSettingsRisk) {
             const remediationMarkdown = liveMetadata.remediation || settingsRiskEntry?.remediation || GUARDRAIL_REMEDIATION_MARKDOWN;
             return {
