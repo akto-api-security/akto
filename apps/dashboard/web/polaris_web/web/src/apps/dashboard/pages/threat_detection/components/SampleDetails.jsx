@@ -161,10 +161,11 @@ function SampleDetails(props) {
         ? resolveSettingsRiskEntry(settingsRiskConfig.riskMap, getSettingsRiskKey(settingsRiskConfig.urlPrefix))
         : undefined;
 
-    // Settings-scanner events now carry their own LLM-generated overview/remediation markdown
-    // directly on metadata (per-event, more specific than the static per-field JSON). Prefer it
-    // when present; the static SETTINGS_RISK_CONFIGS JSON remains the fallback for older events.
-    const liveMetadata = isSettingsRisk ? extractOverviewAndRemediation(moreInfoData?.metadata) : { overview: null, remediation: null };
+    // Several event producers (settings-scanner, skill detector) stamp their own per-event
+    // LLM-generated overview/remediation markdown directly on metadata - more specific than any
+    // static template. Prefer it whenever present, regardless of event type; the static
+    // SETTINGS_RISK_CONFIGS / guardrailRuleDefinitions content remains the fallback.
+    const liveMetadata = extractOverviewAndRemediation(moreInfoData?.metadata);
     const hasLiveOverview = !!liveMetadata.overview;
 
     const settingsRiskSectionsToShow = settingsRiskEntry?.overview
@@ -344,11 +345,12 @@ function SampleDetails(props) {
         </Box>
     )
 
-    // Skill events (url like "/skills/<name>") show their own detail view via the
-    // Values tab reason field - the generic Overview tab adds no extra context there.
+    // Skill events (url like "/skills/<name>") carry their own per-skill overview via
+    // liveMetadata (see skill_detector.go) - show it when present. Without it the generic
+    // guardrailRuleDefinitions.js template adds no extra context, so hide the tab instead.
     const isSkillEvent = (moreInfoData?.url || '').includes('skills/');
 
-    const overviewTab = !isSkillEvent && {
+    const overviewTab = (isSkillEvent && !hasLiveOverview) ? false : {
         id: "overview",
         content: 'Overview',
         component: currentTemplateObj && overviewComp
@@ -399,9 +401,20 @@ function SampleDetails(props) {
     }
 
     const remediationTab = (() => {
+        // Live per-event remediation (settings-scanner, skill detector) takes priority
+        // over any static template, for any event type.
+        if (liveMetadata.remediation) {
+            return {
+                id: "remediation",
+                content: "Remediation",
+                component: (<MarkdownViewer markdown={liveMetadata.remediation} />)
+            };
+        }
+        // No live remediation for a skill event - the generic guardrailRuleDefinitions.js
+        // template adds no extra context, so hide the tab instead.
         if (isSkillEvent) return false;
         if (isSettingsRisk) {
-            const remediationMarkdown = liveMetadata.remediation || settingsRiskEntry?.remediation || GUARDRAIL_REMEDIATION_MARKDOWN;
+            const remediationMarkdown = settingsRiskEntry?.remediation || GUARDRAIL_REMEDIATION_MARKDOWN;
             return {
                 id: "remediation",
                 content: "Remediation",
