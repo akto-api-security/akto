@@ -394,55 +394,77 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
         renderValue: () => <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>,
     }));
 
+    // Latency graph is Akto-internal only (matches the same gate on ThreatDetectionPage.jsx).
+    // Everyone else gets Open/Other Violations side by side instead of stacked, since there's
+    // no third column to fill the space next to them.
+    // TEMP: forced off to preview the non-Akto layout — revert before shipping.
+    // const isAktoUser = window.USER_NAME?.includes('@akto.io');
+    const isAktoUser = false;
+
+    const openCard = (
+        <Box
+            className="violations-card-wrap"
+            style={selectedCard === "open" ? { outline: "1px solid var(--p-color-border-critical)" } : undefined}
+            onClick={onOpenCardClick}
+        >
+            <AgenticStatsCard
+                title="Open Violations"
+                titleTooltip="Active violations that need attention, broken down by severity. Click a severity to filter the table below."
+                total={statusCounts.ACTIVE || 0}
+                delta={0}
+                deltaColor="subdued"
+                breakdown={totalBreakdown}
+                onFilterClick={onSeverityClick}
+                activeFilter={activeSeverityFilter}
+                bodyGap="4"
+            />
+        </Box>
+    );
+
+    const otherCard = (
+        <Box
+            className="violations-card-wrap"
+            style={selectedCard === "other" ? { outline: "1px solid var(--p-color-border-critical)" } : undefined}
+            onClick={onOtherCardClick}
+        >
+            <AgenticStatsCard
+                title="Other Violations"
+                titleTooltip="Violations that are under review or ignored. Click a status to filter the table."
+                total={(statusCounts.UNDER_REVIEW || 0) + (statusCounts.IGNORED || 0)}
+                delta={0}
+                deltaColor="subdued"
+                breakdown={otherBreakdown}
+                onFilterClick={onOtherBreakdownClick}
+                activeFilter={selectedCard === "other" ? new Set([activeStatusValue]) : undefined}
+                bodyGap="4"
+            />
+        </Box>
+    );
+
     return (
         <VerticalStack gap="4">
-            <HorizontalGrid columns={2} gap="4" alignItems="start">
-                <VerticalStack gap="4">
-                    <Box
-                        className="violations-card-wrap"
-                        style={selectedCard === "open" ? { outline: "1px solid var(--p-color-border-critical)" } : undefined}
-                        onClick={onOpenCardClick}
-                    >
-                        <AgenticStatsCard
-                            title="Open Violations"
-                            titleTooltip="Active violations that need attention, broken down by severity. Click a severity to filter the table below."
-                            total={statusCounts.ACTIVE || 0}
-                            delta={0}
-                            deltaColor="subdued"
-                            breakdown={totalBreakdown}
-                            onFilterClick={onSeverityClick}
-                            activeFilter={activeSeverityFilter}
-                            bodyGap="4"
-                        />
-                    </Box>
-                    <Box
-                        className="violations-card-wrap"
-                        style={selectedCard === "other" ? { outline: "1px solid var(--p-color-border-critical)" } : undefined}
-                        onClick={onOtherCardClick}
-                    >
-                        <AgenticStatsCard
-                            title="Other Violations"
-                            titleTooltip="Violations that are under review or ignored. Click a status to filter the table."
-                            total={(statusCounts.UNDER_REVIEW || 0) + (statusCounts.IGNORED || 0)}
-                            delta={0}
-                            deltaColor="subdued"
-                            breakdown={otherBreakdown}
-                            onFilterClick={onOtherBreakdownClick}
-                            activeFilter={selectedCard === "other" ? new Set([activeStatusValue]) : undefined}
-                            bodyGap="4"
-                        />
-                    </Box>
-                </VerticalStack>
-                <P95LatencyGraph
-                    title={`${mapLabel("Guardrail", getDashboardCategory())} Detection Latency`}
-                    subtitle="95th percentile latency metrics for guardrail detection"
-                    dataType="threat-security"
-                    startTimestamp={startTimestamp}
-                    endTimestamp={endTimestamp}
-                    latencyData={latencyData}
-                    height={230}
-                />
-            </HorizontalGrid>
+            {isAktoUser ? (
+                <HorizontalGrid columns={2} gap="4" alignItems="start">
+                    <VerticalStack gap="4">
+                        {openCard}
+                        {otherCard}
+                    </VerticalStack>
+                    <P95LatencyGraph
+                        title={`${mapLabel("Guardrail", getDashboardCategory())} Detection Latency`}
+                        subtitle="95th percentile latency metrics for guardrail detection"
+                        dataType="threat-security"
+                        startTimestamp={startTimestamp}
+                        endTimestamp={endTimestamp}
+                        latencyData={latencyData}
+                        height={230}
+                    />
+                </HorizontalGrid>
+            ) : (
+                <HorizontalGrid columns={2} gap="4" alignItems="center">
+                    {openCard}
+                    {otherCard}
+                </HorizontalGrid>
+            )}
 
             <HorizontalGrid columns={3} gap="4">
                 <AgenticTopListCard
