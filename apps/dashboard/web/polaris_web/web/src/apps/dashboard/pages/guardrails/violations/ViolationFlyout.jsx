@@ -14,7 +14,6 @@ import { MobileCancelMajor } from "@shopify/polaris-icons";
 
 import AgenticFlyoutShell from "@/apps/dashboard/pages/observe/agentic/AgenticFlyoutShell";
 import AiChatSection from "@/apps/dashboard/pages/observe/agentic/AiChatSection";
-import SkillComponentsView from "@/apps/dashboard/pages/observe/agentic/SkillComponentsView";
 import { SeverityBadge } from "@/apps/dashboard/pages/observe/agentic/AgenticCellRenderers";
 import ActivityTracker from "@/apps/dashboard/pages/dashboard/components/ActivityTracker";
 import JiraTicketCreationModal from "@/apps/dashboard/components/shared/JiraTicketCreationModal";
@@ -283,7 +282,7 @@ function FlyoutHeader({ row, onClose, onStatusUpdate }) {
 
 // ─── Flyout ─────────────────────────────────────────────────────────────────────
 
-export default function ViolationFlyout({ violation, show, onClose, onStatusUpdate, allRows = [] }) {
+export default function ViolationFlyout({ violation, show, onClose, onStatusUpdate }) {
     const [selectedTab, setSelectedTab] = useState(0);
 
     useEffect(() => { setSelectedTab(0); }, [violation?.id]);
@@ -293,48 +292,29 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
         return buildFallbackDetail(violation);
     }, [violation]);
 
-    // Build timeline: occurrences of THIS specific violation (same actor + rule + evidence).
-    // When multiple distinct skills/prompts trigger the same rule, narrow to just the
-    // selected row's evidence so the timeline shows "this skill was flagged at these times"
-    // rather than an interleaved list of all different skills.
+    // Timeline for the selected violation — shows just this event.
+    // Previously iterated allRows (the entire dataset) client-side; now the flyout
+    // only has the current page's data so we show a single-entry timeline.
     const timelineActivity = useMemo(() => {
         if (!violation) return [];
-        const sameRuleRows = allRows.filter(
-            r => r.user === violation.user && r.violation === violation.violation
-        );
-        const source = sameRuleRows.length > 0 ? sameRuleRows : [violation];
-        // Most-recent-first, matching the main table's default "Detected" order.
-        const sorted = [...source].sort((a, b) => b.detected - a.detected);
-
-        const uniqueEvidence = new Set(sorted.map(r => r.evidenceText || ""));
-
-        // If there are multiple distinct evidences (e.g. different skills all triggering
-        // malicious_skill_detected), scope the timeline to only this violation's specific
-        // evidence so entries don't interleave unrelated violations.
-        const relevantRows = uniqueEvidence.size > 1 && violation.evidenceText
-            ? sorted.filter(r => r.evidenceText === violation.evidenceText)
-            : sorted;
-
-        return relevantRows
-            .slice(0, 50)
-            .map(r => ({
-                description: (r.violation || "Violation detected") + (r.id === violation.id ? " (this event)" : ""),
-                timestamp: r.detected,
-            }));
-    }, [violation, allRows]);
+        return [{
+            description: (violation.violation || "Violation detected") + " (this event)",
+            timestamp: violation.detected,
+        }];
+    }, [violation]);
 
     // Tabs: Overview · (type-specific middle tab) · Remediation · Timeline.
     const tabModel = useMemo(() => {
         const tabs = [{ id: "overview", content: "Overview" }];
         let middle = null;
         if (detail?.chatSession?.length) middle = "chat";
-        else if (detail?.fileContent) middle = "file";
+        else if (detail?.fileContent && violation?.type !== "Skill") middle = "file";
         if (middle === "chat") tabs.push({ id: "chat", content: "Chat Session" });
         if (middle === "file") tabs.push({ id: "file", content: detail.fileTabLabel || "File" });
         tabs.push({ id: "remediation", content: "Remediation" });
         tabs.push({ id: "timeline", content: "Timeline" });
         return { tabs, middle };
-    }, [detail]);
+    }, [detail, violation]);
 
     const handleTabSelect = useCallback((idx) => setSelectedTab(idx), []);
 
@@ -347,11 +327,7 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
             case "overview":    return <OverviewSection row={violation} detail={detail} />;
             case "chat":        return <ChatSessionSection messages={detail?.chatSession} highlights={detail?.evidence?.highlights || []} />;
             case "file":
-                if (violation.type === "Skill") {
-                    return <SkillComponentsView asset={{ collectionIds: violation.apiCollectionId != null ? [violation.apiCollectionId] : [], name: detail?.skillName }} />;
-                }
                 if (violation.type === "Tool") {
-                    // Same request/response viewer as the Guardrail Activity page's "Values" tab.
                     return (
                         <Box paddingBlockStart="3" paddingInlineEnd="4" paddingInlineStart="4">
                             <SampleDataList

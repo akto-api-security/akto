@@ -30,10 +30,23 @@ import ComplianceTags from "@/apps/dashboard/pages/guardrails/components/Complia
 export function EvidenceBlock({ evidence }) {
     if (!evidence) return null;
     const name = evidence.author || evidence.heading;
+    const assetUrl = evidence.apiCollectionId
+        ? `/dashboard/observe/inventory/${evidence.apiCollectionId}?agentic_view=skills`
+        : null;
     return (
         <Box borderRadius="2">
             <VerticalStack gap="3">
-                <Text variant="headingXs" color="subdued">{evidence.title}</Text>
+                <HorizontalStack gap="1" blockAlign="center">
+                    <Text variant="headingXs" color="subdued">{evidence.title}</Text>
+                    {assetUrl && (
+                        <>
+                            <Text variant="headingXs" color="subdued">/</Text>
+                            <Link url={assetUrl} target="_blank">
+                                <Text variant="headingXs">{evidence.assetName}</Text>
+                            </Link>
+                        </>
+                    )}
+                </HorizontalStack>
                 <Box className="violation-evidence-author-row">
                     {evidence.author
                         ? <Avatar size="small" name={evidence.author} initials={func.initials(evidence.author)} />

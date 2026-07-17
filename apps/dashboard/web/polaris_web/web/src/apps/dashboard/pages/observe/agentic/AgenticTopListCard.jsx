@@ -1,8 +1,9 @@
 import React from "react";
 import { Box, Button, Card, DataTable, HorizontalStack, Text } from "@shopify/polaris";
 import AssetIcon from "./AssetIcon";
+import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
 
-export default function AgenticTopListCard({ title, columns = [], rows = [], emptyStateText = "No data available", renderIcon, activeRows, onClearSelection }) {
+export default function AgenticTopListCard({ title, titleTooltip, columns = [], rows = [], emptyStateText = "No data available", renderIcon, activeRows, onClearSelection }) {
     const headings = columns.map((c) => c.label);
 
     // renderIcon(row) overrides the default AssetIcon (e.g. a user icon, or null for no icon).
@@ -36,7 +37,10 @@ export default function AgenticTopListCard({ title, columns = [], rows = [], emp
         <Card padding="0">
             <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="4" paddingBlockEnd="3">
                 <HorizontalStack align="space-between" blockAlign="center">
-                    <Text variant="headingSm">{title}</Text>
+                    <HorizontalStack gap="1" blockAlign="center">
+                        <Text variant="headingSm">{title}</Text>
+                        <InfoTooltipIcon content={titleTooltip} />
+                    </HorizontalStack>
                     {hasSelection && onClearSelection && (
                         <Button plain onClick={onClearSelection}>Clear selection</Button>
                     )}

@@ -1,11 +1,3 @@
-// Last 7 months ending today — matches the 7-point sparkline arrays on the Violations page.
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const _now = new Date();
-export const SPARKLINE_LABELS = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(_now.getFullYear(), _now.getMonth() - (6 - i), 1);
-    return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
-});
-
 // ─── Flyout detail helpers ───────────────────────────────────────────────────────
 
 function _parseAktoOuter(payloadStr) {
@@ -79,16 +71,17 @@ export function prettyPrintIfJson(text) {
     return { text: JSON.stringify(unwrapped, null, 2), isJson: true };
 }
 
-// Some backends pre-combine metadata.reason as "<Title>: <message>" (e.g. config-scan
-// events: "Bypass Execution Policy: The command uses..."). That inner colon collides with
-// our own "<policy> policy: <reason>" wrapper, reading as "policy: Title: message" — turn
-// the short leading title into its own sentence instead. Only touches a colon within the
-// first 60 chars so it doesn't mangle a colon that's naturally part of a longer sentence.
+// Some backends pre-combine metadata.reason as "<Title>: <message>" (e.g. "Blocked: personal
+// accounts are not permitted..." or "Sandbox Disabled: The sandbox.enabled field is not
+// present..."). That leading title just restates the action/status already shown elsewhere
+// (the Blocked/Flagged badge, the policy name) — drop it and keep only the actual message.
+// Only strips a colon within the first 60 chars so it doesn't mangle a colon that's
+// naturally part of a longer sentence.
 export function normalizeReasonPunctuation(reason) {
     if (!reason) return reason;
     const idx = reason.indexOf(": ");
     if (idx === -1 || idx > 60) return reason;
-    return `${reason.slice(0, idx)}.${reason.slice(idx + 1)}`;
+    return reason.slice(idx + 2);
 }
 
 function _extractGuardrailReason(resp, req) {
@@ -156,16 +149,13 @@ export function buildFallbackDetail(row) {
                 fileTabLabel = "Config.json";
             } else if (row.type === "Skill" || row.type === "Tool") {
                 if (row.type === "Skill") skillName = req?.skill_name || null;
-                // When the payload is skill metadata (has skill_name/skill_description but no
-                // actual file body), format it as readable text instead of raw JSON and use
-                // a label that doesn't imply the full file is present.
                 if (req?.skill_name || req?.skill_description) {
                     const lines = [];
                     if (req.skill_name) lines.push(`# ${req.skill_name}`);
-                    if (req.skill_description) lines.push(`\n${req.skill_description}`);
+                    if (req.skill_description) lines.push(`\n**${req.skill_description}**`);
+                    if (req.skill_content) lines.push(`\n${req.skill_content}`);
                     if (req.file_path) lines.push(`\n**Path:** ${req.file_path}`);
                     if (req.agent) lines.push(`**Agent:** ${req.agent}`);
-                    if (req.content_length != null) lines.push(`\n> Full skill file (${req.content_length} bytes) was validated but is not stored in the event payload.`);
                     fileContent = lines.join("\n");
                     fileTabLabel = "Skill Info";
                 } else {
@@ -220,7 +210,10 @@ export function buildFallbackDetail(row) {
     const req = _parseJson(outer.requestPayload);
     const resp = _parseJson(outer.responsePayload);
 
-    const reason = normalizeReasonPunctuation(meta.reason) || null;
+    // metadata.reason is often empty — fall back to the guardrail's own explanation
+    // extracted from the response payload (resp.error.data.reason, etc.) so the trigger
+    // line reflects what the backend actually detected instead of a generic sentence.
+    const reason = normalizeReasonPunctuation(meta.reason || guardrailReason) || null;
     const policyName = meta.policyName || (row.policyName && row.policyName !== "-" ? row.policyName : null);
     const isPromptOrTool = row.type === "Prompt" || row.type === "Tool";
     const rawPrimaryValue = coerceToText(isPromptOrTool
@@ -237,13 +230,8 @@ export function buildFallbackDetail(row) {
     // above in the evidence box (happens when there's no body/evidence field, so evidenceText
     // itself fell back to `reason`) — that reads as the same sentence said twice.
     const reasonAlreadyShown = reason && reason === evidenceText;
-    const triggerReason = policyName
-        ? (reason && !reasonAlreadyShown
-            ? `Triggered by the "${policyName}" policy: ${reason}`
-            : `Triggered by the "${policyName}" policy monitoring ${row.type} activity on this agentic asset.`)
-        : (reason && !reasonAlreadyShown
-            ? `Triggered because the request matched a guardrail policy rule: ${reason}`
-            : `Triggered by a guardrail policy monitoring ${row.type} activity on this agentic asset.`);
+    const policyLabel = policyName ? `Triggered by the "${policyName}" policy.` : "Triggered by a guardrail policy.";
+    const triggerReason = reason && !reasonAlreadyShown ? `${policyLabel} ${reason}` : policyLabel;
 
     return {
         evidence: {
@@ -252,6 +240,8 @@ export function buildFallbackDetail(row) {
             highlights: undefined,
             mono: evidenceIsMono,
             author: row.type === "Prompt" ? (row.user || undefined) : undefined,
+            assetName: row.type === "Skill" ? (row.agenticAsset || undefined) : undefined,
+            apiCollectionId: row.type === "Skill" ? (row.apiCollectionId || undefined) : undefined,
         },
         triggerReason,
         policyName,
