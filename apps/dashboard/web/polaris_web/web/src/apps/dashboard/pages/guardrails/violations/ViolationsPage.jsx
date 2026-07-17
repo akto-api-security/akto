@@ -161,8 +161,6 @@ function buildColDefs(filterValues) {
             field: "detected",
             headerName: "Detected",
             minWidth: 150,
-            checkboxSelection: true,
-            headerCheckboxSelection: true,
             valueFormatter: p => p.value != null ? func.epochToDateTime(p.value) : "",
         },
         {
@@ -423,7 +421,7 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
                 </div>
             </HorizontalGrid>
 
-            <HorizontalGrid columns={3} gap="4">
+            <HorizontalGrid columns={3} gap="4" alignItems="start">
                 <AgenticTopListCard
                     title="Violations by Top Users"
                     titleTooltip="Top 5 users by number of violations. Click a user to filter the table below."
@@ -806,9 +804,18 @@ function Violations() {
     }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue]);
 
     // ─── Bulk actions ──────────────────────────────────────────────────────────
-    const getSelectedIds = useCallback(() => (
-        (gridRef.current?.api?.getSelectedRows() || []).map(r => r.id).filter(Boolean)
-    ), []);
+    // Under Server-Side Row Model, "select all" tracks selection as an abstract
+    // {selectAll: true, toggledNodes} flag rather than concrete node references, which
+    // leaves api.getSelectedRows() empty the instant select-all is used (it only reads a
+    // separate map that select-all never populates). node.isSelected() correctly reflects
+    // the select-all state per row though, so walk loaded nodes ourselves instead.
+    const getSelectedIds = useCallback(() => {
+        const ids = [];
+        gridRef.current?.api?.forEachNode(node => {
+            if (!node.stub && node.isSelected() && node.data?.id) ids.push(node.data.id);
+        });
+        return ids;
+    }, []);
 
     const clearBulkSelection = useCallback(() => {
         gridRef.current?.api?.deselectAll();
@@ -890,8 +897,25 @@ function Violations() {
                 getRowStyle={() => ({ cursor: "pointer" })}
                 getRowClass={getRowClass}
                 gridRef={gridRef}
-                rowSelection="multiple"
-                onSelectionChanged={e => setBulkSelectedCount(e.api.getSelectedRows().length)}
+                rowSelection={{
+                    mode: "multiRow",
+                    // Dedicated checkbox column (colDef-level checkboxSelection is deprecated in
+                    // AG Grid v32+ and, combined with rowModelType="serverSide", stopped rendering
+                    // altogether — this is the supported replacement).
+                    checkboxes: true,
+                    headerCheckbox: true,
+                    // selectAll: "currentPage"/"filtered" only work for rowModelType="clientSide"
+                    // (AG Grid warns and ignores it otherwise) — SSRM's header checkbox always
+                    // does the abstract "select all" below, regardless of this setting. We handle
+                    // reading the actual selection ourselves (see getSelectedIds/onSelectionChanged)
+                    // instead of fighting that, so this is left at the SSRM-only default.
+                    enableClickSelection: false,
+                }}
+                onSelectionChanged={(e) => {
+                    let count = 0;
+                    e.api.forEachNode(node => { if (!node.stub && node.isSelected()) count++; });
+                    setBulkSelectedCount(count);
+                }}
                 bulkActionCount={bulkSelectedCount}
                 bulkActions={bulkActions}
                 onClearBulk={clearBulkSelection}
@@ -902,6 +926,7 @@ function Violations() {
                 onServerFetch={onServerFetch}
                 filterStateUrl={gridFilterKey.current}
                 serverSideRowModel
+                getRowId={(params) => params.data.id}
             />
         </Box>
     );

@@ -152,14 +152,9 @@
 .agentic-list-table .Polaris-DataTable__TableRow:hover .Polaris-DataTable__Cell {
     background-color: var(--p-color-bg-hover, #f6f6f7);
 }
-/* Selected row — soft fill with outline. */
-.agentic-list-table .Polaris-DataTable__TableRow:has([data-active="true"]) {
-    outline: 1.5px solid #637381;
-    outline-offset: -1.5px;
-    border-radius: 4px;
-}
+/* Selected row — flat purple fill, no border/box. */
 .agentic-list-table .Polaris-DataTable__TableRow:has([data-active="true"]) .Polaris-DataTable__Cell {
-    background: #f4f6f8;
+    background: #F3F0FF;
 }
 .agentic-list-table .Polaris-DataTable__TableRow:has([data-active="true"]) .Polaris-Text--root {
     color: #202223 !important;
