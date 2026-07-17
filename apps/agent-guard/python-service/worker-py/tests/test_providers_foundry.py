@@ -9,6 +9,7 @@ import pytest
 
 import providers
 from llm_scanner import LLMScanner
+from prompts import ban_topics
 from providers import (
     AzureFoundryProvider,
     GemmaFoundryProvider,
@@ -152,6 +153,17 @@ async def test_llm_scanner_routes_foundry_qwen_through_guard_parser():
     assert r["risk_score"] == 1.0
     assert r["details"]["llm_provider"] == "qwen3guard_foundry"
     assert r["details"]["categories"] == "Violent"
+
+
+def test_ban_topics_gemma_prompt_covers_all_gemma_backends():
+    # BanTopics ships a Gemma-tuned template (benchmarked F1 0.981); every Gemma
+    # backend must get it, not just the Vertex one.
+    config = {"topics": ["violence"]}
+    vertex_prompt = ban_topics.build(config, "gemma_vertexai", "some text")
+    foundry_prompt = ban_topics.build(config, "gemma_foundry", "some text")
+    other_prompt = ban_topics.build(config, "azure_foundry", "some text")
+    assert foundry_prompt == vertex_prompt
+    assert other_prompt != vertex_prompt
 
 
 # ── builder / config resolution ───────────────────────────────────────────────
